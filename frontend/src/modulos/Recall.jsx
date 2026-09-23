@@ -135,7 +135,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
   const histView = (histReal && histReal.length ? histReal : (conectado ? [] : HIST_ENVIOS));
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
-      <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 5, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 5, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {[["automatizaciones", "Automatizaciones", Zap], ["historial", "Historial de envíos", Send], ["satisfaccion", "Satisfacción", Star]].map(([k, lbl, Ic]) => { const on = subtab === k; return (
           <button key={k} onClick={() => setSubtab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: "var(--dc-r-md)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
@@ -222,7 +222,9 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "5px 12px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: "var(--dc-ok)", animation: "dcBlink 1.6s ease-in-out infinite" }} /> {activas} activas ahora</span>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "stretch", overflowX: "auto", paddingBottom: 10, minWidth: 0 }}>
+        {/* Siete pasos no caben en una fila de escritorio: se desplaza en horizontal y el
+            borde derecho se desvanece para que se note que hay más. */}
+        <div className="dc-scroll dc-hscroll" style={{ display: "flex", alignItems: "stretch", overflowX: "auto", paddingBottom: 10, minWidth: 0 }}>
           {reglas.map((r, i) => { const Ic = r.icon; return (
             <React.Fragment key={r.clave}>
               <div className="dc-rise" onClick={() => abrirCfg(r)} title="Configurar mensaje" style={{ cursor: "pointer", animationDelay: `${i * 0.06}s`, flexShrink: 0, width: 164, background: r.on ? "rgba(255,255,255,0.7)" : "rgba(245,247,250,0.5)", backdropFilter: "blur(12px)", border: "1px solid " + (r.on ? "rgba(255,255,255,0.9)" : "rgba(228,231,236,0.6)"), borderLeft: r.on ? `4px solid ${r.color}` : "4px solid transparent", borderRadius: "var(--dc-r-lg)", padding: 12, display: "flex", flexDirection: "column", gap: 8, opacity: r.on ? 1 : 0.72, transition: "all .2s", boxShadow: r.on ? `0 8px 24px -10px ${tint(r.color, 0.4)}, inset 0 2px 4px rgba(255,255,255,1)` : "none" }}>

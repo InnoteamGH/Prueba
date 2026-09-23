@@ -4247,19 +4247,19 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
         )}
         {fases.length === 0 && !nueva && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Sin tratamiento" sub="Agrega la primera fase, o créalas desde el odontograma." />}
         {fases.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "40px minmax(0,1.6fr) 64px 64px 90px auto", gap: 8, padding: "8px 20px", borderBottom: "1px solid var(--dc-line)", fontSize: 11, fontWeight: 600, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            <span>#</span><span>Procedimiento</span><span>Pieza</span><span>Cara</span><span>Costo</span><span />
+          <div style={{ display: "grid", gridTemplateColumns: "40px minmax(0,1.6fr) 64px 72px 96px 150px", gap: 8, padding: "8px 20px", borderBottom: "1px solid var(--dc-line)", fontSize: 11, fontWeight: 600, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            <span>#</span><span>Procedimiento</span><span>Pieza</span><span>Cara</span><span style={{ textAlign: "right" }}>Costo</span><span style={{ textAlign: "right" }}>Estado</span>
           </div>
         )}
         {fases.map((f, i) => (
-          <div key={f.id} onClick={() => setDetF(f)} title="Ver detalle" style={{ cursor: "pointer", display: "grid", gridTemplateColumns: "40px minmax(0,1.6fr) 64px 64px 90px auto", gap: 8, alignItems: "center", padding: "14px 20px", borderBottom: i < fases.length - 1 ? "1px solid var(--dc-line)" : "none" }}>
+          <div key={f.id} onClick={() => setDetF(f)} title="Ver detalle" style={{ cursor: "pointer", display: "grid", gridTemplateColumns: "40px minmax(0,1.6fr) 64px 72px 96px 150px", gap: 8, alignItems: "center", padding: "14px 20px", borderBottom: i < fases.length - 1 ? "1px solid var(--dc-line)" : "none" }}>
             <div style={{ width: 28, height: 28, borderRadius: "var(--dc-r-sm)", background: f.estado === "atendida" ? "var(--dc-ok-soft)" : "var(--dc-line)", color: f.estado === "atendida" ? "var(--dc-ok-700)" : "var(--dc-ink-500)", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 13, flexShrink: 0 }}>{f.estado === "atendida" ? "✓" : i + 1}</div>
             <div style={{ minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY }}>{nombreFaseLimpio(f)} {f.origen === "odontograma" && <span style={{ fontSize: 12, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-full)", padding: "1px 7px", fontWeight: 600 }}>del odontograma</span>}</div></div>
             <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontVariantNumeric: "tabular-nums" }}>{piezaDeFase(f)}</div>
             <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{caraDeFase(f)}</div>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>S/ {f.costo.toFixed(2)}</div>
+            <div style={{ fontSize: 13, color: "var(--dc-ink-700)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>S/ {f.costo.toFixed(2)}</div>
             {f.estado === "atendida"
-              ? <Badge estado={f.estado} />
+              ? <div style={{ display: "flex", justifyContent: "flex-end" }}><Badge estado={f.estado} /></div>
               : <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>{puedeCobrar && <Btn small onClick={() => cobrarFase(f)}><DollarSign size={14} strokeWidth={1.75} /> Cobrar</Btn>}{puedeCobrar && <button type="button" className="dc-icon-btn" aria-label="Quitar" onClick={() => quitarFase(f)} title="Quitar" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dc-ink-500)" }}><X size={16} strokeWidth={1.75} /></button>}</div>}
           </div>
         ))}
@@ -6919,7 +6919,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
     : <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}><AlertCircle size={12} strokeWidth={1.75} /> Agotado</span>;
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 5, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 5, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {[["productos", "Productos", Package], ...(puedeGestionar ? [["compras", "Compras", Send]] : []), ["consumo", "Consumo", Activity], ...(puedeGestionar ? [["proveedores", "Proveedores", Building2]] : [])].map(([k, lbl, Ic]) => { const on = tab === k; return (
           <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: "var(--dc-r-md)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
