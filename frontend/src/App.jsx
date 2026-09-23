@@ -905,7 +905,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
     // Antes: seis tarjetas de un número cada una, que había que sumar mentalmente para
     // saber cómo iba el día. Ahora una sola, que se lee de un vistazo.
     { id: "resumenDia", title: "Resumen del día", icon: Calendar, color: NAVY, w: 2, h: 1, render: () => (
-      <div style={{ height: "100%", display: "grid", gridTemplateColumns: `repeat(${Math.min(kpis.length, 6)},minmax(0,1fr))`, gap: 8, alignContent: "center" }}>
+      <div style={{ height: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(84px,1fr))", gap: "10px 8px", alignContent: "center" }}>
         {kpis.map(([l, v, Ic, c, rows]) => (
           <div key={l} onClick={() => setDet({ titulo: l, rows: rows || [] })} style={{ cursor: "pointer", minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: DISPLAY_FONT, lineHeight: 1.1 }}>{v}</div>
@@ -1270,7 +1270,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
       </div>
     ) } : null,
     { id: "citashoy", title: esMed ? "Mi agenda de hoy" : "Citas de hoy", icon: Calendar, color: NAVY, w: 2, h: 2, render: () => (
-      <div style={{ display: "grid", gap: 9, height: "100%", overflowY: "auto", alignContent: ch.length ? "start" : "center" }}>
+      <div style={{ display: "grid", gap: 9, alignContent: ch.length ? "start" : "center" }}>
         {/* En un movil la fila no cabia y la tarjeta obligaba a desplazarse en horizontal
             para ver el estado de la cita. Ahora encoge: la hora se queda fija, el nombre y
             el motivo se recortan y el estado nunca se sale. */}
@@ -1279,7 +1279,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
       </div>
     ) },
     { id: "recientes", title: "Pacientes recientes", icon: Users, color: DS.c.primary, w: 1, h: 2, render: () => (
-      <div style={{ display: "grid", gap: 3, height: "100%", overflowY: "auto", alignContent: "start" }}>
+      <div style={{ display: "grid", gap: 3, alignContent: "start" }}>
         {[...pacientes].sort((a, b) => (b.ultima || "").localeCompare(a.ultima || "")).slice(0, 8).map((p) => { const col = colorDe(p.nombre); return (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--dc-bg)" }}>
             <div style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(p.nombre)}</div>
@@ -4380,7 +4380,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
         { key: "medico", label: "Médico", w: "minmax(120px,1fr)", a: "left", get: (p) => p.medico, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p.medico}</span> },
         { key: "pref", label: "Preferencia", w: "minmax(110px,1fr)", a: "center", get: (p) => p.pref, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{p.pref}</span> },
         { key: "desde", label: "Espera", w: "minmax(96px,0.8fr)", a: "center", get: (p) => p.desde, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.desde}</span> },
-        { key: "acc", label: "Acciones", w: "minmax(150px,1fr)", a: "center", noFilter: true, noSort: true, cell: (p) => <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}><Btn small kind="ghost" onClick={() => ofrecer(p)}><Bell size={14} strokeWidth={1.75} /> Ofrecer</Btn><Btn small kind="red" onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn></div> },
+        { key: "acc", label: "Acciones", w: "236px", a: "center", noFilter: true, noSort: true, cell: (p) => <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}><Btn small kind="ghost" onClick={() => ofrecer(p)}><Bell size={14} strokeWidth={1.75} /> Ofrecer</Btn><Btn small onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn></div> },
       ]} />
       {asignarBase && <AgendarRecepcionModal base={asignarBase} notify={notify} onClose={() => setAsignarBase(null)} onCreada={() => { const eid = asignarBase._esperaId; setAsignarBase(null); if (conectado && eid) api.espera.resolver(eid).catch(() => {}).finally(recargar); else recargar(); }} />}
       {nuevoEsp && (() => {
@@ -7009,7 +7009,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
       ); })()}
       <ModHead icon={<Package size={20} strokeWidth={1.75} />} titulo="Inventario" sub="Stock y cobertura por insumo" accion={puedeGestionar ? <Btn small onClick={nuevo}><Plus size={15} strokeWidth={1.75} /> Nuevo insumo</Btn> : null} />
       <DataTable titulo="Insumos" sub="insumos" minWidth={1120} rows={items} defaultSort={{ key: "cobertura", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub="Agrega tu primer insumo para controlar stock y cobertura." />} cols={[
-        { key: "insumo", label: "Insumo", w: "minmax(180px,1.2fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{it.cat}</div></div></div>; } },
+        { key: "insumo", label: "Insumo", w: "minmax(220px,1.8fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 600, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{it.cat}</div></div></div>; } },
         { key: "loteVence", label: "Lote / Vence", w: "minmax(140px,1.1fr)", a: "left", get: (it) => it.lote || it.fechaVencimiento || "", cell: (it) => {
           const dv = diasVenc(it.fechaVencimiento);
           const estVenc = dv === null ? null : dv < 0 ? "vencido" : dv <= 60 ? "alerta" : "ok";
@@ -10838,7 +10838,7 @@ export default function App() {
           .dc-login{grid-template-columns:1fr!important;}
           .dc-login-brand{display:none!important;}
           .dc-login-mobilelogo{display:flex!important;}
-          .dc-side{position:fixed!important;z-index:50;transform:translateX(-100%);transition:transform .25s;}
+          .dc-side{position:fixed!important;z-index:50;transform:translateX(calc(-100% - 24px));transition:transform .25s;}
           .dc-side.open{transform:translateX(0)!important;}
           .dc-burger{display:inline-flex!important;}
           .dc-trat,.dc-gerencial-row,.dc-inbox,.dc-rec-grid{grid-template-columns:1fr!important;}

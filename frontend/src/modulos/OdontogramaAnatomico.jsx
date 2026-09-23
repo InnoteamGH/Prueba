@@ -189,7 +189,11 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     return () => clearInterval(t);
   }, [frameReady, measureIframe]);
 
+  const cargado = useRef(false);
+  useEffect(() => { cargado.current = false; }, [src]);
   const onIframeLoad = () => {
+    if (cargado.current) return;
+    cargado.current = true;
     setFrameReady(true);
     capaPrev.current = capa;
     syncChrome();
@@ -198,6 +202,20 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       measureIframe();
     }, 120);
   };
+
+  // El evento load del iframe espera a TODO (incluidas las fuentes de Google): si esa
+  // petición tarda o falla, el odontograma se quedaba en "Cargando…" para siempre.
+  // Basta con que el documento ya esté parseado para mostrarlo y hablar con él.
+  useEffect(() => {
+    if (frameReady) return undefined;
+    const t = setInterval(() => {
+      try {
+        const doc = iframeRef.current?.contentDocument;
+        if (doc && doc.URL !== "about:blank" && doc.readyState !== "loading") onIframeLoad();
+      } catch { /* */ }
+    }, 150);
+    return () => clearInterval(t);
+  });
 
   if (!pacienteId) {
     return (
