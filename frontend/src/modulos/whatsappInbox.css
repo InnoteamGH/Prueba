@@ -1,0 +1,126 @@
+/* WhatsApp inbox — responsive reflow (WA-08) */
+.dc-inbox {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.dc-inbox-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.dc-inbox-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.dc-inbox-chat-head-name {
+  min-width: 0;
+  flex: 1 1 120px;
+}
+
+.dc-inbox-chat-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.dc-inbox-ejemplo {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dc-warn-600, #b45309);
+  background: var(--dc-warn-soft, #fef3c7);
+  border: 1px solid var(--dc-line, #e5e7eb);
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.dc-inbox-conexion {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--dc-r-lg, 12px);
+  font-size: 13px;
+  color: var(--dc-slate, #475569);
+}
+
+.dc-inbox-conexion code {
+  font-size: 12px;
+  word-break: break-all;
+  background: var(--dc-bg-soft, #f8fafc);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* WA-08: min widths / reflow bajo ~1265px */
+@media (max-width: 1265px) {
+  .dc-inbox {
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(180px, 240px) !important;
+    min-width: 0 !important;
+  }
+  .dc-inbox-list,
+  .dc-inbox-thread,
+  .dc-inbox-side {
+    min-width: 0 !important;
+  }
+  .dc-inbox-conexion {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 1100px) {
+  .dc-inbox {
+    grid-template-columns: 220px minmax(0, 1fr) 0 !important;
+  }
+  .dc-inbox > .dc-inbox-side {
+    display: none !important;
+  }
+}
+
+@media (max-width: 780px) {
+  .dc-inbox {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+    min-height: 70vh !important;
+  }
+  .dc-inbox > .dc-inbox-list {
+    max-height: 40vh;
+    border-radius: 16px 16px 0 0 !important;
+  }
+  .dc-inbox > .dc-inbox-thread {
+    min-height: 50vh;
+  }
+  .dc-inbox-chat-head-actions .dc-btn,
+  .dc-inbox-chat-head-actions button {
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .dc-inbox-chat-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dc-inbox-chat-head-actions {
+    width: 100%;
+  }
+  .dc-inbox-chat-head-actions > * {
+    flex: 1 1 auto;
+  }
+}

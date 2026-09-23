@@ -1,0 +1,3184 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Odontograma Dento Check</title>
+<script>
+/* Bridge + tema: forzar oscuro antes del primer paint (maqueta de referencia = dark). */
+(function(){
+  try{
+    var q = new URLSearchParams(location.search || "");
+    var theme = q.get("theme");
+    if (theme !== "light" && theme !== "dark") theme = "dark";
+    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "dark") document.documentElement.style.colorScheme = "dark";
+    if (/[?&]bridge=1(?:&|$)/.test(location.search || "")) {
+      document.documentElement.setAttribute("data-bridge", "1");
+    }
+  }catch(e){}
+})();
+</script>
+<style>
+html[data-bridge] .exp-quien{visibility:hidden}
+html[data-bridge][data-paciente-ready] .exp-quien{visibility:visible}
+html[data-theme="dark"]{background:#0A0F16;color-scheme:dark}
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --fondo:#F3F6FA; --panel:#FFFFFF; --papel:#FCFDFE; --panel-2:#F7F9FC;
+  --linea:#E5EAF1; --linea-2:#D3DBE5;
+  --t900:#0D1626; --t700:#33415C; --t500:#61708A; --t400:#8494AC; --t300:#AEBACB;
+  --marca:#0B5366; --marca-2:#0E7490; --marca-luz:#E8F5F8; --marca-borde:#BFE2EA;
+  --rojo:#B42318; --rojo-luz:#FEF3F2; --rojo-borde:#FBD5D2;
+  --azul:#1D4ED8; --azul-luz:#EFF4FF; --azul-borde:#CBD9FD;
+  --ok:#15803D; --ok-luz:#ECFDF3;
+  --ambar:#B45309; --ambar-luz:#FFFBEB; --ambar-borde:#FDE9B6;
+  --diente:#FFFFFF; --diente-linea:#9FADC0; --diente-sombra:rgba(13,22,38,.10);
+  --esm-1:#FFFFFF; --esm-2:#EDF2F8; --den-1:#F7FAFD; --den-2:#E4EBF3;
+  --diente-borde:#A3B2C6; --mesa-1:#F5F9FD; --mesa-2:#EAF0F8;
+  --esm-luz:#FFFFFF; --esm-tibio:#FFFDF8; --esm-med:#F2F6FC; --esm-hondo:#DCE5F1;
+  --ao:rgba(24,40,64,.15); --brillo:rgba(255,255,255,.95); --surco:rgba(52,74,104,.28);
+  --cuspide:rgba(255,255,255,1); --sombra-diente:rgba(21,36,58,.15);
+  --division:#B4C2D3; --sombra-plana:rgba(21,36,58,.11);
+  --s1:0 1px 2px rgba(13,22,38,.05);
+  --s2:0 2px 8px rgba(13,22,38,.06),0 1px 2px rgba(13,22,38,.04);
+  --s3:0 12px 32px rgba(13,22,38,.10),0 2px 8px rgba(13,22,38,.05);
+  --r1:8px; --r2:12px; --r3:18px; --rf:999px;
+  --ui:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --fondo:#0A0F16; --panel:#131A24; --papel:#0F161F; --panel-2:#182130;
+  --linea:#222D3C; --linea-2:#314052;
+  --t900:#EDF2F8; --t700:#C6D0DE; --t500:#94A2B8; --t400:#7A899F; --t300:#4D5C72;
+  --marca:#5FD3EE; --marca-2:#7CDCF2; --marca-luz:#0F2E38; --marca-borde:#1B4655;
+  --rojo:#FF8574; --rojo-luz:#2B1512; --rojo-borde:#552722;
+  --azul:#89AEFF; --azul-luz:#141F38; --azul-borde:#2A3D63;
+  --ok:#4ADE80; --ok-luz:#0F2A1A;
+  --ambar:#FBBF24; --ambar-luz:#2C220A; --ambar-borde:#4A3A12;
+  --diente:#18212D; --diente-linea:#66788D; --diente-sombra:rgba(0,0,0,.5);
+  --esm-1:#243141; --esm-2:#18212D; --den-1:#1A2431; --den-2:#131B25;
+  --diente-borde:#7E8FA4; --mesa-1:#0E151E; --mesa-2:#080D14;
+  --esm-luz:#3C4E66; --esm-tibio:#38495F; --esm-med:#26344A; --esm-hondo:#151E2B;
+  --ao:rgba(0,0,0,.34); --brillo:rgba(255,255,255,.55); --surco:rgba(0,0,0,.44);
+  --cuspide:rgba(255,255,255,.55); --sombra-diente:rgba(0,0,0,.5);
+  --division:#55677E; --sombra-plana:rgba(0,0,0,.42);
+  --s1:0 1px 2px rgba(0,0,0,.4); --s2:0 2px 8px rgba(0,0,0,.4);
+  --s3:0 12px 32px rgba(0,0,0,.55);
+}}
+:root[data-theme="dark"]{
+  --fondo:#0A0F16; --panel:#131A24; --papel:#0F161F; --panel-2:#182130;
+  --linea:#222D3C; --linea-2:#314052;
+  --t900:#EDF2F8; --t700:#C6D0DE; --t500:#94A2B8; --t400:#7A899F; --t300:#4D5C72;
+  --marca:#5FD3EE; --marca-2:#7CDCF2; --marca-luz:#0F2E38; --marca-borde:#1B4655;
+  --rojo:#FF8574; --rojo-luz:#2B1512; --rojo-borde:#552722;
+  --azul:#89AEFF; --azul-luz:#141F38; --azul-borde:#2A3D63;
+  --ok:#4ADE80; --ok-luz:#0F2A1A;
+  --ambar:#FBBF24; --ambar-luz:#2C220A; --ambar-borde:#4A3A12;
+  --diente:#18212D; --diente-linea:#66788D; --diente-sombra:rgba(0,0,0,.5);
+  --esm-1:#243141; --esm-2:#18212D; --den-1:#1A2431; --den-2:#131B25;
+  --diente-borde:#7E8FA4; --mesa-1:#0E151E; --mesa-2:#080D14;
+  --esm-luz:#3C4E66; --esm-tibio:#38495F; --esm-med:#26344A; --esm-hondo:#151E2B;
+  --ao:rgba(0,0,0,.34); --brillo:rgba(255,255,255,.55); --surco:rgba(0,0,0,.44);
+  --cuspide:rgba(255,255,255,.55); --sombra-diente:rgba(0,0,0,.5);
+  --division:#55677E; --sombra-plana:rgba(0,0,0,.42);
+  --s1:0 1px 2px rgba(0,0,0,.4); --s2:0 2px 8px rgba(0,0,0,.4);
+  --s3:0 12px 32px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--t900);font-family:var(--ui);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  font-feature-settings:"cv02","cv03"}
+:focus-visible{outline:2px solid var(--marca-2);outline-offset:2px;border-radius:6px}
+button{font-family:inherit}
+.env{max-width:1640px;margin:0 auto;padding:20px 26px 34px}
+
+/* ---------- cabecera del expediente ---------- */
+.exp{display:flex;align-items:stretch;gap:18px;flex-wrap:wrap;margin-bottom:14px;padding:0 18px;
+  background:var(--panel);border:1px solid var(--linea);border-radius:var(--r3);box-shadow:var(--s1)}
+.exp-quien{display:flex;align-items:center;gap:11px;padding:11px 18px 11px 0;
+  border-right:1px solid var(--linea)}
+.exp-av{width:38px;height:38px;border-radius:var(--rf);flex:none;display:grid;place-items:center;
+  background:linear-gradient(145deg,var(--marca-2),var(--marca));color:#fff;
+  font-weight:700;font-size:13px;letter-spacing:.02em}
+:root[data-theme="dark"] .exp-av{color:#062029}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .exp-av{color:#062029}}
+.exp-nom{font-weight:700;font-size:15px;letter-spacing:-.01em;line-height:1.25}
+.exp-sub{font-size:12px;color:var(--t500);line-height:1.35}
+.exp-sub b{font-family:var(--mono);font-weight:600;color:var(--t700);letter-spacing:-.02em}
+/* pestaña activa subrayada: pesa menos que una pastilla y deja claro dónde estás */
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.tabs::-webkit-scrollbar{display:none}
+.tab{appearance:none;border:0;background:transparent;cursor:pointer;white-space:nowrap;
+  font-size:13px;font-weight:600;color:var(--t500);padding:0 13px;position:relative;
+  transition:color .15s}
+.tab::after{content:"";position:absolute;left:11px;right:11px;bottom:0;height:2px;
+  border-radius:2px 2px 0 0;background:transparent;transition:background .18s}
+.tab:hover{color:var(--t900)}
+.tab[aria-current="page"]{color:var(--marca)}
+.tab[aria-current="page"]::after{background:var(--marca)}
+
+/* ---------- rejilla ---------- */
+.malla{display:flex;flex-direction:column;gap:18px}
+@media (max-width:1120px){.malla{grid-template-columns:1fr}}
+.tarjeta{background:var(--panel);border:1px solid var(--linea);border-radius:var(--r3);
+  box-shadow:var(--s1);overflow:hidden}
+.tarjeta > header{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 18px;border-bottom:1px solid var(--linea);flex-wrap:wrap}
+.tarjeta > header h2{margin:0;font-size:14px;font-weight:700;letter-spacing:-.01em}
+.tarjeta > header .norma{font-size:11.5px;color:var(--t400);font-family:var(--mono)}
+.et{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t400)}
+.jf{display:flex;align-items:center;gap:9px;flex-wrap:wrap;flex:1;min-width:0}
+.jf .modo{margin-left:auto}
+
+/* ---------- barra de trabajo ---------- */
+.trabajo{padding:14px 18px;border-bottom:1px solid var(--linea);background:var(--panel-2)}
+.fila{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fila + .fila{margin-top:11px}
+.seg{display:inline-flex;background:var(--panel);border:1px solid var(--linea);
+  border-radius:var(--rf);padding:3px;gap:2px;box-shadow:var(--s1)}
+.seg button{appearance:none;border:0;background:transparent;cursor:pointer;font:inherit;
+  font-size:12.5px;font-weight:600;color:var(--t500);padding:6px 14px;border-radius:var(--rf);
+  min-height:32px;white-space:nowrap;transition:background .18s,color .18s}
+.seg button:hover{color:var(--t900)}
+.seg button[aria-pressed="true"]{background:var(--marca);color:#fff;font-weight:600}
+:root[data-theme="dark"] .seg button[aria-pressed="true"]{color:#062029}
+.sep{width:1px;align-self:stretch;background:var(--linea);margin:0 3px}
+
+/* buscador */
+.buscar{position:relative;display:block;width:100%}
+.buscar svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t400)}
+.buscar input{width:100%;font:inherit;font-size:12.5px;color:var(--t900);background:var(--panel);
+  border:1px solid var(--linea);border-radius:var(--rf);padding:8px 12px 8px 33px;min-height:36px}
+.buscar input::placeholder{color:var(--t400)}
+.buscar input:focus{border-color:var(--marca-borde);outline:none;box-shadow:0 0 0 3px var(--marca-luz)}
+
+/* modo */
+.modo{display:inline-flex;gap:6px}
+.mb{appearance:none;cursor:pointer;background:var(--panel);border:1px solid var(--linea);
+  border-radius:var(--rf);width:36px;height:36px;display:grid;place-items:center;color:var(--t500);
+  transition:background .15s,color .15s,border-color .15s}
+.mb:hover{background:var(--panel-2);color:var(--t900)}
+.mb[aria-pressed="true"]{background:var(--marca);border-color:var(--marca);color:#fff}
+:root[data-theme="dark"] .mb[aria-pressed="true"]{color:#062029}
+
+/* abajo: pieza grande + herramientas + hallazgos */
+.abajo{display:grid;grid-template-columns:404px minmax(0,1fr) 396px;gap:18px;align-items:start}
+@media (max-width:1400px){.abajo{grid-template-columns:360px minmax(0,1fr)}}
+@media (max-width:940px){.abajo{grid-template-columns:1fr}}
+.rail{padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0;
+  border-bottom:1px solid var(--linea)}
+.foco-cuerpo{padding:8px 18px 14px;display:grid;place-items:center}
+#lupa{display:block;width:100%;max-width:392px;height:auto;overflow:visible;touch-action:none;
+  user-select:none;-webkit-user-select:none}
+/* la pieza ausente se apaga igual que en la arcada */
+#lupa.lupa--ausente .lupa-cara{fill:var(--panel-2);opacity:.6}
+.lupa-sig{font-family:var(--mono);font-size:16px;font-weight:600;text-anchor:middle;
+  letter-spacing:.02em;user-select:none;pointer-events:none}
+.foco-marcas{display:flex;flex-wrap:wrap;gap:5px;padding:0 16px 15px}
+.foco-vacio{padding:34px 20px;text-align:center;color:var(--t400);font-size:12.5px;line-height:1.6}
+/* la pieza grande: aquí el objetivo mide 70 px, no 25 */
+.lupa-cara{fill:url(#esmalteG);stroke:none;cursor:pointer;
+  transition:fill .18s,opacity .18s}
+.lupa-cara:hover{opacity:.74}
+.lupa-cara.oclu{fill:url(#esmalteOG)}
+.cuerpo--g{filter:drop-shadow(5px 12px 20px var(--sombra-diente))
+  drop-shadow(0 2px 4px var(--sombra-diente))}
+.lupa-et{font-family:var(--ui);font-size:11px;font-weight:700;letter-spacing:.08em;
+  fill:var(--t400);text-anchor:middle;pointer-events:none;user-select:none}
+.lupa-nom{font-family:var(--ui);font-size:12.5px;font-weight:600;fill:var(--t700);
+  text-anchor:middle;pointer-events:none;user-select:none}
+.pista{font-size:11.5px;color:var(--t400)}
+.pista kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel);border:1px solid var(--linea);
+  border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:var(--t500)}
+.mb:disabled{opacity:.35;cursor:default}
+.mb:disabled:hover{background:var(--panel);color:var(--t500)}
+
+/* Todos los hallazgos a la vista y agrupados: se busca escribiendo, no cambiando
+   de pestaña para ver qué hay dentro de cada grupo. */
+.chips-caja{display:flex;flex-direction:column}
+.chips{display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:452px;
+  padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--linea-2) transparent}
+.chips::-webkit-scrollbar{width:8px}
+.chips::-webkit-scrollbar-track{background:transparent}
+.chips::-webkit-scrollbar-thumb{background:var(--linea-2);border-radius:99px;
+  border:2px solid var(--panel)}
+.grupo{display:flex;align-items:center;gap:8px;padding:9px 0 5px;position:sticky;top:0;
+  background:var(--panel);z-index:1}
+.grupo>span{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--t400);white-space:nowrap}
+.grupo>i{font-family:var(--mono);font-style:normal;font-size:10px;color:var(--t300)}
+.grupo::after{content:"";flex:1;height:1px;background:var(--linea)}
+.rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(186px,1fr));gap:7px}
+/* la barra de la izquierda dice de qué color pinta el hallazgo antes de aplicarlo */
+.chip{display:flex;align-items:center;gap:8px;cursor:pointer;appearance:none;text-align:left;
+  background:var(--panel);border:1px solid var(--linea);border-radius:var(--r1);
+  padding:5px 9px 5px 11px;min-height:36px;font:inherit;font-size:12.5px;font-weight:600;
+  color:var(--t700);position:relative;overflow:hidden;
+  transition:border-color .14s,background .14s,color .14s,box-shadow .14s}
+.chip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--t300)}
+.chip[data-col="r"]::before{background:var(--rojo)}
+.chip[data-col="a"]::before{background:var(--azul)}
+.chip[data-col="e"]::before{background:linear-gradient(180deg,var(--azul) 50%,var(--rojo) 50%)}
+.chip .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip:hover{border-color:var(--linea-2);background:var(--panel-2);color:var(--t900)}
+.chip[aria-pressed="true"]{background:var(--t900);border-color:var(--t900);color:var(--panel);
+  box-shadow:var(--s2)}
+.chip .mi{width:24px;height:24px;flex:none;border-radius:6px;display:grid;place-items:center;
+  background:var(--panel-2);overflow:hidden}
+.chip[aria-pressed="true"] .mi{background:var(--panel)}
+.chip .mi svg{display:block}
+.chip .pc{width:6px;height:6px;border-radius:var(--rf);background:var(--ambar);flex:none}
+.chip--vacio{color:var(--t400);font-style:italic;border-style:dashed;cursor:default;
+  justify-content:center;padding:5px 9px}
+.chip--vacio::before{display:none}
+.chip--vacio:hover{background:var(--panel);border-color:var(--linea)}
+
+/* opciones contextuales */
+.ctx{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 11px;margin-top:auto;
+  background:var(--panel);border:1px solid var(--linea);border-radius:var(--r2);box-shadow:var(--s1)}
+.ctx[hidden]{display:none}
+.ctx .seg{box-shadow:none}
+.aviso-pc{display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--ambar-luz);
+  border-bottom:1px solid var(--linea);font-size:11.5px;color:var(--ambar);line-height:1.4}
+.aviso-pc i{width:6px;height:6px;border-radius:var(--rf);background:var(--ambar);flex:none}
+
+/* ---------- el diagrama ---------- */
+.lienzo{padding:20px 22px 12px;display:grid;place-items:center;min-width:0;
+  background:linear-gradient(180deg,var(--mesa-1),var(--mesa-2))}
+svg.odo{display:block;width:100%;height:auto;overflow:visible;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.pieza{cursor:pointer}
+.perfil{fill:none;stroke:var(--diente-borde);stroke-width:1;stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;pointer-events:none;transition:stroke .16s,stroke-width .16s}
+.perfil--gr{stroke-width:1.8}
+.pieza .cara{fill:url(#esmalte);stroke:none;transition:opacity .16s}
+.pieza .cara:hover{opacity:.72}
+.pieza .cara--o{fill:url(#esmalteO)}
+.vol{pointer-events:none}
+.ao{fill:url(#ao);pointer-events:none}
+.brillo{fill:url(#brillo);pointer-events:none}
+/* la división entre caras es lo primero que hay que ver: va más marcada que la anatomía */
+.division{fill:none;stroke:var(--division);stroke-width:1;stroke-linecap:round;
+  stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.surcos{fill:none;stroke:var(--surco);stroke-width:.85;stroke-linecap:round;
+  stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
+/* sombra proyectada como silueta desplazada: da el mismo relieve que un filtro sin
+   obligar al navegador a rasterizar 32 capas aparte */
+.sombra{fill:var(--sombra-plana);pointer-events:none}
+/* la pieza grande usa los mismos dibujos a otra escala: sus degradados son los -G.
+   Ahí sí sale a cuenta fundir el relieve: es una sola pieza, no treinta y dos */
+#lupa .ao{fill:url(#aoG)}
+#lupa .brillo{fill:url(#brilloG);mix-blend-mode:soft-light}
+#lupa .cuspide{fill:url(#cuspG);pointer-events:none;mix-blend-mode:soft-light}
+#lupa .cusp-som{fill:url(#cuspSom);pointer-events:none;mix-blend-mode:soft-light}
+#lupa .division{stroke-width:1.5}
+#lupa .surcos{stroke-width:1.5}
+/* los símbolos van a tamaño de la pieza grande, no al de la arcada */
+#lupa .marca--r,#lupa .marca--a{stroke-width:2.6}
+#lupa text.marca--r,#lupa text.marca--a,#lupa tspan.marca--r,#lupa tspan.marca--a{stroke:none}
+.rot-et{font-family:var(--ui);font-size:11px;font-weight:700;letter-spacing:.11em;
+  text-transform:uppercase;fill:var(--t300);text-anchor:middle;user-select:none}
+.pieza .num{font-family:var(--mono);font-size:11px;font-weight:600;fill:var(--t400);
+  letter-spacing:.02em;text-anchor:middle;user-select:none;transition:fill .16s}
+.pieza .sig{font-family:var(--mono);font-size:11px;font-weight:600;text-anchor:middle;user-select:none}
+.pieza:hover .perfil{stroke:var(--marca-2);stroke-width:1.8}
+.pieza.sel .perfil{stroke:var(--marca);stroke-width:1.8}
+.pieza:hover .num{fill:var(--t900)}
+.pieza .halo{fill:var(--marca-luz);opacity:0;pointer-events:none;transition:opacity .22s}
+/* El enfoque no puede ser un outline: en SVG se dibuja sobre la caja del grupo
+   —corona, raíces y número dentro— y sale un rectángulo torcido alrededor del
+   diente. En su sitio va un anillo que sigue el contorno de la corona, y sólo cuando
+   el foco viene del teclado: con el ratón basta el halo de selección. */
+.pieza:focus,.pieza:focus-visible{outline:none}
+.pieza .anillo{fill:none;stroke:var(--marca-2);stroke-width:2;stroke-dasharray:5 4;
+  opacity:0;pointer-events:none;transition:opacity .16s}
+.odo:not(.raton) .pieza:focus-visible .anillo{opacity:.85}
+.pieza.sel .halo{opacity:1}
+.pieza.sel .num{fill:var(--marca);font-weight:700}
+.pieza.ausente .cara,.pieza.ausente .raiz{fill:var(--panel-2);stroke:var(--t300);opacity:.65}
+/* ---------- raíces ----------
+   El diente se dibuja como lo dibuja un odontólogo: la corona con sus cinco caras y,
+   saliendo hacia fuera de la arcada, tantas raíces como tiene esa pieza de verdad
+   (1 en incisivos, caninos y premolares; 2 en la primera premolar superior y en las
+   molares inferiores; 3 en las molares superiores). */
+.raiz{fill:url(#dentina);stroke:var(--diente-borde);stroke-width:1;stroke-linejoin:round;
+  stroke-linecap:round;vector-effect:non-scaling-stroke;pointer-events:auto;cursor:pointer;
+  transition:stroke .16s,stroke-width .16s,fill .18s}
+.raiz:hover{stroke:var(--marca-2);stroke-width:1.6}
+.raiz.marcada--r{fill:var(--rojo-luz);stroke:var(--rojo)}
+.raiz.marcada--a{fill:var(--azul-luz);stroke:var(--azul)}
+.raiz-som{fill:var(--sombra-plana);pointer-events:none}
+.cemento{fill:none;stroke:var(--surco);stroke-width:.7;stroke-linecap:round;
+  vector-effect:non-scaling-stroke;pointer-events:none;opacity:.5}
+.pieza:hover .raiz{stroke:var(--marca-2);stroke-width:1.6}
+.pieza.sel .raiz{stroke:var(--marca);stroke-width:1.6}
+#lupa .raiz{stroke-width:1.5}
+#lupa .cemento{stroke-width:1.1}
+/* remanente radicular: la corona ya no está, queda la raíz */
+.pieza.solo-raiz .cara{opacity:.18}
+.pieza.solo-raiz .perfil{stroke-dasharray:3 3;stroke:var(--t300)}
+#lupa.lupa--solo-raiz .lupa-cara{opacity:.18}
+#lupa.lupa--solo-raiz .perfil--gr{stroke-dasharray:5 5;stroke:var(--t300)}
+#lupa.lupa--ausente .raiz{fill:var(--panel-2);opacity:.6}
+/* los cuatro cuadrantes: paneles tenues y la cruz que los separa */
+.cuad{pointer-events:none}
+.cuad-caja{fill:var(--marca);opacity:.032;stroke:var(--linea);stroke-width:1}
+.cuad-rot{font-family:var(--ui);font-size:12px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;fill:var(--marca);opacity:.55;user-select:none}
+.cruz{stroke:var(--marca);stroke-width:1.4;opacity:.3;vector-effect:non-scaling-stroke}
+.cruz--ocl{stroke-dasharray:7 6}
+.ocl{stroke:var(--linea);stroke-width:1;stroke-dasharray:1 5;stroke-linecap:round;
+  vector-effect:non-scaling-stroke}
+.divis{stroke:var(--linea);stroke-width:1;vector-effect:non-scaling-stroke}
+.marca{pointer-events:none}
+.marca--r{stroke:var(--rojo);fill:none;stroke-width:1.7;vector-effect:non-scaling-stroke;
+  stroke-linecap:round;stroke-linejoin:round}
+.marca--a{stroke:var(--azul);fill:none;stroke-width:1.7;vector-effect:non-scaling-stroke;
+  stroke-linecap:round;stroke-linejoin:round}
+text.marca--r,tspan.marca--r{fill:var(--rojo);stroke:none;paint-order:normal}
+text.marca--a,tspan.marca--a{fill:var(--azul);stroke:none;paint-order:normal}
+.otras{opacity:.15}
+
+/* leyenda: sólo el código de color, que es lo que se consulta a cada rato.
+   El resto de la simbología vive en el modal, para no cargar la pantalla. */
+.leyenda{display:flex;flex-wrap:wrap;align-items:center;gap:8px 22px;padding:11px 18px;
+  border-top:1px solid var(--linea);background:var(--panel)}
+.ly{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--t500)}
+.ly i{width:12px;height:12px;border-radius:4px;flex:none}
+.b-info{margin-left:auto;appearance:none;cursor:pointer;font:inherit;font-size:11.5px;
+  font-weight:600;color:var(--t500);background:transparent;border:1px solid var(--linea);
+  border-radius:var(--rf);padding:5px 12px 5px 9px;display:inline-flex;align-items:center;gap:6px;
+  transition:background .15s,color .15s,border-color .15s}
+.b-info:hover{background:var(--panel-2);color:var(--t900);border-color:var(--linea-2)}
+.b-info svg{flex:none;opacity:.8}
+
+/* ---------- modal de simbología ---------- */
+.modal{border:0;padding:0;background:transparent;max-width:min(640px,92vw);width:100%;
+  color:var(--t900)}
+.modal::backdrop{background:rgba(9,16,28,.45)}
+.modal-caja{background:var(--panel);border:1px solid var(--linea);border-radius:var(--r3);
+  box-shadow:var(--s3);overflow:hidden;display:flex;flex-direction:column;max-height:84vh}
+.modal-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:15px 18px;border-bottom:1px solid var(--linea)}
+.modal-cab h3{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.modal-x{appearance:none;border:0;background:transparent;cursor:pointer;color:var(--t400);
+  padding:6px;border-radius:8px;line-height:0}
+.modal-x:hover{background:var(--panel-2);color:var(--t900)}
+.modal-cuerpo{padding:6px 18px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.modal-pie{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 18px;border-top:1px solid var(--linea);background:var(--panel-2)}
+.modal-pie .norma{font-size:11px;color:var(--t400);font-family:var(--mono)}
+.mi-tit{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--t400);margin:16px 0 8px}
+.mi-fila{display:flex;align-items:flex-start;gap:10px;padding:6px 0;font-size:12.5px;
+  color:var(--t700);line-height:1.45}
+.mi-fila i{width:12px;height:12px;border-radius:4px;flex:none;margin-top:3px}
+.mi-fila b{font-weight:600;color:var(--t900)}
+.mi-caras{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:4px 12px}
+.mi-cara{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--t700);padding:3px 0}
+.mi-cara b{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--marca);
+  min-width:14px;display:inline-block}
+.mi-tec{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:4px 12px}
+.mi-tec span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--t700);padding:3px 0}
+.mi-tec kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel-2);
+  border:1px solid var(--linea);border-bottom-width:2px;border-radius:5px;padding:2px 6px;
+  color:var(--t700);flex:none}
+.mi-pc{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.mi-pc span{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:var(--rf);
+  background:var(--ambar-luz);color:var(--ambar);border:1px solid var(--ambar-borde)}
+.mi-nota{font-size:12px;color:var(--t500);line-height:1.55;margin:8px 0 0}
+
+/* ---------- animaciones ---------- */
+@keyframes brota{from{opacity:0;transform:translateY(7px) scale(.93)}to{opacity:1;transform:none}}
+.pieza{animation:brota .36s cubic-bezier(.2,.9,.3,1) both;transform-origin:center;
+  animation-delay:calc(var(--onda,0) * 24ms)}
+@keyframes tinta{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+.marca{animation:tinta .24s cubic-bezier(.2,.9,.3,1) both;transform-box:fill-box;transform-origin:center}
+@keyframes pulso{0%{transform:scale(1)}45%{transform:scale(1.16)}100%{transform:scale(1)}}
+.cara.pintada{animation:pulso .34s cubic-bezier(.3,1.4,.5,1);transform-box:fill-box;transform-origin:center}
+@keyframes deslizaDer{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+.panel-cuerpo{animation:deslizaDer .26s cubic-bezier(.2,.9,.3,1) both}
+@keyframes aparece{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.chips .chip{animation:aparece .2s ease-out both;animation-delay:calc(var(--i,0) * 18ms)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{
+  animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* ---------- panel derecho ---------- */
+.vacio{padding:30px 20px;text-align:center;color:var(--t400);font-size:12.5px;line-height:1.6}
+.vacio svg{opacity:.45;margin-bottom:12px}
+.panel-cuerpo{padding:18px 20px}
+.pz-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pz-num{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1;
+  background:var(--marca-luz);color:var(--marca);padding:9px 11px;border-radius:var(--r2);flex:none}
+.pz-txt{min-width:0}
+.pz-nom{font-size:14px;font-weight:700;letter-spacing:-.01em;line-height:1.25}
+.pz-meta{font-size:11.5px;color:var(--t500);line-height:1.35}
+.lista{display:flex;flex-direction:column;gap:7px;margin-bottom:17px}
+.mk{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r2);
+  border:1px solid var(--linea);background:var(--panel-2)}
+.mk--r{background:var(--rojo-luz);border-color:var(--rojo-borde)}
+.mk--a{background:var(--azul-luz);border-color:var(--azul-borde)}
+.mk .qt{flex:1;min-width:0;font-size:12.5px;font-weight:600;line-height:1.3}
+.mk--r .qt{color:var(--rojo)} .mk--a .qt{color:var(--azul)}
+.mk .qc{font-size:11px;font-weight:600;color:var(--t500);display:block;margin-top:1px}
+.mk .qx{appearance:none;border:0;background:transparent;cursor:pointer;color:var(--t400);
+  padding:5px;border-radius:6px;line-height:0;flex:none}
+.mk .qx:hover{color:var(--rojo);background:var(--panel)}
+.mk--nada{justify-content:center;color:var(--t400);font-style:italic;background:transparent;
+  border-style:dashed;font-size:12.5px}
+.nota{width:100%;font:inherit;font-size:12.5px;color:var(--t900);background:var(--panel-2);
+  border:1px solid var(--linea);border-radius:var(--r2);padding:10px 11px;resize:vertical;min-height:96px}
+.nota::placeholder{color:var(--t400)}
+.nota:focus{border-color:var(--marca-borde);outline:none;box-shadow:0 0 0 3px var(--marca-luz)}
+
+/* lista de hallazgos del paciente: crece con cada hallazgo que se añade, y sólo cuando
+   se pasa de alto se convierte en lista con desplazamiento */
+.tarjeta--hall{display:flex;flex-direction:column}
+.hall-caja{display:flex;flex-direction:column;flex:1 1 auto}
+.hall{padding:10px 12px 14px;overflow-y:auto;flex:1 1 auto;min-height:0;
+  max-height:min(72vh,800px);
+  scrollbar-width:thin;scrollbar-color:var(--linea-2) transparent}
+.hall::-webkit-scrollbar{width:9px}
+.hall::-webkit-scrollbar-track{background:transparent}
+.hall::-webkit-scrollbar-thumb{background:var(--linea-2);border-radius:99px;
+  border:3px solid var(--panel)}
+/* degradados arriba y abajo: avisan de que la lista sigue, en vez de cortar una fila
+   por la mitad sin más. Vale para la lista del paciente y para la paleta. */
+.despl{position:relative;min-height:0}
+.despl::after,.despl::before{content:"";position:absolute;left:0;right:9px;height:34px;
+  pointer-events:none;opacity:0;transition:opacity .2s}
+.despl::after{bottom:0;background:linear-gradient(180deg,transparent,var(--panel))}
+.despl::before{top:0;background:linear-gradient(0deg,transparent,var(--panel));z-index:2}
+.despl.hay-mas::after{opacity:1}
+.despl.hay-antes::before{opacity:1}
+.hg{display:flex;align-items:flex-start;gap:9px;padding:7px 8px;border-radius:var(--r2);
+  cursor:pointer;transition:background .14s}
+.hg:hover{background:var(--panel-2)}
+.hg.act{background:var(--marca-luz)}
+.hg .n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--t700);
+  background:var(--panel-2);border:1px solid var(--linea);border-radius:7px;
+  min-width:30px;text-align:center;padding:3px 4px;flex:none}
+.hg.act .n{background:var(--panel);border-color:var(--marca-borde);color:var(--marca)}
+.hg .d{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px}
+.pill{font-size:11px;font-weight:600;padding:3px 8px;border-radius:var(--rf);white-space:nowrap}
+.pill .c{font-family:var(--mono);font-weight:600;opacity:.72;margin-right:1px}
+.pill--r{background:var(--rojo-luz);color:var(--rojo)}
+.pill--a{background:var(--azul-luz);color:var(--azul)}
+.pill .c{font-weight:600;opacity:.75}
+
+/* ---------- pie ---------- */
+.pie{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+  margin-top:14px;padding:13px 18px;background:var(--panel);border:1px solid var(--linea);
+  border-radius:var(--r3);box-shadow:var(--s1)}
+.btn{appearance:none;cursor:pointer;font:inherit;font-size:13px;font-weight:600;padding:9px 17px;
+  min-height:40px;border-radius:var(--r2);border:1px solid var(--linea);background:var(--panel);
+  color:var(--t700);transition:background .15s,border-color .15s,color .15s,transform .12s}
+.btn:hover{background:var(--panel-2);color:var(--t900);border-color:var(--linea-2)}
+.btn:active{transform:translateY(1px)}
+.btn--pri{background:var(--marca);border-color:var(--marca);color:#fff}
+:root[data-theme="dark"] .btn--pri{color:#062029}
+.btn--pri:hover{background:var(--marca-2);border-color:var(--marca-2);color:#fff}
+:root[data-theme="dark"] .btn--pri:hover{color:#062029}
+.estado{font-size:12px;color:var(--t500)}
+.estado b{color:var(--t700);font-weight:600}
+.nota-pie{margin:14px 4px 0;font-size:11.5px;color:var(--t400);line-height:1.6;max-width:76ch}
+.nota-pie b{color:var(--t700);font-weight:600}
+
+/* ---------- presupuesto que sale del odontograma ---------- */
+.ppto-cuerpo{padding:0}
+.ppto table{width:100%;border-collapse:collapse;font-size:12.5px}
+.ppto th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--t400);font-weight:700;padding:9px 14px;border-bottom:1px solid var(--linea);
+  background:var(--panel-2)}
+.ppto td{padding:9px 14px;border-bottom:1px solid var(--linea);vertical-align:top;color:var(--t700)}
+.ppto tbody tr:last-child td{border-bottom:0}
+.ppto tbody tr{cursor:pointer}
+.ppto tbody tr:hover{background:var(--panel-2)}
+.ppto .pz{font-family:var(--mono);font-weight:600;color:var(--t900);white-space:nowrap}
+.ppto .imp{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  white-space:nowrap;color:var(--t900)}
+.ppto .det{display:block;font-size:11px;color:var(--t500);margin-top:1px}
+.ppto tfoot td{border-top:1.5px solid var(--linea-2);font-weight:700;font-size:13.5px;
+  padding:12px 14px;color:var(--t900)}
+.ppto-vacio{padding:26px 18px;text-align:center;color:var(--t400);font-size:12.5px;line-height:1.6}
+.ppto-falta{display:flex;gap:9px;align-items:flex-start;padding:11px 14px;background:var(--ambar-luz);
+  border-top:1px solid var(--linea);font-size:11.5px;color:var(--ambar);line-height:1.45}
+.ppto-falta i{width:6px;height:6px;border-radius:var(--rf);background:var(--ambar);flex:none;margin-top:5px}
+.ppto-acc{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--linea)}
+.ppto-acc .btn{font-size:12.5px;padding:7px 14px;min-height:36px}
+.ppto-ref{margin:0;padding:8px 14px 0;font-size:11.5px;color:var(--t400);line-height:1.5}
+.ppto-sue{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:11px 14px;
+  border-top:1px solid var(--linea)}
+.ppto-sue label{font-size:11.5px;color:var(--t500);flex:none}
+.ppto-sue select{font-family:inherit;font-size:12.5px;padding:6px 9px;min-height:34px;
+  border:1px solid var(--linea);border-radius:var(--rf);background:var(--panel);
+  color:var(--t900);max-width:340px;flex:1 1 220px}
+.ppto-sue select:focus{border-color:var(--marca-borde);outline:none;
+  box-shadow:0 0 0 3px var(--marca-luz)}
+/* el maxilar es una lista corta y no debe competir de ancho con la del servicio */
+.ppto-sue select.ppto-max{flex:0 0 auto;max-width:180px}
+.ppto-sue select[hidden]{display:none}
+.ppto-tt{font-family:inherit;font-size:12.5px;padding:3px 7px;min-height:28px;max-width:100%;
+  border:1px solid var(--linea);border-radius:var(--rf);background:var(--panel);
+  color:var(--t900);margin-bottom:2px}
+.ppto-tt:focus{border-color:var(--marca-borde);outline:none;box-shadow:0 0 0 3px var(--marca-luz)}
+.ppto-quita{appearance:none;border:0;background:none;cursor:pointer;color:var(--t400);
+  font-size:15px;line-height:1;padding:2px 6px;border-radius:var(--rf)}
+.ppto-quita:hover{color:var(--rojo);background:var(--panel-2)}
+.btn--min{font-size:11.5px;padding:4px 11px;min-height:28px;border-radius:var(--rf)}
+
+/* ═══════════ documento para el paciente ═══════════
+   Mismo lenguaje visual que el PDF aprobado: serifas, negro de marca, taupe en la
+   cabecera de tabla y marfil en los bloques. El taupe sólo con texto negro encima:
+   blanco sobre taupe da 2,2 de contraste y no se lee. */
+.docu{position:fixed;inset:0;z-index:70;background:#e4e0d9;overflow:auto;display:block}
+.docu[hidden]{display:none}
+.docu-barra{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:10px 14px;
+  align-items:center;padding:10px 16px;background:var(--sup);
+  border-bottom:1px solid var(--linea)}
+.docu-tit{font-size:14px;font-weight:700;color:var(--t700)}
+.docu-pista{font-size:11.5px;color:var(--t400)}
+.docu-acc{display:flex;gap:8px;margin-left:auto}
+.docu-acc .btn{font-size:12.5px;padding:7px 14px;min-height:36px}
+.docu-hojas{padding:18px 12px 46px}
+/* un documento no se anima: las piezas clonadas entran ya dibujadas */
+.docu .pieza,.docu .marca,.docu .cara{animation:none!important;opacity:1!important}
+.docu .pieza{transform:none!important}
+.docu .halo,.docu .anillo{display:none}
+.docu .pieza .num{font-size:15px}
+.docu .pieza .sig{font-size:14px}
+.docu .cuad-rot{font-size:17px;opacity:.7}
+.docu .cruz{opacity:.45}
+
+.hoja{width:210mm;max-width:100%;min-height:294mm;box-sizing:border-box;margin:0 auto 20px;
+  padding:10mm 14mm 20mm;background:#fff;color:#1B1614;position:relative;
+  box-shadow:0 12px 34px rgba(16,32,52,.18);
+  font:11.9px/1.42 'Times New Roman',Times,'Liberation Serif',serif;
+  font-variant-numeric:lining-nums tabular-nums;
+  font-feature-settings:'lnum' 1,'tnum' 1;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.hoja *{color:inherit}
+.hoja .mbr{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  border-bottom:2px solid #1B1614;padding-bottom:7px}
+.hoja .mbr-logo{height:44px;width:auto;display:block}
+.hoja .mbr-marca{display:flex;flex-direction:column;gap:2px;flex:none;white-space:nowrap}
+.hoja .mbr-nom{font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.hoja .mbr-baj{font-size:9.4px;letter-spacing:.16em;text-transform:uppercase;color:#7d746a}
+.hoja .mbr-datos{margin-left:auto;text-align:right;font-size:9px;line-height:1.55;color:#5d564f}
+.hoja .mbr-datos b{display:block;font-size:11.5px;letter-spacing:.06em;color:#1B1614;
+  margin-bottom:2px}
+.doc-h1{text-align:center;font-size:18px;font-weight:bold;letter-spacing:.06em;
+  margin:11px 0 3px}
+.doc-sub{text-align:center;font-size:9.4px;color:#5d564f;margin:0 0 9px}
+/* los datos del documento como campos, no como una tira de texto con puntos */
+.meta{display:flex;margin:8px 0 0;border-top:1px solid #B7AEA2;border-bottom:1px solid #B7AEA2}
+.meta>div{flex:1;padding:5px 10px;text-align:center;min-width:0}
+.meta>div+div{border-left:1px solid #B7AEA2}
+.meta span{display:block;font-size:7.8px;letter-spacing:.14em;text-transform:uppercase;
+  color:#7d746a;margin-bottom:1px}
+.meta b{font-size:10.4px;font-weight:bold;letter-spacing:.01em}
+.ficha{display:flex;gap:24px;border:1px solid #B7AEA2;border-left:3px solid #1B1614;
+  padding:7px 11px;background:#F4F1EA}
+.ficha>div{flex:1;min-width:0}
+.ficha p{margin:0 0 2px}
+.ficha b{display:inline-block;min-width:96px}
+.doc-h2{font-size:11px;font-weight:bold;letter-spacing:.09em;text-transform:uppercase;
+  margin:9px 0 4px;padding-bottom:3px;border-bottom:1px solid #1B1614}
+table.doc{width:100%;border-collapse:collapse;font-size:10.5px}
+table.doc th{border:1px solid #1B1614;background:#B7AEA2;color:#1B1614;padding:5px 7px;
+  font-weight:bold;text-align:center;font-size:9.6px;letter-spacing:.03em}
+table.doc td{border:1px solid #B7AEA2;padding:2.2px 7px;vertical-align:middle}
+table.doc tbody tr:nth-child(even) td{background:#FBFAF7}
+table.doc td.c{text-align:center}
+table.doc td.n{text-align:right}
+table.doc td.pz{text-align:center;font-weight:bold;white-space:nowrap}
+table.doc td.vacio{text-align:center;color:#8d857b;padding:16px}
+.doc-hal{display:block;font-size:9px;color:#7d746a;font-style:italic}
+/* los totales van dentro de la misma tabla: la columna de importes queda alineada y
+   no hay un cuadro flotando sobre el blanco */
+table.doc tfoot td{border:1px solid #B7AEA2;padding:2.2px 7px;font-size:10.8px}
+table.doc tfoot td.rot{text-align:right;white-space:nowrap}
+table.doc tfoot td.vac,table.doc tfoot tr.tot td.vac{border:0;background:#fff}
+table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
+  background:#F4F1EA;font-weight:bold;font-size:12.2px}
+.cond{margin-top:3px;font-size:9.4px;line-height:1.45}
+.cond .cl{display:flex;gap:9px;margin-bottom:3px}
+.cond .cn{flex:none;width:15px;text-align:center;font-weight:bold}
+.idx{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px}
+.idx div{flex:1 1 0;min-width:150px;border:1px solid #B7AEA2;border-radius:3px;padding:7px 10px;
+  background:#F4F1EA}
+.idx span{font-size:8.6px;letter-spacing:.1em;text-transform:uppercase;color:#7d746a}
+.idx b{display:block;font-size:18px;font-weight:800;line-height:1.15}
+.idx i{font-style:normal;font-size:9.6px;color:#5d564f;display:block}
+.idx u{display:block;text-decoration:none;font-size:8.8px;color:#7d746a;margin-top:2px;
+  line-height:1.4}
+.fir{display:flex;gap:64px;margin-top:30px}
+.fir>div{flex:1;text-align:center}
+.fir .rol{display:block;font-size:8.4px;letter-spacing:.14em;text-transform:uppercase;
+  color:#7d746a;margin-bottom:4px}
+.fir .sello{font-size:8.2px;color:#5d564f;line-height:1.45;margin-top:3px}
+.fir-nota{font-size:8.8px;color:#7d746a;margin:10px 0 0;text-align:center;font-style:italic}
+.fir .slot{height:52px;display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:3px}
+.fir .digi{width:100%;height:30px;border:1px dashed #B7AEA2;border-radius:3px;display:flex;
+  align-items:center;justify-content:center;color:#7d746a;font-size:8.6px;background:#F4F1EA}
+.fir i{display:block;border-top:1px solid #1B1614}
+.fir .nom{font-size:9.6px;margin-top:4px;line-height:1.5}
+.fir em{display:block;font-style:normal;font-size:8.4px;color:#7d746a;margin-top:1px}
+.fir .modo{font-size:8.2px;color:#8d857b;margin-top:2px;font-style:italic}
+.doc-pie{position:absolute;left:14mm;right:14mm;bottom:5mm;border-top:1px solid #1B1614;
+  padding-top:8px}
+.traza{display:flex;font-size:8.6px;color:#5d564f;margin-bottom:6px}
+.traza div{flex:1}
+.pieL{display:flex;justify-content:space-between;gap:12px;font-size:8.4px;color:#5d564f}
+.doc-odo{border:1px solid #B7AEA2;padding:13px;margin-top:24px}
+.doc-odo svg{width:100%;height:auto;display:block}
+.ley{display:flex;gap:22px;margin-top:17px;font-size:9.2px;flex-wrap:wrap}
+.ley span{display:flex;align-items:center;gap:6px}
+.ley i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.nota-doc{font-size:9.4px;line-height:1.55;color:#5d564f;margin-top:15px}
+
+@media screen and (max-width:820px){.hoja{padding:10mm 8mm 20mm}}
+
+@media print{
+  @page{size:A4;margin:0}
+  html,body{background:#fff!important}
+  body>*{position:fixed!important;left:0;top:0;width:1px;height:1px;
+    overflow:hidden;opacity:0;pointer-events:none;z-index:-1}
+  body>.docu{position:static!important;width:auto;height:auto;overflow:visible;
+    opacity:1;background:#fff;z-index:auto}
+  .docu-barra{display:none!important}
+  .docu-hojas{padding:0}
+  .hoja{width:auto;max-width:none;min-height:294mm;margin:0;box-shadow:none;
+    padding:10mm 14mm 20mm;break-after:page;page-break-after:always}
+  .hoja:last-child{break-after:auto;page-break-after:auto}
+}
+</style>
+
+<div class="env">
+  <div class="exp">
+    <div class="exp-quien">
+      <div class="exp-av">·</div>
+      <div>
+        <div class="exp-nom">Paciente</div>
+        <div class="exp-sub">Expediente clínico</div>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Expediente clínico">
+      <button class="tab" type="button">Resumen</button>
+      <button class="tab" type="button">Historia clínica</button>
+      <button class="tab" type="button" aria-current="page">Odontograma</button>
+      <button class="tab" type="button">Periodontograma</button>
+      <button class="tab" type="button">Receta médica</button>
+      <button class="tab" type="button">Ortodoncia</button>
+      <button class="tab" type="button">Estado de cuenta</button>
+    </nav>
+  </div>
+  <script>
+  /* Identidad al instante: URL del padre o demo Carlos si no hay bridge. */
+  (function(){
+    function initials(n){
+      var p=String(n||'').trim().split(/\s+/).filter(Boolean);
+      if(!p.length) return '·';
+      return ((p[0][0]||'')+(p.length>1?(p[p.length-1][0]||''):'')).toUpperCase();
+    }
+    function paint(p){
+      var nom=document.querySelector('.exp-nom');
+      var av=document.querySelector('.exp-av');
+      var sub=document.querySelector('.exp-sub');
+      var nombre=p.nombre||'Paciente';
+      if(nom) nom.textContent=nombre;
+      if(av) av.textContent=initials(nombre);
+      if(sub){
+        var parts=[];
+        if(p.edad) parts.push(/años/i.test(String(p.edad))?String(p.edad):(p.edad+' años'));
+        if(p.dni) parts.push('DNI <b>'+String(p.dni).replace(/(\d{2})(?=\d)/g,'$1·')+'</b>');
+        if(p.hc && !/^[0-9a-f-]{8,}$/i.test(String(p.hc))) parts.push('H.C. <b>'+p.hc+'</b>');
+        if(p.sede) parts.push(p.sede);
+        sub.innerHTML=parts.length?parts.join(' · '):'Expediente clínico';
+      }
+      try{ document.documentElement.setAttribute('data-paciente-ready','1'); }catch(e){}
+    }
+    try{
+      var bridge=/[?&]bridge=1(?:&|$)/.test(location.search||'');
+      if(bridge){
+        var q=new URLSearchParams(location.search);
+        paint({
+          nombre:q.get('nombre')||'Paciente',
+          edad:q.get('edad')||'',
+          dni:q.get('dni')||'',
+          hc:q.get('hc')||'',
+          sede:q.get('sede')||''
+        });
+      }else{
+        paint({nombre:'Carlos Ruiz Mendoza',edad:'36',dni:'41234567',hc:'000412',sede:'Los Olivos'});
+      }
+    }catch(e){
+      try{ document.documentElement.setAttribute('data-paciente-ready','1'); }catch(_){}
+    }
+  })();
+  </script>
+
+  <div class="malla">
+    <main class="tarjeta">
+      <header>
+        <div class="jf">
+          <span class="et">Fase</span>
+          <div class="seg" role="group" id="seg-fase">
+            <button type="button" data-fase="inicial"   aria-pressed="true">Inicial</button>
+            <button type="button" data-fase="evolucion" aria-pressed="false">Evolución</button>
+            <button type="button" data-fase="alta"      aria-pressed="false">Alta</button>
+          </div>
+          <span class="et" id="et-piezas" title="El gráfico dibuja las 52 posiciones —permanentes y temporales— porque sirve para las tres denticiones; el conteo es el del paciente">Boca completa</span>
+          <div class="modo" role="group" aria-label="Historial">
+            <button type="button" class="mb" id="b-undo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 9h11a5 5 0 0 1 0 10h-6M4 9l4.5-4.5M4 9l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button type="button" class="mb" id="b-redo" title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer" disabled>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 9H9a5 5 0 0 0 0 10h6M20 9l-4.5-4.5M20 9l-4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </header>
+      <div class="lienzo" id="odo-wrap">
+        <svg class="odo" id="odo" viewBox="0 0 1268 560" role="img"
+             aria-label="Los cuatro cuadrantes con las posiciones permanentes y temporales, numeración FDI. Elige una pieza o una raíz."></svg>
+      </div>
+      <p class="pista" style="padding:0 16px 10px;margin:0">Toca una cara para marcarla y vuelve a tocarla para borrarla · arrastra para varias · para un absceso o una fractura radicular, toca la <b>raíz</b> · <kbd>Alt</kbd>+clic borra</p>
+      <div class="leyenda" id="leyenda"></div>
+    </main>
+
+    <div class="abajo">
+      <section class="tarjeta foco">
+        <header><h2 id="foco-tit">Pieza</h2><span class="norma" id="foco-sub"></span></header>
+        <div class="foco-cuerpo">
+          <svg id="lupa" viewBox="0 0 300 344" role="img" aria-label="Pieza seleccionada en detalle"></svg>
+        </div>
+        <div class="foco-marcas" id="foco-marcas"></div>
+      </section>
+
+      <section class="tarjeta">
+        <header>
+          <h2>Hallazgo a aplicar</h2>
+          <div class="seg" role="group" id="seg-modo" aria-label="Qué hace el clic">
+            <button type="button" data-modo="sel"    aria-pressed="true">Marcar</button>
+            <button type="button" data-modo="borrar" aria-pressed="false">Borrar</button>
+          </div>
+        </header>
+        <div class="rail">
+          <label class="buscar">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="text" id="buscar" placeholder="Buscar un hallazgo…" aria-label="Buscar hallazgo">
+          </label>
+          <div class="chips-caja despl" id="chips-caja"><div class="chips" id="chips" role="group" aria-label="Hallazgos"></div></div>
+          <div class="ctx" id="ctx" hidden></div>
+        </div>
+        <div id="panel"></div>
+      </section>
+
+      <section class="tarjeta tarjeta--hall">
+        <header><h2>Hallazgos del paciente</h2><span class="norma" id="cuenta">0 piezas</span>
+          <button type="button" class="btn btn--min" id="b-resumen" style="margin-left:auto">Ver resumen</button></header>
+        <div class="hall-caja despl" id="hall-caja"><div class="hall" id="hall"></div></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="tarjeta ppto" style="margin-top:14px">
+    <header>
+      <h2>Plan de inversión</h2>
+      <span class="norma" id="ppto-sub">sale del odontograma</span>
+    </header>
+    <div class="ppto-cuerpo" id="ppto"></div>
+  </section>
+
+  <dialog class="modal" id="modal-info" aria-labelledby="mi-tit">
+    <div class="modal-caja">
+      <header class="modal-cab">
+        <h3 id="mi-tit">Cómo se lee el odontograma</h3>
+        <button type="button" class="modal-x" id="mi-cerrar" aria-label="Cerrar">
+          <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><path d="M4.5 4.5l8 8M12.5 4.5l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="modal-cuerpo" id="mi-cuerpo"></div>
+      <footer class="modal-pie">
+        <span class="norma">NTS N.º 188-MINSA/DGIESP-2022</span>
+        <button type="button" class="btn btn--pri" id="mi-ok">Entendido</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <div class="pie">
+    <span class="estado" id="estado">Sin cambios sin guardar.</span>
+    <div style="display:flex;gap:10px">
+      <button type="button" class="btn" id="b-limpiar">Limpiar fase</button>
+      <button type="button" class="btn btn--pri" id="b-guardar">Guardar odontograma</button>
+    </div>
+  </div>
+
+  <p class="nota-pie">Maqueta sobre datos de ejemplo · simbología según la
+    <b>NTS N.º 188-MINSA/DGIESP-2022</b>, con los criterios de dibujo del odontograma
+    digital (numeración FDI, rojo para el hallazgo y azul para lo tratado, símbolo propio
+    por hallazgo y diente dibujado entero, con su raíz).<br>
+    Esta versión recoge lo que pidió la <b>Dra. Cinthya Vásquez</b> el 12 de setiembre:
+    un solo odontograma en lugar de tres vistas, la boca dividida en sus cuatro cuadrantes,
+    lesiones marcables sobre la raíz, más espacio entre piezas, la prótesis removible con
+    las dos líneas continuas y el plan de inversión que sale del propio odontograma.</p>
+</div>
+
+<script>
+"use strict";
+/* ===== Catálogo — NTS N.º 188-MINSA/DGIESP-2022 =====
+   col: 'r' rojo (patológico/temporal/por hacer) · 'a' azul (buen estado/ejecutado)
+        'e' lo decide el operador · pc: no verificado contra el texto oficial     */
+const CATS=[
+ {id:'cr', nom:'Caries y restauración'},
+ {id:'cp', nom:'Coronas y prótesis'},
+ {id:'ep', nom:'Estado de la pieza'},
+ {id:'pa', nom:'Posición y anomalías'},
+ {id:'rz', nom:'Lesiones de la raíz'}
+];
+const CAT=[
+ {id:'caries',   c:'cr', nom:'Caries',              sg:'CD', amb:'cara', col:'r', dib:'relleno'},
+ {id:'restaur',  c:'cr', nom:'Restauración',        sg:'R',  amb:'cara', col:'e', dib:'relleno'},
+ {id:'sellante', c:'cr', nom:'Sellante',            sg:'S',  amb:'cara', col:'e', dib:'sellante'},
+ {id:'dde',      c:'cr', nom:'Defecto del esmalte', sg:'HP', amb:'pieza',col:'r', dib:'sigla'},
+
+ {id:'corona',   c:'cp', nom:'Corona',              sg:'CM', amb:'pieza',col:'e', dib:'circunf'},
+ {id:'coronaT',  c:'cp', nom:'Corona temporal',     sg:'CT', amb:'pieza',col:'r', dib:'circunfPunt'},
+ {id:'protFija', c:'cp', nom:'Prótesis fija',       sg:'PF', amb:'pieza',col:'e', dib:'puente'},
+ {id:'protRem',  c:'cp', nom:'Prótesis removible',  sg:'PR', amb:'pieza',col:'e', dib:'dobleLinea'},
+ {id:'implante', c:'cp', nom:'Implante',            sg:'IMP',amb:'pieza',col:'a', dib:'sigla'},
+ {id:'espigo',   c:'cp', nom:'Espigo o muñón',      sg:'EM', amb:'pieza',col:'e', dib:'espigo', pc:1},
+
+ {id:'ausente',  c:'ep', nom:'Diente ausente',      sg:'—',  amb:'pieza',col:'a', dib:'lineaH'},
+ {id:'extraccion',c:'ep',nom:'Extracción indicada', sg:'EXO',amb:'pieza',col:'r', dib:'aspa', pc:1},
+ {id:'rr',       c:'ep', nom:'Remanente radicular', sg:'RR', amb:'pieza',col:'r', dib:'sigla'},
+ {id:'fractura', c:'ep', nom:'Fractura',            sg:'FR', amb:'pieza',col:'r', dib:'diagonal'},
+ {id:'endodoncia',c:'ep',nom:'Endodoncia',          sg:'TC', amb:'pieza',col:'e', dib:'conducto', pc:1},
+ {id:'pulpotomia',c:'ep',nom:'Pulpotomía',          sg:'PP', amb:'pieza',col:'e', dib:'sigla', pc:1},
+ {id:'movilidad',c:'ep', nom:'Movilidad',           sg:'M',  amb:'pieza',col:'r', dib:'sigla', grado:1},
+
+ {id:'giro',     c:'pa', nom:'Giroversión',         sg:'GV', amb:'pieza',col:'a', dib:'flechaCurva'},
+ {id:'migracion',c:'pa', nom:'Migración',           sg:'MG', amb:'pieza',col:'a', dib:'flechaRecta'},
+ {id:'erupcion', c:'pa', nom:'Pieza en erupción',   sg:'ER', amb:'pieza',col:'a', dib:'zigzag'},
+ {id:'impact',   c:'pa', nom:'Impactación',         sg:'I',  amb:'pieza',col:'a', dib:'sigla'},
+ {id:'supernum', c:'pa', nom:'Supernumerario',      sg:'S',  amb:'pieza',col:'a', dib:'circSigla'},
+ {id:'macro',    c:'pa', nom:'Macrodoncia',         sg:'MAC',amb:'pieza',col:'a', dib:'sigla'},
+ {id:'micro',    c:'pa', nom:'Microdoncia',         sg:'MIC',amb:'pieza',col:'a', dib:'sigla'},
+ {id:'gemin',    c:'pa', nom:'Geminación o fusión', sg:'GF', amb:'pieza',col:'a', dib:'dosCirc'},
+ {id:'diastema', c:'pa', nom:'Diastema',            sg:'DT', amb:'pieza',col:'a', dib:'diastema', pc:1},
+ {id:'transpos', c:'pa', nom:'Transposición',       sg:'TR', amb:'pieza',col:'a', dib:'flechaDoble', pc:1},
+ {id:'intrusion',c:'pa', nom:'Intrusión',           sg:'IN', amb:'pieza',col:'a', dib:'flechaApical', pc:1},
+ {id:'extrusion',c:'pa', nom:'Extrusión',         sg:'EX', amb:'pieza',col:'a', dib:'flechaOclusal', pc:1},
+
+ /* Ámbito raíz. Lo pidió la Dra. Cinthya: «en las raíces también se presentan lesiones,
+    entonces podemos marcar fractura en las raíces, abscesos». Se marcan sobre una raíz
+    concreta, no sobre la pieza entera, porque en una molar no da igual cuál. */
+ {id:'absceso',  c:'rz', nom:'Absceso periapical',  sg:'AB', amb:'raiz', col:'r', dib:'absceso'},
+ {id:'fractR',   c:'rz', nom:'Fractura radicular',  sg:'FR', amb:'raiz', col:'r', dib:'fractRaiz'},
+ {id:'reabs',    c:'rz', nom:'Reabsorción radicular',sg:'RB',amb:'raiz', col:'r', dib:'reabs', pc:1},
+ {id:'periapic', c:'rz', nom:'Lesión periapical',   sg:'LP', amb:'raiz', col:'r', dib:'periapic', pc:1}
+];
+const POR_ID={}; CAT.forEach(h=>POR_ID[h.id]=h);
+
+const SUP_P=[18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
+const INF_P=[48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
+const SUP_T=[55,54,53,52,51,61,62,63,64,65];
+const INF_T=[85,84,83,82,81,71,72,73,74,75];
+
+const AN=48, W=860;
+function esSup(n){const q=(n/10)|0;return q===1||q===2||q===5||q===6;}
+function esDer(n){const q=(n/10)|0;return q===1||q===4||q===5||q===8;}
+function esTemp(n){return ((n/10)|0)>=5;}
+function esAnt(n){return (n%10)<=3;}
+function esMolar(n){const p=n%10;return esTemp(n)?p>=4:p>=6;}
+/* La clínica escribe la pieza en notación FDI con punto: 1.1, 2.1, 5.4. El número
+   entero se sigue usando como clave interna (data-pz, est.datos, est.opcion); el punto
+   es sólo cómo se muestra, así que nunca se parsea de vuelta. */
+function fdi(n){
+  const v=String(n==null?'':n);
+  return /^[1-8][1-8]$/.test(v) ? v.charAt(0)+'.'+v.charAt(1) : v;
+}
+function nombrePieza(n){
+  const q=(n/10)|0,p=n%10;
+  const A=['','Incisivo central','Incisivo lateral','Canino','Primera premolar','Segunda premolar',
+           'Primera molar','Segunda molar','Tercera molar'];
+  const T=['','Incisivo central','Incisivo lateral','Canino','Primera molar','Segunda molar'];
+  return (q<=4?A[p]:T[p])||'Pieza';
+}
+function mapaCaras(n){return carasLocal(n);}
+
+const FASES=['inicial','evolucion','alta'];
+const NOM_FASE={inicial:'inicial',evolucion:'evolución',alta:'alta'};
+const est={fase:'inicial', herr:'sel', cal:'bueno', grado:'II',
+           sel:null, cat:'cr', filtro:'', sucio:false, sueltos:[], opcion:{},
+           datos:{inicial:{},evolucion:{},alta:{}}};
+function reg(f,pz){const d=est.datos[f]; if(!d[pz])d[pz]={caras:{},raices:{},pieza:[],nota:''};
+  if(!d[pz].raices)d[pz].raices={};
+  return d[pz];}
+function color(h,cal){return h.col==='e'?(cal==='malo'?'r':'a'):h.col;}
+
+(function sembrar(){
+  const S=(f,pz,t,v)=>{const r=reg(f,pz);
+    if(t==='cara') r.caras[v.c]={h:v.h,c:v.col};
+    else if(t==='raiz') r.raices[v.r]={h:v.h,c:v.col};
+    else r.pieza.push({h:v.h,c:v.col,g:v.g||null});};
+  S('inicial',18,'cara',{c:'O',h:'caries',col:'r'});
+  S('inicial',18,'cara',{c:'P',h:'caries',col:'r'});
+  S('inicial',17,'cara',{c:'O',h:'caries',col:'r'});
+  S('inicial',16,'cara',{c:'O',h:'restaur',col:'a'});
+  S('inicial',16,'cara',{c:'V',h:'restaur',col:'a'});
+  S('inicial',16,'cara',{c:'P',h:'restaur',col:'a'});
+  S('inicial',14,'pieza',{h:'fractura',col:'r'});
+  S('inicial',13,'pieza',{h:'fractura',col:'r'});
+  S('inicial',12,'pieza',{h:'extraccion',col:'r'});
+  S('inicial',26,'pieza',{h:'corona',col:'a'});
+  S('inicial',36,'pieza',{h:'ausente',col:'a'});
+  S('inicial',37,'pieza',{h:'protFija',col:'a'});
+  S('inicial',47,'pieza',{h:'rr',col:'r'});
+  S('inicial',24,'pieza',{h:'movilidad',col:'r',g:'II'});
+  S('inicial',38,'pieza',{h:'impact',col:'a'});
+  S('inicial',35,'cara',{c:'O',h:'restaur',col:'a'});
+  /* lesiones sobre la raíz: el caso que puso la doctora. La 21 tiene una sola raíz;
+     la 46 tiene dos y la fractura está en la distal, que es la segunda. */
+  S('inicial',21,'raiz',{r:0,h:'absceso',col:'r'});
+  S('inicial',46,'raiz',{r:1,h:'fractR',col:'r'});
+  S('inicial',26,'raiz',{r:2,h:'periapic',col:'r'});
+  /* prótesis removible de tres piezas seguidas: es el tramo que tiene que salir con las
+     dos líneas continuas, sin cortes entre diente y diente */
+  S('inicial',33,'pieza',{h:'protRem',col:'a'});
+  S('inicial',34,'pieza',{h:'protRem',col:'a'});
+  S('inicial',35,'pieza',{h:'protRem',col:'a'});
+  /* y una pieza temporal marcada, para que se vea que permanentes y temporales
+     conviven en el mismo odontograma */
+  S('inicial',75,'cara',{c:'O',h:'caries',col:'r'});
+  S('evolucion',18,'cara',{c:'O',h:'restaur',col:'a'});
+  S('evolucion',12,'pieza',{h:'ausente',col:'a'});
+  S('alta',18,'cara',{c:'O',h:'restaur',col:'a'});
+  reg('inicial',13).nota='Fractura de ángulo mesio-incisal, sin compromiso pulpar aparente. Control en 15 días.';
+})();
+
+const NS='http://www.w3.org/2000/svg';
+function el(t,a){const e=document.createElementNS(NS,t);if(a)for(const k in a)e.setAttribute(k,a[k]);return e;}
+function txt(s,a){const e=el('text',a);e.textContent=s;return e;}
+
+/* ================= arcadas ================= */
+const VB={w:1440,h:880};
+/* arcada con fondo y bien envolvente por detrás: se lee como una boca y las dos
+   quedan cerca, sin dejar un hueco muerto en medio */
+/* Cada dentición tiene su geometría. En la mixta las dos arcadas se separan más,
+   porque la fila temporal se mete por dentro y necesita sitio para sus raíces. */
+/* Arco más ancho y arcadas más separadas que en la versión anterior: es el «darle un
+   poco más de espacio a los dientes» que pidió Innoteam. Rx pasa de 476 a 528 —el mismo
+   número de piezas repartidas sobre un arco más largo— y las dos arcadas se abren de
+   222/330 a 214/344 para que las raíces tengan sitio propio. */
+/* ══ la forma de la arcada ══
+   Antes era una elipse muy achatada (620 × 132). El problema no era el espaciado sino
+   la CURVATURA: en una elipse plana toda la curva se concentra en los extremos, así que
+   las molares giraban de golpe unas sobre otras —hasta 16° de una pieza a la siguiente—
+   mientras el frente iba casi recto. Es justo al revés de una boca.
+   Ahora es una parábola: la curva está en el frente, donde están los incisivos, y el
+   sector posterior corre casi derecho hacia atrás. El giro entre diente y diente pasa
+   de variar 14° a variar 3°, y el hueco entre coronas es el mismo en toda la arcada
+   (ver el reparto en puestos()). */
+const GEO={sup:{cx:720,cy:372,Rx:600,Ry:250}, inf:{cx:720,cy:508,Rx:600,Ry:250}};
+const YMED=440;                       /* plano oclusal: la horizontal de la cruz */
+function geoDe(sup){return GEO[sup?'sup':'inf'];}
+
+function carasLocal(n){
+  const der=esDer(n);
+  const V={id:'V',nom:'Vestibular'};
+  const L=esSup(n)?{id:'P',nom:'Palatina'}:{id:'L',nom:'Lingual'};
+  const M={id:'M',nom:'Mesial'}, D={id:'D',nom:'Distal'};
+  const C=esAnt(n)?{id:'I',nom:'Incisal'}:{id:'O',nom:'Oclusal'};
+  return {arriba:V, abajo:L, izq:der?M:D, der:der?D:M, centro:C};
+}
+/* Reparto por longitud de arco sobre la parábola. El sitio de cada pieza no es una
+   rebanada igual para todas: es su propio ancho mesiodistal más un hueco, y ese hueco
+   es el mismo para todas. Antes, con rebanadas iguales, la molar (66 px de ancho) y el
+   incisivo lateral (49) recibían el mismo sitio, así que el hueco entre coronas iba de
+   21 px atrás a 36 px delante —eso era lo que se veía descuadrado—. Ahora es 29,5 px
+   en las 16 piezas, de la línea media a la tercera molar. */
+function puestos(pz,sup,esc,anchos){
+  const g=geoDe(sup), n=pz.length, sg=sup?-1:1;
+  const Rx=g.Rx*esc, Ry=g.Ry*esc;
+  const P=u=>[g.cx+Rx*u, g.cy+sg*Ry*(1-u*u)];
+  const M=800, us=[], ls=[0];
+  for(let i=0;i<=M;i++) us.push(-1+2*i/M);
+  for(let i=1;i<=M;i++){const a=P(us[i-1]),b=P(us[i]);
+    ls.push(ls[i-1]+Math.hypot(b[0]-a[0],b[1]-a[1]));}
+  const total=ls[M], out=[];
+  /* el hueco sobrante se reparte a partes iguales: medio hueco antes de la primera
+     pieza, uno entero entre cada par, medio después de la última */
+  const A=(anchos&&anchos.length===n)?anchos:pz.map(()=>1);
+  const suma=A.reduce((a,b)=>a+b,0), hueco=(total-suma)/n;
+  const metas=[]; let acc=hueco/2;
+  for(let k=0;k<n;k++){metas.push(acc+A[k]/2); acc+=A[k]+hueco;}
+  for(let k=0;k<n;k++){
+    const meta=metas[k]; let i=1; while(i<M&&ls[i]<meta)i++;
+    const u=us[i], p=P(u);
+    /* normal hacia fuera del arco: hacia arriba en la arcada de arriba, hacia abajo en
+       la de abajo, y hacia los lados conforme se va hacia las molares */
+    const nx=2*Ry*u, ny=sg*Rx, L=Math.hypot(nx,ny)||1;
+    out.push({x:p[0],y:p[1],rot:Math.atan2(ny,nx)*180/Math.PI+90,ux:nx/L,uy:ny/L,u:u});
+  }
+  return out;
+}
+function forma(n){
+  const p=n%10, sup=esSup(n);
+  /* Los temporales anteriores estaban en 34x24 px: demasiado chicos para marcar una
+     cara con el dedo o con el ratón. Se suben acercándolos a la proporción real frente
+     al molar temporal (un incisivo central de leche mide ~6,5 mm mesiodistal contra los
+     ~7,3 del segundo molar), y la fila entera crece en capas(). */
+  if(esTemp(n)){
+    if(p===1) return {w:.80,h:.60,e:2.7,punta:0};
+    if(p===2) return {w:.68,h:.58,e:2.7,punta:0};
+    if(p===3) return {w:.72,h:.74,e:2.2,punta:.16};
+    return {w:.90,h:.94,e:3.0,punta:0};
+  }
+  if(p===1) return sup?{w:.88,h:.60,e:2.8,punta:0}:{w:.58,h:.52,e:2.7,punta:0};
+  if(p===2) return sup?{w:.74,h:.58,e:2.8,punta:0}:{w:.64,h:.54,e:2.7,punta:0};
+  if(p===3) return {w:.70,h:.78,e:2.2,punta:.16};
+  if(p===4) return {w:.72,h:.92,e:2.6,punta:0};
+  if(p===5) return {w:.74,h:.91,e:2.7,punta:0};
+  if(p===6) return {w:.96,h:.98,e:3.2,punta:0};
+  if(p===7) return {w:.92,h:.95,e:3.2,punta:0};
+  return {w:.82,h:.89,e:3.0,punta:0};
+}
+const NPT=64;
+function contorno(fo,w,h){
+  const a=w/2,b=h/2,pts=[];
+  for(let i=0;i<NPT;i++){
+    const t=i/NPT*Math.PI*2,c=Math.cos(t),s=Math.sin(t);
+    let x=a*Math.sign(c)*Math.pow(Math.abs(c),2/fo.e);
+    let y=b*Math.sign(s)*Math.pow(Math.abs(s),2/fo.e);
+    if(fo.punta){const k=1+fo.punta*Math.max(0,-s);x*=k;y*=k;}
+    pts.push([x,y]);
+  }
+  return pts;
+}
+function facetas(fo,w,h){
+  const out=contorno(fo,w,h),K=0.40;
+  const inn=out.map(p=>[p[0]*K,p[1]*K]);
+  const idx=g=>Math.round((g/360)*NPT);
+  const sec=(g0,g1)=>{const o=[],v=[];
+    for(let i=idx(g0);i<=idx(g1);i++){const j=((i%NPT)+NPT)%NPT;o.push(out[j]);v.push(inn[j]);}
+    return o.concat(v.reverse());};
+  return {der:sec(-45,45),abajo:sec(45,135),izq:sec(135,225),arriba:sec(225,315),
+          centro:inn.map(p=>[p[0]*1.05,p[1]*1.05])};
+}
+function encoge(pts,k){
+  let cx=0,cy=0;pts.forEach(p=>{cx+=p[0];cy+=p[1];});cx/=pts.length;cy/=pts.length;
+  return pts.map(p=>{const dx=cx-p[0],dy=cy-p[1],d=Math.hypot(dx,dy)||1;
+    return [p[0]+dx/d*k,p[1]+dy/d*k];});
+}
+function centro(pts){let x=0,y=0;pts.forEach(p=>{x+=p[0];y+=p[1];});return [x/pts.length,y/pts.length];}
+const svg=document.getElementById('odo');
+const lupa=document.getElementById('lupa');
+let CAJAS={};
+function defs(destino){
+  const d=el('defs');
+  const rg=(id,cx,cy,r,paradas)=>{
+    const g=el('radialGradient',{id:id,gradientUnits:'userSpaceOnUse',cx:cx,cy:cy,r:r});
+    paradas.forEach(([o,c,op])=>{const st=el('stop',{offset:o,'stop-color':c});
+      if(op!==undefined)st.setAttribute('stop-opacity',op);g.appendChild(st);});
+    d.appendChild(g);
+  };
+  /* esmalte: la luz entra por arriba a la izquierda, con caída suave */
+  rg('esmalte',  -13,-15,  74, [[0,'var(--esm-luz)'],[.26,'var(--esm-tibio)'],
+                                [.62,'var(--esm-med)'],[1,'var(--esm-hondo)']]);
+  rg('esmalteG', -46,-52, 270, [[0,'var(--esm-luz)'],[.26,'var(--esm-tibio)'],
+                                [.62,'var(--esm-med)'],[1,'var(--esm-hondo)']]);
+  /* la mesa oclusal es un rehundido: algo más apagada que las cúspides */
+  rg('esmalteO', -6, -7,   34, [[0,'var(--esm-tibio)'],[.62,'var(--esm-med)'],[1,'var(--esm-hondo)']]);
+  rg('esmalteOG',-22,-26, 120, [[0,'var(--esm-tibio)'],[.62,'var(--esm-med)'],[1,'var(--esm-hondo)']]);
+  /* oclusión sólo en el filo del contorno: es lo que da bulto sin ensuciar */
+  rg('ao',  0,0,  40, [[.74,'var(--ao)',0],[1,'var(--ao)',1]]);
+  rg('aoG', 0,0, 140, [[.74,'var(--ao)',0],[1,'var(--ao)',1]]);
+  /* brillo especular, relativo a su propia elipse */
+  const suave=(id,color,dentro)=>{const g=el('radialGradient',{id:id,cx:'.5',cy:'.5',r:'.5'});
+    g.appendChild(el('stop',{offset:'0','stop-color':color,'stop-opacity':'1'}));
+    g.appendChild(el('stop',{offset:String(dentro||0.55),'stop-color':color,'stop-opacity':'.55'}));
+    g.appendChild(el('stop',{offset:'1','stop-color':color,'stop-opacity':'0'}));
+    d.appendChild(g);};
+  suave('brillo','var(--brillo)'); suave('brilloG','var(--brillo)');
+  /* cada cúspide es un bulto: una sombra debajo y a la derecha, y la luz arriba a la izquierda */
+  const cusp=(id)=>{const g=el('radialGradient',{id:id,cx:'.38',cy:'.32',r:'.60'});
+    g.appendChild(el('stop',{offset:'0','stop-color':'var(--cuspide)','stop-opacity':'1'}));
+    g.appendChild(el('stop',{offset:'1','stop-color':'var(--cuspide)','stop-opacity':'0'}));
+    d.appendChild(g);};
+  cusp('cusp'); cusp('cuspG');
+  suave('cuspSom','var(--ao)',.5);
+  /* dentina: la raíz no es esmalte, va más apagada y más cálida que la corona */
+  rg('dentina',  -11,-14,  70, [[0,'var(--den-1)'],[.55,'var(--den-1)'],[1,'var(--den-2)']]);
+  rg('dentinaG', -44,-56, 260, [[0,'var(--den-1)'],[.55,'var(--den-1)'],[1,'var(--den-2)']]);
+  destino.appendChild(d);
+}
+/* ---- anatomía: cada clase de diente tiene sus propias cúspides y surcos ---- */
+/* un bulto de esmalte: su sombra abajo-derecha y su luz arriba-izquierda */
+function bulto(destino,q){
+  const rx=+q.rx, ry=+q.ry, cx=+q.cx, cy=+q.cy;
+  destino.appendChild(el('ellipse',{class:'cusp-som vol',
+    cx:(cx+rx*0.17).toFixed(1),cy:(cy+ry*0.22).toFixed(1),
+    rx:rx.toFixed(1),ry:ry.toFixed(1)}));
+  destino.appendChild(el('ellipse',{class:'cuspide vol',cx:q.cx,cy:q.cy,rx:q.rx,ry:q.ry}));
+}
+function clase(n){
+  const p=n%10;
+  if(p===1||p===2) return 'inc';
+  if(p===3) return 'can';
+  if(esTemp(n)) return 'mol';          /* 54,55,64,65,74,75,84,85 son molares */
+  if(p===4||p===5) return 'pre';
+  return 'mol';
+}
+/* ================== raíces ==================
+   Cuántas raíces tiene de verdad cada pieza. Es lo que pidió el área clínica: el
+   odontograma tiene que dibujar el diente entero, no sólo la mesa oclusal.
+     incisivos, caninos y 2.ª premolar ....... 1
+     1.ª premolar superior (14 y 24) ......... 2
+     molares inferiores (36-38, 46-48) ....... 2
+     molares superiores (16-18, 26-28) ....... 3
+     molares temporales: arriba 3, abajo 2; los temporales anteriores, 1            */
+function numRaices(n){
+  const p=n%10, sup=esSup(n);
+  if(esTemp(n)) return p>=4 ? (sup?3:2) : 1;
+  if(p<=3)   return 1;
+  if(p===4)  return sup?2:1;
+  if(p===5)  return 1;
+  return sup?3:2;
+}
+/* Cómo se llama cada raíz. Hace falta para nombrarla en el panel y en la lista:
+   «raíz distal», no «raíz 2». El orden es el mismo con el que se dibujan, de mesial
+   a distal tal como queda la pieza en pantalla. */
+function nombresRaiz(n){
+  const k=numRaices(n);
+  if(k===1) return ['única'];
+  if(k===2) return esSup(n)&&(n%10)===4 ? ['vestibular','palatina'] : ['mesial','distal'];
+  return ['mesiovestibular','distovestibular','palatina'];
+}
+/* Eje de cada raíz en coordenadas locales del diente. En este dibujo -Y es hacia
+   fuera del arco, que es justo donde cae el ápice. El mismo eje sirve para dibujar
+   la raíz y para meter dentro el conducto de la endodoncia. */
+function ejesRaiz(n,w,h,dir){
+  dir=dir||1;                                   /* 1 hacia fuera del arco, -1 hacia dentro */
+  const k=numRaices(n), hw=w/2, hh=h/2;
+  /* el largo se mide contra el tamaño de la fila, no contra el ancho del diente: si no,
+     la molar acabaría con la raíz más larga que el incisivo, que es justo al revés */
+  const u=w/(forma(n).w||1);
+  /* En el diente de leche la corona es baja y ancha, así que con el mismo factor que el
+     permanente la raíz salía 1,5 veces más larga que la corona y se leía como una aguja
+     colgando. Se acorta sólo en la dentición temporal: la silueta queda cónica y corta,
+     que es como se ve una raíz de leche en reabsorción. */
+  const largo=u*(esTemp(n) ? (k===1?0.62 : k===2?0.54 : 0.52)
+                           : (k===1?0.78 : k===2?0.64 : 0.62));
+  /* el grosor se mide también contra el tamaño de la fila y se limita al ancho de la
+     corona: si se midiera sólo contra el diente, el incisivo superior —que es ancho y
+     bajo— sacaría una raíz con forma de lápida en vez de cónica */
+  const gr=k===1?0.170 : k===2?0.135 : 0.115;
+  const tope=k===1?0.62 : k===2?0.40 : 0.31;
+  const cuello=-hh*0.78*dir;
+  const ejes=[];
+  for(let i=0;i<k;i++){
+    const t = k===1 ? 0 : (i-(k-1)/2)/((k-1)/2);
+    ejes.push({x0:t*hw*(k===3?0.44:0.38), y0:cuello,
+               x1:t*hw*(k===3?0.66:0.62), y1:cuello-largo*dir,
+               b : Math.min(u*gr, hw*tope)});
+  }
+  return ejes;
+}
+/* Silueta: sale del cuello con todo su grosor, se estrecha por el tercio medio y
+   cierra en un ápice redondeado. Nada de rectángulos con la punta cortada.
+   Los dos hombros del ápice se retranquean SIEMPRE hacia el cuello, y para eso hay que
+   ir en el sentido de la raíz. Con el desplazamiento fijo, la fila temporal —que saca
+   la raíz hacia dentro del arco, con L negativa— los ponía por detrás del vértice y el
+   ápice salía bifurcado: eran las puntas en forma de horquilla que se veían en las 20
+   piezas de leche. */
+function raices(n,w,h,dir){
+  const f=v=>v.toFixed(1);
+  return ejesRaiz(n,w,h,dir).map(e=>{
+    const b=e.b, L=e.y0-e.y1, sg=L<0?-1:1, hom=e.y1+sg*b*0.78;
+    return 'M'+f(e.x0-b)+','+f(e.y0)+
+      ' C'+f(e.x0-b*0.93)+','+f(e.y0-L*0.46)+' '+f(e.x1-b*0.66)+','+f(e.y1+L*0.34)+' '+f(e.x1-b*0.34)+','+f(hom)+
+      ' Q'+f(e.x1)+','+f(e.y1)+' '+f(e.x1+b*0.34)+','+f(hom)+
+      ' C'+f(e.x1+b*0.66)+','+f(e.y1+L*0.34)+' '+f(e.x0+b*0.93)+','+f(e.y0-L*0.46)+' '+f(e.x0+b)+','+f(e.y0)+' Z';
+  });
+}
+/* el cuello: la línea amelocementaria, donde acaba el esmalte y empieza la raíz */
+function cuelloDe(n,w,h,dir){
+  const hw=w/2, hh=h/2, y=(-hh*0.78*(dir||1)).toFixed(1);
+  return 'M'+(-hw*0.80).toFixed(1)+','+y+'L'+(hw*0.80).toFixed(1)+','+y;
+}
+/* cuánto sobresale la pieza con su raíz: lo necesita el reparto de números */
+function alcanceRaiz(n,w,h){const e=ejesRaiz(n,w,h)[0];return Math.abs(e.y1)+e.b*0.6;}
+
+function anatomia(n,fo,w,h,grande){
+  const cl=clase(n), a=w/2, b=h/2, cus=[], fis=[], div=[];
+  const L=(A,x1,y1,x2,y2)=>A.push('M'+x1.toFixed(1)+','+y1.toFixed(1)+
+                                  'L'+x2.toFixed(1)+','+y2.toFixed(1));
+  const C=(cx,cy,rx,ry)=>cus.push({cx:cx.toFixed(1),cy:cy.toFixed(1),
+                                   rx:rx.toFixed(1),ry:ry.toFixed(1)});
+  if(cl==='inc'){                       /* borde incisal: un filo mesio-distal */
+    C(0,-b*0.16, a*0.60, b*0.30);
+    L(fis,-a*0.30,-b*0.13, a*0.30,-b*0.13);
+  }else if(cl==='can'){                 /* una sola cúspide, algo vestibular */
+    C(0,-b*0.08, a*0.44, b*0.38);
+    L(fis,-a*0.26, b*0.10, 0,-b*0.22); L(fis,0,-b*0.22, a*0.26, b*0.10);
+  }else if(cl==='pre'){                 /* dos cúspides con su fisura en medio */
+    C(0,-b*0.44, a*0.42, b*0.24);
+    C(0, b*0.42, a*0.36, b*0.22);
+    L(fis,-a*0.26,-b*0.02, a*0.26,-b*0.02);
+  }else{                                /* molar: cuatro cúspides y fisura central */
+    C(-a*0.40,-b*0.40, a*0.34, b*0.30);
+    C( a*0.40,-b*0.40, a*0.34, b*0.30);
+    C(-a*0.40, b*0.40, a*0.32, b*0.28);
+    C( a*0.40, b*0.40, a*0.32, b*0.28);
+    if(n%10===6 && !esSup(n) && !esTemp(n))   /* la quinta cúspide distal del primer molar inferior */
+      C((esDer(n)?1:-1)*a*0.52, 0, a*0.20, b*0.22);
+    L(fis,-a*0.28,0, a*0.28,0);
+    L(fis,-a*0.11,0, -a*0.11,-b*0.20);
+    L(fis, a*0.11,0,  a*0.11, b*0.20);
+  }
+  /* Las cinco caras se separan con línea entera, del borde de la cara oclusal al contorno,
+     y la oclusal se cierra con su anillo. Es lo que hace que las zonas se distingan de un
+     vistazo, y va en un tono más marcado que la anatomía para que mande sobre ella. */
+  const out=contorno(fo,w,h), idx=g=>((Math.round((g/360)*NPT)%NPT)+NPT)%NPT;
+  const K=0.42;
+  [45,135,225,315].forEach(g=>{
+    const q=out[idx(g)];
+    L(div,q[0]*0.99,q[1]*0.99, q[0]*K,q[1]*K);
+  });
+  const anillo=out.map(q=>[q[0]*K,q[1]*K]);
+  div.push('M'+anillo.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join('L')+'Z');
+  /* en la pieza grande la anatomía la cuentan las cúspides, con sitio de sobra; en la
+     arcada la cuentan las fisuras, que a 60 px se leen mejor que un bulto */
+  return {cusp:cus, fisuras:(grande?[]:fis).join(''), divisiones:div.join('')};
+}
+
+/* Un solo odontograma, siempre. Lo pidió la Dra. Cinthya el 12/09: «un solo
+   odontograma que esté tanto niño como adulto, porque si no nos podría confundir a
+   todos los doctores». Ya no hay vistas de adulto, niño y mixta. */
+function capas(){
+  /* Entre la fila temporal y la permanente sobraban 83-99 px sin usar, así que la fila
+     de leche puede crecer sin acercarse a la permanente: se sube el tamaño de 48 a 56 y
+     el arco de .54 a .58, con lo que el hueco entre coronas temporales queda en ~33 px,
+     del mismo orden que los ~30 px de la arcada permanente. */
+  return [{pz:SUP_P,sup:1,s:66,esc:1,  cap:'SP'},
+          {pz:SUP_T,sup:1,s:56,esc:.58,cap:'ST',alinea:1},
+          {pz:INF_T,sup:0,s:56,esc:.58,cap:'IT',alinea:1},
+          {pz:INF_P,sup:0,s:66,esc:1,  cap:'IP'}];
+}
+/* Los cuatro cuadrantes, dibujados. Lo pidió la doctora: «que esté dividido en los
+   cuatro cuadrantes». La vertical es la línea media y la horizontal el plano oclusal;
+   entre las dos forman la cruz, y cada esquina dice qué cuadrante es. El rótulo nombra
+   los dos que comparten sitio: el permanente y su temporal. */
+function cuadrantes(destino){
+  const g=el('g',{class:'cuad'});
+  const x=GEO.sup.cx, y=YMED;
+  /* Sin paneles rectangulares: la arcada es curva y las cajas dejaban cuatro huecos
+     muertos en las esquinas. La cruz sola ya divide la boca, que es lo que se pidió. */
+  [['Cuadrante 1','5',1,30],['Cuadrante 2','6',0,30],
+   ['Cuadrante 4','8',1,VB.h-14],['Cuadrante 3','7',0,VB.h-14]
+  ].forEach(q=>{
+    g.appendChild(txt(q[0]+' · temporales '+q[1],{class:'cuad-rot',
+      x:(q[2]?44:VB.w-44), y:q[3], 'text-anchor':q[2]?'start':'end'}));
+  });
+  g.appendChild(el('line',{class:'cruz',x1:x,y1:20,x2:x,y2:VB.h-28}));
+  g.appendChild(el('line',{class:'cruz cruz--ocl',x1:40,y1:y,x2:VB.w-40,y2:y}));
+  destino.appendChild(g);
+}
+
+function construir(){
+  svg.setAttribute('viewBox','0 0 '+VB.w+' '+VB.h);
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  CAJAS={};
+  defs(svg);
+  cuadrantes(svg);
+  const gD=el('g'); svg.appendChild(gD);
+  capas().forEach(c=>{
+    const P=puestos(c.pz,c.sup,c.esc,c.pz.map(n=>c.s*forma(n).w)), mitad=(c.pz.length-1)/2;
+    /* números y siglas a distancia fija: quedan alineados en una curva limpia.
+       En dentición mixta la fila temporal va por dentro, así que sus números salen
+       hacia el centro y no se pisan con los de la fila permanente. */
+    /* La fila interior de la dentición mixta saca las raíces hacia el centro: si las
+       sacara hacia fuera se metería dentro de la fila permanente. */
+    const dirR=c.alinea?-1:1;
+    const rMax=Math.max.apply(null,c.pz.map(n=>{const f=forma(n);
+      return alcanceRaiz(n,c.s*f.w,c.s*f.h);}));
+    const hMax=Math.max.apply(null,c.pz.map(n=>c.s*forma(n).h));
+    /* el número y la sigla van del mismo lado que la raíz —fuera del arco, o hacia el
+       centro en la fila temporal—, y la sigla por detrás del número */
+    /* las filas temporales llevan el número más pegado a su corona: van hacia el centro
+       y con la distancia de la fila permanente acababan encima del plano oclusal */
+    /* El número se pone a una distancia fija medida desde el ápice más lejano de la fila.
+       Con +5 en la fila temporal el número acababa tocando la raíz —0 px de separación
+       medidos en las 20 piezas—, y en las molares permanentes quedaban 6 px. Ahora la
+       separación mínima es la misma en toda la arcada. */
+    const dentro=c.alinea?-1:1, Lf=rMax+(c.alinea?26:21), Ls=rMax+(c.alinea?43:39);
+    c.pz.forEach((n,i)=>{
+      const p=P[i], fo=forma(n), w=c.s*fo.w, h=c.s*fo.h;
+      const g=el('g',{class:'pieza','data-pz':n,tabindex:'0',role:'button',
+                      'aria-label':'Pieza '+fdi(n)+', '+nombrePieza(n)});
+      g.style.setProperty('--onda',Math.round(Math.abs(i-mitad)));
+      const T='translate('+p.x.toFixed(1)+','+p.y.toFixed(1)+') rotate('+p.rot.toFixed(1)+')';
+      /* la sombra es la misma silueta corrida abajo y a la derecha. El desplazamiento va
+         antes del giro, así cae hacia el mismo lado en las 32 piezas */
+      const Ts='translate('+(p.x+1.6).toFixed(1)+','+(p.y+2.6).toFixed(1)+
+               ') rotate('+p.rot.toFixed(1)+')';
+      const F=facetas(fo,w,h), M=carasLocal(n), cont=contorno(fo,w,h), an=anatomia(n,fo,w,h);
+      const RA=raices(n,w,h,dirR);
+      const gs=el('g',{transform:Ts});
+      RA.forEach(d=>gs.appendChild(el('path',{class:'sombra',d:d})));
+      gs.appendChild(el('polygon',{class:'sombra',points:pol(cont.filter((_,k)=>k%2===0))}));
+      g.appendChild(gs);
+      /* halo de selección: sigue el contorno del diente, no una caja */
+      const gh=el('g',{transform:T});
+      gh.appendChild(el('polygon',{class:'halo',points:pol(encoge(cont,-7))}));
+      gh.appendChild(el('polygon',{class:'anillo',points:pol(encoge(cont,-12))}));
+      g.appendChild(gh);
+      /* las raíces van debajo de la corona: la corona tapa el cuello y el empalme
+         queda limpio sin tener que recortar nada */
+      const gr=el('g',{transform:T,class:'raices'});
+      const NR=nombresRaiz(n);
+      RA.forEach((d,ri)=>{
+        const p=el('path',{class:'raiz',d:d,'data-raiz':ri});
+        const t=el('title'); t.textContent='Raíz '+NR[ri]; p.appendChild(t);
+        gr.appendChild(p);
+      });
+      g.appendChild(gr);
+      const cu=el('g',{transform:T});
+      const conNom=(e,nom)=>{const t=el('title');t.textContent=nom;e.appendChild(t);return e;};
+      ['arriba','der','abajo','izq'].forEach(k=>cu.appendChild(conNom(el('polygon',
+        {class:'cara',points:pol(F[k]),'data-cara':M[k].id,'data-nom':M[k].nom}),M[k].nom)));
+      cu.appendChild(conNom(el('polygon',{class:'cara cara--o',points:pol(F.centro),
+        'data-cara':M.centro.id,'data-nom':M.centro.nom}),M.centro.nom));
+      cu.appendChild(el('path',{class:'surcos vol',d:an.fisuras}));
+      cu.appendChild(el('polygon',{class:'ao vol',points:pol(cont)}));
+      cu.appendChild(el('path',{class:'division vol',d:an.divisiones}));
+      cu.appendChild(el('polygon',{class:'perfil',points:pol(cont)}));
+      cu.appendChild(el('path',{class:'cemento',d:cuelloDe(n,w,h,dirR)}));
+      g.appendChild(cu);
+      /* las marcas van encima y aparte, para que nada las tape */
+      const cm=el('g',{transform:T});
+      cm.appendChild(el('g',{class:'otras','data-otras':n}));
+      cm.appendChild(el('g',{'data-marcas':n}));
+      g.appendChild(cm);
+      g.appendChild(txt(fdi(n),{class:'num',x:(p.x+p.ux*Lf*dentro).toFixed(1),
+        y:(p.y+p.uy*Lf*dentro+4).toFixed(1)}));
+      g.appendChild(txt('',{class:'sig','data-sig':n,x:(p.x+p.ux*Ls*dentro).toFixed(1),
+        y:(p.y+p.uy*Ls*dentro+4).toFixed(1)}));
+      gD.appendChild(g);
+      CAJAS[n]={w:w,h:h,sup:c.sup,pz:n,dir:dirR,cap:c.cap,i:i,p:p,T:T};
+    });
+  });
+  pintar();
+}
+
+/* ============ la pieza grande: el mismo dibujo que la arcada, en grande ============
+   Todo lo que se ve en la pieza pequeña tiene que verse aquí: las caras pintadas, los
+   símbolos, las siglas, el sellante y las marcas de otras fases de fondo. */
+/* la pieza grande deja sitio arriba para la raíz: el ápice de un incisivo superior
+   llega bastante más lejos que la corona */
+const VBL={w:300,h:344}, LCX=150, LCY=216, LADO=150, LK=2.4;
+function dibujarLupa(){
+  while(lupa.firstChild)lupa.removeChild(lupa.firstChild);
+  lupa.setAttribute('viewBox','0 0 '+VBL.w+' '+VBL.h);
+  lupa.classList.remove('lupa--ausente','lupa--solo-raiz');
+  const tit=document.getElementById('foco-tit'), sub=document.getElementById('foco-sub');
+  const cont=document.getElementById('foco-marcas');
+  cont.innerHTML='';
+  if(!est.sel||!CAJAS[est.sel]){
+    tit.textContent='Pieza'; sub.textContent='';
+    lupa.appendChild(txt('Elige una pieza en la arcada',
+      {x:LCX,y:LCY,class:'lupa-nom',fill:'var(--t400)'}));
+    return;
+  }
+  const n=est.sel, fo=forma(n);
+  tit.textContent='Pieza '+fdi(n);
+  sub.textContent=nombrePieza(n);
+  const k=LADO/Math.max(fo.w,fo.h), w=fo.w*k, h=fo.h*k;
+  const F=facetas(fo,w,h), M=carasLocal(n), r=reg(est.fase,n);
+  const T='translate('+LCX+','+LCY+')';
+  const g=el('g',{transform:T});
+  const etq=[], sellos=[];
+  const cara=(kk,clase)=>{
+    const pts=F[kk], c=M[kk];
+    const p=el('polygon',{class:clase,points:pol(pts),'data-cara':c.id});
+    const t=el('title'); t.textContent=c.nom; p.appendChild(t);
+    const m=r.caras[c.id], hm=m?POR_ID[m.h]:null;
+    /* el sellante se dibuja, no se rellena: igual que en la arcada */
+    if(m&&hm&&hm.dib==='sellante') sellos.push({p:p,c:m.c});
+    else if(m) p.style.fill=tono(m.c);
+    g.appendChild(p);
+    const ce=centro(pts);
+    etq.push(txt(c.id,{class:'lupa-et',x:ce[0].toFixed(1),y:(ce[1]+4).toFixed(1),
+      fill:(m&&!(hm&&hm.dib==='sellante'))?'#fff':'var(--t500)'}));
+  };
+  ['arriba','der','abajo','izq'].forEach(kk=>cara(kk,'lupa-cara'));
+  cara('centro','lupa-cara oclu');
+  const contG=contorno(fo,w,h), an=anatomia(n,fo,w,h,true);
+  an.cusp.forEach(q=>bulto(g,q));
+  g.appendChild(el('path',{class:'cemento',d:cuelloDe(n,w,h,1)}));
+  g.appendChild(el('polygon',{class:'ao vol',points:pol(contG)}));
+  g.appendChild(el('ellipse',{class:'brillo vol',cx:(-w*0.20).toFixed(1),cy:(-h*0.25).toFixed(1),
+    rx:(w*0.25).toFixed(1),ry:(h*0.19).toFixed(1)}));
+  g.appendChild(el('path',{class:'division vol',d:an.divisiones}));
+  g.appendChild(el('polygon',{class:'perfil perfil--gr',points:pol(contG)}));
+  /* las raíces se dibujan aparte y por debajo, igual que en la arcada */
+  const gRz=el('g',{transform:T,class:'raices'});
+  const NRl=nombresRaiz(n);
+  raices(n,w,h,1).forEach((d,ri)=>{
+    const m=(r.raices||{})[ri];
+    const p=el('path',{class:'raiz'+(m?' marcada--'+m.c:''),d:d,'data-raiz':ri});
+    const t=el('title'); t.textContent='Raíz '+NRl[ri]; p.appendChild(t);
+    gRz.appendChild(p);});
+  /* la sombra envuelve sólo el diente: las letras de las caras quedan nítidas */
+  const gb=el('g',{class:'cuerpo--g'}); gb.appendChild(gRz); gb.appendChild(g);
+  lupa.appendChild(gb);
+  const b={w:w,h:h,sup:esSup(n),pz:n,dir:1};
+  /* marcas de las otras fases, de fondo */
+  const go=el('g',{class:'otras',transform:T});
+  FASES.forEach(f=>{
+    if(f===est.fase) return;
+    const rf=est.datos[f] && est.datos[f][n]; if(!rf) return;
+    for(const cid in rf.caras){
+      const m=rf.caras[cid], hm=POR_ID[m.h];
+      const orig=g.querySelector('.lupa-cara[data-cara="'+cid+'"]');
+      if(!hm||!orig) continue;
+      if(hm.dib==='sellante') go.appendChild(selloEnCara(orig,'marca marca--'+m.c));
+      else{const cl=orig.cloneNode(false); cl.setAttribute('class','marca');
+        cl.removeAttribute('data-cara'); cl.style.fill=tono(m.c); cl.style.stroke='none';
+        go.appendChild(cl);}
+    }
+    rf.pieza.forEach(m=>{const hm=POR_ID[m.h]; if(!hm||hm.dib==='sigla')return;
+      simbolo(hm.dib,b,'marca marca--'+m.c,LK).forEach(e=>go.appendChild(e));});
+  });
+  lupa.appendChild(go);
+  const ge=el('g',{transform:T});
+  etq.forEach(e=>ge.appendChild(e));
+  lupa.appendChild(ge);
+  /* marcas de la fase que se está editando */
+  const gm=el('g',{transform:T});
+  sellos.forEach(s=>gm.appendChild(selloEnCara(s.p,'marca marca--'+s.c)));
+  r.pieza.forEach(m=>{const hm=POR_ID[m.h]; if(!hm||hm.dib==='sigla')return;
+    simbolo(hm.dib,b,'marca marca--'+m.c,LK).forEach(e=>gm.appendChild(e));});
+  for(const ri in (r.raices||{})){const m=r.raices[ri],hm=POR_ID[m.h]; if(!hm)continue;
+    simboloRaiz(hm.dib,b,'marca marca--'+m.c,LK,+ri).forEach(e=>gm.appendChild(e));}
+  lupa.appendChild(gm);
+  /* siglas: en la arcada van al lado de la pieza, aquí debajo */
+  const sig=[];
+  r.pieza.forEach(m=>{const hm=POR_ID[m.h];
+    if(hm&&hm.dib==='sigla') sig.push({tx:(hm.grado&&m.g)?hm.sg+m.g:hm.sg,c:m.c});});
+  if(sig.length){
+    const t=txt('',{class:'lupa-sig',x:LCX,y:(LCY+h/2+46).toFixed(1)});
+    sig.forEach((s,i)=>{const ts=el('tspan',{class:'marca--'+s.c});
+      ts.textContent=(i?'   ':'')+s.tx; t.appendChild(ts);});
+    lupa.appendChild(t);
+  }
+  if(r.pieza.some(m=>m.h==='ausente')) lupa.classList.add('lupa--ausente');
+  if(r.pieza.some(m=>m.h==='rr')) lupa.classList.add('lupa--solo-raiz');
+  r.pieza.forEach(m=>{const hm=POR_ID[m.h]; if(!hm)return;
+    const s=document.createElement('span'); s.className='pill pill--'+m.c;
+    s.textContent=hm.nom+(m.g?' '+m.g:''); cont.appendChild(s);});
+  {const NR=nombresRaiz(n);
+   Object.keys(r.raices||{}).forEach(ri=>{const m=r.raices[ri],h=POR_ID[m.h];if(!h)return;
+    const sp=document.createElement('span'); sp.className='pill pill--'+m.c;
+    sp.textContent=h.nom+' · raíz '+(NR[ri]||ri); cont.appendChild(sp);});}
+  if(!r.pieza.length&&!Object.keys(r.caras).length&&!Object.keys(r.raices||{}).length){
+    const s=document.createElement('span'); s.className='pill'; s.style.color='var(--t400)';
+    s.style.background='var(--panel-2)'; s.textContent='Sin hallazgos en esta fase';
+    cont.appendChild(s);
+  }
+}
+
+/* ---- símbolos, en coordenadas locales del diente (fuera = -Y) ---- */
+function pol(pts){return pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');}
+function ln(x1,y1,x2,y2,c){return el('line',{class:c,x1:x1.toFixed(1),y1:y1.toFixed(1),
+  x2:x2.toFixed(1),y2:y2.toFixed(1)});}
+function pls(pts,c){return el('polyline',{class:c,points:pol(pts)});}
+/* k escala las medidas fijas: el mismo símbolo vale para el diente de 60 px de la
+   arcada y para el de 214 px de la pieza grande, sin quedarse enano en el segundo */
+function simbolo(dib,b,c,k){
+  k=k||1;
+  const u=v=>v*k;
+  const o=[], w=b.w, h=b.h, hw=w/2, hh=h/2;
+  const fuera=-hh-u(11), dentro=hh+u(12);
+  switch(dib){
+    case 'cuadrado': o.push(el('rect',{class:c,x:-hw-u(5),y:-hh-u(5),
+                       width:w+u(10),height:h+u(10),rx:u(7)}));break;
+    case 'circunf':  o.push(el('ellipse',{class:c,cx:0,cy:0,rx:hw+u(6),ry:hh+u(6)}));break;
+    /* corona temporal: el mismo contorno, pero discontinuo, que es lo que la distingue
+       de la definitiva de un vistazo */
+    case 'circunfPunt':{const e=el('ellipse',{class:c,cx:0,cy:0,rx:hw+u(6),ry:hh+u(6)});
+                     e.setAttribute('stroke-dasharray',u(5).toFixed(1)+' '+u(4).toFixed(1));
+                     o.push(e);break;}
+    case 'lineaH':   o.push(ln(-hw-u(7),0,hw+u(7),0,c));break;
+    case 'puente':   o.push(ln(-hw-u(8),dentro,hw+u(8),dentro,c));
+                     o.push(ln(-hw-u(8),dentro,-hw-u(8),dentro-u(8),c));
+                     o.push(ln(hw+u(8),dentro,hw+u(8),dentro-u(8),c));break;
+    /* la prótesis removible ya no se dibuja pieza a pieza: se dibuja el tramo entero
+       de una vez en dibujarProtesis(), para que las dos líneas salgan continuas */
+    case 'dobleLinea':break;
+    case 'diagonal': o.push(ln(-hw*.62,-hh*.62,hw*.62,hh*.62,c));break;
+    case 'aspa':     o.push(ln(-hw*.60,-hh*.60,hw*.60,hh*.60,c));
+                     o.push(ln(hw*.60,-hh*.60,-hw*.60,hh*.60,c));break;
+    /* endodoncia: el conducto va dentro de la raíz de verdad. Si la pieza tiene tres
+       raíces, se dibujan los tres conductos, que es como se lee en la placa. */
+    case 'conducto': {const d=b.dir||1;
+                     ejesRaiz(b.pz,w,h,d).forEach(e=>o.push(
+                       ln(e.x0*0.60, hh*0.28*d, e.x1*0.84, e.y1+(e.y0-e.y1)*0.16, c)));
+                     break;}
+    case 'espigo':   {const d=b.dir||1;
+                     ejesRaiz(b.pz,w,h,d).forEach(e=>o.push(
+                       ln(e.x0*0.60, hh*0.28*d, e.x1*0.84, e.y1+(e.y0-e.y1)*0.16, c)));
+                     o.push(el('rect',{class:c,x:-u(5),y:(-u(3)).toFixed(1),
+                       width:u(10),height:u(6),rx:u(2)}));break;}
+    case 'flechaCurva':
+      o.push(el('path',{class:c,d:'M'+(-u(12)).toFixed(1)+','+dentro.toFixed(1)+
+        ' Q0,'+(dentro+u(9)).toFixed(1)+' '+u(12).toFixed(1)+','+dentro.toFixed(1)}));
+      o.push(pls([[u(7),dentro-u(4.5)],[u(12),dentro],[u(7.5),dentro+u(4.5)]],c));break;
+    case 'flechaRecta':
+      o.push(ln(-u(13),dentro,u(13),dentro,c));
+      o.push(pls([[u(8),dentro-u(4.5)],[u(13),dentro],[u(8),dentro+u(4.5)]],c));break;
+    case 'flechaDoble':
+      o.push(ln(-u(13),dentro,u(13),dentro,c));
+      o.push(pls([[u(8),dentro-u(4.5)],[u(13),dentro],[u(8),dentro+u(4.5)]],c));
+      o.push(pls([[-u(8),dentro-u(4.5)],[-u(13),dentro],[-u(8),dentro+u(4.5)]],c));break;
+    case 'zigzag':{const p=[];for(let i=0;i<4;i++)p.push([(i%2?u(5):-u(5)),fuera-u(4+i*6)]);
+      o.push(pls(p,c));
+      o.push(pls([[-u(5),fuera-u(9)],[0,fuera-u(4)],[u(5),fuera-u(9)]],c));break;}
+    case 'circSigla':{const yy=fuera-u(6);
+      o.push(el('circle',{class:c,cx:0,cy:yy,r:u(8)}));
+      o.push(txt('S',{class:c,x:0,y:(yy+u(3.8)).toFixed(1),'text-anchor':'middle',
+        'font-size':u(9.5).toFixed(1),'font-family':'var(--mono)','font-weight':'600',
+        stroke:'none'}));break;}
+    case 'dosCirc':  o.push(el('circle',{class:c,cx:-w*0.19,cy:0,r:hw*0.82}));
+                     o.push(el('circle',{class:c,cx:w*0.19,cy:0,r:hw*0.82}));break;
+    case 'diastema': o.push(ln(hw+u(6),-hh+u(2),hw+u(6),hh-u(2),c));
+                     o.push(ln(hw+u(10),-hh+u(2),hw+u(10),hh-u(2),c));break;
+    /* intrusión y extrusión: la flecha dice hacia dónde se movió la pieza — al ápice
+       o hacia el plano oclusal */
+    case 'flechaApical': {const d=b.dir||1, x=hw+u(10), p=-hh*0.85*d;
+                     o.push(ln(x, hh*0.55*d, x, p, c));
+                     o.push(pls([[x-u(4.5),p+u(5)*d],[x,p],[x+u(4.5),p+u(5)*d]],c));break;}
+    case 'flechaOclusal':{const d=b.dir||1, x=hw+u(10), p=hh*0.95*d;
+                     o.push(ln(x, -hh*0.55*d, x, p, c));
+                     o.push(pls([[x-u(4.5),p-u(5)*d],[x,p],[x+u(4.5),p-u(5)*d]],c));break;}
+  }
+  return o;
+}
+/* símbolos que van sobre UNA raíz concreta, no sobre la pieza */
+function simboloRaiz(dib,b,c,k,ri){
+  k=k||1; const u=v=>v*k, o=[], d=b.dir||1;
+  const ejes=ejesRaiz(b.pz,b.w,b.h,d), e=ejes[Math.min(ri,ejes.length-1)];
+  const L=Math.abs(e.y0-e.y1), mx=(e.x0+e.x1)/2, my=(e.y0+e.y1)/2;
+  switch(dib){
+    case 'absceso': case 'periapic':{
+      const ax=e.x1, ay=e.y1-u(7)*d;
+      o.push(el('circle',{class:c,cx:ax.toFixed(1),cy:ay.toFixed(1),r:u(6.5).toFixed(1)}));
+      if(dib==='absceso')
+        o.push(el('circle',{class:c,cx:ax.toFixed(1),cy:ay.toFixed(1),r:u(2.2).toFixed(1),
+          fill:'currentColor',style:'fill:'+(c.indexOf('--r')>0?'var(--rojo)':'var(--azul)')}));
+      break;}
+    case 'fractRaiz':{
+      const a=u(4.6), p=[];
+      for(let i=0;i<4;i++){
+        const t=0.22+i*0.20;
+        p.push([mx+(i%2?a:-a)+(e.x1-e.x0)*t, e.y0+(e.y1-e.y0)*t]);
+      }
+      o.push(pls(p,c)); break;}
+    case 'reabs':{
+      o.push(el('circle',{class:c,cx:mx.toFixed(1),cy:my.toFixed(1),r:u(5).toFixed(1),
+        'stroke-dasharray':(u(3)).toFixed(1)+' '+(u(2.4)).toFixed(1)}));
+      break;}
+  }
+  return o;
+}
+function selloEnCara(cara,c){
+  const b=cara.getBBox(), y=b.y+b.height/2, x1=b.x+b.width*0.18, x2=b.x+b.width*0.82;
+  return el('path',{class:c,d:'M'+x1+','+y+' Q'+((x1+x2)/2)+','+(y-b.height*0.32)+' '+x2+','+y});
+}
+function grupoDe(pz){return svg.querySelector('.pieza[data-pz="'+pz+'"]');}
+function caraDe(pz,c){const g=grupoDe(pz);return g?g.querySelector('.cara[data-cara="'+c+'"]'):null;}
+function tono(c){return c==='r'?'var(--rojo)':'var(--azul)';}
+
+function dibujarFase(fase,fantasma){
+  const d=est.datos[fase];
+  for(const pz in d){
+    const b=CAJAS[pz], g=grupoDe(pz); if(!b||!g) continue;
+    const destino = fantasma ? g.querySelector('.otras') : g.querySelector('[data-marcas]');
+    const r=d[pz];
+    for(const cid in r.caras){
+      const m=r.caras[cid], h=POR_ID[m.h], cara=caraDe(pz,cid); if(!cara||!h) continue;
+      const c='marca marca--'+m.c;
+      if(h.dib==='sellante') destino.appendChild(selloEnCara(cara,c));
+      else if(fantasma){const cl=cara.cloneNode(false);cl.setAttribute('class','marca');
+        cl.style.fill=tono(m.c);cl.style.stroke='none';destino.appendChild(cl);}
+      else cara.style.fill=tono(m.c);
+    }
+    for(const ri in (r.raices||{})){
+      const m=r.raices[ri], h=POR_ID[m.h]; if(!h) continue;
+      if(!fantasma){
+        const rp=g.querySelector('.raiz[data-raiz="'+ri+'"]');
+        if(rp) rp.classList.add('marcada--'+m.c);
+      }
+      simboloRaiz(h.dib,b,'marca marca--'+m.c,1,+ri).forEach(e=>destino.appendChild(e));
+    }
+    r.pieza.forEach(m=>{
+      const h=POR_ID[m.h]; if(!h) return;
+      if(h.id==='ausente'&&!fantasma) g.classList.add('ausente');
+      if(h.id==='rr'&&!fantasma) g.classList.add('solo-raiz');
+      if(h.dib==='sigla') return;
+      simbolo(h.dib,b,'marca marca--'+m.c).forEach(e=>destino.appendChild(e));
+    });
+  }
+  dibujarProtesis(fase,fantasma);
+}
+
+/* ══ prótesis removible: UN par de líneas por tramo ══
+   «En cuanto a prótesis removible sí sería ideal que las dos líneas estén bien
+   continuas.» Antes cada pieza dibujaba su propio par y quedaban cortadas entre diente
+   y diente. Ahora se agrupan las piezas contiguas de la misma arcada y se traza una
+   sola polilínea que sigue la curva del arco. Una pieza ausente dentro del tramo no lo
+   corta: precisamente la prótesis la está reponiendo. */
+function dibujarProtesis(fase,fantasma){
+  const d=est.datos[fase], capa={};
+  for(const pz in d){
+    if(!d[pz].pieza.some(m=>m.h==='protRem')) continue;
+    const b=CAJAS[pz]; if(!b) continue;
+    const m=d[pz].pieza.find(x=>x.h==='protRem');
+    (capa[b.cap]=capa[b.cap]||[]).push({i:b.i,pz:+pz,c:m.c,b:b});
+  }
+  let cont=svg.querySelector('#prot-'+(fantasma?'otras':'act'));
+  if(!cont){cont=el('g',{id:'prot-'+(fantasma?'otras':'act'),class:fantasma?'otras':''});
+    svg.appendChild(cont);}
+  for(const cap in capa){
+    const lista=capa[cap].sort((a,b2)=>a.i-b2.i);
+    const ausente=pz=>(d[pz]&&d[pz].pieza.some(m=>m.h==='ausente'));
+    const orden=(capas().find(c=>c.cap===cap)||{}).pz||[];
+    let tramo=[lista[0]];
+    for(let k=1;k<lista.length;k++){
+      let puente=true;
+      for(let j=lista[k-1].i+1;j<lista[k].i;j++) if(!ausente(orden[j])) puente=false;
+      if(puente) tramo.push(lista[k]);
+      else { traza(tramo,cont); tramo=[lista[k]]; }
+    }
+    traza(tramo,cont);
+  }
+  function traza(tr,cont){
+    if(!tr.length) return;
+    const c='marca marca--'+tr[0].c;
+    const orden=(capas().find(x=>x.cap===tr[0].b.cap)||{}).pz||[];
+    const ini=tr[0].i, fin=tr[tr.length-1].i, pts1=[], pts2=[];
+    for(let j=ini;j<=fin;j++){
+      const b=CAJAS[orden[j]]; if(!b) continue;
+      const dentro=(b.h*0.50+9)*(b.dir||1);  /* hacia dentro del arco, bajo el cuello */
+      const ux=b.p.ux, uy=b.p.uy;
+      pts1.push([b.p.x-ux*dentro, b.p.y-uy*dentro]);
+      pts2.push([b.p.x-ux*(dentro-5.5), b.p.y-uy*(dentro-5.5)]);
+    }
+    if(!pts1.length) return;
+    if(pts1.length===1){                       /* una sola pieza: un segmento corto */
+      const b=CAJAS[orden[ini]], px=-b.p.uy, py=b.p.ux, L=b.w*0.62;
+      [pts1,pts2].forEach(p=>{const q=p[0];
+        cont.appendChild(pls([[q[0]-px*L,q[1]-py*L],[q[0]+px*L,q[1]+py*L]],c));});
+      return;
+    }
+    const alarga=(p)=>{
+      if(p.length<2) return p;
+      const a=p[0],b2=p[1],y=p[p.length-1],z=p[p.length-2];
+      const e1=[a[0]+(a[0]-b2[0])*0.26,a[1]+(a[1]-b2[1])*0.26];
+      const e2=[y[0]+(y[0]-z[0])*0.26,y[1]+(y[1]-z[1])*0.26];
+      return [e1].concat(p,[e2]);
+    };
+    [pts1,pts2].forEach(p=>cont.appendChild(pls(alarga(p),c)));
+  }
+}
+function pintarSiglas(){
+  svg.querySelectorAll('.sig').forEach(t=>{while(t.firstChild)t.removeChild(t.firstChild);});
+  const d=est.datos[est.fase];
+  for(const pz in d){
+    const t=svg.querySelector('.sig[data-sig="'+pz+'"]'); if(!t)continue;
+    const partes=[];
+    d[pz].pieza.forEach(m=>{const h=POR_ID[m.h];
+      if(h&&h.dib==='sigla')partes.push({tx:(h.grado&&m.g)?h.sg+m.g:h.sg,c:m.c});});
+    partes.forEach((p,i)=>{const ts=el('tspan',{class:'marca--'+p.c});
+      ts.textContent=(i?' ':'')+p.tx;t.appendChild(ts);});
+  }
+}
+function pintar(){
+  svg.querySelectorAll('.cara').forEach(c=>{c.style.fill='';});
+  svg.querySelectorAll('.pieza').forEach(g=>g.classList.remove('ausente','solo-raiz'));
+  svg.querySelectorAll('.raiz').forEach(r=>r.classList.remove('marcada--r','marcada--a'));
+  svg.querySelectorAll('#prot-act,#prot-otras').forEach(g=>g.remove());
+  svg.querySelectorAll('.otras,[data-marcas]').forEach(g=>{while(g.firstChild)g.removeChild(g.firstChild);});
+  FASES.forEach(f=>{if(f!==est.fase)dibujarFase(f,true);});
+  dibujarFase(est.fase,false);
+  pintarSiglas(); marcarSel(); listaHallazgos(); dibujarLupa(); presupuesto();
+}
+function marcarSel(){svg.querySelectorAll('.pieza').forEach(g=>
+  g.classList.toggle('sel',String(est.sel)===g.getAttribute('data-pz')));}
+
+/* ---- iconos ---- */
+function icono(h){
+  const c=h.col==='r'?'var(--rojo)':h.col==='a'?'var(--azul)':'var(--t500)';
+  const cua='<rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="var(--diente-linea)" stroke-width="1"/>';
+  const T=d=>'<path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  let d='';
+  switch(h.dib){
+    case 'relleno':   d=cua+'<rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" fill="'+c+'"/>';break;
+    case 'sellante':  d=cua+T('M8.5 12.5Q12 8.8 15.5 12.5');break;
+    case 'lineaH':    d=cua+T('M3.5 12h17');break;
+    case 'cuadrado':  d=cua+'<rect x="3.2" y="3.2" width="17.6" height="17.6" rx="3" fill="none" stroke="'+c+'" stroke-width="1.5"/>';break;
+    case 'circunf':   d=cua+'<circle cx="12" cy="12" r="8.6" fill="none" stroke="'+c+'" stroke-width="1.5"/>';break;
+    case 'circunfPunt':d=cua+'<circle cx="12" cy="12" r="8.6" fill="none" stroke="'+c+'" stroke-width="1.5" stroke-dasharray="3 2.4"/>';break;
+    case 'puente':    d=T('M3 14h18M3 14v-4.5M21 14v-4.5');break;
+    case 'dobleLinea':d=T('M3 11h18M3 15.5h18');break;
+    case 'diagonal':  d=cua+T('M7.5 7.5l9 9');break;
+    case 'aspa':      d=cua+T('M6.8 6.8l10.4 10.4M17.2 6.8L6.8 17.2');break;
+    case 'conducto':  d=cua+T('M8.6 15.5 7.4 3.6M15.4 15.5l1.2-11.9');break;
+    case 'espigo':    d=cua+T('M12 8v11')+'<rect x="9.4" y="4.6" width="5.2" height="3.6" rx="1" fill="'+c+'"/>';break;
+    case 'flechaCurva':d=T('M3.5 15Q12 5.6 20.5 15M16 11.4 20.5 15l-4.7 2.6');break;
+    case 'flechaRecta':d=T('M3 12h17M16 8.4 20 12l-4 3.6');break;
+    case 'flechaDoble':d=T('M3.5 12h17M16.5 8.6 20.5 12l-4 3.4M7.5 8.6 3.5 12l4 3.4');break;
+    case 'zigzag':    d=T('M9.5 20.5l3-4.5-3-4.5 3-4.5M9.5 20.5l2.5 2.5 2.5-2.5');break;
+    case 'circSigla': d='<circle cx="12" cy="12" r="7.6" fill="none" stroke="'+c+'" stroke-width="1.5"/>'+
+                        '<text x="12" y="15.5" text-anchor="middle" font-size="9.5" font-weight="600" fill="'+c+'" font-family="var(--mono)">S</text>';break;
+    case 'dosCirc':   d='<circle cx="9" cy="12" r="5.6" fill="none" stroke="'+c+'" stroke-width="1.5"/>'+
+                        '<circle cx="15" cy="12" r="5.6" fill="none" stroke="'+c+'" stroke-width="1.5"/>';break;
+    case 'diastema':  d=cua+T('M20 6.5v11M22.6 6.5v11');break;
+    case 'absceso':   d=T('M12 21V9')+'<circle cx="12" cy="6" r="3.6" fill="none" stroke="'+c+'" stroke-width="1.5"/><circle cx="12" cy="6" r="1.3" fill="'+c+'"/>';break;
+    case 'fractRaiz': d=T('M12 21V4')+T('M9.6 16.5 14.4 13 9.6 9.5 14.4 6');break;
+    case 'reabs':     d=T('M12 21V4')+'<circle cx="12" cy="10" r="3.4" fill="none" stroke="'+c+'" stroke-width="1.4" stroke-dasharray="2.6 2"/>';break;
+    case 'periapic':  d=T('M12 21V8')+'<circle cx="12" cy="5.4" r="3.2" fill="none" stroke="'+c+'" stroke-width="1.5"/>';break;
+    case 'flechaApical': d=cua+T('M12 21V4M8.6 7.4 12 4l3.4 3.4');break;
+    case 'flechaOclusal':d=cua+T('M12 3v17M8.6 16.6 12 20l3.4-3.4');break;
+    default:          d='<text x="12" y="15.8" text-anchor="middle" font-size="8.5" font-weight="600" fill="'+c+'" font-family="var(--mono)">'+h.sg+'</text>';
+  }
+  return '<svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true">'+d+'</svg>';
+}
+
+/* ---- la paleta: todos los hallazgos, agrupados y a la vista ---- */
+function construirChips(){
+  const c=document.getElementById('chips'); c.innerHTML='';
+  const q=est.filtro.trim().toLowerCase();
+  let total=0;
+  CATS.forEach(g=>{
+    const lista=CAT.filter(h=>h.c===g.id &&
+      (!q || (h.nom+' '+h.sg).toLowerCase().includes(q)));
+    if(!lista.length) return;
+    total+=lista.length;
+    const t=document.createElement('div'); t.className='grupo';
+    const tn=document.createElement('span'); tn.textContent=g.nom;
+    const ti=document.createElement('i'); ti.textContent=lista.length;
+    t.appendChild(tn); t.appendChild(ti); c.appendChild(t);
+    const rej=document.createElement('div'); rej.className='rejilla';
+    lista.forEach((h,i)=>{
+      const b=document.createElement('button');
+      b.type='button'; b.className='chip';
+      b.setAttribute('data-h',h.id); b.setAttribute('data-col',h.col);
+      b.setAttribute('aria-pressed',String(est.herr===h.id));
+      b.style.setProperty('--i',Math.min(i,8));
+      b.title=h.nom+' · '+(h.amb==='cara'?'se marca sobre una cara':'afecta a toda la pieza')+
+              ' · '+(h.col==='r'?'rojo':h.col==='a'?'azul':'rojo o azul según el estado')+
+              (h.pc?' · por confirmar contra la norma':'');
+      const ic=document.createElement('span'); ic.className='mi'; ic.innerHTML=icono(h);
+      const tx=document.createElement('span'); tx.className='nom'; tx.textContent=h.nom;
+      b.appendChild(ic); b.appendChild(tx);
+      if(h.pc){const pp=document.createElement('i');pp.className='pc';b.appendChild(pp);}
+      rej.appendChild(b);
+    });
+    c.appendChild(rej);
+  });
+  if(!total){
+    const v=document.createElement('span'); v.className='chip chip--vacio';
+    v.textContent='Ningún hallazgo se llama así'; c.appendChild(v);
+  }
+  if(typeof avisaPaleta==='function') requestAnimationFrame(avisaPaleta);
+}
+function opciones(){
+  const c=document.getElementById('ctx'); c.innerHTML='';
+  const h=POR_ID[est.herr];
+  if(!h){c.hidden=true;return;}
+  let algo=false;
+  if(h.col==='e'){algo=true;
+    c.appendChild(rot('Estado'));
+    c.appendChild(seg([['bueno','Buen estado'],['malo','Mal estado']],est.cal,v=>{est.cal=v;opciones();}));}
+  if(h.grado){algo=true;
+    c.appendChild(rot('Grado'));
+    c.appendChild(seg([['I','I'],['II','II'],['III','III']],est.grado,v=>{est.grado=v;opciones();}));}
+  c.hidden=!algo;
+}
+function rot(t){const s=document.createElement('span');s.className='et';s.textContent=t;return s;}
+function seg(pares,act,fn){
+  const d=document.createElement('div'); d.className='seg'; d.setAttribute('role','group');
+  pares.forEach(([v,t])=>{const b=document.createElement('button');b.type='button';b.textContent=t;
+    b.setAttribute('aria-pressed',String(v===act));b.addEventListener('click',()=>fn(v));d.appendChild(b);});
+  return d;
+}
+function construirLeyenda(){
+  const c=document.getElementById('leyenda'); c.innerHTML='';
+  const li=(t,pinta)=>{const s=document.createElement('span');s.className='ly';
+    const i=document.createElement('i');pinta(i);s.appendChild(i);
+    const x=document.createElement('span');x.textContent=t;s.appendChild(x);c.appendChild(s);};
+  li('Patológico o por hacer',i=>i.style.background='var(--rojo)');
+  li('Buen estado o ejecutado',i=>i.style.background='var(--azul)');
+  li('Otras fases',i=>{i.style.background='var(--azul)';i.style.opacity='.18';});
+  const b=document.createElement('button');
+  b.type='button'; b.className='b-info'; b.id='b-info';
+  b.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">'+
+    '<circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>'+
+    '<path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'+
+    '<circle cx="8" cy="4.9" r=".95" fill="currentColor"/></svg>Cómo se lee';
+  c.appendChild(b);
+}
+/* toda la referencia vive aquí dentro: en la pantalla sólo queda el código de color */
+function construirInfo(){
+  const c=document.getElementById('mi-cuerpo'); if(!c) return; c.innerHTML='';
+  const tit=t=>{const h=document.createElement('p');h.className='mi-tit';h.textContent=t;
+    c.appendChild(h);return h;};
+  const fila=(color,fuerte,resto)=>{
+    const d=document.createElement('div'); d.className='mi-fila';
+    const i=document.createElement('i'); i.style.background=color;
+    if(color==='var(--azul)'&&resto.indexOf('otra fase')>=0) i.style.opacity='.18';
+    const x=document.createElement('span');
+    x.innerHTML='<b>'+fuerte+'</b> '+resto; d.appendChild(i); d.appendChild(x); c.appendChild(d);
+  };
+  tit('Color');
+  fila('var(--rojo)','Rojo','señala lo patológico, lo temporal y lo que queda por hacer.');
+  fila('var(--azul)','Azul','señala lo que está en buen estado o ya se ejecutó.');
+  fila('var(--azul)','Azul claro','es una marca hecha en otra fase, que se ve de fondo pero no se edita.');
+  {const d=document.createElement('div'); d.className='mi-fila';
+   const i=document.createElement('i');
+   i.style.background='linear-gradient(180deg,var(--azul) 50%,var(--rojo) 50%)';
+   const x=document.createElement('span');
+   x.innerHTML='<b>Media y media</b> en la paleta: ese hallazgo se pinta de azul o de rojo '+
+     'según marques buen estado o mal estado antes de aplicarlo.';
+   d.appendChild(i); d.appendChild(x); c.appendChild(d);}
+  const amb=CAT.filter(h=>h.pc);
+  tit('Caras de la pieza');
+  const g=document.createElement('div'); g.className='mi-caras';
+  [['V','Vestibular'],['P','Palatina'],['L','Lingual'],['M','Mesial'],
+   ['D','Distal'],['O','Oclusal'],['I','Incisal']].forEach(([k,n])=>{
+    const s=document.createElement('span'); s.className='mi-cara';
+    s.innerHTML='<b>'+k+'</b>'+n; g.appendChild(s);});
+  c.appendChild(g);
+  const n1=document.createElement('p'); n1.className='mi-nota';
+  n1.textContent='Palatina en las piezas de arriba y lingual en las de abajo: es la misma cara, '+
+    'la que da al paladar o a la lengua.';
+  c.appendChild(n1);
+  tit('Los cuatro cuadrantes');
+  const nc=document.createElement('p'); nc.className='mi-nota';
+  nc.innerHTML='Un solo odontograma. El gráfico dibuja las 52 posiciones —32 permanentes '+
+    'y 20 temporales— porque sirve para las tres denticiones; nadie tiene 52 piezas a la vez. '+
+    'La línea media y el plano oclusal forman la cruz que divide la boca, y cada esquina '+
+    'dice qué cuadrante es. El rótulo nombra los dos que comparten sitio: el permanente '+
+    'y su temporal — <b>1 y 5</b>, <b>2 y 6</b>, <b>3 y 7</b>, <b>4 y 8</b>.';
+  c.appendChild(nc);
+  tit('Raíces');
+  const nr=document.createElement('p'); nr.className='mi-nota';
+  nr.innerHTML='Cada pieza se dibuja con las raíces que tiene de verdad, y el ápice '+
+    'apunta hacia fuera de la arcada:<br>'+
+    '<b>1 raíz</b> — incisivos, caninos, segundas premolares y primeras premolares inferiores.<br>'+
+    '<b>2 raíces</b> — primera premolar superior (14 y 24) y molares inferiores (36-38, 46-48).<br>'+
+    '<b>3 raíces</b> — molares superiores (16-18, 26-28).<br>'+
+    'En dentición temporal, las molares de arriba llevan 3 y las de abajo 2.';
+  c.appendChild(nr);
+  const nr2=document.createElement('p'); nr2.className='mi-nota';
+  nr2.innerHTML='Por eso la <b>endodoncia</b> dibuja un conducto por cada raíz y no una sola '+
+    'raya, y el <b>remanente radicular</b> apaga la corona y deja la raíz a la vista. '+
+    'En dentición mixta la fila temporal saca sus raíces hacia el centro, para no meterse '+
+    'dentro de la fila permanente.';
+  c.appendChild(nr2);
+  const nr3=document.createElement('p'); nr3.className='mi-nota';
+  nr3.innerHTML='<b>En la raíz también se marca.</b> Elige un hallazgo del grupo '+
+    '<b>Lesiones de la raíz</b> —absceso, fractura radicular, reabsorción— y toca la raíz, '+
+    'no la corona. En una molar hay que decir cuál: el sistema guarda «raíz distal», no '+
+    '«raíz 2». En piezas de una sola raíz no pregunta.';
+  c.appendChild(nr3);
+  tit('Del odontograma al presupuesto');
+  const np=document.createElement('p'); np.className='mi-nota';
+  np.innerHTML='El plan de inversión de abajo se arma solo con lo que está marcado en '+
+    '<b>rojo</b>, que es lo que está por hacer. Lo azul ya se ejecutó y no entra. '+
+    'Un hallazgo sin tratamiento asociado, o con un tratamiento sin precio en el catálogo, '+
+    '<b>no desaparece</b>: sale avisado debajo de la tabla, para que nadie mande un '+
+    'presupuesto al que le faltan líneas sin saberlo.';
+  c.appendChild(np);
+  tit('Atajos de teclado');
+  const t=document.createElement('div'); t.className='mi-tec';
+  [['C','Caries'],['R','Restauración'],['S','Sellante'],['A','Diente ausente'],
+   ['F','Fractura'],['E','Extracción indicada'],['B','Borrar'],
+   ['Esc','Volver a seleccionar'],['Ctrl Z','Deshacer'],['Alt + clic','Borrar una cara'],
+   ['← →','Cambiar de pieza']].forEach(([k,n])=>{
+    const s=document.createElement('span');
+    s.innerHTML='<kbd>'+k+'</kbd>'+n; t.appendChild(s);});
+  c.appendChild(t);
+  if(amb.length){
+    tit(amb.length+' hallazgos por confirmar');
+    const p=document.createElement('div'); p.className='mi-pc';
+    amb.forEach(h=>{const s=document.createElement('span');s.textContent=h.nom;p.appendChild(s);});
+    c.appendChild(p);
+    const n2=document.createElement('p'); n2.className='mi-nota';
+    n2.textContent='Llevan un punto ámbar en la paleta. Su grafía no se pudo verificar en las '+
+      'fuentes accesibles de la norma, así que la representación que usa la maqueta está a '+
+      'confirmar con el área clínica antes de darla por buena.';
+    c.appendChild(n2);
+  }
+}
+
+/* ---- panel de la pieza ---- */
+function panel(){
+  const c=document.getElementById('panel'); c.innerHTML='';
+  if(!est.sel){c.innerHTML='<div class="vacio" style="padding:18px">'+
+    'Elige una pieza en la arcada para anotarla.</div>';return;}
+  const pz=est.sel, r=reg(est.fase,pz), M=mapaCaras(pz), nom={};
+  ['arriba','abajo','izq','der','centro'].forEach(k=>nom[M[k].id]=M[k].nom);
+  const cu=document.createElement('div'); cu.className='panel-cuerpo';
+
+  const fs=[];
+  Object.keys(r.caras).forEach(cid=>{const m=r.caras[cid],h=POR_ID[m.h];if(!h)return;
+    fs.push({c:m.c,t:h.nom,d:'Cara '+(nom[cid]||cid).toLowerCase(),q:()=>{delete r.caras[cid];}});});
+  {const NR=nombresRaiz(pz);
+   Object.keys(r.raices||{}).forEach(ri=>{const m=r.raices[ri],h=POR_ID[m.h];if(!h)return;
+    fs.push({c:m.c,t:h.nom,d:'Raíz '+(NR[ri]||ri),q:()=>{delete r.raices[ri];}});});}
+  r.pieza.forEach(m=>{const h=POR_ID[m.h];if(!h)return;
+    fs.push({c:m.c,t:h.nom+(m.g?' grado '+m.g:''),d:'Toda la pieza',
+             q:()=>{r.pieza.splice(r.pieza.indexOf(m),1);}});});
+  if(fs.length){
+    const et=rot('En la pieza '+fdi(pz)); et.style.display='block'; et.style.marginBottom='7px';
+    cu.appendChild(et);
+    const lista=document.createElement('div'); lista.className='lista';
+    fs.forEach(f=>{
+      const d=document.createElement('div'); d.className='mk mk--'+f.c;
+      const t=document.createElement('span'); t.className='qt';
+      t.appendChild(document.createTextNode(f.t));
+      const sb=document.createElement('span'); sb.className='qc'; sb.textContent=f.d; t.appendChild(sb);
+      const x=document.createElement('button'); x.type='button'; x.className='qx';
+      x.setAttribute('aria-label','Quitar '+f.t);
+      x.innerHTML='<svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><path d="M4 4l7 7M11 4l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+      x.addEventListener('click',()=>{anota();f.q();sucio();pintar();panel();});
+      d.appendChild(t); d.appendChild(x); lista.appendChild(d);
+    });
+    cu.appendChild(lista);
+  }
+  const et2=rot('Nota clínica'); et2.style.display='block'; et2.style.marginBottom='7px';
+  cu.appendChild(et2);
+  const ta=document.createElement('textarea'); ta.className='nota'; ta.value=r.nota||'';
+  ta.placeholder='Lo que un colega necesitaría saber al abrir esta pieza.';
+  ta.addEventListener('input',()=>{r.nota=ta.value;sucio();});
+  cu.appendChild(ta); c.appendChild(cu);
+}
+
+/* ---- lista de hallazgos del paciente ---- */
+function listaHallazgos(){
+  const c=document.getElementById('hall'); if(!c) return; c.innerHTML='';
+  const d=est.datos[est.fase];
+  const piezas=Object.keys(d).filter(pz=>Object.keys(d[pz].caras).length||
+    d[pz].pieza.length||Object.keys(d[pz].raices||{}).length).sort((a,b)=>a-b);
+  document.getElementById('cuenta').textContent=piezas.length+(piezas.length===1?' pieza':' piezas');
+  if(!piezas.length){
+    const v=document.createElement('div'); v.className='vacio'; v.style.padding='22px 16px';
+    v.textContent='Todavía no hay hallazgos en la fase '+NOM_FASE[est.fase]+'.';
+    c.appendChild(v); return;
+  }
+  piezas.forEach(pz=>{
+    const r=d[pz], M=mapaCaras(+pz), nom={};
+    ['arriba','abajo','izq','der','centro'].forEach(k=>nom[M[k].id]=M[k].nom);
+    const g=document.createElement('div'); g.className='hg'+(String(est.sel)===String(pz)?' act':'');
+    g.setAttribute('role','button'); g.tabIndex=0;
+    const n=document.createElement('span'); n.className='n'; n.textContent=fdi(pz);
+    const dd=document.createElement('div'); dd.className='d';
+    r.pieza.forEach(m=>{const h=POR_ID[m.h];if(!h)return;
+      const p=document.createElement('span'); p.className='pill pill--'+m.c;
+      p.textContent=h.nom+(m.g?' '+m.g:''); dd.appendChild(p);});
+    Object.keys(r.caras).forEach(cid=>{const m=r.caras[cid],h=POR_ID[m.h];if(!h)return;
+      const p=document.createElement('span'); p.className='pill pill--'+m.c;
+      p.innerHTML='<span class="c">'+cid+'</span> '+h.nom;
+      p.title=(nom[cid]||cid)+' · '+h.nom; dd.appendChild(p);});
+    {const NR=nombresRaiz(+pz);
+     Object.keys(r.raices||{}).forEach(ri=>{const m=r.raices[ri],h=POR_ID[m.h];if(!h)return;
+      const p=document.createElement('span'); p.className='pill pill--'+m.c;
+      p.innerHTML='<span class="c">R</span> '+h.nom;
+      p.title='Raíz '+(NR[ri]||ri)+' · '+h.nom; dd.appendChild(p);});}
+    g.appendChild(n); g.appendChild(dd);
+    const ir=()=>{est.sel=+pz;marcarSel();panel();listaHallazgos();dibujarLupa();};
+    g.addEventListener('click',ir);
+    g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();ir();}});
+    c.appendChild(g);
+  });
+  aLaVista(); avisaMas();
+}
+/* si el hallazgo recién puesto queda fuera de la parte visible, la lista se acerca a él */
+function aLaVista(){
+  const c=document.getElementById('hall'); if(!c) return;
+  const a=c.querySelector('.hg.act'); if(!a) return;
+  const arr=a.offsetTop, aba=arr+a.offsetHeight;
+  if(arr<c.scrollTop) c.scrollTop=arr-6;
+  else if(aba>c.scrollTop+c.clientHeight) c.scrollTop=aba-c.clientHeight+6;
+}
+/* enciende los degradados sólo si de verdad queda lista fuera de la parte visible */
+function avisos(idLista,idCaja){
+  const c=document.getElementById(idLista), caja=document.getElementById(idCaja);
+  if(!c||!caja) return;
+  caja.classList.toggle('hay-mas', c.scrollHeight-c.scrollTop-c.clientHeight>6);
+  caja.classList.toggle('hay-antes', c.scrollTop>6);
+}
+function avisaMas(){avisos('hall','hall-caja');}
+/* en la paleta sólo el degradado de abajo: arriba mandan los rótulos de grupo, que se
+   quedan pegados, y un velo encima los borraría */
+function avisaPaleta(){
+  const c=document.getElementById('chips'), caja=document.getElementById('chips-caja');
+  if(!c||!caja) return;
+  caja.classList.toggle('hay-mas', c.scrollHeight-c.scrollTop-c.clientHeight>6);
+}
+
+/* ══ del odontograma al presupuesto ══
+   «Una vez que marquemos todo lo que necesita nuestro paciente desde el odontograma,
+   automáticamente se esté realizando un presupuesto de lo que está en mal estado.»
+   Sólo entra lo rojo: lo azul ya está hecho. Lo que no tiene servicio o no tiene precio
+   en el catálogo NO desaparece: sale abajo, en su propio aviso. Un presupuesto al que
+   le faltan líneas sin avisar es peor que uno que no se genera. */
+/* El precio de una endodoncia depende de la pieza, y eso el plan que se imprime hoy no
+   lo distingue: en el catálogo de la clínica la multirradicular de molares cuesta
+   S/ 850 y las demás no están. Por eso la tabla hallazgo → tratamiento (D-2) no puede
+   ser una línea por hallazgo: tiene que mirar la pieza. */
+/* ── tarifas ─────────────────────────────────────────────────────────────────
+   Precios y códigos del catálogo real de Odonto Sonrisa («ODONTOSONRISA MEDICAL 20»,
+   columna Precio 1 S/.). El precio de la endodoncia depende de la pieza: por eso la
+   tabla hallazgo → tratamiento mira el número de la pieza, no sólo el hallazgo. */
+function tarifaEndo(pz){
+  const p=pz%10;
+  if(p>=6) return {cod:8, t:'Endodoncia multirradicular (molares)', v:850,
+                   alt:[{cod:182,t:'Endodoncia multirradicular + reconstrucción',v:1800},
+                        {cod:137,t:'Retratamiento endodoncia multirradicular',v:1200}]};
+  if(p>=4) return {cod:7, t:'Endodoncia birradicular (premolares)', v:700,
+                   alt:[{cod:199,t:'Pulpectomía + resina',v:800}]};
+  return     {cod:6, t:'Endodoncia unirradicular (anteriores)',  v:700,
+                   alt:[{cod:199,t:'Pulpectomía + resina',v:800},
+                        {cod:291,t:'Retratamiento de pulpectomía + resina',v:850}]};
+}
+/* Varios hallazgos admiten más de un tratamiento y el precio cambia mucho entre ellos:
+   la caries tiene cinco tipos de curación, de S/ 85 a S/ 260. El sistema propone uno y
+   quien arma el presupuesto elige, línea por línea. Esa elección es clínica. */
+const EXO_ALT=[{cod:19,t:'Exodoncia compleja',v:600},
+               {cod:90,t:'Exodoncia semicompleja 3.ª molar',v:500},
+               {cod:180,t:'Exodoncia con odontosección',v:450}];
+const TARIFA={
+  caries:    {cod:127, t:'Curación con resina esencial',   v:85,
+              alt:[{cod:166,t:'Curación resina plus',v:140},
+                   {cod:4,  t:'Curación con resina full',v:200},
+                   {cod:284,t:'Curación con resina infiltrante',v:260},
+                   {cod:5,  t:'Curación con ionómero',v:100},
+                   {cod:210,t:'Reconstrucción molar con ionómero-resina',v:250}]},
+  dde:       {cod:242, t:'Profilaxis dental',              v:159,
+              alt:[{cod:1,t:'Flúor barniz',v:80},
+                   {cod:284,t:'Curación con resina infiltrante',v:260}]},
+  fractura:  {cod:18,  t:'Exodoncia simple',               v:95, alt:EXO_ALT},
+  fractR:    {cod:18,  t:'Exodoncia simple',               v:95, alt:EXO_ALT},
+  rr:        {cod:18,  t:'Exodoncia simple',               v:95, alt:EXO_ALT},
+  extraccion:{cod:18,  t:'Exodoncia simple',               v:95, alt:EXO_ALT},
+  coronaT:   {cod:12,  t:'Corona de porcelana sobre metal',v:850,
+              alt:[{cod:14, t:'Corona porcelana sobre zirconio',v:1600},
+                   {cod:13, t:'Corona de porcelana libre de metal',v:1350},
+                   {cod:281,t:'Corona nano híbrida',v:850},
+                   {cod:57, t:'Corona de acero',v:350},
+                   {cod:23, t:'Corona acrílico provisional',v:350}]},
+  absceso:   {res:tarifaEndo},
+  periapic:  {res:tarifaEndo},
+  endodoncia:{res:tarifaEndo},
+  reabs:     {t:null, v:null},
+  ausente:   {t:null, v:null},
+  movilidad: {t:null, v:null}
+};
+/* Servicios que no salen de ninguna pieza y que recepción añade a mano.
+   El ámbito no es un invento: el propio catálogo ya lo dice en el nombre del servicio
+   —«X PZA.», «POR MAXILAR», «SUPERIOR E INFERIOR», «X DIENTE»—, y 32 de los 322
+   servicios están tarifados por maxilar. Así que se guarda como atributo:
+     amb 'pieza'    la línea se cuelga de la pieza elegida en el odontograma
+     amb 'maxilar'  no se especifica la pieza; se indica en qué maxilar se hace
+     amb 'general'  ni pieza ni maxilar (una consulta no se hace «en» un maxilar)
+   'fijo' es para el servicio que ya viene atado a un maxilar por catálogo, y 'porMax'
+   marca el que se tarifa POR maxilar: elegir ambos son dos unidades, no una. */
+const MAXILAR={sup:'Maxilar superior', inf:'Maxilar inferior', ambos:'Ambos maxilares'};
+const SUELTOS=[
+  {id:'consulta',  cod:26,  t:'Consulta general',                 v:50,   amb:'general'},
+  {id:'consProfi', cod:133, t:'Consulta + profilaxis dental',     v:159,  amb:'general'},
+  {id:'rxperi',    cod:21,  t:'Radiografía periapical',           v:35,   amb:'pieza'},
+  {id:'perno',     cod:10,  t:'Pernos de fibra de vidrio',        v:450,  amb:'pieza'},
+  {id:'coronaZ',   cod:14,  t:'Corona porcelana sobre zirconio',  v:1600, amb:'pieza'},
+  {id:'blqInt',    cod:119, t:'Blanqueamiento interno por diente',v:250,  amb:'pieza'},
+  {id:'profi',     cod:242, t:'Profilaxis dental',                v:159,  amb:'maxilar'},
+  {id:'destMax',   cod:202, t:'Destartraje por maxilar',          v:50,   amb:'maxilar', porMax:1},
+  {id:'destSI',    cod:58,  t:'Destartraje superior e inferior',  v:100,  amb:'maxilar', fijo:'ambos'},
+  {id:'blqLaser',  cod:3,   t:'Blanqueamiento láser por sesión',  v:250,  amb:'maxilar'},
+  {id:'blqLaser3', cod:59,  t:'Blanqueamiento láser 3 sesiones',  v:620,  amb:'maxilar'},
+  {id:'fluor',     cod:1,   t:'Flúor barniz',                     v:80,   amb:'maxilar'}
+];
+/* Qué se escribe en la columna «Pieza» de cada línea. */
+function ambitoRot(L){
+  if(L.max) return MAXILAR[L.max]||'—';
+  return L.pz ? fdi(L.pz) : '—';
+}
+/* El descuento es opcional: si no está activo, el documento ni lo menciona */
+const DESCUENTO={activo:false, tipo:'porcentaje', valor:10, etiqueta:'Descuento'};
+
+/* Un solo sitio donde se recorren los hallazgos de la fase. Lo usan la tabla de la
+   pantalla, el resumen clínico y el plan que se imprime: así no pueden decir cosas
+   distintas. Las caras y las raíces salen con su nombre anatómico completo —«cara
+   mesial», «raíz distal»—, nunca por su posición en pantalla (DEV-15). */
+function recorrer(fn){
+  const d=est.datos[est.fase];
+  Object.keys(d).sort((a,b)=>a-b).forEach(pz=>{
+    const r=d[pz], NR=nombresRaiz(+pz), M=mapaCaras(+pz), nom={};
+    ['arriba','abajo','izq','der','centro'].forEach(k=>nom[M[k].id]=M[k].nom);
+    Object.keys(r.caras).forEach(cid=>fn(r.caras[cid],+pz,'cara '+(nom[cid]||cid).toLowerCase()));
+    Object.keys(r.raices||{}).forEach(ri=>fn(r.raices[ri],+pz,'raíz '+(NR[ri]||ri)));
+    r.pieza.forEach(m=>fn(m,+pz,'toda la pieza'));
+  });
+}
+/* el plan: sólo lo que está en mal estado, que es lo que pidió la doctora */
+function planLineas(){
+  const lineas=[], faltan=[];
+  recorrer((m,pz,ubic)=>{
+    if(m.c!=='r') return;
+    const h=POR_ID[m.h]; if(!h) return;
+    const b=TARIFA[m.h]; if(!b) {faltan.push({pz:pz,q:h.nom,ubic:ubic,por:'no tiene tratamiento asociado'});return;}
+    const base=b.res?b.res(pz):b;
+    if(!base.t) {faltan.push({pz:pz,q:h.nom,ubic:ubic,por:'no tiene tratamiento asociado'});return;}
+    /* el catálogo ofrece varias salidas para el mismo hallazgo: la propuesta va primero
+       y quien arma el presupuesto puede cambiarla sin volver al odontograma */
+    const opts=[{cod:base.cod,t:base.t,v:base.v}].concat(base.alt||[]);
+    const clave=pz+':'+m.h;
+    const eleg=opts.filter(function(o){return o.cod===est.opcion[clave];})[0]||opts[0];
+    if(eleg.v==null){faltan.push({pz:pz,q:h.nom,ubic:ubic,por:'«'+eleg.t+'» no tiene precio en el catálogo'});return;}
+    lineas.push({pz:pz,cod:eleg.cod,t:eleg.t,v:eleg.v,cant:1,ubic:ubic,q:h.nom,
+                 det:h.nom+' · '+ubic,opts:opts,clave:clave});
+  });
+  /* y los servicios sueltos que añadió recepción */
+  (est.sueltos||[]).forEach(function(x){
+    const d=SUELTOS.filter(function(y){return y.id===x.id;})[0]; if(!d)return;
+    const max = d.amb==='maxilar' ? (d.fijo||x.max||'ambos') : null;
+    const ubic = max ? MAXILAR[max].toLowerCase()
+               : (x.pz ? ('pieza '+fdi(x.pz)) : '—');
+    if(d.v==null){faltan.push({pz:x.pz||'—',q:d.t,ubic:ubic,
+      por:'no tiene precio en el catálogo'});return;}
+    /* el destartraje se cobra POR maxilar: hacer los dos son dos unidades */
+    const uds=(x.cant||1)*((d.porMax&&max==='ambos')?2:1);
+    lineas.push({pz:x.pz||null,max:max,cod:d.cod,t:d.t,v:d.v,cant:uds,
+      ubic:ubic,q:'Añadido en recepción',det:d.t,suelto:1,src:x});
+  });
+  /* Se agrupa por pieza y tratamiento: dos caries en la misma pieza son una línea con
+     cantidad 2. Lo pidió la clínica al quitar la columna de cara —dos filas idénticas
+     seguidas parecen un error de cobro—. */
+  const orden=[], agr={};
+  lineas.forEach(function(L){
+    const k=L.clave||((L.pz||L.max||'-')+':'+(L.cod||L.t));
+    if(!agr[k]){agr[k]=Object.assign({},L,{cant:0,ubics:[],srcs:[]}); orden.push(k);}
+    agr[k].cant+=L.cant; agr[k].ubics.push(L.ubic);
+    if(L.src)agr[k].srcs.push(L.src);
+  });
+  const juntas=orden.map(function(k){return agr[k];}).sort(function(a,b){
+    return (a.pz===null?9999:a.pz)-(b.pz===null?9999:b.pz);});
+  return {lineas:juntas,faltan:faltan};
+}
+/* Subtotal, descuento y total. El descuento se muestra sólo si está activo. */
+function totalesPlan(lineas){
+  const sub=lineas.reduce(function(a,L){return a+L.v*(L.cant||1);},0);
+  let d=0;
+  if(DESCUENTO.activo)
+    d = DESCUENTO.tipo==='porcentaje' ? Math.round(sub*DESCUENTO.valor)/100 : +DESCUENTO.valor;
+  return {sub:sub, desc:d, tot:sub-d};
+}
+/* el resumen clínico: todo lo registrado, esté bien o mal */
+/* Lo que se guarda en la marca es el color con el que se pintó —'r' rojo, 'a' azul—,
+   no la letra del catálogo. Un hallazgo del catálogo marcado en rojo está por tratar;
+   en azul, si el hallazgo es un tratamiento ya está ejecutado y si es una anomalía
+   —pieza ausente, impactación— es una observación. */
+function hallazgosLineas(){
+  const out=[];
+  recorrer((m,pz,ubic)=>{const h=POR_ID[m.h]; if(!h)return;
+    const e = m.c==='r' ? ['Por tratar','r']
+            : (h.col==='e' ? ['Ejecutado','e'] : ['Observación','a']);
+    out.push({pz:pz,ubic:ubic,rotulo:h.nom,sg:h.sg,col:e[1],estado:e[0]});});
+  return out;
+}
+/* CPOD en permanentes y ceod en temporales. Una pieza cuenta una sola vez y manda la
+   categoría más grave: perdida, luego cariada, luego obturada. Criterio a validar con
+   la Dra. Cinthya —la extracción indicada y el remanente radicular se están contando
+   como cariadas—. */
+/* Nadie tiene 52 piezas: un adulto tiene 32 permanentes y un niño 20 temporales. El
+   gráfico dibuja las 52 posiciones porque sirve para las tres denticiones, pero el
+   rótulo tiene que decir las del paciente. */
+function denticion(){
+  const e=parseInt(PACIENTE.edad,10)||0;
+  if(e>=13) return {tipo:'permanente', n:32, txt:'Boca completa · 32 piezas'};
+  if(e<=5)  return {tipo:'temporal',   n:20, txt:'Boca completa · 20 piezas temporales'};
+  return {tipo:'mixta', n:52, txt:'Dentición mixta · 32 permanentes y 20 temporales'};
+}
+/* Índice CPOD (Klein, Palmer y Knutson): dientes permanentes Cariados, Perdidos por
+   caries y Obturados. Se mide sobre 28 piezas: excluye los terceros molares.
+   Índice ceod: el equivalente en dentición temporal, donde la «e» es «con extracción
+   indicada» y NO se cuentan los ausentes, porque un diente de leche que falta puede
+   haberse caído solo y no por caries. */
+function indices(){
+  const d=est.datos[est.fase], P={c:0,p:0,o:0}, T={c:0,e:0,o:0};
+  Object.keys(d).forEach(pz=>{
+    const n=+pz, r=d[pz], ids={};
+    r.pieza.forEach(m=>ids[m.h]=1);
+    Object.keys(r.caras).forEach(k=>ids[r.caras[k].h]=1);
+    if(esTemp(n)){
+      /* en temporales el ausente no cuenta: pudo exfoliarse solo */
+      if(ids.caries||ids.rr) T.c++;
+      else if(ids.extraccion) T.e++;
+      else if(ids.restaur) T.o++;
+    } else {
+      if(n%10===8) return;            /* el CPOD excluye los terceros molares */
+      if(ids.ausente) P.p++;
+      else if(ids.caries||ids.rr||ids.extraccion) P.c++;
+      else if(ids.restaur) P.o++;
+    }
+  });
+  P.t=P.c+P.p+P.o; T.t=T.c+T.e+T.o;
+  return {cpod:P,ceod:T};
+}
+
+function presupuesto(){
+  const c=document.getElementById('ppto'); if(!c) return; c.innerHTML='';
+  const R=planLineas(), lineas=R.lineas, faltan=R.faltan;
+  document.getElementById('ppto-sub').textContent =
+    lineas.length ? lineas.length+(lineas.length===1?' línea':' líneas')+' · fase '+NOM_FASE[est.fase]
+                  : 'sale del odontograma';
+  if(!lineas.length&&!faltan.length){
+    const v=document.createElement('div'); v.className='ppto-vacio';
+    v.textContent='Marca un hallazgo en mal estado y el presupuesto se arma solo.';
+    c.appendChild(v); return;
+  }
+  if(lineas.length){
+    const tb=document.createElement('table');
+    tb.innerHTML='<thead><tr><th style="width:112px">Pieza</th><th>Tratamiento</th>'+
+      '<th style="width:62px;text-align:right">Cant.</th>'+
+      '<th style="width:106px;text-align:right">P. Unit. S/</th>'+
+      '<th style="width:106px;text-align:right">Subtotal S/</th></tr></thead>';
+    const cu=document.createElement('tbody'); let tot=0;
+    lineas.forEach(L=>{
+      const c=L.cant||1, sub=L.v*c; tot+=sub;
+      const tr=document.createElement('tr'); if(L.pz)tr.setAttribute('data-pz',L.pz);
+      const det = L.suelto ? L.det
+                : (c>1 ? L.q+' · '+c+' superficies' : L.q+' · '+L.ubics[0]);
+      const varios = L.opts && L.opts.length>1;
+      tr.innerHTML='<td class="pz">'+esc(ambitoRot(L))+'</td>'+
+        '<td class="trat">'+(varios?'':L.t)+
+        '<span class="det">'+det+'</span></td><td class="imp">'+c+'</td>'+
+        '<td class="imp">'+L.v.toFixed(2)+'</td><td class="imp">'+sub.toFixed(2)+'</td>';
+      if(varios){
+        const sel=document.createElement('select'); sel.className='ppto-tt';
+        sel.setAttribute('aria-label','Tratamiento para la pieza '+fdi(L.pz));
+        sel.innerHTML=L.opts.map(function(o){
+          const et=o.t+(o.v==null?' · sin precio':' · S/ '+o.v.toFixed(2));
+          return '<option value="'+o.cod+'"'+(o.cod===L.cod?' selected':'')+'>'+et+'</option>';
+        }).join('');
+        sel.addEventListener('click',function(e){e.stopPropagation();});
+        sel.addEventListener('change',function(){
+          est.opcion[L.clave]=+sel.value; sucio(); presupuesto();});
+        tr.children[1].insertBefore(sel,tr.children[1].firstChild);
+      }
+      if(L.suelto){
+        const td=tr.lastChild, q=document.createElement('button');
+        q.type='button'; q.className='ppto-quita'; q.textContent='×';
+        q.title='Quitar del plan'; q.setAttribute('aria-label','Quitar '+L.t+' del plan');
+        q.addEventListener('click',function(e){e.stopPropagation();
+          (L.srcs||[]).forEach(function(sx){const i=est.sueltos.indexOf(sx);
+            if(i>=0)est.sueltos.splice(i,1);});
+          sucio(); presupuesto();});
+        td.appendChild(q);
+      } else if(L.pz){
+        tr.addEventListener('click',()=>{est.sel=+L.pz;marcarSel();panel();listaHallazgos();dibujarLupa();});
+      }
+      cu.appendChild(tr);
+    });
+    tb.appendChild(cu);
+    const T=totalesPlan(lineas);
+    const tf=document.createElement('tfoot');
+    let ftx='';
+    if(DESCUENTO.activo){
+      ftx+='<tr><td colspan="4">Subtotal</td><td class="imp">S/ '+T.sub.toFixed(2)+'</td></tr>';
+      ftx+='<tr><td colspan="4">'+DESCUENTO.etiqueta+
+           (DESCUENTO.tipo==='porcentaje'?' '+DESCUENTO.valor+' %':'')+
+           '</td><td class="imp">− S/ '+T.desc.toFixed(2)+'</td></tr>';
+    }
+    ftx+='<tr><td colspan="4">Total</td><td class="imp">S/ '+T.tot.toFixed(2)+'</td></tr>';
+    tf.innerHTML=ftx;
+    tb.appendChild(tf);
+    c.appendChild(tb);
+  }
+  if(faltan.length){
+    const a=document.createElement('div'); a.className='ppto-falta';
+    const i=document.createElement('i');
+    const x=document.createElement('span');
+    const g2={}; faltan.forEach(f=>{(g2[f.por]=g2[f.por]||[]).push('pieza '+fdi(f.pz));});
+    x.innerHTML='<b>Aviso interno · no sale en el documento del paciente.</b> '+
+      faltan.length+(faltan.length===1?' hallazgo no entra':' hallazgos no entran')+
+      ' al plan. '+Object.keys(g2).map(k=>k+': '+g2[k].join(', ')).join(' · ')+'.';
+    a.appendChild(i); a.appendChild(x); c.appendChild(a);
+  }
+  /* El plan de hoy sí sabe meter una consulta o una radiografía, que no salen de ninguna
+     pieza. Si el automático no lo permite, el presupuesto nace incompleto y recepción
+     vuelve a armarlo a mano —justo lo que la doctora quiere dejar de hacer—. */
+  const sue=document.createElement('div'); sue.className='ppto-sue';
+  const lab=document.createElement('label'); lab.textContent='Agregar un servicio suelto';
+  const sel=document.createElement('select'); sel.setAttribute('aria-label','Servicio suelto');
+  const alcance=function(x){
+    if(x.amb==='pieza')   return ' · sobre la pieza elegida';
+    if(x.amb==='maxilar') return x.fijo ? ' · ambos maxilares' : ' · por maxilar';
+    return '';
+  };
+  sel.innerHTML='<option value="">Elige un servicio…</option>'+
+    SUELTOS.map(function(x){return '<option value="'+x.id+'">'+x.t+
+      (x.v==null?' · sin precio':' · S/ '+x.v.toFixed(2))+
+      alcance(x)+'</option>';}).join('');
+  /* La profilaxis, el destartraje o el blanqueamiento no se hacen «en la pieza 1.6»:
+     se hacen en un maxilar o en los dos. Por eso el maxilar se elige aquí y la columna
+     de pieza del documento imprime «Maxilar superior» en vez de un número. */
+  const mx=document.createElement('select'); mx.className='ppto-max';
+  mx.setAttribute('aria-label','Maxilar donde se realiza');
+  mx.innerHTML=Object.keys(MAXILAR).map(function(k){
+    return '<option value="'+k+'"'+(k==='ambos'?' selected':'')+'>'+MAXILAR[k]+'</option>';
+  }).join('');
+  mx.hidden=true;
+  const refrescaMx=function(){
+    const d=SUELTOS.filter(function(y){return y.id===sel.value;})[0];
+    mx.hidden = !(d && d.amb==='maxilar' && !d.fijo);
+  };
+  sel.addEventListener('change',refrescaMx);
+  const add=document.createElement('button'); add.type='button'; add.className='btn';
+  add.textContent='Añadir al plan';
+  add.addEventListener('click',function(){
+    const id=sel.value; if(!id)return;
+    const d=SUELTOS.filter(function(y){return y.id===id;})[0];
+    if(d.amb==='pieza'&&!est.sel){avisa('Elige primero la pieza en el odontograma.');return;}
+    est.sueltos.push({id:id, pz:d.amb==='pieza'?est.sel:null,
+                      max:d.amb==='maxilar'?(d.fijo||mx.value):null, cant:1});
+    sucio(); presupuesto();
+  });
+  sue.appendChild(lab); sue.appendChild(sel); sue.appendChild(mx); sue.appendChild(add);
+  c.appendChild(sue);
+
+  const acc=document.createElement('div'); acc.className='ppto-acc';
+  /* El plan ya está hecho: se arma solo mientras se marca, que es lo que pidió la
+     doctora —«tiene que salir automático»—. El botón no lo genera, lo emite. */
+  const bi=document.createElement('button'); bi.type='button'; bi.className='btn btn--pri';
+  bi.textContent='Ver e imprimir el documento';
+  bi.addEventListener('click',()=>abrirDocumento('plan'));
+  acc.appendChild(bi);
+  [['Enviar por WhatsApp','En la maqueta no se envía. Ojo: ese mensaje tiene cobro de Meta.'],
+   ['Guardar como presupuesto','En la maqueta no se guarda. Según D-6, lo que sale del '+
+    'odontograma es una propuesta: alguien la aprueba y recién ahí se convierte en '+
+    'presupuesto con número.']].forEach(([t,m])=>{
+    const b=document.createElement('button'); b.type='button'; b.className='btn';
+    b.textContent=t; b.addEventListener('click',()=>avisa(m)); acc.appendChild(b);});
+  c.appendChild(acc);
+}
+
+/* ═════════════════ el documento para el paciente ═════════════════
+   La Dra. Cinthya pidió dos cosas que conviene no mezclar:
+
+   · A-6, el resumen del odontograma — «lo que me refiero es cómo sale ese resumen
+     para mi paciente». Es un documento clínico: qué se encontró, en qué pieza y en
+     qué cara o raíz, con el índice CPOD y ceod.
+   · A-7, el plan de inversión — «listo para imprimir o enviar por WhatsApp». Es el
+     documento comercial: qué se propone hacer y cuánto cuesta.
+
+   Los dos se calculan solos mientras se marca, porque lo que ella pidió fue
+   «tiene que salir automático». El botón no los genera: los emite. Y su queja de
+   origen era que después de guardar no sabía DÓNDE verlos, así que esconderlos
+   detrás de un botón «generar» sería repetir el problema que reportó. */
+
+/* Membrete tomado del plan de inversión que la clínica imprime hoy desde Sistedent
+   (documento del 11/09/2026). Falta el RUC: no sale en ese PDF. */
+const CLINICA={
+  nombre:'Odonto Sonrisa',
+  razon:'ODONTOSONRISA MEDICAL',          /* sólo dato fiscal, no va en el membrete */
+  bajada:'Centro odontológico',
+  ruc:'20612478636',
+  dir:'Av. Antúnez de Mayolo 1094 A, 2do piso — Los Olivos',
+  tel:'(01) 233 4998 · 997 091 083',
+  horario:'Lun a vie 9:00–19:00 · sáb 9:00–18:00',
+  web:'odontosonrisa.pe',
+  logo:'data:image/png;base64,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'
+};
+const PROF={nombre:'Dra. Cinthya Vásquez Pezzutti', cop:'24493', rne:'4141'};
+/* El RNE es el registro de especialista: en la clínica atienden odontólogos generales
+   que no lo tienen, y el campo salía en blanco en la mitad de los documentos. Se
+   imprime sólo la colegiatura. Queda como parámetro por si otra sede lo quiere. */
+const MOSTRAR_RNE=false;
+const PACIENTE={nombre:'Carlos Ruiz Mendoza', edad:'36 años', hc:'000412', dni:'41·23·4567',
+                esMenor:false, apoderado:null, sede:'Los Olivos'};
+/* quién hizo qué: con nombre de persona, no con el usuario del sistema */
+const TRAZA={creado:'Recepción · Liliana M.', solicitado:PROF.nombre,
+             impreso:'Recepción · Liliana M.'};
+const CONDICIONES=[
+ ['Alcance','Esta propuesta sale de los hallazgos marcados en mal estado en el odontograma '+
+  'del paciente, más los servicios añadidos en recepción. No incluye lo que ya está '+
+  'ejecutado ni las observaciones que no requieren tratamiento.'],
+ ['Vigencia','Válida por 30 días contados desde la fecha de emisión.'],
+ ['Variación','Los importes son los del catálogo vigente y pueden variar si al iniciar el '+
+  'tratamiento cambia el diagnóstico.'],
+ ['Aceptación','No constituye un presupuesto aceptado hasta que el paciente firme su '+
+  'conformidad al pie de este documento.'],
+ ['Pago','La forma de pago y las cuotas se acuerdan en recepción y quedan registradas en el '+
+  'estado de cuenta del paciente.'],
+ /* Redactada para decir lo que pidió la clínica sin declarar una renuncia general: el
+    importe queda disponible en vez de perderse, y se excluye el supuesto en que es la
+    clínica la que no ejecuta. Ver el anexo D. */
+ ['Tratamientos pagados','Los importes pagados por un tratamiento no son objeto de devolución en efectivo. Si el tratamiento no llega a realizarse o el paciente decide cambiarlo, el importe permanece a su favor como saldo en su estado de cuenta y puede aplicarse a cualquier otro tratamiento de la clínica. Esta condición no se aplica cuando el tratamiento no se ejecute por causa atribuible a la clínica y no restringe los derechos que la ley reconoce al paciente.']
+];
+const TOMA={id:'ODO-'+PACIENTE.hc+'-0007'};
+
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function mayus1(t){return t.charAt(0).toUpperCase()+t.slice(1);}
+function fechaLarga(){
+  const M=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+           'setiembre','octubre','noviembre','diciembre'], d=new Date();
+  return d.getDate()+' de '+M[d.getMonth()]+' de '+d.getFullYear();
+}
+function fechaCorta(d){const z=x=>(x<10?'0':'')+x;
+  return z(d.getDate())+'/'+z(d.getMonth()+1)+'/'+d.getFullYear();}
+const NUM_DOC='PI-'+new Date().getFullYear()+'-'+PACIENTE.hc+'-01';
+const imp=v=>v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+
+function metaFranja(pares){
+  return '<div class="meta">'+pares.map(function(p){
+    return '<div><span>'+esc(p[0])+'</span><b>'+esc(p[1])+'</b></div>';}).join('')+'</div>';
+}
+function membrete(titulo,sub,derExtra){
+  const marca = CLINICA.logo
+    ? '<img class="mbr-logo" src="'+esc(CLINICA.logo)+'" alt="'+esc(CLINICA.nombre)+'">'
+    : '<div class="mbr-marca"><span class="mbr-nom">'+esc(CLINICA.nombre)+'</span>'+
+      '<span class="mbr-baj">'+esc(CLINICA.bajada)+'</span></div>';
+  const datos = derExtra || [CLINICA.ruc?('RUC '+CLINICA.ruc):'', CLINICA.dir, CLINICA.tel,
+                             CLINICA.web, CLINICA.horario];
+  return '<header class="mbr">'+marca+'<div class="mbr-datos"><b>'+esc(CLINICA.nombre)+'</b>'+
+    datos.filter(function(x){return x;}).map(esc).join('<br>')+'</div></header>'+
+    '<h1 class="doc-h1">'+esc(titulo)+'</h1>'+
+    (sub?'<p class="doc-sub">'+esc(sub)+'</p>':'');
+}
+function fichaPaciente(){
+  return '<div class="ficha"><div>'+
+    '<p><b>Paciente :</b> '+esc(PACIENTE.nombre)+'</p>'+
+    '<p><b>DNI :</b> '+esc(PACIENTE.dni)+'</p>'+
+    '<p><b>Historia clínica :</b> '+esc(PACIENTE.hc)+'</p></div><div>'+
+    '<p><b>Profesional :</b> '+esc(PROF.nombre)+'</p>'+
+    '<p><b>'+(MOSTRAR_RNE&&PROF.rne?'COP · RNE :</b> '+esc(PROF.cop)+' · '+esc(PROF.rne)
+                                    :'COP :</b> '+esc(PROF.cop))+'</p>'+
+    '<p><b>Sede :</b> '+esc(PACIENTE.sede)+'</p></div></div>';
+}
+/* ── firmas ────────────────────────────────────────────────────────────────
+   Tres formas, y ninguna bloquea la impresión:
+     · manuscrita  — se imprime la línea en blanco y se firma a mano
+     · electronica — la imagen de la firma (grafo escaneado o firma en tableta)
+     · digital     — firma con certificado: lleva emisor, fecha y código de verificación
+   Valen para el profesional y para el paciente por separado: la clínica puede firmar
+   digitalmente y el paciente a mano, o al revés. Si el modo es electrónica o digital y
+   falta la imagen, se degrada a manuscrita y el documento sale igual.
+   Si esa firma tiene o no valor legal lo define la clínica con su abogado: el sistema
+   la dibuja y guarda su rastro, no valida certificados. */
+const MOSTRAR_INDICES=false;     /* decisión de la clínica: fuera del documento */
+const FIRMA={
+  profesional:{modo:'manuscrita', imagen:null, certificado:null, fechaHora:null},
+  paciente:   {modo:'manuscrita', imagen:null, certificado:null, fechaHora:null}
+};
+function zonaFirma(f){
+  if((f.modo==='electronica'||f.modo==='digital') && f.imagen)
+    return '<div class="slot"><img src="'+esc(f.imagen)+'" alt=""></div>';
+  if(f.modo==='electronica')
+    return '<div class="slot"><div class="digi">Firma electrónica registrada</div></div>';
+  if(f.modo==='digital')
+    return '<div class="slot"><div class="digi">Firma digital con certificado</div></div>';
+  return '<div class="slot"></div>';
+}
+function pieFirma(f,extra){
+  const h=f.fechaHora||fechaCorta(new Date());
+  if(f.modo==='digital')
+    return '<div class="sello">Firmado digitalmente el '+esc(h)+
+      (f.certificado?'<br>Certificado '+esc(f.certificado):'')+
+      '<br>Verificación '+esc(NUM_DOC)+'</div>';
+  if(f.modo==='electronica')
+    return '<div class="sello">Firma electrónica registrada el '+esc(h)+'</div>';
+  if(f.modo==='ninguna') return '';
+  return '<div class="modo">'+esc(extra||'Para firmar a mano')+'</div>';
+}
+function firmas(){
+  const men=PACIENTE.esMenor, ap=PACIENTE.apoderado||{};
+  const cols=[
+    {rot:'Profesional tratante', f:FIRMA.profesional,
+     nom:PROF.nombre,
+     sub:'COP '+PROF.cop+(MOSTRAR_RNE&&PROF.rne?' &nbsp;·&nbsp; RNE '+PROF.rne:''), extra:null},
+    {rot: men?'Apoderado':'Paciente', f:FIRMA.paciente,
+     nom: men?(ap.nombre||'__________________________'):PACIENTE.nombre,
+     sub: 'DNI '+(men?(ap.dni||'____________'):PACIENTE.dni),
+     extra:'Fecha '+(FIRMA.paciente.fechaHora||fechaCorta(new Date()))}
+  ];
+  return '<div class="fir">'+cols.map(function(c){
+    return '<div><span class="rol">'+esc(c.rot)+'</span>'+zonaFirma(c.f)+'<i></i>'+
+      '<div class="nom">'+esc(c.nom)+'<em>'+c.sub+'</em></div>'+
+      pieFirma(c.f,c.extra)+'</div>';}).join('')+'</div>';
+}
+function pieDoc(cual,pag){
+  const hora=new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  return '<div class="doc-pie">'+
+    (pag===1 ? '<div class="traza"><div>Creado por : '+esc(TRAZA.creado)+'</div>'+
+      '<div style="text-align:center">Solicitado por : '+esc(TRAZA.solicitado)+'</div>'+
+      '<div style="text-align:right">Impreso por : '+esc(TRAZA.impreso)+' · '+hora+'</div></div>' : '')+
+    '<div class="pieL"><span></span><span data-pag>Página</span></div></div>';
+}
+/* Cuántas páginas de papel son. No se puede dar por hecho: un plan de 8 líneas entra en
+   una hoja y uno de 30 no, y la hoja se parte sola. Se mide la altura real de cada hoja
+   contra el alto útil de una A4 y se numera con eso; el pie va pegado al final de su
+   hoja, así que le toca el último papel de esa hoja. */
+const ALTO_A4=297;                                   /* mm, tamaño de la página */
+function numeraPaginas(caja){
+  const hojas=[].slice.call(caja.querySelectorAll('.hoja'));
+  const porMm=96/25.4;
+  /* Misma cuenta que construir.py, y con la misma tolerancia: medio milímetro para el
+     redondeo del navegador. Con una tolerancia del 2% —casi 6 mm— una hoja que se pasaba
+     por un milímetro se contaba como una sola página y el pie decía «de 2» en un PDF de 3. */
+  const trozos=hojas.map(function(h){
+    const mm=h.scrollHeight/porMm;
+    return Math.max(1, Math.floor((mm-0.5)/ALTO_A4)+1);});
+  const total=trozos.reduce(function(a,b){return a+b;},0);
+  let acum=0;
+  hojas.forEach(function(h,i){
+    acum+=trozos[i];
+    const e=h.querySelector('[data-pag]');
+    if(e) e.textContent='Página '+acum+' de '+total;
+  });
+}
+/* el dibujo, tal cual está en pantalla */
+function odoParaDocumento(){
+  const o=document.getElementById('odo').cloneNode(true);
+  o.removeAttribute('id'); o.setAttribute('class','');
+  const q=o.querySelectorAll('[tabindex]');
+  for(let i=0;i<q.length;i++){q[i].removeAttribute('tabindex');q[i].removeAttribute('role');}
+  return o;
+}
+function hojaOdontograma(titulo,extra){
+  const h=document.createElement('div'); h.className='hoja';
+  h.innerHTML = membrete(titulo||'ODONTOGRAMA DEL PACIENTE',null,
+      [PACIENTE.nombre+' · H.C. '+PACIENTE.hc, fechaCorta(new Date())])+
+    metaFranja([['Dentición',denticion().txt.replace('Boca completa · ','')],
+                ['Fase',mayus1(NOM_FASE[est.fase])],['Toma',TOMA.id],
+                ['Anexo al documento',NUM_DOC]])+
+    '<div class="doc-odo" id="doc-odo-slot"></div>'+
+    '<div class="ley">'+
+      '<span><i style="background:#b3261e"></i>Patológico o por hacer</span>'+
+      '<span><i style="background:#1a47b8"></i>Buen estado o ya ejecutado</span>'+
+    '</div>'+(extra||'')+pieDoc('Odontograma',2);
+  const slot=h.querySelector('#doc-odo-slot');
+  slot.appendChild(odoParaDocumento()); slot.removeAttribute('id');
+  return h;
+}
+
+/* ── hoja 1 del plan: sólo pieza y tratamiento ──────────────────────────────
+   La clínica pidió que al paciente no se le diga qué no tiene precio —eso es un
+   aviso interno— y que la línea no mencione la cara ni la raíz. El detalle por
+   cara y raíz vive en el resumen clínico. */
+function hojaPlan(){
+  const R=planLineas(), L=R.lineas, T=totalesPlan(L);
+  const filas = L.length
+    ? L.map(function(x){
+        return '<tr><td class="pz">'+esc(ambitoRot(x))+'</td><td>'+esc(x.t)+'</td>'+
+          '<td class="c">'+(x.cant||1)+'</td><td class="n">'+imp(x.v)+'</td>'+
+          '<td class="n">'+imp(x.v*(x.cant||1))+'</td></tr>';}).join('')
+    : '<tr><td colspan="5" class="vacio">No hay hallazgos en mal estado en esta fase.</td></tr>';
+  /* las dos primeras columnas quedan vacías y sin borde: el bloque de totales se
+     recoge a la derecha en vez de cruzar toda la tabla */
+  const ft=function(et,val,cls){
+    return '<tr'+(cls||'')+'><td class="vac" colspan="2"></td>'+
+           '<td class="rot" colspan="2">'+et+'</td><td class="n">'+val+'</td></tr>';};
+  let tots=ft('Subtotal','S/ '+imp(T.sub));
+  if(DESCUENTO.activo && T.desc>0){
+    tots+=ft(esc(DESCUENTO.etiqueta)+
+      (DESCUENTO.tipo==='porcentaje'?' '+DESCUENTO.valor+' %':''),
+      '− S/ '+imp(T.desc));
+  }
+  tots+=ft('Total a pagar','S/ '+imp(T.tot),' class="tot"');
+  const vence=new Date(); vence.setDate(vence.getDate()+30);
+  const h=document.createElement('div'); h.className='hoja';
+  h.innerHTML =
+    membrete('PLAN DE INVERSIÓN')+
+    metaFranja([['Documento',NUM_DOC],['Emitido',fechaCorta(new Date())],
+                ['Válido hasta',fechaCorta(vence)],['Estado','Propuesta · sin aceptar']])+
+    fichaPaciente()+
+    '<h2 class="doc-h2">1 &nbsp;·&nbsp; Tratamientos propuestos</h2>'+
+    '<table class="doc"><thead><tr><th style="width:88px">Pieza</th><th>Tratamiento</th>'+
+    '<th style="width:46px">Cant</th><th style="width:92px">P. unit. S/</th>'+
+    '<th style="width:98px">Importe S/</th></tr></thead><tbody>'+filas+'</tbody>'+
+    '<tfoot>'+tots+'</tfoot></table>'+
+    '<h2 class="doc-h2">2 &nbsp;·&nbsp; Condiciones</h2><div class="cond">'+
+    CONDICIONES.map(function(c,i){
+      return '<div class="cl"><span class="cn">'+(i+1)+'</span><span><b>'+esc(c[0])+'.</b> '+
+             esc(c[1])+'</span></div>';}).join('')+'</div>'+
+    firmas()+pieDoc('Plan de inversión',1);
+  return h;
+}
+
+/* ── el resumen clínico sí lleva la cara y la raíz ── */
+function hojaResumen(){
+  const L=hallazgosLineas(), I=indices();
+  const filas = L.length
+    ? L.map(function(x){
+        return '<tr><td class="pz">'+fdi(x.pz)+'</td><td>'+esc(mayus1(x.ubic))+'</td>'+
+          '<td>'+esc(x.rotulo)+'</td><td class="c">'+esc(x.estado)+'</td></tr>';}).join('')
+    : '<tr><td colspan="4" class="vacio">Sin hallazgos registrados en esta fase.</td></tr>';
+  const idx=function(nom,g,pares,pie){
+    return '<div><span>'+nom+'</span><b>'+g.t+'</b><i>'+
+      pares.map(function(p){return p[0]+' '+p[1];}).join(' · ')+'</i>'+
+      '<u>'+pie+'</u></div>';};
+  const h=document.createElement('div'); h.className='hoja';
+  h.innerHTML =
+    membrete('RESUMEN DEL ODONTOGRAMA')+
+    metaFranja([['Dentición',denticion().txt.replace('Boca completa · ','')],
+                ['Fase',mayus1(NOM_FASE[est.fase])],['Toma',TOMA.id],
+                ['Fecha',fechaCorta(new Date())]])+
+    fichaPaciente()+
+    '<h2 class="doc-h2">Hallazgos · '+L.length+(L.length===1?' registro':' registros')+'</h2>'+
+    '<table class="doc"><thead><tr><th style="width:52px">Pieza</th>'+
+    '<th style="width:31%">Ubicación</th><th>Hallazgo</th>'+
+    '<th style="width:96px">Estado</th></tr></thead><tbody>'+filas+'</tbody></table>'+
+    (MOSTRAR_INDICES ? '<div class="idx">'+
+      idx('Índice CPOD · dentición permanente',I.cpod,
+          [['Cariadas',I.cpod.c],['Perdidas',I.cpod.p],['Obturadas',I.cpod.o]],
+          'Piezas permanentes afectadas por caries. No incluye los terceros molares.')+
+      idx('Índice ceod · dentición temporal',I.ceod,
+          [['Cariadas',I.ceod.c],['Con extracción indicada',I.ceod.e],['Obturadas',I.ceod.o]],
+          'Piezas de leche afectadas. No cuenta las ausentes: pueden haberse caído solas.')+
+    '</div>' : '')+
+    '<p class="nota-doc">Las caras y las raíces se nombran por su nombre anatómico —cara '+
+    'mesial, raíz distal— y no por su posición en la pantalla. Cada pieza cuenta una sola '+
+    'vez y manda la categoría más grave; el remanente radicular y la extracción indicada '+
+    'se cuentan como cariadas. Criterio pendiente de validar con la doctora.</p>'+
+    firmas()+pieDoc('Resumen del odontograma',1);
+  return h;
+}
+
+/* ---- la vista del documento ---- */
+let DOCU=null, DOC_QUE='ambos';
+function armarDocu(){
+  const d=document.createElement('div');
+  d.className='docu'; d.id='docu'; d.hidden=true;
+  d.innerHTML =
+    '<div class="docu-barra">'+
+      '<span class="docu-tit">Documento para el paciente</span>'+
+      '<div class="seg" role="group" id="seg-doc" aria-label="Qué documento">'+
+        '<button type="button" data-doc="ambos" aria-pressed="true">Ambos</button>'+
+        '<button type="button" data-doc="resumen" aria-pressed="false">Resumen clínico</button>'+
+        '<button type="button" data-doc="plan" aria-pressed="false">Plan de inversión</button>'+
+      '</div>'+
+      '<span class="docu-pista" id="docu-pista"></span>'+
+      '<div class="docu-acc">'+
+        '<button type="button" class="btn" id="doc-cerrar">Cerrar</button>'+
+        '<button type="button" class="btn btn--pri" id="doc-pdf">Imprimir o guardar PDF</button>'+
+      '</div>'+
+    '</div><div class="docu-hojas" id="docu-hojas"></div>';
+  document.body.appendChild(d);
+  d.querySelector('#doc-cerrar').addEventListener('click',cerrarDocumento);
+  d.querySelector('#doc-pdf').addEventListener('click',function(){
+    try{window.print();}
+    catch(_){avisa('El navegador no dejó abrir la impresión. Usa Ctrl+P o Cmd+P.');}
+  });
+  d.querySelectorAll('#seg-doc button').forEach(function(b){
+    b.addEventListener('click',function(){DOC_QUE=b.getAttribute('data-doc');pintarDocu();});
+  });
+  const p=d.querySelector('#docu-pista');
+  p.textContent = CLINICA.ruc
+    ? 'Se guarda en PDF desde el diálogo de impresión.'
+    : 'Falta el RUC en la configuración. Se guarda en PDF desde el diálogo de impresión.';
+  DOCU=d; return d;
+}
+/* Medir con el documento oculto da altura 0 y el contador se queda en «de 1». Se numera
+   después de mostrarlo, y otra vez antes de imprimir por si el navegador recalcula. */
+function pintarDocu(){
+  const caja=DOCU.querySelector('#docu-hojas'); caja.innerHTML='';
+  DOCU.querySelectorAll('#seg-doc button').forEach(function(b){
+    b.setAttribute('aria-pressed',String(b.getAttribute('data-doc')===DOC_QUE));});
+  if(DOC_QUE==='plan'){ caja.appendChild(hojaPlan()); caja.appendChild(hojaOdontograma()); }
+  else if(DOC_QUE==='resumen'){ caja.appendChild(hojaResumen()); caja.appendChild(hojaOdontograma()); }
+  else { caja.appendChild(hojaPlan()); caja.appendChild(hojaResumen()); caja.appendChild(hojaOdontograma()); }
+  if(DOCU && !DOCU.hidden) numeraPaginas(caja);
+  caja.scrollTop=0;
+}
+function abrirDocumento(que){
+  if(!DOCU) armarDocu();
+  DOC_QUE=que||'ambos';
+  pintarDocu();
+  DOCU.hidden=false;
+  numeraPaginas(DOCU.querySelector('#docu-hojas'));
+  document.documentElement.style.overflow='hidden';
+  const b=DOCU.querySelector('#doc-pdf'); if(b)b.focus();
+}
+function cerrarDocumento(){
+  if(!DOCU)return;
+  DOCU.hidden=true;
+  document.documentElement.style.overflow='';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&DOCU&&!DOCU.hidden){e.stopPropagation();cerrarDocumento();}
+},true);
+addEventListener('beforeprint',function(){
+  if(DOCU&&!DOCU.hidden) numeraPaginas(DOCU.querySelector('#docu-hojas'));
+});
+
+/* ---- historial ---- */
+const HIST={atras:[],adelante:[]};
+function foto(){return JSON.stringify(est.datos);}
+function anota(){HIST.atras.push(foto());if(HIST.atras.length>80)HIST.atras.shift();
+  HIST.adelante.length=0;botonesHist();}
+function botonesHist(){
+  const a=document.getElementById('b-undo'), b=document.getElementById('b-redo');
+  if(a)a.disabled=!HIST.atras.length; if(b)b.disabled=!HIST.adelante.length;}
+function deshacer(){if(!HIST.atras.length)return;HIST.adelante.push(foto());
+  est.datos=JSON.parse(HIST.atras.pop());sucio();pintar();panel();botonesHist();}
+function rehacer(){if(!HIST.adelante.length)return;HIST.atras.push(foto());
+  est.datos=JSON.parse(HIST.adelante.pop());sucio();pintar();panel();botonesHist();}
+
+/* ---- aplicar ---- */
+let avisoT=null;
+function avisa(t){
+  const e=document.getElementById('estado'); if(!e)return;
+  e.innerHTML='<b>'+t+'</b>';
+  clearTimeout(avisoT);
+  avisoT=setTimeout(()=>{e.textContent=est.sucio?'':'Sin cambios sin guardar.';
+    if(est.sucio)e.innerHTML='<b>Cambios sin guardar</b> en la fase '+NOM_FASE[est.fase]+'.';},3200);
+}
+function sucio(){est.sucio=true;
+  document.getElementById('estado').innerHTML='<b>Cambios sin guardar</b> en la fase '+NOM_FASE[est.fase]+'.';}
+function aplicar(pz,caraId,nodo,opt){
+  opt=opt||{};
+  if(opt.tocadas){const k=pz+':'+(caraId||'*');
+    if(opt.tocadas.has(k))return; opt.tocadas.add(k);}
+  est.sel=pz;
+  const borrar = opt.borrar || est.herr==='borrar';
+  if(!borrar && est.herr==='sel'){marcarSel();panel();listaHallazgos();dibujarLupa();return;}
+  const r=reg(est.fase,pz);
+  if(borrar){
+    if(opt.raiz!=null&&r.raices[opt.raiz])delete r.raices[opt.raiz];
+    else if(caraId&&r.caras[caraId])delete r.caras[caraId];
+    else if(!caraId){r.pieza=[];r.caras={};r.raices={};}
+    sucio();pintar();panel();return;
+  }
+  const h=POR_ID[est.herr]; if(!h){marcarSel();panel();dibujarLupa();return;}
+  if(h.amb==='raiz'){
+    /* hay que tocar la raíz: si se toca la corona con un hallazgo de raíz, no se aplica
+       a ciegas, se avisa. En piezas de una sola raíz no hace falta elegir cuál. */
+    let ri=opt.raiz;
+    if(ri==null){
+      if(numRaices(pz)===1) ri=0;
+      else{ avisa('«'+h.nom+'» se marca sobre una raíz: toca la raíz de la pieza '+fdi(pz)+'.');
+            marcarSel();panel();dibujarLupa();return; }
+    }
+    const c=color(h,est.cal), ya=r.raices[ri];
+    if(!opt.forzar && ya && ya.h===h.id && ya.c===c) delete r.raices[ri];
+    else r.raices[ri]={h:h.id,c:c};
+    sucio();pintar();panel();return;
+  }
+  if(h.amb==='cara'){
+    if(!caraId){marcarSel();panel();dibujarLupa();return;}
+    const c=color(h,est.cal), ya=r.caras[caraId];
+    if(!opt.forzar && ya && ya.h===h.id && ya.c===c) delete r.caras[caraId];
+    else r.caras[caraId]={h:h.id,c:c};
+    if(nodo){nodo.classList.remove('pintada');void nodo.getBBox();nodo.classList.add('pintada');
+      setTimeout(()=>nodo.classList.remove('pintada'),360);}
+  } else {
+    const c=color(h,est.cal), ya=r.pieza.findIndex(m=>m.h===h.id);
+    if(ya>=0){ if(opt.forzar) r.pieza[ya].c=c; else r.pieza.splice(ya,1); }
+    else r.pieza.push({h:h.id,c:c,g:h.grado?est.grado:null});
+  }
+  sucio();pintar();panel();
+}
+
+/* ---- eventos ---- */
+function fijarHerr(id){
+  est.herr=id;
+  let elegido=null;
+  document.querySelectorAll('#chips .chip').forEach(b=>{
+    const suyo=b.getAttribute('data-h')===id;
+    b.setAttribute('aria-pressed',String(suyo)); if(suyo) elegido=b;});
+  document.querySelectorAll('#seg-modo button').forEach(b=>
+    b.setAttribute('aria-pressed',String(b.getAttribute('data-modo')===id)));
+  /* si el hallazgo elegido con el teclado quedó fuera de la parte visible, se acerca */
+  if(elegido){const c=document.getElementById('chips');
+    const arr=elegido.offsetTop, aba=arr+elegido.offsetHeight;
+    if(arr<c.scrollTop+26) c.scrollTop=arr-30;
+    else if(aba>c.scrollTop+c.clientHeight) c.scrollTop=aba-c.clientHeight+6;}
+  opciones();
+}
+
+/* pintar arrastrando: un gesto en vez de un clic por cara */
+let pintando=false, tocadas=null, borrarDrag=false;
+function objetivo(e){
+  const g=e.target.closest&&e.target.closest('.pieza'); if(!g)return null;
+  const cl=e.target.classList;
+  const cara=cl&&cl.contains('cara')?e.target:null;
+  const raiz=cl&&cl.contains('raiz')?e.target:null;
+  return {pz:parseInt(g.getAttribute('data-pz'),10),cara:cara,raiz:raiz};
+}
+svg.addEventListener('pointerdown',e=>{
+  const o=objetivo(e); if(!o)return;
+  e.preventDefault();
+  /* preventDefault corta el enfoque por defecto: si venías del buscador, el foco se
+     quedaba dentro del campo y los atajos de teclado dejaban de responder */
+  const gp=e.target.closest('.pieza');
+  svg.classList.add('raton');
+  if(gp&&document.activeElement!==gp){try{gp.focus({preventScroll:true});}catch(_){}}
+  const borra = e.altKey || e.button===2 || est.herr==='borrar';
+  if(borra || est.herr!=='sel') anota();
+  pintando=true; tocadas=new Set(); borrarDrag=borra;
+  try{svg.setPointerCapture(e.pointerId);}catch(_){}
+  aplicar(o.pz, o.cara?o.cara.getAttribute('data-cara'):null, o.cara,
+          {borrar:borra,tocadas:tocadas,raiz:o.raiz?+o.raiz.getAttribute('data-raiz'):null});
+});
+svg.addEventListener('pointermove',e=>{
+  if(!pintando)return;
+  const el2=document.elementFromPoint(e.clientX,e.clientY); if(!el2)return;
+  if(!el2.classList||!el2.classList.contains('cara'))return;
+  const g=el2.closest('.pieza'); if(!g)return;
+  aplicar(parseInt(g.getAttribute('data-pz'),10), el2.getAttribute('data-cara'), el2,
+          {forzar:true,borrar:borrarDrag,tocadas:tocadas});
+});
+['pointerup','pointercancel'].forEach(ev=>
+  window.addEventListener(ev,()=>{pintando=false;tocadas=null;}));
+svg.addEventListener('contextmenu',e=>e.preventDefault());
+
+/* la pieza grande: mismo gesto, objetivos enormes */
+lupa.addEventListener('pointerdown',e=>{
+  if(e.target.classList&&e.target.classList.contains('raiz')&&est.sel){
+    e.preventDefault(); anota();
+    aplicar(est.sel,null,null,{raiz:+e.target.getAttribute('data-raiz'),
+      borrar:e.altKey||e.button===2||est.herr==='borrar'});
+    return;}
+  const c=e.target.closest&&e.target.closest('.lupa-cara'); if(!c||!est.sel)return;
+  e.preventDefault();
+  const borra=e.altKey||e.button===2||est.herr==='borrar';
+  if(borra||est.herr!=='sel') anota();
+  pintando=true; tocadas=new Set(); borrarDrag=borra;
+  try{lupa.setPointerCapture(e.pointerId);}catch(_){}
+  aplicar(est.sel,c.getAttribute('data-cara'),null,{borrar:borra,tocadas:tocadas});
+});
+lupa.addEventListener('pointermove',e=>{
+  if(!pintando||!est.sel)return;
+  const t=document.elementFromPoint(e.clientX,e.clientY);
+  if(!t||!t.classList||!t.classList.contains('lupa-cara'))return;
+  aplicar(est.sel,t.getAttribute('data-cara'),null,{forzar:true,borrar:borrarDrag,tocadas:tocadas});
+});
+lupa.addEventListener('contextmenu',e=>e.preventDefault());
+
+svg.addEventListener('keydown',e=>{
+  const g=e.target.closest&&e.target.closest('.pieza'); if(!g)return;
+  const pz=parseInt(g.getAttribute('data-pz'),10);
+  if(e.key==='Enter'||e.key===' '){e.preventDefault();
+    if(est.herr!=='sel')anota();
+    aplicar(pz,null,null,{});return;}
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+    e.preventDefault();
+    const t=[...svg.querySelectorAll('.pieza')], i=t.indexOf(g), j=i+(e.key==='ArrowRight'?1:-1);
+    if(t[j]){t[j].focus();est.sel=parseInt(t[j].getAttribute('data-pz'),10);
+      marcarSel();panel();listaHallazgos();dibujarLupa();}
+  }
+});
+/* en cuanto se toca el teclado vuelve el anillo de enfoque */
+document.addEventListener('keydown',e=>{if(e.key==='Tab'||e.key.indexOf('Arrow')===0)svg.classList.remove('raton');},true);
+document.addEventListener('keydown',e=>{
+  const enCampo=/^(INPUT|TEXTAREA)$/.test((e.target.tagName||''));
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){
+    e.preventDefault(); e.shiftKey?rehacer():deshacer(); return;}
+  if(enCampo)return;
+  if(e.key==='Escape'){fijarHerr('sel');return;}
+  const atajo={c:'caries',r:'restaur',s:'sellante',a:'ausente',f:'fractura',e:'extraccion',b:'borrar'};
+  const id=atajo[e.key.toLowerCase()];
+  if(id&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+    if(est.filtro){est.filtro='';document.getElementById('buscar').value='';construirChips();}
+    fijarHerr(id);
+  }
+});
+
+document.getElementById('chips').addEventListener('click',e=>{
+  const b=e.target.closest('.chip[data-h]'); if(!b)return; fijarHerr(b.getAttribute('data-h'));});
+document.getElementById('buscar').addEventListener('input',e=>{
+  est.filtro=e.target.value; construirChips(); fijarHerr(est.herr);});
+document.getElementById('seg-modo').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return; fijarHerr(b.getAttribute('data-modo'));});
+
+/* ---- modal de simbología ---- */
+const dlgInfo=document.getElementById('modal-info');
+document.getElementById('leyenda').addEventListener('click',e=>{
+  if(!e.target.closest('#b-info'))return;
+  construirInfo(); dlgInfo.showModal();});
+document.getElementById('mi-cerrar').addEventListener('click',()=>dlgInfo.close());
+document.getElementById('mi-ok').addEventListener('click',()=>dlgInfo.close());
+dlgInfo.addEventListener('click',e=>{if(e.target===dlgInfo)dlgInfo.close();});
+document.getElementById('b-undo').addEventListener('click',deshacer);
+document.getElementById('b-redo').addEventListener('click',rehacer);
+document.getElementById('seg-fase').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  est.fase=b.getAttribute('data-fase');
+  [...e.currentTarget.children].forEach(o=>o.setAttribute('aria-pressed',String(o===b)));
+  pintar(); panel();});
+document.getElementById('b-limpiar').addEventListener('click',()=>{
+  anota(); est.datos[est.fase]={}; est.sel=null; sucio(); pintar(); panel();});
+document.getElementById('b-guardar').addEventListener('click',()=>{
+  est.sucio=false;
+  const h=new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('estado').innerHTML='Guardado a las <b>'+h+'</b>. Maqueta: no envía nada al servidor. '+
+    '<button type="button" class="btn btn--min" id="b-tras-guardar">Ver el resumen del paciente</button>';
+  const bg=document.getElementById('b-tras-guardar');
+  if(bg)bg.addEventListener('click',()=>abrirDocumento('ambos'));});
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  if(t.getAttribute('aria-current')==='page')return;
+  document.getElementById('estado').textContent='En la maqueta sólo está montada la pestaña de Odontograma.';}));
+
+/* ---- arranque ---- */
+construirChips(); construirLeyenda(); opciones(); botonesHist();
+document.getElementById('et-piezas').textContent=denticion().txt;
+document.getElementById('hall').addEventListener('scroll',avisaMas,{passive:true});
+document.getElementById('b-resumen').addEventListener('click',()=>abrirDocumento('resumen'));
+document.getElementById('chips').addEventListener('scroll',avisaPaleta,{passive:true});
+addEventListener('resize',()=>{avisaMas();avisaPaleta();},{passive:true});
+est.sel=46;
+construir(); panel();
+</script>
+
+
+<script id="dento-bridge">
+(function(){
+  if(!/bridge=1/.test(location.search)) return;
+  // Embebido en Dento Check: conservar chrome original (.exp), rellenar con paciente real,
+  // cortar animaciones que hacen "vibrar", zoom/paciente/tabs vía postMessage.
+  // Tema: la maqueta de referencia es oscura — no forzar light (antes pisaba data-theme=dark).
+  try{
+    var tema=(new URLSearchParams(location.search||'')).get('theme');
+    if(tema!=='light' && tema!=='dark') tema='dark';
+    document.documentElement.setAttribute('data-theme',tema);
+    if(tema==='dark') document.documentElement.style.colorScheme='dark';
+    var st=document.createElement('style');
+    st.id='dento-bridge-chrome';
+    st.textContent=[
+      '.pieza,.cara.pintada{animation:none!important;opacity:1!important;transform:none!important}',
+      '#odo-wrap{transform-origin:top center;transition:transform .12s ease}',
+      '.lienzo{overflow:visible!important}',
+      'body{background:var(--fondo)!important}',
+      'html,body{color-scheme:'+tema+'}',
+      /* Embebido: maqueta a ancho completo, sin marco de demo. */
+      '.env{max-width:none!important;margin:0!important;padding:12px 14px 18px!important}',
+      '.exp .tab{cursor:pointer}'
+    ].join('');
+    document.head.appendChild(st);
+  }catch(e){}
+  function initials(n){
+    try{
+      var p=String(n||'').trim().split(/\s+/).filter(Boolean);
+      if(!p.length) return '·';
+      return ((p[0][0]||'')+(p.length>1?(p[p.length-1][0]||''):'')).toUpperCase();
+    }catch(e){ return '·'; }
+  }
+  function applyPaciente(p){
+    try{
+      if(!p||typeof p!=='object') return;
+      if(typeof PACIENTE==='object'&&PACIENTE){
+        if(p.nombre) PACIENTE.nombre=String(p.nombre);
+        if(p.edad!=null) PACIENTE.edad=String(p.edad);
+        if(p.dni) PACIENTE.dni=String(p.dni);
+        if(p.hc) PACIENTE.hc=String(p.hc);
+        if(p.sede) PACIENTE.sede=String(p.sede);
+      }
+      var nom=document.querySelector('.exp-nom');
+      var av=document.querySelector('.exp-av');
+      var sub=document.querySelector('.exp-sub');
+      var nombre=p.nombre||(PACIENTE&&PACIENTE.nombre)||'Paciente';
+      if(nom) nom.textContent=nombre;
+      if(av) av.textContent=initials(nombre);
+      if(sub){
+        var edad=p.edad!=null&&p.edad!==''?String(p.edad):(PACIENTE&&PACIENTE.edad)||'';
+        var dni=p.dni||(PACIENTE&&PACIENTE.dni)||'';
+        var hc=p.hc||(PACIENTE&&PACIENTE.hc)||'';
+        var sede=p.sede||(PACIENTE&&PACIENTE.sede)||'';
+        var parts=[];
+        if(edad) parts.push(/años/i.test(edad)?edad:(edad+' años'));
+        if(dni) parts.push('DNI <b>'+String(dni).replace(/(\d{2})(?=\d)/g,'$1·')+'</b>');
+        if(hc && !/^[0-9a-f-]{8,}$/i.test(String(hc))) parts.push('H.C. <b>'+hc+'</b>');
+        if(sede) parts.push(sede);
+        sub.innerHTML=parts.length?parts.join(' · '):'Expediente clínico';
+      }
+      try{ document.documentElement.setAttribute('data-paciente-ready','1'); }catch(e){}
+      try{ parent.postMessage({ type:'dento-odontograma-resize', ts:Date.now() }, '*'); }catch(e){}
+    }catch(e){}
+  }
+  function applyZoom(pct){
+    try{
+      var n=Number(pct); if(!isFinite(n)||n<=0) n=100;
+      var wrap=document.getElementById('odo-wrap')||document.getElementById('odo')||document.querySelector('main.tarjeta');
+      if(!wrap) return;
+      wrap.style.transform='scale('+(n/100)+')';
+    }catch(e){}
+  }
+  function snapshot(){
+    try{
+      if(typeof est==='undefined') return null;
+      return { type:'dento-odontograma-state', fase: est.fase, datos: est.datos[est.fase]||{}, ts: Date.now() };
+    }catch(e){ return null; }
+  }
+  function notify(){
+    var s=snapshot(); if(!s) return;
+    try{ parent.postMessage(s,'*'); }catch(e){}
+  }
+  function hydrate(msg){
+    try{
+      if(typeof est==='undefined' || typeof pintar!=='function') return;
+      var fase=msg.fase||est.fase||'inicial';
+      if(!est.datos[fase]) est.datos[fase]={};
+      var incoming=msg.datos||{};
+      // Sustituir la capa (no mergear piezas huérfanas de una toma anterior).
+      est.datos[fase]={};
+      Object.keys(incoming).forEach(function(pz){
+        var row=incoming[pz]||{};
+        est.datos[fase][pz]={
+          caras: row.caras||{},
+          raices: row.raices||{},
+          pieza: row.pieza||[],
+          nota: row.nota||''
+        };
+      });
+      est.fase=fase;
+      var seg=document.getElementById('seg-fase');
+      if(seg){
+        Array.prototype.forEach.call(seg.children, function(o){
+          o.setAttribute('aria-pressed', String(o.getAttribute('data-fase')===fase));
+        });
+      }
+      pintar();
+      if(typeof panel==='function') panel();
+      notify();
+    }catch(e){}
+  }
+  var last='';
+  var lastFase='';
+  setInterval(function(){
+    var s=snapshot(); if(!s) return;
+    var j=JSON.stringify(s.datos);
+    if(j===last && s.fase===lastFase) return;
+    last=j; lastFase=s.fase||'';
+    notify();
+  }, 1200);
+  window.addEventListener('mouseup', function(){ setTimeout(notify, 80); });
+  window.addEventListener('keyup', function(){ setTimeout(notify, 80); });
+  // Cambio de fase (Inicial/Evolución/Alta) debe avisarse al instante al padre.
+  document.getElementById('seg-fase')?.addEventListener('click', function(){
+    setTimeout(notify, 0);
+  });
+  function exportPng(reqId){
+    try{
+      var svg=document.getElementById('odo');
+      if(!svg){ parent.postMessage({type:'dento-odontograma-anexo',id:reqId,error:'sin svg'},'*'); return; }
+      var clone=svg.cloneNode(true);
+      var st=document.createElementNS('http://www.w3.org/2000/svg','style');
+      st.textContent='.pieza{animation:none!important;opacity:1!important;transform:none!important}.halo,.anillo{display:none!important}';
+      clone.insertBefore(st, clone.firstChild);
+      var vb=clone.viewBox && clone.viewBox.baseVal;
+      var w=(vb && vb.width) || 1268, h=(vb && vb.height) || 560;
+      clone.setAttribute('width', String(w));
+      clone.setAttribute('height', String(h));
+      clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+      var xml=new XMLSerializer().serializeToString(clone);
+      var url=URL.createObjectURL(new Blob([xml],{type:'image/svg+xml;charset=utf-8'}));
+      var img=new Image();
+      img.onload=function(){
+        try{
+          var scale=2, margin=18;
+          var canvas=document.createElement('canvas');
+          canvas.width=Math.round(w*scale)+margin*2;
+          canvas.height=Math.round(h*scale)+margin*2;
+          var ctx=canvas.getContext('2d');
+          ctx.fillStyle='#fff';
+          ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(img, margin, margin, Math.round(w*scale), Math.round(h*scale));
+          URL.revokeObjectURL(url);
+          parent.postMessage({type:'dento-odontograma-anexo',id:reqId,dataUrl:canvas.toDataURL('image/png')},'*');
+        }catch(e){
+          URL.revokeObjectURL(url);
+          parent.postMessage({type:'dento-odontograma-anexo',id:reqId,error:String(e&&e.message||e)},'*');
+        }
+      };
+      img.onerror=function(){
+        URL.revokeObjectURL(url);
+        parent.postMessage({type:'dento-odontograma-anexo',id:reqId,error:'raster fail'},'*');
+      };
+      img.src=url;
+    }catch(e){
+      try{ parent.postMessage({type:'dento-odontograma-anexo',id:reqId,error:String(e&&e.message||e)},'*'); }catch(_){}
+    }
+  }
+  var TAB_MAP={
+    'Resumen':'resumen',
+    'Historia clínica':'historia',
+    'Odontograma':'odontograma',
+    'Periodontograma':'perio',
+    'Receta médica':'receta',
+    'Ortodoncia':'ortodoncia',
+    'Estado de cuenta':'cuenta'
+  };
+  function wireTabs(){
+    try{
+      var nav=document.querySelector('.exp nav.tabs');
+      if(!nav||nav.getAttribute('data-dento-wired')) return;
+      nav.setAttribute('data-dento-wired','1');
+      nav.addEventListener('click', function(ev){
+        var btn=ev.target&&ev.target.closest&&ev.target.closest('button.tab');
+        if(!btn) return;
+        var label=(btn.textContent||'').trim();
+        var tab=TAB_MAP[label];
+        if(!tab) return;
+        if(tab==='odontograma') return;
+        try{ parent.postMessage({ type:'dento-odontograma-nav', tab: tab, label: label }, '*'); }catch(e){}
+      });
+    }catch(e){}
+  }
+  // Identidad ya aplicada por el script inline / URL; no pisar con "Selecciona…"
+  wireTabs();
+  try{
+    var q0=new URLSearchParams(location.search);
+    if(q0.get('nombre')) applyPaciente({
+      nombre:q0.get('nombre'), edad:q0.get('edad')||'', dni:q0.get('dni')||'',
+      hc:q0.get('hc')||'', sede:q0.get('sede')||''
+    });
+  }catch(e){}
+  // Avisar al padre la altura real (maqueta completa = chart + lupa + hallazgos + plan)
+  function avisarResize(){
+    try{ parent.postMessage({ type:'dento-odontograma-resize', h: document.documentElement.scrollHeight, ts:Date.now() }, '*'); }catch(e){}
+  }
+  setTimeout(avisarResize, 200);
+  setTimeout(avisarResize, 800);
+  window.addEventListener('load', avisarResize);
+  window.addEventListener('message', function(ev){
+    var d=ev&&ev.data; if(!d) return;
+    if(d.type==='dento-odontograma-hydrate') hydrate(d);
+    if(d.type==='dento-odontograma-ping') notify();
+    if(d.type==='dento-odontograma-export-png') exportPng(d.id);
+    if(d.type==='dento-odontograma-zoom') applyZoom(d.zoom);
+    if(d.type==='dento-odontograma-paciente') applyPaciente(d.paciente);
+  });
+  window.__dentoBridge={snapshot:snapshot,notify:notify,hydrate:hydrate,exportPng:exportPng,applyZoom:applyZoom,applyPaciente:applyPaciente};
+  setTimeout(notify, 400);
+  try{
+    var params=new URLSearchParams(location.search);
+    if(params.get('zoom')) applyZoom(params.get('zoom'));
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

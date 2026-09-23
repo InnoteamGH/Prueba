@@ -1,0 +1,441 @@
+/* Sprint 2 — primitivos UI sobre tokens (SPEC). */
+
+/* ---- Botón ---- */
+.dc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dc-sp-2);
+  min-height: var(--dc-tap-min);
+  min-width: var(--dc-tap-min);
+  padding: 10px 18px;
+  border-radius: var(--dc-r-md);
+  border: 1.5px solid transparent;
+  font-size: var(--dc-fs-md);
+  font-weight: var(--dc-fw-semibold);
+  line-height: var(--dc-lh-md);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s, opacity .15s;
+  font-family: inherit;
+}
+.dc-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--dc-focus);
+}
+.dc-btn:disabled,
+.dc-btn[aria-disabled="true"] {
+  opacity: .55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.dc-btn[aria-busy="true"] {
+  opacity: .7;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.dc-btn--primario {
+  background: var(--dc-brand-600);
+  color: #fff;
+  border-color: var(--dc-brand-600);
+}
+.dc-btn--primario:hover:not(:disabled):not([aria-busy="true"]) {
+  background: var(--dc-brand-500);
+  border-color: var(--dc-brand-500);
+}
+
+.dc-btn--exito {
+  background: var(--dc-ok-700);
+  color: #fff;
+  border-color: var(--dc-ok-700);
+}
+
+.dc-btn--peligro {
+  background: var(--dc-danger-700);
+  color: #fff;
+  border-color: var(--dc-danger-700);
+}
+
+.dc-btn--secundario {
+  background: var(--dc-surface);
+  color: var(--dc-ink-900);
+  border-color: var(--dc-line);
+}
+.dc-btn--secundario:hover:not(:disabled):not([aria-busy="true"]) {
+  background: var(--dc-bg);
+}
+
+.dc-btn--fantasma {
+  background: transparent;
+  color: var(--dc-brand-600);
+  border-color: transparent;
+}
+.dc-btn--fantasma:hover:not(:disabled):not([aria-busy="true"]) {
+  background: var(--dc-brand-050);
+}
+
+.dc-btn--peligro-outline {
+  background: var(--dc-surface);
+  color: var(--dc-danger-700);
+  border-color: var(--dc-danger-700);
+}
+.dc-btn--peligro-outline:hover:not(:disabled):not([aria-busy="true"]) {
+  background: var(--dc-danger-100);
+}
+
+.dc-btn--sm {
+  position: relative;
+  padding: 8px 14px;
+  font-size: var(--dc-fs-sm);
+  line-height: var(--dc-lh-sm);
+}
+/* Área táctil ≥ 44 px (SPEC P03 / panel gerencial v2) sin agrandar el dibujo. */
+.dc-btn--sm::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+  min-height: var(--dc-tap-min, 44px);
+}
+
+/* ---- KPI ---- */
+.dc-kpi {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 14px 17px;
+  background: var(--dc-surface);
+  border: 1px solid var(--dc-line);
+  border-radius: var(--dc-r-lg);
+  box-shadow: var(--dc-sh-1);
+}
+.dc-kpi__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.dc-kpi__body { min-width: 0; flex: 1; }
+.dc-kpi__label {
+  font-size: var(--dc-fs-xs);
+  color: var(--dc-ink-500);
+  font-weight: var(--dc-fw-bold);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.dc-kpi__value {
+  font-size: 23px;
+  font-weight: var(--dc-fw-bold);
+  color: var(--dc-ink-900);
+  letter-spacing: -.02em;
+  line-height: 1.15;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dc-kpi__sub {
+  font-size: var(--dc-fs-xs);
+  font-weight: var(--dc-fw-medium);
+  color: var(--dc-ink-500);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dc-kpi--cargando .dc-kpi__value { color: var(--dc-ink-400); }
+.dc-kpi--vacio .dc-kpi__value { color: var(--dc-ink-400); }
+.dc-kpi--error .dc-kpi__value { color: var(--dc-ink-400); }
+.dc-kpi--error .dc-kpi__sub { color: var(--dc-danger-700); }
+.dc-kpi__retry {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--dc-brand-600);
+  font-weight: var(--dc-fw-semibold);
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+}
+.dc-kpi__retry:focus-visible {
+  outline: none;
+  box-shadow: var(--dc-focus);
+  border-radius: 2px;
+}
+.dc-kpi__skel {
+  height: 22px;
+  width: 56%;
+  margin-top: 4px;
+  border-radius: var(--dc-r-sm);
+  background: linear-gradient(90deg, var(--dc-bg) 0%, var(--dc-line) 50%, var(--dc-bg) 100%);
+  background-size: 200% 100%;
+  animation: dc-kpi-pulse 1.2s ease-in-out infinite;
+}
+@keyframes dc-kpi-pulse {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-kpi__skel { animation: none; background: var(--dc-line); }
+}
+
+/* ---- Aviso ---- */
+.dc-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dc-sp-3);
+  padding: 12px 14px;
+  border-radius: var(--dc-r-md);
+  border: 1px solid;
+  font-size: var(--dc-fs-sm);
+  line-height: var(--dc-lh-sm);
+}
+.dc-aviso__body { flex: 1; min-width: 0; }
+.dc-aviso__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dc-sp-2);
+  flex-shrink: 0;
+}
+.dc-aviso--info {
+  background: var(--dc-info-100);
+  border-color: var(--dc-sky);
+  color: var(--dc-info-700);
+}
+.dc-aviso--ok {
+  background: var(--dc-ok-100);
+  border-color: var(--dc-ok-soft);
+  color: var(--dc-ok-700);
+}
+.dc-aviso--aviso {
+  background: var(--dc-warn-100);
+  border-color: var(--dc-amber-soft);
+  color: var(--dc-warn-700);
+}
+.dc-aviso--error {
+  background: var(--dc-danger-100);
+  border-color: var(--dc-danger-mid);
+  color: var(--dc-danger-700);
+}
+
+/* ---- Chip alergia ---- */
+.dc-chip-alergia {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--dc-r-sm);
+  background: var(--dc-danger-100);
+  color: var(--dc-danger-700);
+  border: 1px solid var(--dc-danger-mid);
+  font-size: var(--dc-fs-xs);
+  font-weight: var(--dc-fw-semibold);
+  line-height: var(--dc-lh-xs);
+}
+
+/* ---- Campo ---- */
+.dc-campo { display: block; }
+.dc-campo__label {
+  display: block;
+  font-size: var(--dc-fs-xs);
+  font-weight: var(--dc-fw-bold);
+  color: var(--dc-ink-400);
+  margin-bottom: 6px;
+  letter-spacing: .2px;
+}
+.dc-campo__input {
+  width: 100%;
+  min-height: var(--dc-tap-min);
+  padding: 12px 14px;
+  border-radius: var(--dc-r-md);
+  border: 1.5px solid var(--dc-line);
+  background: var(--dc-bg);
+  font-size: var(--dc-fs-md);
+  color: var(--dc-ink-900);
+  box-sizing: border-box;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.dc-campo__input:focus-visible {
+  border-color: var(--dc-brand-500);
+  background: var(--dc-surface);
+  box-shadow: var(--dc-focus);
+}
+.dc-campo__input:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+.dc-campo__hint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--dc-ink-500);
+  margin-top: 5px;
+}
+.dc-campo__error {
+  display: block;
+  font-size: 11.5px;
+  color: var(--dc-danger-700);
+  margin-top: 5px;
+}
+
+/* ---- Sprint 3 responsive (cimiento mínimo) ---- */
+.dc-burger,
+.dc-nav-drawer__toggle {
+  min-width: var(--dc-tap-min);
+  min-height: var(--dc-tap-min);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.dc-nav-drawer {
+  /* Estilos listos para un drawer colapsable futuro / sidebar móvil */
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 767px) {
+  .dc-app-shell {
+    /* Si el shell usa esta clase: reduce márgenes en móvil */
+    --dc-shell-pad: var(--dc-sp-2);
+  }
+  .dc-nav-drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    width: min(280px, 88vw);
+    max-width: 100%;
+    background: var(--dc-surface);
+    box-shadow: var(--dc-sh-3);
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+  }
+  .dc-nav-drawer.is-open {
+    transform: translateX(0);
+  }
+  .dc-kpi {
+    padding: 12px 14px;
+  }
+  .dc-kpi__value {
+    font-size: 20px;
+  }
+}
+
+/* ---- Sprint QA BvFnLL-P: sort / chip / modal (§14.1) ---- */
+.dc-col-sort {
+  position: relative;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+}
+.dc-col-sort::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+/* Acciones de fila: 32 px visual, hit ≥44 (§14.1 / A30) */
+.dc-row-action {
+  position: relative;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  box-sizing: border-box;
+  border-radius: var(--dc-r-sm);
+  border: 1px solid var(--dc-line);
+  background: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+.dc-row-action::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+/* NAV-07: el hit expandido no debe inflar scrollWidth de la tabla */
+.dc-row-actions {
+  position: relative;
+  overflow: visible;
+  max-width: none;
+  vertical-align: middle;
+}
+.dc-pacientes-root .dc-row-action::after {
+  inset: 0;
+}
+/* La celda de acciones no debe recortar el primer botón (Ver ficha) */
+.dc-table-head > div,
+.dc-table-row > div {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.dc-table-row > div:has(.dc-row-actions),
+.dc-table-head > div:has(+ *),
+.dc-pacientes-root .dc-table-row > div:last-child,
+.dc-pacientes-root .dc-table-head > div:last-child {
+  overflow: visible;
+}
+.dc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--dc-fs-xs);
+  font-weight: 600;
+  border-radius: var(--dc-r-full);
+  padding: 4px 10px;
+  white-space: nowrap;
+  min-height: 28px;
+}
+.dc-chip--accionable {
+  position: relative;
+  min-height: 32px;
+}
+.dc-chip--accionable::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+.dc-chip--vivo,
+.dc-chip--ok {
+  background: var(--dc-ok-100);
+  color: var(--dc-ok-700);
+  border: 1px solid color-mix(in srgb, var(--dc-ok-700) 26%, transparent);
+}
+.dc-chip--aviso {
+  background: var(--dc-warn-100);
+  color: var(--dc-warn-700);
+  border: 1px solid var(--dc-amber-soft);
+}
+.dc-chip--riesgo {
+  background: var(--dc-danger-100);
+  color: var(--dc-danger-700);
+  border: 1px solid var(--dc-danger-mid);
+}
+.dc-chip--info {
+  background: var(--dc-info-100);
+  color: var(--dc-info-700);
+  border: 1px solid var(--dc-sky);
+}
+.dc-chip--gris {
+  background: var(--dc-bg-alt);
+  color: var(--dc-ink-500);
+  border: 1px solid var(--dc-line);
+}
+.dc-modal-backdrop { z-index: 200; }
+.dc-modal {
+  max-height: min(92vh, 880px);
+  outline: none;
+}
+.dc-modal__body { max-height: min(70vh, 640px); }

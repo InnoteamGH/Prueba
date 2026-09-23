@@ -1,0 +1,295 @@
+:root{
+  /* ---- Marca (SIN CAMBIOS, ya cumplen AA) ---- */
+  --dc-brand-900:#12224A;
+  --dc-brand-700:#1B2E5E;   /* azul Dento Check   · 13.13:1 sobre blanco */
+  --dc-brand-600:#0B5366;   /* teal de acción     ·  8.59:1 sobre blanco */
+  --dc-brand-500:#0F5F75;
+  --dc-brand-100:#E6F4F8;
+  --dc-brand-050:#F2FAFC;
+
+  /* ---- Escala de grises (CORREGIDA para AA) ---- */
+  --dc-ink:#101828;
+  --dc-ink-900:#101828;   /* títulos          · 17.75:1 */
+  --dc-ink-700:#344054;   /* cuerpo           · 10.46:1 */
+  --dc-ink-500:#5A6474;   /* secundario       ·  5.98:1  ← reemplaza #707B8C */
+  --dc-ink-400:#667085;   /* meta, timestamps ·  4.97:1  ← reemplaza #98A2B3 */
+  --dc-ink-200:#C4CBD6;   /* SOLO bordes e iconos decorativos. NUNCA texto. */
+  --dc-line:#E7EAF0;      /* bordes */
+  --dc-surface:#FFFFFF;   /* tarjetas */
+  --dc-bg:#F7F9FC;        /* fondo de app */
+
+  /* ---- Semánticos (CORREGIDOS) ---- */
+  --dc-ok-700:#15803D;      /* texto y botón verde ·  5.02:1 sobre blanco */
+  --dc-ok-100:#E7F7EE;
+  --dc-warn-700:#92400E;    /* texto ámbar         ·  7.09:1 */
+  --dc-warn-600:#B45309;    /* botón ámbar         ·  5.02:1 */
+  --dc-warn-100:#FEF3C7;
+  --dc-danger-700:#B42318;  /* rojo                ·  6.57:1 */
+  --dc-danger-100:#FEF2F2;
+  --dc-info-700:#1D4ED8;
+  --dc-info-100:#DBEAFE;
+
+  /* ---- Tipografía: 8 pasos, ninguno fraccionario ---- */
+  --dc-fs-xs:12px;    --dc-lh-xs:16px;   /* etiquetas de tabla, chips */
+  --dc-fs-sm:13px;    --dc-lh-sm:18px;   /* meta, ayudas */
+  --dc-fs-md:15px;    --dc-lh-md:22px;   /* CUERPO POR DEFECTO */
+  --dc-fs-lg:17px;    --dc-lh-lg:24px;   /* subtítulos */
+  --dc-fs-xl:20px;    --dc-lh-xl:28px;   /* títulos de tarjeta */
+  --dc-fs-2xl:24px;   --dc-lh-2xl:32px;  /* títulos de pantalla */
+  --dc-fs-3xl:32px;   --dc-lh-3xl:40px;  /* cifras grandes */
+  --dc-fs-4xl:44px;   --dc-lh-4xl:52px;  /* cifra protagonista (una por pantalla) */
+
+  /* UX-11: densidad de ficha clínica (override por data-densidad en .fm) */
+  --dc-ficha-fs:15px;     /* recepción / admin */
+  --dc-ficha-row:56px;
+
+  --dc-fw-normal:400;   /* CUERPO. Hoy se usa 1 vez; debe ser el más frecuente. */
+  --dc-fw-medium:500;
+  --dc-fw-semibold:600; /* énfasis */
+  --dc-fw-bold:700;     /* títulos. NO usar 800. */
+
+  /* ---- Espaciado: base 4 ---- */
+  --dc-sp-1:4px;  --dc-sp-2:8px;   --dc-sp-3:12px; --dc-sp-4:16px;
+  --dc-sp-5:20px; --dc-sp-6:24px;  --dc-sp-8:32px; --dc-sp-10:40px;
+
+  /* ---- Radios: 4 valores ---- */
+  --dc-r-sm:6px;    /* chips, badges */
+  --dc-r-md:10px;   /* botones, campos */
+  --dc-r-lg:14px;   /* tarjetas */
+  --dc-r-full:999px;
+
+  /* ---- Elevación: 3 niveles ---- */
+  --dc-sh-1:0 1px 2px rgba(16,24,40,.05);
+  --dc-sh-2:0 4px 12px -2px rgba(16,24,40,.08);
+  --dc-sh-3:0 20px 45px -28px rgba(15,27,56,.40);
+
+
+  /* ---- Alias de marca / estados usados en app (Sprint 5) ---- */
+  --dc-navy:#1B2E5E;
+  --dc-red:#C8312B;
+  --dc-teal:#0F5F75;
+  --dc-ok:#16A34A;
+  --dc-ok-soft:#E7F7EE;
+  --dc-warn:#F59E0B;
+  --dc-warn-soft:#FEF3C7;
+  --dc-warn-ink:#92400E;
+  --dc-danger:#DC2626;
+  --dc-danger-soft:#FEF2F2;
+  --dc-danger-mid:#FECACA;
+  --dc-info-soft:#DBEAFE;
+  --dc-info-ink:#1E40AF;
+  --dc-info-700b:#1D4ED8;
+  --dc-accent-cyan:#0E7490;
+  --dc-accent-soft:#E6F4F8;
+  --dc-purple:#7C3AED;
+  --dc-amber-soft:#FDE68A;
+  --dc-amber-ink:#D97706;
+  --dc-green-soft:#A7F3D0;
+  --dc-sky:#BAE6FD;
+  --dc-ink-alt:#0F1B38;
+  --dc-slate:#64748B;
+  --dc-bg-alt:#F1F4F9;
+  --dc-bg-soft:#F9FAFB;
+  --dc-bg-soft2:#F8FAFC;
+  --dc-white:#FFFFFF;
+  --dc-red-deep:#B91C1C;
+  --dc-red-alt:#C22F27;
+  --dc-brand-mid:#2A4178;
+  --dc-brand-soft:#B9C3DE;
+  --dc-blue:#1B5FBF;
+  --dc-primary-alt:#087E8B;
+  --dc-fee:#FEE2E2;
+  --dc-fee2:#FEE4E2;
+  --dc-line-alt:#CBD2DC;
+  --dc-line-alt2:#CBD2DE;
+
+
+  /* ---- Auto Sprint 5 (hex residuales → tokens) ---- */
+
+  /* ---- Foco ---- */
+  --dc-focus:0 0 0 3px rgba(11,83,102,.35);
+
+  /* ---- Objetivo táctil ---- */
+  --dc-tap-min:44px;
+
+  /* UX-17: --dc-x-* eliminados; usar solo tokens semánticos de este archivo. */
+}
+
+/* SPEC §5 / UX-16 — foco de teclado global (WCAG 2.4.7).
+   !important: gana a boxShadow inline en Btn (~41 botones) que dejaba computed none. */
+*:focus-visible{
+  outline:none !important;
+  box-shadow: var(--dc-focus) !important;
+  border-radius: inherit;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+.dc-btn:focus-visible{
+  box-shadow: var(--dc-focus) !important;
+}
+
+/* ---- UX-01 contraste: texto nunca usa tinta fallida ---- */
+:root {
+  --dc-ink-fail-707b8c: var(--dc-ink-500);
+  --dc-ink-fail-98a2b3: var(--dc-ink-400);
+}
+
+/* ---- UX-04 / UX-06 / UX-08 tipografía y táctil globales ---- */
+body {
+  font-size: var(--dc-fs-md);
+  line-height: var(--dc-lh-md);
+  font-weight: var(--dc-fw-normal);
+  color: var(--dc-ink-700);
+}
+h1, h2, h3, h4, .dc-title {
+  font-weight: var(--dc-fw-bold);
+  color: var(--dc-ink-900);
+}
+.dc-btn, input.dc-premium-inp, select, textarea,
+.dc-campo__input, [role="button"] {
+  min-height: var(--dc-tap-min);
+  box-sizing: border-box;
+}
+/* Icon-only / close: ampliar hit area sin agrandar el glifo */
+.dc-icon-btn,
+button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort) {
+  min-width: var(--dc-tap-min) !important;
+  min-height: var(--dc-tap-min) !important;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+/* UX-12 */
+.dc-money, [data-money], td.num, .dc-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* NAV-07: filas de tabla sin desborde ~10px */
+.dc-table-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+.dc-table-row {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+.dc-table-row > div {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* NAV-07: Pacientes — evitar scrollWidth > clientWidth en KPIs/filas */
+.dc-pacientes-root {
+  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
+}
+.dc-pacientes-root,
+.dc-pacientes-root * {
+  box-sizing: border-box;
+}
+.dc-pacientes-root .dc-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.dc-pacientes-root .dc-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+.dc-pacientes-root .dc-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--dc-line-alt2, #cbd5e1);
+  border-radius: 999px;
+}
+.dc-pacientes-root .dc-table-wrap > div[style] {
+  /* el scroller interno es el único con overflow-x intencional */
+  max-width: 100%;
+}
+.dc-pacientes-root .dc-table-row > div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dc-pacientes-root .dc-title,
+.dc-pacientes-root h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ---- UX-03 breakpoints ---- */
+@media (max-width: 1023px) {
+  .dc-split { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 767px) {
+  input, select, textarea, .dc-premium-inp {
+    font-size: 16px !important; /* iOS zoom + UX-08 */
+  }
+  /* Tablas → tarjetas (UX-18: sin > al scroller; min-width en nieto + overflow anulado) */
+  .dc-table-wrap { overflow: visible !important; }
+  .dc-table-wrap div[style*="overflow"] {
+    overflow-x: visible !important;
+  }
+  .dc-table-wrap div[style*="minWidth"],
+  .dc-table-wrap div[style*="min-width"] {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .dc-table-head {
+    display: none !important;
+  }
+  .dc-table-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 14px 16px !important;
+    border: 1px solid var(--dc-line) !important;
+    border-radius: 14px !important;
+    margin: 0 12px 10px !important;
+    background: var(--dc-surface) !important;
+    grid-template-columns: none !important;
+    box-sizing: border-box !important;
+    width: calc(100% - 24px) !important;
+    max-width: calc(100% - 24px) !important;
+  }
+  .dc-table-row > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    text-align: left !important;
+    padding: 0 !important;
+  }
+  .dc-table-row > div::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dc-ink-500);
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  .dc-action-bar-mobile {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--dc-line);
+    display: flex;
+    gap: 8px;
+  }
+}
+@media (max-width: 479px) {
+  .dc-kpi__value { font-size: 20px !important; }
+}
+
+/* UX-14: toast mínimo 4s — clase aplicada desde notify host */
+.dc-toast { animation: dcToastIn .2s ease-out; }
+@keyframes dcToastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
