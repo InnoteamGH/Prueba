@@ -439,3 +439,13 @@
   outline: none;
 }
 .dc-modal__body { max-height: min(70vh, 640px); }
+
+/* Con puntero táctil las acciones de fila vuelven al objetivo de 44 px. */
+@media (pointer: coarse) {
+  .dc-row-action {
+    width: var(--dc-tap-min) !important;
+    height: var(--dc-tap-min) !important;
+    min-width: var(--dc-tap-min) !important;
+    min-height: var(--dc-tap-min) !important;
+  }
+}

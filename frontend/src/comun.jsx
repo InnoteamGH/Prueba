@@ -1152,7 +1152,7 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
           Ver solo lo principal
         </button>
       )}
-      <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: `repeat(${cols},minmax(0,1fr))`, gridAutoRows: `${DASH_ROWH}px`, gridAutoFlow: "dense", gap: 16 }}>
+      <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: `repeat(${cols},minmax(0,1fr))`, gridAutoRows: `minmax(${DASH_ROWH}px, auto)`, gridAutoFlow: "dense", gap: 16 }}>
         {shown.map((l, i) => { const W = byId[l.id]; const span = Math.min(l.w, cols); const Ic = W.icon; const c = W.color || NAVY; return (
           <div key={l.id} draggable={edit} onDragStart={() => { dragI.current = i; }} onDragEnd={() => { dragI.current = null; setOver(null); }} onDragOver={(e) => { e.preventDefault(); if (over !== i) setOver(i); }} onDrop={() => { move(dragI.current, i); dragI.current = null; setOver(null); }}
             className="dw-card" style={{ gridColumn: `span ${span}`, gridRow: `span ${l.h}`, outline: edit ? `2px dashed ${over === i ? c : "var(--dc-line-alt2)"}` : "none", outlineOffset: -3, cursor: edit ? "grab" : "default" }}>
@@ -1166,7 +1166,9 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
                   <button type="button" className="dc-icon-btn" aria-label="Ocultar" title="Ocultar" onClick={() => quitar(l.id)} style={{ ...btn, color: "var(--dc-red)" }}><X size={14} strokeWidth={1.75} /></button>
                 </div>}
               </div>
-              <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden", pointerEvents: edit ? "none" : "auto" }}>{W.render({ w: span, h: l.h })}</div>
+              {/* Filas con altura mínima (no fija): la tarjeta crece con su contenido en vez de
+                  recortarlo a media línea. */}
+              <div className="dc-scroll" style={{ flex: 1, minWidth: 0, maxHeight: l.h > 1 ? 380 : 240, overflowY: "auto", display: "flex", flexDirection: "column", pointerEvents: edit ? "none" : "auto" }}><div style={{ flex: 1, minHeight: 0 }}>{W.render({ w: span, h: l.h })}</div></div>
             </div>
           </div>
         ); })}
@@ -1255,6 +1257,10 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
   }, [rows, cols, colFilters, sortCol, sortDir]);
   const mostradas = lista.slice(0, visible);
   const hayMas = lista.length > visible;
+  // Columna fija a la derecha (acciones): fondo opaco y sombra para que, al hacer
+  // scroll horizontal, no se lea el texto de las columnas que pasan por debajo.
+  const stickyCell = { position: "sticky", right: 0, alignSelf: "stretch", alignItems: "center", background: "var(--dc-white)", boxShadow: "-10px 0 12px -12px rgba(16,24,40,.35)", zIndex: 1 };
+  const stickyHead = { ...stickyCell, zIndex: 2 };
   const scrollStyle = maxHeight
     ? { overflowX: "auto", overflowY: "auto", maxHeight }
     : { overflowX: "auto" };
@@ -1264,19 +1270,23 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;
             width: max-content solo cuando minWidth > 0 explícito exige scroll horizontal. */}
-        <div style={minWidth > 0 ? { minWidth, width: "max-content" } : { width: "100%", minWidth: 0, maxWidth: "100%" }}>
+        {/* La tabla ocupa todo el ancho de la tarjeta; minWidth solo fija desde dónde
+            aparece el scroll horizontal. Con "max-content" las columnas fr se encogían
+            a su contenido y la tabla quedaba más angosta que su tarjeta. */}
+        <div style={minWidth > 0 ? { minWidth, width: "100%" } : { width: "100%", minWidth: 0, maxWidth: "100%" }}>
           <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 12, padding: "7px 16px", borderBottom: "1px solid rgba(16,24,40,.06)", background: "rgba(255,255,255,0.95)", ...(maxHeight ? { position: "sticky", top: 0, zIndex: 3 } : {}) }}>
             {cols.map((col) => {
-              if (col.noFilter && col.noSort) return <span key={col.key} style={{ fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-500)", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", alignSelf: "center", paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", ...(col.sticky ? { position: "sticky", right: 0, background: "rgba(255,255,255,0.95)", zIndex: 2 } : {}) }}>{col.label}</span>;
+              if (col.noFilter && col.noSort) return <span key={col.key} style={{ fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-500)", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", alignSelf: "center", paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", ...(col.sticky ? { ...stickyHead, display: "flex", justifyContent: "center" } : {}) }}>{col.label}</span>;
               const isSort = sortCol === col.key; const isFilt = !!(colFilters[col.key] && colFilters[col.key].trim()); const open = activeCol === col.key || isFilt;
+              const just = col.a === "left" ? "flex-start" : col.a === "right" ? "flex-end" : "center";
               return (
-                <div key={col.key} style={{ position: "relative", display: "flex", alignItems: "center", minWidth: 0 }}>
+                <div key={col.key} style={{ display: "flex", alignItems: "center", justifyContent: just, gap: 4, minWidth: 0, paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, ...(col.sticky ? stickyHead : {}) }}>
                   {open ? (
-                    <input className="dc-th dc-premium-inp" autoFocus={activeCol === col.key} value={colFilters[col.key] || ""} onChange={(e) => setColFilters((f) => ({ ...f, [col.key]: e.target.value }))} onBlur={() => { if (!(colFilters[col.key] || "").trim()) setActiveCol(null); }} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[col.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} placeholder={col.label} style={{ width: "100%", minWidth: 0, textAlign: "center", fontSize: 12, fontWeight: 600, color: NAVY, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 24px 6px 22px", outline: "none", boxSizing: "border-box" }} />
+                    <input className="dc-th dc-premium-inp" aria-label={`Filtrar ${col.label}`} autoFocus={activeCol === col.key} value={colFilters[col.key] || ""} onChange={(e) => setColFilters((f) => ({ ...f, [col.key]: e.target.value }))} onBlur={() => { if (!(colFilters[col.key] || "").trim()) setActiveCol(null); }} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[col.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} placeholder={col.label} style={{ flex: 1, width: "100%", minWidth: 0, minHeight: 30, textAlign: col.a === "left" ? "left" : "center", fontSize: 12, fontWeight: 600, color: NAVY, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 8px", outline: "none", boxSizing: "border-box" }} />
                   ) : (
-                    <button onClick={() => !col.noFilter && setActiveCol(col.key)} title={col.noFilter ? col.label : "Clic para filtrar"} style={{ width: "100%", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-500)", background: "transparent", border: "none", cursor: col.noFilter ? "default" : "text", padding: "6px 22px", borderRadius: "var(--dc-r-sm)", whiteSpace: "normal", lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{col.label}</button>
+                    <button type="button" onClick={() => !col.noFilter && setActiveCol(col.key)} title={col.noFilter ? col.label : "Clic para filtrar"} style={{ minWidth: 0, textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: isFilt || isSort ? NAVY : "var(--dc-ink-500)", background: "transparent", border: "none", cursor: col.noFilter ? "default" : "text", padding: "6px 0", borderRadius: "var(--dc-r-sm)", whiteSpace: "normal", lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{col.label}</button>
                   )}
-                  {!col.noSort && <button type="button" className="dc-col-sort" aria-label={`Ordenar ${col.label}`} onClick={() => toggleSort(col.key)} title="Ordenar" style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", display: "grid", placeItems: "center", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", background: isSort ? "linear-gradient(135deg,var(--dc-accent-cyan),var(--dc-brand-600))" : "transparent", color: isSort ? "var(--dc-white)" : "var(--dc-ink-400)", transition: "background .12s", padding: 0 }}>{isSort ? (sortDir === "asc" ? <ChevronUp size={13} strokeWidth={1.75} /> : <ChevronDown size={13} strokeWidth={1.75} />) : <ArrowUpDown size={12} strokeWidth={1.75} />}</button>}
+                  {!col.noSort && <button type="button" className="dc-col-sort" aria-label={`Ordenar ${col.label}`} onClick={() => toggleSort(col.key)} title="Ordenar" style={{ flexShrink: 0, width: 22, height: 22, display: "grid", placeItems: "center", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", background: isSort ? tint(DS.c.primary, 0.12) : "transparent", color: isSort ? DS.c.primary : "var(--dc-ink-400)", transition: "background .12s, color .12s", padding: 0 }}>{isSort ? (sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />) : <ArrowUpDown size={12} strokeWidth={1.75} />}</button>}
                 </div>
               );
             })}
@@ -1284,7 +1294,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
           {lista.length === 0 ? (rows.length > 0 ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." /> : (empty || <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin registros" sub="Aún no hay datos para mostrar." />)) : mostradas.map((r, i) => { return (
             <div key={r.id ?? i} className="dc-table-row" onClick={onRowClick ? () => onRowClick(r) : undefined} style={{ display: "grid", gridTemplateColumns: COL, gap: 12, alignItems: "center", padding: "13px 16px", borderBottom: "1px solid rgba(16,24,40,.04)", cursor: onRowClick ? "pointer" : "default", background: "transparent", transition: "background .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s", position: "relative", zIndex: 1, boxSizing: "border-box", width: "100%", maxWidth: "100%", minWidth: 0 }} onMouseEnter={(ev) => { ev.currentTarget.style.background = "rgba(255,255,255,0.6)"; ev.currentTarget.style.boxShadow = "0 4px 16px -8px rgba(16,24,40,.1)"; ev.currentTarget.style.zIndex = 2; }} onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.boxShadow = "none"; ev.currentTarget.style.zIndex = 1; }}>
               {cols.map((col) => (
-                <div key={col.key} data-label={col.label || ""} style={{ minWidth: 0, ...(col.sticky ? { position: "sticky", right: 0, background: "rgba(255,255,255,0.92)", zIndex: 1 } : {}), ...(col.a === "left" ? { paddingLeft: 12 }
+                <div key={col.key} data-label={col.label || ""} className={col.sticky ? "dc-col-sticky" : undefined} style={{ minWidth: 0, ...(col.sticky ? stickyCell : {}), ...(col.a === "left" ? { paddingLeft: 12 }
                   : col.a === "right" ? { display: "flex", justifyContent: "flex-end", textAlign: "right", paddingRight: 12, fontVariantNumeric: "tabular-nums" }
                   : { display: "flex", justifyContent: "center", textAlign: "center" }) }}>{col.cell ? col.cell(r) : <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: "100%" }}>{col.get ? col.get(r) : ""}</span>}</div>
               ))}

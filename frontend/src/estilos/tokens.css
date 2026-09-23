@@ -109,10 +109,16 @@
   /* ---- Foco ---- */
   --dc-focus:0 0 0 3px rgba(11,83,102,.35);
 
-  /* ---- Objetivo táctil ---- */
-  --dc-tap-min:44px;
+  /* ---- Objetivo táctil ----
+     44 px solo con puntero táctil (WCAG 2.5.5). Con ratón, 44 px por botón de icono
+     inflaba las filas de las tablas, desbordaba la columna de acciones y convertía
+     las "×" en círculos enormes; 36 px sigue muy por encima del mínimo AA (24 px). */
+  --dc-tap-min:36px;
 
   /* UX-17: --dc-x-* eliminados; usar solo tokens semánticos de este archivo. */
+}
+@media (pointer: coarse) {
+  :root { --dc-tap-min:44px; }
 }
 
 /* SPEC §5 / UX-16 — foco de teclado global (WCAG 2.4.7).
@@ -153,7 +159,7 @@ h1, h2, h3, h4, .dc-title {
 }
 /* Icon-only / close: ampliar hit area sin agrandar el glifo */
 .dc-icon-btn,
-button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort) {
+button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn) {
   min-width: var(--dc-tap-min) !important;
   min-height: var(--dc-tap-min) !important;
   display: inline-grid;
@@ -264,6 +270,11 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort) {
     align-items: center !important;
     text-align: left !important;
     padding: 0 !important;
+  }
+  .dc-table-row > .dc-col-sticky {
+    position: static !important;
+    box-shadow: none !important;
+    background: transparent !important;
   }
   .dc-table-row > div::before {
     content: attr(data-label);

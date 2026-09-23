@@ -125,8 +125,8 @@ function Login({ onLogin }) {
       }
     }
     // 3) Fallback: modo demo (usuario/clave de la lista de accesos rápidos).
-    const u = USUARIOS.find((x) => x.user === id.toLowerCase() && x.pass === pass);
-    if (u) { setError(""); onLogin(u); }
+    const u = demoLoginOk && USUARIOS.find((x) => x.user === id.toLowerCase() && x.pass === pass);
+    if (u) { setError(""); onLogin({ ...u, demo: true }); }
     else setError("Usuario o contraseña incorrectos. Usa un email, tu DNI del portal, o los accesos demo de abajo.");
   };
 
@@ -140,7 +140,7 @@ function Login({ onLogin }) {
     // Solo demo local (sin llamar API con credenciales embebidas).
     const demo = USUARIOS.find((u) => u.rol === "paciente");
     setCargando(false);
-    if (demo) onLogin(demo);
+    if (demo) onLogin({ ...demo, demo: true });
     else setError("Portal demo local no disponible.");
   };
   // P2-5: auto-registro del paciente por el link → crea su cuenta y entra a su portal.
@@ -207,10 +207,10 @@ function Login({ onLogin }) {
                     <button onClick={() => setError("Contacta al administrador de tu clínica o a soporte para restablecer tu contraseña.")} style={{ background: "none", border: "none", color: DS.c.primary, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>¿La olvidaste?</button>
                   </div>
                   <div className="dc-input-container" style={{ position: "relative" }}>
-                    <span style={{ position: "absolute", left: 12, top: 12, color: "var(--dc-ink-500)", transition: "color .2s" }}><Lock size={16} strokeWidth={1.75} /></span>
-                    <input className="dc-premium-inp" type={showPass ? "text" : "password"} value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="••••••••"
+                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", display: "flex", color: "var(--dc-ink-500)", transition: "color .2s", pointerEvents: "none" }}><Lock size={16} strokeWidth={1.75} /></span>
+                    <input className="dc-premium-inp" type={showPass ? "text" : "password"} value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="Tu contraseña"
                       style={{ width: "100%", padding: "12px 40px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 15, outline: "none", boxSizing: "border-box", color: NAVY, transition: "border-color .2s, box-shadow .2s" }} />
-                    <button aria-label="Mostrar u ocultar la contraseña" onClick={() => setShowPass((s) => !s)} style={{ position: "absolute", right: 10, top: 11, background: "none", border: "none", cursor: "pointer", color: "var(--dc-ink-500)" }}>{showPass ? <EyeOff size={17} strokeWidth={1.75} /> : <Eye size={17} strokeWidth={1.75} />}</button>
+                    <button aria-label="Mostrar u ocultar la contraseña" onClick={() => setShowPass((s) => !s)} style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, display: "grid", placeItems: "center", padding: 0, borderRadius: "var(--dc-r-sm)", background: "none", border: "none", cursor: "pointer", color: "var(--dc-ink-500)" }}>{showPass ? <EyeOff size={17} strokeWidth={1.75} /> : <Eye size={17} strokeWidth={1.75} />}</button>
                   </div>
                 </div>
                 {error && <div style={{ background: "var(--dc-danger-soft)", color: "var(--dc-danger-700)", border: "1px solid var(--dc-danger-mid)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>{error}</div>}
@@ -231,16 +231,16 @@ function Login({ onLogin }) {
               {demoLoginOk && verDemo && (
                 <div style={{ marginTop: 12, background: "var(--dc-bg-soft2)", border: "1px dashed var(--dc-bg)", borderRadius: "var(--dc-r-lg)", padding: 14 }}>
                   <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginBottom: 10 }}>Accesos locales de desarrollo (no llaman al portal de producción).</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 8 }}>
                     {USUARIOS.filter((u) => u.rol !== "superadmin").map((u) => { const R = ROLES[u.rol]; const Ic = R.icon; return (
-                      <button key={u.user} onClick={() => (u.rol === "paciente" ? entrarPortalDemo() : onLogin(u))} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", cursor: "pointer", textAlign: "left" }}
+                      <button key={u.user} onClick={() => (u.rol === "paciente" ? entrarPortalDemo() : onLogin({ ...u, demo: true }))} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", cursor: "pointer", textAlign: "left" }}
                         onMouseEnter={(e) => { e.currentTarget.style.borderColor = R.color; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dc-line)"; }}>
                         <span style={{ background: tint(R.color, 0.094), color: R.color, width: 28, height: 28, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={15} strokeWidth={1.75} /></span>
                         <span style={{ minWidth: 0 }}><span style={{ display: "block", fontSize: 12, fontWeight: 600, color: NAVY, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{R.label}</span><span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{u.rol === "paciente" ? "demo local" : `@${u.user}`}</span></span>
                       </button>
                     ); })}
                   </div>
-                  <button onClick={() => onLogin(USUARIOS.find((u) => u.rol === "superadmin"))} style={{ marginTop: 8, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "9px 10px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-info-100)", background: "var(--dc-bg)", cursor: "pointer", color: "var(--dc-purple)", fontSize: 12, fontWeight: 600 }}><Globe size={15} strokeWidth={1.75} /> Entrar al BackOffice AWG (Super Admin)</button>
+                  <button onClick={() => onLogin({ ...USUARIOS.find((u) => u.rol === "superadmin"), demo: true })} style={{ marginTop: 8, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "9px 10px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-info-100)", background: "var(--dc-bg)", cursor: "pointer", color: "var(--dc-purple)", fontSize: 12, fontWeight: 600 }}><Globe size={15} strokeWidth={1.75} /> Entrar al BackOffice AWG (Super Admin)</button>
                 </div>
               )}
             </div>
@@ -253,7 +253,7 @@ function Login({ onLogin }) {
                 <Field label="RUC" value={reg.ruc} onChange={(v) => setReg({ ...reg, ruc: v })} placeholder="20123456789" icon={<FileText size={16} strokeWidth={1.75} />} />
                 <Field label="Tu nombre" value={reg.nombre} onChange={(v) => setReg({ ...reg, nombre: v })} placeholder="Nombre del responsable" icon={<UserCheck size={16} strokeWidth={1.75} />} />
                 <Field label="Correo" value={reg.email} onChange={(v) => setReg({ ...reg, email: v })} placeholder="tucorreo@mail.com" type="email" icon={<MessageSquare size={16} strokeWidth={1.75} />} />
-                <Btn full kind="red" onClick={() => onLogin(USUARIOS.find((u) => u.user === "admin"))}>Crear cuenta y empezar <ArrowRight size={16} strokeWidth={1.75} /></Btn>
+                <Btn full kind="red" onClick={() => onLogin({ ...USUARIOS.find((u) => u.user === "admin"), demo: true })}>Crear cuenta y empezar <ArrowRight size={16} strokeWidth={1.75} /></Btn>
                 <p style={{ fontSize: 12, color: "var(--dc-ink-500)", textAlign: "center", margin: 0 }}>En la demo, registrarte te ingresa como Administrador General para que veas todo.</p>
               </div>
             </Card>
@@ -323,7 +323,7 @@ function AreaChart({ data, color = DS.c.primary, labels, formato }) {
   const gid = "ag_" + Math.abs([...color].reduce((a, c) => a + c.charCodeAt(0), 0));
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", flex: 1, minHeight: 40, overflow: "visible" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 0, flex: "1 1 auto", minHeight: 96, overflow: "visible" }}>
         <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.38" /><stop offset="100%" stopColor={color} stopOpacity="0.02" /></linearGradient></defs>
         <path d={area} fill={`url(#${gid})`} />
         <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
@@ -1236,7 +1236,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
       const horaFuerte = tope > 0 && enTope.length === 1 ? enTope[0] : null;
       return (
       <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "stretch", gap: 5 }}>{porHora.map((x) => {
+        <div style={{ flex: 1, minHeight: 140, display: "flex", alignItems: "stretch", gap: 5 }}>{porHora.map((x) => {
           const pct = Math.min(100, Math.round((x.n / capHora) * 100));
           return (
             <div key={x.h} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}
@@ -2264,7 +2264,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         </div>); } },
     { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(128px,1.2fr)", a: "left",
       cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
-    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(96px,0.9fr)", a: "left",
+    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(84px,0.8fr)", a: "left",
       cell: (c) => <div style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 6, minWidth: 0 }}><MapPin size={12} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sedeNombre || cortaSede(c.sede)}</span></div> },
     { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(120px,1.3fr)", a: "left",
       cell: (c) => { const base = c.motivo.replace(/\s*\([^)]*\)\s*/g, " ").trim(); const hasDet = base !== c.motivo; return (
@@ -2272,15 +2272,17 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{base}</span>
           {hasDet && <Info size={13} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} />}
         </div>); } },
-    { key: "llegada", label: "Llegada", get: (c) => (c.llegada ? "Presente" : "Por llegar"), w: "minmax(96px,0.8fr)", a: "center",
+    { key: "llegada", label: "Llegada", get: (c) => (c.llegada ? "Presente" : "Por llegar"), w: "minmax(104px,0.8fr)", a: "center",
       cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return <div style={{ display: "flex", justifyContent: "center" }}>{pasada ? <span style={{ fontSize: 13, color: "var(--dc-line)" }}>—</span> : c.llegada
         ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "linear-gradient(180deg, var(--dc-white), var(--dc-bg))", border: "1px solid var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><CheckCircle2 size={11} strokeWidth={1.75} /> Presente</span>
-        : <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--dc-warn-600)", background: "linear-gradient(180deg, var(--dc-white), var(--dc-danger-soft))", border: "1px solid var(--dc-amber-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><Clock size={11} strokeWidth={1.75} /> Por llegar</span>}</div>; } },
-    { key: "estado", label: "Estado", get: (c) => (EST[c.estado] || EST.pendiente).l, w: "minmax(96px,0.8fr)", a: "center",
+        : <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--dc-warn-600)", background: "linear-gradient(180deg, var(--dc-white), var(--dc-danger-soft))", border: "1px solid var(--dc-amber-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}><Clock size={11} strokeWidth={1.75} /> Por llegar</span>}</div>; } },
+    { key: "estado", label: "Estado", get: (c) => (EST[c.estado] || EST.pendiente).l, w: "minmax(108px,0.8fr)", a: "center",
       cell: (c) => { const e = EST[c.estado] || EST.pendiente; return <div style={{ display: "flex", justifyContent: "center" }}><span className="dc-chip" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: e.c, background: tint(e.c, 0.1), border: `1px solid ${tint(e.c, 0.25)}`, padding: "5px 12px", borderRadius: "var(--dc-r-full)" }}><span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: e.c }} /> {e.l}</span></div>; } },
-    { key: "acc", label: "Acciones", w: "minmax(160px,1.2fr)", a: "center", noFilter: true, noSort: true, sticky: true,
+    // Ancho fijo: cada fila es su propia rejilla, así que un ancho "según contenido"
+    // descuadraba la columna de una fila a otra.
+    { key: "acc", label: "Acciones", w: "292px", a: "center", noFilter: true, noSort: true, sticky: true,
       cell: (c) => (
-        <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", padding: "0 4px" }} onClick={(e) => e.stopPropagation()}>
           {rol === "medico" && c.estado === "confirmada" && c.llegada && <ActionBtn onClick={() => { set(c.id, "en_atencion"); onAtender && onAtender(c); }} color={DS.c.primary}>Iniciar</ActionBtn>}
           {rol === "medico" && c.estado === "en_atencion" && <ActionBtn onClick={() => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); setEvoCita(c); }} color="var(--dc-ok-700)">Finalizar</ActionBtn>}
           {rol === "medico" && c.estado === "atendida" && <ActionBtn subtle onClick={() => setEvoCita(c)} color={DS.c.primary}>Evolución</ActionBtn>}
@@ -2476,7 +2478,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
 
       {/* Lista o Calendario según el toggle */}
       {vista !== "calendario" ? (<>
-      <DataTable titulo="Citas de hoy" sub="citas" minWidth={940} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
+      <DataTable titulo="Citas de hoy" sub="citas" minWidth={1100} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
         cols={COLS_AGENDA} />
@@ -2557,7 +2559,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     </div>
   );
 }
-const ActionBtn = ({ children, onClick, color, subtle }) => <button onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }} style={{ background: subtle ? "var(--dc-bg)" : tint(color, 0.078), color: subtle ? "var(--dc-ink-400)" : color, border: subtle ? "1px solid var(--dc-line)" : "1px solid " + tint(color, 0.149), borderRadius: "var(--dc-r-full)", padding: "7px 15px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background .15s, color .15s, border-color .15s" }} onMouseEnter={(e) => { e.currentTarget.style.background = subtle ? tint(color, 0.063) : tint(color, 0.125); e.currentTarget.style.color = color; e.currentTarget.style.borderColor = tint(color, 0.227); }} onMouseLeave={(e) => { e.currentTarget.style.background = subtle ? "var(--dc-bg)" : tint(color, 0.078); e.currentTarget.style.color = subtle ? "var(--dc-ink-400)" : color; e.currentTarget.style.borderColor = subtle ? "var(--dc-line)" : tint(color, 0.149); }}>{children}</button>;
+const ActionBtn = ({ children, onClick, color, subtle }) => <button onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }} style={{ background: subtle ? "var(--dc-bg)" : tint(color, 0.078), color: subtle ? "var(--dc-ink-400)" : color, border: subtle ? "1px solid var(--dc-line)" : "1px solid " + tint(color, 0.149), borderRadius: "var(--dc-r-full)", padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background .15s, color .15s, border-color .15s" }} onMouseEnter={(e) => { e.currentTarget.style.background = subtle ? tint(color, 0.063) : tint(color, 0.125); e.currentTarget.style.color = color; e.currentTarget.style.borderColor = tint(color, 0.227); }} onMouseLeave={(e) => { e.currentTarget.style.background = subtle ? "var(--dc-bg)" : tint(color, 0.078); e.currentTarget.style.color = subtle ? "var(--dc-ink-400)" : color; e.currentTarget.style.borderColor = subtle ? "var(--dc-line)" : tint(color, 0.149); }}>{children}</button>;
 
 /* ---- Pacientes ---- */
 const CANALES = ["Recomendación", "Instagram", "Facebook", "Google", "TikTok", "Volante", "Pasó por el local", "Convenio empresa"];
@@ -3082,7 +3084,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // Fuera del listado "Fuente" y "Comentario": con ocho columnas la tabla pedia 1220 px
     // y se cortaban las cabeceras. Las dos siguen en la ficha del paciente -se abre al
     // pulsar la fila- y la fuente ademas tiene su propia tarjeta, "Como nos conocen".
-    { key: "acc", label: "Acciones", w: "minmax(176px,176px)", a: "center", sticky: true, noFilter: true, noSort: true, cell: (p) => (
+    { key: "acc", label: "Acciones", w: "184px", a: "center", sticky: true, noFilter: true, noSort: true, cell: (p) => (
       <div className="dc-row-actions" style={{ display: "inline-flex", gap: 4, justifyContent: "center", flexWrap: "nowrap" }} onClick={(e) => e.stopPropagation()}>
         <button type="button" className="dc-row-action" aria-label="Ver ficha" onClick={() => verFicha(p)} title="Ver ficha" style={{ color: DS.c.primary }}><FileText size={14} strokeWidth={1.75} /></button>
         <button type="button" className="dc-row-action" onClick={() => abrirHistoria(p)} title="Historia clínica" aria-label="Historia clínica" style={{ color: DS.c.primary }}><Stethoscope size={14} strokeWidth={1.75} /></button>
@@ -8595,7 +8597,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.4)" }}>
           <div style={{ display: "flex", flexDirection: colap ? "column" : "row", alignItems: "center", gap: colap ? 8 : 10, padding: colap ? "10px 6px" : "12px", borderRadius: "var(--dc-r-lg)", background: "linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4))", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 8px 24px -6px rgba(16,24,40,0.1), inset 0 2px 4px rgba(255,255,255,1)" }}>
             <div title={usuario.nombre} style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: `linear-gradient(135deg, ${R.color}, ${tint(R.color, 0.8)})`, color: "#fff", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 15, flexShrink: 0, boxShadow: `0 4px 12px ${tint(R.color, 0.4)}` }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
-            {!colap && <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.01em" }}>{usuario.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-slate)", fontWeight: 600, letterSpacing: 0.5 }}>{R.label}</div></div>}
+            {!colap && <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.01em" }}>{usuario.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, lineHeight: 1.3 }}>{R.label}</div></div>}
             <button type="button" className="dc-icon-btn" aria-label="Cerrar sesión" onClick={onLogout} title="Cerrar sesión" style={{ background: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.9)", borderRadius: "var(--dc-r-md)", cursor: "pointer", color: "var(--dc-slate)", display: "grid", placeItems: "center", width: 32, height: 32, boxShadow: "0 2px 4px rgba(0,0,0,0.02)", transition: "all 0.15s" }} onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dc-danger)"; e.currentTarget.style.background = "var(--dc-fee)"; e.currentTarget.style.borderColor = "var(--dc-danger-mid)"; }} onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dc-slate)"; e.currentTarget.style.background = "rgba(255,255,255,0.6)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.9)"; }}><LogOut size={16} strokeWidth={2} /></button>
           </div>
           {!colap && !auth.token && !usuario?.conectado && <button onClick={() => { if (confirm("¿Restablecer los datos de demostración? Se perderán los cambios guardados en este navegador.")) { Object.keys(localStorage).filter((k) => k.startsWith("dc_data_")).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} title="Volver a los datos de demo" style={{ width: "100%", marginTop: 8, background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "7px 10px", cursor: "pointer", color: "var(--dc-ink-500)", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}><Repeat size={13} strokeWidth={1.75} /> Restablecer datos de demo</button>}
@@ -8617,7 +8619,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                   <span title="Tareas tuyas de primeros pasos (no es el checklist de puesta en marcha de Configuración)" style={{ width: 26, height: 26, borderRadius: "var(--dc-r-full)", background: "rgba(255,255,255,.22)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{done}/{misPasos.length}</span>
                   <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>Primeros pasos</span>
                 </button>
-                <button type="button" aria-label="Cerrar permanentemente" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }} title="Cerrar permanentemente" style={{ width: 22, height: 22, minWidth: 22, minHeight: 22, borderRadius: "var(--dc-r-full)", background: "#fff", border: "1.5px solid var(--dc-accent-cyan)", color: "var(--dc-accent-cyan)", display: "grid", placeItems: "center", cursor: "pointer", fontSize: 12, fontWeight: 600, boxShadow: "0 2px 8px rgba(0,0,0,.12)", flexShrink: 0, padding: 0, lineHeight: 1 }}>×</button>
+                <button type="button" className="dc-mini-btn" aria-label="Ocultar primeros pasos" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }} title="Ocultar primeros pasos" style={{ width: 28, height: 28, borderRadius: "var(--dc-r-full)", background: "transparent", border: "none", color: "var(--dc-ink-400)", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0, padding: 0 }} onMouseEnter={(e) => { e.currentTarget.style.background = "var(--dc-bg)"; e.currentTarget.style.color = NAVY; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--dc-ink-400)"; }}><X size={15} strokeWidth={2} /></button>
               </div>
             ); })()}
             {/* Sin ninguna acción disponible el desplegable salía vacío. */}
@@ -8640,7 +8642,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
               {/* Llevaba fondo var(--dc-bg) y ningun borde sobre una cabecera casi blanca: 1,07:1 de
                   contraste de superficie, o sea invisible como control. El boton de al lado si
                   tiene borde, y por eso se veia uno y el otro no. Ahora los dos igual. */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "4px 8px", boxShadow: "0 1px 2px rgba(16,24,40,.06)" }}><MapPin size={16} strokeWidth={1.75} color={sedeDetectada && String(sede) === String(sedeDetectada) ? "var(--dc-ok-700)" : NAVY} /><Select small width={220} ariaLabel="Sede activa" value={sede} onChange={(v) => {
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}><MapPin size={16} strokeWidth={1.75} color={sedeDetectada && String(sede) === String(sedeDetectada) ? "var(--dc-ok-700)" : NAVY} /><Select small width={220} ariaLabel="Sede activa" value={sede} onChange={(v) => {
                 if (v === "all") { setSede("all"); return; }
                 // UUID de API: no Number()
                 setSede(typeof v === "string" && v.includes("-") ? v : Number(v));
@@ -10639,7 +10641,7 @@ const NeuralDentalBackground = () => {
           const maxDist = window.innerWidth < 768 ? 120 : 180;
           if (dist < maxDist) {
             ctx.beginPath();
-            ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - dist/maxDist) * 0.35})`;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - dist/maxDist) * 0.14})`;
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.stroke();
@@ -10667,13 +10669,16 @@ const NeuralDentalBackground = () => {
       {/* canvas receives pointer events so we can track the mouse */}
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
       {icons.map((Icon, i) => (
-        <div key={i} ref={el => iconRefs.current[i] = el} style={{ position: 'absolute', top: 0, left: 0, color: 'rgba(255,255,255,0.6)', willChange: 'transform', pointerEvents: 'none' }}>
-          <Icon size={32} strokeWidth={1.5} />
+        <div key={i} ref={el => iconRefs.current[i] = el} style={{ position: 'absolute', top: 0, left: 0, color: 'rgba(255,255,255,0.2)', willChange: 'transform', pointerEvents: 'none' }}>
+          <Icon size={28} strokeWidth={1.5} />
         </div>
       ))}
     </div>
   );
 };
+/** Sesión de los accesos de demostración: solo existe fuera de producción. */
+const esSesionDemo = (u) => !import.meta.env.PROD && !!u?.demo;
+
 export default function App() {
   const [usuario, setUsuario] = useState(() => { try { return JSON.parse(localStorage.getItem("dc_usuario")) || null; } catch { return null; } });
   const [entro, setEntro] = useState(() => localStorage.getItem("dc_entro") === "1" || !!localStorage.getItem("dc_usuario"));
@@ -10698,7 +10703,7 @@ export default function App() {
         }
         return;
       }
-      if (!auth.token && (usuario || entro)) {
+      if (!auth.token && !esSesionDemo(usuario) && (usuario || entro)) {
         setUsuario(null);
         setEntro(false);
       }
@@ -10763,7 +10768,8 @@ export default function App() {
   };
 
   // NEW-18: exige token + identidad; sin token → Login aunque quede basura en estado
-  const haySesion = !!(usuario && auth.token);
+  // Los accesos de demostración (solo fuera de producción) no tienen token del backend.
+  const haySesion = !!(usuario && (auth.token || esSesionDemo(usuario)));
   
   return (
     <>
