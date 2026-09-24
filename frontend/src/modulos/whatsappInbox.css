@@ -227,3 +227,26 @@
 .dc-inbox-list > div:first-child > div:last-child { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; gap: 4px !important; }
 .dc-inbox-list > div:first-child > div:last-child::-webkit-scrollbar { display: none; }
 .dc-inbox-list > div:first-child > div:last-child > button { padding: 4px 8px !important; font-size: 11.5px !important; white-space: nowrap; flex-shrink: 0; }
+
+/* Sin barra superior: la bandeja ocupa toda la altura. */
+@media (min-width: 768px) { .dc-inbox.wa { height: calc(100dvh - 36px); } }
+.wa-lista__tit { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wa-lista__tit > span:first-child { font-family: var(--dc-font-title); font-size: 15px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; }
+.wa-canal { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: #E3F7EC; color: #15803D; }
+.wa-canal i { width: 6px; height: 6px; border-radius: 999px; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); }
+.wa-canal.is-ambar { background: #FEF4DC; color: #946009; }
+.wa-canal.is-rojo { background: #FDECEA; color: #B23A2B; }
+.wa-canal.is-gris { background: var(--dc-bg); color: var(--dc-ink-500); }
+.wa-lista__acc { display: flex; align-items: center; gap: 4px; }
+.wa-lista__btn { all: unset; box-sizing: border-box; cursor: pointer; width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: var(--dc-primary-alt); }
+.wa-lista__btn:hover { background: var(--dc-bg); }
+.wa-lista__btn:focus-visible { box-shadow: var(--dc-focus); }
+.wa-filtro__n { font-size: 11px; font-weight: 700; opacity: .75; font-variant-numeric: tabular-nums; }
+.wa-avisos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.wa-aviso { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+.wa-aviso.is-aviso { background: #FEF4DC; color: #946009; }
+.wa-aviso.is-ok { background: #E3F7EC; color: #15803D; }
+.wa-aviso.is-error { background: #FDECEA; color: #B23A2B; }
+.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { gap: 4px !important; flex-wrap: nowrap !important; }
+.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 8px !important; font-size: 11.5px !important; gap: 4px !important; white-space: nowrap; }
+.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; } .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 7px !important; flex-shrink: 0; }

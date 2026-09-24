@@ -7930,11 +7930,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
             <span className="dc-sb__mark"><Smile size={18} strokeWidth={2} color="#fff" /></span>
             {!colap && <span className="dc-sb__name"><span>Dento <b>Check</b></span><small>Sonríe+</small></span>}
           </button>
+          {rol !== "superadmin" && hayQueCrear && (
+            <button type="button" className="dc-sb__mas" aria-label="Crear" title="Crear: cita, paciente, servicio…" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 8, left: Math.max(8, r.left - (colap ? 0 : 180)) })); }}><Plus size={16} strokeWidth={2.25} /></button>
+          )}
         </div>
         <div className={`dc-sb__acc${colap ? " is-colap" : ""}`}>
-            {rol !== "superadmin" && hayQueCrear && (
-              <button type="button" className="dc-sb__crear" aria-label="Crear" title="Crear paciente, cita, cobro…" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 6, left: r.left })); }}><Plus size={16} strokeWidth={2} />{!colap && <span>Crear</span>}</button>
-            )}
             {crearMenu && (<>
               <div onClick={() => setCrearMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 140 }} />
               <div className="dc-sb__crearmenu" style={{ top: crearMenu.top, left: crearMenu.left }}>

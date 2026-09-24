@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Settings, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, X, Zap } from "lucide-react";
 import api, { auth } from "../api/client";
-import {EnCabecera, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
+import {MenuAcciones, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
 import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";
 import "./whatsappInbox.css";
 
@@ -445,57 +445,14 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
 
   return (
     <div>
-      {(() => { 
-        const total = chats.length; 
-        const porIA = chats.filter((c) => c.modo === "ia").length; 
-        const humano = total - porIA; 
-        const msgs = chats.reduce((s, c) => s + c.msgs.length, 0); 
-        
-        const sem = conectado ? (salud?.semaforo || "gris") : "verde";
-        const cfg = { verde: ["var(--dc-ok-700)", "var(--dc-ok-soft)", "IA Conectada"], ambar: ["var(--dc-warn-600)", "var(--dc-warn-soft)", "Con fallos"], rojo: ["var(--dc-red-deep)", "var(--dc-danger-soft)", "Desconectado"], gris: ["var(--dc-ink-400)", "var(--dc-bg)", "Comprobando…"] }[sem];
-
-        return (
-          // Estado del canal y acciones en la cabecera de la app: toda la altura queda para el chat.
-          <EnCabecera><div className="wa-estado">
-            <div className="wa-estado__datos">
-              <span style={{ fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: "var(--dc-r-full)", background: cfg[1], color: cfg[0], display: "inline-flex", alignItems: "center", gap: 5, letterSpacing: 0, boxShadow: "0 2px 8px -2px "+tint(cfg[0], 0.251) }}>
-                <span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: cfg[0] }}/> {cfg[2]}
-              </span>
-              <span className="wa-estado__sep" />
-              <span><b>{total}</b> chats</span>
-              <span style={{color: "var(--dc-ink-400)"}}>•</span>
-              <span><b style={{color: "var(--dc-ok-700)", fontWeight: 500}}>{porIA}</b> IA</span>
-              <span style={{color: "var(--dc-ink-400)"}}>•</span>
-              <span><b style={{color: "var(--dc-warn-600)", fontWeight: 500}}>{humano}</b> Recepción</span>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} className="dc-inbox-header-actions">
-              {/* WA-07: Probar conexión siempre visible con sesión (llama GET /salud). */}
-              {conectado && (
-                <Btn small kind="ghost" onClick={probarConexion} disabled={probando}>
-                  {probando ? "Probando…" : "Probar conexión"}
-                </Btn>
-              )}
-              {conectado && Number(salud?.fallos24h) > 0 && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-warn-mid, #f59e0b)", background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", fontSize: 12, fontWeight: 500 }}>
-                  <AlertTriangle size={14} strokeWidth={2}/> Con fallos · {salud.fallos24h} en 24 h
-                </span>
-              )}
-              {conectado && probarResultado && (
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: "var(--dc-r-md)", fontSize: 12, fontWeight: 500,
-                  border: `1px solid ${probarResultado.ok ? "var(--dc-ok-mid, #86efac)" : "var(--dc-danger-mid)"}`,
-                  background: probarResultado.ok ? "var(--dc-ok-soft)" : "var(--dc-danger-soft)",
-                  color: probarResultado.ok ? "var(--dc-ok-700)" : "var(--dc-red-deep)",
-                }}>
-                  {probarResultado.texto}
-                </span>
-              )}
-              {conectado && puedeConfigurarWa && <Btn small kind="ghost" onClick={() => { setConexionOpen(true); cargarConexion(); }}><Phone size={14} strokeWidth={1.75} /> Conexión WhatsApp</Btn>}
-              {conectado && <Btn small kind="ghost" onClick={abrirInstrucciones}><Settings size={14} strokeWidth={1.75} /> Configurar IA</Btn>}
-            </div>
-          </div></EnCabecera>
-        ); 
-      })()}
+      {/* Estado del canal: va dentro del panel de chats (cabecera y filtros con conteo);
+          aquí solo aparecen los avisos cuando hay algo que decir. */}
+      {conectado && (Number(salud?.fallos24h) > 0 || probarResultado) && (
+        <div className="wa-avisos">
+          {Number(salud?.fallos24h) > 0 && <span className="wa-aviso is-aviso"><AlertTriangle size={14} strokeWidth={2} /> Con fallos · {salud.fallos24h} en 24 h</span>}
+          {probarResultado && <span className={`wa-aviso ${probarResultado.ok ? "is-ok" : "is-error"}`}>{probarResultado.texto}</span>}
+        </div>
+      )}
       {conectado && puedeConfigurarWa && conexionOpen && (
         <div className="dc-inbox-conexion">
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -523,16 +480,28 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         <div className="dc-inbox-list">
           <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <span style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Chats</span>
-              {conectado && <button type="button" className="dc-icon-btn" aria-label="Actualizar" onClick={cargarConversaciones} title="Actualizar" style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: 6, cursor: "pointer", color: DS.c.primary, display: "grid", placeItems: "center" }}><Repeat size={14} strokeWidth={1.75} /></button>}
+              <div className="wa-lista__tit">
+                <span>Chats</span>
+                {(() => { const sem = conectado ? (salud?.semaforo || "gris") : "verde"; const l = { verde: "IA conectada", ambar: "Con fallos", rojo: "Desconectado", gris: "Comprobando…" }[sem]; return <span className={`wa-canal is-${sem}`} title="Estado del asistente de WhatsApp"><i /> {l}</span>; })()}
+              </div>
+              {conectado && (
+                <div className="wa-lista__acc">
+                  <button type="button" className="wa-lista__btn" aria-label="Actualizar" onClick={cargarConversaciones} title="Actualizar"><Repeat size={14} strokeWidth={1.75} /></button>
+                  <MenuAcciones etiqueta="Opciones de WhatsApp" opciones={[
+                    { label: probando ? "Probando…" : "Probar conexión", onClick: probarConexion },
+                    puedeConfigurarWa && { label: "Conexión WhatsApp", onClick: () => { setConexionOpen(true); cargarConexion(); } },
+                    { label: "Configurar IA", onClick: abrirInstrucciones },
+                  ]} />
+                </div>
+              )}
             </div>
             <div style={{ position: "relative" }}>
               <span style={{ position: "absolute", left: 10, top: 9, color: "var(--dc-ink-400)" }}><Search size={15} strokeWidth={1.75} /></span>
               <input className="dc-premium-inp" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar contacto o número" style={{ width: "100%", padding: "8px 10px 8px 32px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, outline: "none", boxSizing: "border-box", color: NAVY }} />
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {FILTROS.map(([k, l]) => { const on = filtro === k; const n = k === "pendientes" ? chats.filter((c) => (c.porResponder || 0) > 0).length : 0; return (
-                <button key={k} onClick={() => setFiltro(k)} style={{ padding: "5px 10px", borderRadius: "var(--dc-r-full)", border: on ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: on ? (tint(DS.c.primary, 0.071)) : "var(--dc-white)", color: on ? DS.c.primary : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>{l}{k === "pendientes" && n > 0 && <span style={{ background: "var(--dc-line)", color: INK, borderRadius: "var(--dc-r-full)", fontSize: 12, fontWeight: 500, minWidth: 16, height: 16, padding: "0 4px", display: "grid", placeItems: "center" }}>{n}</span>}</button>
+              {FILTROS.map(([k, l]) => { const on = filtro === k; const n = k === "pendientes" ? chats.filter((c) => (c.porResponder || 0) > 0).length : k === "ia" ? chats.filter((c) => c.modo === "ia").length : k === "humano" ? chats.filter((c) => c.modo !== "ia").length : 0; return (
+                <button key={k} onClick={() => setFiltro(k)} style={{ padding: "5px 10px", borderRadius: "var(--dc-r-full)", border: on ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: on ? (tint(DS.c.primary, 0.071)) : "var(--dc-white)", color: on ? DS.c.primary : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>{l}{n > 0 && <span className="wa-filtro__n">{n}</span>}</button>
               ); })}
             </div>
           </div>

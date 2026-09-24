@@ -1543,3 +1543,22 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
   .dc-esp-hero__agregar { justify-self: start; }
 }
 .dc-sb__sede [role="listbox"] { right: auto !important; min-width: 200px; }
+
+/* Crear: botón redondo discreto junto al logo (antes una píldora grande). */
+.dc-sb__brand { gap: 8px; justify-content: space-between; }
+.dc-sb__brand .dc-sb__logo { flex: 1; min-width: 0; }
+.dc-sb__mas { all: unset; box-sizing: border-box; cursor: pointer; flex-shrink: 0; width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: #7FE0DD; background: rgba(127,224,221,.14); box-shadow: inset 0 0 0 1px rgba(127,224,221,.3); transition: background .15s, color .15s, transform .15s; }
+.dc-sb__mas:hover { background: #3CC3C3; color: #0B3440; transform: rotate(90deg); }
+.dc-sb__mas:focus-visible { box-shadow: 0 0 0 3px rgba(127,224,221,.5); }
+.dc-sb.is-colap .dc-sb__brand { flex-direction: column; justify-content: center; height: auto; padding: 14px 0 10px; gap: 10px; }
+.dc-sb.is-colap .dc-sb__brand .dc-sb__logo { flex: 0 0 auto; }
+.dc-sb__acc { padding-top: 0; }
+.dc-sb__acc:not(.is-colap) { padding-bottom: 10px; }
+
+/* Botones de acción: siempre en píldora (quedaban algunos rectangulares). */
+#dc-main button[style*="border-radius: var(--dc-r-md)"],
+#dc-main button[style*="border-radius: var(--dc-r-sm)"],
+.dc-modal button[style*="border-radius: var(--dc-r-md)"] { border-radius: 999px !important; }
+#dc-main [role="listbox"] button, #dc-main [role="menu"] button, #dc-main [role="option"],
+#dc-main [role="grid"] button { border-radius: 10px !important; }
+.dc-sb__acc.is-colap .dc-sb__crear { width: 34px; height: 34px; }
