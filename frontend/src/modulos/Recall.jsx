@@ -214,7 +214,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
       <Card className="dc-rec">
         <div className="dc-rec__cab">
           <div className="dc-rec__tit">
-            <h3><Sparkles size={16} strokeWidth={1.75} /> Recorrido automático del paciente</h3>
+            <h3><span className="dc-rec__sello"><Sparkles size={16} strokeWidth={1.75} /></span> Recorrido automático del paciente</h3>
             <p>Cada paso se envía solo por WhatsApp. Toca uno para editar su mensaje.</p>
           </div>
           <div className="dc-rec__cifras">
@@ -227,7 +227,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
         <div className="dc-rec__fases">
           {[[true, "Antes de la cita", Clock], [false, "Después de la cita", CalendarCheck]].map(([antes, tit, FIc]) => (
             <section key={tit} className="dc-rec__fase">
-              <h4><FIc size={14} strokeWidth={1.75} /> {tit}</h4>
+              <h4 className={antes ? "is-antes" : "is-despues"}><FIc size={13} strokeWidth={2} /> {tit}</h4>
               {reglas.filter((r) => !!r.antes === antes).map((r) => { const Ic = r.icon || (AUT_META[r.clave] || {}).icon || Zap; const color = r.color || (AUT_META[r.clave] || {}).color || DS.c.primary; return (
                 <div key={r.clave} className={`dc-rec__paso${r.on ? " is-on" : ""}`} style={{ "--paso": color }} onClick={() => abrirCfg(r)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") abrirCfg(r); }} title="Editar mensaje">
                   <span className="dc-rec__ico" style={{ background: tint(color, 0.12), color }}><Ic size={16} strokeWidth={1.75} /></span>
@@ -238,21 +238,31 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
               ); })}
             </section>
           ))}
+          <span className="dc-rec__dia" title="Día de la cita" aria-hidden="true"><CalendarCheck size={16} strokeWidth={1.75} /></span>
         </div>
       </Card>
 
       <Card style={{ overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="dc-rec__cola-cab" style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14.5, fontWeight: 700, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}>Pacientes por volver {cola.some((c) => c.estado === "por_contactar") && <span className="dc-rec__pend">{cola.filter((c) => c.estado === "por_contactar").length} por contactar</span>}</h3><div style={{ fontSize: 12.5, color: "var(--dc-ink-500)", marginTop: 2 }}>Sin control hace más de 6 meses. El recall les propone una cita automáticamente.</div></div>
           {puedeEnviar && cola.some((c) => c.estado === "por_contactar") && <Btn small onClick={enviarTodos}><Send size={14} strokeWidth={1.75} /> Enviar a todos</Btn>}
         </div>
-        {cola.map((p) => { const col = colorDe(p.nombre); return (
-          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: "1px solid var(--dc-line)" }}>
-            <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.nombre)}</div>
-            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Última visita: {p.ultima}</div></div>
-            {p.estado === "enviado" ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={13} strokeWidth={1.75} /> Enviado</span> : <Btn small kind="ghost" onClick={() => enviar(p.id)}><Send size={13} strokeWidth={1.75} /> Recordar</Btn>}
+        {cola.length > 0 && (
+          <div className="dc-rec__cola">
+            {cola.map((p) => { const col = colorDe(p.nombre); const f = p.ultima ? new Date(String(p.ultima).slice(0, 10) + "T00:00:00") : null; const meses = f && !isNaN(f) ? Math.max(0, Math.round((hoy - f) / 2629800000)) : null; return (
+              <div key={p.id} className={`dc-rec__pac${p.estado === "enviado" ? " is-enviado" : ""}`}>
+                <span className="dc-rec__av" style={{ background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(p.nombre)}</span>
+                <div className="dc-rec__pac-txt">
+                  <b>{p.nombre}</b>
+                  <span title={f && !isNaN(f) ? `Última visita: ${f.toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" })}` : undefined}>{meses != null ? <><em>{meses} {meses === 1 ? "mes" : "meses"}</em> sin venir</> : "Sin fecha de última visita"}</span>
+                </div>
+                {p.estado === "enviado"
+                  ? <span className="dc-rec__ok"><CheckCircle2 size={14} strokeWidth={1.75} /> Enviado</span>
+                  : <button type="button" className="dc-rec__recordar" onClick={() => enviar(p.id)}><Send size={14} strokeWidth={1.75} /> Recordar</button>}
+              </div>
+            ); })}
           </div>
-        ); })}
+        )}
         {cola.length === 0 && <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todos al día" sub="No hay pacientes pendientes de recall." />}
       </Card>
       </>)}
