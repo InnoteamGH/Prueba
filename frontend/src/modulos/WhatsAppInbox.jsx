@@ -1,9 +1,9 @@
 /* Módulo WhatsApp + IA (inbox, agente, configuración del asistente).
    Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect, useRef } from "react";
-import { AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Settings, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Settings, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, X, Zap } from "lucide-react";
 import api, { auth } from "../api/client";
-import {Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
+import {EnCabecera, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
 import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";
 import "./whatsappInbox.css";
 
@@ -167,6 +167,10 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   const aplicarPersonalidad = (id, combo) => setPerfil((p) => ({ ...p, personalidad: id, ...combo }));
   const scrollRef = useRef(null);
   const [atBottom, setAtBottom] = useState(true);
+  // Móvil: se ve la lista o la conversación, como en WhatsApp. Escritorio mediano:
+  // el panel del contacto se abre a demanda con el botón de información.
+  const [enHilo, setEnHilo] = useState(false);
+  const [verInfo, setVerInfo] = useState(false);
   const chat = chats.find((c) => c.id === activo);
   const scrollBottom = (smooth) => { const el = scrollRef.current; if (el) { el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" }); setAtBottom(true); } };
   // Al abrir una conversación: baja al último mensaje.
@@ -250,7 +254,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     return () => { parar(); document.removeEventListener("visibilitychange", alCambiarVisibilidad); };
     /* eslint-disable-next-line */
   }, [conectado, activo]);
-  const seleccionar = (id) => { setActivo(id); if (conectado) cargarMensajes(id); };
+  const seleccionar = (id) => { setActivo(id); setEnHilo(true); if (conectado) cargarMensajes(id); };
   const eliminarChat = (id) => {
     if (!id) return;
     if (!window.confirm("¿Eliminar esta conversación y sus mensajes? No se puede deshacer.")) return;
@@ -317,23 +321,22 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     setChats((cs) => cs.map((c) => c.id === activo ? { ...c, modo: c.modo === "ia" ? "humano" : "ia" } : c));
   };
 
-  const burbuja = (m, i) => {
-    if (m.de === "sistema") return <div key={i} style={{ textAlign: "center", margin: "10px 0" }}><span style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-600)", fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: "var(--dc-r-full)" }}>{m.txt}</span></div>;
-    const mapa = { paciente: { bg: "var(--dc-white)", fg: INK, a: "flex-start", b: "1px solid var(--dc-line)", sh: "0 2px 6px -1px rgba(16,24,40,.04)" }, ia: { bg: DS.c.primary, fg: "var(--dc-white)", a: "flex-end", b: "none", sh: "0 4px 10px -2px " + tint(DS.c.primary, 0.376) }, agente: { bg: NAVY, fg: "var(--dc-white)", a: "flex-end", b: "none", sh: "0 4px 10px -2px rgba(16,24,40,.2)" } };
-    const s = mapa[m.de] || mapa.paciente;
+  // Burbuja al estilo WhatsApp: entrante en blanco a la izquierda; saliente a la
+  // derecha (verde si escribe recepción, aqua si responde el asistente IA). La hora
+  // y los ticks van dentro de la burbuja, abajo a la derecha. La "colita" solo en
+  // el primer mensaje de cada racha del mismo emisor.
+  const burbuja = (m, i, primero) => {
+    if (m.de === "sistema") return <div key={i} className="wa-sis"><span>{m.txt}</span></div>;
+    const sale = m.de !== "paciente";
+    const cls = `wa-b ${sale ? "wa-b--out" : "wa-b--in"}${m.de === "ia" ? " wa-b--ia" : ""}${primero ? " wa-b--cola" : ""}`;
     return (
-      <div key={i} style={{ display: "flex", justifyContent: s.a, marginBottom: 8 }}>
-        <div style={{ maxWidth: "78%" }}>
-          {m.de === "ia" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", fontWeight: 500, marginBottom: 4, display: "flex", alignItems: "center", gap: 3 }}><Bot size={11} strokeWidth={1.75} /> Asistente IA</div>}
-          {m.de === "agente" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", fontWeight: 500, marginBottom: 4, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}><UserCheck size={11} strokeWidth={1.75} /> Recepción (tú)</div>}
-          <div style={{ background: s.bg, color: s.fg, border: s.b, padding: "10px 14px", borderRadius: "var(--dc-r-lg)", borderBottomLeftRadius: m.de === "paciente" ? 2 : 14, borderBottomRightRadius: m.de !== "paciente" ? 2 : 14, fontSize: 14, lineHeight: 1.45, boxShadow: s.sh, wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}>
-            {m.txt}
-            {m.tools?.length > 0 && <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", gap: 4 }}>{m.tools.map((tl, k) => <span key={k} style={{ fontSize: 12, fontWeight: 500, background: "rgba(255,255,255,.2)", color: "var(--dc-white)", padding: "2px 7px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 3 }}><Zap size={9} strokeWidth={1.75} /> {tl}()</span>)}</div>}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 2, textAlign: s.a === "flex-end" ? "right" : "left", display: "flex", alignItems: "center", justifyContent: s.a === "flex-end" ? "flex-end" : "flex-start", gap: 4 }}>
-            <span>{m.t}</span>
-            {(m.de === "ia" || m.de === "agente") && ticks(m.estado)}
-          </div>
+      <div key={i} className={`wa-fila ${sale ? "wa-fila--out" : ""}${primero ? " wa-fila--primero" : ""}`}>
+        <div className={cls}>
+          {primero && m.de === "ia" && <div className="wa-b__autor"><Bot size={12} strokeWidth={2} /> Asistente IA</div>}
+          {primero && m.de === "agente" && <div className="wa-b__autor wa-b__autor--rec"><UserCheck size={12} strokeWidth={2} /> Recepción</div>}
+          <span className="wa-b__txt">{m.txt}</span>
+          {m.tools?.length > 0 && <div className="wa-b__tools">{m.tools.map((tl, k) => <span key={k}><Zap size={10} strokeWidth={2} /> {tl}()</span>)}</div>}
+          <span className="wa-b__meta">{m.t}{sale && ticks(m.estado)}</span>
         </div>
       </div>
     );
@@ -342,7 +345,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   const ticks = (estado) => {
     if (!estado || estado === "pendiente") return null;
     if (estado === "fallido") return <span title="No se pudo entregar" style={{ color: "var(--dc-danger)", fontWeight: 500 }}>⚠</span>;
-    if (estado === "leido") return <CheckCheck size={13} strokeWidth={1.75} style={{ color: "var(--dc-blue)" }} />;
+    if (estado === "leido") return <CheckCheck size={15} strokeWidth={2} style={{ color: "#53BDEB" }} />;
     if (estado === "entregado") return <CheckCheck size={13} strokeWidth={1.75} style={{ color: "var(--dc-slate)" }} />;
     if (estado === "enviado") return <Check size={13} strokeWidth={1.75} style={{ color: "var(--dc-ink-400)" }} />;
     return null;
@@ -353,10 +356,12 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     return msgs.map((m, i) => {
       const sep = m.fecha && m.fecha !== ultima;
       if (m.fecha) ultima = m.fecha;
+      const prev = msgs[i - 1];
+      const primero = sep || !prev || prev.de !== m.de || prev.de === "sistema";
       return (
         <React.Fragment key={i}>
-          {sep && <div style={{ textAlign: "center", margin: "12px 0 8px", position: "relative", zIndex: 1 }}><span style={{ background: "rgba(255,255,255,0.75)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "var(--dc-ink-500)", fontSize: 12, fontWeight: 500, padding: "5px 14px", borderRadius: "var(--dc-r-full)", textTransform: "capitalize", boxShadow: "0 1px 2px rgba(16,24,40,.04)", border: "1px solid rgba(255,255,255,0.4)" }}>{diaLabel(m.fecha)}</span></div>}
-          {burbuja(m, i)}
+          {sep && <div className="wa-fecha"><span>{m.fecha}</span></div>}
+          {burbuja(m, i, primero)}
         </React.Fragment>
       );
     });
@@ -420,13 +425,14 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         const cfg = { verde: ["var(--dc-ok-700)", "var(--dc-ok-soft)", "IA Conectada"], ambar: ["var(--dc-warn-600)", "var(--dc-warn-soft)", "Con fallos"], rojo: ["var(--dc-red-deep)", "var(--dc-danger-soft)", "Desconectado"], gris: ["var(--dc-ink-400)", "var(--dc-bg)", "Comprobando…"] }[sem];
 
         return (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 12, flexWrap: "wrap", background: "var(--dc-surface)", padding: "8px 14px", borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", boxShadow: "0 4px 20px -10px rgba(16,24,40,.05)" }}>
-            <div style={{ fontSize: 13, color: "var(--dc-slate)", display: "flex", alignItems: "center", gap: 12, fontWeight: 500 }}>
+          // Estado del canal y acciones en la cabecera de la app: toda la altura queda para el chat.
+          <EnCabecera><div className="wa-estado">
+            <div className="wa-estado__datos">
               <span style={{ fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: "var(--dc-r-full)", background: cfg[1], color: cfg[0], display: "inline-flex", alignItems: "center", gap: 5, letterSpacing: 0, boxShadow: "0 2px 8px -2px "+tint(cfg[0], 0.251) }}>
                 <span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: cfg[0] }}/> {cfg[2]}
               </span>
-              <span style={{color: "var(--dc-ink-400)"}}>|</span>
-              <span><b style={{color: INK, fontWeight: 500}}>{total}</b> chats</span>
+              <span className="wa-estado__sep" />
+              <span><b>{total}</b> chats</span>
               <span style={{color: "var(--dc-ink-400)"}}>•</span>
               <span><b style={{color: "var(--dc-ok-700)", fontWeight: 500}}>{porIA}</b> IA</span>
               <span style={{color: "var(--dc-ink-400)"}}>•</span>
@@ -457,7 +463,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
               {conectado && puedeConfigurarWa && <Btn small kind="ghost" onClick={() => { setConexionOpen(true); cargarConexion(); }}><Phone size={14} strokeWidth={1.75} /> Conexión WhatsApp</Btn>}
               {conectado && <Btn small kind="ghost" onClick={abrirInstrucciones}><Settings size={14} strokeWidth={1.75} /> Configurar IA</Btn>}
             </div>
-          </div>
+          </div></EnCabecera>
         ); 
       })()}
       {conectado && puedeConfigurarWa && conexionOpen && (
@@ -482,9 +488,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           <Btn small onClick={cargarConversaciones}>Reintentar</Btn>
         </div>
       )}
-      <Card style={{ overflow: "hidden", display: "grid", gridTemplateColumns: "290px minmax(0,1fr) 300px", height: "calc(100vh - 150px)", minHeight: 480, padding: 0, background: "transparent", border: "none", boxShadow: "0 10px 40px -10px rgba(16,24,40,.06)" }} className="dc-inbox">
+      <Card className={`dc-inbox wa${enHilo && chat ? " is-hilo" : ""}${verInfo ? " is-info" : ""}`}>
         {/* Columna 1 · lista con búsqueda y filtros */}
-        <div className="dc-inbox-list" style={{ borderRight: "1px solid rgba(16,24,40,.06)", background: "var(--dc-surface)", backdropFilter: "none", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, height: "100%", borderRadius: "20px 0 0 20px" }}>
+        <div className="dc-inbox-list">
           <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Chats</span>
@@ -515,11 +521,11 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
               <div style={{ padding: "28px 18px", textAlign: "center", color: "var(--dc-ink-500)", fontSize: 13 }}>Sin conversaciones.</div>
             )}
             {lista.map((c) => (
-              <button key={c.id} onClick={() => seleccionar(c.id)} style={{ display: "flex", gap: 11, alignItems: "center", width: "100%", textAlign: "left", padding: "12px 14px", border: "none", borderBottom: "1px solid var(--dc-line)", cursor: "pointer", background: activo === c.id ? "var(--dc-bg-soft)" : "var(--dc-white)", borderLeft: activo === c.id ? "3px solid " + DS.c.primary : "3px solid transparent", transition: "background .15s" }} onMouseEnter={(e) => { if (activo !== c.id) e.currentTarget.style.background = "var(--dc-bg-soft)"; }} onMouseLeave={(e) => { if (activo !== c.id) e.currentTarget.style.background = "var(--dc-white)"; }}>
-                <div style={{ width: 42, height: 42, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>{inicial(c.nombre)}</div>
+              <button key={c.id} onClick={() => seleccionar(c.id)} className={`wa-item${activo === c.id ? " is-on" : ""}`}>
+                <div className="wa-av">{inicial(c.nombre)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nombre}</span>
+                    <span className="wa-item__nom">{c.nombre}</span>
                     {c.ejemplo && <span className="dc-inbox-ejemplo">Ejemplo</span>}
                     {conectado && <span title={c.esPaciente ? "Paciente registrado" : "Contacto nuevo (lead)"} style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: c.esPaciente ? "var(--dc-ok)" : "var(--dc-line-alt)", flexShrink: 0 }} />}
                   </div>
@@ -527,7 +533,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                   {conectado && c.actualizado && <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{hhmm(c.actualizado)}</span>}
-                  <span style={{ fontSize: 12, fontWeight: 500, padding: "2px 7px", borderRadius: "var(--dc-r-full)", background: c.modo === "ia" ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", color: c.modo === "ia" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>{c.modo === "ia" ? "IA" : "ATENCIÓN"}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, padding: "2px 7px", borderRadius: "var(--dc-r-full)", background: c.modo === "ia" ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", color: c.modo === "ia" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>{c.modo === "ia" ? "IA" : "Recepción"}</span>
                   {conectado && c.porResponder > 0 && <span title="Mensajes por responder" style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, fontSize: 12, fontWeight: 500, display: "grid", placeItems: "center" }}>{c.porResponder}</span>}
                 </div>
               </button>
@@ -536,45 +542,47 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         </div>
         {/* Columna 2 · hilo de conversación */}
         {!chat ? (
-          <div style={{ gridColumn: "2 / 4", display: "grid", placeItems: "center", background: "var(--dc-bg)", color: "var(--dc-ink-500)", fontSize: 14, padding: 24, textAlign: "center" }}>
+          <div className="wa-vacio">
             <div><MessageSquare size={34} strokeWidth={1.75} color="var(--dc-ink-400)" /><div style={{ marginTop: 10 }}>{conectado ? "Selecciona una conversación para verla." : "Sin conversación."}</div></div>
           </div>
         ) : (<>
-        <div className="dc-inbox-thread" style={{ display: "flex", flexDirection: "column", background: "var(--dc-bg-soft)", minWidth: 0, minHeight: 0, position: "relative", height: "100%" }}>
-          <div className="dc-inbox-chat-head" style={{ padding: "10px 16px", background: "var(--dc-surface)", borderBottom: "1px solid rgba(16,24,40,.06)", flexShrink: 0 }}>
-            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
+        <div className="dc-inbox-thread">
+          <div className="dc-inbox-chat-head">
+            <button type="button" className="wa-volver" aria-label="Volver a los chats" onClick={() => setEnHilo(false)}><ArrowLeft size={18} strokeWidth={2} /></button>
+            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm">{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
               {conectado && <Btn small onClick={() => abrirAgendar("Solicitud por WhatsApp")}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
-              <Btn small kind={chat.modo === "ia" ? "navy" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>
+              <button type="button" className="wa-info" aria-label="Datos del contacto" title="Datos del contacto" aria-pressed={verInfo} onClick={() => setVerInfo((v) => !v)}><Info size={17} strokeWidth={1.9} /></button>
+              <Btn small kind={chat.modo === "ia" ? "primary" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>
             </div>
           </div>
-          <div ref={scrollRef} onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }} style={{ width: "100%", flex: 1, minHeight: 0, overflowY: "auto", padding: "16px", boxSizing: "border-box" }}>{hilo(chat.msgs)}</div>
-          {!atBottom && <button type="button" className="dc-icon-btn" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" style={{ position: "absolute", right: 16, bottom: 150, width: 38, height: 38, borderRadius: "var(--dc-r-full)", border: "1px solid var(--dc-line)", background: "var(--dc-white)", color: NAVY, boxShadow: "0 6px 16px rgba(16,24,40,.22)", cursor: "pointer", display: "grid", placeItems: "center", zIndex: 5 }}><ChevronDown size={20} strokeWidth={1.75} /></button>}
+          <div ref={scrollRef} className="wa-hilo" onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }}>{hilo(chat.msgs)}</div>
+          {!atBottom && <button type="button" className="dc-icon-btn" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" className="wa-bajar"><ChevronDown size={20} strokeWidth={1.75} /></button>}
           {chat.modo === "ia" && conectado && !modoDemo ? (
-            <div style={{ padding: "12px 14px", background: "var(--dc-surface)", borderTop: "1px solid rgba(16,24,40,.06)", fontSize: 13, color: "var(--dc-ok-700)", display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+            <div className="wa-pie wa-pie--nota">
               <Bot size={14} strokeWidth={1.75} /> El asistente IA responde automáticamente por WhatsApp. Usa <b>&nbsp;Tomar control&nbsp;</b> para responder tú.
             </div>
           ) : chat.modo === "ia" ? (
-            <div style={{ padding: 12, background: "var(--dc-surface)", borderTop: "1px solid rgba(16,24,40,.06)", flexShrink: 0 }}>
-              <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}><Bot size={13} strokeWidth={1.75} /> {modoDemo ? "Modo demo: simula un mensaje del paciente (como si escribiera por WhatsApp):" : "La IA responde sola. Simula un mensaje del paciente:"}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{sugs.map((s, i) => <button key={i} onClick={() => recibir(s)} style={{ background: "var(--dc-bg)", color: NAVY, border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-full)", padding: "6px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{s}</button>)}</div>
+            <div className="wa-pie">
+              <div className="wa-pie__ayuda"><Bot size={13} strokeWidth={1.75} /> {modoDemo ? "Modo demo: simula un mensaje del paciente (como si escribiera por WhatsApp):" : "La IA responde sola. Simula un mensaje del paciente:"}</div>
+              <div className="wa-chips">{sugs.map((s, i) => <button key={i} type="button" className="wa-chip" onClick={() => recibir(s)}>{s}</button>)}</div>
             </div>
           ) : (
-            <div style={{ background: "var(--dc-surface)", borderTop: "1px solid rgba(16,24,40,.06)", padding: "12px 16px", flexShrink: 0 }}>
-              <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 4, scrollbarWidth: "none" }}>
-                <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-                <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, marginRight: 4, display: "flex", alignItems: "center" }}><Zap size={13} strokeWidth={2} style={{marginRight: 2}}/> Respuestas:</span>
-                {PLANTILLAS.map(([et, txt]) => <button key={et} title={txt} onClick={() => setInput(txt)} style={{ background: "var(--dc-bg-soft)", color: "var(--dc-ink-700)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-full)", padding: "5px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = DS.c.primary; e.currentTarget.style.color = DS.c.primary; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dc-line)"; e.currentTarget.style.color = "var(--dc-ink-700)"; }}>{et}</button>)}
+            <div className="wa-pie">
+              <div className="wa-chips">
+                <span className="wa-chips__et"><Zap size={13} strokeWidth={2} style={{marginRight: 2}}/> Respuestas:</span>
+                {PLANTILLAS.map(([et, txt]) => <button key={et} type="button" className="wa-chip" title={txt} onClick={() => setInput(txt)}>{et}</button>)}
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input className="dc-premium-inp" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && enviarHumano()} placeholder="Escribe un mensaje..." style={{ flex: 1, padding: "12px 18px", borderRadius: "var(--dc-r-full)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", background: "var(--dc-bg-soft)", transition: "border-color .2s" }} onFocus={(e) => e.target.style.borderColor = DS.c.primary} onBlur={(e) => e.target.style.borderColor = "var(--dc-line)"} />
-                <button aria-label="Enviar el mensaje" onClick={enviarHumano} style={{ width: 44, height: 44, borderRadius: "var(--dc-r-full)", border: "none", background: input.trim() ? DS.c.primary : "var(--dc-line)", color: "var(--dc-white)", display: "grid", placeItems: "center", cursor: input.trim() ? "pointer" : "default", transition: "background .2s", flexShrink: 0 }}><Send size={18} strokeWidth={1.75} style={{ marginLeft: 2 }} /></button>
+              <div className="wa-compositor">
+                <input className="wa-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && enviarHumano()} placeholder="Escribe un mensaje" onFocus={(e) => e.target.style.borderColor = DS.c.primary} onBlur={(e) => e.target.style.borderColor = "var(--dc-line)"} />
+                <button type="button" aria-label="Enviar el mensaje" onClick={enviarHumano} className="wa-enviar" disabled={!input.trim()}><Send size={18} strokeWidth={1.75} style={{ marginLeft: 2 }} /></button>
               </div>
             </div>
           )}
         </div>
         {/* Columna 3 · panel del contacto */}
-        <div className="dc-inbox-side" style={{ borderLeft: "1px solid rgba(16,24,40,.06)", background: "var(--dc-surface)", backdropFilter: "none", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", overflowY: "auto", minWidth: 0, height: "100%", borderRadius: "0 20px 20px 0" }}>
+        <div className="dc-inbox-side">
+          <button type="button" className="wa-info-cerrar" aria-label="Cerrar datos del contacto" onClick={() => setVerInfo(false)}><X size={16} strokeWidth={2} /></button>
           <div style={{ padding: "32px 20px 24px", textAlign: "center", borderBottom: "1px solid var(--dc-line)" }}>
             <div style={{ width: 84, height: 84, borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: INK, border: "1px solid var(--dc-line)", boxShadow: "0 8px 24px -6px rgba(16,24,40,.08)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 27, margin: "0 auto 16px" }}>{inicial(chat.nombre)}</div>
             <div style={{ fontWeight: 600, color: NAVY, fontSize: 16, fontFamily: DISPLAY_FONT }}>{chat.nombre}</div>
@@ -585,7 +593,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           </div>
           <div style={{ padding: 20, display: "grid", gap: 16 }}>
             <div style={{ background: "var(--dc-bg-soft)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-400)", marginBottom: 12 }}>Detalles del Contacto</div>
+              <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-400)", marginBottom: 12 }}>Detalles del contacto</div>
               <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 500 }}><Phone size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> {chat.tel}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 500 }}><Calendar size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> Creado {conectado ? fmtCreado(chat.creado) : "hoy"}</div>

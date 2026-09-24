@@ -881,3 +881,13 @@
 .dc-top__slot .dc-pg .dc-chip { white-space: nowrap; }
 @media (max-width: 1440px) { .dc-top__slot .dc-reloj { display: none; } }
 @media (max-width: 1280px) { .dc-top__onb { display: none; } }
+
+/* Móvil: la cabecera puede ocupar dos líneas sin montarse sobre el contenido. */
+@media (max-width: 767px) {
+  .dc-top { height: auto !important; min-height: 56px; padding: 8px 12px !important; flex-wrap: wrap; row-gap: 6px; }
+  .dc-top__izq { flex: 1 1 100%; }
+  .dc-top__der { flex: 1 1 100%; justify-content: space-between; flex-wrap: nowrap; }
+  .dc-top__sede { flex: 1; min-width: 0; }
+  .dc-top__slot { display: none; }
+  .dc-pagina--chat { padding: 10px 10px 10px !important; }
+}
