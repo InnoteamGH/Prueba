@@ -1817,6 +1817,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
                 </div>
               </div>
             )}
+            <div className="dc-ag-hero__acc" data-slot-acciones />
           </section>
         );
       })()}
@@ -3709,11 +3710,6 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
     <div style={{ overflowX: "auto", maxWidth: "100%", width: "100%" }}>
       {!embedded && (() => { const top = ordenada[0]; const u = top ? URGENCIA[top.urg] : null; const nAlta = esp.filter((x) => x.urg === "alta").length; const nOf = esp.filter((x) => x.ofrecido.length).length; const nEsp = new Set(esp.map((x) => x.e)).size; return (
         <>
-        <EnCabecera>
-          <div className="dc-esp-top dc-slot-movil">
-            <Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>
-          </div>
-        </EnCabecera>
         <section className="dc-esp-hero">
           <div className="dc-esp-hero__txt">
             <div className="dc-esp-hero__num"><b>{esp.length}</b><span>en espera</span></div>
@@ -3731,6 +3727,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
               <button type="button" className="dc-esp-hero__btn" onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer</button>
             </div>
           )}
+          <button type="button" className="dc-esp-hero__agregar" onClick={nuevoEspera}><Plus size={15} strokeWidth={2} /> Agregar</button>
         </section>
         </>
       ); })()}
@@ -7785,7 +7782,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     { grupo: "General", items: [
       { id: "plataforma", label: "Plataforma (clínicas)", icon: Globe },
       { id: "gerencial", label: "Dashboard gerencial", icon: BarChart3 },
-      { id: "reportes", label: "Producción y comisiones", icon: TrendingUp },
+      { label: "Producción y comisiones", icon: TrendingUp, children: [
+        { id: "reportes", label: "Resumen", mod: "reportes" },
+        { id: "reportes_aus", label: "Ausentismo", mod: "reportes" },
+      ] },
       // NAV-11: #/comisiones es alias de reportes (sin segunda entrada de menú)
     ] },
     { grupo: "Atención", items: [
@@ -7797,7 +7797,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       ] },
       { id: "espera", label: "Lista de espera", icon: Bell },
       { id: "disponibilidad", label: "Mi disponibilidad", icon: Clock },
-      { id: "recall", label: "Recordatorios", icon: BellRing },
+      { label: "Recordatorios", icon: BellRing, children: [
+        { id: "recall", label: "Automatizaciones", mod: "recall" },
+        { id: "recall_hist", label: "Historial de envíos", mod: "recall" },
+        { id: "recall_sat", label: "Satisfacción", mod: "recall" },
+      ] },
       { id: "formularios", label: "Formularios", icon: ClipboardList },
       { id: "resenas", label: "Reseñas", icon: Star },
     ] },
@@ -7871,6 +7875,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "plataforma": return <Plataforma notify={notify} />;
       case "gerencial": return <Gerencial citas={cf} sede={sede} />;
       case "reportes": return <Reportes citas={cf} can={can} />;
+      case "reportes_aus": return <Reportes citas={cf} can={can} tab="ausencias" />;
       case "servicios": return <Servicios notify={notify} can={can} crearIntent={crearIntent === "servicio"} onIntentDone={() => setCrearIntent(null)} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
@@ -7890,6 +7895,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "radiografias": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} />;
       case "fotos": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} soloFotos />;
       case "recall": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} />;
+      case "recall_hist": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="historial" />;
+      case "recall_sat": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="satisfaccion" />;
       case "formularios": return <Formularios pacientes={pf} notify={notify} />;
       case "seguros": return <Seguros notify={notify} pacientes={pf} fichas={fichas} />;
       case "resenas": return <Resenas notify={notify} can={can} citas={cf} />;
@@ -7923,6 +7930,43 @@ function MainApp({ usuario, setUsuario, onLogout }) {
             <span className="dc-sb__mark"><Smile size={18} strokeWidth={2} color="#fff" /></span>
             {!colap && <span className="dc-sb__name"><span>Dento <b>Check</b></span><small>Sonríe+</small></span>}
           </button>
+        </div>
+        <div className={`dc-sb__acc${colap ? " is-colap" : ""}`}>
+            {rol !== "superadmin" && hayQueCrear && (
+              <button type="button" className="dc-sb__crear" aria-label="Crear" title="Crear paciente, cita, cobro…" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 6, left: r.left })); }}><Plus size={16} strokeWidth={2} />{!colap && <span>Crear</span>}</button>
+            )}
+            {crearMenu && (<>
+              <div onClick={() => setCrearMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 140 }} />
+              <div className="dc-sb__crearmenu" style={{ top: crearMenu.top, left: crearMenu.left }}>
+                {ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear")).map(([k, l, Ic, t]) => (
+                  <button key={k} type="button" onClick={() => { setCrearMenu(false); setVista(t); setSidebarOpen(false); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }}><Ic size={16} strokeWidth={1.75} /> {l}</button>
+                ))}
+              </div>
+            </>)}
+            {colap ? (puedeMultisede && <button type="button" className="dc-sb__crear dc-sb__crear--sede" aria-label="Cambiar sede" title={`Sede: ${etiquetaSedeActiva}`} onClick={() => setColap(false)}><MapPin size={16} strokeWidth={1.75} /></button>) : (
+            <div className="dc-sb__sedefila">
+          {puedeMultisede ? (
+            <>
+              {/* Llevaba fondo var(--dc-bg) y ningun borde sobre una cabecera casi blanca: 1,07:1 de
+                  contraste de superficie, o sea invisible como control. El boton de al lado si
+                  tiene borde, y por eso se veia uno y el otro no. Ahora los dos igual. */}
+              <div className="dc-sb__sede" title="Sede activa"><MapPin size={15} strokeWidth={1.75} color={sedeDetectada && String(sede) === String(sedeDetectada) ? "var(--dc-ok-700)" : "var(--dc-ink-500)"} /><Select small ariaLabel="Sede activa" value={sede} onChange={(v) => {
+                if (v === "all") { setSede("all"); return; }
+                // UUID de API: no Number()
+                setSede(typeof v === "string" && v.includes("-") ? v : Number(v));
+              }} options={[...sedesDelSelector.map((s) => ({ value: s.id, label: `${s.nombre}${sedeDetectada != null && String(sedeDetectada) === String(s.id) ? " · aquí" : ""}` })), { value: "all", label: usuario.sedes === "all" ? "Todas las sedes" : "Todas mis sedes" }]} /></div>
+              {/* Bug D12 re-test: Ocultar botón "Detectar mi sede" cuando solo tiene 1 sede */}
+              {sedesDelSelector.length > 1 && (
+                <button type="button" onClick={detectarSede} className="dc-sb__gps" aria-label={geoEstado === "buscando" ? "Ubicando…" : geoEstado === "ok" ? "Ubicación detectada" : "Detectar mi sede"} title={geoEstado === "ok" ? "Ubicación detectada" : "Detectar mi sede por ubicación (siempre puedes cambiarla)"} style={{ color: geoEstado === "ok" ? "var(--dc-ok-700)" : undefined }}><Navigation size={16} strokeWidth={1.75} /></button>
+              )}
+            </>
+          ) : rol === "superadmin" ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 7, color: DS.c.primary, fontSize: 13, fontWeight: 500 }}><Globe size={15} strokeWidth={1.75} /> Plataforma global · AWG</div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13, fontWeight: 500 }}><MapPin size={15} strokeWidth={1.75} color={NAVY} /> {etiquetaSedeActiva}</div>
+          )}
+            </div>
+            )}
         </div>
         <nav className="dc-sb__nav" aria-label="Módulos">
           {NAV_GRUPOS.map((g) => (
@@ -7978,6 +8022,14 @@ function MainApp({ usuario, setUsuario, onLogout }) {
           ))}
         </nav>
         <div className="dc-sb__pie">
+            {rol !== "superadmin" && !onbDismissed && misPasos.length > 0 && (() => { const done = misPasos.filter((p) => pasos[p.id]).length; if (done >= misPasos.length) return null; return (
+              <div className="dc-sb__onb">
+                <button type="button" onClick={() => setShowPasos(true)} title="Tus tareas de primeros pasos (el checklist de la clínica está en Configuración)">
+                  <span className="dc-sb__onbnum">{done}/{misPasos.length}</span>{!colap && " Primeros pasos"}
+                </button>
+                <button type="button" className="dc-mini-btn dc-sb__onbx" aria-label="Ocultar primeros pasos" title="Ocultar primeros pasos" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }}><X size={14} strokeWidth={2} /></button>
+              </div>
+            ); })()}
           {!esSuper && (mods.includes("plan") ? (
             <button type="button" className="dc-sb__plan" title={`Plan ${PLAN_NOMBRE[plan]}`} aria-label={`Plan ${PLAN_NOMBRE[plan]}`} onClick={() => { setVista("plan"); setSidebarOpen(false); }}>
               <Crown size={15} strokeWidth={1.75} />{!colap && <><span>Plan <b>{PLAN_NOMBRE[plan]}</b></span><ChevronRight size={14} strokeWidth={1.75} /></>}
@@ -7995,59 +8047,15 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       </aside>
 
       <main id="dc-main" style={{ flex: 1, minWidth: 0, height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
+        {/* Solo en celular: botón del menú y nombre de la vista. En escritorio la vista
+            ya se ve marcada en el menú lateral y la barra se quitaba espacio a todas. */}
         <header className="dc-top">
           <div className="dc-top__izq">
             <button aria-label="Abrir o cerrar el menú" className="dc-burger" onClick={() => setSidebarOpen((s) => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: NAVY, display: "none", minWidth: "var(--dc-tap-min)", minHeight: "var(--dc-tap-min)" }}><Menu size={22} strokeWidth={1.75} /></button>
             <h1 className="dc-top__titulo">{NAV.find((n) => n.id === vista)?.label}</h1>
-            <div id="dc-top-slot" className="dc-top__slot" />
-          </div>
-          <div className="dc-top__der">
-            {/* Bug D11 re-test: Onboarding dismissable permanentemente */}
-            {rol !== "superadmin" && !onbDismissed && misPasos.length > 0 && (() => { const done = misPasos.filter((p) => pasos[p.id]).length; if (done >= misPasos.length) return null; return (
-              <div className="dc-top__onb">
-                <button type="button" onClick={() => setShowPasos(true)} title="Tus tareas de primeros pasos (el checklist de la clínica está en Configuración)">
-                  <span className="dc-top__onbnum">{done}/{misPasos.length}</span> Primeros pasos
-                </button>
-                <button type="button" className="dc-mini-btn dc-top__onbx" aria-label="Ocultar primeros pasos" title="Ocultar primeros pasos" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }}><X size={14} strokeWidth={2} /></button>
-              </div>
-            ); })()}
-          {puedeMultisede ? (
-            <>
-              {/* Llevaba fondo var(--dc-bg) y ningun borde sobre una cabecera casi blanca: 1,07:1 de
-                  contraste de superficie, o sea invisible como control. El boton de al lado si
-                  tiene borde, y por eso se veia uno y el otro no. Ahora los dos igual. */}
-              <div className="dc-top__sede"><MapPin size={15} strokeWidth={1.75} color={sedeDetectada && String(sede) === String(sedeDetectada) ? "var(--dc-ok-700)" : "var(--dc-ink-500)"} /><Select small width={190} ariaLabel="Sede activa" value={sede} onChange={(v) => {
-                if (v === "all") { setSede("all"); return; }
-                // UUID de API: no Number()
-                setSede(typeof v === "string" && v.includes("-") ? v : Number(v));
-              }} options={[...sedesDelSelector.map((s) => ({ value: s.id, label: `${s.nombre}${sedeDetectada != null && String(sedeDetectada) === String(s.id) ? " · aquí" : ""}` })), { value: "all", label: usuario.sedes === "all" ? "Todas las sedes" : "Todas mis sedes" }]} /></div>
-              {/* Bug D12 re-test: Ocultar botón "Detectar mi sede" cuando solo tiene 1 sede */}
-              {sedesDelSelector.length > 1 && (
-                <button type="button" onClick={detectarSede} className="dc-icon-btn dc-top__icono" aria-label={geoEstado === "buscando" ? "Ubicando…" : geoEstado === "ok" ? "Ubicación detectada" : "Detectar mi sede"} title={geoEstado === "ok" ? "Ubicación detectada" : "Detectar mi sede por ubicación (siempre puedes cambiarla)"} style={{ color: geoEstado === "ok" ? "var(--dc-ok-700)" : undefined }}><Navigation size={16} strokeWidth={1.75} /></button>
-              )}
-            </>
-          ) : rol === "superadmin" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 7, color: DS.c.primary, fontSize: 13, fontWeight: 500 }}><Globe size={15} strokeWidth={1.75} /> Plataforma global · AWG</div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13, fontWeight: 500 }}><MapPin size={15} strokeWidth={1.75} color={NAVY} /> {etiquetaSedeActiva}</div>
-          )}
-            {/* Sin ninguna acción disponible el desplegable salía vacío. */}
-            {rol !== "superadmin" && hayQueCrear && (
-              <div style={{ position: "relative" }}>
-                <button onClick={() => setCrearMenu((v) => !v)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: DS.c.primary, color: "#fff", border: "none", borderRadius: "var(--dc-r-full)", padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 500, boxShadow: "0 1px 2px rgba(16,24,40,.10)" }}><Plus size={16} strokeWidth={1.75} /> Crear</button>
-                {crearMenu && (<>
-                  <div onClick={() => setCrearMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 41, background: "#fff", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", boxShadow: "0 16px 40px rgba(16,24,40,.18)", padding: 6, minWidth: 210 }}>
-                    {ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear")).map(([k, l, Ic, t]) => (
-                      <button key={k} onClick={() => { setCrearMenu(false); setVista(t); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "none", background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 500, color: NAVY, textAlign: "left" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}><Ic size={16} strokeWidth={1.75} color={DS.c.primary} /> {l}</button>
-                    ))}
-                  </div>
-                </>)}
-              </div>
-            )}
           </div>
         </header>
-        <div data-dc-scroll className="dc-contenido" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}><div className={`dc-pagina${vista === "whatsapp" ? " dc-pagina--chat" : ""}`}><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 14 }}>Cargando módulo…</div>}>{render()}</React.Suspense></div></div>
+        <div data-dc-scroll className="dc-contenido" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}><div className={`dc-pagina${vista === "whatsapp" ? " dc-pagina--chat" : ""}`}><div id="dc-top-slot" className="dc-vista-acc" /><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 14 }}>Cargando módulo…</div>}>{render()}</React.Suspense></div></div>
       </main>
 
       {showPasos && (() => {

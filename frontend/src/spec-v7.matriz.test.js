@@ -26,7 +26,9 @@ describe("A26 — menú sin duplicados", () => {
     const block = app.slice(start, end);
     assert.match(block, /\{ id: "espera", label: "Lista de espera", icon:/);
     // NAV-11 (revision5): "Producción y comisiones" cubre comisiones sin menú duplicado
-    assert.match(block, /(?:\{ id: "comisiones", label: "Comisiones", icon:|\{ id: "reportes", label: "Producción y comisiones", icon:)/);
+    // Producción y comisiones puede ser entrada directa o grupo con submódulos (Resumen/Ausentismo).
+    assert.match(block, /(?:\{ id: "comisiones", label: "Comisiones", icon:|\{ id: "reportes", label: "Producción y comisiones", icon:|\{ label: "Producción y comisiones", icon: \w+, children: \[\s*\{ id: "reportes")/);
+    assert.equal((block.match(/label: "Producción y comisiones"/g) || []).length, 1, "una sola entrada de Producción y comisiones");
     assert.match(block, /id: "dashboard"/);
     assert.match(block, /id: "odontograma"/);
     assert.match(block, /id: "perio"/);

@@ -176,7 +176,7 @@ export const permisosEfectivos = (usuario, rolePerms) => mergePerms((rolePerms &
 export const modulosVisibles = (perms) => MODULOS.filter((m) => (perms?.[m.id] || []).includes("ver")).map((m) => m.id);
 /* Rutas de sub-vista que pertenecen a un módulo (para permisos/validación de navegación). */
 /* Rutas de sub-vista → módulo de permisos (no colapsar agenda_cal en el router). */
-export const VISTA_ALIAS = { agenda_cal: "agenda", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
+export const VISTA_ALIAS = { agenda_cal: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
 export const modDeVista = (v) => VISTA_ALIAS[v] || v;
 
 /* Catálogo de módulos (para la matriz de permisos y la navegación). */
@@ -1326,7 +1326,9 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
 // la app, junto al título, en vez de gastar una fila entera debajo.
 export function EnCabecera({ children }) {
   const [el, setEl] = useState(null);
-  useEffect(() => { setEl(document.getElementById("dc-top-slot")); }, []);
+  // Sin barra superior: las acciones van dentro de la cabecera de color de la vista
+  // si la tiene ([data-slot-acciones]); si no, en una fila discreta sobre el contenido.
+  useEffect(() => { setEl(document.querySelector("#dc-main [data-slot-acciones]") || document.getElementById("dc-top-slot")); }, []);
   return el ? createPortal(children, el) : null;
 }
 // Menú "⋯" para las acciones secundarias de una fila: deja visible solo la acción

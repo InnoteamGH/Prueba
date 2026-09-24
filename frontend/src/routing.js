@@ -17,6 +17,7 @@ const MOD_IDS = new Set([
   "inventario", "laboratorio", "consentimientos", "resenas", "whatsapp", "integraciones",
   "config", "usuarios", "permisos", "auditoria", "plan", "plataforma", "servicios",
   "disponibilidad", "formularios", "seguros", "tratamientos", "recetas", "radiografias", "fotos", "recall",
+  "recall_hist", "recall_sat", "reportes_aus",
 ]);
 
 /** UUID de sede demo/prod (backend Supabase). Si ya es UUID, se respeta. */

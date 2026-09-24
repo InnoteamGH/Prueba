@@ -4,7 +4,7 @@ import { AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2
 import api, { auth } from "../api/client";
 import {EnCabecera, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint} from "../comun";
 
-function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
+function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
   // Es una acción que sale de la clínica: quien solo consulta no la lanza.
   const puedeEnviar = can ? can("recall", "crear") : true;
@@ -121,7 +121,8 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
     notify(`Recordatorio enviado a ${pend.length} paciente(s).`);
   };
   const activas = reglas.filter((r) => r.on).length;
-  const [subtab, setSubtab] = useState("automatizaciones");
+  // Las tres vistas son submódulos del menú lateral (Recordatorios → …).
+  const subtab = tab;
   const [filtroEnv, setFiltroEnv] = useState("todos");   // automatizaciones | historial
   const HIST_ENVIOS = [
     { id: 1, paciente: "Rosa Linares", regla: "Recordatorio 48 h antes", fecha: fmt(hoy), hora: "08:12", estado: "leido" },
@@ -144,15 +145,6 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
   const histView = (histReal && histReal.length ? histReal : (conectado ? [] : HIST_ENVIOS));
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
-      <EnCabecera>
-        <div className="dc-rec-top">
-          <nav className="dc-segmento" role="tablist" aria-label="Vistas de recordatorios">
-            {[["automatizaciones", "Automatizaciones"], ["historial", "Historial de envíos"], ["satisfaccion", "Satisfacción"]].map(([k, lbl]) => (
-              <button key={k} type="button" role="tab" aria-selected={subtab === k} onClick={() => setSubtab(k)}>{lbl}</button>
-            ))}
-          </nav>
-        </div>
-      </EnCabecera>
       {subtab === "satisfaccion" ? (() => {
         const fuenteResenas = (resenasNps && resenasNps.length) ? resenasNps : (conectado ? [] : RESENAS_DEMO);
         const rs = fuenteResenas.filter((r) => r.nps != null);

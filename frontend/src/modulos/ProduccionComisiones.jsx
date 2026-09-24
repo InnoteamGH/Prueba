@@ -720,8 +720,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   );
 }
 
-export default function ProduccionComisiones({ citas = [], can }) {
-  const [tab, setTab] = useState("resumen");
+export default function ProduccionComisiones({ citas = [], can, tab = "resumen" }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [ficha, setFicha] = useState(null);
@@ -792,13 +791,7 @@ export default function ProduccionComisiones({ citas = [], can }) {
 
   return (
     <div className="dc-pc">
-      {/* Pestañas en la cabecera de la app, junto al título: sin fila extra. */}
-      <EnCabecera>
-        <nav className="dc-segmento" role="tablist" aria-label="Vistas">
-          <button type="button" role="tab" aria-selected={tab === "resumen"} onClick={() => setTab("resumen")}>Resumen</button>
-          <button type="button" role="tab" aria-selected={tab === "ausencias"} onClick={() => setTab("ausencias")}>Ausentismo</button>
-        </nav>
-      </EnCabecera>
+      {/* Resumen y Ausentismo son submódulos del menú lateral (sin fila de pestañas). */}
 
       {err && <div className="dc-banda dc-banda--peligro" style={{ marginBottom: 16 }}><p>{err}</p></div>}
 
