@@ -159,7 +159,7 @@ h1, h2, h3, h4, .dc-title {
 }
 /* Icon-only / close: ampliar hit area sin agrandar el glifo */
 .dc-icon-btn,
-button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn) {
+button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn):not(.dc-info) {
   min-width: var(--dc-tap-min) !important;
   min-height: var(--dc-tap-min) !important;
   display: inline-grid;

@@ -793,7 +793,6 @@ export default function ProduccionComisiones({ citas = [], can }) {
     <div className="dc-pc">
       <header className="dc-pc-head">
         <div>
-          <h1>Producción y comisiones</h1>
           <p>Cómo va cada persona: producción, comisión, cobros del periodo y rendimiento por cita.</p>
         </div>
       </header>

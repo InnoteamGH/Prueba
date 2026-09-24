@@ -957,7 +957,7 @@ export const Btn = ({ children, onClick, kind = "primary", small, disabled, full
     secundario: "dc-btn--secundario",
     "peligro-outline": "dc-btn--peligro-outline",
   }[kind] || "dc-btn--primario";
-  const solid = { primary: `linear-gradient(135deg, ${DS.c.accent}, ${DS.c.primaryDark})`, navy: NAVY, red: DS.c.error, danger: DS.c.error, peligro: DS.c.error, green: "var(--dc-ok-700)" }[kind] || DS.c.primary;
+  const solid = { primary: DS.c.primary, navy: NAVY, red: DS.c.error, danger: DS.c.error, peligro: DS.c.error, green: "var(--dc-ok-700)" }[kind] || DS.c.primary;
   const shadowColor = { primary: "rgba(15,95,117,0.3)", navy: "rgba(27,46,94,0.3)", red: "rgba(217,92,92,0.3)", danger: "rgba(217,92,92,0.3)", peligro: "rgba(217,92,92,0.3)", green: "rgba(21,128,61,0.3)" }[kind] || "rgba(0,0,0,0.1)";
   const ghost = kind === "ghost";
   const outline = kind === "secundario" || kind === "peligro-outline";
@@ -965,15 +965,20 @@ export const Btn = ({ children, onClick, kind = "primary", small, disabled, full
   const outlineBg = kind === "peligro-outline" ? "var(--dc-surface)" : "var(--dc-surface)";
   const outlineColor = kind === "peligro-outline" ? "var(--dc-danger-700)" : "var(--dc-ink-900)";
   const outlineBorder = kind === "peligro-outline" ? "1.5px solid var(--dc-danger-700)" : "1.5px solid var(--dc-line)";
-  return <button type={type} className={`dc-btn ${kindClass}${small ? " dc-btn--sm" : ""}`} aria-label={ariaLabel} title={title || ariaLabel} aria-busy={isBusy ? "true" : undefined} onClick={onClick} disabled={disabled || isBusy}
-    style={{ background: disabled || isBusy ? "var(--dc-line-alt2)" : outline ? outlineBg : ghost ? "rgba(255,255,255,0.6)" : solid, color: outline ? outlineColor : ghost ? DS.c.ink : "var(--dc-white)",
-      border: outline ? outlineBorder : ghost ? `1.5px solid rgba(255,255,255,0.8)` : "none", borderRadius: "var(--dc-r-md)", padding: small ? "8px 16px" : "12px 22px",
-      fontSize: small ? 13.5 : 15, fontWeight: 700, cursor: disabled || isBusy ? "not-allowed" : "pointer", width: full ? "100%" : "auto",
-      minHeight: "var(--dc-tap-min)", minWidth: small ? undefined : undefined,
-      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, backdropFilter: ghost ? "blur(12px)" : "none",
-      boxShadow: ghost || outline || disabled || isBusy ? "none" : `inset 0 2px 4px rgba(255,255,255,0.4), 0 8px 16px ${shadowColor}`, transition: "all .2s cubic-bezier(.2,.7,.2,1)", opacity: isBusy ? 0.85 : 1 }}
-    onMouseEnter={(e) => { if (!disabled && !isBusy) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.filter = "brightness(1.1)"; } }}
-    onMouseLeave={(e) => { if (!disabled && !isBusy) { e.currentTarget.style.transform = "none"; e.currentTarget.style.filter = "none"; } }}>{isBusy ? "Guardando…" : children}</button>;
+  // Botón en píldora, compacto y plano: sin degradado, sin brillo interior y sin
+  // sombra de color, que lo hacían tosco y pesado. El hover solo oscurece un poco.
+  const off = disabled || isBusy;
+  const bg = off ? "var(--dc-line)" : outline ? outlineBg : ghost ? "var(--dc-white)" : solid;
+  const fg = off ? "var(--dc-ink-500)" : outline ? outlineColor : ghost ? NAVY : "var(--dc-white)";
+  const bd = outline ? outlineBorder.replace("1.5px", "1px") : ghost ? "1px solid var(--dc-line)" : "1px solid transparent";
+  return <button type={type} className={`dc-btn ${kindClass}${small ? " dc-btn--sm" : ""}`} aria-label={ariaLabel} title={title || ariaLabel} aria-busy={isBusy ? "true" : undefined} onClick={onClick} disabled={off}
+    style={{ background: bg, color: fg, border: bd, borderRadius: "var(--dc-r-full)", padding: small ? "5px 14px" : "8px 18px",
+      fontSize: small ? 13 : 14, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.005em", cursor: off ? "not-allowed" : "pointer", width: full ? "100%" : "auto",
+      minHeight: small ? 32 : "var(--dc-tap-min)", whiteSpace: "nowrap",
+      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+      boxShadow: ghost || outline || off ? "none" : "0 1px 2px rgba(16,24,40,.10)", transition: "filter .15s, background .15s, border-color .15s", opacity: isBusy ? 0.85 : 1 }}
+    onMouseEnter={(e) => { if (!off) { if (ghost || outline) e.currentTarget.style.background = "var(--dc-bg)"; else e.currentTarget.style.filter = "brightness(.93)"; } }}
+    onMouseLeave={(e) => { if (!off) { e.currentTarget.style.background = bg; e.currentTarget.style.filter = "none"; } }}>{isBusy ? "Guardando…" : children}</button>;
 };
 export const Field = ({ label, value, onChange, placeholder, type = "text", icon, hint }) => (
   <label style={{ display: "block" }}>
@@ -1135,7 +1140,7 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div><h1 className="dc-title" style={{ margin: 0, fontSize: 24, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT }}>{titulo}</h1>{sub && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{sub}</div>}</div>
+        <div><h2 className="dc-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT }}>{titulo}</h2>{sub && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{sub}</div>}</div>
         <div style={{ display: "flex", gap: 8 }}>
           {edit && <Btn small kind="ghost" onClick={() => setLayout(def())}><Repeat size={14} strokeWidth={1.75} /> Restablecer</Btn>}
           <Btn small kind={edit ? "navy" : "ghost"} onClick={() => setEdit((e) => !e)}>{edit ? <><Check size={15} strokeWidth={1.75} /> Listo</> : <><Settings size={15} strokeWidth={1.75} /> Personalizar</>}</Btn>
@@ -1313,14 +1318,15 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
   );
 }
 // Encabezado de módulo (título + subtítulo + acción).
-export const ModHead = ({ icon, titulo, sub, accion, color = NAVY }) => (
-  <Card style={{ padding: "15px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", background: "rgba(255,255,255,0.7)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid rgba(16,24,40,.06)" }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-      {icon && <div style={{ width: 42, height: 42, borderRadius: "var(--dc-r-md)", background: tint(color, 0.12), border: `1px solid ${tint(color, 0.19)}`, color, display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</div>}
-      <div style={{ minWidth: 0 }}><h1 className="dc-title" style={{ margin: 0, color: NAVY, fontSize: 17, fontWeight: 700, fontFamily: DISPLAY_FONT }}>{titulo}</h1>{sub && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{sub}</div>}</div>
-    </div>
-    {accion && <div style={{ flexShrink: 0 }}>{accion}</div>}
-  </Card>
+// El nombre del módulo ya está en la cabecera de la app: repetirlo aquí en una
+// tarjeta con icono gastaba espacio y lo mostraba dos o tres veces. Queda una
+// línea con la descripción y la acción principal. `titulo` sigue aceptándose
+// para no tocar las llamadas, pero no se pinta.
+export const ModHead = ({ sub, accion }) => (!sub && !accion) ? null : (
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", minHeight: 36 }}>
+    {sub ? <p style={{ margin: 0, fontSize: 13, color: "var(--dc-ink-500)", minWidth: 0, flex: "1 1 280px" }}>{sub}</p> : <span />}
+    {accion && <div style={{ flexShrink: 0, display: "flex", gap: 8 }}>{accion}</div>}
+  </div>
 );
 // Barra de paciente unificada para los módulos clínicos.
 export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, accion, sedeLabel = null }) => {

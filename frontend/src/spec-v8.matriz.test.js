@@ -17,12 +17,14 @@ const kpi = readFileSync(join(root, "ui/TarjetaKPI.jsx"), "utf8");
 const reportes = readFileSync(join(root, "modulos/Reportes.jsx"), "utf8");
 
 describe("SPEC v8 A23 jerarquía", () => {
-  it("ModHead usa h1.dc-title", () => {
-    assert.match(comun, /export const ModHead[\s\S]*?<h1 className="dc-title"/);
-    assert.doesNotMatch(comun, /export const ModHead[\s\S]*?<h2 className="dc-title"/);
+  // Un solo h1 por pantalla: el nombre del módulo en la cabecera de la app.
+  // ModHead y el lienzo del dashboard no repiten otro h1 debajo.
+  it("la cabecera de la app pinta el h1 con el nombre del módulo", () => {
+    assert.match(app, /<h1 style=\{\{[^}]*\}\}>\{NAV\.find\(\(n\) => n\.id === vista\)\?\.label\}<\/h1>/);
   });
-  it("DashLienzo título de pantalla es h1", () => {
-    assert.match(comun, /<h1 className="dc-title"[\s\S]*?>\{titulo\}<\/h1>/);
+  it("ModHead y DashLienzo no repiten un h1", () => {
+    assert.doesNotMatch(comun, /export const ModHead[\s\S]*?<h1/);
+    assert.match(comun, /<h2 className="dc-title"[\s\S]*?>\{titulo\}<\/h2>/);
   });
   it("Facturación y Reportes tienen ModHead / h1 de pantalla", () => {
     assert.match(app, /titulo="Facturación y caja"/);

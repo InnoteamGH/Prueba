@@ -934,19 +934,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
 
   return (
     <div className="dc-pg">
-      <div className="dc-aviso dc-aviso--info">
-        <span aria-hidden="true">ℹ</span>
-        <div className="dc-aviso__body">
-          <b>Panel gerencial</b> montado sobre los tokens y componentes de la app.
-          Las cifras son de la clínica
-          {sede && sede !== "all" ? " (vista filtrada por sede activa)" : ""}.
-          {" "}Cada cifra se puede abrir para ver de dónde sale.
-        </div>
-      </div>
 
       <header className="dc-page-head">
         <div>
-          <h1>Panel gerencial</h1>
           <p>{subHead}</p>
         </div>
         <div className="sp" />

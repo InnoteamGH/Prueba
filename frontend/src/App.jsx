@@ -4924,9 +4924,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     <div style={{ display: "grid", gap: 16 }}>
       <ModHead icon={<CreditCard size={20} strokeWidth={1.75} />} titulo="Facturación y caja" sub="Apertura, cobros, cierre y comprobantes del día" accion={puedeConfig ? <Btn small kind="ghost" onClick={() => setDatosFact(true)}><FileText size={15} strokeWidth={1.75} /> Datos de facturación</Btn> : null} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 5, boxShadow: "0 1px 2px rgba(16,24,40,.04)", overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", overflowX: "auto" }}>
           {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
-            <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: "var(--dc-r-md)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)", transition: "background .12s" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+            <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 15px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)", transition: "background .12s" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
           ); })}
         </div>
       </div>
@@ -6923,9 +6923,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
     : <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}><AlertCircle size={12} strokeWidth={1.75} /> Agotado</span>;
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 5, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {[["productos", "Productos", Package], ...(puedeGestionar ? [["compras", "Compras", Send]] : []), ["consumo", "Consumo", Activity], ...(puedeGestionar ? [["proveedores", "Proveedores", Building2]] : [])].map(([k, lbl, Ic]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: "var(--dc-r-md)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 15px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
       </div>
       {tab === "compras" && (() => {
@@ -8615,7 +8615,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
               del titulo puede encoger. */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", minWidth: 0, rowGap: 8 }}>
             <button aria-label="Abrir o cerrar el menú" className="dc-burger" onClick={() => setSidebarOpen((s) => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: NAVY, display: "none", minWidth: "var(--dc-tap-min)", minHeight: "var(--dc-tap-min)" }}><Menu size={22} strokeWidth={1.75} /></button>
-            <div style={{ minWidth: 0 }}><div style={{ fontSize: 17, fontWeight: 600, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{NAV.find((n) => n.id === vista)?.label}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 5 }}><RolIcon size={12} strokeWidth={1.75} /> Vista de {R.label}</div></div>
+            <div style={{ minWidth: 0 }}><h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, fontFamily: DISPLAY_FONT, letterSpacing: "-0.01em", color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{NAV.find((n) => n.id === vista)?.label}</h1><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 5 }}><RolIcon size={12} strokeWidth={1.75} /> Vista de {R.label}</div></div>
             {/* Bug D11 re-test: Onboarding dismissable permanentemente */}
             {rol !== "superadmin" && !onbDismissed && misPasos.length > 0 && (() => { const done = misPasos.filter((p) => pasos[p.id]).length; if (done >= misPasos.length) return null; return (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -8629,7 +8629,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
             {/* Sin ninguna acción disponible el desplegable salía vacío. */}
             {rol !== "superadmin" && hayQueCrear && (
               <div style={{ position: "relative" }}>
-                <button onClick={() => setCrearMenu((v) => !v)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: DS.c.primary, color: "#fff", border: "none", borderRadius: "var(--dc-r-md)", padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, boxShadow: "0 8px 18px -10px rgba(14,116,144,.9)" }}><Plus size={16} strokeWidth={1.75} /> Crear</button>
+                <button onClick={() => setCrearMenu((v) => !v)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: DS.c.primary, color: "#fff", border: "none", borderRadius: "var(--dc-r-full)", padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600, boxShadow: "0 1px 2px rgba(16,24,40,.10)" }}><Plus size={16} strokeWidth={1.75} /> Crear</button>
                 {crearMenu && (<>
                   <div onClick={() => setCrearMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                   <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 41, background: "#fff", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", boxShadow: "0 16px 40px rgba(16,24,40,.18)", padding: 6, minWidth: 210 }}>

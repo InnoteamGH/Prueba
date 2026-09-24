@@ -72,7 +72,7 @@
 .dc-pc .dc-card__meta { font-size: var(--dc-fs-xs); color: var(--dc-ink-400); display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dc-pc .vin { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .dc-pc .dc-info {
-  width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--dc-line);
+  width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--dc-line);
   background: var(--dc-bg); color: var(--dc-ink-500); cursor: pointer; font: inherit;
   font-weight: 700; position: relative;
 }
