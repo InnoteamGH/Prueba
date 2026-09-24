@@ -20,7 +20,7 @@ describe("SPEC v8 A23 jerarquía", () => {
   // Un solo h1 por pantalla: el nombre del módulo en la cabecera de la app.
   // ModHead y el lienzo del dashboard no repiten otro h1 debajo.
   it("la cabecera de la app pinta el h1 con el nombre del módulo", () => {
-    assert.match(app, /<h1 style=\{\{[^}]*\}\}>\{NAV\.find\(\(n\) => n\.id === vista\)\?\.label\}<\/h1>/);
+    assert.match(app, /<h1 className="dc-top__titulo">\{NAV\.find\(\(n\) => n\.id === vista\)\?\.label\}<\/h1>/);
   });
   it("ModHead y DashLienzo no repiten un h1", () => {
     assert.doesNotMatch(comun, /export const ModHead[\s\S]*?<h1/);

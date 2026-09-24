@@ -10,9 +10,9 @@
    renombres claves, solo valores (misma regla que antes).
    ============================================================================ */
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { ChevronRight, AlertTriangle,ArrowUpDown,ArrowUpRight,Briefcase,Check,ChevronDown,ChevronUp,Clock,Globe,Info,MapPin,Menu,Plus,Repeat,Search,Server,Settings,ShieldCheck,Smile,Stethoscope,UserCheck,UserCog,X } from "lucide-react";
+import { ChevronRight, AlertTriangle,ArrowUpDown,ArrowUpRight,Briefcase,Check,ChevronDown,ChevronUp,Clock,Globe,Info,MapPin,Menu,Plus,Repeat,Search,Server,Settings,ShieldCheck,Smile,Stethoscope,UserCheck,UserCog,X,MoreHorizontal } from "lucide-react";
 
-export const NAVY = "var(--dc-navy)", RED = "var(--dc-red)", BG = "radial-gradient(circle at 15% 15%, rgba(14,116,144,0.12) 0%, transparent 40%), radial-gradient(circle at 85% 30%, rgba(200,49,43,0.08) 0%, transparent 45%), radial-gradient(circle at 50% 80%, rgba(14,116,144,0.1) 0%, transparent 50%), radial-gradient(circle at 0% 100%, rgba(254,240,138,0.15) 0%, transparent 50%), var(--dc-bg)", INK = "var(--dc-ink-alt)", TEAL = "var(--dc-teal)", WARM = "var(--dc-warn-700)";
+export const NAVY = "var(--dc-navy)", RED = "var(--dc-red)", BG = "var(--dc-bg)", INK = "var(--dc-ink-alt)", TEAL = "var(--dc-teal)", WARM = "var(--dc-warn-700)";
 
 /* ============================================================================
  * DENTO CHECK · DESIGN SYSTEM (tokens únicos)
@@ -25,13 +25,13 @@ export const DS = {
     primary: "var(--dc-primary-alt)", primaryDark: "var(--dc-brand-600)", accent: "var(--dc-accent-cyan)", primaryLight: "var(--dc-brand-100)", primarySoft: "rgba(8,126,139,.10)",
     info: "var(--dc-primary-alt)", success: "var(--dc-ok-700)", warning: "var(--dc-warn-600)", error: "var(--dc-danger)",
     ink: "var(--dc-ink-alt)", text: "var(--dc-ink-700)", muted: "var(--dc-ink-500)", faint: "var(--dc-ink-500)",
-    line: "var(--dc-line)", bg: "radial-gradient(circle at 15% 50%, rgba(204,251,241,1) 0%, transparent 40%), radial-gradient(circle at 85% 30%, rgba(243,232,255,1) 0%, transparent 45%), radial-gradient(circle at 50% 80%, rgba(224,242,254,1) 0%, transparent 50%), radial-gradient(circle at 0% 100%, rgba(254,240,138,0.4) 0%, transparent 40%), var(--dc-bg)", surface: "rgba(255,255,255,0.65)", surfaceAlt: "rgba(255,255,255,0.4)" },
+    line: "var(--dc-line)", bg: "var(--dc-bg)", surface: "var(--dc-surface)", surfaceAlt: "var(--dc-bg)" },
   r: { card: 20, sub: 16, item: 14, pill: 999 },
   s: (n) => n * 8,
   sh: { xs: "0 1px 2px rgba(16,24,40,.04)", sm: "0 4px 16px rgba(20,50,60,0.06)", md: "0 16px 40px -16px rgba(15,23,42,.22)", glass: "0 8px 32px rgba(15,23,42,0.05)" },
   f: { hero: 26, h1: 22, h2: 18, body: 15, cap: 13, micro: 11.5 },
   motion: { fast: ".16s ease", base: ".24s ease", slow: ".4s ease", spring: ".26s cubic-bezier(.2,.7,.2,1)" } };
-DS.card = { background: DS.c.surface, backdropFilter: "blur(24px)", borderRadius: DS.r.card, border: `1px solid rgba(255,255,255,0.7)`, boxShadow: DS.sh.glass };
+DS.card = { background: "var(--dc-surface)", borderRadius: 16, border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)" };
 DS.label = { fontSize: DS.f.cap, fontWeight: 600, color: DS.c.ink, fontFamily: "'Bricolage Grotesque','Inter',sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
 export const DISPLAY_FONT = "'Bricolage Grotesque', 'Inter', sans-serif";
 
@@ -942,7 +942,9 @@ export const ESTADO_BADGE = {
 };
 
 /* ---- UI ---- */
-export const Card = ({ children, style, ...rest }) => <div {...rest} style={{ background: "rgba(255,255,255,0.55)", backdropFilter: "blur(24px)", borderRadius: "var(--dc-r-lg)", border: "1px solid rgba(255,255,255,0.7)", boxShadow: "0 8px 32px rgba(31,38,135,0.05), inset 0 1px 1px rgba(255,255,255,0.8)", ...style }}>{children}</div>;
+// Superficie base: blanca, borde fino y sombra mínima. Sin efecto vidrio: sobre un
+// fondo plano el desenfoque solo ensuciaba el color y hacía cada tarjeta distinta.
+export const Card = ({ children, style, ...rest }) => <div {...rest} style={{ background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)", ...style }}>{children}</div>;
 export const Badge = ({ estado }) => { const e = ESTADO_BADGE[estado] || ESTADO_BADGE.pendiente; return <span style={{ background: e.bg, color: e.fg, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{e.l}</span>; };
 /* Sistema de botones DS: primary · secundario · ghost · peligro · peligro-outline · green. */
 export const Btn = ({ children, onClick, kind = "primary", small, disabled, full, type, busy, "aria-label": ariaLabel, title }) => {
@@ -1056,15 +1058,15 @@ export const KpiCard = ({ icon, label, value, color = NAVY, sub, delta, up, onCl
   }
   const clickable = typeof onClick === "function" && (st === "dato" || st === "vacio");
   return (
-  <div onClick={clickable ? onClick : undefined} className={`dc-kpi dc-kpi--${st} dc-rise`} style={{ animation: "dcTabSlide 0.18s ease-out forwards", background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)", borderRadius: "var(--dc-r-lg)", border: "1px solid rgba(255,255,255,0.9)", boxShadow: `0 8px 24px -10px ${tint(color, 0.19)}, inset 0 2px 4px rgba(255,255,255,1)`, cursor: clickable ? "pointer" : "default", transition: "transform .16s, box-shadow .16s", minWidth: 0, maxWidth: "100%", overflow: "hidden" }} onMouseEnter={clickable ? (e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 14px 28px -12px ${tint(color, 0.31)}, inset 0 2px 4px rgba(255,255,255,1)`; } : undefined} onMouseLeave={clickable ? (e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = `0 8px 24px -10px ${tint(color, 0.19)}, inset 0 2px 4px rgba(255,255,255,1)`; } : undefined}>
-    {icon && <div className="dc-kpi__icon" style={{ background: tint(color, 0.12), border: `1px solid ${tint(color, 0.19)}`, color }}>{icon}</div>}
+  <div onClick={clickable ? onClick : undefined} className={`dc-kpi dc-kpi--${st}${clickable ? " dc-kpi--click" : ""}`} style={{ cursor: clickable ? "pointer" : "default", minWidth: 0, maxWidth: "100%" }}>
+    {icon && <div className="dc-kpi__icon" style={{ background: tint(color, 0.1), color }}>{icon}</div>}
     <div className="dc-kpi__body">
       <div className="dc-kpi__label">{label}</div>
       {st === "cargando" ? (
         <div className="dc-kpi__skel" aria-hidden="true" />
       ) : (
         <div>
-          <div className="dc-kpi__value dc-tabular" style={{ color: st === "error" || st === "vacio" ? "var(--dc-ink-400)" : NAVY, fontFamily: DISPLAY_FONT }}>{shown}</div>
+          <div className="dc-kpi__value dc-tabular" style={{ color: st === "error" || st === "vacio" ? "var(--dc-ink-400)" : "var(--dc-ink-900)", fontFamily: DISPLAY_FONT }}>{shown}</div>
         </div>
       )}
       {st === "error" ? (
@@ -1140,7 +1142,7 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div><h2 className="dc-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT }}>{titulo}</h2>{sub && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{sub}</div>}</div>
+        <div><h2 className="dc-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--dc-ink-900)" }}>{titulo}</h2>{sub && edit && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{sub}</div>}</div>
         <div style={{ display: "flex", gap: 8 }}>
           {edit && <Btn small kind="ghost" onClick={() => setLayout(def())}><Repeat size={14} strokeWidth={1.75} /> Restablecer</Btn>}
           <Btn small kind={edit ? "navy" : "ghost"} onClick={() => setEdit((e) => !e)}>{edit ? <><Check size={15} strokeWidth={1.75} /> Listo</> : <><Settings size={15} strokeWidth={1.75} /> Personalizar</>}</Btn>
@@ -1161,10 +1163,10 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
         {shown.map((l, i) => { const W = byId[l.id]; const span = Math.min(l.w, cols); const Ic = W.icon; const c = W.color || NAVY; return (
           <div key={l.id} draggable={edit} onDragStart={() => { dragI.current = i; }} onDragEnd={() => { dragI.current = null; setOver(null); }} onDragOver={(e) => { e.preventDefault(); if (over !== i) setOver(i); }} onDrop={() => { move(dragI.current, i); dragI.current = null; setOver(null); }}
             className="dw-card" style={{ gridColumn: `span ${span}`, gridRow: `span ${l.h}`, outline: edit ? `2px dashed ${over === i ? c : "var(--dc-line-alt2)"}` : "none", outlineOffset: -3, cursor: edit ? "grab" : "default" }}>
-            <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "14px 16px", minHeight: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "16px 18px", minHeight: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, flexShrink: 0 }}>
-                {Ic && <div style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: tint(c, 0.09), color: c, display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={16} strokeWidth={1.75} /></div>}
-                <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", flex: 1, minWidth: 0, margin: 0, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{W.title}</h2>
+                {Ic && <div style={{ width: 28, height: 28, borderRadius: 999, background: tint(c, 0.09), color: c, display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={15} strokeWidth={1.75} /></div>}
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-ink-900)", flex: 1, minWidth: 0, margin: 0, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{W.title}</h2>
                 {edit && <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                   <button type="button" className="dc-icon-btn" aria-label="Ancho" title="Ancho" onClick={() => cycleW(l.id)} style={btn}><ArrowUpDown size={13} strokeWidth={1.75} style={{ transform: "rotate(90deg)" }} /></button>
                   <button type="button" className="dc-icon-btn" aria-label="Alto" title="Alto" onClick={() => toggleH(l.id)} style={btn}><ArrowUpDown size={13} strokeWidth={1.75} /></button>
@@ -1173,7 +1175,7 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
               </div>
               {/* Filas con altura mínima (no fija): la tarjeta crece con su contenido en vez de
                   recortarlo a media línea. */}
-              <div className="dc-scroll" style={{ flex: 1, minWidth: 0, maxHeight: l.h > 1 ? 380 : 240, overflowY: "auto", display: "flex", flexDirection: "column", pointerEvents: edit ? "none" : "auto" }}><div style={{ flex: 1, minHeight: 0 }}>{W.render({ w: span, h: l.h })}</div></div>
+              <div className="dc-scroll" style={{ flex: 1, minWidth: 0, maxHeight: l.h > 1 ? 380 : 240, overflowY: "auto", display: "flex", flexDirection: "column", pointerEvents: edit ? "none" : "auto" }}><div className="dw-body" style={{ flex: 1, minHeight: 0 }}>{W.render({ w: span, h: l.h })}</div></div>
             </div>
           </div>
         ); })}
@@ -1264,14 +1266,14 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
   const hayMas = lista.length > visible;
   // Columna fija a la derecha (acciones): fondo opaco y sombra para que, al hacer
   // scroll horizontal, no se lea el texto de las columnas que pasan por debajo.
-  const stickyCell = { position: "sticky", right: 0, alignSelf: "stretch", alignItems: "center", background: "var(--dc-white)", boxShadow: "-10px 0 12px -12px rgba(16,24,40,.35)", zIndex: 1 };
-  const stickyHead = { ...stickyCell, zIndex: 2 };
+  const stickyCell = { position: "sticky", right: 0, alignSelf: "stretch", alignItems: "center", background: "var(--dc-surface)", zIndex: 1 };
+  const stickyHead = { ...stickyCell, background: "var(--dc-bg-soft)", zIndex: 2 };
   const scrollStyle = maxHeight
     ? { overflowX: "auto", overflowY: "auto", maxHeight }
     : { overflowX: "auto" };
   return (
-    <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "rgba(255, 255, 255, 0.55)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", borderRadius: "var(--dc-r-lg)", boxShadow: "0 8px 32px rgba(31,38,135,0.05), inset 0 1px 1px rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.7)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
-      {titulo && <div style={{ padding: "15px 22px", borderBottom: "1px solid rgba(16,24,40,.06)", background: "rgba(255,255,255,0.4)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>{titulo}</h2><span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? " · filtrado" : ""}{hayMas ? ` · mostrando ${mostradas.length}` : ""}</span></div>{accion && <div>{accion}</div>}</div>}
+    <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
+      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 15, fontWeight: 600 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? " · filtrado" : ""}{hayMas ? ` · mostrando ${mostradas.length}` : ""}</span></div>{accion && <div>{accion}</div>}</div>}
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;
             width: max-content solo cuando minWidth > 0 explícito exige scroll horizontal. */}
@@ -1279,9 +1281,9 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
             aparece el scroll horizontal. Con "max-content" las columnas fr se encogían
             a su contenido y la tabla quedaba más angosta que su tarjeta. */}
         <div style={minWidth > 0 ? { minWidth, width: "100%" } : { width: "100%", minWidth: 0, maxWidth: "100%" }}>
-          <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 12, padding: "7px 16px", borderBottom: "1px solid rgba(16,24,40,.06)", background: "rgba(255,255,255,0.95)", ...(maxHeight ? { position: "sticky", top: 0, zIndex: 3 } : {}) }}>
+          <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 12, padding: "4px 16px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-bg-soft)", ...(maxHeight ? { position: "sticky", top: 0, zIndex: 3 } : {}) }}>
             {cols.map((col) => {
-              if (col.noFilter && col.noSort) return <span key={col.key} style={{ fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-500)", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", alignSelf: "center", paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", ...(col.sticky ? { ...stickyHead, display: "flex", justifyContent: "center" } : {}) }}>{col.label}</span>;
+              if (col.noFilter && col.noSort) return <span key={col.key} style={{ fontSize: 12, fontWeight: 600, letterSpacing: .02, color: "var(--dc-ink-500)", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", alignSelf: "center", paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", ...(col.sticky ? { ...stickyHead, display: "flex", justifyContent: "center" } : {}) }}>{col.label}</span>;
               const isSort = sortCol === col.key; const isFilt = !!(colFilters[col.key] && colFilters[col.key].trim()); const open = activeCol === col.key || isFilt;
               const just = col.a === "left" ? "flex-start" : col.a === "right" ? "flex-end" : "center";
               return (
@@ -1289,7 +1291,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
                   {open ? (
                     <input className="dc-th dc-premium-inp" aria-label={`Filtrar ${col.label}`} autoFocus={activeCol === col.key} value={colFilters[col.key] || ""} onChange={(e) => setColFilters((f) => ({ ...f, [col.key]: e.target.value }))} onBlur={() => { if (!(colFilters[col.key] || "").trim()) setActiveCol(null); }} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[col.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} placeholder={col.label} style={{ flex: 1, width: "100%", minWidth: 0, minHeight: 30, textAlign: col.a === "left" ? "left" : "center", fontSize: 12, fontWeight: 600, color: NAVY, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 8px", outline: "none", boxSizing: "border-box" }} />
                   ) : (
-                    <button type="button" onClick={() => !col.noFilter && setActiveCol(col.key)} title={col.noFilter ? col.label : "Clic para filtrar"} style={{ minWidth: 0, textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: isFilt || isSort ? NAVY : "var(--dc-ink-500)", background: "transparent", border: "none", cursor: col.noFilter ? "default" : "text", padding: "6px 0", borderRadius: "var(--dc-r-sm)", whiteSpace: "normal", lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{col.label}</button>
+                    <button type="button" onClick={() => !col.noFilter && setActiveCol(col.key)} title={col.noFilter ? col.label : "Clic para filtrar"} style={{ minWidth: 0, textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", fontSize: 12, fontWeight: 600, letterSpacing: .02, color: isFilt || isSort ? "var(--dc-ink-900)" : "var(--dc-ink-500)", background: "transparent", border: "none", cursor: col.noFilter ? "default" : "text", padding: "6px 0", borderRadius: "var(--dc-r-sm)", whiteSpace: "normal", lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{col.label}</button>
                   )}
                   {!col.noSort && <button type="button" className="dc-col-sort" aria-label={`Ordenar ${col.label}`} onClick={() => toggleSort(col.key)} title="Ordenar" style={{ flexShrink: 0, width: 22, height: 22, display: "grid", placeItems: "center", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", background: isSort ? tint(DS.c.primary, 0.12) : "transparent", color: isSort ? DS.c.primary : "var(--dc-ink-400)", transition: "background .12s, color .12s", padding: 0 }}>{isSort ? (sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />) : <ArrowUpDown size={12} strokeWidth={1.75} />}</button>}
                 </div>
@@ -1297,7 +1299,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
             })}
           </div>
           {lista.length === 0 ? (rows.length > 0 ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." /> : (empty || <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin registros" sub="Aún no hay datos para mostrar." />)) : mostradas.map((r, i) => { return (
-            <div key={r.id ?? i} className="dc-table-row" onClick={onRowClick ? () => onRowClick(r) : undefined} style={{ display: "grid", gridTemplateColumns: COL, gap: 12, alignItems: "center", padding: "13px 16px", borderBottom: "1px solid rgba(16,24,40,.04)", cursor: onRowClick ? "pointer" : "default", background: "transparent", transition: "background .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s", position: "relative", zIndex: 1, boxSizing: "border-box", width: "100%", maxWidth: "100%", minWidth: 0 }} onMouseEnter={(ev) => { ev.currentTarget.style.background = "rgba(255,255,255,0.6)"; ev.currentTarget.style.boxShadow = "0 4px 16px -8px rgba(16,24,40,.1)"; ev.currentTarget.style.zIndex = 2; }} onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.boxShadow = "none"; ev.currentTarget.style.zIndex = 1; }}>
+            <div key={r.id ?? i} className="dc-table-row" onClick={onRowClick ? () => onRowClick(r) : undefined} style={{ display: "grid", gridTemplateColumns: COL, gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--dc-line)", cursor: onRowClick ? "pointer" : "default", background: "transparent", transition: "background .15s", position: "relative", zIndex: 1, boxSizing: "border-box", width: "100%", maxWidth: "100%", minWidth: 0 }} onMouseEnter={(ev) => { ev.currentTarget.style.background = "var(--dc-bg-soft2)"; }} onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; }}>
               {cols.map((col) => (
                 <div key={col.key} data-label={col.label || ""} className={col.sticky ? "dc-col-sticky" : undefined} style={{ minWidth: 0, ...(col.sticky ? stickyCell : {}), ...(col.a === "left" ? { paddingLeft: 12 }
                   : col.a === "right" ? { display: "flex", justifyContent: "flex-end", textAlign: "right", paddingRight: 12, fontVariantNumeric: "tabular-nums" }
@@ -1314,6 +1316,43 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
           </button>
         </div>
       )}
+    </div>
+  );
+}
+// Menú "⋯" para las acciones secundarias de una fila: deja visible solo la acción
+// principal y evita filas con cuatro botones en línea.
+// opciones: [{ label, onClick, peligro }]
+export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
+  // La lista va en position:fixed: dentro de una tabla con scroll horizontal una
+  // lista absoluta quedaba recortada por el contenedor.
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  const lista = opciones.filter(Boolean);
+  useEffect(() => {
+    if (!pos) return undefined;
+    const cerrar = () => setPos(null);
+    window.addEventListener("resize", cerrar);
+    document.addEventListener("scroll", cerrar, true);
+    return () => { window.removeEventListener("resize", cerrar); document.removeEventListener("scroll", cerrar, true); };
+  }, [pos]);
+  if (!lista.length) return null;
+  const abrir = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const abajo = window.innerHeight - r.bottom > 44 * lista.length + 24;
+    setPos({ right: Math.max(8, window.innerWidth - r.right), ...(abajo ? { top: r.bottom + 6 } : { bottom: window.innerHeight - r.top + 6 }) });
+  };
+  return (
+    <div className="dc-menu" onClick={(e) => e.stopPropagation()}>
+      <button ref={btnRef} type="button" className="dc-row-action" aria-label={etiqueta} title={etiqueta} aria-haspopup="menu" aria-expanded={!!pos} onClick={() => (pos ? setPos(null) : abrir())}><MoreHorizontal size={16} strokeWidth={1.75} /></button>
+      {pos && (<>
+        <div onClick={() => setPos(null)} style={{ position: "fixed", inset: 0, zIndex: 190 }} />
+        <div className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onKeyDown={(e) => { if (e.key === "Escape") setPos(null); }}>
+          {lista.map((o) => (
+            <button key={o.label} type="button" role="menuitem" className={`dc-menu__op${o.peligro ? " dc-menu__op--peligro" : ""}`} onClick={() => { setPos(null); o.onClick(); }}>{o.label}</button>
+          ))}
+        </div>
+      </>)}
     </div>
   );
 }
@@ -1610,10 +1649,10 @@ export function Select({
         aria-haspopup="listbox" aria-expanded={abierto} aria-label={ariaLabel}
         style={{
           width: "100%", textAlign: "left", padding: alto, borderRadius: DS.r.item,
-          border: `1.5px solid ${abierto ? DS.c.primary : DS.c.line}`,
+          border: `1px solid ${abierto ? DS.c.primary : DS.c.line}`,
           background: disabled ? "var(--dc-white)" : "var(--dc-white)",
-          color: elegido ? DS.c.ink : DS.c.faint,
-          fontSize: small ? 12.5 : 13.5, fontWeight: 600, fontFamily: "inherit",
+          color: elegido ? "var(--dc-ink-900)" : DS.c.faint,
+          fontSize: small ? 13 : 14, fontWeight: 500, fontFamily: "inherit",
           cursor: disabled ? "not-allowed" : "pointer", position: "relative",
           boxShadow: abierto ? `0 0 0 3px ${DS.c.primarySoft}` : "none",
           transition: `border-color ${DS.motion.fast}, box-shadow ${DS.motion.fast}`,

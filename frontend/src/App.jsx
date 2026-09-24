@@ -57,7 +57,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {DIAS_SEM, EDAD_PEDIATRICA, EDAD_TRANSICION, EmblemaNino, HORAS_SEL, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, etapaFicha, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, acentoFicha, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, WARM, addDays, calcEdad, colorDe, cortaSede, espsDe, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, minutosViaje, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
+import {MenuAcciones, DIAS_SEM, EDAD_PEDIATRICA, EDAD_TRANSICION, EmblemaNino, HORAS_SEL, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, etapaFicha, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, acentoFicha, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, WARM, addDays, calcEdad, colorDe, cortaSede, espsDe, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, minutosViaje, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -2249,7 +2249,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
 
   const atend = todasHoy.filter((c) => c.estado === "atendida").length;
   const avance = todasHoy.length ? Math.round((atend / todasHoy.length) * 100) : 0;
-  const EST = { pendiente: { c: "var(--dc-ink-200)", l: "Pendiente" }, confirmada: { c: DS.c.primary, l: "Confirmada" }, en_sala: { c: "var(--dc-purple)", l: "En sala" }, en_atencion: { c: "var(--dc-warn)", l: "En atención" }, atendida: { c: "var(--dc-ok-700)", l: "Atendida" }, cancelada: { c: "var(--dc-red)", l: "Cancelada" }, no_show: { c: "var(--dc-warn-600)", l: "No asistió" }, reprogramada: { c: "var(--dc-purple)", l: "Reprogramada" }, cerrada_sistema: { c: "var(--dc-ink-400)", l: "Cerrada por sistema" } };
+  const EST = { pendiente: { c: "var(--dc-ink-500)", l: "Pendiente" }, confirmada: { c: DS.c.primary, l: "Confirmada" }, en_sala: { c: "var(--dc-purple)", l: "En sala" }, en_atencion: { c: "var(--dc-warn-600)", l: "En atención" }, atendida: { c: "var(--dc-ok-700)", l: "Atendida" }, cancelada: { c: "var(--dc-red)", l: "Cancelada" }, no_show: { c: "var(--dc-warn-600)", l: "No asistió" }, reprogramada: { c: "var(--dc-purple)", l: "Reprogramada" }, cerrada_sistema: { c: "var(--dc-ink-400)", l: "Cerrada por sistema" } };
   const COLS_AGENDA = [
     { key: "hora", label: "Hora", get: (c) => c.hora, w: "76px", a: "center",
       cell: (c) => { const e = EST[c.estado] || EST.pendiente; const esProx = proxima && c.id === proxima.id; const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
@@ -2284,18 +2284,30 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       cell: (c) => { const e = EST[c.estado] || EST.pendiente; return <div style={{ display: "flex", justifyContent: "center" }}><span className="dc-chip" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: e.c, background: tint(e.c, 0.1), border: `1px solid ${tint(e.c, 0.25)}`, padding: "5px 12px", borderRadius: "var(--dc-r-full)" }}><span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: e.c }} /> {e.l}</span></div>; } },
     // Ancho fijo: cada fila es su propia rejilla, así que un ancho "según contenido"
     // descuadraba la columna de una fila a otra.
-    { key: "acc", label: "Acciones", w: "292px", a: "center", noFilter: true, noSort: true, sticky: true,
-      cell: (c) => (
-        <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", padding: "0 4px" }} onClick={(e) => e.stopPropagation()}>
-          {rol === "medico" && c.estado === "confirmada" && c.llegada && <ActionBtn onClick={() => { set(c.id, "en_atencion"); onAtender && onAtender(c); }} color={DS.c.primary}>Iniciar</ActionBtn>}
-          {rol === "medico" && c.estado === "en_atencion" && <ActionBtn onClick={() => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); setEvoCita(c); }} color="var(--dc-ok-700)">Finalizar</ActionBtn>}
-          {rol === "medico" && c.estado === "atendida" && <ActionBtn subtle onClick={() => setEvoCita(c)} color={DS.c.primary}>Evolución</ActionBtn>}
-          {rol !== "medico" && c.estado === "confirmada" && c.llegada && <ActionBtn onClick={() => set(c.id, "en_atencion", `Llamando a ${c.paciente} a consultorio…`)} color="var(--dc-warn)">Llamar</ActionBtn>}
-          {rol !== "medico" && conectado && c.pacienteId && saldos[c.pacienteId] > 0 && <ActionBtn onClick={() => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede })} color={DS.c.primary}>Cobrar S/ {saldos[c.pacienteId].toFixed(0)}</ActionBtn>}
-          {puedeOperarAgenda && c.estado !== "cancelada" && c.estado !== "atendida" && c.estado !== "no_show" && <ActionBtn subtle onClick={() => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora })} color={DS.c.primary}>Reprogramar</ActionBtn>}
-          {puedeOperarAgenda && !c.llegada && c.estado !== "cancelada" && c.estado !== "atendida" && c.estado !== "no_show" && <ActionBtn subtle onClick={() => set(c.id, "no_show", `${c.paciente}: marcada como no asistió.`)} color="var(--dc-warn-600)">No asistió</ActionBtn>}
-          {puedeOperarAgenda && c.estado !== "cancelada" && c.estado !== "atendida" && c.estado !== "no_show" && <ActionBtn subtle onClick={() => setCancelCita(c)} color={RED}>Cancelar</ActionBtn>}
-        </div>) },
+    // Una acción principal visible según el estado de la cita; el resto en el menú ⋯.
+    { key: "acc", label: "Acciones", w: "176px", a: "right", noFilter: true, noSort: true, sticky: true,
+      cell: (c) => {
+        const abierta = c.estado !== "cancelada" && c.estado !== "atendida" && c.estado !== "no_show";
+        const principal =
+          rol === "medico" && c.estado === "confirmada" && c.llegada ? <ActionBtn onClick={() => { set(c.id, "en_atencion"); onAtender && onAtender(c); }} color={DS.c.primary}>Iniciar</ActionBtn>
+          : rol === "medico" && c.estado === "en_atencion" ? <ActionBtn onClick={() => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); setEvoCita(c); }} color="var(--dc-ok-700)">Finalizar</ActionBtn>
+          : rol === "medico" && c.estado === "atendida" ? <ActionBtn subtle onClick={() => setEvoCita(c)} color={DS.c.primary}>Evolución</ActionBtn>
+          : rol !== "medico" && c.estado === "confirmada" && c.llegada ? <ActionBtn onClick={() => set(c.id, "en_atencion", `Llamando a ${c.paciente} a consultorio…`)} color="var(--dc-warn-600)">Llamar</ActionBtn>
+          : rol !== "medico" && conectado && c.pacienteId && saldos[c.pacienteId] > 0 ? <ActionBtn onClick={() => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede })} color={DS.c.primary}>Cobrar S/ {saldos[c.pacienteId].toFixed(0)}</ActionBtn>
+          : puedeOperarAgenda && abierta ? <ActionBtn subtle onClick={() => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora })} color={DS.c.primary}>Reprogramar</ActionBtn>
+          : null;
+        const opciones = puedeOperarAgenda && abierta ? [
+          { label: "Reprogramar", onClick: () => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora }) },
+          !c.llegada && { label: "Marcar no asistió", onClick: () => set(c.id, "no_show", `${c.paciente}: marcada como no asistió.`) },
+          { label: "Cancelar cita", peligro: true, onClick: () => setCancelCita(c) },
+        ] : [];
+        return (
+          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center", width: "100%" }} onClick={(e) => e.stopPropagation()}>
+            {principal}
+            <MenuAcciones opciones={opciones} />
+          </div>
+        );
+      } },
   ];
   const lista = [...todasHoy].sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
   const fechaRaw = new Date(fmt(hoy) + "T00:00:00").toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
@@ -2335,11 +2347,11 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   };
   return (
     <div style={{ display: "grid", gap: 18 }}>
-      {/* Encabezado */}
-      <div style={{ ...soft, padding: "24px 32px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 8, background: "rgba(255,255,255,0.4)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.7)", boxShadow: "0 10px 40px -10px rgba(16,24,40,.04), inset 0 2px 4px rgba(255,255,255,0.6)", borderRadius: "var(--dc-r-lg)" }}>
+      {/* Encabezado: la fecha y las acciones del día, sin tarjeta alrededor. */}
+      <div className="dc-toolbar">
         <div>
-          <h2 style={{ margin: 0, fontSize: 32, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, letterSpacing: "-.02em", textShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>{fechaLarga}</h2>
-          <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 4, fontWeight: 500 }}>{todasHoy.length} citas programadas hoy · filtra escribiendo en cada columna</div>
+          <h2 className="dc-toolbar__titulo">{fechaLarga}</h2>
+          <div className="dc-toolbar__sub">{pluralEs(todasHoy.length, "cita programada", "citas programadas")} · haz clic en el título de una columna para filtrar</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {/* Action Icons */}
@@ -2356,9 +2368,6 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           </div>
           {puedeAgendar && <button type="button" className="dc-icon-btn" aria-label="Bloquear horario" onClick={() => setBloqForm({ tipo: "dia", fecha: fmt(hoy), diaSemana: String(hoy.getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" })} title="Bloquear horario" style={{ width: 36, height: 36, borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", color: "var(--dc-ink-700)", cursor: "pointer", display: "grid", placeItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><Lock size={16} strokeWidth={1.75} /></button>}
           {puedeAgendar && <button type="button" className="dc-icon-btn" aria-label="Sala TV" onClick={() => setTv(true)} title="Sala TV" style={{ width: 36, height: 36, borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", color: "var(--dc-ink-700)", cursor: "pointer", display: "grid", placeItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><Monitor size={16} strokeWidth={1.75} /></button>}
-          
-          <div style={{ width: 1, height: 20, background: "var(--dc-line)", margin: "0 4px" }} />
-          
           {puedeAgendar && <Btn onClick={() => setAgendar(true)}><Plus size={16} strokeWidth={1.75} /> Agendar cita</Btn>}
         </div>
       </div>
@@ -2409,80 +2418,37 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           { l: "Pendientes", c: "var(--dc-ink-500)", n: cnt("pendiente") },
           { l: "Canceladas", c: "var(--dc-red)", n: cnt("cancelada") },
         ].filter((x) => x.n > 0);
+        // Una sola franja: tres cifras principales y el desglose por estado. Antes eran
+        // ocho tarjetas en dos filas que repetían los mismos números.
         return (
-          <div style={{ animation: "dcTabSlide 0.18s ease-out forwards", display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-            
-            {/* Tarjetas Principales */}
-            <div style={{ display: "flex", gap: 16, flex: "1 1 auto", flexWrap: "wrap" }}>
-              {/* Card 1: Squircle + Rings */}
-              <div style={{ ...soft, padding: "24px", display: "flex", alignItems: "center", gap: 20, flex: "1 1 220px", position: "relative", overflow: "hidden" }}>
-                  {/* Aquí había tres anillos de progreso -confirmadas, presentes, atendidas- a 54 px
-                      y sin leyenda: un gráfico que no se puede leer no es un dato, es un adorno. Y
-                      ese desglose ya lo dan las dos tarjetas de al lado, "Por llegar" y "Progreso".
-                      Un calendario dice de un vistazo lo que la tarjeta cuenta: citas de hoy. */}
-                  {/* A33–A34: icono 40×40 neutro (.dc-kpi__icon), sin gradiente de identidad */}
-                  <div className="dc-kpi__icon" style={{ background: tint(NAVY, 0.12), border: `1px solid ${tint(NAVY, 0.19)}`, color: NAVY }}>
-                    <Calendar size={20} strokeWidth={1.75} />
-                  </div>
-                  <div style={{ position: "relative", zIndex: 1, flex: 1 }}>
-                    <div style={{ fontSize: 13, color: "var(--dc-slate)", fontWeight: 600, marginBottom: 4 }}>Citas hoy</div>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1.1, textShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>{nCitas}</div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2, fontWeight: 500 }}>{pluralEs(citasHoyActivas.length, "cita activa", "citas activas")} (confirmadas, presentes y pendientes)</div>
-                  </div>
-              </div>
-              
-              {/* Card 2: Squircle + Text */}
-              <div style={{ ...soft, padding: "24px", display: "flex", alignItems: "center", gap: 20, flex: "1 1 220px", position: "relative", overflow: "hidden" }}>
-                  {/* "Por llegar" es conteo neutro, no advertencia (A34) */}
-                  <div className="dc-kpi__icon" style={{ background: tint(DS.c.primary, 0.12), border: `1px solid ${tint(DS.c.primary, 0.19)}`, color: DS.c.primary }}>
-                    <Users size={20} strokeWidth={1.75} />
-                  </div>
-                  <div style={{ position: "relative", zIndex: 1, flex: 1 }}>
-                    <div style={{ fontSize: 13, color: "var(--dc-slate)", fontWeight: 600, marginBottom: 4 }}>Por llegar</div>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1.1, textShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>{stats[2][1]}</div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2, fontWeight: 500 }}>Pacientes hoy</div>
-                  </div>
-              </div>
-
-              {/* Card 3: Squircle + Progress */}
-              <div style={{ ...soft, padding: "24px", display: "flex", alignItems: "center", gap: 20, flex: "1 1 220px", position: "relative", overflow: "hidden" }}>
-                  <div className="dc-kpi__icon" style={{ background: tint(DS.c.primary, 0.12), border: `1px solid ${tint(DS.c.primary, 0.19)}`, color: DS.c.primary }}>
-                    <CheckCircle2 size={20} strokeWidth={1.75} />
-                  </div>
-                  <div style={{ position: "relative", zIndex: 1, flex: 1 }}>
-                    <div style={{ fontSize: 13, color: "var(--dc-slate)", fontWeight: 600, marginBottom: 4 }}>Progreso</div>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1.1, textShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>{nAv}%</div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2, fontWeight: 500 }}>
-                      <span style={{ display: "inline-block", background: "rgba(15,95,117,0.08)", color: DS.c.primary, padding: "3px 10px", borderRadius: "var(--dc-r-full)", fontSize: 12, fontWeight: 600 }}>Completado</span>
-                    </div>
-                  </div>
+          <Card className="dc-franja">
+            <div className="dc-franja__main">
+              <div className="dc-franja__cifra"><span>Citas activas</span><b>{nCitas}</b></div>
+              <div className="dc-franja__cifra"><span>Por llegar</span><b>{stats[2][1]}</b></div>
+              <div className="dc-franja__cifra dc-franja__avance">
+                <span>Avance del día</span>
+                <b>{nAv}%</b>
+                <i><em style={{ width: `${Math.min(100, nAv)}%` }} /></i>
               </div>
             </div>
-
-            {/* Bento Grid Right Side (Desglose) */}
             {desglose.length > 0 && (
-              <div style={{ display: "flex", gap: 16, flex: "2 1 400px", flexWrap: "wrap" }}>
+              <div className="dc-franja__desglose">
                 {desglose.map((a) => (
-                  <div key={a.l} style={{ ...soft, padding: "16px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between", flex: "1 1 140px" }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ fontSize: 12, color: "var(--dc-slate)", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>{a.l}</span>
-                      <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: a.c, marginTop: 3, flexShrink: 0 }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1, marginBottom: 10 }}>{a.n}<span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 600 }}> /{todasHoy.length}</span></div>
-                      <div style={{ height: 5, borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", overflow: "hidden" }}><div style={{ height: "100%", width: Math.min(100, a.n / total * 100) + "%", background: a.c, borderRadius: "var(--dc-r-full)", transition: "width 1s cubic-bezier(.2,.7,.2,1)" }} /></div>
-                    </div>
+                  <div key={a.l} className="dc-franja__estado">
+                    <span className="dc-franja__punto" style={{ background: a.c }} />
+                    <span>{a.l}</span>
+                    <b>{a.n}</b>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         );
       })()}
 
       {/* Lista o Calendario según el toggle */}
       {vista !== "calendario" ? (<>
-      <DataTable titulo="Citas de hoy" sub="citas" minWidth={1100} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
+      <DataTable titulo="Citas de hoy" sub="citas" minWidth={980} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
         cols={COLS_AGENDA} />
@@ -3088,13 +3054,16 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // Fuera del listado "Fuente" y "Comentario": con ocho columnas la tabla pedia 1220 px
     // y se cortaban las cabeceras. Las dos siguen en la ficha del paciente -se abre al
     // pulsar la fila- y la fuente ademas tiene su propia tarjeta, "Como nos conocen".
-    { key: "acc", label: "Acciones", w: "184px", a: "center", sticky: true, noFilter: true, noSort: true, cell: (p) => (
-      <div className="dc-row-actions" style={{ display: "inline-flex", gap: 4, justifyContent: "center", flexWrap: "nowrap" }} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="dc-row-action" aria-label="Ver ficha" onClick={() => verFicha(p)} title="Ver ficha" style={{ color: DS.c.primary }}><FileText size={14} strokeWidth={1.75} /></button>
-        <button type="button" className="dc-row-action" onClick={() => abrirHistoria(p)} title="Historia clínica" aria-label="Historia clínica" style={{ color: DS.c.primary }}><Stethoscope size={14} strokeWidth={1.75} /></button>
-        <button type="button" className="dc-row-action" onClick={() => abrirOdontograma(p)} title="Odontograma" aria-label="Odontograma" style={{ color: DS.c.primary }}><Smile size={14} strokeWidth={1.75} /></button>
-        <button type="button" className="dc-row-action" aria-label="Editar" onClick={() => editar(p)} title="Editar" style={{ color: NAVY }}><Pencil size={14} strokeWidth={1.75} /></button>
-        {puedeGestionar && <button type="button" className="dc-row-action" aria-label="Eliminar" onClick={() => eliminarPaciente(p)} title="Eliminar" style={{ color: RED }}><Trash2 size={14} strokeWidth={1.75} /></button>}
+    // Las dos acciones clínicas más usadas a la vista; ficha, editar y eliminar en ⋯.
+    { key: "acc", label: "Acciones", w: "128px", a: "right", sticky: true, noFilter: true, noSort: true, cell: (p) => (
+      <div className="dc-row-actions" style={{ display: "inline-flex", gap: 4, justifyContent: "flex-end", alignItems: "center", flexWrap: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="dc-row-action" onClick={() => abrirHistoria(p)} title="Historia clínica" aria-label="Historia clínica"><Stethoscope size={15} strokeWidth={1.75} /></button>
+        <button type="button" className="dc-row-action" onClick={() => abrirOdontograma(p)} title="Odontograma" aria-label="Odontograma"><Smile size={15} strokeWidth={1.75} /></button>
+        <MenuAcciones opciones={[
+          { label: "Ver ficha", onClick: () => verFicha(p) },
+          { label: "Editar datos", onClick: () => editar(p) },
+          puedeGestionar && { label: "Eliminar paciente", peligro: true, onClick: () => eliminarPaciente(p) },
+        ]} />
       </div>
     ) },
   ];
@@ -3111,7 +3080,9 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         <KpiCard label="Para reactivar" value={reactivar} color="var(--dc-warn-600)" icon={<BellRing size={18} strokeWidth={1.75} />} sub="+6 meses sin venir" />
         <KpiCard label="Nuevos" value={nuevos} color={DS.c.primary} icon={<UserPlus size={18} strokeWidth={1.75} />} sub="últimos 30 días" />
       </div>
-      {reactivar > 0 && <Card style={{ padding: 16, background: "rgba(254,243,199,0.5)", backdropFilter: "blur(12px)", border: "1px solid rgba(245,158,11,0.3)", borderLeft: "4px solid var(--dc-warn)", boxShadow: "0 8px 16px rgba(245,158,11,0.08), inset 0 2px 4px rgba(255,255,255,0.6)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}><div style={{ display: "flex", gap: 9, alignItems: "center", fontSize: 13, color: "var(--dc-warn-ink)", flex: 1, minWidth: 220 }}><BellRing size={18} strokeWidth={1.75} style={{ flexShrink: 0, color: "var(--dc-warn)" }} /> <span><strong>{pluralEs(reactivar, "paciente", "pacientes")}</strong> {reactivar === 1 ? "lleva" : "llevan"} más de 6 meses sin venir. Reactívalos con una campaña de control.</span></div>{puedeGestionar && <Btn small onClick={enviarRecordatoriosReactivar} disabled={enviandoRec}><Send size={14} strokeWidth={1.75} /> {enviandoRec ? "Enviando..." : "Enviar recordatorio"}</Btn>}</Card>}
+      {reactivar > 0 && <div className="dc-banda dc-banda--aviso"><BellRing size={18} strokeWidth={1.75} /><p><strong>{pluralEs(reactivar, "paciente", "pacientes")}</strong> {reactivar === 1 ? "lleva" : "llevan"} más de 6 meses sin venir. Reactívalos con una campaña de control.</p>{puedeGestionar && <Btn small onClick={enviarRecordatoriosReactivar} disabled={enviandoRec}><Send size={14} strokeWidth={1.75} /> {enviandoRec ? "Enviando…" : "Enviar recordatorio"}</Btn>}</div>}
+      <DataTable titulo="Directorio de pacientes" maxHeight={560} sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
+      <h2 className="dc-seccion">Marketing</h2>
       <div className="dc-split">
         <Card style={{ padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}><BarChart3 size={17} strokeWidth={1.75} color={TEAL} /><span style={{ fontWeight: 600, color: NAVY, fontSize: 15 }}>Cómo nos conocen</span></div>
@@ -3133,18 +3104,17 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         <Card style={{ padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}><Megaphone size={17} strokeWidth={1.75} color={DS.c.primary} /><span style={{ fontWeight: 600, color: NAVY, fontSize: 15 }}>Segmentos para campaña</span></div>
           <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 16 }}>Grupos listos para una acción de marketing hoy</div>
-          <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid" }}>
             {segmentos.map((s) => (
-              <div key={s.k} className="dc-rise" style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px", background: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 4px 12px rgba(15,27,56,0.03), inset 0 1px 2px rgba(255,255,255,0.5)", borderRadius: "var(--dc-r-lg)", transition: "transform .16s, box-shadow .16s", cursor: "default" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px) scale(1.02)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(15,27,56,0.06), inset 0 1px 2px rgba(255,255,255,0.6)"; }} onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(15,27,56,0.03), inset 0 1px 2px rgba(255,255,255,0.5)"; }}>
-                <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: tint(s.color, 0.09), color: s.color, display: "grid", placeItems: "center", flexShrink: 0 }}>{s.icon}</div>
-                <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 20, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{s.n}</div><div style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 600 }}>{s.label}</div></div>
+              <div key={s.k} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderTop: "1px solid var(--dc-line)" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 999, background: tint(s.color, 0.09), color: s.color, display: "grid", placeItems: "center", flexShrink: 0 }}>{s.icon}</div>
+                <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 14, fontWeight: 500, color: "var(--dc-ink-700)" }}>{s.label}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{pluralEs(s.n, "paciente", "pacientes")}</div></div>
                 {puedeGestionar && <button onClick={() => setCamp({ ...s, canal: "ambos", msg: s.plantilla })} disabled={!s.n} style={{ fontSize: 13, fontWeight: 600, color: s.n ? s.color : "var(--dc-ink-400)", background: s.n ? tint(s.color, 0.078) : "var(--dc-line)", border: "none", borderRadius: "var(--dc-r-sm)", padding: "8px 12px", cursor: s.n ? "pointer" : "default", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", flexShrink: 0 }}><Send size={13} strokeWidth={1.75} /> Campaña</button>}
               </div>
             ))}
           </div>
         </Card>
       </div>
-      <DataTable titulo="Directorio de pacientes" maxHeight={560} sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
       {ficha && <FichaPaciente nombre={ficha} onClose={() => setFicha(null)} fichas={fichas} />}
       {ficha360 && <FichaReal data={ficha360} onClose={() => setFicha360(null)} notify={notify} />}
       {fmId && (
@@ -4358,9 +4328,9 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 
   return (
     <div style={{ overflowX: "auto", maxWidth: "100%", width: "100%" }}>
-      {!embedded && <Card style={{ padding: 18, marginBottom: 16, background: "linear-gradient(120deg, rgba(254,243,199,0.7), rgba(254,243,199,0.3))", border: "1px solid rgba(253,230,138,0.8)" }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}><AlertTriangle size={20} strokeWidth={1.75} color="var(--dc-warn-600)" /><div style={{ fontSize: 15, color: "var(--dc-warn-600)" }}>La lista se ordena por <strong>urgencia</strong>. Al liberarse un cupo, el primer paciente compatible recibe la oferta automática por WhatsApp; si no responde en 15 min, pasa al siguiente.</div></div>
-      </Card>}
+      {!embedded && <div className="dc-banda dc-banda--info" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}><Info size={18} strokeWidth={1.75} style={{ flexShrink: 0 }} /><div style={{ fontSize: 14 }}>La lista se ordena por <strong>urgencia</strong>. Al liberarse un cupo, el primer paciente compatible recibe la oferta automática por WhatsApp; si no responde en 15 min, pasa al siguiente.</div></div>
+      </div>}
       {!embedded && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 16 }}>
         {[["En espera", esp.length, NAVY, <Bell size={18} strokeWidth={1.75} />], ["Urgencia alta", esp.filter((x) => x.urg === "alta").length, RED, <AlertTriangle size={18} strokeWidth={1.75} />], ["Ofertas activas", esp.filter((x) => x.ofrecido.length).length, "var(--dc-warn-600)", <Send size={18} strokeWidth={1.75} />]].map(([l, v, c, ic]) => (
           <KpiCard key={l} label={l} value={v} color={c} icon={ic} />
@@ -4926,7 +4896,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", overflowX: "auto" }}>
           {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
-            <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 15px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)", transition: "background .12s" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+            <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)", transition: "background .12s" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
           ); })}
         </div>
       </div>
@@ -5043,16 +5013,17 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
 
       {tab === "cobros" && (<div style={{ display: "grid", gap: 16 }}>
       {!cajaAbierta && (
-        <Card style={{ padding: 14, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 13, color: "var(--dc-warn-ink)" }}>
+        <div className="dc-banda dc-banda--aviso">
+          <KeyRound size={18} strokeWidth={1.75} />
+          <p>
             {jornadaAbiertaPrevia?.id
               ? `Hay una jornada abierta del ${jornadaAbiertaPrevia.fecha}. Ciérrala en Historial antes de abrir la de hoy.`
-              : "La caja del día está cerrada. Abre la caja para poder cobrar."}
-          </div>
+              : "La caja del día está cerrada. Ábrela para poder cobrar."}
+          </p>
           <Btn small onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>
             <KeyRound size={14} strokeWidth={1.75} /> {jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}
           </Btn>
-        </Card>
+        </div>
       )}
       {conectado && cajaError && (
         <Card style={{ padding: 14, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
@@ -5063,9 +5034,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
         </Card>
       )}
-      <Card style={{ padding: 16, background: "var(--dc-bg)", border: "1px solid var(--dc-info-soft)" }}><div style={{ display: "flex", gap: 10, alignItems: "center" }}><FileText size={18} strokeWidth={1.75} color="var(--dc-info-700b)" />{/* Decía "Emite boleta electrónica SUNAT (NubeFacT)" cuatro líneas después de que este
+      <div className="dc-banda dc-banda--info"><div style={{ display: "flex", gap: 10, alignItems: "center" }}><FileText size={18} strokeWidth={1.75} style={{ flexShrink: 0 }} />{/* Decía "Emite boleta electrónica SUNAT (NubeFacT)" cuatro líneas después de que este
                 mismo componente reconozca, en textoComprobante, que todavía no se envía a SUNAT. */}
-            <div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>Caja única: cobra el <strong>saldo del plan de tratamiento</strong> de cada paciente, el mismo que ven el odontólogo y recepción. {conectado ? <>El cobro queda registrado; <strong>la boleta electrónica aún no se envía a SUNAT</strong>.</> : <>Modo demostración: el cobro queda en el navegador <strong>sin envío a SUNAT</strong>.</>}</div></div></Card>
+            <div style={{ fontSize: 13 }}>Caja única: cobra el <strong>saldo del plan de tratamiento</strong> de cada paciente, el mismo que ven el odontólogo y recepción. {conectado ? <>El cobro queda registrado; <strong>la boleta electrónica aún no se envía a SUNAT</strong>.</> : <>Modo demostración: el cobro queda en el navegador <strong>sin envío a SUNAT</strong>.</>}</div></div></div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
         <KpiCard label="Por cobrar (planes)" value={`S/ ${montoPorCobrar.toLocaleString()}`} color="var(--dc-warn-600)" icon={<Clock size={18} strokeWidth={1.75} />} sub={`${porCobrar.length} ${porCobrar.length === 1 ? "plan en curso" : "planes en curso"}`} estado={conectado && cajaError ? "error" : "dato"} onRetry={recargarCaja} />
         <KpiCard label={`Cobrado este mes · ${sedeNombreCobros()}`} value={`S/ ${cobradoMes.toLocaleString()}`} color="var(--dc-ok-700)" icon={<Wallet size={18} strokeWidth={1.75} />} sub={`hoy S/ ${montoHoy.toLocaleString()}`} estado={conectado && (cajaError || histError) ? "error" : "dato"} onRetry={() => { recargarCaja(); recargarHist(); }} />
@@ -6925,7 +6896,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {[["productos", "Productos", Package], ...(puedeGestionar ? [["compras", "Compras", Send]] : []), ["consumo", "Consumo", Activity], ...(puedeGestionar ? [["proveedores", "Proveedores", Building2]] : [])].map(([k, lbl, Ic]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 15px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
       </div>
       {tab === "compras" && (() => {
@@ -7006,10 +6977,10 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
         <KpiCard label="Próximos a vencer" value={vencenPronto.length} color={vencenPronto.length ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} icon={<Calendar size={18} strokeWidth={1.75} />} sub="caducidad ≤ 60 días" />
       </div>
       {(() => { const totalPedir = requieren.reduce((s, i) => s + pedir(i), 0); return requieren.length > 0 && (
-        <Card style={{ padding: 14, background: "var(--dc-white)", border: "1px solid var(--dc-amber-soft)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 9, alignItems: "center", fontSize: 13, color: "var(--dc-warn-600)", flex: 1, minWidth: 220 }}><AlertCircle size={17} strokeWidth={1.75} style={{ flexShrink: 0 }} /> <span><strong>{requieren.length} insumo(s)</strong> requieren compra. Reposición sugerida: <strong>{totalPedir} unidades</strong> para cubrir 2× el mínimo (≈ 2 semanas).</span></div>
-          {puedeGestionar && <Btn small kind="red" onClick={() => conectado ? (ocDesdeUrgentes(requieren), setTab("compras")) : notify(`Orden de compra: ${totalPedir} unidades de ${requieren.length} insumos. (Demo)`)}><Send size={14} strokeWidth={1.75} /> Generar orden de compra</Btn>}
-        </Card>
+        <div className="dc-banda dc-banda--aviso">
+          <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 14, flex: 1, minWidth: 220 }}><AlertCircle size={18} strokeWidth={1.75} style={{ flexShrink: 0 }} /> <span><strong>{requieren.length} insumo(s)</strong> requieren compra. Reposición sugerida: <strong>{totalPedir} unidades</strong> para cubrir 2× el mínimo (≈ 2 semanas).</span></div>
+          {puedeGestionar && <Btn small onClick={() => conectado ? (ocDesdeUrgentes(requieren), setTab("compras")) : notify(`Orden de compra: ${totalPedir} unidades de ${requieren.length} insumos. (Demo)`)}><Send size={14} strokeWidth={1.75} /> Generar orden de compra</Btn>}
+        </div>
       ); })()}
       <ModHead icon={<Package size={20} strokeWidth={1.75} />} titulo="Inventario" sub="Stock y cobertura por insumo" accion={puedeGestionar ? <Btn small onClick={nuevo}><Plus size={15} strokeWidth={1.75} /> Nuevo insumo</Btn> : null} />
       <DataTable titulo="Insumos" sub="insumos" minWidth={1120} rows={items} defaultSort={{ key: "cobertura", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub="Agrega tu primer insumo para controlar stock y cobertura." />} cols={[
@@ -8520,48 +8491,36 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   const RolIcon = R.icon;
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter',sans-serif" }}>
+    <div className="dc-shell" style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter',sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 600, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}
          onBlur={(e) => { e.currentTarget.style.left = "-9999px"; e.currentTarget.style.top = "0"; }}>Saltar al contenido</a>
-      <aside className={`dc-side${sidebarOpen ? " open" : ""}`} style={{ width: colap ? 70 : 224, background: "rgba(255,255,255,0.92)", color: INK, flexShrink: 0, position: "relative", height: "calc(100vh - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(16,24,40,.04)", border: "1px solid var(--dc-line)", display: "flex", flexDirection: "column", transition: "width .22s cubic-bezier(.2,.7,.2,1)", zIndex: 50 }}>
-        <button type="button" aria-label={colap ? "Expandir menú" : "Ocultar menú"} onClick={() => setColap((c) => !c)} title={colap ? "Expandir menú" : "Ocultar menú"} style={{ padding: colap ? "18px 0 16px" : "18px 18px 16px", display: "flex", alignItems: "center", justifyContent: colap ? "center" : "flex-start", gap: 11, background: "none", border: "none", cursor: "pointer", width: "100%" }}>
-          <div style={{ background: `linear-gradient(135deg,${DS.c.accent},${DS.c.primary})`, borderRadius: "var(--dc-r-md)", width: 36, height: 36, display: "grid", placeItems: "center", boxShadow: `inset 0 2px 4px rgba(255,255,255,0.4), 0 6px 16px -6px ${tint(DS.c.primary, 0.6)}`, flexShrink: 0 }}><Smile size={20} strokeWidth={1.75} color="#fff" /></div>
-          {!colap && <div style={{ textAlign: "left" }}><div style={{ fontWeight: 700, fontSize: 15, color: NAVY, fontFamily: DISPLAY_FONT, letterSpacing: "-.01em", textShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>Dento <span style={{ color: DS.c.primary, fontWeight: 600 }}>Check</span></div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 600 }}>Sonríe+</div></div>}
-        </button>
-        {!esSuper && (
-          mods.includes("plan") ? (
-          <button type="button" aria-label={`Plan ${PLAN_NOMBRE[plan]}`} onClick={() => { setVista("plan"); setSidebarOpen(false); }} title={`Plan ${PLAN_NOMBRE[plan]}`} style={{ margin: colap ? "0 10px 4px" : "0 12px 4px", display: "flex", alignItems: "center", justifyContent: colap ? "center" : "flex-start", gap: 10, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-lg)", padding: colap ? "9px 0" : "10px 12px", cursor: "pointer", textAlign: "left" }}>
-            <div style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: "linear-gradient(135deg,var(--dc-warn),var(--dc-warn-600))", display: "grid", placeItems: "center", flexShrink: 0, boxShadow: "0 5px 12px -5px rgba(217,119,6,.7)" }}><Crown size={16} strokeWidth={1.75} color="#fff" /></div>
-            {!colap && <><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, color: "var(--dc-warn-700)", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Plan actual</div><div style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-warn-600)" }}>{PLAN_NOMBRE[plan]}</div></div><ChevronRight size={15} strokeWidth={1.75} color="var(--dc-warn)" /></>}
+      <aside className={`dc-side dc-sb${colap ? " is-colap" : ""}${sidebarOpen ? " open" : ""}`}>
+        <div className="dc-sb__brand">
+          <button type="button" className="dc-sb__logo" aria-label={colap ? "Expandir menú" : "Contraer menú"} title={colap ? "Expandir menú" : "Contraer menú"} onClick={() => setColap((c) => !c)}>
+            <span className="dc-sb__mark"><Smile size={18} strokeWidth={2} color="#fff" /></span>
+            {!colap && <span className="dc-sb__name"><span>Dento <b>Check</b></span><small>Sonríe+</small></span>}
           </button>
-          ) : (
-          <div title={`Plan ${PLAN_NOMBRE[plan]}`} style={{ margin: colap ? "0 10px 4px" : "0 12px 4px", display: "flex", alignItems: "center", justifyContent: colap ? "center" : "flex-start", gap: 10, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-lg)", padding: colap ? "9px 0" : "10px 12px", textAlign: "left" }}>
-            <div style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: "linear-gradient(135deg,var(--dc-warn),var(--dc-warn-600))", display: "grid", placeItems: "center", flexShrink: 0 }}><Crown size={16} strokeWidth={1.75} color="#fff" /></div>
-            {!colap && <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, color: "var(--dc-warn-700)", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Plan actual</div><div style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-warn-600)" }}>{PLAN_NOMBRE[plan]}</div></div>}
-          </div>
-          )
-        )}
-        <nav style={{ padding: "6px 10px", flex: 1, overflowY: "auto" }}>
+        </div>
+        <nav className="dc-sb__nav" aria-label="Módulos">
           {NAV_GRUPOS.map((g) => (
-            <div key={g.grupo} style={{ marginBottom: 6 }}>
-              {NAV_GRUPOS.length > 1 && !colap && <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--dc-ink-400)", padding: "10px 12px 5px" }}>{g.grupo}</div>}
+            <div key={g.grupo} className="dc-sb__grupo">
+              {NAV_GRUPOS.length > 1 && !colap && <div className="dc-sb__titulo">{g.grupo}</div>}
               {g.items.map((it) => {
                 if (it.children) {
                   const Icon = it.icon;
                   const algunActivo = it.children.some((c) => c.id === vista);
                   if (colap) {
                     return (
-                      <button type="button" key={it.label} className="dc-icon-btn" aria-label={it.label} title={it.label} onClick={() => { setVista(it.children[0].id); setSidebarOpen(false); }}
-                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 11, width: "100%", padding: "11px 0", borderRadius: "var(--dc-r-md)", marginBottom: 3, cursor: "pointer", border: "none", background: algunActivo ? "var(--dc-white)" : "transparent", color: algunActivo ? DS.c.primary : "var(--dc-ink-400)", boxShadow: algunActivo ? "0 4px 12px rgba(16,24,40,0.06), 0 0 0 1px rgba(15,23,42,0.05)" : "none" }}>
-                        <Icon size={17} strokeWidth={1.75} color={algunActivo ? DS.c.primary : undefined} />
+                      <button type="button" key={it.label} className={`dc-sb__item${algunActivo ? " is-on" : ""}`} aria-label={it.label} title={it.label} onClick={() => { setVista(it.children[0].id); setSidebarOpen(false); }}>
+                        <Icon size={18} strokeWidth={1.75} />
                       </button>
                     );
                   }
                   const abierto = subAbierto[it.label] ?? algunActivo;
                   return (
-                    <div key={it.label} style={{ marginBottom: 3 }}>
-                      <button aria-label={it.label} onClick={() => {
+                    <div key={it.label}>
+                      <button type="button" className={`dc-sb__item${algunActivo && !abierto ? " is-on" : ""}`} aria-expanded={abierto} onClick={() => {
                           const next = !abierto;
                           setSubAbierto((s) => ({ ...s, [it.label]: next }));
                           // DC-03: primer clic también navega al primer hijo desbloqueado
@@ -8569,70 +8528,93 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                             const dest = it.children.find((c) => modAllowed(c.mod));
                             if (dest) { setVista(dest.id); setSidebarOpen(false); }
                           }
-                        }}
-                        style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: "var(--dc-r-md)", cursor: "pointer", border: "none", fontSize: 13, fontWeight: algunActivo ? 800 : 700, background: algunActivo ? "rgba(255,255,255,0.95)" : "transparent", color: algunActivo ? DS.c.primary : "var(--dc-ink-400)", boxShadow: algunActivo ? "0 4px 12px rgba(16,24,40,0.08)" : "none", transition: "color .12s, background .12s" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = algunActivo ? NAVY : DS.c.primary; e.currentTarget.style.background = algunActivo ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.3)"; }} onMouseLeave={(e) => { e.currentTarget.style.color = algunActivo ? NAVY : "var(--dc-ink-400)"; e.currentTarget.style.background = algunActivo ? "rgba(255,255,255,0.85)" : "transparent"; }}>
-                        <Icon size={17} strokeWidth={1.75} color={algunActivo ? DS.c.primary : "var(--dc-ink-400)"} />
-                        <span style={{ flex: 1 }}>{it.label}</span>
-                        <ChevronDown size={14} strokeWidth={1.75} style={{ transform: abierto ? "none" : "rotate(-90deg)", transition: "transform .16s", color: "var(--dc-ink-400)" }} />
+                        }}>
+                        <Icon size={18} strokeWidth={1.75} />
+                        <span className="dc-sb__label">{it.label}</span>
+                        <ChevronDown size={15} strokeWidth={1.75} className="dc-sb__chev" style={{ transform: abierto ? "none" : "rotate(-90deg)" }} />
                       </button>
-                      {abierto && it.children.map((c) => { const locked = !modAllowed(c.mod); const active = vista === c.id && !locked; return (
-                        <button key={c.id} title={locked ? `Disponible desde el plan ${PLAN_NOMBRE[planMinimo(c.mod)]}` : c.label} onClick={() => { if (locked) { setVista("plan"); notify(`“${c.label}” se desbloquea desde el plan ${PLAN_NOMBRE[planMinimo(c.mod)]}.`); } else { setVista(c.id); } setSidebarOpen(false); }}
-                          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "8px 12px 8px 24px", borderRadius: "var(--dc-r-md)", marginTop: 2, cursor: "pointer", border: "none", fontSize: 13, fontWeight: active ? 800 : 600, background: active ? "var(--dc-white)" : "transparent", color: active ? DS.c.primary : locked ? "var(--dc-ink-400)" : "var(--dc-ink-400)", boxShadow: active ? "0 4px 12px rgba(16,24,40,0.06), 0 0 0 1px rgba(15,23,42,0.05)" : "none", transition: "background .16s, color .16s" }}
-                          onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.5)"; e.currentTarget.style.color = locked ? "var(--dc-ink-200)" : NAVY; } }} onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = locked ? "var(--dc-ink-200)" : "var(--dc-ink-400)"; } }}>
-                          <span style={{ width: 5, height: 5, borderRadius: "var(--dc-r-full)", background: active ? DS.c.primary : "var(--dc-line)", flexShrink: 0 }} />
-                          <span style={{ flex: 1 }}>{c.label}</span>
-                          {locked && <Lock size={12} strokeWidth={1.75} color="var(--dc-ink-400)" />}
+                      {abierto && <div className="dc-sb__sub">{it.children.map((c) => { const locked = !modAllowed(c.mod); const active = vista === c.id && !locked; return (
+                        <button type="button" key={c.id} className={`dc-sb__subitem${active ? " is-on" : ""}${locked ? " is-locked" : ""}`} aria-current={active ? "page" : undefined} title={locked ? `Disponible desde el plan ${PLAN_NOMBRE[planMinimo(c.mod)]}` : c.label} onClick={() => { if (locked) { setVista("plan"); notify(`“${c.label}” se desbloquea desde el plan ${PLAN_NOMBRE[planMinimo(c.mod)]}.`); } else { setVista(c.id); } setSidebarOpen(false); }}>
+                          <span className="dc-sb__label">{c.label}</span>
+                          {locked && <Lock size={12} strokeWidth={1.75} />}
                         </button>
-                      ); })}
+                      ); })}</div>}
                     </div>
                   );
                 }
                 const Icon = it.icon; const locked = !modAllowed(modDeVista(it.id)); const active = vista === it.id && !locked; return (
-                <button type="button" key={it.id} aria-label={locked ? `Disponible desde el plan ${PLAN_NOMBRE[planMinimo(it.id)]}` : it.label} title={locked ? `Disponible desde el plan ${PLAN_NOMBRE[planMinimo(it.id)]}` : it.label} aria-current={active ? "page" : undefined} onClick={() => { if (locked) { setVista("plan"); notify(`“${it.label}” se desbloquea desde el plan ${PLAN_NOMBRE[planMinimo(it.id)]}.`); } else { setVista(it.id); } setSidebarOpen(false); }}
-                  style={{ display: "flex", alignItems: "center", justifyContent: colap ? "center" : "flex-start", gap: 11, width: "100%", textAlign: "left", padding: colap ? "11px 0" : "10px 12px", borderRadius: "var(--dc-r-md)", marginBottom: 3, cursor: "pointer", border: "none", fontSize: 13, fontWeight: active ? 800 : 700, background: active ? "var(--dc-white)" : "transparent", color: active ? DS.c.primary : locked ? "var(--dc-ink-400)" : "var(--dc-ink-400)", boxShadow: active ? "0 4px 12px rgba(16,24,40,0.06), 0 0 0 1px rgba(15,23,42,0.05)" : "none", transition: "all .16s" }}
-                  onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.5)"; e.currentTarget.style.color = locked ? "var(--dc-ink-200)" : NAVY; if (!colap) e.currentTarget.style.transform = "translateX(2px)"; } }} onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = locked ? "var(--dc-ink-200)" : "var(--dc-ink-400)"; e.currentTarget.style.transform = "none"; } }}>
-                  <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}><Icon size={17} strokeWidth={1.75} color={active ? DS.c.primary : "var(--dc-ink-400)"} />{colap && it.id === "whatsapp" && waUnread > 0 && <span style={{ position: "absolute", top: -4, right: -5, width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, border: "1.5px solid #fff" }} />}</span> {!colap && <><span style={{ flex: 1 }}>{it.label}</span>{it.id === "whatsapp" && waUnread > 0 && <span title="Mensajes por responder" style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, fontSize: 12, fontWeight: 600, display: "grid", placeItems: "center" }}>{waUnread}</span>}{locked ? <Lock size={13} strokeWidth={1.75} color="var(--dc-ink-400)" /> : it.tag && <span style={{ fontSize: 12, fontWeight: 600, background: "rgba(22,163,74,.12)", color: "var(--dc-ok-700)", padding: "2px 6px", borderRadius: "var(--dc-r-sm)" }}>{it.tag}</span>}</>}
+                <button type="button" key={it.id} className={`dc-sb__item${active ? " is-on" : ""}${locked ? " is-locked" : ""}`} aria-label={colap ? it.label : undefined} title={locked ? `Disponible desde el plan ${PLAN_NOMBRE[planMinimo(it.id)]}` : it.label} aria-current={active ? "page" : undefined} onClick={() => { if (locked) { setVista("plan"); notify(`“${it.label}” se desbloquea desde el plan ${PLAN_NOMBRE[planMinimo(it.id)]}.`); } else { setVista(it.id); } setSidebarOpen(false); }}>
+                  <span className="dc-sb__ico"><Icon size={18} strokeWidth={1.75} />{colap && it.id === "whatsapp" && waUnread > 0 && <span className="dc-sb__dot" />}</span>
+                  {!colap && <>
+                    <span className="dc-sb__label">{it.label}</span>
+                    {it.id === "whatsapp" && waUnread > 0 && <span className="dc-sb__count" title="Mensajes por responder">{waUnread}</span>}
+                    {locked ? <Lock size={13} strokeWidth={1.75} /> : it.tag && <span className="dc-sb__tag">{it.tag}</span>}
+                  </>}
                 </button>
               ); })}
             </div>
           ))}
         </nav>
-        <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.4)" }}>
-          <div style={{ display: "flex", flexDirection: colap ? "column" : "row", alignItems: "center", gap: colap ? 8 : 10, padding: colap ? "10px 6px" : "12px", borderRadius: "var(--dc-r-lg)", background: "linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4))", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 8px 24px -6px rgba(16,24,40,0.1), inset 0 2px 4px rgba(255,255,255,1)" }}>
-            <div title={usuario.nombre} style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: `linear-gradient(135deg, ${R.color}, ${tint(R.color, 0.8)})`, color: "#fff", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 15, flexShrink: 0, boxShadow: `0 4px 12px ${tint(R.color, 0.4)}` }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
-            {!colap && <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.01em" }}>{usuario.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, lineHeight: 1.3 }}>{R.label}</div></div>}
-            <button type="button" className="dc-icon-btn" aria-label="Cerrar sesión" onClick={onLogout} title="Cerrar sesión" style={{ background: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.9)", borderRadius: "var(--dc-r-md)", cursor: "pointer", color: "var(--dc-slate)", display: "grid", placeItems: "center", width: 32, height: 32, boxShadow: "0 2px 4px rgba(0,0,0,0.02)", transition: "all 0.15s" }} onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dc-danger)"; e.currentTarget.style.background = "var(--dc-fee)"; e.currentTarget.style.borderColor = "var(--dc-danger-mid)"; }} onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dc-slate)"; e.currentTarget.style.background = "rgba(255,255,255,0.6)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.9)"; }}><LogOut size={16} strokeWidth={2} /></button>
+        <div className="dc-sb__pie">
+          {!esSuper && (mods.includes("plan") ? (
+            <button type="button" className="dc-sb__plan" title={`Plan ${PLAN_NOMBRE[plan]}`} aria-label={`Plan ${PLAN_NOMBRE[plan]}`} onClick={() => { setVista("plan"); setSidebarOpen(false); }}>
+              <Crown size={15} strokeWidth={1.75} />{!colap && <><span>Plan <b>{PLAN_NOMBRE[plan]}</b></span><ChevronRight size={14} strokeWidth={1.75} /></>}
+            </button>
+          ) : (
+            <div className="dc-sb__plan" title={`Plan ${PLAN_NOMBRE[plan]}`}><Crown size={15} strokeWidth={1.75} />{!colap && <span>Plan <b>{PLAN_NOMBRE[plan]}</b></span>}</div>
+          ))}
+          <div className="dc-sb__user">
+            <div className="dc-sb__avatar" title={usuario.nombre} style={{ background: R.color }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
+            {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{R.label}</div></div>}
+            <button type="button" className="dc-icon-btn dc-sb__out" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={onLogout}><LogOut size={16} strokeWidth={1.75} /></button>
           </div>
-          {!colap && !auth.token && !usuario?.conectado && <button onClick={() => { if (confirm("¿Restablecer los datos de demostración? Se perderán los cambios guardados en este navegador.")) { Object.keys(localStorage).filter((k) => k.startsWith("dc_data_")).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} title="Volver a los datos de demo" style={{ width: "100%", marginTop: 8, background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "7px 10px", cursor: "pointer", color: "var(--dc-ink-500)", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}><Repeat size={13} strokeWidth={1.75} /> Restablecer datos de demo</button>}
+          {!colap && !auth.token && !usuario?.conectado && <button type="button" className="dc-sb__reset" onClick={() => { if (confirm("¿Restablecer los datos de demostración? Se perderán los cambios guardados en este navegador.")) { Object.keys(localStorage).filter((k) => k.startsWith("dc_data_")).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} title="Volver a los datos de demo"><Repeat size={13} strokeWidth={1.75} /> Restablecer datos de demo</button>}
         </div>
       </aside>
 
       <main id="dc-main" style={{ flex: 1, minWidth: 0, height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
-        <header style={{ background: "rgba(255,255,255,.92)", borderBottom: "1px solid var(--dc-line)", boxShadow: "0 1px 0 rgba(16,24,40,.04)", padding: "12px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, zIndex: 10, gap: 12, flexWrap: "wrap" }}>
-          {/* En un movil el titulo, la pildora de primeros pasos y el boton Crear sumaban
-              392 px en 375 de pantalla y se salian de la cabecera. Envuelven y el bloque
-              del titulo puede encoger. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", minWidth: 0, rowGap: 8 }}>
+        <header className="dc-top">
+          <div className="dc-top__izq">
             <button aria-label="Abrir o cerrar el menú" className="dc-burger" onClick={() => setSidebarOpen((s) => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: NAVY, display: "none", minWidth: "var(--dc-tap-min)", minHeight: "var(--dc-tap-min)" }}><Menu size={22} strokeWidth={1.75} /></button>
-            <div style={{ minWidth: 0 }}><h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, fontFamily: DISPLAY_FONT, letterSpacing: "-0.01em", color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{NAV.find((n) => n.id === vista)?.label}</h1><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 5 }}><RolIcon size={12} strokeWidth={1.75} /> Vista de {R.label}</div></div>
+            <h1 className="dc-top__titulo">{NAV.find((n) => n.id === vista)?.label}</h1>
+          </div>
+          <div className="dc-top__der">
             {/* Bug D11 re-test: Onboarding dismissable permanentemente */}
             {rol !== "superadmin" && !onbDismissed && misPasos.length > 0 && (() => { const done = misPasos.filter((p) => pasos[p.id]).length; if (done >= misPasos.length) return null; return (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <button onClick={() => setShowPasos(true)} title="Primeros pasos" className="dc-onb-pill" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(105deg,var(--dc-primary-alt),var(--dc-accent-cyan))", border: "none", borderRadius: "var(--dc-r-full)", padding: "6px 13px 6px 7px", cursor: "pointer", color: "#fff", boxShadow: "0 8px 20px -10px rgba(14,116,144,.8)" }}>
-                  <span title="Tareas tuyas de primeros pasos (no es el checklist de puesta en marcha de Configuración)" style={{ width: 26, height: 26, borderRadius: "var(--dc-r-full)", background: "rgba(255,255,255,.22)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{done}/{misPasos.length}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>Primeros pasos</span>
+              <div className="dc-top__onb">
+                <button type="button" onClick={() => setShowPasos(true)} title="Tus tareas de primeros pasos (el checklist de la clínica está en Configuración)">
+                  <span className="dc-top__onbnum">{done}/{misPasos.length}</span> Primeros pasos
                 </button>
-                <button type="button" className="dc-mini-btn" aria-label="Ocultar primeros pasos" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }} title="Ocultar primeros pasos" style={{ width: 28, height: 28, borderRadius: "var(--dc-r-full)", background: "transparent", border: "none", color: "var(--dc-ink-400)", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0, padding: 0 }} onMouseEnter={(e) => { e.currentTarget.style.background = "var(--dc-bg)"; e.currentTarget.style.color = NAVY; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--dc-ink-400)"; }}><X size={15} strokeWidth={2} /></button>
+                <button type="button" className="dc-mini-btn dc-top__onbx" aria-label="Ocultar primeros pasos" title="Ocultar primeros pasos" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }}><X size={14} strokeWidth={2} /></button>
               </div>
             ); })()}
+          {puedeMultisede ? (
+            <>
+              {/* Llevaba fondo var(--dc-bg) y ningun borde sobre una cabecera casi blanca: 1,07:1 de
+                  contraste de superficie, o sea invisible como control. El boton de al lado si
+                  tiene borde, y por eso se veia uno y el otro no. Ahora los dos igual. */}
+              <div className="dc-top__sede"><MapPin size={15} strokeWidth={1.75} color={sedeDetectada && String(sede) === String(sedeDetectada) ? "var(--dc-ok-700)" : "var(--dc-ink-500)"} /><Select small width={190} ariaLabel="Sede activa" value={sede} onChange={(v) => {
+                if (v === "all") { setSede("all"); return; }
+                // UUID de API: no Number()
+                setSede(typeof v === "string" && v.includes("-") ? v : Number(v));
+              }} options={[...sedesDelSelector.map((s) => ({ value: s.id, label: `${s.nombre}${sedeDetectada != null && String(sedeDetectada) === String(s.id) ? " · aquí" : ""}` })), { value: "all", label: usuario.sedes === "all" ? "Todas las sedes" : "Todas mis sedes" }]} /></div>
+              {/* Bug D12 re-test: Ocultar botón "Detectar mi sede" cuando solo tiene 1 sede */}
+              {sedesDelSelector.length > 1 && (
+                <button type="button" onClick={detectarSede} className="dc-icon-btn dc-top__icono" aria-label={geoEstado === "buscando" ? "Ubicando…" : geoEstado === "ok" ? "Ubicación detectada" : "Detectar mi sede"} title={geoEstado === "ok" ? "Ubicación detectada" : "Detectar mi sede por ubicación (siempre puedes cambiarla)"} style={{ color: geoEstado === "ok" ? "var(--dc-ok-700)" : undefined }}><Navigation size={16} strokeWidth={1.75} /></button>
+              )}
+            </>
+          ) : rol === "superadmin" ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 7, color: DS.c.primary, fontSize: 13, fontWeight: 600 }}><Globe size={15} strokeWidth={1.75} /> Plataforma global · AWG</div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13, fontWeight: 600 }}><MapPin size={15} strokeWidth={1.75} color={NAVY} /> {etiquetaSedeActiva}</div>
+          )}
             {/* Sin ninguna acción disponible el desplegable salía vacío. */}
             {rol !== "superadmin" && hayQueCrear && (
               <div style={{ position: "relative" }}>
                 <button onClick={() => setCrearMenu((v) => !v)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: DS.c.primary, color: "#fff", border: "none", borderRadius: "var(--dc-r-full)", padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600, boxShadow: "0 1px 2px rgba(16,24,40,.10)" }}><Plus size={16} strokeWidth={1.75} /> Crear</button>
                 {crearMenu && (<>
                   <div onClick={() => setCrearMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 41, background: "#fff", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", boxShadow: "0 16px 40px rgba(16,24,40,.18)", padding: 6, minWidth: 210 }}>
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 41, background: "#fff", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", boxShadow: "0 16px 40px rgba(16,24,40,.18)", padding: 6, minWidth: 210 }}>
                     {ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear")).map(([k, l, Ic, t]) => (
                       <button key={k} onClick={() => { setCrearMenu(false); setVista(t); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "none", background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600, color: NAVY, textAlign: "left" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}><Ic size={16} strokeWidth={1.75} color={DS.c.primary} /> {l}</button>
                     ))}
@@ -8641,28 +8623,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
               </div>
             )}
           </div>
-          {puedeMultisede ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {/* Llevaba fondo var(--dc-bg) y ningun borde sobre una cabecera casi blanca: 1,07:1 de
-                  contraste de superficie, o sea invisible como control. El boton de al lado si
-                  tiene borde, y por eso se veia uno y el otro no. Ahora los dos igual. */}
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}><MapPin size={16} strokeWidth={1.75} color={sedeDetectada && String(sede) === String(sedeDetectada) ? "var(--dc-ok-700)" : NAVY} /><Select small width={220} ariaLabel="Sede activa" value={sede} onChange={(v) => {
-                if (v === "all") { setSede("all"); return; }
-                // UUID de API: no Number()
-                setSede(typeof v === "string" && v.includes("-") ? v : Number(v));
-              }} options={[...sedesDelSelector.map((s) => ({ value: s.id, label: `${s.nombre}${sedeDetectada != null && String(sedeDetectada) === String(s.id) ? " · aquí" : ""}` })), { value: "all", label: usuario.sedes === "all" ? "Todas las sedes" : "Todas mis sedes" }]} /></div>
-              {/* Bug D12 re-test: Ocultar botón "Detectar mi sede" cuando solo tiene 1 sede */}
-              {sedesDelSelector.length > 1 && (
-                <button onClick={detectarSede} title="Detectar mi sede por ubicación (siempre puedes cambiarla)" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: geoEstado === "ok" ? "var(--dc-ok-soft)" : "#fff", border: "1px solid " + (geoEstado === "ok" ? "var(--dc-green-soft)" : "var(--dc-line)"), borderRadius: "var(--dc-r-md)", padding: "7px 11px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: geoEstado === "ok" ? "var(--dc-ok-700)" : NAVY, boxShadow: "0 1px 2px rgba(16,24,40,.06)" }}><Navigation size={14} strokeWidth={1.75} /> {geoEstado === "buscando" ? "Ubicando…" : geoEstado === "ok" ? "Ubicación detectada" : "Detectar mi sede"}</button>
-              )}
-            </div>
-          ) : rol === "superadmin" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 7, color: DS.c.primary, fontSize: 13, fontWeight: 600 }}><Globe size={15} strokeWidth={1.75} /> Plataforma global · AWG</div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13, fontWeight: 600 }}><MapPin size={15} strokeWidth={1.75} color={NAVY} /> {etiquetaSedeActiva}</div>
-          )}
         </header>
-        <div data-dc-scroll style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", padding: vista === "whatsapp" ? "4px 26px 12px" : "22px 26px 48px", width: "100%", margin: "0 auto", boxSizing: "border-box" }}><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 15 }}>Cargando módulo…</div>}>{render()}</React.Suspense></div>
+        <div data-dc-scroll className="dc-contenido" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}><div className={`dc-pagina${vista === "whatsapp" ? " dc-pagina--chat" : ""}`}><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 15 }}>Cargando módulo…</div>}>{render()}</React.Suspense></div></div>
       </main>
 
       {showPasos && (() => {
@@ -10817,9 +10779,9 @@ export default function App() {
 @keyframes float3 { 0% { transform: translateY(0) scale(1); } 100% { transform: translateY(-20px) scale(0.9); } }
 
         /* Tarjetas 3D del dashboard personalizable */
-        .dw-card{position:relative;border-radius:20px;background:linear-gradient(158deg,var(--dc-white) 0%,var(--dc-bg) 100%);border:1px solid var(--dc-line);box-shadow:0 1px 2px rgba(16,24,40,.05), 0 20px 42px -26px rgba(27,46,94,.42), inset 0 1px 0 rgba(255,255,255,.9);overflow:hidden;transition:transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .2s}
-        .dw-card::before{content:"";position:absolute;top:0;left:0;right:0;height:44%;background:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,0));pointer-events:none}
-        .dw-card:hover{transform:translateY(-4px);box-shadow:0 1px 2px rgba(16,24,40,.05), 0 30px 56px -24px rgba(27,46,94,.5), inset 0 1px 0 rgba(255,255,255,.95)}
+        /* Tarjetas del dashboard: misma superficie que el resto (blanca, borde fino). */
+        .dw-card{position:relative;border-radius:var(--dc-r-lg);background:var(--dc-surface);border:1px solid var(--dc-line);box-shadow:var(--dc-sh-1);overflow:hidden;transition:border-color .15s, box-shadow .15s}
+        .dw-card:hover{border-color:var(--dc-ink-200)}
         .dw-card:active{cursor:grabbing}
         .dc-th::placeholder{color:var(--dc-ink-500);text-transform:uppercase;font-weight:700;letter-spacing:.6px;font-size:10.5px}
         .dc-side nav::-webkit-scrollbar{width:6px}

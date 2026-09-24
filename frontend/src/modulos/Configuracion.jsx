@@ -1,6 +1,6 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect } from "react";
-import { AlertCircle, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2 } from "lucide-react";
+import { AlertCircle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2 } from "lucide-react";
 import api, { auth } from "../api/client";
 import {Btn, Card, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint} from "../comun";
 
@@ -352,10 +352,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   );
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {!conectado && <Card style={{ padding: 16 }}><div style={{ color: "var(--dc-warn-600)", fontSize: 13 }}>Inicia sesión con una cuenta de la clínica para editar la configuración.</div></Card>}
+      {!conectado && <div className="dc-banda dc-banda--info"><Info size={18} strokeWidth={1.75} /><p>Inicia sesión con una cuenta de la clínica para editar la configuración.</p></div>}
       <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 15px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
       </div>
 
@@ -417,7 +417,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         const set = (k, v) => setClinica((c) => ({ ...c, [k]: v }));
         return (
         <div style={{ display: "grid", gap: 16 }}>
-          {!conectado && <Card style={{ padding: 16 }}><div style={{ color: "var(--dc-warn-600)", fontSize: 13 }}>Inicia sesión con una cuenta de la clínica para editar estos datos.</div></Card>}
+          {!conectado && <div className="dc-banda dc-banda--info"><Info size={18} strokeWidth={1.75} /><p>Inicia sesión con una cuenta de la clínica para editar estos datos.</p></div>}
           {fiscalReadOnly && conectado && <Card style={{ padding: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-sky)" }}><div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>RUC, razón social y datos fiscales son de solo lectura para tu rol. Contacta a administración para cambios.</div></Card>}
           {/* Ficha fiscal */}
           <div style={{ ...card, overflow: "hidden" }}>

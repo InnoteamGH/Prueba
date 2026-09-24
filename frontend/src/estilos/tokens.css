@@ -14,9 +14,9 @@
   --dc-ink-500:#5A6474;   /* secundario       ·  5.98:1  ← reemplaza #707B8C */
   --dc-ink-400:#667085;   /* meta, timestamps ·  4.97:1  ← reemplaza #98A2B3 */
   --dc-ink-200:#C4CBD6;   /* SOLO bordes e iconos decorativos. NUNCA texto. */
-  --dc-line:#E7EAF0;      /* bordes */
+  --dc-line:#E4E8EE;      /* bordes */
   --dc-surface:#FFFFFF;   /* tarjetas */
-  --dc-bg:#F7F9FC;        /* fondo de app */
+  --dc-bg:#F4F6F9;        /* fondo de app: neutro plano, sin degradados */
 
   /* ---- Semánticos (CORREGIDOS) ---- */
   --dc-ok-700:#15803D;      /* texto y botón verde ·  5.02:1 sobre blanco */
@@ -55,11 +55,11 @@
   /* ---- Radios: 4 valores ---- */
   --dc-r-sm:6px;    /* chips, badges */
   --dc-r-md:10px;   /* botones, campos */
-  --dc-r-lg:14px;   /* tarjetas */
+  --dc-r-lg:16px;   /* tarjetas */
   --dc-r-full:999px;
 
   /* ---- Elevación: 3 niveles ---- */
-  --dc-sh-1:0 1px 2px rgba(16,24,40,.05);
+  --dc-sh-1:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.03);
   --dc-sh-2:0 4px 12px -2px rgba(16,24,40,.08);
   --dc-sh-3:0 20px 45px -28px rgba(15,27,56,.40);
 
@@ -159,7 +159,7 @@ h1, h2, h3, h4, .dc-title {
 }
 /* Icon-only / close: ampliar hit area sin agrandar el glifo */
 .dc-icon-btn,
-button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn):not(.dc-info) {
+button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn):not(.dc-info):not([class*="dc-sb__"]):not([class*="dc-top__"]) {
   min-width: var(--dc-tap-min) !important;
   min-height: var(--dc-tap-min) !important;
   display: inline-grid;
