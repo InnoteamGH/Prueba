@@ -4684,9 +4684,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                         <div key={v} className={`dc-cz__den is-${t}${q ? " is-on" : ""}`}>
                           <span className="dc-cz__dval">{v >= 1 ? `S/ ${v}` : `${Math.round(v * 100)} ct`}</span>
                           <div className="dc-cz__step">
-                            <button type="button" aria-label={`Quitar ${v}`} onClick={() => set(q - 1)} disabled={!q}><Minus size={13} strokeWidth={2.4} /></button>
+                            <button type="button" className="dc-mini-btn" aria-label={`Quitar ${v}`} onClick={() => set(q - 1)} disabled={!q}><Minus size={13} strokeWidth={2.4} /></button>
                             <input inputMode="numeric" aria-label={`Cantidad de ${v}`} value={q || ""} placeholder="0" onChange={(e) => set(Number(e.target.value.replace(/\D/g, "")) || 0)} />
-                            <button type="button" aria-label={`Agregar ${v}`} onClick={() => set(q + 1)}><Plus size={13} strokeWidth={2.4} /></button>
+                            <button type="button" className="dc-mini-btn" aria-label={`Agregar ${v}`} onClick={() => set(q + 1)}><Plus size={13} strokeWidth={2.4} /></button>
                           </div>
                         </div>
                       ); })}
@@ -4748,8 +4748,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                       <div><b>{m.paciente}</b><small>{m.hora ? `${m.hora} – ` : ""}{m.concepto || "Cobro"}</small></div>
                       <em>{nfmt(m.monto)}</em>
                       {m.id && <div className="dc-cz__macc">
-                        <button type="button" title="Enviar boleta por WhatsApp" aria-label="Enviar boleta por WhatsApp" onClick={() => api.pagos.enviarWa(m.id).then((r) => notify(r?.ok ? `Boleta enviada a ${m.paciente} por WhatsApp.` : "No se pudo enviar (¿el paciente tiene teléfono?).")).catch(() => notify("No se pudo enviar la boleta."))}><MessageSquare size={13} strokeWidth={2} /></button>
-                        {puedeAbrirCaja && <button type="button" className="is-mal" title="Anular cobro" aria-label="Anular cobro" onClick={() => anularPagoHoy(m.id)}><X size={13} strokeWidth={2.2} /></button>}
+                        <button type="button" className="dc-mini-btn" title="Enviar boleta por WhatsApp" aria-label="Enviar boleta por WhatsApp" onClick={() => api.pagos.enviarWa(m.id).then((r) => notify(r?.ok ? `Boleta enviada a ${m.paciente} por WhatsApp.` : "No se pudo enviar (¿el paciente tiene teléfono?).")).catch(() => notify("No se pudo enviar la boleta."))}><MessageSquare size={13} strokeWidth={2} /></button>
+                        {puedeAbrirCaja && <button type="button" className="dc-mini-btn is-mal" title="Anular cobro" aria-label="Anular cobro" onClick={() => anularPagoHoy(m.id)}><X size={13} strokeWidth={2.2} /></button>}
                       </div>}
                     </div>
                   ); })}

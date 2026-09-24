@@ -2502,3 +2502,159 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-ap2__atajos { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 @media (max-width: 900px) { .dc-cz__denoms.is-b, .dc-cz__denoms.is-m { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dc-cz__notas { grid-template-columns: 1fr; } }
 .dc-cz__denoms.is-m .dc-cz__den { padding: 8px 6px; } .dc-cz__denoms.is-m .dc-cz__step { gap: 2px; }
+
+/* ======================================================================
+   CAJA compacta — menos alto, tipografía y controles más contenidos
+   ====================================================================== */
+/* Cobros */
+.dc-cob { gap: 14px; grid-template-columns: minmax(0, 1fr) 290px; }
+.dc-cob__cab { padding: 10px 16px; }
+.dc-cob__cab h3 { font-size: 14px; }
+.dc-cob__cab > div:first-child > span { font-size: 12px; }
+.dc-cob__buscar { height: 30px; }
+.dc-cob__buscar input { width: 130px; font-size: 12.5px; }
+.dc-cob .dc-env__filtros button { height: 28px !important; padding: 0 11px !important; font-size: 12px !important; }
+.dc-cob__fila { grid-template-columns: 32px minmax(0, 1.3fr) minmax(150px, 1fr) 100px auto; gap: 12px; padding: 7px 16px; }
+.dc-cob__fila .dc-rec__av { width: 32px !important; height: 32px !important; font-size: 11.5px !important; }
+.dc-cob__quien b { font-size: 13px; }
+.dc-cob__quien span { font-size: 11.5px; }
+.dc-cob__anillo { width: 32px; height: 32px; }
+.dc-cob__anillo b { font-size: 9.5px; }
+.dc-cob__avance small, .dc-cob__saldo small { font-size: 10.5px; }
+.dc-cob__avance span { font-size: 12px; }
+.dc-cob__saldo b { font-size: 14px; }
+.dc-cob__btn { height: 28px; padding: 0 12px; font-size: 12px; }
+.dc-cob__btn svg { width: 13px; height: 13px; }
+.dc-cob__lado { gap: 10px; }
+.dc-cob__estado { padding: 10px 12px; border-radius: 16px; gap: 10px; }
+.dc-cob__estado-ico { width: 32px; height: 32px; border-radius: 10px; }
+.dc-cob__estado b { font-size: 15px; }
+.dc-cob__estado button { height: 28px; padding: 0 12px; font-size: 12px; }
+.dc-cob__hoy { gap: 8px; }
+.dc-cob__hoy > div { padding: 9px 12px; border-radius: 14px; }
+.dc-cob__hoy b { font-size: 16px; }
+.dc-cob__boletas-cab { padding: 10px 14px; }
+.dc-cob__boletas-cab h4 { font-size: 13px; }
+.dc-cob__boletas .dc-vacio, .dc-cob__boletas [class*="vacio"] { padding: 16px 12px !important; }
+/* Ingresos y egresos, links, historial */
+.dc-flujo__col header { padding: 12px 16px; }
+.dc-flujo__ico { width: 34px; height: 34px; border-radius: 11px; }
+.dc-flujo__col h3 { font-size: 14px; }
+.dc-flujo__col header > b { font-size: 17px; }
+.dc-flujo__col li { padding: 8px 16px; }
+.dc-flujo__txt b { font-size: 13px; }
+.dc-flujo__vacio { padding: 18px 16px; }
+.dc-tickets { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.dc-ticket__top { padding: 12px 14px 4px; }
+.dc-ticket__top .dc-rec__av { width: 32px !important; height: 32px !important; font-size: 11.5px !important; }
+.dc-ticket__monto { padding: 2px 14px 10px 56px; }
+.dc-ticket__monto b { font-size: 20px; }
+.dc-ticket__pie { padding: 10px 14px 12px; }
+.dc-ticket__acc button { height: 28px; font-size: 12px; }
+.dc-jor { gap: 8px; }
+.dc-jor__card { grid-template-columns: 54px minmax(0, 1.2fr) minmax(280px, 1.4fr) 150px; gap: 14px; padding: 10px 14px 10px 10px; border-radius: 16px; }
+.dc-jor__fecha { padding: 5px 0; border-radius: 12px; }
+.dc-jor__fecha b { font-size: 18px; }
+.dc-jor__fecha small { display: none; }
+.dc-jor__info b { font-size: 13.5px; }
+.dc-jor__info span { font-size: 12px; }
+.dc-jor__arq div { padding: 6px 10px; border-radius: 10px; }
+.dc-jor__arq b { font-size: 13px; }
+.dc-jor__dif { font-size: 12px; padding: 4px 10px; }
+/* Apertura */
+.dc-ap2 { grid-template-columns: minmax(0, 1fr) 290px; gap: 14px; }
+.dc-ap2__main { gap: 10px; }
+.dc-ap2__paso { padding: 12px 16px 14px; border-radius: 18px; }
+.dc-ap2__paso header { margin-bottom: 10px; gap: 10px; }
+.dc-ap2__paso h3 { font-size: 14px; }
+.dc-ap2__paso header span:not(.dc-ap2__ico) { font-size: 12px; }
+.dc-ap2__ico { width: 36px; height: 36px; border-radius: 12px; }
+.dc-ap2__ico svg { width: 17px; height: 17px; }
+.dc-ap2__ico i { width: 17px; height: 17px; font-size: 10px; }
+.dc-ap2__cuerpo { gap: 10px; padding-left: 46px; }
+.dc-ap2__sedes { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.dc-ap2__sedes button { padding: 8px 12px; border-radius: 14px; }
+.dc-ap2__sedes button > span { width: 28px; height: 28px; border-radius: 9px; }
+.dc-ap2__sedes button b { font-size: 13px; }
+.dc-ap2__monto { height: 42px; padding: 0 14px; border-radius: 14px; }
+.dc-ap2__monto span { font-size: 14px; }
+.dc-ap2__monto input { width: 100px; font-size: 20px; }
+.dc-ap2__rapidos button { height: 30px; padding: 0 11px; font-size: 12px; }
+.dc-ap2__nota { height: 36px; border-radius: 12px; }
+.dc-ap2__nota input { font-size: 13px; }
+.dc-ap2__medios { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.dc-ap2__medios button { grid-template-columns: 30px 1fr; align-items: center; justify-items: start; gap: 8px; padding: 8px 10px; border-radius: 14px; }
+.dc-ap2__mico { width: 30px; height: 30px; border-radius: 10px; }
+.dc-ap2__mico svg { width: 15px; height: 15px; }
+.dc-ap2__medios button b { font-size: 12.5px; padding-right: 18px; }
+.dc-ap2__medios button i { right: 8px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; }
+.dc-ap2__ok { padding: 12px 14px; border-radius: 16px; }
+.dc-ap2__ok > span { width: 40px; height: 40px; border-radius: 13px; }
+.dc-ap2__ok b { font-size: 16px; }
+.dc-ap2__atajos { gap: 8px; }
+.dc-ap2__atajos button { grid-template-columns: 34px 1fr; column-gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; }
+.dc-ap2__atajos button > span { grid-row: span 2; width: 34px; height: 34px; border-radius: 11px; margin: 0; }
+.dc-ap2__atajos button b { font-size: 13px; }
+.dc-ap2__atajos button small { font-size: 11.5px; }
+.dc-ap2__ticket { gap: 10px; padding-bottom: 14px; border-radius: 18px; }
+.dc-ap2__tcab { padding: 12px 14px; gap: 10px; }
+.dc-ap2__tcab > span { width: 32px; height: 32px; border-radius: 10px; }
+.dc-ap2__tcab b { font-size: 15px; }
+.dc-ap2__ticket ul, .dc-ap2__tmedios, .dc-ap2__ttotal, .dc-ap2__ticket p { padding-left: 14px; padding-right: 14px; }
+.dc-ap2__tcorte { margin: 2px 14px 0; }
+.dc-ap2__ticket li { padding: 5px 0; font-size: 12.5px; }
+.dc-ap2__tmedios span { height: 22px; font-size: 11.5px; padding: 0 8px; }
+.dc-ap2__ttotal b { font-size: 21px; }
+.dc-ap2__cta { height: 38px; padding: 0 16px; font-size: 13.5px; }
+.dc-ap2__ticket .dc-ap2__cta { margin: 2px 14px 0; }
+/* Cierre */
+.dc-cz { grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
+.dc-cz__main, .dc-cz__lado { gap: 12px; }
+.dc-cz__arq, .dc-cz__conteo, .dc-cz__cobros, .dc-cz__bloq { padding: 14px 16px !important; border-radius: 18px !important; }
+.dc-cz__cab { margin-bottom: 10px; gap: 10px; }
+.dc-cz__cab h3 { font-size: 14px; }
+.dc-cz__cab > div > span { font-size: 12px; }
+.dc-cz__cico { width: 36px; height: 36px; border-radius: 12px; }
+.dc-cz__cico svg { width: 17px; height: 17px; }
+.dc-cz__libro li { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; padding: 6px 2px; }
+.dc-cz__lico { width: 30px; height: 30px; border-radius: 10px; }
+.dc-cz__lico svg { width: 14px; height: 14px; }
+.dc-cz__libro b { font-size: 13px; }
+.dc-cz__libro small { font-size: 11.5px; }
+.dc-cz__libro em { font-size: 14px; }
+.dc-cz__esp { margin-top: 8px; padding: 10px 14px; border-radius: 14px; }
+.dc-cz__esp b { font-size: 21px; }
+.dc-cz__grupo { gap: 6px; margin-bottom: 10px; }
+.dc-cz__denoms { gap: 6px; }
+.dc-cz__den { gap: 6px; padding: 7px 8px; border-radius: 12px; }
+.dc-cz__dval { font-size: 12px; padding: 2px 8px; }
+.dc-cz__step { grid-template-columns: 22px 1fr 22px; }
+.dc-cz__step button { width: 22px; height: 22px; }
+.dc-cz__step input { font-size: 14px; }
+.dc-cz__cuadre { gap: 8px; margin: 10px 0; }
+.dc-cz__contado { padding: 8px 14px; border-radius: 14px; }
+.dc-cz__contado input { font-size: 20px; }
+.dc-cz__res { padding: 8px 14px; border-radius: 14px; gap: 10px; }
+.dc-cz__res > span { width: 34px; height: 34px; border-radius: 11px; }
+.dc-cz__res > span svg { width: 18px; height: 18px; }
+.dc-cz__res b { font-size: 15.5px; }
+.dc-cz__pie { margin-top: 10px; padding-top: 10px; }
+.dc-cz__bloq > span { width: 40px; height: 40px; border-radius: 13px; }
+.dc-cz__dona { width: 116px; height: 116px; margin: 0 auto 10px; }
+.dc-cz__dona b { font-size: 15px; }
+.dc-cz__met li { grid-template-columns: 24px 1fr auto auto; padding: 4px 0; }
+.dc-cz__met li > span { width: 24px; height: 24px; border-radius: 8px; }
+.dc-cz__tot { margin-top: 8px; padding-top: 8px; }
+.dc-cz__tot .is-neto { padding: 7px 10px; }
+.dc-cz__movcab { padding: 10px 14px; }
+.dc-cz__mov { padding: 8px 14px; }
+.dc-cz__step button, .dc-cz__macc button { min-width: 0 !important; min-height: 0 !important; padding: 0 !important; box-sizing: border-box; }
+.dc-cz__step { grid-template-columns: 22px minmax(0, 1fr) 22px !important; }
+.dc-ap2__medios { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); }
+.dc-ap2__medios button b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dc-ap2__medios button { min-height: 0 !important; }
+.dc-cob__boletas .dc-vacio, .dc-cob__boletas > div:not(.dc-cob__boletas-cab) { padding-top: 12px !important; padding-bottom: 14px !important; }
+.dc-cz__libro { grid-template-columns: 1fr 1fr; column-gap: 18px; }
+.dc-cz__libro li + li { border-top: 0; }
+.dc-cz__libro li:nth-child(n+3) { border-top: 1px dashed #E3ECED; }
+@media (max-width: 760px) { .dc-cz__libro { grid-template-columns: 1fr; } }
