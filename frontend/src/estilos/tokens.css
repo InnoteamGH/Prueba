@@ -130,8 +130,8 @@
   --dc-violeta:#7C5CD6;
   --dc-violeta-100:#EFEAFC;
   --dc-grad-marca: linear-gradient(135deg, #14A3A8 0%, #0E8C95 45%, #0A6C76 100%);
-  --dc-font: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --dc-font-title: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dc-font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dc-font-title: 'Manrope Variable', 'Manrope', 'Inter Variable', system-ui, sans-serif;
 }
 @media (pointer: coarse) {
   :root { --dc-tap-min:44px; }
@@ -160,10 +160,11 @@ a:focus-visible,
 /* ---- UX-04 / UX-06 / UX-08 tipografía y táctil globales ---- */
 body {
   font-family: var(--dc-font);
-  /* Geist: la tipografía de Vercel, sobria y precisa; activa dígitos alineados y
-     la "l" con cola para no confundirla con el 1 en DNI y teléfonos. */
-  font-feature-settings: "ss01", "cv11";
-  letter-spacing: -0.005em;
+  /* Inter para leer (tablas, formularios, chat) y Manrope para títulos y cifras.
+     cv05: "l" con cola, para no confundirla con el 1 en DNI y teléfonos;
+     cv08: "I" con remates, distinta de la "l". */
+  font-feature-settings: "cv05", "cv08", "calt";
+  letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: var(--dc-fs-md);
@@ -180,12 +181,13 @@ h1, h2, h3, h4, .dc-title {
 button, input, select, textarea { font-family: inherit; word-spacing: inherit; }
 
 /* ---- Reglas de mayúsculas y números ----
-   Todo el texto va en tipo oración. Las mayúsculas quedan solo para etiquetas
-   pequeñas (overline): 11 px, seminegrita y con espaciado, para que se lean
-   como etiqueta y no como grito. Las cifras usan dígitos tabulares. */
+   Todo el texto va en tipo oración, también las etiquetas pequeñas: se
+   distinguen por peso y color, no por MAYÚSCULAS espaciadas. Las cifras usan
+   dígitos tabulares. */
 [style*="text-transform: uppercase"] {
-  font-size: 11px !important;
-  letter-spacing: .08em !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
 }
 .dc-kpi__value, .dc-franja__cifra b, .dc-hoy__cifras b, .dc-cita__hora,
@@ -342,3 +344,7 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc
 .dc-toast { animation: dcToastIn .2s ease-out; }
 @keyframes dcToastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+/* "capitalize" ponía mayúscula en cada palabra ("Septiembre De 2026"):
+   en español solo va la primera letra. */
+div[style*="text-transform: capitalize"] { text-transform: none !important; }
+div[style*="text-transform: capitalize"]::first-letter { text-transform: uppercase; }

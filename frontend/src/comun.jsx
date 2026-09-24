@@ -33,8 +33,8 @@ export const DS = {
   f: { hero: 26, h1: 22, h2: 18, body: 15, cap: 13, micro: 11.5 },
   motion: { fast: ".16s ease", base: ".24s ease", slow: ".4s ease", spring: ".26s cubic-bezier(.2,.7,.2,1)" } };
 DS.card = { background: "var(--dc-surface)", borderRadius: 16, border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)" };
-DS.label = { fontSize: DS.f.cap, fontWeight: 500, color: DS.c.ink, fontFamily: "'Geist Variable', 'Geist', system-ui, sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
-export const DISPLAY_FONT = "'Geist Variable', 'Geist', system-ui, sans-serif";
+DS.label = { fontSize: DS.f.cap, fontWeight: 500, color: DS.c.ink, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
+export const DISPLAY_FONT = "'Manrope Variable', 'Manrope', 'Inter Variable', system-ui, sans-serif";
 
 /* ============================================================================
    PALETA ESTÁNDAR — tokens semánticos estilo Apple (una sola fuente de verdad).
@@ -92,13 +92,13 @@ export const ROLES = {
   superadmin: { label: "Super Admin AWG", icon: Globe, color: "var(--dc-purple)",
     desc: "Operado por AWG. Administra toda la plataforma multi-tenant desde el BackOffice: clínicas, licencias, suscripciones, métricas globales, auditoría y soporte. No pertenece a ninguna clínica.",
     mods: ["plataforma","auditoria"] },
-  admin:     { label: "Administrador General", icon: ShieldCheck, color: "var(--dc-brand-mid)",
+  admin:     { label: "Administrador general", icon: ShieldCheck, color: "var(--dc-brand-mid)",
     desc: "Máximo administrador de la clínica: control total de todos los módulos, todas las sedes, configuración, usuarios, permisos, facturación e integraciones.",
     mods: MODS_ADMIN_GENERAL },
   gerencia:  { label: "Gerencia", icon: Briefcase, color: NAVY,
     desc: "Gestión y toma de decisiones: dashboards, indicadores, reportes, finanzas, producción, ventas, pacientes y agenda consolidada. Vista ejecutiva (principalmente lectura). Su acceso puede limitarse a una, varias o todas las sedes.",
     mods: ["gerencial","reportes","dashboard","agenda","pacientes","odontograma","tratamientos","servicios","inventario","laboratorio","facturacion","comisiones","metas","resenas","seguros","recall","plan"] },
-  admin_sede:{ label: "Administrador de Sede", icon: UserCog, color: "var(--dc-brand-mid)",
+  admin_sede:{ label: "Administrador de sede", icon: UserCog, color: "var(--dc-brand-mid)",
     desc: "Responsable operativo de la(s) sede(s) asignada(s): agenda, personal, pacientes, cajas, inventario, laboratorio, reportes y producción de su sede. Solo ve la información de sus sedes habilitadas.",
     mods: ["dashboard","reportes","whatsapp","agenda","espera","pacientes","servicios","inventario","laboratorio","facturacion","comisiones","metas","resenas","recall","seguros","formularios","tratamientos","config","plan"] },
   ti:        { label: "Administrador TI", icon: Server, color: DS.c.primary,

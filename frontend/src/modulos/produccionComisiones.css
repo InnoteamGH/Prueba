@@ -127,8 +127,8 @@
 }
 .dc-pc .dc-tabla-doc .fila.cab {
   padding: 0 8px 10px; border-bottom: 1px solid var(--dc-line-alt); cursor: default;
-  color: var(--dc-ink-400); font-weight: var(--dc-fw-semibold); text-transform: uppercase;
-  letter-spacing: 0.04em; font-size: var(--dc-fs-xs); min-height: 0;
+  color: var(--dc-ink-400); font-weight: var(--dc-fw-semibold); text-transform: none;
+  letter-spacing: 0; font-size: var(--dc-fs-xs); min-height: 0;
 }
 .dc-pc .dc-tabla-doc .fila.cab:hover,
 .dc-pc .dc-tabla-doc .fila.pie:hover { background: none; }
@@ -204,8 +204,8 @@
 .dc-pc .dc-nota--aviso b { color: var(--dc-warn-700); }
 
 .dc-pc .dc-rotulo {
-  font-size: var(--dc-fs-xs); font-weight: var(--dc-fw-bold); letter-spacing: 0.05em;
-  text-transform: uppercase; color: var(--dc-ink-400); margin: 0 0 var(--dc-sp-3);
+  font-size: var(--dc-fs-xs); font-weight: var(--dc-fw-bold); letter-spacing: 0;
+  text-transform: none; color: var(--dc-ink-400); margin: 0 0 var(--dc-sp-3);
 }
 
 .dc-pc .dc-split {

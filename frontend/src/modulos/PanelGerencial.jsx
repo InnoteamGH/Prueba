@@ -285,7 +285,7 @@ function CanvasCaja({ puntos, onOpen }) {
         ctx.lineTo(x, H - pad.b);
         ctx.stroke();
         ctx.fillStyle = ink;
-        ctx.font = "10px 'Geist Variable', 'Geist', sans-serif";
+        ctx.font = "10px 'Inter Variable', 'Inter', sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(`${String(h).padStart(2, "0")}:00`, x, H - 8);
       }
@@ -939,7 +939,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
       <EnCabecera>
         {/* .dc-pg envuelve el portal para que los estilos del panel (chip, botones) sigan aplicando. */}
         <div className="dc-pg dc-pg--top"><div className="dc-head-acc" title={subHead}>
-          <span className="dc-chip dc-chip--vivo"><span className="punto" aria-hidden="true" />EN VIVO</span>
+          <span className="dc-chip dc-chip--vivo"><span className="punto" aria-hidden="true" />En vivo</span>
           <span className="dc-reloj">{reloj}</span>
           <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={recargar}>Hoy</button>
           <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={() => abrir({

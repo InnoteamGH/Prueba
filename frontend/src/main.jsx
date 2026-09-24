@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 // Tipografía incluida en el paquete: no depende de que cargue Google Fonts.
-import '@fontsource-variable/geist'
-import '@fontsource-variable/geist-mono'
+import '@fontsource-variable/inter'
+import '@fontsource-variable/manrope'
 import './estilos/tokens.css'
 import './ui/ui.css'
 

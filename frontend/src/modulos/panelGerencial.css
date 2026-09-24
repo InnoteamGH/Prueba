@@ -6,10 +6,10 @@
   padding: 0;
   background: transparent;
   color: var(--dc-ink-900);
-  font-family: var(--dc-font, 'Geist Variable', 'Geist', system-ui, sans-serif);
+  font-family: var(--dc-font, 'Inter Variable', 'Inter', system-ui, sans-serif);
   font-size: var(--dc-fs-md);
   line-height: var(--dc-lh-md);
-  --dc-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --dc-mono: "Inter Variable", system-ui, sans-serif;
   --g1: var(--dc-accent-cyan);
   --g2: var(--dc-amber-ink);
   --g3: var(--dc-purple);
@@ -86,7 +86,7 @@
 .dc-pg .delta{font-size:var(--dc-fs-sm);font-weight:var(--dc-fw-semibold)}
 /* marca visible: este dato NO sale del sistema todavía */
 .dc-pg .marca-demo{display:inline-flex;align-items:center;gap:4px;font-size:11px;
-  font-weight:var(--dc-fw-bold);letter-spacing:.04em;text-transform:uppercase;
+  font-weight:var(--dc-fw-bold);letter-spacing: 0;text-transform: none;
   padding:1px 6px;border-radius:var(--dc-r-full);background:var(--dc-warn-100);
   color:var(--dc-warn-700);border:1px dashed var(--dc-amber-soft);
   vertical-align:middle;margin-left:6px;cursor:help}
@@ -167,8 +167,8 @@
   line-height:1.35}
 .dc-pg .eje dd{margin:1px 0 0;font-size:var(--dc-fs-xs);color:var(--dc-ink-500);
   font-variant-numeric:tabular-nums}
-.dc-pg .dc-rotulo{font-size:var(--dc-fs-xs);font-weight:var(--dc-fw-bold);letter-spacing:.05em;
-  text-transform:uppercase;color:var(--dc-ink-500);margin:0 0 var(--dc-sp-3)}
+.dc-pg .dc-rotulo{font-size:var(--dc-fs-xs);font-weight:var(--dc-fw-bold);letter-spacing: 0;
+  text-transform: none;color:var(--dc-ink-500);margin:0 0 var(--dc-sp-3)}
 /* ══════════════════════════════════════════════════════════════════
    BARRAS HORIZONTALES — reescritas: la escala es el TOTAL, no el
    máximo de la serie. Ninguna barra llega al 100% salvo que una sola
@@ -232,8 +232,8 @@
   from{opacity:0;transform:translateY(-11px);background:var(--dc-brand-100)}
   to{opacity:1;transform:none;background:transparent}}
 .dc-pg .lg .t{color:var(--dc-ink-400);font-variant-numeric:tabular-nums;font-size:var(--dc-fs-xs)}
-.dc-pg .lg .k{font-weight:var(--dc-fw-bold);font-size:var(--dc-fs-xs);letter-spacing:.03em;
-  text-transform:uppercase}
+.dc-pg .lg .k{font-weight:var(--dc-fw-bold);font-size:var(--dc-fs-xs);letter-spacing: 0;
+  text-transform: none}
 .dc-pg .lg .d{color:var(--dc-ink-700);font-size:var(--dc-fs-sm);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* ── ocupación de agenda ── */
@@ -265,8 +265,8 @@
 .dc-pg .ficha.ver{opacity:1}
 .dc-pg .ficha b{font-size:12px;color:var(--dc-ink-900)}
 .dc-pg .ficha em{font-style:normal;color:var(--dc-ink-500)}
-.dc-pg .etq{position:absolute;bottom:8px;font-family:var(--dc-mono);font-size:11px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--dc-ink-400)}
+.dc-pg .etq{position:absolute;bottom:8px;font-family:var(--dc-mono);font-size:11px;letter-spacing: 0;
+  text-transform: none;color:var(--dc-ink-400)}
 .dc-pg .serie{position:relative;height:206px}
 .dc-pg .serie canvas{display:block;width:100%;height:100%;cursor:crosshair}
 /* variante alta: el gráfico ocupa a lo ancho y a lo alto lo que le sobre a la
@@ -295,8 +295,8 @@
   grid-template-columns:minmax(220px,1.3fr) minmax(150px,1fr) 78px 116px 150px;
   gap:var(--dc-sp-4);align-items:center;padding:11px var(--dc-sp-5)}
 .dc-pg .dc-table-head{background:var(--dc-bg-alt);border-bottom:1px solid var(--dc-line);
-  font-size:var(--dc-fs-xs);font-weight:var(--dc-fw-bold);letter-spacing:.05em;
-  text-transform:uppercase;color:var(--dc-ink-500)}
+  font-size:var(--dc-fs-xs);font-weight:var(--dc-fw-bold);letter-spacing: 0;
+  text-transform: none;color:var(--dc-ink-500)}
 .dc-pg .dc-table-row{border-bottom:1px solid var(--dc-line);font-size:var(--dc-fs-sm);
   transition:background .15s}
 .dc-pg .dc-table-row:last-child{border-bottom:none}
@@ -563,8 +563,8 @@
 .dc-pg .mdl-micro dt { font-size: var(--dc-fs-xs); color: var(--dc-ink-500); }
 .dc-pg .mdl-bloq { margin-top: var(--dc-sp-4); }
 .dc-pg .mdl-seccion {
-  font-size: var(--dc-fs-xs); font-weight: 700; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--dc-ink-400); margin: 0 0 8px;
+  font-size: var(--dc-fs-xs); font-weight: 700; letter-spacing: 0;
+  text-transform: none; color: var(--dc-ink-400); margin: 0 0 8px;
 }
 .dc-pg .mdl-como {
   margin: 0; border-left: 3px solid var(--dc-brand-100);

@@ -489,12 +489,12 @@
 .dc-sb__brand { height: 64px; display: flex; align-items: center; padding: 0 16px; flex-shrink: 0; }
 .dc-sb__logo { all: unset; display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 12px; padding: 4px; }
 .dc-sb__mark { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--dc-primary-alt); flex-shrink: 0; }
-.dc-sb__name { display: flex; flex-direction: column; font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 16px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; line-height: 1.1; }
+.dc-sb__name { display: flex; flex-direction: column; font-family: 'Inter Variable', 'Inter', system-ui, sans-serif; font-size: 16px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; line-height: 1.1; }
 .dc-sb__name b { color: var(--dc-primary-alt); font-weight: 700; }
-.dc-sb__name small { font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 12px; font-weight: 500; color: var(--dc-ink-500); letter-spacing: 0; margin-top: 2px; }
+.dc-sb__name small { font-family: 'Inter Variable', 'Inter', system-ui, sans-serif; font-size: 12px; font-weight: 500; color: var(--dc-ink-500); letter-spacing: 0; margin-top: 2px; }
 .dc-sb__nav { flex: 1; overflow-y: auto; padding: 4px 12px 12px; scrollbar-width: thin; scrollbar-color: var(--dc-line) transparent; }
 .dc-sb__grupo + .dc-sb__grupo { margin-top: 14px; }
-.dc-sb__titulo { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dc-ink-400); padding: 0 10px 6px; }
+.dc-sb__titulo { font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--dc-ink-400); padding: 0 10px 6px; }
 .dc-sb__item, .dc-sb__subitem {
   all: unset; box-sizing: border-box;
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -550,7 +550,7 @@
   border-bottom: 1px solid var(--dc-line);
 }
 .dc-top__izq { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.dc-top__titulo { margin: 0; font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-top__titulo { margin: 0; font-family: 'Inter Variable', 'Inter', system-ui, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-top__der { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .dc-top__sede { display: flex; align-items: center; gap: 6px; }
 .dc-top__icono { all: unset; box-sizing: border-box; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--dc-line); color: var(--dc-ink-500); cursor: pointer; }
@@ -576,7 +576,7 @@
 /* ---- Barra de página: título de sección + acciones, sin tarjeta ---- */
 .dc-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .dc-toolbar > div:first-child { min-width: 0; }
-.dc-toolbar__titulo { margin: 0; font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); }
+.dc-toolbar__titulo { margin: 0; font-family: 'Inter Variable', 'Inter', system-ui, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); }
 .dc-toolbar__sub { font-size: 13px; color: var(--dc-ink-500); margin-top: 2px; }
 
 /* ---- Franja de cifras: varias métricas en una sola tarjeta ---- */
@@ -584,7 +584,7 @@
 .dc-franja__main { display: flex; flex: 1 1 520px; }
 .dc-franja__cifra { flex: 1; padding: 16px 20px; display: grid; gap: 4px; align-content: start; border-right: 1px solid var(--dc-line); }
 .dc-franja__cifra span { font-size: 13px; font-weight: 500; color: var(--dc-ink-500); }
-.dc-franja__cifra b { font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.dc-franja__cifra b { font-family: 'Inter Variable', 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .dc-franja__avance i { display: block; height: 6px; border-radius: 999px; background: var(--dc-bg-alt); overflow: hidden; margin-top: 4px; }
 .dc-franja__avance em { display: block; height: 100%; border-radius: 999px; background: var(--dc-primary-alt); transition: width .6s ease; }
 .dc-franja__desglose { flex: 1 1 360px; display: flex; flex-wrap: wrap; align-content: center; gap: 8px; padding: 16px 20px; background: var(--dc-bg-soft); }
@@ -657,7 +657,7 @@
 .dc-hoy__cifras > div:nth-child(odd) { border-right: 1px solid var(--dc-line); }
 .dc-hoy__cifras > div:nth-last-child(-n+2) { border-bottom: 0; }
 .dc-hoy__cifras span { font-size: 13px; font-weight: 500; color: var(--dc-ink-500); }
-.dc-hoy__cifras b { font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.dc-hoy__cifras b { font-family: 'Inter Variable', 'Inter', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
 .dc-cita { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--dc-line); }
 .dc-cita:last-child { border-bottom: 0; }
@@ -768,7 +768,7 @@
   background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 3c-2.2 0-4 1.8-4 4.2 0 2 .8 3.3 1.3 5 .6 2 .7 4.4 1.3 6.3.4 1.3 1 2.5 2 2.5 1.6 0 1.5-3.4 2.1-5.1.3-.9.8-1.4 2.3-1.4s2 .5 2.3 1.4c.6 1.7.5 5.1 2.1 5.1 1 0 1.6-1.2 2-2.5.6-1.9.7-4.3 1.3-6.3.5-1.7 1.3-3 1.3-5C21 4.8 19.2 3 17 3c-2 0-3 1.2-5 1.2S9 3 7 3z'/%3E%3C/svg%3E");
 }
 .dc-hero__txt { position: relative; z-index: 1; display: grid; gap: 6px; align-content: center; max-width: 560px; }
-.dc-hero__fecha { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+.dc-hero__fecha { font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: rgba(255,255,255,.7); }
 .dc-hero h2 { margin: 0; color: #fff; font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .dc-hero p { margin: 0; font-size: 15px; color: rgba(255,255,255,.85); line-height: 1.5; }
 .dc-hero__btn { all: unset; cursor: pointer; justify-self: start; margin-top: 10px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: #fff; color: var(--dc-brand-600); font-size: 13px; font-weight: 700; box-shadow: 0 8px 20px -10px rgba(0,0,0,.4); }
@@ -912,7 +912,7 @@
   background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.3'%3E%3Crect x='3' y='4.5' width='18' height='16' rx='3'/%3E%3Cpath d='M3 9.5h18M8 2.5v4M16 2.5v4'/%3E%3C/svg%3E");
 }
 .dc-ag-hero__top { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
-.dc-ag-hero__eyebrow { display: block; font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: rgba(255,255,255,.68); margin-bottom: 4px; }
+.dc-ag-hero__eyebrow { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none; color: rgba(255,255,255,.68); margin-bottom: 4px; }
 .dc-ag-hero__dia h2 { margin: 0; color: #fff; font-size: 26px; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .dc-ag-hero__dia p { margin: 4px 0 0; font-size: 13.5px; color: rgba(255,255,255,.82); }
 .dc-ag-hero__prox { min-width: 260px; max-width: 420px; padding: 12px 16px; border-radius: 16px; background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); backdrop-filter: blur(6px); }
@@ -1062,7 +1062,7 @@
 .dc-esp-sug__txt { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; font-size: 13px; color: var(--dc-ink-700); }
 .dc-esp-sug__txt > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-esp-sug__txt strong { color: var(--dc-ink-900); font-weight: 650; }
-.dc-esp-sug__eti { flex-shrink: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--dc-brand-600); }
+.dc-esp-sug__eti { flex-shrink: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--dc-brand-600); }
 .dc-esp-sug > .dc-btn { flex-shrink: 0; }
 .dc-esp-fila.is-sug { background: linear-gradient(90deg, rgba(14,140,149,.07), transparent 60%); box-shadow: inset 3px 0 0 #0E8C95; }
 @media (max-width: 767px) {
@@ -1079,3 +1079,37 @@
 .dc-esp-ofrecer { all: unset; box-sizing: border-box; cursor: pointer; width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; color: var(--dc-brand-600); background: #fff; box-shadow: inset 0 0 0 1px var(--dc-line); transition: background .15s, box-shadow .15s; }
 .dc-esp-ofrecer:hover { background: var(--dc-brand-050, #E6F6F6); box-shadow: inset 0 0 0 1px #B9E3E4; }
 .dc-esp-ofrecer:focus-visible { box-shadow: var(--dc-focus); }
+
+/* ======================================================================
+   TIPOGRAFÍA — Manrope para títulos y cifras, Inter para leer.
+   Todo en tipo oración: las etiquetas se distinguen por peso y color.
+   ====================================================================== */
+h1, h2, h3, .dc-title, .dc-top__titulo, .dc-sb__name,
+.dc-kpi__value, .dc-hero h2, .dc-hero__cifras b, .dc-hoy__cifras b,
+.dc-ag-hero h2, .dc-ag-hero__cifras b, .dc-ag-hero__hora, .dc-hoy__cab h3,
+.dc-esp-chip b, .dc-hoy__pct, .dc-pg .dc-kpi__value, .dc-pg h2, .dc-pg h3 {
+  font-family: var(--dc-font-title);
+  letter-spacing: -.02em;
+}
+.dc-top__titulo { font-size: 19px; font-weight: 700; }
+.dc-sb__name { letter-spacing: -.025em; }
+.dc-kpi__value, .dc-hero__cifras b, .dc-ag-hero__cifras b, .dc-ag-hero__hora { font-weight: 750; font-variant-numeric: tabular-nums lining-nums; }
+.dc-hoy__cab h3, .dc-hero h2, .dc-ag-hero h2 { font-weight: 700; }
+
+/* Etiquetas pequeñas en tipo oración (antes EN MAYÚSCULAS espaciadas). */
+.dc-sb__titulo { font-size: 12px !important; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: 0; padding: 0 10px 4px; }
+.dc-hero__fecha, .dc-ag-hero__eyebrow { font-size: 12px; font-weight: 500; letter-spacing: 0; color: rgba(255,255,255,.72); }
+.dc-esp-sug__eti { font-size: 12px; font-weight: 700; letter-spacing: 0; }
+
+/* Texto de lectura: Inter respira mejor con interlineado algo mayor. */
+.dc-tarea__txt span, .dc-kpi__sub, .dc-kpi__label { letter-spacing: -.003em; }
+table, .dc-table-row { font-feature-settings: "tnum", "cv05", "cv08"; }
+/* Manrope: sus dígitos tabulares separan el "1" ("1 1"); en cifras grandes
+   van proporcionales. Las tablas siguen con dígitos tabulares de Inter. */
+.dc-kpi__value, .dc-hero__cifras b, .dc-ag-hero__cifras b, .dc-ag-hero__hora,
+.dc-hoy__cifras b, .dc-esp-chip b, .dc-hoy__pct, .dc-pg .dc-kpi__value {
+  font-variant-numeric: lining-nums proportional-nums !important;
+}
+.dc-top .dc-top__titulo { font-weight: 700; }
+h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.015em; }
+.dc-hero h2, .dc-ag-hero h2 { font-weight: 750; }
