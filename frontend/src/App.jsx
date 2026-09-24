@@ -58,6 +58,10 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import {DIAS_SEM, EDAD_PEDIATRICA, EDAD_TRANSICION, EmblemaNino, HORAS_SEL, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, etapaFicha, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, acentoFicha, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, WARM, addDays, calcEdad, colorDe, cortaSede, espsDe, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, minutosViaje, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
+/** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
+    con VITE_DEMO=1 (nunca en la de producción normal). */
+const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
+
 function Login({ onLogin }) {
   const [modo, setModo] = useState("login");
   const [user, setUser] = useState("");
@@ -74,7 +78,7 @@ function Login({ onLogin }) {
   const [regPac, setRegPac] = useState({ nombre: "", dni: "", telefono: "" });
   const [verDemo, setVerDemo] = useState(false);
   // NEW-44/45: panel demo y portal hardcodeado solo fuera de producción.
-  const demoLoginOk = !import.meta.env.PROD;
+  const demoLoginOk = MODO_DEMO;
 
   const [cargando, setCargando] = useState(false);
   // Convierte UUID de sede a número (1 o 2) para compatibilidad con el resto del frontend
@@ -10677,7 +10681,7 @@ const NeuralDentalBackground = () => {
   );
 };
 /** Sesión de los accesos de demostración: solo existe fuera de producción. */
-const esSesionDemo = (u) => !import.meta.env.PROD && !!u?.demo;
+const esSesionDemo = (u) => MODO_DEMO && !!u?.demo;
 
 export default function App() {
   const [usuario, setUsuario] = useState(() => { try { return JSON.parse(localStorage.getItem("dc_usuario")) || null; } catch { return null; } });

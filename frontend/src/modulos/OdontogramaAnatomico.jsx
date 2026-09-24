@@ -43,7 +43,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     if (pacienteHc) q.set("hc", String(pacienteHc));
     if (pacienteSede) q.set("sede", String(pacienteSede));
     q.set("theme", "dark");
-    return `/odontograma-anatomico/index.html?${q.toString()}`;
+    return `${import.meta.env.BASE_URL}odontograma-anatomico/index.html?${q.toString()}`;
   }, [pacienteId, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede]);
 
   useEffect(() => {

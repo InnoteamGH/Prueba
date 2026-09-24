@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "build:demo": "VITE_DEMO=1 vite build --base ./ --outDir dist-demo",
     "test": "node --test src/util/fechaLima.test.js src/util/formatearFDI.test.js src/util/planInversion.test.js src/util/planInversionPaginacion.test.js src/util/odontogramaBridge.test.js src/util/odontogramaHydrate.test.js src/util/odontogramaAnatomicoDom.test.js src/util/conformanceChecklist.test.js src/api/clientClinicoGuard.test.js src/api/clientClinicaShape.test.js src/FichaMedica.sprint4.test.js src/comun.kpi.test.js src/comun.color.test.js src/sprint0.matriz.test.js src/spec-v7.matriz.test.js src/spec-v8.matriz.test.js src/modulos/panelGerencialUtil.test.js src/modulos/produccionComisionesUtil.test.js"
   },
   "dependencies": {

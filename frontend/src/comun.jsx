@@ -642,10 +642,10 @@ export function EmblemaNino({ size = 44, dormido = false }) {
    Las ilustraciones las elige la clínica: aquí no se incluye ninguna, porque las
    de bancos de imágenes necesitan licencia y esa decisión no es del código. */
 const AVATAR_GENERICO = {
-  mujer: "/avatares/mujer.png",
-  hombre: "/avatares/hombre.png",
-  nina: "/avatares/nina.png",
-  nino: "/avatares/nino.png",
+  mujer: `${import.meta.env.BASE_URL}avatares/mujer.png`,
+  hombre: `${import.meta.env.BASE_URL}avatares/hombre.png`,
+  nina: `${import.meta.env.BASE_URL}avatares/nina.png`,
+  nino: `${import.meta.env.BASE_URL}avatares/nino.png`,
 };
 
 /** Qué ilustración le toca a este paciente. */
