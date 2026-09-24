@@ -182,7 +182,7 @@ export const modDeVista = (v) => VISTA_ALIAS[v] || v;
 export const MODULOS = [
   { id: "gerencial",    label: "Dashboard gerencial" },
   { id: "reportes",     label: "Producción y comisiones" },
-  { id: "dashboard",    label: "Hoy (resumen del día)" },
+  { id: "dashboard",    label: "Pendientes de hoy" },
   { id: "whatsapp",     label: "WhatsApp + IA" },
   { id: "agenda",       label: "Agenda" },
   { id: "disponibilidad", label: "Mi disponibilidad" },

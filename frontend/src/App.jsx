@@ -393,277 +393,7 @@ function Gerencial({ citas, sede }) {
   return <PanelGerencial citas={citas} sede={sede} />;
 }
 
-/* ---- Dashboard operativo (otros roles) ---- */
-/* ---- Panel de operaciones de recepción: acciones primero, escaneable en 5 s ---- */
-function RecepcionHoy({ ch, citas, proxima, ocupacion, libres, capacidad, conectado, notify = () => {}, enviarConfMañana, onReload = () => {} }) {
-  const [caja, setCaja] = useState(null);
-  const [convs, setConvs] = useState([]);
-  const [done, setDone] = useState(() => new Set());   // tareas marcadas como hechas (local)
-  const [saliendo, setSaliendo] = useState(() => new Set());   // tareas animándose al salir
-  const [verTodo, setVerTodo] = useState(false);
-  const [ficha, setFicha] = useState(null);
-  const hacerTarea = (t) => { setSaliendo((s) => new Set(s).add(t.id)); setTimeout(() => t.run(), 240); };
-  useEffect(() => {
-    if (!conectado) return;
-    api.caja().then((r) => setCaja(r || null)).catch(() => {});
-    api.conversaciones.listar().then((r) => setConvs(r || [])).catch(() => {});
-  }, [conectado]);
-  const marcarHecho = (id) => setDone((s) => new Set(s).add(id));
-  const confirmarCita = (id) => { if (!conectado) { notify("Disponible al iniciar sesión."); return; } api.citas.cambiarEstado(id, "confirmada").then(() => { notify("Cita confirmada."); onReload(); }).catch(() => notify("No se pudo confirmar.")); };
-  const abrirFicha = (pid, nom) => { if (!conectado || !pid) { notify(`${nom || "El paciente"}: ábrelo en el módulo Pacientes.`); return; } api.pacientes.ficha360(pid).then((d) => setFicha(d)).catch(() => notify("No se pudo cargar la ficha.")); };
-  const abrirWa = (pid, nom) => { if (!conectado || !pid) { notify("Escríbele desde el módulo WhatsApp."); return; } api.pacientes.ver(pid).then((p) => { const tel = (p && p.telefono || "").replace(/\D/g, ""); if (tel) window.open(`https://wa.me/${tel}`, "_blank"); else notify(`${nom || "El paciente"} no tiene teléfono registrado.`); }).catch(() => notify("No se pudo abrir WhatsApp.")); };
-  const hace = (iso) => { try { const d = (Date.now() - new Date(iso).getTime()) / 60000; if (d < 1) return "ahora"; if (d < 60) return `hace ${Math.round(d)} min`; if (d < 1440) return `hace ${Math.round(d / 60)} h`; return `hace ${Math.round(d / 1440)} d`; } catch { return ""; } }; // eslint-disable-line
-  const nombre = (auth.sesion && (auth.sesion.nombre || "").split(" ")[0]) || "";
-  const h = new Date().getHours();
-  const saludo = h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
-
-  const porConfirmar = ch.filter((c) => c.estado === "pendiente");
-  const llegadasPend = ch.filter((c) => c.estado === "confirmada" && !c.llegada);
-  const atendidas = ch.filter((c) => c.estado === "atendida");
-  const confirmadas = ch.filter((c) => c.estado === "confirmada");
-  const noShow = ch.filter((c) => c.estado === "cancelada" || c.estado === "no_show");
-  const manana = citas.filter((c) => c.fecha === addDays(1) && (c.estado === "pendiente" || c.estado === "confirmada")).length;
-  const porCobrar = (caja && Array.isArray(caja.porCobrar)) ? caja.porCobrar : [];
-  const montoCobrar = porCobrar.reduce((s, p) => s + (Number(p.saldo) || 0), 0);
-  // Sobre las citas que siguen en pie: contar las canceladas y los no-show en el
-  // denominador hacía imposible el 100%, porque una cita cancelada nunca se confirma.
-  // Una recepción impecable con dos cancelaciones de doce se quedaba en 83% y en ámbar.
-  const enPie = ch.filter((c) => c.estado !== "cancelada" && c.estado !== "no_show");
-  const tasaConf = enPie.length ? Math.round((confirmadas.length + atendidas.length) * 100 / enPie.length) : 0;
-  const msgsPend = [...convs].filter((c) => (c.porResponder || 0) > 0).sort((a, b) => (b.actualizadoEn || "").localeCompare(a.actualizadoEn || "")).slice(0, 4);
-
-  const checkin = (id) => { if (!conectado) { notify("Disponible al iniciar sesión."); return; } api.citas.checkin(id).then(() => { notify("Llegada registrada. Pasa a sala de espera."); onReload(); }).catch(() => notify("No se pudo registrar la llegada.")); };
-
-  const card = DS.card;
-  const cardHero = { background: "linear-gradient(160deg,var(--dc-white) 0%,var(--dc-white) 100%)", borderRadius: "var(--dc-r-lg)", border: `1px solid ${tint(DS.c.primary, 0.102)}`, boxShadow: `0 14px 40px ${tint(DS.c.primary, 0.071)}` };
-  const lbl = { fontSize: 15, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 };
-  const iconChip = (Ic, col) => <span style={{ width: 26, height: 26, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.086), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={15} strokeWidth={1.75} /></span>;
-  const stat = (l, v, danger) => <div style={{ minWidth: 60 }}><div style={{ fontSize: 24, fontWeight: 700, color: danger && v > 0 ? RED : NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{v}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 4 }}>{l}</div></div>;
-
-  // To-do accionable: cada tarea ejecuta una acción real o se marca hecha localmente.
-  // Va ANTES que los avisos del asistente porque el asistente necesita saber qué ya
-  // está en la lista para no repetirlo.
-  let tareas = [];
-  if (manana > 0) tareas.push({ id: "conf-manana", c: DS.c.info, txt: `Confirmar ${pluralEs(manana, "cita", "citas")} de mañana`, sub: "recordatorios por WhatsApp", run: () => enviarConfMañana() });
-  porConfirmar.forEach((c) => tareas.push({ id: "cf-" + c.id, c: DS.c.warning, txt: `Confirmar cita de ${c.paciente}`, sub: `hoy · ${c.hora}`, run: () => confirmarCita(c.id) }));
-  llegadasPend.forEach((c) => tareas.push({ id: "chk-" + c.id, c: DS.c.primary, txt: `Registrar llegada de ${c.paciente}`, sub: `cita ${c.hora}`, run: () => checkin(c.id) }));
-  porCobrar.forEach((p) => tareas.push({ id: "cob-" + p.pacienteId, c: DS.c.error, txt: `Cobrar a ${p.paciente}`, sub: "hoy", val: `S/ ${(Number(p.saldo) || 0).toLocaleString()}`, run: () => { marcarHecho("cob-" + p.pacienteId); notify("Ábrelo en el módulo Cobros para registrar el pago."); } }));
-  noShow.forEach((c) => tareas.push({ id: "rea-" + c.id, c: "var(--dc-purple)", txt: `Reagendar a ${c.paciente}`, sub: "inasistencia de hoy", run: () => { marcarHecho("rea-" + c.id); notify("Reagéndalo desde la Agenda."); } }));
-  tareas = tareas.filter((t) => !done.has(t.id));
-
-  // Asistente: SOLO lo que no está ya en "¿Qué hago ahora?". Confirmaciones, llegadas y
-  // cobros tienen su tarea con botón; repetirlos aquí en prosa no añade nada y hacía
-  // parecer que eran dos cosas distintas. Quedan los avisos sin acción directa.
-  const insights = [];
-  if (conectado && msgsPend.length > 0) insights.push([MessageSquare, "var(--dc-ok-700)", true, `${msgsPend.length} mensaje(s) de WhatsApp esperan respuesta.`]);
-  if (libres >= 3) insights.push([CalendarCheck, WARM, false, `Todavía quedan ${libres} horarios libres hoy; buen momento para promover evaluaciones.`]);
-  if (noShow.length > 0) insights.push([UserCheck, "var(--dc-purple)", false, `${pluralEs(noShow.length, "paciente", "pacientes")} no asistió hoy; conviene reagendarlos.`]);
-  // La felicitación solo cuando de verdad no queda nada: antes salía "¡Buen trabajo!"
-  // con tres tareas pendientes justo encima.
-  if (tareas.length === 0 && ch.length > 0) insights.push([CheckCircle2, "var(--dc-ok-700)", false, "No queda nada pendiente del día. ¡Buen trabajo!"]);
-  if (insights.length === 0) insights.push([Sparkles, "var(--dc-ok-700)", false, "Todo tranquilo por ahora. Buen momento para ponerte al día."]);
-
-  const ordenadas = [...ch].sort((a, b) => a.hora.localeCompare(b.hora));
-  const primera = ordenadas[0];
-  const espera = ch.filter((c) => c.llegada && c.estado !== "atendida" && c.estado !== "cancelada" && c.estado !== "no_show");
-  const agendaVista = verTodo ? ordenadas : ordenadas.slice(0, 5);
-  const saludoSub = ch.length === 0
-    ? "Hoy la agenda está libre. Buen momento para contactar pacientes pendientes o promover evaluaciones."
-    : (porConfirmar.length > 0 || porCobrar.length > 0)
-      ? <>Hoy tienes <b style={{ color: NAVY }}>{ch.length}</b> {ch.length === 1 ? "cita" : "citas"}. {porConfirmar.length > 0 ? <>{pluralEs(porConfirmar.length, "cita", "citas")} por confirmar</> : null}{porConfirmar.length > 0 && porCobrar.length > 0 ? " y " : null}{porCobrar.length > 0 ? <>{pluralEs(porCobrar.length, "cobro pendiente", "cobros pendientes")}</> : null}.</>
-      : <>Hoy tienes <b style={{ color: NAVY }}>{ch.length}</b> {ch.length === 1 ? "cita" : "citas"}. La primera es a las <b style={{ color: NAVY }}>{primera ? primera.hora : "—"}</b>. Todo listo para empezar.</>;
-
-  const accion = (Ic, txt, onClick, primary) => <button onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "none", background: "none", cursor: "pointer", color: primary ? DS.c.primary : "var(--dc-ink-400)", fontSize: 13, fontWeight: 600, padding: "4px 2px" }}><Ic size={15} strokeWidth={1.75} /> {txt}</button>;
-  // Hero contextual: el mensaje y el color reaccionan al estado real del día.
-  const jornadaPct = ch.length ? Math.round(atendidas.length * 100 / ch.length) : 0;
-  const todoAlDia = ch.length > 0 && porConfirmar.length === 0 && porCobrar.length === 0 && llegadasPend.length === 0;
-  let heroGrad, heroMsg, heroEmoji;
-  if (todoAlDia) {
-    heroGrad = "linear-gradient(120deg,var(--dc-teal),var(--dc-primary-alt))"; heroEmoji = "👏";
-    heroMsg = "Excelente trabajo: todo está al día. No hay pendientes por ahora.";
-  } else if (ch.length === 0) {
-    heroGrad = "linear-gradient(120deg,var(--dc-teal),var(--dc-primary-alt))"; heroEmoji = "✨";
-    heroMsg = "Hoy la agenda está tranquila. Buen momento para contactar pacientes o promover evaluaciones.";
-  } else if (ocupacion >= 85) {
-    heroGrad = "linear-gradient(120deg,var(--dc-warn-700),var(--dc-red))"; heroEmoji = "🔴";
-    heroMsg = `La agenda está casi llena (${pluralEs(ch.length, "cita", "citas")}). Prioriza las confirmaciones y las llegadas.`;
-  } else if (ch.length >= 8) {
-    heroGrad = "linear-gradient(120deg,var(--dc-warn-600),var(--dc-warn-700))"; heroEmoji = "⚡";
-    heroMsg = `Hoy será un día intenso: ${ch.length} pacientes programados. ${porConfirmar.length > 0 ? `${porConfirmar.length} por confirmar.` : "Todo listo."}`;
-  } else {
-    heroGrad = "linear-gradient(120deg,var(--dc-teal),var(--dc-primary-alt))"; heroEmoji = "👋";
-    heroMsg = (porConfirmar.length > 0 || porCobrar.length > 0)
-      ? `Hoy atenderás ${pluralEs(ch.length, "paciente", "pacientes")}. ${[porConfirmar.length > 0 ? `${porConfirmar.length} por confirmar` : null, porCobrar.length > 0 ? `${pluralEs(porCobrar.length, "cobro pendiente", "cobros pendientes")}` : null].filter(Boolean).join(" · ")}.`
-      : `Hoy atenderás ${pluralEs(ch.length, "paciente", "pacientes")}. Todo listo para empezar.`;
-  }
-  return (
-    <div style={{ display: "grid", gap: 18 }}>
-      {/* HERO — compacto y contextual */}
-      <div style={{ borderRadius: "var(--dc-r-lg)", padding: "18px 24px", background: heroGrad, color: "#fff", position: "relative", overflow: "hidden", boxShadow: DS.sh.md, transition: "background .4s ease" }}>
-        <Smile size={150} style={{ position: "absolute", right: -14, bottom: -48, color: "rgba(255,255,255,.08)" }} strokeWidth={1.2} />
-        <div style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 24, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ minWidth: 240, flex: 1 }}>
-            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: DISPLAY_FONT, letterSpacing: -.3 }}>{saludo}{nombre ? `, ${nombre}` : ""} {heroEmoji}</div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,.9)", marginTop: 3, maxWidth: 620 }}>{heroMsg}</div>
-            {/* Antes había aquí tres cifras -libres, cobros, WhatsApp- que el bloque
-                "Resumen del día", a dos dedos de distancia, ya da con más contexto.
-                La cabecera se queda con lo que solo ella dice: cómo va la jornada. */}
-          </div>
-          {ch.length > 0 && (
-            <div style={{ minWidth: 170, flexShrink: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "rgba(255,255,255,.82)", marginBottom: 6 }}><span>Tu jornada · {atendidas.length}/{ch.length}</span><b style={{ color: "#fff" }}>{jornadaPct}%</b></div>
-              <div style={{ height: 6, background: "rgba(255,255,255,.22)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: jornadaPct + "%", height: "100%", background: "#fff", borderRadius: "var(--dc-r-full)", transition: "width .5s ease" }} /></div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* FILA 1 — Próximo paciente (protagonista) + apoyo derecha */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.7fr) minmax(0,1fr)", gap: 18, alignItems: "start" }} className="dc-rec-grid">
-        {/* Próximo paciente — HÉROE */}
-        <div style={{ ...cardHero, padding: 30, position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", left: 0, top: 24, bottom: 24, width: 4, borderRadius: "var(--dc-r-full)", background: `linear-gradient(180deg,${DS.c.accent},${DS.c.primary})` }} />
-          <div style={{ ...lbl, color: "var(--dc-ink-400)", fontWeight: 600, fontSize: 13, marginBottom: 16, paddingLeft: 12 }}>Próximo paciente</div>
-          {proxima ? (
-            <div style={{ paddingLeft: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
-                <div style={{ fontSize: 44, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: .9, letterSpacing: -1.5 }}>{proxima.hora}</div>
-                <div style={{ flex: 1, minWidth: 150 }}>
-                  <div style={{ fontSize: 24, fontWeight: 600, color: NAVY, lineHeight: 1.1 }}>{proxima.paciente}</div>
-                  <div style={{ fontSize: 15, color: "var(--dc-ink-400)", marginTop: 4 }}>{proxima.motivo || proxima.especialidad || "Consulta"}{proxima.medico ? ` · ${proxima.medico}` : ""}</div>
-                  <div style={{ marginTop: 9, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: proxima.estado === "confirmada" || proxima.estado === "atendida" ? "var(--dc-ok-700)" : proxima.estado === "cancelada" ? RED : "var(--dc-ink-400)" }}>
-                    {(proxima.estado === "confirmada" || proxima.estado === "atendida") && <CheckCircle2 size={15} strokeWidth={1.75} />} {(ESTADO_BADGE[proxima.estado] || {}).l || proxima.estado}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--dc-bg)" }}>
-                {proxima.estado === "confirmada" && !proxima.llegada && accion(CheckCircle2, "Llegó", () => checkin(proxima.id), true)}
-                {accion(MessageSquare, "WhatsApp", () => abrirWa(proxima.pacienteId, proxima.paciente))}
-                {accion(User, "Ficha", () => abrirFicha(proxima.pacienteId, proxima.paciente))}
-              </div>
-            </div>
-          ) : (
-            <div style={{ paddingLeft: 12 }}>
-              <div style={{ fontSize: 20, fontWeight: 600, color: NAVY }}>Tu agenda está libre por ahora ✨</div>
-              <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 4 }}>Puedes aprovechar este momento para:</div>
-              <div style={{ display: "grid", gap: 11, marginTop: 16 }}>
-                {[[Sparkles, WARM, "Promover evaluaciones a pacientes inactivos", null], [Wallet, WARM, porCobrar.length ? `Revisar ${porCobrar.length} cobro(s) pendiente(s)` : "Revisar los cobros del día", null], [BellRing, DS.c.primary, "Confirmar las citas de mañana", () => enviarConfMañana && enviarConfMañana()], [MessageSquare, "var(--dc-ok-700)", msgsPend.length ? `Responder ${msgsPend.length} chat(s) de WhatsApp` : "Contactar pacientes por WhatsApp", null]].map(([Ic, col, txt, run], i) => (
-                  <div key={i} onClick={run || undefined} style={{ display: "flex", alignItems: "center", gap: 11, cursor: run ? "pointer" : "default" }}>
-                    {iconChip(Ic, col)}<span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{txt}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Apoyo derecha: sala de espera (si hay) + WhatsApp compacto */}
-        <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
-          {espera.length > 0 && (
-            <div style={{ ...card, padding: 20, background: "linear-gradient(160deg,var(--dc-white),#fff)", border: "1px solid rgba(22,163,74,.14)" }}>
-              <div style={lbl}>Sala de espera <span style={{ marginLeft: "auto", fontWeight: 600, color: "var(--dc-ok-700)", fontSize: 15 }}>{espera.length}</span></div>
-              <div style={{ display: "grid", gap: 11 }}>{espera.slice(0, 4).map((c) => { const col = colorDe(c.paciente); return (
-                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(c.paciente)}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.paciente}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>cita {c.hora}</div></div>
-                </div>
-              ); })}</div>
-            </div>
-          )}
-          {/* Resumen del día — una sola tarjeta */}
-          <div style={{ ...card, padding: 20 }}>
-            <div style={lbl}>Resumen del día</div>
-            <div style={{ display: "grid" }}>
-              {[[Calendar, DS.c.info, "Agenda", pluralEs(ch.length, "cita", "citas"), NAVY], [MessageSquare, DS.c.success, "WhatsApp", conectado ? (msgsPend.length ? `${msgsPend.length} sin responder` : "al día") : "—", conectado && !msgsPend.length ? "var(--dc-ok-700)" : NAVY], [Wallet, DS.c.error, "Caja", montoCobrar > 0 ? `S/ ${montoCobrar.toLocaleString()}` : "al día", montoCobrar > 0 ? "var(--dc-warn-600)" : "var(--dc-ok-700)"], [CheckCircle2, "var(--dc-ink-200)", "Confirmación", `${tasaConf}%`, tasaConf >= 90 ? "var(--dc-ok-700)" : NAVY]].map(([Ic, col, t, v, vc], i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 2px", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
-                  <Ic size={16} strokeWidth={1.75} color={col} style={{ flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: 13, color: DS.c.text }}>{t}</span>
-                  <b style={{ fontSize: 15, color: vc, fontFamily: DISPLAY_FONT }}>{v}</b>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* FILA 2 — Tareas (protagonista) + apoyo: asistente */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.7fr) minmax(0,1fr)", gap: 18, alignItems: "start" }} className="dc-rec-grid">
-        {/* ¿Qué hago ahora? */}
-        <div style={{ ...card, padding: 26 }}>
-          <div style={lbl}>¿Qué hago ahora?{tareas.length > 0 && <span style={{ marginLeft: "auto", fontWeight: 600, color: "var(--dc-ink-400)", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>{tareas.length} pendiente(s)</span>}</div>
-          <div style={{ display: "grid", gap: 2 }}>
-            {tareas.length === 0 && <div style={{ fontSize: 15, color: "var(--dc-ok-700)" }}>✓ Todo hecho. Sin tareas pendientes.</div>}
-            {tareas.slice(0, 8).map((t, i) => { const sale = saliendo.has(t.id); return (
-              <div key={t.id} onClick={() => !sale && hacerTarea(t)} style={{ display: "flex", alignItems: "center", gap: 13, padding: "12px 2px", borderTop: i ? "1px solid var(--dc-bg)" : "none", cursor: "pointer", opacity: sale ? 0 : 1, transform: sale ? "translateY(-8px)" : "none", transition: "opacity .26s ease, transform .26s ease" }} title="Marcar / ejecutar">
-                <span style={{ width: 19, height: 19, borderRadius: "var(--dc-r-full)", border: sale ? "none" : `2px solid ${tint(t.c, 0.333)}`, background: sale ? DS.c.success : "transparent", color: "#fff", flexShrink: 0, display: "grid", placeItems: "center" }}>{sale && <Check size={12} strokeWidth={1.75} />}</span>
-                <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 600, color: DS.c.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.txt}</div><div style={{ fontSize: 12, color: DS.c.faint }}>{t.sub}</div></div>
-                {t.val && <span style={{ fontSize: 15, fontWeight: 700, color: DS.c.ink, fontFamily: DISPLAY_FONT, flexShrink: 0 }}>{t.val}</span>}
-              </div>
-            ); })}
-            {tareas.length > 8 && <div style={{ fontSize: 12, color: "var(--dc-ink-400)", paddingTop: 8 }}>+{tareas.length - 8} tarea(s) más</div>}
-          </div>
-        </div>
-
-        {/* Apoyo derecha: Resumen IA compacto + KPIs discretos */}
-        <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
-          <div style={{ ...card, padding: 22, background: "linear-gradient(150deg,var(--dc-white) 0%,var(--dc-bg) 100%)", border: `1px solid ${tint(DS.c.primary, 0.125)}` }}>
-            <div style={{ ...DS.label, marginBottom: 6 }}><span style={{ width: 26, height: 26, borderRadius: "var(--dc-r-sm)", background: `linear-gradient(135deg,${DS.c.primary},${DS.c.primaryDark})`, display: "grid", placeItems: "center", flexShrink: 0 }}><Bot size={15} strokeWidth={1.75} color="#fff" /></span> Asistente Dento <span style={{ marginLeft: 6, width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: DS.c.success }} /></div>
-            <div style={{ fontSize: DS.f.cap, color: DS.c.text, marginBottom: 16 }}>Esto es lo que veo para hoy 👇</div>
-            <div style={{ display: "grid", gap: 11 }}>{insights.slice(0, 4).map(([Ic, col, urgente, t], i) => (
-              <div key={i} style={{ fontSize: 13, color: urgente ? NAVY : "var(--dc-ink-400)", fontWeight: urgente ? 600 : 400, display: "flex", gap: 10, alignItems: "center", lineHeight: 1.35 }}>
-                {iconChip(Ic, col)}
-                <span>{t}</span>
-              </div>
-            ))}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* FILA 3 — Agenda a lo ancho (solo si hay citas) */}
-      {ch.length > 0 && (
-      <div style={{ ...card, padding: 26 }}>
-        <div style={lbl}>Agenda de hoy<span style={{ marginLeft: "auto", fontWeight: 600, color: "var(--dc-ink-400)", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>{verTodo ? `${ch.length} citas` : `próximas ${Math.min(5, ch.length)} de ${ch.length}`}</span></div>
-        <div style={{ display: "grid", gap: 2 }}>
-          {agendaVista.map((c) => { const esProx = proxima && c.id === proxima.id; return (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 4px", borderTop: "1px solid var(--dc-bg)" }}>
-              <div style={{ fontWeight: 600, color: esProx ? DS.c.primary : "var(--dc-ink-400)", width: 52, flexShrink: 0, fontSize: 15 }}>{c.hora}</div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.paciente}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.motivo || c.especialidad || "Consulta"}</div></div>
-              {c.estado === "confirmada" && !c.llegada
-                ? <button onClick={() => checkin(c.id)} title="Registrar llegada" style={{ border: "none", background: "none", color: "var(--dc-ok-700)", cursor: "pointer", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}><CheckCircle2 size={14} strokeWidth={1.75} /> Llegó</button>
-                : <span style={{ fontSize: 13, fontWeight: 600, color: (ESTADO_BADGE[c.estado] || {}).fg || "var(--dc-ink-400)", flexShrink: 0 }}>{(ESTADO_BADGE[c.estado] || {}).l || c.estado}</span>}
-            </div>
-          ); })}
-          {ch.length > 5 && <button onClick={() => setVerTodo((v) => !v)} style={{ border: "none", background: "none", color: DS.c.primary, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "12px 0 2px", textAlign: "left" }}>{verTodo ? "Ver menos" : `Ver agenda completa (${ch.length})`}</button>}
-        </div>
-      </div>
-      )}
-
-      {ficha && (
-        <Modal icon={<User size={20} strokeWidth={1.75} />} titulo={ficha.paciente?.nombre || "Ficha del paciente"} sub={[ficha.paciente?.dni ? `DNI ${ficha.paciente.dni}` : null, ficha.paciente?.telefono].filter(Boolean).join(" · ")} onClose={() => setFicha(null)} maxW={560}>
-          <div style={{ display: "grid", gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: NAVY, textTransform: "uppercase", letterSpacing: .4, marginBottom: 8 }}>Últimas citas</div>
-              {(ficha.citas || []).length === 0 ? <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Sin citas registradas.</div> : (ficha.citas || []).slice(0, 6).map((c, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: i ? "1px solid var(--dc-bg)" : "none", fontSize: 13 }}>
-                  <span style={{ color: "var(--dc-ink-700)" }}>{c.fecha || "—"} {c.hora ? `· ${c.hora}` : ""} · {c.especialidad || "—"}</span>
-                  <span style={{ fontWeight: 600, color: NAVY }}>{(ESTADO_BADGE[c.estado] || {}).l || c.estado}</span>
-                </div>
-              ))}
-            </div>
-            {(ficha.resenas || []).length > 0 && (
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: NAVY, textTransform: "uppercase", letterSpacing: .4, marginBottom: 8 }}>Reseñas</div>
-                {(ficha.resenas || []).slice(0, 3).map((r, i) => (
-                  <div key={i} style={{ padding: "8px 0", borderTop: i ? "1px solid var(--dc-bg)" : "none", fontSize: 13, color: "var(--dc-ink-700)" }}>{r.nps != null ? `NPS ${r.nps} · ` : ""}{r.comentario || "—"}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
+/* ---- Pendientes de hoy: bandeja de tareas accionables para todos los roles ---- */
 
 function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {}, onIr = () => {}, horarioClinica = { horario: {}, feriados: [] }, sedeActiva = "all" }) {
   const enviarConfMañana = () => {
@@ -905,447 +635,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
     </div>
   );
   const kpiBody = (l, v, rows) => <div onClick={() => setDet({ titulo: l, rows: rows || [] })} style={{ cursor: "pointer", height: "100%", display: "flex", alignItems: "center" }}><div style={{ fontSize: 32, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{v}</div></div>;
-  const widgets = [
-    // Antes: seis tarjetas de un número cada una, que había que sumar mentalmente para
-    // saber cómo iba el día. Ahora una sola, que se lee de un vistazo.
-    { id: "resumenDia", title: "Resumen del día", icon: Calendar, color: NAVY, w: 2, h: 1, render: () => (
-      <div style={{ height: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(84px,1fr))", gap: "10px 8px", alignContent: "center" }}>
-        {kpis.map(([l, v, Ic, c, rows]) => (
-          <div key={l} onClick={() => setDet({ titulo: l, rows: rows || [] })} style={{ cursor: "pointer", minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: DISPLAY_FONT, lineHeight: 1.1 }}>{v}</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l}</div>
-          </div>
-        ))}
-      </div>
-    ) },
-    ...(esMed ? [(() => {
-      const miMed = MEDICOS.find((m) => m.id === 1) || MEDICOS[0];
-      const vivo = miProd && miProd.esMedico ? miProd : null;
-      // Con sesión abierta y sin respuesta del backend NO se cae a los 9200 de la demo:
-      // un médico no puede distinguir esa cifra de la suya. Se muestra "—".
-      const mesProd = vivo ? (Number(vivo.produccionMes) || 0) : (conectado ? null : 9200);
-      const metaMed = vivo ? (Number(vivo.meta) || null) : (conectado ? null : (miMed.meta || null));
-      const pct = (mesProd != null && metaMed > 0) ? Math.min(100, Math.round((mesProd / metaMed) * 100)) : null;
-      const c = pct == null ? "var(--dc-ink-400)" : pct >= 100 ? "var(--dc-ok-700)" : pct >= 70 ? "var(--dc-warn-600)" : DS.c.primary;
-      const R = 52, C = 2 * Math.PI * R; return { id: "mimeta", title: "Mi meta del mes", icon: CalendarCheck, color: c, w: 1, h: 2, render: () => (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
-        <svg viewBox="0 0 140 140" style={{ width: 108, height: 108 }}><circle cx="70" cy="70" r={R} fill="none" stroke="var(--dc-line)" strokeWidth="14" /><circle cx="70" cy="70" r={R} fill="none" stroke={c} strokeWidth="14" strokeLinecap="round" strokeDasharray={`${((pct || 0) / 100) * C} ${C}`} transform="rotate(-90 70 70)" /><text x="70" y="66" textAnchor="middle" fontSize="26" fontWeight="800" fill={pct == null ? "var(--dc-ink-400)" : NAVY}>{pct == null ? "—" : pct + "%"}</text><text x="70" y="86" textAnchor="middle" fontSize="9.5" fill="var(--dc-ink-500)">{pct == null ? "sin meta" : "de tu meta"}</text></svg>
-        <div style={{ fontSize: 13, color: "var(--dc-ink-700)", textAlign: "center" }}>
-          {mesProd == null
-            ? <span style={{ color: "var(--dc-ink-400)" }}>Sin datos de producción todavía</span>
-            : metaMed == null
-              ? <>S/ {mesProd.toLocaleString()} este mes · <span style={{ color: "var(--dc-ink-400)" }}>gerencia aún no fija tu meta</span></>
-              : <>S/ {mesProd.toLocaleString()} de <b style={{ color: NAVY }}>S/ {metaMed.toLocaleString()}</b></>}
-        </div>
-      </div>
-    ) }; })(),
-    { id: "mistrat", title: "Mis tratamientos del mes", icon: BarChart3, color: DS.c.primary, w: 1, h: 2, render: () => {
-      // /api/mi-produccion ya devuelve porEspecialidad con las atenciones del mes. La
-      // lista fija (Restauraciones 22, Limpiezas 18…) solo queda para la demo sin sesión.
-      const vivo = miProd && miProd.esMedico ? miProd : null;
-      const paleta = [NAVY, DS.c.primary, DS.c.accent, RED, "var(--dc-warn-600)", "var(--dc-ok-700)"];
-      if (conectado && !vivo) return <SinDato dato={miProd} />;
-      const reales = (vivo?.porEspecialidad || []).filter((e) => (Number(e.atenciones) || 0) > 0)
-        .map((e, i) => [e.especialidad, Number(e.atenciones) || 0, paleta[i % paleta.length]]);
-      if (conectado && reales.length === 0) return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 14px" }}>Aún no has atendido citas este mes.</div>;
-      const T = conectado ? reales : [["Restauraciones", 22, NAVY], ["Limpiezas", 18, DS.c.primary], ["Endodoncia", 9, DS.c.accent], ["Ortodoncia", 6, RED], ["Cirugía", 4, "var(--dc-warn-600)"]];
-      const max = Math.max(...T.map((t) => t[1])); return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>{T.map(([l, v, c]) => (
-        <div key={l}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: "var(--dc-ink-700)", fontWeight: 600 }}>{l}</span><b style={{ color: NAVY }}>{v}</b></div><div style={{ height: 8, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${(v / max) * 100}%`, height: "100%", background: c, borderRadius: "var(--dc-r-full)" }} /></div></div>
-      ))}</div>
-    ); } },
-    { id: "seguim", title: "Controles pendientes de seguimiento", icon: BellRing, color: "var(--dc-warn-600)", w: 2, h: 2, render: () => {
-      // No existe todavía agenda de controles en el backend: no hay tabla ni endpoint de
-      // recordatorios de seguimiento. Con sesión abierta se dice, en vez de listar cinco
-      // pacientes inventados que el médico tomaría por suyos.
-      if (conectado) return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 20px", lineHeight: 1.5 }}>Aún no hay agenda de controles.<br />Programa el siguiente control desde la ficha del paciente.</div>;
-      const S = [["María Fernanda López", "Control de ortodoncia", "Vence en 2 días", "var(--dc-red)"], ["Carlos Quispe", "Revisión post-endodoncia", "Vence en 5 días", "var(--dc-warn-600)"], ["Ana Torres", "Control de limpieza (6m)", "En 1 semana", DS.c.primary], ["Diego Ramírez", "Ajuste de brackets", "En 9 días", DS.c.primary], ["Lucía Mendoza", "Evaluación de implante", "En 2 semanas", "var(--dc-ok-700)"]]; return (
-      <div style={{ height: "100%", display: "grid", gap: 8, overflowY: "auto", alignContent: "center" }}>{S.map(([n, m, v, c], i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)" }}>
-          <div style={{ width: 32, height: 32, borderRadius: "var(--dc-r-sm)", background: tint(colorDe(n), 0.102), color: colorDe(n), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(n)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m}</div></div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: c, background: tint(c, 0.086), borderRadius: "var(--dc-r-sm)", padding: "3px 8px", flexShrink: 0 }}>{v}</span>
-        </div>
-      ))}</div>
-    ); } },
-    { id: "satis", title: "Satisfacción de mis pacientes", icon: Star, color: "var(--dc-warn-600)", w: 1, h: 2, render: () => {
-      // La nota sale del promedio de reseñas del médico (/api/mi-produccion). El NPS y el
-      // "94% recomendarían" no salían de ningún sitio: no hay encuesta en el producto, así
-      // que con sesión abierta no se enseñan.
-      const vivo = miProd && miProd.esMedico ? miProd : null;
-      if (conectado && !vivo) return <SinDato dato={miProd} />;
-      const nota = conectado ? (vivo?.calificacion ?? null) : 4.8;
-      const n = conectado ? (Number(vivo?.resenas) || 0) : 96;
-      if (nota == null) return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 18px", lineHeight: 1.5 }}>Todavía no tienes reseñas de pacientes.</div>;
-      const llenas = Math.round(nota);
-      return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, textAlign: "center" }}>
-        <div style={{ fontSize: 44, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{nota.toFixed(1)}</div>
-        <div style={{ display: "flex", gap: 2 }}>{[0, 1, 2, 3, 4].map((i) => <Star key={i} size={16} strokeWidth={1.75} color="var(--dc-warn)" fill={i < llenas ? "var(--dc-warn)" : "none"} />)}</div>
-        <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sobre {n} {n === 1 ? "reseña" : "reseñas"}</div>
-        {!conectado && (
-          <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "8px 11px", background: "var(--dc-white)", borderRadius: "var(--dc-r-sm)" }}><span style={{ color: "var(--dc-ink-700)" }}>NPS</span><b style={{ color: "var(--dc-ok-700)" }}>+72</b></div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "8px 11px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-sm)" }}><span style={{ color: "var(--dc-ink-700)" }}>Recomendarían</span><b style={{ color: NAVY }}>94%</b></div>
-          </div>
-        )}
-      </div>
-    ); } }] : []),
-    // (Recepcion NO llega aqui: retorna antes con <RecepcionHoy/>. Los tres widgets
-    //  que habia en este punto -recTareas, recConfirm, recCaja- no los veia nadie.)
-    // Gerencia ya tiene su pantalla de análisis en el módulo "Dashboard gerencial"
-    // (ingresos de 12 meses, conversión de presupuestos, cobranza, producción del
-    // equipo). Aquí solo va lo que allí no está: quién dejó de venir.
-    ...(esGer ? [
-      { id: "gerCartera", title: "Cartera de pacientes", icon: Users, color: NAVY, w: 2, h: 1, render: () => {
-        const c = indGer?.cartera || (conectado ? null : { activos: 186, dormidos: 54, perdidos: 38, nuevos: 12 });
-        if (!c) return bloque("—", NAVY, "Sin datos todavía.");
-        // El detalle va en el tooltip: cuatro subtítulos en pantalla llenaban más de lo
-        // que explicaban. Activos = menos de 6 meses · Dormidos = 6-12 · Perdidos = +1 año.
-        const filas = [["Activos", c.activos, "var(--dc-ok-700)", "vinieron hace menos de 6 meses"],
-                       ["Dormidos", c.dormidos, "var(--dc-warn-600)", "entre 6 y 12 meses sin venir"],
-                       ["Perdidos", c.perdidos, "var(--dc-red)", "más de un año sin venir"],
-                       ["Nuevos", c.nuevos, DS.c.primary, "registrados, aún sin atender"]];
-        return (
-          <div style={{ height: "100%", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, alignContent: "center" }}>
-            {filas.map(([l, v, col, sub]) => (
-              <div key={l} title={sub}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: col, fontFamily: DISPLAY_FONT, lineHeight: 1.1 }}>{num(v)}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: INK }}>{l}</div>
-              </div>
-            ))}
-          </div>
-        );
-      } },
-    ] : []),
-    ...(esAdmSede ? [
-      { id: "sedeOcup", title: "Ocupación de hoy en tu sede", icon: Activity, color: DS.c.primary, w: 1, h: 1, render: () => {
-        // Leía indGer.agenda.ocupacion, que es del MES, pero indGer solo se pide para
-        // gerencia -y /gerencial/indicadores exige un permiso que admin_sede no tiene-,
-        // así que esa rama nunca se ejecutaba y el número era siempre el de hoy bajo un
-        // título que sonaba a acumulado. Ahora dice el periodo que mide.
-        // El pie va en CUPOS, la misma unidad que el porcentaje: antes contaba franjas
-        // horarias sin cita, y "13%" junto a "9 de 16 libres" no cuadra por ningún lado.
-        if (ocupacion == null) return bloque("—", "var(--dc-ink-400)", <>Hoy la clínica no atiende</>);
-        return bloque(`${ocupacion}%`, DS.c.primary,
-          <>{Math.max(0, capacidad - ch.length)} de {capacidad} cupos libres hoy</>);
-      } },
-      // El backend lo calcula sobre TODA la historia de la sede, no sobre el mes: el pie
-      // lo dice, porque la tarjeta de "citas que se pierden" del tablero gerencial mide el
-      // mes en curso y las dos cifras no tienen por qué coincidir.
-      { id: "sedeAus", title: "Ausentismo de tu sede", icon: TrendingDown, color: "var(--dc-warn-600)", w: 1, h: 1, render: () => {
-        // DEV-12: sin relleno hardcodeado. Sin dato → guion.
-        const v = repSede?.ausentismo ?? null;
-        return bloque(v != null ? `${v}%` : "—", v != null && v > 15 ? "var(--dc-red)" : "var(--dc-ok-700)",
-          v != null ? <>Canceladas o no asistidas · histórico de tu sede{v > 15 ? " · conviene reforzar recordatorios" : ""}</>
-            : "Sin datos todavía.");
-      } },
-      { id: "sedeMes", title: "Tu sede este mes", icon: TrendingUp, color: NAVY, w: 2, h: 1, render: () => {
-        // NEW-29: Ingresos = cobrado en caja (misma sede que el selector), no porMes org-wide.
-        const m = (repSede?.porMes || []).slice(-1)[0] || (conectado ? null : { ingresos: 18900, atendidas: 96, ausencias: 9 });
-        const ingresosUi = conectado
-          ? (pagosHistFalló ? null : (pagosHist == null ? null : cobradoMesCaja))
-          : (m ? Number(m.ingresos) || 0 : null);
-        if (pagosHistFalló) return bloque("No disponible", "var(--dc-warn-600)", <>No se pudo cargar el historial de pagos. Reintenta; no es un cero real.</>);
-        if (ingresosUi == null && !m) return bloque("—", NAVY, "Sin datos todavía.");
-        const atendidas = m ? num(m.atendidas) : "—";
-        const ausencias = m ? num(m.ausencias) : "—";
-        return (
-          <div style={{ height: "100%", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, alignContent: "center" }}>
-            {[["S/ " + (ingresosUi == null ? "…" : num(ingresosUi)), "Ingresos (cobrado)", DS.c.primary], [atendidas, "Atendidas", "var(--dc-ok-700)"], [ausencias, "Ausencias", "var(--dc-warn-600)"]].map(([v, l, col]) => (
-              <div key={l}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: col, fontFamily: DISPLAY_FONT, lineHeight: 1.1 }}>{v}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: INK }}>{l}</div>
-              </div>
-            ))}
-          </div>
-        );
-      } },
-    ] : []),
-    ...(esAdmin ? [
-      { id: "admCaja", title: "Caja del día · por medio de pago", icon: Wallet, color: "var(--dc-ok-700)", w: 1, h: 2, render: () => {
-        // Conectado: el cierre real de caja (/api/pagos/cierre devuelve porMetodo). Antes
-        // eran cuatro cifras fijas que además CONTRADECÍAN al KPI "Ingresos del día" de
-        // esta misma pantalla, que sí se calcula de las citas atendidas.
-        const ETIQUETA = { tarjeta: "Tarjeta", efectivo: "Efectivo", yape: "Yape", plin: "Plin", transferencia: "Transferencia", seguro: "Seguro" };
-        // Un solo color: cobrar en efectivo no es "mejor" que cobrar con tarjeta, y con
-        // verde, morado y ámbar el reparto parecía un semáforo. La etiqueta ya los separa.
-        const COLOR = { tarjeta: NAVY, efectivo: NAVY, yape: NAVY, plin: NAVY, transferencia: NAVY, seguro: NAVY };
-        const real = cierreCaja?.porMetodo
-          ? Object.entries(cierreCaja.porMetodo)
-              .map(([k, v]) => [ETIQUETA[k] || k, Number(v) || 0, COLOR[k] || "var(--dc-ink-500)"])
-              .filter(([, v]) => v > 0)
-              .sort((a, b) => b[1] - a[1])
-          : null;
-        // El reparto por medio de pago solo lo sabe el cierre de caja. Sin él se repartía
-        // el importe del día con porcentajes escritos a mano (47% tarjeta, 26% efectivo…):
-        // el total cuadraba con el KPI de al lado, pero cada línea era inventada.
-        if (conectado && !(real && real.length)) return <SinDato dato={cierreCaja} texto="El desglose por medio de pago sale del cierre de caja, que todavía no ha llegado." />;
-        const MEZCLA = [["Tarjeta", 0.47, NAVY], ["Efectivo", 0.26, NAVY], ["Yape / Plin", 0.16, NAVY], ["Transferencia", 0.11, NAVY]];
-        const P = (real && real.length) ? real : MEZCLA.map(([l, pct, c]) => [l, Math.round(ingresos * pct), c]);
-        const tot = P.reduce((a, b) => a + b[1], 0);
-        if (tot === 0) return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 14px" }}>Todavía no se ha cobrado nada hoy.</div>;
-
-        return (
-        <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 11 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-            <span style={{ fontSize: 24, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>S/ {tot.toLocaleString()}</span>
-            <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>cobrado hoy</span>
-          </div>
-          <div style={{ display: "grid", gap: 9 }}>
-            {P.map(([l, v, c]) => (
-              <div key={l}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12, marginBottom: 3 }}>
-                  <span style={{ flex: 1, color: "var(--dc-ink-700)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l}</span>
-                  <b style={{ color: NAVY, fontVariantNumeric: "tabular-nums" }}>S/ {v.toLocaleString()}</b>
-                  <span style={{ color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums", minWidth: 30, textAlign: "right" }}>{Math.round((v / tot) * 100)}%</span>
-                </div>
-                {/* Parte de lo cobrado hoy, que es lo que dice el porcentaje. */}
-                <div style={{ height: 7, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}>
-                  <div style={{ width: `${(v / tot) * 100}%`, height: "100%", background: c, borderRadius: "var(--dc-r-full)" }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ); } },
-      { id: "admFact", title: "Comprobantes electrónicos (SUNAT)", icon: FileText, color: DS.c.primary, w: 1, h: 2, render: () => {
-        // Conectado: la integración con OSE/NubeFacT NO existe todavía (frente 1 de
-        // README §10), así que no se inventan comprobantes aceptados ni observados.
-        // Se dice lo que pasa de verdad. En demo se conserva el ejemplo de siempre.
-        if (conectado) return (
-          <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 9, textAlign: "center", padding: "0 8px" }}>
-            <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: "var(--dc-warn-soft)", color: "var(--dc-warn-600)", display: "grid", placeItems: "center", margin: "0 auto" }}>
-              <AlertTriangle size={19} strokeWidth={1.75} />
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: NAVY }}>Facturación electrónica sin configurar</div>
-            <div style={{ fontSize: 12, color: "var(--dc-ink-500)", lineHeight: 1.55 }}>
-              Falta conectar el OSE (NubeFacT o similar). Las boletas se registran en el sistema,
-              pero <b style={{ color: "var(--dc-warn-600)" }}>no se envían a SUNAT</b>, así que todavía no hay comprobantes reales que mostrar aquí.
-            </div>
-          </div>
-        );
-        const F = [["Aceptados", 128, "var(--dc-ok-700)"], ["Pendientes de envío", 9, "var(--dc-warn-600)"], ["Observados / rechazados", 2, "var(--dc-red)"]]; const tot = F.reduce((a, b) => a + b[1], 0); return (
-        <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 13, justifyContent: "center" }}>{F.map(([l, v, c]) => { const pct = Math.round((v / tot) * 100); return (
-          <div key={l}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}><span style={{ color: "var(--dc-ink-700)", fontWeight: 600 }}>{l}</span><b style={{ color: NAVY }}>{v}</b></div><div style={{ height: 8, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: c, borderRadius: "var(--dc-r-full)" }} /></div></div>
-        ); })}<div style={{ fontSize: 12, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", borderRadius: "var(--dc-r-sm)", padding: "8px 10px", fontWeight: 600 }}>11 comprobantes requieren tu atención hoy.</div></div>
-      ); } },
-      { id: "admSeguros", title: "Liquidaciones de seguros pendientes", icon: Umbrella, color: DS.c.primary, w: 2, h: 2, render: () => {
-      if (conectado) return <SinConectar que="Las liquidaciones de seguros aún no se sincronizan con la clínica." />;
-        const S = [["Rimac", 8400, "En revisión"], ["Pacífico", 5200, "Enviado"], ["Mapfre", 3100, "Por enviar"], ["La Positiva", 1900, "Observado"]]; const est = { "En revisión": DS.c.primary, "Enviado": "var(--dc-ok-700)", "Por enviar": "var(--dc-warn-600)", "Observado": "var(--dc-red)" }; const max = Math.max(...S.map((x) => x[1])); return (
-        <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 12, justifyContent: "center", overflowY: "auto" }}>{S.map(([l, v, e]) => (
-          <div key={l}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}><span style={{ fontSize: 13, fontWeight: 600, color: NAVY }}>{l}</span><span style={{ display: "flex", gap: 8, alignItems: "center" }}><b style={{ fontSize: 13, color: NAVY }}>S/ {v.toLocaleString()}</b><span style={{ fontSize: 12, fontWeight: 600, color: est[e], background: tint(est[e], 0.094), borderRadius: "var(--dc-r-sm)", padding: "2px 7px" }}>{e}</span></span></div><div style={{ height: 8, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${(v / max) * 100}%`, height: "100%", background: "linear-gradient(90deg,var(--dc-primary-alt),var(--dc-accent-cyan))", borderRadius: "var(--dc-r-full)" }} /></div></div>
-        ))}</div>
-      ); } },
-      { id: "admDeudores", title: "Pacientes con saldo pendiente", icon: AlertTriangle, color: "var(--dc-red)", w: 2, h: 2, render: () => {
-        if (conectado) {
-          if (!cajaDeuda) return <SinDato />;
-          const rows = (cajaDeuda.porCobrar || []).slice(0, 8);
-          if (!rows.length) return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13 }}>Sin saldos pendientes.</div>;
-          return (
-            <div style={{ height: "100%", display: "grid", gap: 7, overflowY: "auto", alignContent: "center" }}>{rows.map((r, i) => (
-              <div key={r.pacienteId || i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)" }}>
-                <div style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: tint(colorDe(r.paciente || "?"), 0.102), color: colorDe(r.paciente || "?"), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(r.paciente || "?")}</div>
-                <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.paciente || "—"}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600 }}>{r.sede || "Sede"} · plan S/ {Number(r.total || 0).toLocaleString()}</div></div>
-                <b style={{ color: "var(--dc-red)", fontSize: 13, flexShrink: 0 }}>S/ {Number(r.saldo || 0).toLocaleString()}</b>
-              </div>
-            ))}</div>
-          );
-        }
-        const D = [["Elena Vargas", 1240, "45 días"], ["Marco Salas", 860, "31 días"], ["Julia Ríos", 640, "62 días"], ["Andrés Paz", 420, "18 días"], ["Nora Campos", 300, "8 días"]]; return (
-        <div style={{ height: "100%", display: "grid", gap: 7, overflowY: "auto", alignContent: "center" }}>{D.map(([n, v, d], i) => { const risk = parseInt(d) > 60 ? "var(--dc-red)" : parseInt(d) > 30 ? "var(--dc-warn-600)" : "var(--dc-ok-700)"; return (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)" }}>
-            <div style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: tint(colorDe(n), 0.102), color: colorDe(n), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(n)}</div>
-            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n}</div><div style={{ fontSize: 12, color: risk, fontWeight: 600 }}>Vencido hace {d}</div></div>
-            <b style={{ color: "var(--dc-red)", fontSize: 13, flexShrink: 0 }}>S/ {v.toLocaleString()}</b>
-          </div>
-        ); })}</div>
-      ); } },
-    ] : []),
-    ...(esTI ? [
-      { id: "tiIntegr", title: "Estado de integraciones", icon: Plug, color: "var(--dc-ok-700)", w: 2, h: 2, render: () => {
-        // NEW-49: mismo criterio honesto que Integraciones (NubeFacT pendiente).
-        const I = INTEGRACIONES_TI;
-        const c = { operativo: "var(--dc-ok-700)", incidencia: "var(--dc-red)", lento: "var(--dc-warn-600)", pendiente: "var(--dc-ink-400)" };
-        return (
-        <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 8, justifyContent: "center", overflowY: "auto" }}>{I.map(([l, st, s], i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)" }}>
-            <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: c[st], flexShrink: 0, boxShadow: `0 0 0 3px ${tint(c[st], 0.133)}` }} />
-            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{s}</div></div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: c[st], background: tint(c[st], 0.094), borderRadius: "var(--dc-r-sm)", padding: "3px 8px", flexShrink: 0, textTransform: "capitalize" }}>{st}</span>
-          </div>
-        ))}</div>
-      ); } },
-      { id: "tiSalud", title: "Salud del sistema", icon: Activity, color: DS.c.primary, w: 1, h: 2, render: () => (
-        <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 14px", lineHeight: 1.5 }}>
-          Disponibilidad y latencia aún no se miden desde la app. Revisa CloudWatch / API Gateway en AWS.
-        </div>
-      ) },
-      { id: "tiUsuarios", title: "Usuarios del directorio", icon: Users, color: DS.c.primary, w: 1, h: 2, render: () => {
-        if (!conectado) return <SinConectar que="Conéctate para ver el directorio." />;
-        if (!usrTiDash) return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)" }}>Cargando…</div>;
-        const activos = usrTiDash.filter((u) => u.activo !== false).length;
-        const porRol = {};
-        usrTiDash.forEach((u) => { const r = u.rol || "—"; porRol[r] = (porRol[r] || 0) + 1; });
-        const U = Object.entries(porRol).sort((a, b) => b[1] - a[1]).slice(0, 4);
-        const max = Math.max(1, ...U.map((x) => x[1]));
-        return (
-          <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 4, justifyContent: "center" }}>
-            <div style={{ fontSize: 32, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{activos}</div>
-            <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginBottom: 5 }}>activos de {usrTiDash.length}</div>
-            {U.map(([l, v]) => <div key={l} style={{ marginBottom: 5 }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}><span style={{ color: "var(--dc-ink-700)" }}>{l}</span><b style={{ color: NAVY }}>{v}</b></div><div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${(v / max) * 100}%`, height: "100%", background: DS.c.primary, borderRadius: "var(--dc-r-full)" }} /></div></div>)}
-          </div>
-        );
-      } },
-      { id: "tiSeguridad", title: "Seguridad y accesos", icon: ShieldCheck, color: "var(--dc-purple)", w: 2, h: 2, render: () => (
-        <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 16px", lineHeight: 1.55 }}>
-          Los inicios de sesión y las aperturas de historia clínica se registran en <b>Auditoría y accesos</b>. También puedes ver el último acceso en <b>Usuarios</b>.
-        </div>
-      ) },
-    ] : []),
-    { id: "semana", title: "Citas · últimos 7 días", icon: TrendingUp, color: DS.c.primary, w: 2, h: 2, render: () => (
-      <div style={{ height: "100%", minHeight: 0 }}><AreaChart data={dias.map((d) => d.v || 0)} color={DS.c.primary} labels={dias.map((d) => d.lbl)} /></div>
-    ) },
-    { id: "conv", title: "Asistencia de hoy", icon: PieChart, color: "var(--dc-ok-700)", w: 1, h: 1, render: () => {
-      const at = ch.filter((c) => c.estado === "atendida").length;
-      const tasa = ch.length ? Math.round((at / ch.length) * 100) : 0;
-      // Verde solo cuando de verdad se ha atendido a la mayoría; ámbar mientras el día
-      // está en marcha; gris si aún no hay nada, para no pintar de rojo una mañana.
-      const col = ch.length === 0 ? "var(--dc-ink-400)" : tasa >= 60 ? "var(--dc-ok-700)" : "var(--dc-warn-600)";
-      return bloque(`${tasa}%`, col, ch.length ? <>{at} de {ch.length} citas ya atendidas</> : "Sin citas hoy");
-    } },
-    { id: "ocup", title: "Ocupación de hoy", icon: Activity, color: ocupacion > 80 ? RED : "var(--dc-ok-700)", w: 1, h: 1, render: () => ocupacion == null ? (
-      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 14px", lineHeight: 1.5 }}>Hoy la clínica no atiende{jornadaHoy.nota ? " · " + jornadaHoy.nota : ""}.</div>
-    ) : (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
-        <div style={{ fontSize: 32, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{ocupacion}%</div>
-        <div style={{ height: 9, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: ocupacion + "%", height: "100%", background: ocupacion > 80 ? "linear-gradient(90deg,var(--dc-red),var(--dc-red))" : "linear-gradient(90deg,var(--dc-ok),var(--dc-ok))", borderRadius: "var(--dc-r-full)" }} /></div>
-      </div>
-    ) },
-    { id: "estados", title: "Estado de citas hoy", icon: PieChart, color: DS.c.primary, w: 1, h: 2, render: () => estados.length === 0 ? <div style={{ color: "var(--dc-ink-500)", fontSize: 13, height: "100%", display: "grid", placeItems: "center" }}>Sin citas hoy.</div> : (
-      <div style={{ display: "grid", gap: 11, height: "100%", alignContent: "center" }}>{estados.map((e) => { const b = ESTADO_BADGE[e.k]; const pct = Math.round((e.v / totalEstados) * 100); return (
-        <div key={e.k}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontWeight: 600 }}><span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-sm)", background: e.c }} /> {b.l}</span><span style={{ fontWeight: 600, color: NAVY }}>{e.v}</span></div><div style={{ height: 7, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: e.c, borderRadius: "var(--dc-r-full)" }} /></div></div>
-      ); })}</div>
-    ) },
-    { id: "porhora", title: "Agenda de hoy por hora · " + capHora + " cupos/h", icon: Clock, color: TEAL, w: 2, h: 2, render: () => {
-      // Día cerrado por horario o por feriado: no hay rejilla que pintar.
-      if (!jornadaHoy.abierta) return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 16px", lineHeight: 1.5 }}>Hoy la clínica no atiende{jornadaHoy.nota ? " · " + jornadaHoy.nota : ""}.<br />Se configura en Configuración › Horario de atención.</div>;
-      // Cada columna vale la CAPACIDAD de esa hora y se rellena lo que está vendido. Lo
-      // que queda en claro es el hueco, que es lo que se viene a mirar aquí.
-      const cuposTotales = capacidad;   // la misma cuenta que usa el resto de la pantalla
-      // Nombrar un "pico" con varias horas empatadas es inventarse una punta: solo se
-      // dice cuando hay UNA hora por encima de las demás.
-      const tope = Math.max(0, ...porHora.map((x) => x.n));
-      const enTope = porHora.filter((x) => x.n === tope);
-      const horaFuerte = tope > 0 && enTope.length === 1 ? enTope[0] : null;
-      return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        <div style={{ flex: 1, minHeight: 140, display: "flex", alignItems: "stretch", gap: 5 }}>{porHora.map((x) => {
-          const pct = Math.min(100, Math.round((x.n / capHora) * 100));
-          return (
-            <div key={x.h} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}
-                 title={`${x.h}:00 · ${x.n} de ${capHora} cupos ocupados · ${Math.max(0, capHora - x.n)} libre(s)`}>
-              {/* La columna entera es la capacidad de la hora; lo relleno, lo vendido. */}
-              <div style={{ flex: 1, width: "100%", maxWidth: 22, minHeight: 0, background: pct > 0 && pct < 5 ? "transparent" : "var(--dc-line)", borderRadius: "var(--dc-r-sm)", display: "flex", flexDirection: "column", justifyContent: "flex-end", overflow: "hidden" }}>
-                {x.n > 0 && pct >= 5 && (
-                  <div style={{ height: `${pct}%`, background: colHora(x), borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center", transition: "height .7s cubic-bezier(.2,.7,.2,1)" }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{x.n}</span>
-                  </div>
-                )}
-                {x.n > 0 && pct > 0 && pct < 5 && (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: NAVY, textAlign: "center" }}>{x.n}</span>
-                )}
-              </div>
-              <span style={{ fontSize: 12, color: x.n ? NAVY : "var(--dc-ink-400)", fontWeight: x.n ? 700 : 400 }}>{x.h}</span>
-            </div>
-          );
-        })}</div>
-        <div style={{ display: "flex", gap: 8, marginTop: 10, fontSize: 12, flexWrap: "wrap" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--dc-brand-600)" }}><CalendarCheck size={13} strokeWidth={1.75} color={TEAL} /> {cuposLibres} cupo(s) libres de aquí al cierre · {cuposTotales} en toda la jornada</span>
-          {horaFuerte && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--dc-warn-700)", marginLeft: "auto" }}><TrendingUp size={13} strokeWidth={1.75} color="var(--dc-warn-600)" /> La hora más cargada, {horaFuerte.h}:00</span>}
-        </div>
-      </div>
-      );
-    } },
-    proxima ? { id: "prox", title: "Próxima cita", icon: BellRing, color: DS.c.primary, w: 2, h: 1, render: () => (
-      <div style={{ height: "100%", display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: tint(DS.c.primary, 0.086), color: DS.c.primary, display: "grid", placeItems: "center", flexShrink: 0 }}><Clock size={22} strokeWidth={1.75} /></div>
-        <div style={{ minWidth: 0 }}><div style={{ fontSize: 17, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT }}>{proxima.hora} · {proxima.paciente}</div><div style={{ fontSize: 13, color: "var(--dc-ink-400)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{proxima.motivo}</div></div>
-      </div>
-    ) } : null,
-    { id: "citashoy", title: esMed ? "Mi agenda de hoy" : "Citas de hoy", icon: Calendar, color: NAVY, w: 2, h: 2, render: () => (
-      <div style={{ display: "grid", gap: 9, alignContent: ch.length ? "start" : "center" }}>
-        {/* En un movil la fila no cabia y la tarjeta obligaba a desplazarse en horizontal
-            para ver el estado de la cita. Ahora encoge: la hora se queda fija, el nombre y
-            el motivo se recortan y el estado nunca se sale. */}
-        {[...ch].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)", minWidth: 0, overflow: "hidden" }}><div style={{ fontWeight: 600, color: NAVY, width: 44, flexShrink: 0, fontSize: 13 }}>{c.hora}</div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.paciente}</div><div style={{ fontSize: 13, color: "var(--dc-ink-400)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.motivo}</div></div><span style={{ flexShrink: 0 }}><Badge estado={c.estado} /></span></div>)}
-        {ch.length === 0 && <div style={{ color: "var(--dc-ink-500)", fontSize: 13, textAlign: "center" }}>No hay citas para hoy.</div>}
-      </div>
-    ) },
-    { id: "recientes", title: "Pacientes recientes", icon: Users, color: DS.c.primary, w: 1, h: 2, render: () => (
-      <div style={{ display: "grid", gap: 3, alignContent: "start" }}>
-        {[...pacientes].sort((a, b) => (b.ultima || "").localeCompare(a.ultima || "")).slice(0, 8).map((p) => { const col = colorDe(p.nombre); return (
-          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--dc-bg)" }}>
-            <div style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(p.nombre)}</div>
-            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{p.ultima ? (fechaLegible(p.ultima) || p.ultima) : "—"}</div></div>
-          </div>
-        ); })}
-      </div>
-    ) },
-  // Sistemas gestiona usuarios, accesos e integraciones: ni la caja ni la agenda
-  // clínica son suyas. "resumenDia" trae ingresos del día, citas y pacientes, así que
-  // entra en la lista. (Antes se excluían los seis indicadores sueltos por su id con
-  // /^k\d+$/; al agruparlos en una tarjeta esa regla dejó de casar con nada.)
-  ].filter(Boolean).filter((w) => !(esTI && ["resumenDia", "semana", "conv", "ocup", "estados", "porhora", "prox", "citashoy", "recientes"].includes(w.id)));
-
-  // Orden del lienzo del ADMINISTRADOR: primero lo que exige una ACCIÓN hoy (cobrar,
-  // comprobantes rechazados, liquidaciones sin conciliar) y después lo informativo.
-  // Antes el orden era simplemente el de construcción del array, así que lo primero
-  // que veía el admin eran tendencias y no las cosas que tiene que resolver.
-  // El resto de roles conserva su orden (recepción tiene su propia pantalla).
-  const ORDEN_ADMIN = ["admDeudores", "admFact", "admSeguros", "admCaja",
-                       "citashoy", "ocup", "conv", "estados", "semana", "porhora", "recientes"];
-  const prioridadAdmin = (w) => {
-    if (w.id === "resumenDia") return 0;             // el resumen del día encabeza
-    const i = ORDEN_ADMIN.indexOf(w.id);
-    return i >= 0 ? 1 + i : 99;                      // lo no listado, al final
-  };
-  // La agenda del día -próxima cita, lista nominal, ocupación por franja, estados-
-  // es trabajo de recepción y de la sede. A Gerencia le tapa lo que sí decide.
-  const OPERATIVOS_DEL_DIA = ["prox", "citashoy", "porhora", "estados", "conv"];
-  // "Próxima cita" repetía la primera fila de "Mi agenda de hoy", que está al lado. En
-  // recepción no se toca: allí el próximo paciente trae los botones de llegada,
-  // WhatsApp y ficha, y eso sí es algo más que repetir la hora y el nombre.
-  const REPETIDO_EN_LA_AGENDA = ["prox"];
-  // El "Resumen del día" ya trae citas, confirmadas, en atención y atendidas, así que
-  // estos dos repetían el mismo dato en otra forma. Fuera para todos los roles.
-  const YA_EN_EL_RESUMEN = ["conv", "estados"];
-  const base = widgets.filter((w) => !YA_EN_EL_RESUMEN.includes(w.id) && !REPETIDO_EN_LA_AGENDA.includes(w.id));
-  // Orden del ODONTÓLOGO: la pantalla se llama "Hoy", así que primero su día -lo que
-  // tiene delante- y después el mes, que es contexto. Antes salían la meta y los
-  // tratamientos del mes por encima de su propia agenda.
-  const ORDEN_MEDICO = ["resumenDia", "citashoy", "porhora", "mimeta", "mistrat", "semana", "seguim", "satis"];
-  const prioridadMedico = (w) => { const i = ORDEN_MEDICO.indexOf(w.id); return i >= 0 ? i : 99; };
-  const widgetsVista = esAdmin
-    // "ocup" es el mismo porcentaje que "porhora", que además dice dónde están los
-    // huecos. Ya se quitaba para el médico y para el administrador de sede.
-    ? [...base].filter((w) => w.id !== "ocup").sort((a, b) => prioridadAdmin(a) - prioridadAdmin(b))
-    : esGer
-      // "retencion"/"gerCartera" y la cartera del Dashboard gerencial son el mismo
-      // widget con distinto número (186/54/38/12 aquí, 128/34/21/12 allí). Se queda la
-      // de allí, que es donde gerencia mira la cartera. Y "recientes" son ocho nombres
-      // con su fecha: no hay nada que decidir con eso.
-      ? base.filter((w) => !OPERATIVOS_DEL_DIA.includes(w.id) && !["gerCartera", "recientes"].includes(w.id))
-      // "ocup" repetiría el mismo porcentaje que "sedeOcup", que además lo explica.
-      : esAdmSede
-        ? base.filter((w) => w.id !== "ocup")
-        : esMed
-          // "ocup" es el mismo dato que "porhora", que además dice dónde están los
-          // huecos. "recientes" son los últimos pacientes de la clínica, no los suyos.
-          ? [...base].filter((w) => !["ocup", "recientes"].includes(w.id))
-                     .sort((a, b) => prioridadMedico(a) - prioridadMedico(b))
-          : base;
-  if (esRec) return <RecepcionHoy ch={ch} citas={citas} proxima={proxima} ocupacion={ocupacion} libres={libres} capacidad={capacidad} conectado={conectado} notify={notify} enviarConfMañana={enviarConfMañana} onReload={cargarDash} />;
+  // Recepción usa la misma bandeja de pendientes que el resto de roles.
   const nPend = pendEvo?.pendientes || 0;
 
   // Una frase por rol, con el mismo criterio que usa recepción: primero cómo va la
@@ -1368,49 +658,100 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
         : (ch.length === 0 ? "Hoy no hay citas agendadas." : `${pluralEs(ch.length, "cita", "citas")} hoy${sinConfirmar ? `, ${pluralEs(sinConfirmar, "sin confirmar", "sin confirmar")}` : ""}. Quedan ${pluralEs(cuposLibres, "cupo libre", "cupos libres")}.`);
   const avance = ch.length ? Math.round((atendidasHoy / ch.length) * 100) : 0;
 
+  // ======================================================================
+  // PENDIENTES DE HOY — bandeja de tareas accionables. Sustituye al lienzo de
+  // tarjetas, que repetía cifras del Dashboard gerencial y de la Agenda.
+  // Cada fila dice qué falta hacer y lleva al sitio donde se resuelve.
+  // ======================================================================
+  const manana = addDays(1);
+  const mananaSinConf = citasMed.filter((c) => c.fecha === manana && c.estado === "pendiente");
+  const sinConfHoy = ch.filter((c) => c.estado === "pendiente");
+  const mesesDesde = (iso) => { if (!iso) return 0; const d = new Date(iso + "T00:00:00"); return (hoy.getFullYear() - d.getFullYear()) * 12 + (hoy.getMonth() - d.getMonth()); };
+  const porReactivar = pacientes.filter((p) => p.ultima && mesesDesde(p.ultima) >= 6);
+  const DEUDORES_DEMO = [["Elena Vargas", 1240, 45], ["Marco Salas", 860, 31], ["Julia Ríos", 640, 62], ["Andrés Paz", 420, 18], ["Nora Campos", 300, 8]];
+  const deudores = conectado
+    ? ((cajaDeuda && cajaDeuda.porCobrar) || []).filter((r) => Number(r.saldo) > 0).map((r) => ({ n: r.paciente || "—", v: Number(r.saldo) || 0 }))
+    : DEUDORES_DEMO.filter(([, , d]) => d > 30).map(([n, v]) => ({ n, v }));
+  const verCaja = esAdmin || esGer || esAdmSede;
+  const nombres = (arr, k = "paciente") => arr.slice(0, 3).map((x) => x[k]).join(", ") + (arr.length > 3 ? ` y ${arr.length - 3} más` : "");
+  const tareas = [
+    esTI && INTEGRACIONES_TI.some(([, e]) => e === "pendiente") && { id: "tiPend", tono: "info", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length, "integración por activar", "integraciones por activar")}`, detalle: INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").map(([n]) => n).join(", ") + ".", accion: "Ver integraciones", ir: () => onIr("integraciones") },
+    esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: "Revisa el estado y reconecta antes de que afecte a la atención.", accion: "Ver integraciones", ir: () => onIr("integraciones") },
+    nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => { const primer = (pendEvo.items || [])[0]; if (primer?.pacienteId) onIr("pacientes", { pacienteId: primer.pacienteId }); else onIr("pacientes"); } },
+    !esTI && sinConfHoy.length > 0 && { id: "confHoy", tono: "aviso", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `${pluralEs(sinConfHoy.length, "cita de hoy sin confirmar", "citas de hoy sin confirmar")}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))), accion: "Ir a la agenda", ir: () => onIr("agenda") },
+    !esTI && !esMed && mananaSinConf.length > 0 && { id: "confMan", tono: "info", icon: <Send size={18} strokeWidth={1.75} />, titulo: `${pluralEs(mananaSinConf.length, "cita de mañana por confirmar", "citas de mañana por confirmar")}`, detalle: "Envía el recordatorio por WhatsApp para que confirmen hoy.", accion: "Enviar confirmaciones", ir: enviarConfMañana },
+    verCaja && deudores.length > 0 && { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} · S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") },
+    esAdmin && !conectado && { id: "sunat", tono: "peligro", icon: <FileText size={18} strokeWidth={1.75} />, titulo: "2 comprobantes observados por SUNAT", detalle: "Y 9 pendientes de envío. Corrígelos para no perder el plazo de emisión.", accion: "Revisar", ir: () => onIr("facturacion") },
+    esAdmin && !conectado && { id: "seguros", tono: "info", icon: <Umbrella size={18} strokeWidth={1.75} />, titulo: "1 liquidación de seguro observada", detalle: "La Positiva · S/ 1,900. Mapfre tiene S/ 3,100 por enviar.", accion: "Ver seguros", ir: () => onIr("seguros") },
+    esMed && !conectado && { id: "controles", tono: "info", icon: <BellRing size={18} strokeWidth={1.75} />, titulo: "2 controles vencen esta semana", detalle: "María Fernanda López (ortodoncia) y Carlos Quispe (post-endodoncia).", accion: "Ver pacientes", ir: () => onIr("pacientes") },
+    !esTI && !esMed && porReactivar.length > 0 && { id: "reactivar", tono: "info", icon: <Repeat size={18} strokeWidth={1.75} />, titulo: `${pluralEs(porReactivar.length, "paciente para reactivar", "pacientes para reactivar")}`, detalle: `Más de 6 meses sin venir: ${nombres(porReactivar, "nombre")}.`, accion: "Enviar recordatorio", ir: () => onIr("recall") },
+  ].filter(Boolean);
+  const ordenTono = { peligro: 0, aviso: 1, info: 2 };
+  tareas.sort((a, b) => ordenTono[a.tono] - ordenTono[b.tono]);
+  const ahoraHM = `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
+  const activasHoy = [...ch].filter(esCitaActivaHoy).sort((a, b) => a.hora.localeCompare(b.hora));
+  const proximas = (() => { const q = activasHoy.filter((c) => c.hora >= ahoraHM && c.estado !== "atendida"); return (q.length ? q : activasHoy).slice(0, 6); })();
+  const fechaHoy = (() => { const f = hoy.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" }); return f.charAt(0).toUpperCase() + f.slice(1); })();
+  const cifras = esTI
+    ? [["Integraciones operativas", `${INTEGRACIONES_TI.filter(([, e]) => e === "operativo").length}/${INTEGRACIONES_TI.length}`], ["Con incidencia", incidenciasTI], ["Por activar", INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length], ["Usuarios", usrTiDash ? usrTiDash.length : STAFF_INIT.length]]
+    : [["Citas hoy", citasHoyKpi.length], ["Atendidas", atendidasHoy], ["Por confirmar", sinConfirmar], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE")}`]];
   return (
-    <>
-      <div style={{ background: `linear-gradient(135deg, ${DS.c.primary} 0%, var(--dc-brand-600) 100%)`, borderRadius: DS.r.card, padding: "16px 20px", marginBottom: 20, color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, fontFamily: DISPLAY_FONT }}>{saludo}{miNombre ? ` ${miNombre}` : ""} 👋</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 3 }}>{frase}</div>
+    <div className="dc-hoy">
+      <div className="dc-toolbar">
+        <div>
+          <h2 className="dc-toolbar__titulo">{saludo}{miNombre ? `, ${miNombre}` : ""}</h2>
+          <div className="dc-toolbar__sub">{fechaHoy} · {frase}</div>
         </div>
-        {!esTI && ch.length > 0 && (
-          <div style={{ minWidth: 150 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "rgba(255,255,255,.8)", marginBottom: 5 }}>
-              <span>{esMed ? "Tu jornada" : "Jornada"} · {atendidasHoy}/{ch.length}</span><span style={{ fontWeight: 600 }}>{avance}%</span>
-            </div>
-            <div style={{ height: 5, borderRadius: "var(--dc-r-full)", background: "rgba(255,255,255,.25)" }}>
-              <div style={{ width: `${avance}%`, height: "100%", borderRadius: "var(--dc-r-full)", background: "#fff" }} />
-            </div>
-          </div>
-        )}
+        {!esTI && <Btn small kind="ghost" onClick={() => onIr("agenda")}><Calendar size={15} strokeWidth={1.75} /> Ver agenda</Btn>}
       </div>
-      {nPend > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", marginBottom: 14, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-lg)" }}>
-          <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: "var(--dc-warn-soft)", color: "var(--dc-warn-600)", display: "grid", placeItems: "center", flexShrink: 0 }}><ClipboardList size={19} strokeWidth={1.75} /></div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--dc-warn-ink)" }}>{pendEvo.soloMias ? "Tienes" : "Hay"} {nPend} {nPend === 1 ? "evolución sin completar" : "evoluciones sin completar"}</div>
-            <div style={{ fontSize: 12, color: "var(--dc-warn-600)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {(pendEvo.items || []).slice(0, 3).map((x) => `${x.paciente} (${fechaLegible(x.fecha) || x.fecha})`).join(" · ")}{nPend > 3 ? ` y ${nPend - 3} más` : ""} — la producción cuenta cuando las llenes.
-            </div>
+
+      <div className="dc-hoy__grid">
+        <Card className="dc-hoy__tareas">
+          <div className="dc-hoy__cab">
+            <h3>Por hacer</h3>
+            <span className="dc-hoy__num">{tareas.length}</span>
           </div>
-          <button onClick={() => {
-            const primer = (pendEvo.items || [])[0];
-            if (primer?.pacienteId) onIr("pacientes", { pacienteId: primer.pacienteId });
-            else onIr("pacientes");
-          }} style={{ padding: "8px 14px", borderRadius: "var(--dc-r-md)", border: "none", background: "var(--dc-warn-600)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>Completar</button>
+          {tareas.length === 0 ? (
+            <div className="dc-hoy__vacio"><CheckCircle2 size={28} strokeWidth={1.5} /><b>Todo al día</b><span>No hay nada pendiente por ahora.</span></div>
+          ) : tareas.map((t) => (
+            <div key={t.id} className={`dc-tarea dc-tarea--${t.tono}`}>
+              <span className="dc-tarea__ico">{t.icon}</span>
+              <div className="dc-tarea__txt"><b>{t.titulo}</b><span>{t.detalle}</span></div>
+              <Btn small kind={t.tono === "peligro" ? "primary" : "ghost"} onClick={t.ir}>{t.accion} <ChevronRight size={14} strokeWidth={1.75} /></Btn>
+            </div>
+          ))}
+        </Card>
+
+        <div className="dc-hoy__lado">
+          <Card className="dc-hoy__cifras">
+            {cifras.map(([l, v]) => <div key={l}><span>{l}</span><b>{v}</b></div>)}
+          </Card>
+          {!esTI && (
+            <Card className="dc-hoy__proximas">
+              <div className="dc-hoy__cab"><h3>{esMed ? "Tus próximos pacientes" : "Próximas citas"}</h3><button type="button" className="dc-hoy__link" onClick={() => onIr("agenda")}>Ver todas</button></div>
+              {proximas.length === 0 ? <div className="dc-hoy__vacio dc-hoy__vacio--mini"><span>No hay citas para hoy.</span></div> : proximas.map((c) => {
+                const e = ESTADO_BADGE[c.estado] || ESTADO_BADGE.pendiente;
+                return (
+                  <div key={c.id} className="dc-cita">
+                    <span className="dc-cita__hora">{c.hora}</span>
+                    <div className="dc-cita__txt"><b>{c.paciente}</b><span>{c.motivo || "Consulta"}</span></div>
+                    <span className="dc-cita__estado" style={{ background: e.bg, color: e.fg }}>{e.l}</span>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
         </div>
-      )}
-      <DashLienzo role={"resumen_" + rol} titulo={esMed ? "Mi día" : esAdmin ? "Resumen administrativo" : esTI ? "Panel de sistemas" : esGer ? "Visión de la clínica" : "Resumen de tu sede"} sub={(() => { const key = "dashboard_personalization_seen"; const seen = localStorage.getItem(key); if (!seen) { try { localStorage.setItem(key, "1"); } catch (e) { /* */ } return "Personalizable · arrastra y redimensiona las tarjetas"; } return "Arrastra y redimensiona las tarjetas"; })()} widgets={widgetsVista} />
+      </div>
       {det && <Modal icon={<BarChart3 size={20} strokeWidth={1.75} />} titulo={det.titulo} sub={`${det.rows.length} registro(s)`} onClose={() => setDet(null)} maxW={520}>
         {det.rows.length === 0 ? <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Sin registros para mostrar.</div> : det.rows.map((r, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: i ? "1px solid var(--dc-line)" : "none", fontSize: 13 }}><span style={{ color: "var(--dc-ink-700)" }}>{r.izq}</span><span style={{ fontWeight: 600, color: NAVY }}>{r.der}</span></div>
         ))}
       </Modal>}
-    </>
+    </div>
   );
 }
+
 
 /* ---- Agenda con acciones de flujo ---- */
 /* Resumen de estados del odontograma para la ficha. */
@@ -8367,7 +7708,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       // NAV-11: #/comisiones es alias de reportes (sin segunda entrada de menú)
     ] },
     { grupo: "Atención", items: [
-      { id: "dashboard", label: "Hoy (resumen del día)", icon: LayoutDashboard },
+      { id: "dashboard", label: "Pendientes de hoy", icon: LayoutDashboard },
       { id: "whatsapp", label: "WhatsApp + IA", icon: MessageSquare, tag: "IA" },
       { label: "Agenda", icon: Calendar, children: [
         { id: "agenda", label: "Hoy", mod: "agenda" },
