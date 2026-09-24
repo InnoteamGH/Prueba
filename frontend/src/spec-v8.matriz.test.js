@@ -26,8 +26,9 @@ describe("SPEC v8 A23 jerarquía", () => {
     assert.doesNotMatch(comun, /export const ModHead[\s\S]*?<h1/);
     assert.match(comun, /<h2 className="dc-title"[\s\S]*?>\{titulo\}<\/h2>/);
   });
-  it("Facturación y Reportes tienen ModHead / h1 de pantalla", () => {
-    assert.match(app, /titulo="Facturación y caja"/);
+  it("Facturación y Reportes tienen cabecera de pantalla", () => {
+    // Caja abre con su franja de color (el h1 sigue en la cabecera de la app).
+    assert.match(app, /className="dc-esp-hero dc-caja-hero"/);
     assert.match(reportes, /titulo="Producción y comisiones"/);
   });
 });

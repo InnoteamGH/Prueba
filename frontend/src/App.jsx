@@ -4326,9 +4326,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const METODO_LBL = { efectivo: "Efectivo", tarjeta: "Tarjeta", yape: "Yape", plin: "Plin", transferencia: "Transferencia", seguro: "Seguro" };
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <ModHead icon={<CreditCard size={20} strokeWidth={1.75} />} titulo="Facturación y caja" sub="Apertura, cobros, cierre y comprobantes del día" accion={puedeConfig ? <Btn small kind="ghost" onClick={() => setDatosFact(true)}><FileText size={15} strokeWidth={1.75} /> Datos de facturación</Btn> : null} />
+      <section className="dc-esp-hero dc-caja-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>S/ {montoPorCobrar.toLocaleString("es-PE")}</b><span>por cobrar</span></div>
+          <p>{porCobrar.length} {porCobrar.length === 1 ? "plan en curso" : "planes en curso"}, {conectado ? "boleta aún sin envío a SUNAT" : "demo sin envío a SUNAT"}</p>
+        </div>
+        <div className="dc-esp-hero__cifras">
+          <div title={`Cobrado este mes – ${sedeNombreCobros()}`}><b>S/ {cobradoMes.toLocaleString("es-PE")}</b><span>Cobrado este mes</span></div>
+          <div><b>S/ {montoHoy.toLocaleString("es-PE")}</b><span>Cobrado hoy</span></div>
+          <div><b>{boletasHoyActivas.length}</b><span>Boletas hoy</span></div>
+        </div>
+        <div className={`dc-caja-estado${cajaAbierta ? " is-abierta" : ""}`}>
+          <span className="dc-caja-estado__ico"><KeyRound size={15} strokeWidth={1.9} /></span>
+          <div className="dc-esp-hero__prox-txt"><span>{cajaAbierta ? "Caja del día" : (jornadaAbiertaPrevia?.id ? `Jornada del ${jornadaAbiertaPrevia.fecha} sin cerrar` : "Caja del día")}</span><b>{cajaAbierta ? "Abierta" : "Cerrada"}</b></div>
+          {!cajaAbierta && <button type="button" className="dc-esp-hero__btn" onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>{jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}</button>}
+        </div>
+        {puedeConfig && <button type="button" className="dc-esp-hero__agregar" onClick={() => setDatosFact(true)}><FileText size={15} strokeWidth={1.9} /> Datos de facturación</button>}
+      </section>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", overflowX: "auto" }}>
+        <div className="dc-tabs-caja" style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", overflowX: "auto" }}>
           {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
             <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)", transition: "background .12s" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
           ); })}
@@ -4446,19 +4462,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       )}
 
       {tab === "cobros" && (<div style={{ display: "grid", gap: 16 }}>
-      {!cajaAbierta && (
-        <div className="dc-banda dc-banda--aviso">
-          <KeyRound size={18} strokeWidth={1.75} />
-          <p>
-            {jornadaAbiertaPrevia?.id
-              ? `Hay una jornada abierta del ${jornadaAbiertaPrevia.fecha}. Ciérrala en Historial antes de abrir la de hoy.`
-              : "La caja del día está cerrada. Ábrela para poder cobrar."}
-          </p>
-          <Btn small onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>
-            <KeyRound size={14} strokeWidth={1.75} /> {jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}
-          </Btn>
-        </div>
-      )}
       {conectado && cajaError && (
         <Card style={{ padding: 14, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -4468,15 +4471,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
         </Card>
       )}
-      <div className="dc-banda dc-banda--info"><div style={{ display: "flex", gap: 10, alignItems: "center" }}><FileText size={18} strokeWidth={1.75} style={{ flexShrink: 0 }} />{/* Decía "Emite boleta electrónica SUNAT (NubeFacT)" cuatro líneas después de que este
-                mismo componente reconozca, en textoComprobante, que todavía no se envía a SUNAT. */}
-            <div style={{ fontSize: 13 }}>Caja única: cobra el <strong>saldo del plan de tratamiento</strong> de cada paciente, el mismo que ven el odontólogo y recepción. {conectado ? <>El cobro queda registrado; <strong>la boleta electrónica aún no se envía a SUNAT</strong>.</> : <>Modo demostración: el cobro queda en el navegador <strong>sin envío a SUNAT</strong>.</>}</div></div></div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        <KpiCard label="Por cobrar (planes)" value={`S/ ${montoPorCobrar.toLocaleString()}`} color="var(--dc-warn-600)" icon={<Clock size={18} strokeWidth={1.75} />} sub={`${porCobrar.length} ${porCobrar.length === 1 ? "plan en curso" : "planes en curso"}`} estado={conectado && cajaError ? "error" : "dato"} onRetry={recargarCaja} />
-        <KpiCard label={`Cobrado este mes – ${sedeNombreCobros()}`} value={`S/ ${cobradoMes.toLocaleString()}`} color="var(--dc-ok-700)" icon={<Wallet size={18} strokeWidth={1.75} />} sub={`hoy S/ ${montoHoy.toLocaleString()}`} estado={conectado && (cajaError || histError) ? "error" : "dato"} onRetry={() => { recargarCaja(); recargarHist(); }} />
-        <KpiCard label={conectado ? "Promedio por cobro de hoy" : "Promedio por cobro"} value={`S/ ${ticketProm.toLocaleString()}`} color={DS.c.primary} icon={<Percent size={18} strokeWidth={1.75} />} sub={conectado ? `${boletasHoyActivas.length} cobro(s) hoy` : "de todos los cobros registrados"} estado={conectado && cajaError ? "error" : "dato"} onRetry={recargarCaja} />
-        <KpiCard label="Boletas hoy" value={boletasHoyActivas.length} color={NAVY} icon={<FileText size={18} strokeWidth={1.75} />} sub={conectado ? "registradas – sin envío a SUNAT" : "demo – sin SUNAT"} estado={conectado && cajaError ? "error" : (conectado && boletasHoyActivas.length === 0 ? "vacio" : "dato")} onRetry={recargarCaja} />
-      </div>
       {conectado && porCobrarHoy.length > 0 && (
         <Card style={{ overflow: "hidden", border: "1px solid var(--dc-amber-soft)" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-warn-soft)", background: "var(--dc-white)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
@@ -4494,7 +4488,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         </Card>
       )}
       <DataTable titulo="Saldos por cobrar" sub="por cobrar" minWidth={980} rows={conectado && cajaError ? [] : porCobrar} onRowClick={(x) => cajaAbierta && intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })} empty={conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todo cobrado" sub="No hay saldos pendientes en esta sede." />} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(180px,1.3fr)", a: "left", get: (x) => x.p.nombre, cell: (x) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: tint(NAVY, 0.078), color: NAVY, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(x.p.nombre)}</div><span style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.p.nombre}</span></div> },
+        { key: "paciente", label: "Paciente", w: "minmax(180px,1.3fr)", a: "left", get: (x) => x.p.nombre, cell: (x) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 36, height: 36, fontSize: 12, background: `linear-gradient(135deg, ${tint(colorDe(x.p.nombre), 0.2)}, ${tint(colorDe(x.p.nombre), 0.08)})`, color: colorDe(x.p.nombre) }}>{iniciales(x.p.nombre)}</span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.p.nombre}</span></div> },
         // Fuera "DNI" -esta en la ficha y en el propio cobro- y "Plan total", que repetia
         // el total que "Plan cobrado" ya da como "S/ 410 de 1.100". La tabla pedia 1148 px.
         { key: "sede", label: "Sede", w: "minmax(130px,1fr)", a: "left", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? ""), cell: (x) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 }}><MapPin size={12} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") || "—"}</span></span> },
@@ -6012,7 +6006,7 @@ const INVENTARIO_INIT = [
 
 /* ---- Servicios / catálogo (estilo Doctocliq: Administración > Servicios) ---- */
 const SERV_CATS = ["Odontología general", "Ortodoncia", "Endodoncia", "Periodoncia", "Cirugía", "Estética", "Odontopediatría", "Prótesis"];
-const SERV_CAT_COL = { "Odontología general": DS.c.primary, Ortodoncia: "var(--dc-purple)", Endodoncia: "var(--dc-red)", Periodoncia: "var(--dc-ok-700)", Cirugía: "var(--dc-danger)", Estética: "var(--dc-warn-700)", Odontopediatría: PED, Prótesis: "var(--dc-warn-700)" };
+const SERV_CAT_COL = { "Odontología general": DS.c.primary, Ortodoncia: "var(--dc-purple)", Endodoncia: "var(--dc-red)", Periodoncia: "var(--dc-ok-700)", Cirugía: "var(--dc-danger)", Estética: "var(--dc-warn-700)", Odontopediatría: PED, Prótesis: "#2563EB" };
 const SERVICIOS_INIT = [
   { id: 1, nombre: "Consulta / evaluación", cat: "Odontología general", monto: 50 },
   { id: 2, nombre: "Profilaxis (limpieza dental)", cat: "Odontología general", monto: 120 },
@@ -6118,26 +6112,33 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
   const acBtn = { width: 30, height: 30, borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", cursor: "pointer", color: NAVY, display: "grid", placeItems: "center", flexShrink: 0 };
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        <KpiCard label="Servicios activos" value={items.filter((s) => s.activo !== false).length} color={NAVY} icon={<ClipboardList size={18} strokeWidth={1.75} />} sub="en el catálogo" />
-        {puedeGestionar && <KpiCard label="Precio medio del catálogo" value={`S/ ${ticket.toLocaleString()}`} color="var(--dc-ok-700)" icon={<DollarSign size={18} strokeWidth={1.75} />} sub={`sobre ${nConPrecio} servicio${nConPrecio === 1 ? "" : "s"} con precio`} />}
-        {puedeGestionar && <KpiCard label="Más caro" value={`S/ ${Math.max(0, ...serviciosConPrecioSafe(items).map((s) => s.monto)).toLocaleString()}`} color={NAVY} icon={<TrendingUp size={18} strokeWidth={1.75} />} sub="del catálogo activo" />}
-      </div>
-      <ModHead icon={<ClipboardList size={20} strokeWidth={1.75} />} titulo="Servicios" sub={puedeGestionar ? "Catálogo – duración, especialidad y estado" : "Catálogo – consulta"} accion={puedeGestionar ? <Btn small onClick={nuevo}><Plus size={15} strokeWidth={1.75} /> Nuevo servicio</Btn> : null} />
+      <section className="dc-esp-hero dc-serv-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{items.filter((s) => s.activo !== false).length}</b><span>servicios activos</span></div>
+          <p>{puedeGestionar ? "Catálogo con duración, especialidad y precio" : "Catálogo de consulta"}</p>
+        </div>
+        <div className="dc-esp-hero__cifras">
+          {puedeGestionar && <div><b>S/ {ticket.toLocaleString("es-PE")}</b><span>Precio medio</span></div>}
+          {puedeGestionar && <div><b>S/ {Math.max(0, ...serviciosConPrecioSafe(items).map((s) => s.monto)).toLocaleString("es-PE")}</b><span>Más caro</span></div>}
+          <div><b>{cats.length}</b><span>Especialidades</span></div>
+        </div>
+        <span />
+        {puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={nuevo}><Plus size={14} strokeWidth={2} /> Nuevo servicio</button>}
+      </section>
       {cats.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {[["all", "Todas"], ...cats.map((c) => [c, c])].map(([k, l]) => { const on = cat === k; const col = k === "all" ? NAVY : (SERV_CAT_COL[k] || "var(--dc-ink-400)"); return (
-          <button key={k} onClick={() => setCat(k)} style={{ fontSize: 13, fontWeight: 500, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${col}` : "1.5px solid var(--dc-line)", background: on ? tint(col, 0.078) : "#fff", color: on ? col : "var(--dc-ink-400)", cursor: "pointer" }}>{l}</button>
+          <button key={k} type="button" className={`dc-cat${on ? " is-on" : ""}`} style={{ "--c": col }} onClick={() => setCat(k)}>{k !== "all" && <i />}{l}<span>{k === "all" ? items.length : items.filter((x) => (x.especialidad || x.cat) === k).length}</span></button>
         ); })}
       </div>}
       <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={980} rows={filtrados} onRowClick={(s) => editar(s)} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
-        { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{s.nombre}</span> },
-        { key: "esp", label: "Especialidad", w: "minmax(140px,1.1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{s.especialidad || s.cat || "—"}</span> },
+        { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span></span>; } },
+        { key: "esp", label: "Especialidad", w: "minmax(140px,1.1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
         { key: "dur", label: "Duración", w: "100px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
         { key: "monto", label: "Precio", w: "minmax(110px,0.8fr)", a: "right", get: (s) => s.monto, cell: (s) => <span className="dc-money" style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {Number(s.monto).toFixed(2)}</span> },
         { key: "margen", label: "Margen", w: "140px", a: "right", get: (s) => margenCatalogo(s) ?? -1, cell: (s) => { const m = margenCatalogo(s); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {m.toFixed(0)}</span>; } },
         { key: "estado", label: "Estado", w: "110px", a: "center", get: (s) => s.activo === false ? "Inactivo" : "Activo", cell: (s) => s.activo === false
-          ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", background: "var(--dc-bg)", padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}>Inactivo</span>
-          : <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}>Activo</span> },
+          ? <span className="dc-pill" style={{ "--c": "#8A9CA1" }}><i /> Inactivo</span>
+          : <span className="dc-pill is-ok"><i /> Activo</span> },
         ...(puedeGestionar ? [{ key: "acc", label: "Acciones", w: "108px", a: "center", noFilter: true, noSort: true, cell: (s) => <div style={{ display: "flex", gap: 6, justifyContent: "center" }} onClick={(e) => e.stopPropagation()}><button type="button" className="dc-icon-btn" aria-label="Editar" onClick={() => editar(s)} title="Editar" style={acBtn}><Pencil size={15} strokeWidth={1.75} /></button></div> }] : []),
       ]} />
       {form && (
@@ -6422,20 +6423,25 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
         ]} />
       )}
       {tab === "productos" && (<>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        {puedeGestionar && <KpiCard label="Valor del inventario" value={`S/ ${valorTotal.toLocaleString()}`} color={NAVY} icon={<Wallet size={18} strokeWidth={1.75} />} sub="costo × stock" />}
-        <KpiCard label="Requieren compra" value={requieren.length} color={requieren.length ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} icon={<AlertCircle size={18} strokeWidth={1.75} />} sub={`${agotadosN} agotado(s) – ${bajosN} bajo mínimo`} />
-        <KpiCard label="Cobertura mínima (hoy)" value={covMinHoy === Infinity ? "—" : (covMinInsumo ? `~${covMinHoy} d – ${covMinInsumo.nombre}` : `~${covMinHoy} d`)} color={covMinHoy <= 7 ? "var(--dc-red)" : NAVY} icon={<Clock size={18} strokeWidth={1.75} />} sub="al ritmo de consumo" />
-        <KpiCard label="Próximos a vencer" value={vencenPronto.length} color={vencenPronto.length ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} icon={<Calendar size={18} strokeWidth={1.75} />} sub="caducidad ≤ 60 días" />
-      </div>
-      {(() => { const totalPedir = requieren.reduce((s, i) => s + pedir(i), 0); return requieren.length > 0 && (
-        <div className="dc-banda dc-banda--aviso">
-          <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 14, flex: 1, minWidth: 220 }}><AlertCircle size={18} strokeWidth={1.75} style={{ flexShrink: 0 }} /> <span><strong>{requieren.length} insumo(s)</strong> requieren compra. Reposición sugerida: <strong>{totalPedir} unidades</strong> para cubrir 2× el mínimo (≈ 2 semanas).</span></div>
-          {puedeGestionar && <Btn small onClick={() => conectado ? (ocDesdeUrgentes(requieren), setTab("compras")) : notify(`Orden de compra: ${totalPedir} unidades de ${requieren.length} insumos. (Demo)`)}><Send size={14} strokeWidth={1.75} /> Generar orden de compra</Btn>}
-        </div>
+      {(() => { const totalPedir = requieren.reduce((s, i) => s + pedir(i), 0); return (
+        <section className="dc-esp-hero dc-inv-hero">
+          <div className="dc-esp-hero__txt">
+            <div className="dc-esp-hero__num"><b>{requieren.length}</b><span>{requieren.length === 1 ? "insumo requiere compra" : "insumos requieren compra"}</span></div>
+            <p>{agotadosN} agotado{agotadosN === 1 ? "" : "s"} y {bajosN} bajo mínimo{requieren.length ? `, reposición sugerida de ${totalPedir} unidades` : ""}</p>
+          </div>
+          <div className="dc-esp-hero__cifras">
+            {puedeGestionar && <div><b>S/ {valorTotal.toLocaleString("es-PE")}</b><span>Valor en stock</span></div>}
+            <div title={covMinHoy === Infinity ? undefined : (covMinInsumo ? `~${covMinHoy} d – ${covMinInsumo.nombre}` : `~${covMinHoy} d`)}><b>{covMinHoy === Infinity ? "—" : `~${covMinHoy} d`}</b><span>Cobertura mínima</span></div>
+            <div><b>{vencenPronto.length}</b><span>Vencen pronto</span></div>
+          </div>
+          <span />
+          <div className="dc-hero-acc">
+            {puedeGestionar && requieren.length > 0 && <button type="button" className="dc-esp-hero__btn" onClick={() => conectado ? (ocDesdeUrgentes(requieren), setTab("compras")) : notify(`Orden de compra: ${totalPedir} unidades de ${requieren.length} insumos. (Demo)`)}><Send size={14} strokeWidth={1.9} /> Generar orden de compra</button>}
+            {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo insumo</button>}
+          </div>
+        </section>
       ); })()}
-      <ModHead icon={<Package size={20} strokeWidth={1.75} />} titulo="Inventario" sub="Stock y cobertura por insumo" accion={puedeGestionar ? <Btn small onClick={nuevo}><Plus size={15} strokeWidth={1.75} /> Nuevo insumo</Btn> : null} />
-      <DataTable titulo="Insumos" sub="insumos" minWidth={1120} rows={items} defaultSort={{ key: "cobertura", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub="Agrega tu primer insumo para controlar stock y cobertura." />} cols={[
+      <DataTable titulo="Insumos" sub="insumos" minWidth={1040} rows={items} defaultSort={{ key: "cobertura", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub="Agrega tu primer insumo para controlar stock y cobertura." />} cols={[
         { key: "insumo", label: "Insumo", w: "minmax(220px,1.8fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{it.cat}</div></div></div>; } },
         { key: "loteVence", label: "Lote / Vence", w: "minmax(140px,1.1fr)", a: "left", get: (it) => it.lote || it.fechaVencimiento || "", cell: (it) => {
           const dv = diasVenc(it.fechaVencimiento);
@@ -6544,7 +6550,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
 
 /* ---- Casos a laboratorio (paridad con Doctocliq) ---- */
 const LAB_FLUJO = ["enviado", "en_proceso", "recibido", "entregado"];
-const LAB_INFO = { enviado: { l: "Enviado", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" }, en_proceso: { l: "En proceso", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" }, recibido: { l: "Recibido", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" }, entregado: { l: "Entregado", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)" } };
+const LAB_INFO = { enviado: { l: "Enviado", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" }, en_proceso: { l: "En proceso", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" }, recibido: { l: "Recibido", bg: "#EFEAFC", fg: "#5B3FC4" }, entregado: { l: "Entregado", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)" } };
 function Laboratorio({ pacientes, notify, updFicha, can }) {
   // Mandar un trabajo al laboratorio es dar de alta un caso. Quien solo consulta el
   // estado de las entregas -gerencia, o el odontologo segun la matriz- no lo hace.
@@ -6580,33 +6586,33 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
   const kpis = [["En proceso", casosVista.filter((c) => c.estado === "en_proceso" || c.estado === "enviado").length, "var(--dc-warn-600)", <FlaskConical size={18} strokeWidth={1.75} />], ["Por entregar", casosVista.filter((c) => c.estado === "recibido").length, "var(--dc-info-ink)", <Clock size={18} strokeWidth={1.75} />], ["Atrasados", atrasados.length, "var(--dc-red)", <AlertTriangle size={18} strokeWidth={1.75} />], ["Entregados", casosVista.filter((c) => c.estado === "entregado").length, "var(--dc-ok-700)", <CheckCircle2 size={18} strokeWidth={1.75} />]];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-        {kpis.map(([l, v, c, ic]) => <KpiCard key={l} label={l} value={v} color={c} icon={ic} />)}
-      </div>
+      {(() => { const activos = casos.filter((c) => c.estado !== "entregado").length; const atr = casos.filter((c) => c.estado !== "entregado" && faltanDias(c) < 0); return (
+        <section className="dc-esp-hero dc-lab-hero">
+          <div className="dc-esp-hero__txt">
+            <div className="dc-esp-hero__num"><b>{activos}</b><span>{activos === 1 ? "caso en curso" : "casos en curso"}</span></div>
+            <p>Coronas, prótesis y férulas con su fecha de entrega</p>
+          </div>
+          <ol className="dc-lab-flujo" aria-label="Flujo del laboratorio">
+            {LAB_FLUJO.map((st, i) => { const I = LAB_INFO[st]; const n = casos.filter((c) => c.estado === st).length; return (
+              <li key={st} className={`is-${st}`}><b>{n}</b><span>{I.l}</span>{i < LAB_FLUJO.length - 1 && <ChevronRight size={14} strokeWidth={2} className="dc-lab-flujo__fl" />}</li>
+            ); })}
+          </ol>
+          {atr.length > 0 ? (
+            <div className="dc-esp-hero__prox dc-lab-hero__atr">
+              <span className="dc-pac-hero__ico" style={{ background: "rgba(245,154,141,.28)", color: "#FFD1C9" }}><AlertTriangle size={15} strokeWidth={1.9} /></span>
+              <div className="dc-esp-hero__prox-txt"><span>{atr.length === 1 ? "1 trabajo atrasado" : `${atr.length} trabajos atrasados`}</span><b>{atr.map((c) => c.paciente).join(", ")}</b></div>
+              <button type="button" className="dc-esp-hero__btn" onClick={() => notify(`Se contactó al laboratorio por ${atr.length} trabajo(s) atrasado(s).`)}><Phone size={13} strokeWidth={1.9} /> Contactar</button>
+            </div>
+          ) : <span />}
+          {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", trabajo: "", lab: "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
+        </section>
+      ); })()}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {[["todos", "Todos"], ["enviado", "Enviado"], ["en_proceso", "En proceso"], ["recibido", "Recibido"], ["entregado", "Entregado"], ["atrasados", "Atrasados"]].map(([k, l]) => {
-          const on = filtroLab === k;
-          return <button key={k} type="button" onClick={() => setFiltroLab(k)} style={{ padding: "6px 12px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${DS.c.primary}` : "1px solid var(--dc-line)", background: on ? "var(--dc-accent-soft)" : "#fff", color: on ? DS.c.primary : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>{l}</button>;
+        {[["todos", "Todos", "#0E9199"], ["enviado", "Enviado", "#2563EB"], ["en_proceso", "En proceso", "#D97706"], ["recibido", "Recibido", "#6D4FD1"], ["entregado", "Entregado", "#16A36A"], ["atrasados", "Atrasados", "#D0563F"]].map(([k, l, c]) => {
+          const n = k === "todos" ? casos.length : k === "atrasados" ? casos.filter((x) => x.estado !== "entregado" && faltanDias(x) < 0).length : casos.filter((x) => x.estado === k).length;
+          return <button key={k} type="button" className={`dc-cat${filtroLab === k ? " is-on" : ""}`} style={{ "--c": c }} onClick={() => setFiltroLab(k)}>{k !== "todos" && <i />}{l}<span>{n}</span></button>;
         })}
       </div>
-      {atrasados.length > 0 && <Card style={{ padding: 14, background: "linear-gradient(120deg, rgba(253,236,234,0.7), rgba(253,236,234,0.3))", border: "1px solid rgba(254,226,226,0.8)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}><div style={{ display: "flex", gap: 9, alignItems: "center", fontSize: 13, color: "var(--dc-danger-700)", flex: 1, minWidth: 220 }}><AlertTriangle size={17} strokeWidth={1.75} style={{ flexShrink: 0 }} /> <span><strong>{atrasados.length} trabajo(s) atrasado(s)</strong>: {atrasados.map((c) => c.paciente).join(", ")}. Contacta al laboratorio.</span></div><Btn small kind="red" onClick={() => notify(`Se contactó al laboratorio por ${atrasados.length} trabajo(s) atrasado(s).`)}><Phone size={14} strokeWidth={1.75} /> Contactar laboratorio</Btn></Card>}
-      <Card style={{ padding: "18px 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}><Activity size={17} strokeWidth={1.75} color={DS.c.primary} /><span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Flujo de trabajos</span></div>
-        <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 16 }}>Dónde está cada caso en el proceso del laboratorio</div>
-        <div style={{ display: "flex", alignItems: "stretch", gap: 0, overflowX: "auto" }}>
-          {LAB_FLUJO.map((st, i) => { const I = LAB_INFO[st]; const n = casosVista.filter((c) => c.estado === st).length; const last = i === LAB_FLUJO.length - 1; return (
-            <React.Fragment key={st}>
-              <div style={{ flex: "1 0 74px", textAlign: "center", padding: "14px 8px", background: tint(I.bg, 0.4), border: `1px solid ${I.bg}`, borderRadius: "var(--dc-r-lg)" }}>
-                <div style={{ fontSize: 27, fontWeight: 600, color: I.fg, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{n}</div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: I.fg, marginTop: 5 }}>{I.l}</div>
-                <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 2 }}>{n === 1 ? "caso" : "casos"}</div>
-              </div>
-              {!last && <div style={{ display: "flex", alignItems: "center", padding: "0 4px", color: "var(--dc-ink-400)", flexShrink: 0 }}><ChevronRight size={18} strokeWidth={1.75} /></div>}
-            </React.Fragment>
-          ); })}
-        </div>
-      </Card>
-      <ModHead icon={<FlaskConical size={20} strokeWidth={1.75} />} color={DS.c.primary} titulo="Casos en laboratorio" sub="Coronas, prótesis y férulas — controla envíos y fechas de entrega." accion={puedeGestionar ? <Btn small onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", trabajo: "", lab: "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={1.75} /> Nuevo envío</Btn> : null} />
       {nuevo && (
         <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Enviar caso a laboratorio" sub="Registra un trabajo (corona, prótesis, férula)" onClose={() => setNuevo(null)} maxW={560} footer={<><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crear}><Send size={15} strokeWidth={1.75} /> Enviar</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -7364,49 +7370,48 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
     <div style={{ display: "grid", gap: 16 }}>
       {soloFotos && <Card style={{ padding: 14, background: "var(--dc-white)", border: "1px solid var(--dc-sky)" }}><div style={{ fontSize: 13, color: "var(--dc-brand-500)" }}>Galería de <strong>fotografía clínica</strong> (intra/extraoral). Se guarda en el expediente del paciente.</div></Card>}
       <PacienteBar pacientes={pacientes} pacienteId={pid} setPacienteId={setPid} modulo={soloFotos ? "Fotografía clínica" : "Radiografías"} accion={
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, textTransform: "uppercase", letterSpacing: .5 }}>Registrar en</span>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "7px 10px" }}>
-              <MapPin size={14} strokeWidth={1.75} color={sedeReg === sedeActiva ? "var(--dc-ok-700)" : DS.c.primary} />
-              <Select small width={200} ariaLabel="Sede" value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: `${nombreSede(s)}${s === sedeActiva ? " – aquí" : ""}` }))} />
-            </div>
-          </div>
-          <Btn small onClick={() => fileRef.current && fileRef.current.click()}><Upload size={15} strokeWidth={1.75} /> Subir imagen</Btn>
+        <div className="dc-rx-acc">
+          <label className="dc-rx-sede" title="Sede donde se registra el estudio">
+            <MapPin size={14} strokeWidth={1.9} />
+            <span>Registrar en</span>
+            <Select small width={170} ariaLabel="Sede" value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: `${nombreSede(s)}${s === sedeActiva ? " (aquí)" : ""}` }))} />
+          </label>
+          <button type="button" className="dc-esp-hero__btn" onClick={() => fileRef.current && fileRef.current.click()}><Upload size={14} strokeWidth={1.9} /> Subir imagen</button>
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
       } />
       {(() => { const base = listaVista; const rx = base.filter((s) => s.tipo !== "foto").length; const fotos = base.filter((s) => s.tipo === "foto").length; const ult = base.length ? [...base].map((s) => s.fecha).sort().slice(-1)[0] : null; return (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-          <KpiCard label={soloFotos ? "Fotos" : "Estudios"} value={base.length} color={NAVY} icon={soloFotos ? <Camera size={18} strokeWidth={1.75} /> : <Scan size={18} strokeWidth={1.75} />} sub="en el expediente" />
-          {!soloFotos && <KpiCard label="Radiografías" value={rx} color={TEAL} icon={<Scan size={18} strokeWidth={1.75} />} sub="panorámica, periapical…" />}
-          <KpiCard label="Fotos intraorales" value={fotos} color={DS.c.primary} icon={<Camera size={18} strokeWidth={1.75} />} sub="registro clínico" />
-          <KpiCard label="Última toma" value={ult ? fechaLegible(ult) : "—"} color="var(--dc-ok-700)" icon={<Calendar size={18} strokeWidth={1.75} />} sub={ult ? "estudio más reciente" : "sin estudios"} />
-        </div>
+        <Card className="dc-env dc-gal">
+          <div className="dc-env__cab">
+            <h3>{soloFotos ? "Fotos del expediente" : "Estudios del expediente"}</h3>
+            <div className="dc-gal__cifras">
+              <span className="dc-gal__c"><b>{base.length}</b> {soloFotos ? "fotos" : "estudios"}</span>
+              {!soloFotos && <span className="dc-gal__c is-rx"><Scan size={13} strokeWidth={2} /><b>{rx}</b> radiografías</span>}
+              <span className="dc-gal__c is-foto"><Camera size={13} strokeWidth={2} /><b>{fotos}</b> fotos</span>
+              {ult && <span className="dc-gal__c"><Calendar size={13} strokeWidth={2} /> Última toma {fechaLegible(ult)}</span>}
+            </div>
+          </div>
+          {base.length === 0 ? (
+            <Vacio icon={soloFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={soloFotos ? "Sin fotos" : "Sin estudios"} sub={soloFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía o foto de este paciente."} />
+          ) : (
+            <div className="dc-gal__grid">
+              {base.map((s) => { const esFoto = s.tipo === "foto"; return (
+                <article key={s.id} className={`dc-gal__item${esFoto ? " is-foto" : ""}`}>
+                  <button type="button" className="dc-gal__img" onClick={() => setVisor(s)} aria-label={`Abrir ${RX_TIPOS[s.tipo]}`}>
+                    {s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} /> : (esFoto ? <Camera size={34} strokeWidth={1.5} /> : <Scan size={34} strokeWidth={1.5} />)}
+                    <span className="dc-gal__tipo">{esFoto ? <Camera size={12} strokeWidth={2} /> : <Scan size={12} strokeWidth={2} />} {RX_TIPOS[s.tipo]}</span>
+                  </button>
+                  <div className="dc-gal__pie">
+                    <div className="dc-gal__meta"><b>{fechaLegible(s.fecha)}</b>{s.sede ? <span><MapPin size={11} strokeWidth={2} /> {cortaSede(s.sede)}</span> : null}</div>
+                    <button type="button" className="dc-gal__btn" onClick={() => setVisor(s)} title="Abrir visor" aria-label="Abrir visor"><Eye size={15} strokeWidth={1.9} /></button>
+                    {puedeBorrarRx && <button type="button" className="dc-gal__btn is-del" onClick={() => setBorrarRx(s)} title="Eliminar estudio" aria-label="Eliminar estudio"><Trash2 size={15} strokeWidth={1.9} /></button>}
+                  </div>
+                </article>
+              ); })}
+            </div>
+          )}
+        </Card>
       ); })()}
-      {listaVista.length === 0 ? (
-        <Card><Vacio icon={soloFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={soloFotos ? "Sin fotos" : "Sin estudios"} sub={soloFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía o foto de este paciente."} /></Card>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 14 }}>
-          {listaVista.map((s) => { const esFoto = s.tipo === "foto"; return (
-            <Card key={s.id} style={{ overflow: "hidden", padding: 0 }}>
-              <div style={{ height: 150, background: esFoto ? "linear-gradient(135deg, var(--dc-ink-alt), var(--dc-navy))" : "radial-gradient(circle at 50% 40%, var(--dc-ink-700), var(--dc-ink-900))", display: "grid", placeItems: "center", position: "relative", overflow: "hidden" }}>
-                {s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (esFoto ? <Camera size={34} strokeWidth={1.75} color="rgba(255,255,255,.5)" /> : <Scan size={34} strokeWidth={1.75} color="rgba(255,255,255,.55)" />)}
-                <span style={{ position: "absolute", top: 10, left: 10, fontSize: 12, fontWeight: 500, color: "#fff", background: "rgba(0,0,0,.5)", padding: "3px 9px", borderRadius: "var(--dc-r-full)" }}>{RX_TIPOS[s.tipo]}</span>
-              </div>
-              <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{RX_TIPOS[s.tipo]}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 4 }}>{fechaLegible(s.fecha)}{s.sede ? <> – <MapPin size={11} strokeWidth={1.75} /> {cortaSede(s.sede)}</> : ""}</div></div>
-                <span style={{ display: "inline-flex", gap: 6 }}>
-                  <button onClick={() => setVisor(s)} title="Abrir visor" aria-label="Abrir visor" style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: 7, cursor: "pointer", color: DS.c.primary, display: "grid", placeItems: "center" }}><Eye size={15} strokeWidth={1.75} /></button>
-                  {/* El endpoint y el permiso ya existian: solo faltaba el boton, asi que
-                      una radiografia subida por error se quedaba ahi para siempre. */}
-                  {puedeBorrarRx && <button onClick={() => setBorrarRx(s)} title="Eliminar estudio" aria-label="Eliminar estudio" style={{ background: "none", border: "1px solid var(--dc-fee)", borderRadius: "var(--dc-r-sm)", padding: 7, cursor: "pointer", color: "var(--dc-red)", display: "grid", placeItems: "center" }}><Trash2 size={15} strokeWidth={1.75} /></button>}
-                </span>
-              </div>
-            </Card>
-          ); })}
-        </div>
-      )}
       {borrarRx && (
         <Modal icon={<Trash2 size={20} strokeWidth={1.75} />} tone="var(--dc-red)" titulo="Eliminar estudio"
           sub={`${RX_TIPOS[borrarRx.tipo] || "Estudio"} – ${paciente.nombre}`} maxW={430} onClose={() => setBorrarRx(null)}

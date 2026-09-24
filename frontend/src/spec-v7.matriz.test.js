@@ -108,7 +108,8 @@ describe("A35–A36 — inventario", () => {
   it("App no muestra Urgentes y Por reponer como KPIs hermanos", () => {
     assert.doesNotMatch(app, /label="Urgentes/);
     assert.doesNotMatch(app, /label="Por reponer"/);
-    assert.match(app, /label="Requieren compra"/);
+    // Un solo indicador de reposición (ahora en la franja de Inventario).
+    assert.match(app, /insumos requieren compra/);
   });
 });
 

@@ -199,7 +199,7 @@ button, input, select, textarea { font-family: inherit; word-spacing: inherit; }
 }
 /* Icon-only / close: ampliar hit area sin agrandar el glifo */
 .dc-icon-btn,
-button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn):not(.dc-info):not([class*="dc-sb__"]):not([class*="dc-top__"]):not([class*="wa-"]):not(.dc-rec__switch) {
+button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn):not(.dc-info):not([class*="dc-sb__"]):not([class*="dc-top__"]):not([class*="wa-"]):not(.dc-rec__switch):not([class*="dc-gal__"]) {
   min-width: var(--dc-tap-min) !important;
   min-height: var(--dc-tap-min) !important;
   display: inline-grid;
