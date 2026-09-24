@@ -2003,7 +2003,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     ["Por pagar", money(porPagar), debe ? WARN : GREEN],
                     ...(saldoAFavor > 0.005 ? [["Saldo a favor", money(saldoAFavor), GREEN]] : []),
                   ].map(([l, v, c]) => (
-                    <div key={l} style={card}><div style={{ fontSize: 12, fontWeight: 500, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em" }}>{l}</div><div style={{ fontSize: 21, fontWeight: 500, color: c, marginTop: 3 }}>{v}</div></div>
+                    <div key={l} className="fm-cta" style={{ "--c": l === "Total plan" ? "#0E9199" : l === "Pagado" ? "#16A36A" : (debe ? "#D97706" : "#16A36A") }}><span>{l}</span><b>{v}</b></div>
                   ))}
                 </div>
                 <div style={{ ...card, padding: 0, overflow: "hidden" }}>

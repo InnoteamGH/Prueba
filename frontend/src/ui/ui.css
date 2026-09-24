@@ -2080,3 +2080,91 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-ap-lado__medios span { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.16); }
 .dc-ap-lado p { margin: 0; font-size: 12px; line-height: 1.45; color: rgba(255,255,255,.75); }
 @media (max-width: 1100px) { .dc-ap-grid { grid-template-columns: 1fr; } .dc-ap-lado { position: static; } }
+
+/* ======================================================================
+   CAJA y FICHA — versión clara con baldosas de color
+   ====================================================================== */
+.dc-caja-hero, .dc-caja-sub {
+  background:
+    radial-gradient(40% 140% at 100% 0%, rgba(34,175,170,.14) 0%, transparent 60%),
+    radial-gradient(30% 120% at 0% 100%, rgba(240,124,108,.10) 0%, transparent 60%),
+    #fff !important;
+  color: var(--dc-ink-900) !important;
+  box-shadow: 0 1px 2px rgba(14,42,51,.05), 0 18px 40px -30px rgba(14,42,51,.45), inset 0 0 0 1px rgba(14,42,51,.06) !important;
+  padding: 16px 18px 16px 24px !important;
+}
+.dc-caja-hero::before, .dc-caja-sub::before { content: "" !important; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; right: auto !important; border-radius: 0 !important; box-shadow: none !important; background: linear-gradient(180deg, #22AFAA, #0B6C78) !important; }
+.dc-caja-hero .dc-esp-hero__num b, .dc-caja-sub .dc-esp-hero__num b { color: var(--dc-ink-900); }
+.dc-caja-hero .dc-esp-hero__num b.is-neg, .dc-caja-sub .dc-esp-hero__num b.is-neg { color: #C0392B; }
+.dc-caja-hero .dc-esp-hero__num span, .dc-caja-sub .dc-esp-hero__num span { color: #0A6C76; }
+.dc-caja-hero .dc-esp-hero__txt p, .dc-caja-sub .dc-esp-hero__txt p { color: var(--dc-ink-500); }
+/* Cifras como baldosas de color */
+.dc-caja-hero .dc-esp-hero__cifras, .dc-caja-sub .dc-esp-hero__cifras { gap: 8px; }
+.dc-caja-hero .dc-esp-hero__cifras > div, .dc-caja-sub .dc-esp-hero__cifras > div {
+  border: 0 !important; padding: 8px 14px 9px !important; border-radius: 14px;
+  background: color-mix(in srgb, var(--acento) 11%, #fff); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acento) 22%, transparent);
+}
+.dc-caja-hero .dc-esp-hero__cifras b, .dc-caja-sub .dc-esp-hero__cifras b { color: var(--dc-ink-900); font-size: 18px; }
+.dc-caja-hero .dc-esp-hero__cifras span, .dc-caja-sub .dc-esp-hero__cifras span { color: color-mix(in srgb, var(--acento) 70%, #1F3A40); font-weight: 600; }
+.dc-caja-hero .dc-esp-hero__cifras > div > b::before, .dc-caja-sub .dc-esp-hero__cifras > div > b::before { box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 22%, transparent) !important; }
+:is(.dc-caja-hero, .dc-caja-sub) .dc-esp-hero__cifras > div:nth-child(1) { --acento: #16A36A; }
+:is(.dc-caja-hero, .dc-caja-sub) .dc-esp-hero__cifras > div:nth-child(2) { --acento: #D97706; }
+:is(.dc-caja-hero, .dc-caja-sub) .dc-esp-hero__cifras > div:nth-child(3) { --acento: #6D4FD1; }
+/* Botones */
+:is(.dc-caja-hero, .dc-caja-sub) .dc-esp-hero__btn { background: linear-gradient(118deg, #0B6C78, #14A3A8) !important; color: #fff !important; box-shadow: 0 10px 20px -12px rgba(11,108,120,.9) !important; }
+:is(.dc-caja-hero, .dc-caja-sub) .dc-esp-hero__btn.is-coral { background: linear-gradient(118deg, #D0563F, #F07C6C) !important; box-shadow: 0 10px 20px -12px rgba(208,86,63,.9) !important; }
+:is(.dc-caja-hero, .dc-caja-sub) .dc-esp-hero__agregar { color: #0A6C76 !important; background: #fff !important; box-shadow: inset 0 0 0 1.5px #BFE3E4 !important; }
+:is(.dc-caja-hero, .dc-caja-sub) .dc-esp-hero__agregar:hover { background: #EAF7F7 !important; }
+/* Estado de caja */
+.dc-caja-estado { background: #FFF4DE !important; box-shadow: inset 0 0 0 1px #F6DFA6 !important; }
+.dc-caja-estado .dc-esp-hero__prox-txt span { color: #946009 !important; }
+.dc-caja-estado .dc-esp-hero__prox-txt b { color: #7A4E05 !important; }
+.dc-caja-estado__ico { background: #FBE5B4 !important; color: #946009 !important; }
+.dc-caja-estado.is-abierta { background: #E3F7EC !important; box-shadow: inset 0 0 0 1px #BFE9D1 !important; }
+.dc-caja-estado.is-abierta .dc-esp-hero__prox-txt span, .dc-caja-estado.is-abierta .dc-esp-hero__prox-txt b { color: #15803D !important; }
+.dc-caja-estado.is-abierta .dc-caja-estado__ico { background: #C4ECD5 !important; color: #15803D !important; }
+.dc-caja-estado .dc-esp-hero__btn { background: linear-gradient(118deg, #0B6C78, #14A3A8) !important; color: #fff !important; }
+/* Rango de fechas del historial */
+.dc-caja-sub .dc-rango label { background: #F3F8F8; box-shadow: inset 0 0 0 1px #DCE9EA; }
+.dc-caja-sub .dc-rango label span { color: var(--dc-ink-500); }
+.dc-caja-sub .dc-rango input { color: var(--dc-ink-900); color-scheme: light; }
+/* Panel lateral de apertura en claro con acento */
+.dc-ap-lado { color: var(--dc-ink-900) !important; background: linear-gradient(180deg, #EAF7F7, #fff 55%) !important; box-shadow: inset 0 0 0 1px #D2EAEA, 0 16px 32px -26px rgba(14,42,51,.5) !important; }
+.dc-ap-lado li { background: #fff !important; box-shadow: inset 0 0 0 1px #E1EEEE !important; }
+.dc-ap-lado li svg { color: #0E9199 !important; }
+.dc-ap-lado li span { color: var(--dc-ink-500) !important; }
+.dc-ap-lado__medios span { background: #E3F4F4 !important; color: #0A6C76; }
+.dc-ap-lado p { color: var(--dc-ink-500) !important; }
+/* Cierre: el total en turquesa claro */
+.dc-cierre__t.is-total { background: linear-gradient(118deg, #0B6C78, #14A3A8) !important; }
+
+/* ---- Ficha: cabecera luminosa ---- */
+.fm .fm-top {
+  color: var(--dc-ink-900) !important;
+  background:
+    radial-gradient(45% 160% at 100% 0%, rgba(34,175,170,.22) 0%, transparent 60%),
+    radial-gradient(35% 140% at 0% 100%, rgba(240,124,108,.14) 0%, transparent 60%),
+    linear-gradient(180deg, #F2FBFA, #fff) !important;
+  border-bottom: 1px solid #E1EEEE !important;
+}
+.fm .fm-top > div:first-child > div:first-child { background: linear-gradient(135deg, #22AFAA, #0B6C78) !important; box-shadow: 0 10px 20px -10px rgba(11,108,120,.8) !important; }
+.fm-top__eti { color: #0A6C76 !important; font-weight: 600 !important; }
+.fm-top__nom { color: var(--dc-ink-900) !important; font-size: 21px !important; }
+.fm-top__chips span { color: #1F4A52 !important; background: #fff !important; box-shadow: inset 0 0 0 1px #D6E8E8 !important; }
+.fm-top__chips span.is-ok { background: #E3F7EC !important; color: #15803D !important; box-shadow: inset 0 0 0 1px #BFE9D1 !important; }
+.fm .fm-top button:not([aria-label="Cerrar expediente"]) { background: linear-gradient(118deg, #0B6C78, #14A3A8) !important; color: #fff !important; }
+.fm .fm-top button[aria-label="Cerrar expediente"] { background: #fff !important; color: var(--dc-ink-700) !important; box-shadow: inset 0 0 0 1px #D6E8E8 !important; }
+.fm .fm-top button[aria-label="Cerrar expediente"] svg { color: var(--dc-ink-700) !important; }
+/* Rail con fondo suave y activo en píldora clara con barra */
+.fm .fm-rail { background: linear-gradient(180deg, #F7FCFC, #fff) !important; }
+.fm .fm-navbtn.is-on { background: #E3F4F4 !important; color: #0A6C76 !important; box-shadow: inset 3px 0 0 #0E9199 !important; }
+.fm .fm-navbtn.is-on svg { color: #0E9199 !important; }
+/* Columna de presupuesto con color */
+.fm .fm-lateral > div:first-child { background: linear-gradient(180deg, #EEF4FF, #fff) !important; box-shadow: inset 0 0 0 1px #D8E4FB !important; }
+.fm .fm-lateral > div:nth-child(2) { border-radius: 16px !important; background: #F3F8F8 !important; box-shadow: inset 0 0 0 1px #E1EEEE; }
+.dc-caja-estado .dc-esp-hero__prox-txt { min-width: 92px; }
+.dc-caja-estado .dc-esp-hero__prox-txt span, .dc-caja-estado .dc-esp-hero__prox-txt b { white-space: nowrap; overflow: visible; }
+.fm-cta { --c: #0E9199; position: relative; overflow: hidden; display: grid; gap: 2px; padding: 14px 16px 14px 18px; border-radius: 18px; background: color-mix(in srgb, var(--c) 9%, #fff); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 22%, transparent); }
+.fm-cta::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+.fm-cta span { font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--c) 75%, #1F3A40); }
+.fm-cta b { font-family: var(--dc-font-title); font-size: 22px; font-weight: 800; color: var(--dc-ink-900); letter-spacing: -.02em; }
