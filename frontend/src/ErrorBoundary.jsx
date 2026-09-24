@@ -48,11 +48,11 @@ export default class ErrorBoundary extends React.Component {
                       padding: 32, textAlign: "center" }}>
           <div style={{ fontSize: 44, lineHeight: 1, marginBottom: 14 }} aria-hidden="true">🦷</div>
 
-          <h1 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 600, color: "var(--dc-brand-900)" }}>
+          <h1 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 500, color: "var(--dc-brand-900)" }}>
             {esChunk ? "No se pudo cargar esta sección" : "Algo se rompió en la pantalla"}
           </h1>
 
-          <p style={{ margin: "0 0 22px", fontSize: 15, lineHeight: 1.6, color: "var(--dc-ink-500)" }}>
+          <p style={{ margin: "0 0 22px", fontSize: 14, lineHeight: 1.6, color: "var(--dc-ink-500)" }}>
             {esChunk
               ? "Suele pasar cuando se publicó una versión nueva mientras tenías la app abierta. Al recargar se descarga la actualizada."
               : "El fallo es de la interfaz, no de tus datos: nada de lo que ya estaba guardado se ha perdido."}
@@ -61,13 +61,13 @@ export default class ErrorBoundary extends React.Component {
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
             <button onClick={this.recargar}
                     style={{ padding: "11px 20px", borderRadius: "var(--dc-r-lg)", border: "none", cursor: "pointer",
-                             background: "var(--dc-teal)", color: "var(--dc-white)", fontSize: 15, fontWeight: 600 }}>
+                             background: "var(--dc-teal)", color: "var(--dc-white)", fontSize: 14, fontWeight: 500 }}>
               Recargar
             </button>
             <button onClick={this.volverAlInicio}
                     style={{ padding: "11px 20px", borderRadius: "var(--dc-r-lg)", cursor: "pointer",
                              border: "1px solid var(--dc-line)", background: "var(--dc-white)", color: "var(--dc-ink-500)",
-                             fontSize: 15, fontWeight: 600 }}>
+                             fontSize: 14, fontWeight: 500 }}>
               Volver al inicio
             </button>
           </div>

@@ -1716,7 +1716,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
               <button type="button" className="dc-pg-ficha__cerrar" aria-label="Cerrar" onClick={() => setMetaEdit(null)}>×</button>
             </div>
             <div className="dc-pg-ficha__body">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", display: "block" }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block" }}>
                 Meta del mes (S/)
                 <input
                   className="dc-premium-inp"

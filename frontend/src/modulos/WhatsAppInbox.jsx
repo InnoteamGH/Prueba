@@ -318,17 +318,17 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   };
 
   const burbuja = (m, i) => {
-    if (m.de === "sistema") return <div key={i} style={{ textAlign: "center", margin: "10px 0" }}><span style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-600)", fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: "var(--dc-r-full)" }}>{m.txt}</span></div>;
+    if (m.de === "sistema") return <div key={i} style={{ textAlign: "center", margin: "10px 0" }}><span style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-600)", fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: "var(--dc-r-full)" }}>{m.txt}</span></div>;
     const mapa = { paciente: { bg: "var(--dc-white)", fg: INK, a: "flex-start", b: "1px solid var(--dc-line)", sh: "0 2px 6px -1px rgba(16,24,40,.04)" }, ia: { bg: DS.c.primary, fg: "var(--dc-white)", a: "flex-end", b: "none", sh: "0 4px 10px -2px " + tint(DS.c.primary, 0.376) }, agente: { bg: NAVY, fg: "var(--dc-white)", a: "flex-end", b: "none", sh: "0 4px 10px -2px rgba(16,24,40,.2)" } };
     const s = mapa[m.de] || mapa.paciente;
     return (
       <div key={i} style={{ display: "flex", justifyContent: s.a, marginBottom: 8 }}>
         <div style={{ maxWidth: "78%" }}>
-          {m.de === "ia" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", fontWeight: 600, marginBottom: 4, display: "flex", alignItems: "center", gap: 3 }}><Bot size={11} strokeWidth={1.75} /> Asistente IA</div>}
-          {m.de === "agente" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", fontWeight: 600, marginBottom: 4, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}><UserCheck size={11} strokeWidth={1.75} /> Recepción (tú)</div>}
-          <div style={{ background: s.bg, color: s.fg, border: s.b, padding: "10px 14px", borderRadius: "var(--dc-r-lg)", borderBottomLeftRadius: m.de === "paciente" ? 2 : 14, borderBottomRightRadius: m.de !== "paciente" ? 2 : 14, fontSize: 15, lineHeight: 1.45, boxShadow: s.sh, wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}>
+          {m.de === "ia" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", fontWeight: 500, marginBottom: 4, display: "flex", alignItems: "center", gap: 3 }}><Bot size={11} strokeWidth={1.75} /> Asistente IA</div>}
+          {m.de === "agente" && <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", fontWeight: 500, marginBottom: 4, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}><UserCheck size={11} strokeWidth={1.75} /> Recepción (tú)</div>}
+          <div style={{ background: s.bg, color: s.fg, border: s.b, padding: "10px 14px", borderRadius: "var(--dc-r-lg)", borderBottomLeftRadius: m.de === "paciente" ? 2 : 14, borderBottomRightRadius: m.de !== "paciente" ? 2 : 14, fontSize: 14, lineHeight: 1.45, boxShadow: s.sh, wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}>
             {m.txt}
-            {m.tools?.length > 0 && <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", gap: 4 }}>{m.tools.map((tl, k) => <span key={k} style={{ fontSize: 12, fontWeight: 600, background: "rgba(255,255,255,.2)", color: "var(--dc-white)", padding: "2px 7px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 3 }}><Zap size={9} strokeWidth={1.75} /> {tl}()</span>)}</div>}
+            {m.tools?.length > 0 && <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", gap: 4 }}>{m.tools.map((tl, k) => <span key={k} style={{ fontSize: 12, fontWeight: 500, background: "rgba(255,255,255,.2)", color: "var(--dc-white)", padding: "2px 7px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 3 }}><Zap size={9} strokeWidth={1.75} /> {tl}()</span>)}</div>}
           </div>
           <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 2, textAlign: s.a === "flex-end" ? "right" : "left", display: "flex", alignItems: "center", justifyContent: s.a === "flex-end" ? "flex-end" : "flex-start", gap: 4 }}>
             <span>{m.t}</span>
@@ -341,7 +341,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   // Indicador de entrega tipo WhatsApp: ✓ enviado, ✓✓ entregado, ✓✓ azul leído, ⚠ fallido.
   const ticks = (estado) => {
     if (!estado || estado === "pendiente") return null;
-    if (estado === "fallido") return <span title="No se pudo entregar" style={{ color: "var(--dc-danger)", fontWeight: 600 }}>⚠</span>;
+    if (estado === "fallido") return <span title="No se pudo entregar" style={{ color: "var(--dc-danger)", fontWeight: 500 }}>⚠</span>;
     if (estado === "leido") return <CheckCheck size={13} strokeWidth={1.75} style={{ color: "var(--dc-blue)" }} />;
     if (estado === "entregado") return <CheckCheck size={13} strokeWidth={1.75} style={{ color: "var(--dc-slate)" }} />;
     if (estado === "enviado") return <Check size={13} strokeWidth={1.75} style={{ color: "var(--dc-ink-400)" }} />;
@@ -355,7 +355,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
       if (m.fecha) ultima = m.fecha;
       return (
         <React.Fragment key={i}>
-          {sep && <div style={{ textAlign: "center", margin: "12px 0 8px", position: "relative", zIndex: 1 }}><span style={{ background: "rgba(255,255,255,0.75)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "var(--dc-ink-500)", fontSize: 12, fontWeight: 600, padding: "5px 14px", borderRadius: "var(--dc-r-full)", textTransform: "capitalize", boxShadow: "0 1px 2px rgba(16,24,40,.04)", border: "1px solid rgba(255,255,255,0.4)" }}>{diaLabel(m.fecha)}</span></div>}
+          {sep && <div style={{ textAlign: "center", margin: "12px 0 8px", position: "relative", zIndex: 1 }}><span style={{ background: "rgba(255,255,255,0.75)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "var(--dc-ink-500)", fontSize: 12, fontWeight: 500, padding: "5px 14px", borderRadius: "var(--dc-r-full)", textTransform: "capitalize", boxShadow: "0 1px 2px rgba(16,24,40,.04)", border: "1px solid rgba(255,255,255,0.4)" }}>{diaLabel(m.fecha)}</span></div>}
           {burbuja(m, i)}
         </React.Fragment>
       );
@@ -422,15 +422,15 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         return (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 12, flexWrap: "wrap", background: "rgba(255,255,255,0.5)", padding: "10px 16px", borderRadius: "var(--dc-r-lg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.9)", boxShadow: "0 4px 20px -10px rgba(16,24,40,.05)" }}>
             <div style={{ fontSize: 13, color: "var(--dc-slate)", display: "flex", alignItems: "center", gap: 12, fontWeight: 500 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: "var(--dc-r-full)", background: cfg[1], color: cfg[0], display: "inline-flex", alignItems: "center", gap: 5, letterSpacing: 0, boxShadow: "0 2px 8px -2px "+tint(cfg[0], 0.251) }}>
+              <span style={{ fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: "var(--dc-r-full)", background: cfg[1], color: cfg[0], display: "inline-flex", alignItems: "center", gap: 5, letterSpacing: 0, boxShadow: "0 2px 8px -2px "+tint(cfg[0], 0.251) }}>
                 <span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: cfg[0] }}/> {cfg[2]}
               </span>
               <span style={{color: "var(--dc-ink-400)"}}>|</span>
-              <span><b style={{color: INK, fontWeight: 600}}>{total}</b> chats</span>
+              <span><b style={{color: INK, fontWeight: 500}}>{total}</b> chats</span>
               <span style={{color: "var(--dc-ink-400)"}}>•</span>
-              <span><b style={{color: "var(--dc-ok-700)", fontWeight: 600}}>{porIA}</b> IA</span>
+              <span><b style={{color: "var(--dc-ok-700)", fontWeight: 500}}>{porIA}</b> IA</span>
               <span style={{color: "var(--dc-ink-400)"}}>•</span>
-              <span><b style={{color: "var(--dc-warn-600)", fontWeight: 600}}>{humano}</b> Recepción</span>
+              <span><b style={{color: "var(--dc-warn-600)", fontWeight: 500}}>{humano}</b> Recepción</span>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} className="dc-inbox-header-actions">
               {/* WA-07: Probar conexión siempre visible con sesión (llama GET /salud). */}
@@ -440,13 +440,13 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
                 </Btn>
               )}
               {conectado && Number(salud?.fallos24h) > 0 && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-warn-mid, #f59e0b)", background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", fontSize: 12, fontWeight: 600 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-warn-mid, #f59e0b)", background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", fontSize: 12, fontWeight: 500 }}>
                   <AlertTriangle size={14} strokeWidth={2}/> Con fallos · {salud.fallos24h} en 24 h
                 </span>
               )}
               {conectado && probarResultado && (
                 <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: "var(--dc-r-md)", fontSize: 12, fontWeight: 600,
+                  display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: "var(--dc-r-md)", fontSize: 12, fontWeight: 500,
                   border: `1px solid ${probarResultado.ok ? "var(--dc-ok-mid, #86efac)" : "var(--dc-danger-mid)"}`,
                   background: probarResultado.ok ? "var(--dc-ok-soft)" : "var(--dc-danger-soft)",
                   color: probarResultado.ok ? "var(--dc-ok-700)" : "var(--dc-red-deep)",
@@ -487,7 +487,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         <div className="dc-inbox-list" style={{ borderRight: "1px solid rgba(16,24,40,.06)", background: "rgba(255,255,255,0.7)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, height: "100%", borderRadius: "20px 0 0 20px" }}>
           <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <span style={{ fontWeight: 700, color: NAVY, fontSize: 15, fontFamily: DISPLAY_FONT }}>Chats</span>
+              <span style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Chats</span>
               {conectado && <button type="button" className="dc-icon-btn" aria-label="Actualizar" onClick={cargarConversaciones} title="Actualizar" style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: 6, cursor: "pointer", color: DS.c.primary, display: "grid", placeItems: "center" }}><Repeat size={14} strokeWidth={1.75} /></button>}
             </div>
             <div style={{ position: "relative" }}>
@@ -496,7 +496,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {FILTROS.map(([k, l]) => { const on = filtro === k; const n = k === "pendientes" ? chats.filter((c) => (c.porResponder || 0) > 0).length : 0; return (
-                <button key={k} onClick={() => setFiltro(k)} style={{ padding: "5px 10px", borderRadius: "var(--dc-r-full)", border: on ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: on ? (tint(DS.c.primary, 0.071)) : "var(--dc-white)", color: on ? DS.c.primary : "var(--dc-ink-400)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>{l}{k === "pendientes" && n > 0 && <span style={{ background: "var(--dc-line)", color: INK, borderRadius: "var(--dc-r-full)", fontSize: 12, fontWeight: 600, minWidth: 16, height: 16, padding: "0 4px", display: "grid", placeItems: "center" }}>{n}</span>}</button>
+                <button key={k} onClick={() => setFiltro(k)} style={{ padding: "5px 10px", borderRadius: "var(--dc-r-full)", border: on ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: on ? (tint(DS.c.primary, 0.071)) : "var(--dc-white)", color: on ? DS.c.primary : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>{l}{k === "pendientes" && n > 0 && <span style={{ background: "var(--dc-line)", color: INK, borderRadius: "var(--dc-r-full)", fontSize: 12, fontWeight: 500, minWidth: 16, height: 16, padding: "0 4px", display: "grid", placeItems: "center" }}>{n}</span>}</button>
               ); })}
             </div>
           </div>
@@ -516,19 +516,19 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             )}
             {lista.map((c) => (
               <button key={c.id} onClick={() => seleccionar(c.id)} style={{ display: "flex", gap: 11, alignItems: "center", width: "100%", textAlign: "left", padding: "12px 14px", border: "none", borderBottom: "1px solid var(--dc-line)", cursor: "pointer", background: activo === c.id ? "var(--dc-bg-soft)" : "var(--dc-white)", borderLeft: activo === c.id ? "3px solid " + DS.c.primary : "3px solid transparent", transition: "background .15s" }} onMouseEnter={(e) => { if (activo !== c.id) e.currentTarget.style.background = "var(--dc-bg-soft)"; }} onMouseLeave={(e) => { if (activo !== c.id) e.currentTarget.style.background = "var(--dc-white)"; }}>
-                <div style={{ width: 42, height: 42, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>{inicial(c.nombre)}</div>
+                <div style={{ width: 42, height: 42, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>{inicial(c.nombre)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontWeight: 600, color: NAVY, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nombre}</span>
+                    <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nombre}</span>
                     {c.ejemplo && <span className="dc-inbox-ejemplo">Ejemplo</span>}
                     {conectado && <span title={c.esPaciente ? "Paciente registrado" : "Contacto nuevo (lead)"} style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: c.esPaciente ? "var(--dc-ok)" : "var(--dc-line-alt)", flexShrink: 0 }} />}
                   </div>
                   <div style={{ fontSize: 13, color: c.porResponder > 0 ? "var(--dc-ok-700)" : "var(--dc-ink-400)", fontWeight: c.porResponder > 0 ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.msgs.length ? c.msgs[c.msgs.length - 1].txt : (c.ultimoMensaje || c.tel)}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                  {conectado && c.actualizado && <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 600 }}>{hhmm(c.actualizado)}</span>}
-                  <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 7px", borderRadius: "var(--dc-r-full)", background: c.modo === "ia" ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", color: c.modo === "ia" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>{c.modo === "ia" ? "IA" : "ATENCIÓN"}</span>
-                  {conectado && c.porResponder > 0 && <span title="Mensajes por responder" style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, fontSize: 12, fontWeight: 600, display: "grid", placeItems: "center" }}>{c.porResponder}</span>}
+                  {conectado && c.actualizado && <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{hhmm(c.actualizado)}</span>}
+                  <span style={{ fontSize: 12, fontWeight: 500, padding: "2px 7px", borderRadius: "var(--dc-r-full)", background: c.modo === "ia" ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", color: c.modo === "ia" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>{c.modo === "ia" ? "IA" : "ATENCIÓN"}</span>
+                  {conectado && c.porResponder > 0 && <span title="Mensajes por responder" style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, fontSize: 12, fontWeight: 500, display: "grid", placeItems: "center" }}>{c.porResponder}</span>}
                 </div>
               </button>
             ))}
@@ -536,13 +536,13 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         </div>
         {/* Columna 2 · hilo de conversación */}
         {!chat ? (
-          <div style={{ gridColumn: "2 / 4", display: "grid", placeItems: "center", background: "var(--dc-bg)", color: "var(--dc-ink-500)", fontSize: 15, padding: 24, textAlign: "center" }}>
+          <div style={{ gridColumn: "2 / 4", display: "grid", placeItems: "center", background: "var(--dc-bg)", color: "var(--dc-ink-500)", fontSize: 14, padding: 24, textAlign: "center" }}>
             <div><MessageSquare size={34} strokeWidth={1.75} color="var(--dc-ink-400)" /><div style={{ marginTop: 10 }}>{conectado ? "Selecciona una conversación para verla." : "Sin conversación."}</div></div>
           </div>
         ) : (<>
         <div className="dc-inbox-thread" style={{ display: "flex", flexDirection: "column", background: "rgba(245,247,250,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", minWidth: 0, minHeight: 0, position: "relative", height: "100%" }}>
           <div className="dc-inbox-chat-head" style={{ padding: "10px 16px", background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: "1px solid rgba(16,24,40,.06)", position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 }}>
-            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 13, flexShrink: 0 }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
+            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
               {conectado && <Btn small onClick={() => abrirAgendar("Solicitud por WhatsApp")}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
               <Btn small kind={chat.modo === "ia" ? "navy" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>
@@ -557,17 +557,17 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           ) : chat.modo === "ia" ? (
             <div style={{ padding: 12, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderTop: "1px solid rgba(16,24,40,.06)", position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
               <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}><Bot size={13} strokeWidth={1.75} /> {modoDemo ? "Modo demo: simula un mensaje del paciente (como si escribiera por WhatsApp):" : "La IA responde sola. Simula un mensaje del paciente:"}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{sugs.map((s, i) => <button key={i} onClick={() => recibir(s)} style={{ background: "var(--dc-bg)", color: NAVY, border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-full)", padding: "6px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{s}</button>)}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{sugs.map((s, i) => <button key={i} onClick={() => recibir(s)} style={{ background: "var(--dc-bg)", color: NAVY, border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-full)", padding: "6px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{s}</button>)}</div>
             </div>
           ) : (
             <div style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderTop: "1px solid rgba(16,24,40,.06)", padding: "12px 16px", position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
               <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 4, scrollbarWidth: "none" }}>
                 <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-                <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 600, marginRight: 4, display: "flex", alignItems: "center" }}><Zap size={13} strokeWidth={2} style={{marginRight: 2}}/> Respuestas:</span>
-                {PLANTILLAS.map(([et, txt]) => <button key={et} title={txt} onClick={() => setInput(txt)} style={{ background: "var(--dc-bg-soft)", color: "var(--dc-ink-700)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-full)", padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = DS.c.primary; e.currentTarget.style.color = DS.c.primary; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dc-line)"; e.currentTarget.style.color = "var(--dc-ink-700)"; }}>{et}</button>)}
+                <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, marginRight: 4, display: "flex", alignItems: "center" }}><Zap size={13} strokeWidth={2} style={{marginRight: 2}}/> Respuestas:</span>
+                {PLANTILLAS.map(([et, txt]) => <button key={et} title={txt} onClick={() => setInput(txt)} style={{ background: "var(--dc-bg-soft)", color: "var(--dc-ink-700)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-full)", padding: "5px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = DS.c.primary; e.currentTarget.style.color = DS.c.primary; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dc-line)"; e.currentTarget.style.color = "var(--dc-ink-700)"; }}>{et}</button>)}
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input className="dc-premium-inp" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && enviarHumano()} placeholder="Escribe un mensaje..." style={{ flex: 1, padding: "12px 18px", borderRadius: "var(--dc-r-full)", border: "1.5px solid var(--dc-line)", fontSize: 15, outline: "none", background: "var(--dc-bg-soft)", transition: "border-color .2s" }} onFocus={(e) => e.target.style.borderColor = DS.c.primary} onBlur={(e) => e.target.style.borderColor = "var(--dc-line)"} />
+                <input className="dc-premium-inp" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && enviarHumano()} placeholder="Escribe un mensaje..." style={{ flex: 1, padding: "12px 18px", borderRadius: "var(--dc-r-full)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", background: "var(--dc-bg-soft)", transition: "border-color .2s" }} onFocus={(e) => e.target.style.borderColor = DS.c.primary} onBlur={(e) => e.target.style.borderColor = "var(--dc-line)"} />
                 <button aria-label="Enviar el mensaje" onClick={enviarHumano} style={{ width: 44, height: 44, borderRadius: "var(--dc-r-full)", border: "none", background: input.trim() ? DS.c.primary : "var(--dc-line)", color: "var(--dc-white)", display: "grid", placeItems: "center", cursor: input.trim() ? "pointer" : "default", transition: "background .2s", flexShrink: 0 }}><Send size={18} strokeWidth={1.75} style={{ marginLeft: 2 }} /></button>
               </div>
             </div>
@@ -576,30 +576,30 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         {/* Columna 3 · panel del contacto */}
         <div className="dc-inbox-side" style={{ borderLeft: "1px solid rgba(16,24,40,.06)", background: "rgba(255,255,255,0.7)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", overflowY: "auto", minWidth: 0, height: "100%", borderRadius: "0 20px 20px 0" }}>
           <div style={{ padding: "32px 20px 24px", textAlign: "center", borderBottom: "1px solid var(--dc-line)" }}>
-            <div style={{ width: 84, height: 84, borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: INK, border: "1px solid var(--dc-line)", boxShadow: "0 8px 24px -6px rgba(16,24,40,.08)", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 32, margin: "0 auto 16px" }}>{inicial(chat.nombre)}</div>
-            <div style={{ fontWeight: 700, color: NAVY, fontSize: 17, fontFamily: DISPLAY_FONT }}>{chat.nombre}</div>
+            <div style={{ width: 84, height: 84, borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: INK, border: "1px solid var(--dc-line)", boxShadow: "0 8px 24px -6px rgba(16,24,40,.08)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 27, margin: "0 auto 16px" }}>{inicial(chat.nombre)}</div>
+            <div style={{ fontWeight: 600, color: NAVY, fontSize: 16, fontFamily: DISPLAY_FONT }}>{chat.nombre}</div>
             <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 4 }}>{chat.tel}</div>
             <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>
-              {conectado && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: "var(--dc-r-full)", background: chat.esPaciente ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", color: chat.esPaciente ? "var(--dc-ok-700)" : "var(--dc-warn-600)", border: "1px solid " + (chat.esPaciente ? "var(--dc-green-soft)" : "var(--dc-amber-soft)") }}>{chat.esPaciente ? <><CheckCircle2 size={13} strokeWidth={2} /> {chat.pacientes && chat.pacientes.length > 1 ? `${chat.pacientes.length} pacientes` : "Paciente"}</> : <><UserPlus size={13} strokeWidth={2} /> Lead (nuevo)</>}</span>}
+              {conectado && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, padding: "4px 12px", borderRadius: "var(--dc-r-full)", background: chat.esPaciente ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", color: chat.esPaciente ? "var(--dc-ok-700)" : "var(--dc-warn-600)", border: "1px solid " + (chat.esPaciente ? "var(--dc-green-soft)" : "var(--dc-amber-soft)") }}>{chat.esPaciente ? <><CheckCircle2 size={13} strokeWidth={2} /> {chat.pacientes && chat.pacientes.length > 1 ? `${chat.pacientes.length} pacientes` : "Paciente"}</> : <><UserPlus size={13} strokeWidth={2} /> Lead (nuevo)</>}</span>}
             </div>
           </div>
           <div style={{ padding: 20, display: "grid", gap: 16 }}>
             <div style={{ background: "var(--dc-bg-soft)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-400)", marginBottom: 12 }}>Detalles del Contacto</div>
+              <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-400)", marginBottom: 12 }}>Detalles del Contacto</div>
               <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 600 }}><Phone size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> {chat.tel}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 600 }}><Calendar size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> Creado {conectado ? fmtCreado(chat.creado) : "hoy"}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 500 }}><Phone size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> {chat.tel}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 500 }}><Calendar size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> Creado {conectado ? fmtCreado(chat.creado) : "hoy"}</div>
               </div>
             </div>
             {chat.pacientes && chat.pacientes.length > 0 && (
               <div style={{ background: "var(--dc-bg-soft)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-400)", marginBottom: 10 }}>{chat.pacientes.length > 1 ? "Pacientes en este número" : "Paciente"}</div>
+                <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-400)", marginBottom: 10 }}>{chat.pacientes.length > 1 ? "Pacientes en este número" : "Paciente"}</div>
                 <div style={{ display: "grid", gap: 8 }}>
                   {chat.pacientes.map((pp) => (
                     <button key={pp.id} onClick={() => abrirFicha(pp.id, pp.nombre)} title="Ver ficha del paciente" style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", transition: "border-color .15s, box-shadow .15s" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = DS.c.primary; e.currentTarget.style.boxShadow = "0 2px 8px rgba(16,24,40,.06)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dc-line)"; e.currentTarget.style.boxShadow = "none"; }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: DS.c.primarySoft, color: DS.c.primary, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 13, flexShrink: 0 }}>{inicial(pp.nombre)}</div>
+                      <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: DS.c.primarySoft, color: DS.c.primary, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{inicial(pp.nombre)}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pp.nombre}</div>
+                        <div style={{ fontWeight: 500, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pp.nombre}</div>
                         <div style={{ fontSize: 12, color: pp.proximaCita ? "var(--dc-ok-700)" : "var(--dc-ink-400)" }}>{pp.proximaCita ? `Próxima cita: ${fmtCreado(pp.proximaCita + "T12:00:00")}` : "Sin cita próxima"}</div>
                       </div>
                       <ChevronRight size={16} strokeWidth={1.75} color="var(--dc-ink-400)" />
@@ -609,9 +609,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
               </div>
             )}
             <div style={{ display: "grid", gap: 10, marginTop: 4 }}>
-              <button onClick={() => abrirAgendar("Solicitud por WhatsApp")} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 16px", borderRadius: "var(--dc-r-md)", border: "none", background: DS.c.primary, color: "var(--dc-white)", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 6px " + tint(DS.c.primary, 0.376), transition: "transform .1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "none"} onMouseLeave={e => e.currentTarget.style.transform = "none"}><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>
+              <button onClick={() => abrirAgendar("Solicitud por WhatsApp")} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 16px", borderRadius: "var(--dc-r-md)", border: "none", background: DS.c.primary, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", boxShadow: "0 2px 6px " + tint(DS.c.primary, 0.376), transition: "transform .1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "none"} onMouseLeave={e => e.currentTarget.style.transform = "none"}><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>
               {!chat.esPaciente && <Btn small kind="ghost" full onClick={abrirRegistro}><UserPlus size={15} strokeWidth={1.75} /> Registrar como paciente</Btn>}
-              <button onClick={() => eliminarChat(chat.id)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", padding: "10px 16px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-fee)", background: "var(--dc-white)", color: RED, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "background .15s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--dc-danger-soft)"} onMouseLeave={e => e.currentTarget.style.background = "var(--dc-white)"}><Trash2 size={14} strokeWidth={1.75} /> Eliminar chat</button>
+              <button onClick={() => eliminarChat(chat.id)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", padding: "10px 16px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-fee)", background: "var(--dc-white)", color: RED, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background .15s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--dc-danger-soft)"} onMouseLeave={e => e.currentTarget.style.background = "var(--dc-white)"}><Trash2 size={14} strokeWidth={1.75} /> Eliminar chat</button>
             </div>
           </div>
         </div>
@@ -625,28 +625,28 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
               {[["DNI", p.dni], ["Teléfono", p.telefono], ["Email", p.email || "—"], ["Nacimiento", p.fechaNacimiento || "—"]].map(([k, v]) => (
-                <div key={k} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "9px 12px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600 }}>{k}</div><div style={{ fontSize: 13, fontWeight: 600, color: NAVY }}>{v || "—"}</div></div>
+                <div key={k} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "9px 12px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>{k}</div><div style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{v || "—"}</div></div>
               ))}
             </div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>Citas ({(ficha360.citas || []).length})</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>Citas ({(ficha360.citas || []).length})</div>
               <div style={{ display: "grid", gap: 6, maxHeight: 190, overflowY: "auto" }}>
                 {(ficha360.citas || []).length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Sin citas registradas.</div>}
                 {(ficha360.citas || []).map((c, i) => { const es = EST[c.estado] || ["var(--dc-line)", "var(--dc-ink-700)"]; return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13 }}>{c.fecha || "—"} {c.hora ? "· " + c.hora : ""}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{c.especialidad} · {c.medico} · {c.sede}</div></div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: es[1], background: es[0], padding: "3px 9px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{(c.estado || "").replace("_", " ")}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.fecha || "—"} {c.hora ? "· " + c.hora : ""}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{c.especialidad} · {c.medico} · {c.sede}</div></div>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: es[1], background: es[0], padding: "3px 9px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{(c.estado || "").replace("_", " ")}</span>
                   </div>
                 ); })}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>Reseñas ({(ficha360.resenas || []).length})</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>Reseñas ({(ficha360.resenas || []).length})</div>
               <div style={{ display: "grid", gap: 6, maxHeight: 150, overflowY: "auto" }}>
                 {(ficha360.resenas || []).length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Sin reseñas.</div>}
                 {(ficha360.resenas || []).map((r, i) => { const bajo = r.nps != null && r.nps <= 6; return (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 11px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
-                    {r.nps != null && <span style={{ fontSize: 12, fontWeight: 600, color: bajo ? "var(--dc-danger-700)" : "var(--dc-ok-700)", background: bajo ? "var(--dc-fee2)" : "var(--dc-ok-soft)", padding: "3px 8px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{r.nps}/10</span>}
+                    {r.nps != null && <span style={{ fontSize: 12, fontWeight: 500, color: bajo ? "var(--dc-danger-700)" : "var(--dc-ok-700)", background: bajo ? "var(--dc-fee2)" : "var(--dc-ok-soft)", padding: "3px 8px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{r.nps}/10</span>}
                     <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{r.comentario || "(sin comentario)"}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{r.fecha} · {r.medico}</div></div>
                   </div>
                 ); })}
@@ -657,10 +657,10 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
       ); })()}
       {/* Editor de instrucciones del agente */}
                         {instrOpen && (() => {
-        const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", fontSize: 15, color: DS.c.ink, boxSizing: "border-box", fontFamily: "inherit" };
-        const secTit = { fontSize: 13, fontWeight: 600, color: DS.c.ink, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 };
+        const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", fontSize: 14, color: DS.c.ink, boxSizing: "border-box", fontFamily: "inherit" };
+        const secTit = { fontSize: 13, fontWeight: 500, color: DS.c.ink, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 };
         const secCard = { background: "var(--dc-white)", border: "1px solid var(--dc-bg)", borderRadius: "var(--dc-r-lg)", padding: "28px 32px", boxShadow: "0 4px 16px rgba(20, 50, 60, 0.06)" };
-        const lbl = { fontSize: 13, fontWeight: 600, color: DS.c.muted, display: "block", marginBottom: 8 };
+        const lbl = { fontSize: 13, fontWeight: 500, color: DS.c.muted, display: "block", marginBottom: 8 };
         
         const Segmented = ({ options, value, onChange }) => (
           <div style={{ display: "inline-flex", background: "var(--dc-bg)", padding: 3, borderRadius: "var(--dc-r-md)", gap: 2 }}>
@@ -670,13 +670,13 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           </div>
         );
         
-        const pill = (on) => ({ padding: "8px 16px", borderRadius: "var(--dc-r-md)", border: on ? `1px solid ${DS.c.primary}` : "1px solid var(--dc-bg)", background: on ? "var(--dc-bg)" : "var(--dc-white)", color: on ? DS.c.primaryDark : DS.c.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 150ms ease", display: "inline-flex", alignItems: "center", gap: 6 });
+        const pill = (on) => ({ padding: "8px 16px", borderRadius: "var(--dc-r-md)", border: on ? `1px solid ${DS.c.primary}` : "1px solid var(--dc-bg)", background: on ? "var(--dc-bg)" : "var(--dc-white)", color: on ? DS.c.primaryDark : DS.c.muted, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 150ms ease", display: "inline-flex", alignItems: "center", gap: 6 });
         
         const IconBox = ({ children }) => <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", color: DS.c.primary }}>{children}</div>;
         
         return (
         <Modal icon={<Bot size={20} strokeWidth={1.75} />} titulo="Configurar el asistente" sub="Personaliza la identidad y la forma de atención del agente." onClose={() => setInstrOpen(false)} maxW={1080}
-          footer={<><button onClick={() => setInstrOpen(false)} style={{ background: "transparent", border: "1px solid var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: "10px 18px", color: "var(--dc-ink-700)", fontWeight: 600, fontSize: 15, cursor: "pointer", transition: "background 150ms" }} onMouseEnter={(e) => e.currentTarget.style.background = "var(--dc-white)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>Cancelar</button><button onClick={guardarInstrucciones} style={{ background: DS.c.primary, border: "none", borderRadius: "var(--dc-r-md)", padding: "10px 24px", color: "var(--dc-white)", fontWeight: 600, fontSize: 15, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 2px 4px rgba(8,126,139,0.15)", transition: "all 120ms ease" }} onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"} onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = DS.c.primary; }} onMouseEnter={(e) => e.currentTarget.style.background = DS.c.primaryDark}><Check size={16} strokeWidth={2} /> Guardar</button></>}>
+          footer={<><button onClick={() => setInstrOpen(false)} style={{ background: "transparent", border: "1px solid var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: "10px 18px", color: "var(--dc-ink-700)", fontWeight: 500, fontSize: 14, cursor: "pointer", transition: "background 150ms" }} onMouseEnter={(e) => e.currentTarget.style.background = "var(--dc-white)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>Cancelar</button><button onClick={guardarInstrucciones} style={{ background: DS.c.primary, border: "none", borderRadius: "var(--dc-r-md)", padding: "10px 24px", color: "var(--dc-white)", fontWeight: 500, fontSize: 14, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 2px 4px rgba(8,126,139,0.15)", transition: "all 120ms ease" }} onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"} onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = DS.c.primary; }} onMouseEnter={(e) => e.currentTarget.style.background = DS.c.primaryDark}><Check size={16} strokeWidth={2} /> Guardar</button></>}>
           
           <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", alignItems: "stretch", margin: "-32px -32px -40px -32px", minHeight: "65vh" }}>
             
@@ -790,16 +790,16 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
 
               {iaTab === "urgencias" && (
                 <div style={{ animation: "dcTabSlide 0.18s ease-out forwards", display: "grid", gap: 24 }}>
-                  <div style={{ fontSize: 15, color: DS.c.primaryDark, background: DS.c.primaryLight, border: `1px solid ${DS.c.primarySoft}`, borderRadius: "var(--dc-r-lg)", padding: "20px 24px", lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 14, color: DS.c.primaryDark, background: DS.c.primaryLight, border: `1px solid ${DS.c.primarySoft}`, borderRadius: "var(--dc-r-lg)", padding: "20px 24px", lineHeight: 1.6 }}>
                     El manejo de urgencias viene incorporado en la inteligencia del agente. Está programado con protocolos de triaje dental internacional y siempre dará prioridad a salvaguardar la salud del paciente.
                   </div>
                   <div style={{ ...secCard, background: "var(--dc-white)", border: "1px solid rgba(214, 158, 46, 0.3)" }}>
-                    <div style={{ ...secTit, color: DS.c.warning }}><div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "var(--dc-r-md)", background: "rgba(214, 158, 46, 0.12)" }}><AlertTriangle size={16} strokeWidth={2} color={DS.c.warning} /></div> Protocolo de Urgencias <span style={{ fontWeight: 600, textTransform: "none", letterSpacing: 0, color: DS.c.success, background: "var(--dc-ok-soft)", padding: "4px 12px", borderRadius: "var(--dc-r-full)", fontSize: 12, marginLeft: 10 }}>Siempre activo</span></div>
+                    <div style={{ ...secTit, color: DS.c.warning }}><div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "var(--dc-r-md)", background: "rgba(214, 158, 46, 0.12)" }}><AlertTriangle size={16} strokeWidth={2} color={DS.c.warning} /></div> Protocolo de Urgencias <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0, color: DS.c.success, background: "var(--dc-ok-soft)", padding: "4px 12px", borderRadius: "var(--dc-r-full)", fontSize: 12, marginLeft: 10 }}>Siempre activo</span></div>
                     <div style={{ fontSize: 13, color: DS.c.ink, display: "grid", gap: 16, marginTop: 24 }}>
                       <div style={{ display: "flex", gap: 12 }}>✅ <span>Primero <b>tranquiliza al paciente</b> mediante empatía y luego busca la atención más cercana.</span></div>
                       <div style={{ display: "flex", gap: 12 }}>✅ <span>Da <b>primeros auxilios básicos</b> cuando corresponde (ej. qué hacer con un diente avulsionado).</span></div>
                       <div style={{ display: "flex", gap: 12 }}>✅ <span>Prioriza y fuerza la <b>atención más cercana</b> disponible en la agenda.</span></div>
-                      <div style={{ display: "flex", gap: 12 }}>🚨 <span style={{ color: DS.c.danger, fontWeight: 600 }}>Deriva a emergencias médicas hospitalarias si detecta signos de gravedad sistémica (infección severa, fiebre alta, dificultad para tragar).</span></div>
+                      <div style={{ display: "flex", gap: 12 }}>🚨 <span style={{ color: DS.c.danger, fontWeight: 500 }}>Deriva a emergencias médicas hospitalarias si detecta signos de gravedad sistémica (infección severa, fiebre alta, dificultad para tragar).</span></div>
                     </div>
                   </div>
                 </div>
@@ -815,9 +815,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           footer={<><Btn small kind="ghost" onClick={() => setNuevoPac(null)}>Cancelar</Btn><Btn small kind="ghost" onClick={() => guardarPaciente(true)}><Calendar size={15} strokeWidth={1.75} /> Registrar y agendar</Btn><Btn small onClick={() => guardarPaciente(false)}><Check size={15} strokeWidth={1.75} /> Registrar</Btn></>}>
           <div style={{ display: "grid", gap: 14 }}>
             <div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>DNI</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>DNI</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <input className="dc-premium-inp" value={nuevoPac.dni} onChange={(e) => setNuevoPac((f) => ({ ...f, dni: e.target.value.replace(/\D/g, "").slice(0, 8) }))} placeholder="8 dígitos" style={{ flex: 1, padding: "11px 14px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 15, outline: "none", color: NAVY, boxSizing: "border-box" }} />
+                <input className="dc-premium-inp" value={nuevoPac.dni} onChange={(e) => setNuevoPac((f) => ({ ...f, dni: e.target.value.replace(/\D/g, "").slice(0, 8) }))} placeholder="8 dígitos" style={{ flex: 1, padding: "11px 14px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", color: NAVY, boxSizing: "border-box" }} />
                 <BtnReniec dni={nuevoPac.dni} onNombre={(nom) => setNuevoPac((f) => ({ ...f, nombre: nom }))} notify={notify} />
               </div>
             </div>

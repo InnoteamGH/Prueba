@@ -159,7 +159,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
       <ModHead icon={<TrendingUp size={20} strokeWidth={1.75} />} titulo="Producción y comisiones" sub="Resumen, producción por doctor, ausentismo y liquidaciones" />
       <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
       </div>
 
@@ -185,7 +185,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
               <KpiCard label="Captación WhatsApp · periodo" value={`${f.agendadas || 0}`} color={NAVY} icon={<MessageSquare size={18} strokeWidth={1.75} />} sub={`${f.conversaciones || 0} conversaciones · ${f.agendadas || 0} citas agendadas`} />
             </div>
             <Card style={{ padding: "18px 20px" }}>
-              <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Ingresos por mes · últimos 6 meses</h3>
+              <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos por mes · últimos 6 meses</h3>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 160 }}>
                 {(() => {
                   const vals = meses.map((m) => Number(m.ingresos) || 0);
@@ -196,11 +196,11 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
                   }
                   return layout.map((b, i) => (
                     <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, height: "100%", justifyContent: "flex-end" }}>
-                      <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{(() => { const n = b.valor; if (n >= 1000) { const k = n / 1000; return (k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)) + "k"; } return n || ""; })()}</div>
+                      <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{(() => { const n = b.valor; if (n >= 1000) { const k = n / 1000; return (k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)) + "k"; } return n || ""; })()}</div>
                       {b.dibujar
                         ? <div title={nfmt(b.valor)} style={{ width: "100%", maxWidth: 46, height: `${b.pct}%`, maxHeight: 130, borderRadius: "var(--dc-r-sm) var(--dc-r-sm) 0 0", background: "var(--dc-ok-700)" }} />
                         : <div style={{ height: 0 }} />}
-                      <div style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 600 }}>{meses[i].mes}</div>
+                      <div style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>{meses[i].mes}</div>
                     </div>
                   ));
                 })()}
@@ -209,14 +209,14 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
             </Card>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
               <Card style={{ padding: "18px 20px" }}>
-                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Producción por especialidad · mismos 6 meses</h3>
+                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Producción por especialidad · mismos 6 meses</h3>
                 <div style={{ display: "grid", gap: 10 }}>
                   {normalizarProduccionEsp(r.porEspecialidad || []).slice(0, 8).map((e, i) => {
                     const maxP = maxSerie((r.porEspecialidad || []).map((x) => Number(x.produccion) || 0));
                     const { dibujar, pct } = (() => { const v = Number(e.produccion) || 0; if (v <= 0 || maxP <= 0) return { dibujar: false, pct: 0 }; const p = Math.min(100, (v / maxP) * 100); return p < 5 ? { dibujar: false, pct: p } : { dibujar: true, pct: p }; })();
                     return (
                     <div key={i}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}><span style={{ color: NAVY, fontWeight: 600 }}>{e.especialidad}</span><span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{nfmt(e.produccion)} · {e.atendidas}</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}><span style={{ color: NAVY, fontWeight: 500 }}>{e.especialidad}</span><span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{nfmt(e.produccion)} · {e.atendidas}</span></div>
                       {dibujar ? <div style={{ height: 8, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", borderRadius: "var(--dc-r-full)", background: DS.c.primary }} /></div> : <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div>}
                     </div>
                     );
@@ -225,7 +225,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
                 </div>
               </Card>
               <Card style={{ padding: "18px 20px" }}>
-                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 7 }}><MessageSquare size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /> Captación por WhatsApp · periodo</h3>
+                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 7 }}><MessageSquare size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /> Captación por WhatsApp · periodo</h3>
                 {(() => {
                   const serie = [f.conversaciones || 0, f.agendadas || 0, f.atendidas || 0];
                   const layout = layoutBarras(serie);
@@ -233,7 +233,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
                   const colors = [DS.c.primary, DS.c.accent, "var(--dc-ok-700)"];
                   return labels.map((l, i) => (
                     <div key={i} style={{ marginBottom: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}><span style={{ color: NAVY, fontWeight: 600 }}>{l}</span><span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{layout[i].valor}</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}><span style={{ color: NAVY, fontWeight: 500 }}>{l}</span><span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{layout[i].valor}</span></div>
                       {layout[i].dibujar
                         ? <div style={{ height: 10, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", overflow: "hidden" }}><div style={{ width: `${layout[i].pct}%`, height: "100%", borderRadius: "var(--dc-r-full)", background: colors[i] }} /></div>
                         : <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div>}
@@ -288,25 +288,25 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
             return (
             <Card style={{ padding: "16px 18px" }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 13 }}>
-                <h4 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Ranking del equipo</h4>
+                <h4 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ranking del equipo</h4>
                 <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>por producción con evolución · clic para ver su detalle</span>
               </div>
               <div style={{ display: "grid", gap: 11 }}>
                 {rank.map((d, i) => (
                   <button key={d.m.id} onClick={() => setProdMed(String(d.m.id))} title={`Ver el detalle de ${d.m.nombre}`}
                           style={{ textAlign: "left", background: "transparent", border: "none", padding: 0, cursor: "pointer", display: "grid", gridTemplateColumns: "18px 1fr", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? NAVY : "var(--dc-ink-400)", fontFamily: DISPLAY_FONT, textAlign: "right" }}>{i + 1}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: i === 0 ? NAVY : "var(--dc-ink-400)", fontFamily: DISPLAY_FONT, textAlign: "right" }}>{i + 1}</span>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                        <span style={{ fontWeight: 600, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.m.nombre}</span>
-                        <span style={{ fontWeight: 700, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, fontSize: 15, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>S/ {soles(d.pagar)}</span>
+                        <span style={{ fontWeight: 500, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.m.nombre}</span>
+                        <span style={{ fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>S/ {soles(d.pagar)}</span>
                       </span>
                       <span style={{ display: "block", height: 7, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", margin: "5px 0 3px" }}>
                         <span style={{ display: "block", width: `${Math.round((d.pagar / tope) * 100)}%`, height: "100%", borderRadius: "var(--dc-r-full)", background: d.m.color || NAVY }} />
                       </span>
                       <span style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--dc-ink-400)" }}>
                         <span>{d.n} tratamiento(s)</span>
-                        {d.retenido > 0 && <span style={{ color: "var(--dc-warn-600)", fontWeight: 600 }}>· S/ {soles(d.retenido)} sin contar por falta de evolución</span>}
+                        {d.retenido > 0 && <span style={{ color: "var(--dc-warn-600)", fontWeight: 500 }}>· S/ {soles(d.retenido)} sin contar por falta de evolución</span>}
                       </span>
                     </span>
                   </button>
@@ -316,14 +316,14 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
             );
           })()}
           <DataTable titulo="Tratamientos terminados por doctor" sub="tratamientos" minWidth={900} rows={rows} defaultSort={{ key: "medico", dir: "asc" }} empty={<Vacio icon={<Stethoscope size={22} strokeWidth={1.75} />} titulo="Sin producción" sub="No hay tratamientos en el periodo." />} cols={[
-            { key: "medico", label: "Doctor", w: "minmax(150px,1.2fr)", a: "left", get: (r) => r.medico, cell: (r) => { const m = MEDICOS.find((x) => x.id === r.medicoId); return <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 600, color: NAVY, fontSize: 13 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: m?.color || NAVY, flexShrink: 0 }} />{r.medico}</span>; } },
+            { key: "medico", label: "Doctor", w: "minmax(150px,1.2fr)", a: "left", get: (r) => r.medico, cell: (r) => { const m = MEDICOS.find((x) => x.id === r.medicoId); return <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 500, color: NAVY, fontSize: 13 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: m?.color || NAVY, flexShrink: 0 }} />{r.medico}</span>; } },
             { key: "paciente", label: "Paciente", w: "minmax(150px,1.3fr)", a: "left", get: (r) => r.paciente, cell: (r) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{r.paciente}</span> },
-            { key: "tratamiento", label: "Tratamiento terminado", w: "minmax(180px,1.6fr)", a: "left", get: (r) => r.tratamiento, cell: (r) => <span style={{ fontSize: 13, color: NAVY, fontWeight: 600 }}>{r.tratamiento}</span> },
+            { key: "tratamiento", label: "Tratamiento terminado", w: "minmax(180px,1.6fr)", a: "left", get: (r) => r.tratamiento, cell: (r) => <span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{r.tratamiento}</span> },
             { key: "cantidad", label: "Cant.", w: "70px", a: "right", get: (r) => r.cantidad, cell: (r) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{r.cantidad}</span> },
-            { key: "pago", label: "Valor", w: "120px", a: "right", get: (r) => r.pago, cell: (r) => <span style={{ fontWeight: 700, color: r.evolucion ? "var(--dc-ok-700)" : "var(--dc-ink-400)", fontFamily: DISPLAY_FONT, fontSize: 15, fontVariantNumeric: "tabular-nums", textDecoration: r.evolucion ? "none" : "line-through" }}>S/ {r.pago.toFixed(2)}</span> },
+            { key: "pago", label: "Valor", w: "120px", a: "right", get: (r) => r.pago, cell: (r) => <span style={{ fontWeight: 600, color: r.evolucion ? "var(--dc-ok-700)" : "var(--dc-ink-400)", fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums", textDecoration: r.evolucion ? "none" : "line-through" }}>S/ {r.pago.toFixed(2)}</span> },
             { key: "evolucion", label: "Evolución", w: "minmax(120px,0.9fr)", a: "center", get: (r) => r.evolucion ? "Llena" : "Falta", cell: (r) => r.evolucion
-              ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={12} strokeWidth={1.75} /> Llena</span>
-              : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><AlertTriangle size={12} strokeWidth={1.75} /> Falta evolución</span> },
+              ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={12} strokeWidth={1.75} /> Llena</span>
+              : <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><AlertTriangle size={12} strokeWidth={1.75} /> Falta evolución</span> },
           ]} />
         </div>
         );
@@ -392,11 +392,11 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
               <KpiCard label="Canceladas" value={canceladas.length} color={NAVY} icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub="con aviso · no son inasistencia" />
             </div>
             <DataTable titulo="Ausentismo por doctor" sub="doctores" minWidth={720} rows={rows} empty={<Vacio icon={<CheckCircle2 size={22} strokeWidth={1.75} />} titulo="Sin ausencias" sub="No hay citas canceladas ni no-show en el listado." />} cols={[
-              { key: "medico", label: "Doctor", w: "minmax(180px,1.4fr)", a: "left", get: (r) => r.medico, cell: (r) => <span style={{ fontWeight: 600, color: NAVY }}>{r.medico}</span> },
-              { key: "noShow", label: "No asistió", w: "110px", a: "right", get: (r) => r.noShow, cell: (r) => <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--dc-warn-600)" }}>{r.noShow}</span> },
+              { key: "medico", label: "Doctor", w: "minmax(180px,1.4fr)", a: "left", get: (r) => r.medico, cell: (r) => <span style={{ fontWeight: 500, color: NAVY }}>{r.medico}</span> },
+              { key: "noShow", label: "No asistió", w: "110px", a: "right", get: (r) => r.noShow, cell: (r) => <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 500, color: "var(--dc-warn-600)" }}>{r.noShow}</span> },
               { key: "cancelada", label: "Canceladas", w: "110px", a: "right", get: (r) => r.cancelada, cell: (r) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.cancelada}</span> },
-              { key: "total", label: "Ausencias", w: "100px", a: "right", get: (r) => r.total, cell: (r) => <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{r.total}</span> },
-              { key: "tasa", label: "Tasa", w: "100px", a: "right", get: (r) => r.tasa, cell: (r) => <span style={{ fontWeight: 600, color: r.tasa >= 15 ? "var(--dc-red)" : NAVY, fontVariantNumeric: "tabular-nums" }}>{r.tasa}%</span> },
+              { key: "total", label: "Ausencias", w: "100px", a: "right", get: (r) => r.total, cell: (r) => <span style={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{r.total}</span> },
+              { key: "tasa", label: "Tasa", w: "100px", a: "right", get: (r) => r.tasa, cell: (r) => <span style={{ fontWeight: 500, color: r.tasa >= 15 ? "var(--dc-red)" : NAVY, fontVariantNumeric: "tabular-nums" }}>{r.tasa}%</span> },
               { key: "programadas", label: "Citas", w: "90px", a: "right", get: (r) => r.programadas, cell: (r) => <span style={{ color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{r.programadas}</span> },
             ]} />
           </div>
@@ -413,23 +413,23 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
           <KpiCard label="Ingreso del embudo" value={`S/ ${REP_FUNNEL.reduce((s, r) => s + r.ing, 0).toLocaleString()}`} color={NAVY} icon={<Wallet size={18} strokeWidth={1.75} />} sub="anual" />
         </div>
         <div style={{ ...soft, overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-bg)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Embudo de ventas por trimestre</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>De cuántos pacientes agendaron, cuántos vinieron y cuántos pagaron</div></div>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-bg)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Embudo de ventas por trimestre</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>De cuántos pacientes agendaron, cuántos vinieron y cuántos pagaron</div></div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse", fontSize: 13 }}>
               <thead><tr style={{ background: "var(--dc-bg-soft2)" }}>
-                <th style={{ textAlign: "left", padding: "11px 20px", fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".04em" }}>Etapa</th>
-                {REP_FUNNEL.map((r) => <th key={r.q} style={{ textAlign: "center", padding: "11px 12px", fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)" }}>{r.q}</th>)}
+                <th style={{ textAlign: "left", padding: "11px 20px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".04em" }}>Etapa</th>
+                {REP_FUNNEL.map((r) => <th key={r.q} style={{ textAlign: "center", padding: "11px 12px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)" }}>{r.q}</th>)}
               </tr></thead>
               <tbody>
                 {[["Leads (agendaron cita)", "leads", DS.c.primary], ["Nuevos (asistieron)", "nuevos", DS.c.accent], ["Convertidos (pagaron)", "conv", "var(--dc-ok-700)"]].map(([lbl, key, col]) => (
                   <tr key={key} style={{ borderTop: "1px solid var(--dc-bg)" }}>
-                    <td style={{ padding: "11px 20px", fontWeight: 600, color: NAVY, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: col }} /> {lbl}</td>
-                    {REP_FUNNEL.map((r) => <td key={r.q} style={{ textAlign: "center", padding: "11px 12px", fontVariantNumeric: "tabular-nums" }}><span style={{ fontWeight: 600, color: NAVY }}>{r[key]}</span> <span style={{ color: "var(--dc-ink-400)", fontSize: 12 }}>{pct(r[key], r.leads)}%</span></td>)}
+                    <td style={{ padding: "11px 20px", fontWeight: 500, color: NAVY, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: col }} /> {lbl}</td>
+                    {REP_FUNNEL.map((r) => <td key={r.q} style={{ textAlign: "center", padding: "11px 12px", fontVariantNumeric: "tabular-nums" }}><span style={{ fontWeight: 500, color: NAVY }}>{r[key]}</span> <span style={{ color: "var(--dc-ink-400)", fontSize: 12 }}>{pct(r[key], r.leads)}%</span></td>)}
                   </tr>
                 ))}
                 <tr style={{ borderTop: "2px solid var(--dc-line)", background: "var(--dc-white)" }}>
-                  <td style={{ padding: "11px 20px", fontWeight: 600, color: "var(--dc-warn-600)" }}>Ingreso obtenido (S/)</td>
-                  {REP_FUNNEL.map((r) => <td key={r.q} style={{ textAlign: "center", padding: "11px 12px", fontWeight: 700, color: "var(--dc-warn-600)", fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>{r.ing.toLocaleString()}</td>)}
+                  <td style={{ padding: "11px 20px", fontWeight: 500, color: "var(--dc-warn-600)" }}>Ingreso obtenido (S/)</td>
+                  {REP_FUNNEL.map((r) => <td key={r.q} style={{ textAlign: "center", padding: "11px 12px", fontWeight: 600, color: "var(--dc-warn-600)", fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>{r.ing.toLocaleString()}</td>)}
                 </tr>
               </tbody>
             </table>
@@ -437,8 +437,8 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
         </div>
         <div style={{ ...soft, padding: "18px 20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-            <h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>N° de pacientes según etapa del embudo</h3>
-            <div style={{ display: "flex", gap: 14, fontSize: 12, fontWeight: 600 }}>
+            <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>N° de pacientes según etapa del embudo</h3>
+            <div style={{ display: "flex", gap: 14, fontSize: 12, fontWeight: 500 }}>
               {[["Leads", DS.c.primary], ["Nuevos", DS.c.accent], ["Convertidos", "var(--dc-ok-700)"]].map(([l, c]) => <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--dc-ink-700)" }}><span style={{ width: 10, height: 10, borderRadius: "var(--dc-r-sm)", background: c }} /> {l}</span>)}
             </div>
           </div>
@@ -454,8 +454,8 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
         </div>
         <div style={{ ...soft, padding: "18px 20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-            <h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Ingresos y egresos por mes</h3>
-            <div style={{ display: "flex", gap: 14, fontSize: 12, fontWeight: 600 }}>
+            <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos y egresos por mes</h3>
+            <div style={{ display: "flex", gap: 14, fontSize: 12, fontWeight: 500 }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--dc-ink-700)" }}><span style={{ width: 10, height: 10, borderRadius: "var(--dc-r-sm)", background: DS.c.primary }} /> Ingresos</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--dc-ink-700)" }}><span style={{ width: 10, height: 10, borderRadius: "var(--dc-r-sm)", background: "var(--dc-danger)" }} /> Egresos</span>
             </div>
@@ -466,28 +466,28 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
 
       {tab === "anual" && (<>
         <div style={{ ...soft, overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-bg)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Resumen {hoy.getFullYear()}</h3></div>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-bg)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Resumen {hoy.getFullYear()}</h3></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 0 }}>
             {[["Ingreso", totIng, "var(--dc-ok-700)"], ["Egresos", totEgr, "var(--dc-danger)"], ["Utilidad", util, NAVY], ["Margen", pct(util, totIng), DS.c.primary]].map(([l, v, c], i) => (
               <div key={l} style={{ padding: "18px 20px", borderLeft: i ? "1px solid var(--dc-bg)" : "none" }}>
-                <div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 600 }}>{l}</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: c, fontFamily: DISPLAY_FONT, marginTop: 3 }}>{l === "Margen" ? `${v}%` : `S/ ${v.toLocaleString()}`}</div>
+                <div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div>
+                <div style={{ fontSize: 21, fontWeight: 600, color: c, fontFamily: DISPLAY_FONT, marginTop: 3 }}>{l === "Margen" ? `${v}%` : `S/ ${v.toLocaleString()}`}</div>
               </div>
             ))}
           </div>
         </div>
         <div className="dc-split">
           <div style={{ ...soft, padding: "18px 20px" }}>
-            <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Ingresos por mes</h3>
+            <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos por mes</h3>
             <RepLineChart labels={REP_MESES} series={[{ label: "Ingresos", color: "var(--dc-ok-700)", data: REP_ING }]} height={200} />
           </div>
           <div style={{ ...soft, padding: "18px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Star size={17} strokeWidth={1.75} color="var(--dc-warn)" /><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Top pacientes del año</h3></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Star size={17} strokeWidth={1.75} color="var(--dc-warn)" /><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Top pacientes del año</h3></div>
             {REP_TOP.map((t, i) => (
               <div key={t.paciente} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
-                <div style={{ width: 26, height: 26, borderRadius: "var(--dc-r-full)", background: i === 0 ? "var(--dc-warn-soft)" : "var(--dc-bg-alt)", color: i === 0 ? "var(--dc-warn-600)" : "var(--dc-ink-400)", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{i + 1}</div>
-                <span style={{ flex: 1, fontWeight: 600, color: NAVY, fontSize: 13 }}>{t.paciente}</span>
-                <span style={{ fontWeight: 700, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>S/ {t.monto.toLocaleString()}</span>
+                <div style={{ width: 26, height: 26, borderRadius: "var(--dc-r-full)", background: i === 0 ? "var(--dc-warn-soft)" : "var(--dc-bg-alt)", color: i === 0 ? "var(--dc-warn-600)" : "var(--dc-ink-400)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{i + 1}</div>
+                <span style={{ flex: 1, fontWeight: 500, color: NAVY, fontSize: 13 }}>{t.paciente}</span>
+                <span style={{ fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>S/ {t.monto.toLocaleString()}</span>
               </div>
             ))}
           </div>

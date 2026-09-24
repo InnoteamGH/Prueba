@@ -39,7 +39,7 @@ function OnboardingWizard({ onClose, onDone = () => {}, notify = () => {} }) {
   const [disp, setDisp] = useState([]);
   const [medHor, setMedHor] = useState("");
   const [busy, setBusy] = useState(false);
-  const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 15, outline: "none", color: NAVY, boxSizing: "border-box", background: "var(--dc-white)" };
+  const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", color: NAVY, boxSizing: "border-box", background: "var(--dc-white)" };
   const cargar = () => {
     api.sedes.listar().then((r) => setSedes(r || [])).catch(() => {});
     api.catalogo.especialidades().then((r) => setEsps(r || [])).catch(() => {});
@@ -86,7 +86,7 @@ function OnboardingWizard({ onClose, onDone = () => {}, notify = () => {} }) {
   };
 
   const PASOS = ["Sedes", "Servicios", "Doctores", "Horarios"];
-  const Lbl = ({ children }) => <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 }}>{children}</label>;
+  const Lbl = ({ children }) => <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 }}>{children}</label>;
   const okPaso = [sedes.length > 0, esps.length > 0, meds.length > 0, disp.length > 0 || meds.length > 0];
 
   return (
@@ -101,8 +101,8 @@ function OnboardingWizard({ onClose, onDone = () => {}, notify = () => {} }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {PASOS.map((p, i) => (
           <div key={p} onClick={() => setPaso(i)} style={{ cursor: "pointer", flex: 1, minWidth: 120, padding: "8px 10px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${i === paso ? NAVY : "var(--dc-line)"}`, background: i === paso ? "var(--dc-bg)" : "var(--dc-white)", display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 22, height: 22, borderRadius: "var(--dc-r-full)", background: okPaso[i] ? "var(--dc-ok)" : (i === paso ? NAVY : "var(--dc-ink-200)"), color: "var(--dc-white)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{okPaso[i] ? "✓" : i + 1}</div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: i === paso ? NAVY : "var(--dc-ink-400)" }}>{p}</span>
+            <div style={{ width: 22, height: 22, borderRadius: "var(--dc-r-full)", background: okPaso[i] ? "var(--dc-ok)" : (i === paso ? NAVY : "var(--dc-ink-200)"), color: "var(--dc-white)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 500, flexShrink: 0 }}>{okPaso[i] ? "✓" : i + 1}</div>
+            <span style={{ fontSize: 13, fontWeight: 500, color: i === paso ? NAVY : "var(--dc-ink-400)" }}>{p}</span>
           </div>
         ))}
       </div>
@@ -170,7 +170,7 @@ function WizList({ items, icon, vacio }) {
       {items.map((it) => (
         <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", background: "var(--dc-white)" }}>
           <span style={{ flexShrink: 0 }}>{icon}</span>
-          <span style={{ fontWeight: 600, color: NAVY, fontSize: 13 }}>{it.main}</span>
+          <span style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{it.main}</span>
           {it.sub && <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>· {it.sub}</span>}
         </div>
       ))}
@@ -197,7 +197,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
     return { nombre: "", razonSocial: "", ruc: "", direccion: "", telefono: "", email: "", web: "", cuentas: [], billeteras: [],
              horario: local.horario || {}, feriados: local.feriados || [], tipoCambio: 3.75 };
   });
-  const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 15, outline: "none", color: NAVY, boxSizing: "border-box", background: "var(--dc-white)" };
+  const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", color: NAVY, boxSizing: "border-box", background: "var(--dc-white)" };
   const cargarGoLive = () => {
     // NEW-48: solo si el rol puede ver config (go-live ahora exige config:ver).
     if (conectado && (!can || can("config", "ver"))) api.goLive().then(setGoLive).catch(() => setGoLive(null));
@@ -345,17 +345,17 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
 
   const TABS = [["puesta", "Puesta en marcha", Navigation], ["empresa", "Datos de la clínica", Briefcase], ["atencion", "Horario de atención", Clock], ["servicios", "Servicios y precios", ClipboardList], ["doctores", "Doctores", Stethoscope], ["sedes", "Sedes", Building2], ["horarios", "Horarios por doctor", Clock], ["promos", "Promociones", Megaphone]];
   const card = { background: "var(--dc-white)", borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", boxShadow: "0 1px 2px rgba(16,24,40,.04)" };
-  const th = { textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: .4, borderBottom: "1px solid var(--dc-line)" };
-  const td = { padding: "12px 16px", fontSize: 15, color: NAVY, borderTop: "1px solid var(--dc-bg)" };
+  const th = { textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: .4, borderBottom: "1px solid var(--dc-line)" };
+  const td = { padding: "12px 16px", fontSize: 14, color: NAVY, borderTop: "1px solid var(--dc-bg)" };
   const rowBtns = (tipo, item) => (
-    <button onClick={() => setEdit({ tipo, item: { ...item } })} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--dc-line)", background: "var(--dc-white)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: DS.c.primary }}><Pencil size={13} strokeWidth={1.75} /> Editar</button>
+    <button onClick={() => setEdit({ tipo, item: { ...item } })} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--dc-line)", background: "var(--dc-white)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: DS.c.primary }}><Pencil size={13} strokeWidth={1.75} /> Editar</button>
   );
   return (
     <div style={{ display: "grid", gap: 16 }}>
       {!conectado && <div className="dc-banda dc-banda--info"><Info size={18} strokeWidth={1.75} /><p>Inicia sesión con una cuenta de la clínica para editar la configuración.</p></div>}
       <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
       </div>
 
@@ -370,7 +370,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 <div style={{ padding: "18px 20px", display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
                   <div style={{ background: listo ? "var(--dc-ok)" : NAVY, borderRadius: "var(--dc-r-md)", width: 48, height: 48, display: "grid", placeItems: "center", flexShrink: 0 }}>{listo ? <CheckCircle2 size={26} strokeWidth={1.75} color="var(--dc-white)" /> : <Navigation size={24} strokeWidth={1.75} color="var(--dc-white)" />}</div>
                   <div style={{ flex: 1, minWidth: 240 }}>
-                    <h3 style={{ margin: 0, color: NAVY, fontSize: 17, fontWeight: 700, fontFamily: DISPLAY_FONT }}>{listo ? "¡Todo listo para operar! 🎉" : "Puesta en marcha de la clínica"}</h3>
+                    <h3 style={{ margin: 0, color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>{listo ? "¡Todo listo para operar! 🎉" : "Puesta en marcha de la clínica"}</h3>
                     <div style={{ fontSize: 13, color: "var(--dc-ink-700)", marginTop: 3 }}>{listo ? "Checklist de la clínica (sedes, servicios, doctores, horarios). No es el contador de «Primeros pasos» de la barra." : `${goLive?.obligatoriosPendientes || 0} punto(s) obligatorio(s) pendiente(s) para que el asistente pueda agendar y atender.`}</div>
                     <div style={{ marginTop: 10, height: 8, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: listo ? "var(--dc-ok)" : NAVY, transition: "width .4s" }} /></div>
                     <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 5 }}>{total ? `${hechos} de ${total} del checklist de clínica (${pct}%)` : "Cargando checklist de la clínica…"}</div>
@@ -390,12 +390,12 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 <div style={{ flexShrink: 0, marginTop: 1 }}>{it.ok ? <CheckCircle2 size={22} strokeWidth={1.75} color="var(--dc-ok-700)" /> : (it.obligatorio ? <AlertCircle size={22} strokeWidth={1.75} color="var(--dc-danger)" /> : <Clock size={22} strokeWidth={1.75} color="var(--dc-warn-700)" />)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 600, color: NAVY, fontSize: 15 }}>{it.titulo}</span>
-                    {it.obligatorio && <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-red-deep)", background: "var(--dc-fee)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>OBLIGATORIO</span>}
-                    {!it.obligatorio && <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", background: "var(--dc-bg)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>OPCIONAL</span>}
+                    <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{it.titulo}</span>
+                    {it.obligatorio && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-red-deep)", background: "var(--dc-fee)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>OBLIGATORIO</span>}
+                    {!it.obligatorio && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", background: "var(--dc-bg)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>OPCIONAL</span>}
                   </div>
                   <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{it.descripcion}</div>
-                  <div style={{ fontSize: 13, color: it.ok ? "var(--dc-ok-700)" : "var(--dc-ink-400)", marginTop: 3, fontWeight: 600 }}>{it.detalle}</div>
+                  <div style={{ fontSize: 13, color: it.ok ? "var(--dc-ok-700)" : "var(--dc-ink-400)", marginTop: 3, fontWeight: 500 }}>{it.detalle}</div>
                 </div>
                 {!it.ok && it.modulo && ["config", "whatsapp", "recall", "facturacion"].includes(it.modulo) && (
                   <div style={{ flexShrink: 0 }}>
@@ -413,7 +413,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       {wizard && <OnboardingWizard sedes={sedes} esps={esps} meds={meds} onClose={() => { setWizard(false); cargar(); }} onDone={cargar} notify={notify} />}
 
       {tab === "empresa" && (() => {
-        const lbl = { fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 };
+        const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 };
         const set = (k, v) => setClinica((c) => ({ ...c, [k]: v }));
         return (
         <div style={{ display: "grid", gap: 16 }}>
@@ -422,7 +422,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
           {/* Ficha fiscal */}
           <div style={{ ...card, overflow: "hidden" }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)" }}>
-              <h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Datos de la empresa</h3>
+              <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Datos de la empresa</h3>
               <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Se usan en boletas/facturas y para que el asistente sepa quién es la clínica.</div>
             </div>
             <div style={{ padding: 18, display: "grid", gap: 14 }}>
@@ -448,7 +448,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
           {/* Cuentas bancarias */}
           <div style={{ ...card, overflow: "hidden" }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Cuentas bancarias</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Para cobros por transferencia. El asistente de WhatsApp puede compartirlas.</div></div>
+              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Cuentas bancarias</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Para cobros por transferencia. El asistente de WhatsApp puede compartirlas.</div></div>
               <Btn small kind="ghost" onClick={addCuenta}><Plus size={15} strokeWidth={1.75} /> Agregar cuenta</Btn>
             </div>
             <div style={{ padding: 18, display: "grid", gap: 12 }}>
@@ -492,7 +492,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
           {/* Yape / Plin */}
           <div style={{ ...card, overflow: "hidden" }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Yape / Plin</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Billeteras digitales para pagos rápidos. Número de celular (9 dígitos) y titular.</div></div>
+              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Yape / Plin</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Billeteras digitales para pagos rápidos. Número de celular (9 dígitos) y titular.</div></div>
               <div style={{ display: "flex", gap: 8 }}>
                 <Btn small kind="ghost" onClick={() => addBilletera("yape")}><Plus size={15} strokeWidth={1.75} /> Yape</Btn>
                 <Btn small kind="ghost" onClick={() => addBilletera("plin")}><Plus size={15} strokeWidth={1.75} /> Plin</Btn>
@@ -508,7 +508,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 return (
                 <div key={i} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12, background: "var(--dc-white)", display: "grid", gridTemplateColumns: "auto 1fr 1.2fr auto", gap: 10, alignItems: "flex-end" }}>
                   <div style={{ minWidth: 70 }}><label style={lbl}>Tipo</label>
-                    <div style={{ padding: "8px 12px", borderRadius: "var(--dc-r-full)", background: tint(col, 0.094), color: col, fontWeight: 600, fontSize: 13, textAlign: "center" }}>{es === "yape" ? "Yape" : "Plin"}</div>
+                    <div style={{ padding: "8px 12px", borderRadius: "var(--dc-r-full)", background: tint(col, 0.094), color: col, fontWeight: 500, fontSize: 13, textAlign: "center" }}>{es === "yape" ? "Yape" : "Plin"}</div>
                   </div>
                   <div>
                     <label style={lbl}>Número (celular)</label>
@@ -531,7 +531,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       })()}
 
       {tab === "atencion" && (() => {
-        const lbl = { fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 };
+        const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 };
         return (
         <div style={{ display: "grid", gap: 16 }}>
           {!conectado && <Card style={{ padding: 16 }}><div style={{ color: "var(--dc-warn-600)", fontSize: 13 }}>Sin sesión, el horario se guarda solo en este navegador — suficiente para probarlo: al guardar cambian la agenda, la capacidad del día y la disponibilidad de los doctores.</div></Card>}
@@ -540,7 +540,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div>
-                  <h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Horario de atención</h3>
+                  <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Horario de atención</h3>
                   <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>
                     {sedeHorario
                       ? "Horario propio de esta sede. Los días que no cambies siguen el horario general."
@@ -558,10 +558,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
             <div style={{ padding: 18, display: "grid", gap: 8 }}>
               {DIAS_ATN.map(([k, l]) => { const d = diaCfg(k); return (
                 <div key={k} style={{ display: "grid", gridTemplateColumns: "120px auto 1fr", gap: 12, alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--dc-bg)" }}>
-                  <span style={{ fontWeight: 600, color: NAVY, fontSize: 15 }}>{l}
-                    {diaHeredado(k) && <span title="Sigue el horario general de la clínica" style={{ marginLeft: 7, fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", background: "var(--dc-bg)", borderRadius: "var(--dc-r-full)", padding: "2px 7px" }}>general</span>}
+                  <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{l}
+                    {diaHeredado(k) && <span title="Sigue el horario general de la clínica" style={{ marginLeft: 7, fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", background: "var(--dc-bg)", borderRadius: "var(--dc-r-full)", padding: "2px 7px" }}>general</span>}
                   </span>
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, color: d.cerrado ? "var(--dc-ink-400)" : "var(--dc-ok-700)", fontWeight: 600 }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, color: d.cerrado ? "var(--dc-ink-400)" : "var(--dc-ok-700)", fontWeight: 500 }}>
                     <input type="checkbox" checked={!d.cerrado} onChange={(e) => setDia(k, { cerrado: !e.target.checked })} /> {d.cerrado ? "Cerrado" : "Abierto"}
                   </label>
                   {!d.cerrado ? (
@@ -578,7 +578,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
           {/* Feriados / excepciones */}
           <div style={{ ...card, overflow: "hidden" }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Feriados y excepciones</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Marca los feriados como cerrados, o ábrelos con un horario especial si tu clínica atiende ese día.</div></div>
+              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Feriados y excepciones</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Marca los feriados como cerrados, o ábrelos con un horario especial si tu clínica atiende ese día.</div></div>
               <Btn small kind="ghost" onClick={addFeriado}><Plus size={15} strokeWidth={1.75} /> Agregar feriado</Btn>
             </div>
             <div style={{ padding: 18, display: "grid", gap: 12 }}>
@@ -586,7 +586,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
               {(clinica.feriados || []).map((fr, i) => (
                 <div key={i} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12, background: "var(--dc-white)", display: "grid", gridTemplateColumns: "150px auto 1fr auto", gap: 10, alignItems: "center" }}>
                   <div><label style={lbl}>Fecha</label><input className="dc-premium-inp" type="date" value={fr.fecha || ""} onChange={(e) => setFeriado(i, "fecha", e.target.value)} style={inp} /></div>
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, fontWeight: 600, color: fr.cerrado ? "var(--dc-red-deep)" : "var(--dc-ok-700)", marginTop: 18 }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, color: fr.cerrado ? "var(--dc-red-deep)" : "var(--dc-ok-700)", marginTop: 18 }}>
                     <input type="checkbox" checked={!!fr.cerrado} onChange={(e) => setFeriado(i, "cerrado", e.target.checked)} /> {fr.cerrado ? "Cerrado" : "Abierto"}
                   </label>
                   {fr.cerrado ? (
@@ -612,13 +612,13 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       {tab === "servicios" && (
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Servicios y precios</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>El agente de WhatsApp y los presupuestos usan estos precios.</div></div>
+            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Servicios y precios</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>El agente de WhatsApp y los presupuestos usan estos precios.</div></div>
             <Btn small onClick={() => setEdit({ tipo: "servicio", item: {} })}><Plus size={15} strokeWidth={1.75} /> Nuevo servicio</Btn>
           </div>
           <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Servicio</th><th style={th}>Precio</th><th style={{ ...th, textAlign: "right" }}></th></tr></thead>
             <tbody>{esps.map((e) => (
-              <tr key={e.id}><td style={{ ...td, fontWeight: 600 }}>{e.nombre}</td><td style={td}>S/ {Number(e.precioBase) || 0}</td><td style={{ ...td, textAlign: "right" }}>{rowBtns("servicio", e)}</td></tr>
+              <tr key={e.id}><td style={{ ...td, fontWeight: 500 }}>{e.nombre}</td><td style={td}>S/ {Number(e.precioBase) || 0}</td><td style={{ ...td, textAlign: "right" }}>{rowBtns("servicio", e)}</td></tr>
             ))}{esps.length === 0 && <tr><td style={td} colSpan={3}>Sin servicios aún.</td></tr>}</tbody>
           </table></div>
         </div>
@@ -627,16 +627,16 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       {tab === "doctores" && (
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Doctores</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.</div></div>
+            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Doctores</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.</div></div>
             <Btn small onClick={() => setEdit({ tipo: "doctor", item: {} })}><Plus size={15} strokeWidth={1.75} /> Nuevo doctor</Btn>
           </div>
           <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Doctor</th><th style={th}>Especialidad</th><th style={th}>CMP/COP</th><th style={th}>Comisión</th><th style={th}>Meta</th><th style={th}>Estado</th><th style={{ ...th, textAlign: "right" }}></th></tr></thead>
             <tbody>{meds.map((m) => (
-              <tr key={m.id}><td style={{ ...td, fontWeight: 600 }}>{m.nombre}</td><td style={td}>{espNombre(m.especialidadId)}</td><td style={td}>{m.cop || "—"}</td>
+              <tr key={m.id}><td style={{ ...td, fontWeight: 500 }}>{m.nombre}</td><td style={td}>{espNombre(m.especialidadId)}</td><td style={td}>{m.cop || "—"}</td>
                 <td style={td}>{m.porcentajeComision != null ? `${m.porcentajeComision}%` : "—"}</td>
                 <td style={td}>{m.metaMensual != null ? `S/ ${Number(m.metaMensual).toLocaleString()}` : "—"}</td>
-                <td style={td}><span style={{ fontSize: 12, fontWeight: 600, padding: "3px 9px", borderRadius: "var(--dc-r-full)", background: m.activo ? "var(--dc-ok-soft)" : "var(--dc-fee2)", color: m.activo ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>{m.activo ? "Activo" : "Inactivo"}</span></td>
+                <td style={td}><span style={{ fontSize: 12, fontWeight: 500, padding: "3px 9px", borderRadius: "var(--dc-r-full)", background: m.activo ? "var(--dc-ok-soft)" : "var(--dc-fee2)", color: m.activo ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>{m.activo ? "Activo" : "Inactivo"}</span></td>
                 <td style={{ ...td, textAlign: "right" }}>{rowBtns("doctor", m)}</td></tr>
             ))}{meds.length === 0 && <tr><td style={td} colSpan={7}>Sin doctores aún.</td></tr>}</tbody>
           </table></div>
@@ -646,13 +646,13 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       {tab === "sedes" && (
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Sedes</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Locales de atención de la clínica.</div></div>
+            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Sedes</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Locales de atención de la clínica.</div></div>
             <Btn small onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={15} strokeWidth={1.75} /> Nueva sede</Btn>
           </div>
           <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={th}>Sede</th><th style={th}>Dirección</th><th style={th}>Teléfono</th><th style={{ ...th, textAlign: "right" }}></th></tr></thead>
             <tbody>{sedes.map((s) => (
-              <tr key={s.id}><td style={{ ...td, fontWeight: 600 }}>{s.nombre}</td><td style={td}>{s.direccion || "—"}</td><td style={td}>{s.telefono || "—"}</td><td style={{ ...td, textAlign: "right" }}>{rowBtns("sede", s)}</td></tr>
+              <tr key={s.id}><td style={{ ...td, fontWeight: 500 }}>{s.nombre}</td><td style={td}>{s.direccion || "—"}</td><td style={td}>{s.telefono || "—"}</td><td style={{ ...td, textAlign: "right" }}>{rowBtns("sede", s)}</td></tr>
             ))}{sedes.length === 0 && <tr><td style={td} colSpan={4}>Sin sedes aún.</td></tr>}</tbody>
           </table></div>
         </div>
@@ -662,10 +662,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         const nuevo = { diaSemana: 1, horaInicio: "09:00", horaFin: "13:00", sedeId: "" };
         return (
           <div style={{ ...card, padding: "18px 20px" }}>
-            <h3 style={{ margin: "0 0 4px", color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Horarios de atención</h3>
+            <h3 style={{ margin: "0 0 4px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Horarios de atención</h3>
             <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 14 }}>Define la disponibilidad de cada doctor. El agente de WhatsApp solo ofrece estos horarios.</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Doctor:</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Doctor:</span>
               <Select width={240} value={medHor} onChange={setMedHor} placeholder="— Selecciona —"
                       options={meds.filter((m) => m.activo).map((m) => ({ value: m.id, label: m.nombre }))} />
             </div>
@@ -674,10 +674,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 {disp.length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Este doctor no tiene horarios configurados.</div>}
                 {[...disp].sort((a, b) => (a.diaSemana === 0 ? 7 : a.diaSemana) - (b.diaSemana === 0 ? 7 : b.diaSemana) || String(a.horaInicio).localeCompare(String(b.horaInicio))).map((d) => (
                   <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 13px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
-                    <span style={{ fontWeight: 600, color: NAVY, width: 44 }}>{(DIAS_SEM.find((x) => x.v === d.diaSemana) || {}).l || d.diaSemana}</span>
+                    <span style={{ fontWeight: 500, color: NAVY, width: 44 }}>{(DIAS_SEM.find((x) => x.v === d.diaSemana) || {}).l || d.diaSemana}</span>
                     <span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{String(d.horaInicio).slice(0, 5)} – {String(d.horaFin).slice(0, 5)}</span>
                     <span style={{ flex: 1 }} />
-                    <button onClick={() => delHorario(d.id)} style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-white)", color: RED, borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} strokeWidth={1.75} /> Quitar</button>
+                    <button onClick={() => delHorario(d.id)} style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-white)", color: RED, borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} strokeWidth={1.75} /> Quitar</button>
                   </div>
                 ))}
               </div>
@@ -693,7 +693,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         return (
           <div style={{ ...card, overflow: "hidden" }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Promociones</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>El agente de WhatsApp ofrece SOLO las promociones vigentes automáticamente.</div></div>
+              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Promociones</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>El agente de WhatsApp ofrece SOLO las promociones vigentes automáticamente.</div></div>
               <Btn small onClick={() => setEdit({ tipo: "promo", item: { activa: true } })}><Plus size={15} strokeWidth={1.75} /> Nueva promoción</Btn>
             </div>
             <div style={{ display: "grid", gap: 0 }}>
@@ -702,11 +702,11 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
                   <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: viv ? "var(--dc-ok-soft)" : "var(--dc-bg)", color: viv ? "var(--dc-ok-700)" : "var(--dc-ink-400)", display: "grid", placeItems: "center", flexShrink: 0 }}><Megaphone size={18} strokeWidth={1.75} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, color: NAVY, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{p.titulo}{p.descuento && <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{p.descuento}</span>}<span style={{ fontSize: 12, fontWeight: 600, color: viv ? "var(--dc-ok-700)" : "var(--dc-ink-400)", background: viv ? "var(--dc-ok-soft)" : "var(--dc-line)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{viv ? "Vigente" : (p.activa ? "Programada/vencida" : "Inactiva")}</span></div>
+                    <div style={{ fontWeight: 500, color: NAVY, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{p.titulo}{p.descuento && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{p.descuento}</span>}<span style={{ fontSize: 12, fontWeight: 500, color: viv ? "var(--dc-ok-700)" : "var(--dc-ink-400)", background: viv ? "var(--dc-ok-soft)" : "var(--dc-line)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{viv ? "Vigente" : (p.activa ? "Programada/vencida" : "Inactiva")}</span></div>
                     <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{p.descripcion || ""}{p.especialidadId ? ` · ${espNombre(p.especialidadId)}` : ""}{p.hasta ? ` · hasta ${p.hasta}` : ""}</div>
                   </div>
-                  <button onClick={() => setEdit({ tipo: "promo", item: { ...p } })} style={{ border: "1px solid var(--dc-line)", background: "var(--dc-white)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: DS.c.primary, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={13} strokeWidth={1.75} /> Editar</button>
-                  <button aria-label="Eliminar" onClick={() => delPromo(p.id)} style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-white)", color: RED, borderRadius: "var(--dc-r-sm)", padding: "6px 9px", cursor: "pointer", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} strokeWidth={1.75} /></button>
+                  <button onClick={() => setEdit({ tipo: "promo", item: { ...p } })} style={{ border: "1px solid var(--dc-line)", background: "var(--dc-white)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: DS.c.primary, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={13} strokeWidth={1.75} /> Editar</button>
+                  <button aria-label="Eliminar" onClick={() => delPromo(p.id)} style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-white)", color: RED, borderRadius: "var(--dc-r-sm)", padding: "6px 9px", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} strokeWidth={1.75} /></button>
                 </div>
               ); })}
             </div>
@@ -719,31 +719,31 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
           <Modal icon={<Settings size={20} strokeWidth={1.75} />} titulo={`${it.id ? "Editar" : "Nuevo"} ${T.toLowerCase()}`} onClose={() => setEdit(null)} maxW={460}
             footer={<><Btn small kind="ghost" onClick={() => setEdit(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> Guardar</Btn></>}>
             <div style={{ display: "grid", gap: 12 }}>
-              {edit.tipo !== "promo" && <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Nombre<input className="dc-premium-inp" value={it.nombre || ""} onChange={(e) => set("nombre", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder={edit.tipo === "servicio" ? "Ej. Blanqueamiento dental" : edit.tipo === "doctor" ? "Ej. Dra. Carla Mendoza" : "Ej. Sede San Isidro"} /></label>}
-              {edit.tipo === "servicio" && <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Precio (S/)<input className="dc-premium-inp" type="number" value={it.precioBase ?? ""} onChange={(e) => set("precioBase", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="80" /></label>}
+              {edit.tipo !== "promo" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Nombre<input className="dc-premium-inp" value={it.nombre || ""} onChange={(e) => set("nombre", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder={edit.tipo === "servicio" ? "Ej. Blanqueamiento dental" : edit.tipo === "doctor" ? "Ej. Dra. Carla Mendoza" : "Ej. Sede San Isidro"} /></label>}
+              {edit.tipo === "servicio" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Precio (S/)<input className="dc-premium-inp" type="number" value={it.precioBase ?? ""} onChange={(e) => set("precioBase", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="80" /></label>}
               {edit.tipo === "promo" && <>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Título<input className="dc-premium-inp" value={it.titulo || ""} onChange={(e) => set("titulo", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. Blanqueamiento con 20% dto" /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Descripción<input className="dc-premium-inp" value={it.descripcion || ""} onChange={(e) => set("descripcion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Detalle breve de la promo" /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Descuento<input className="dc-premium-inp" value={it.descuento || ""} onChange={(e) => set("descuento", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="20% · S/ 50 · 2x1" /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Aplica a (servicio, opcional)<Select value={it.especialidadId || ""} onChange={(v) => set("especialidadId", v)} placeholder="Todos" options={[{ value: "", label: "Todos" }, ...esps.map((e) => ({ value: e.id, label: e.nombre }))]} /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Título<input className="dc-premium-inp" value={it.titulo || ""} onChange={(e) => set("titulo", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. Blanqueamiento con 20% dto" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Descripción<input className="dc-premium-inp" value={it.descripcion || ""} onChange={(e) => set("descripcion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Detalle breve de la promo" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Descuento<input className="dc-premium-inp" value={it.descuento || ""} onChange={(e) => set("descuento", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="20% · S/ 50 · 2x1" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Aplica a (servicio, opcional)<Select value={it.especialidadId || ""} onChange={(v) => set("especialidadId", v)} placeholder="Todos" options={[{ value: "", label: "Todos" }, ...esps.map((e) => ({ value: e.id, label: e.nombre }))]} /></label>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <label style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Desde<input className="dc-premium-inp" type="date" value={it.desde || ""} onChange={(e) => set("desde", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
-                  <label style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Hasta<input className="dc-premium-inp" type="date" value={it.hasta || ""} onChange={(e) => set("hasta", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
+                  <label style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Desde<input className="dc-premium-inp" type="date" value={it.desde || ""} onChange={(e) => set("desde", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
+                  <label style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Hasta<input className="dc-premium-inp" type="date" value={it.hasta || ""} onChange={(e) => set("hasta", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
                 </div>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--dc-ink-700)", cursor: "pointer" }}><input type="checkbox" checked={it.activa !== false} onChange={(e) => set("activa", e.target.checked)} /> Activa (el agente la ofrece si está vigente)</label>
               </>}
               {edit.tipo === "doctor" && <>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Especialidad<Select value={it.especialidadId || ""} onChange={(v) => set("especialidadId", v)} placeholder="— Selecciona —" options={esps.map((e) => ({ value: e.id, label: e.nombre }))} /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>CMP/COP (opcional)<input className="dc-premium-inp" value={it.cop || ""} onChange={(e) => set("cop", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="COP 12345" /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Usuario vinculado<input className="dc-premium-inp" value={it.usuarioId || it.usuario || ""} readOnly style={{ ...inp, marginTop: 5, background: "var(--dc-bg)" }} placeholder="Sin usuario vinculado" /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Comisión %<input className="dc-premium-inp" type="number" value={it.porcentajeComision ?? ""} onChange={(e) => set("porcentajeComision", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 40" /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Meta mensual (S/)<input className="dc-premium-inp" type="number" value={it.metaMensual ?? ""} onChange={(e) => set("metaMensual", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 8000 · vacío = sin meta" /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Sillón preferido<input className="dc-premium-inp" type="number" min="1" max="8" value={it.sillonPreferido ?? ""} onChange={(e) => set("sillonPreferido", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Sin preferencia" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Especialidad<Select value={it.especialidadId || ""} onChange={(v) => set("especialidadId", v)} placeholder="— Selecciona —" options={esps.map((e) => ({ value: e.id, label: e.nombre }))} /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>CMP/COP (opcional)<input className="dc-premium-inp" value={it.cop || ""} onChange={(e) => set("cop", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="COP 12345" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Usuario vinculado<input className="dc-premium-inp" value={it.usuarioId || it.usuario || ""} readOnly style={{ ...inp, marginTop: 5, background: "var(--dc-bg)" }} placeholder="Sin usuario vinculado" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Comisión %<input className="dc-premium-inp" type="number" value={it.porcentajeComision ?? ""} onChange={(e) => set("porcentajeComision", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 40" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Meta mensual (S/)<input className="dc-premium-inp" type="number" value={it.metaMensual ?? ""} onChange={(e) => set("metaMensual", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 8000 · vacío = sin meta" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Sillón preferido<input className="dc-premium-inp" type="number" min="1" max="8" value={it.sillonPreferido ?? ""} onChange={(e) => set("sillonPreferido", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Sin preferencia" /></label>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--dc-ink-700)", cursor: "pointer" }}><input type="checkbox" checked={it.activo !== false} onChange={(e) => set("activo", e.target.checked)} /> Activo (visible en agenda y WhatsApp)</label>
               </>}
               {edit.tipo === "sede" && <>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Dirección<input className="dc-premium-inp" value={it.direccion || ""} onChange={(e) => set("direccion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Av. ..." /></label>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>Teléfono<input className="dc-premium-inp" value={it.telefono || ""} onChange={(e) => set("telefono", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="01 234 5678" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Dirección<input className="dc-premium-inp" value={it.direccion || ""} onChange={(e) => set("direccion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Av. ..." /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Teléfono<input className="dc-premium-inp" value={it.telefono || ""} onChange={(e) => set("telefono", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="01 234 5678" /></label>
               </>}
             </div>
           </Modal>
@@ -756,10 +756,10 @@ function HorarioNuevo({ inp, sedes, onAdd }) {
   const [d, setD] = useState({ diaSemana: 1, horaInicio: "09:00", horaFin: "13:00", sedeId: "" });
   return (
     <div style={{ borderTop: "1px dashed var(--dc-line)", paddingTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-500)" }}>Día<br /><Select width={150} value={d.diaSemana} onChange={(v) => setD({ ...d, diaSemana: Number(v) })} options={DIAS_SEM.map((x) => ({ value: x.v, label: x.l }))} /></label>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-500)" }}>Desde<br /><input className="dc-premium-inp" type="time" value={d.horaInicio} onChange={(e) => setD({ ...d, horaInicio: e.target.value })} style={{ ...inp, width: "auto", marginTop: 4 }} /></label>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-500)" }}>Hasta<br /><input className="dc-premium-inp" type="time" value={d.horaFin} onChange={(e) => setD({ ...d, horaFin: e.target.value })} style={{ ...inp, width: "auto", marginTop: 4 }} /></label>
-      {sedes.length > 0 && <label style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-500)" }}>Sede<br /><Select width={190} value={d.sedeId} onChange={(v) => setD({ ...d, sedeId: v })} placeholder="Cualquiera" options={[{ value: "", label: "Cualquiera" }, ...sedes.map((s) => ({ value: s.id, label: s.nombre }))]} /></label>}
+      <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Día<br /><Select width={150} value={d.diaSemana} onChange={(v) => setD({ ...d, diaSemana: Number(v) })} options={DIAS_SEM.map((x) => ({ value: x.v, label: x.l }))} /></label>
+      <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Desde<br /><input className="dc-premium-inp" type="time" value={d.horaInicio} onChange={(e) => setD({ ...d, horaInicio: e.target.value })} style={{ ...inp, width: "auto", marginTop: 4 }} /></label>
+      <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Hasta<br /><input className="dc-premium-inp" type="time" value={d.horaFin} onChange={(e) => setD({ ...d, horaFin: e.target.value })} style={{ ...inp, width: "auto", marginTop: 4 }} /></label>
+      {sedes.length > 0 && <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Sede<br /><Select width={190} value={d.sedeId} onChange={(v) => setD({ ...d, sedeId: v })} placeholder="Cualquiera" options={[{ value: "", label: "Cualquiera" }, ...sedes.map((s) => ({ value: s.id, label: s.nombre }))]} /></label>}
       <Btn small onClick={() => onAdd(d)}><Plus size={14} strokeWidth={1.75} /> Agregar horario</Btn>
     </div>
   );

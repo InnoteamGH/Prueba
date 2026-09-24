@@ -791,22 +791,20 @@ export default function ProduccionComisiones({ citas = [], can }) {
 
   return (
     <div className="dc-pc">
-      <header className="dc-pc-head">
-        <div>
-          <p>Cómo va cada persona: producción, comisión, cobros del periodo y rendimiento por cita.</p>
-        </div>
-      </header>
+      {/* Pestañas y descripción en una sola línea: el título ya está en la cabecera. */}
+      <div className="dc-pc-barra">
+        <nav className="dc-tabs" role="tablist" aria-label="Vistas">
+          <button type="button" className="dc-tab" role="tab" aria-selected={tab === "resumen"} onClick={() => setTab("resumen")}>
+            Producción y comisiones
+          </button>
+          <button type="button" className="dc-tab" role="tab" aria-selected={tab === "ausencias"} onClick={() => setTab("ausencias")}>
+            Ausentismo por doctor
+          </button>
+        </nav>
+        <p>Producción, comisión, cobros del periodo y rendimiento por cita de cada persona.</p>
+      </div>
 
-      <nav className="dc-tabs" role="tablist" aria-label="Vistas">
-        <button type="button" className="dc-tab" role="tab" aria-selected={tab === "resumen"} onClick={() => setTab("resumen")}>
-          Producción y comisiones
-        </button>
-        <button type="button" className="dc-tab" role="tab" aria-selected={tab === "ausencias"} onClick={() => setTab("ausencias")}>
-          Ausentismo por doctor
-        </button>
-      </nav>
-
-      {err && <p className="dc-nota" style={{ color: "var(--dc-danger-700)" }}>{err}</p>}
+      {err && <div className="dc-banda dc-banda--peligro" style={{ marginBottom: 16 }}><p>{err}</p></div>}
 
       {tab === "ausencias" ? (
         <AusentismoTab

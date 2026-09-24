@@ -213,7 +213,7 @@ export default function PlanInversionDocumento({
         </div>
 
         <div className="plan-inv-no-print" style={{ margin: "12px 16px", padding: 12, background: "#F4F1EA", borderRadius: 8, fontFamily: "system-ui,sans-serif", fontSize: 13 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Añadir servicio suelto</div>
+          <div style={{ fontWeight: 500, marginBottom: 8 }}>Añadir servicio suelto</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             <select value={codAdd} onChange={(e) => setCodAdd(Number(e.target.value))} style={inp}>
               {SUELTOS_PARTIDA.map((s) => (
@@ -260,12 +260,12 @@ export default function PlanInversionDocumento({
                 <>
                   <header style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 16, fontFamily: "Georgia, serif" }}>
                     <div>
-                      <div style={{ fontSize: 22, fontWeight: 700 }}>{empresa.nombreParaDocumento || empresa.nombreComercial || "Clínica"}</div>
+                      <div style={{ fontSize: 22, fontWeight: 600 }}>{empresa.nombreParaDocumento || empresa.nombreComercial || "Clínica"}</div>
                       <div className="plan-inv-muted">RUC {empresa.ruc}</div>
                       {empresa.web && <div className="plan-inv-muted">{empresa.web}</div>}
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 18, fontWeight: 700 }}>{doc.titulo || "PLAN DE INVERSIÓN"}</div>
+                      <div style={{ fontSize: 18, fontWeight: 600 }}>{doc.titulo || "PLAN DE INVERSIÓN"}</div>
                       {planRemote?.numeroDocumento && <div className="plan-inv-muted">{planRemote.numeroDocumento}</div>}
                       <div className="plan-inv-muted">{sede.nombre}</div>
                       <div className="plan-inv-muted">{sede.direccion}</div>
@@ -360,6 +360,6 @@ export default function PlanInversionDocumento({
   );
 }
 
-const btnPrimary = { padding: "8px 14px", borderRadius: 8, border: "none", background: "#1B1614", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 13 };
+const btnPrimary = { padding: "8px 14px", borderRadius: 8, border: "none", background: "#1B1614", color: "#fff", fontWeight: 500, cursor: "pointer", fontSize: 13 };
 const btnGhost = { padding: "8px 14px", borderRadius: 8, border: "1px solid #cfc8be", background: "#fff", cursor: "pointer", fontSize: 13 };
 const inp = { padding: "6px 10px", borderRadius: 6, border: "1px solid #cfc8be", fontSize: 13 };

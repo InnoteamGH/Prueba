@@ -32,7 +32,7 @@ export const DS = {
   f: { hero: 26, h1: 22, h2: 18, body: 15, cap: 13, micro: 11.5 },
   motion: { fast: ".16s ease", base: ".24s ease", slow: ".4s ease", spring: ".26s cubic-bezier(.2,.7,.2,1)" } };
 DS.card = { background: "var(--dc-surface)", borderRadius: 16, border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)" };
-DS.label = { fontSize: DS.f.cap, fontWeight: 600, color: DS.c.ink, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
+DS.label = { fontSize: DS.f.cap, fontWeight: 500, color: DS.c.ink, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
 export const DISPLAY_FONT = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif";
 
 /* ============================================================================
@@ -686,7 +686,7 @@ export function AvatarPaciente({ nombre, fotoUrl, genero, pediatrico = false, si
 
   return (
     <div style={{ ...base, background: `linear-gradient(135deg,${DS.c.accent},${tono})`, color: "var(--dc-white)",
-                  fontWeight: 600, fontSize: Math.round(size / 2.9) }}>
+                  fontWeight: 500, fontSize: Math.round(size / 2.9) }}>
       {iniciales(nombre)}
     </div>);
 }
@@ -945,7 +945,7 @@ export const ESTADO_BADGE = {
 // Superficie base: blanca, borde fino y sombra mínima. Sin efecto vidrio: sobre un
 // fondo plano el desenfoque solo ensuciaba el color y hacía cada tarjeta distinta.
 export const Card = ({ children, style, ...rest }) => <div {...rest} style={{ background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)", ...style }}>{children}</div>;
-export const Badge = ({ estado }) => { const e = ESTADO_BADGE[estado] || ESTADO_BADGE.pendiente; return <span style={{ background: e.bg, color: e.fg, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{e.l}</span>; };
+export const Badge = ({ estado }) => { const e = ESTADO_BADGE[estado] || ESTADO_BADGE.pendiente; return <span style={{ background: e.bg, color: e.fg, fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{e.l}</span>; };
 /* Sistema de botones DS: primary · secundario · ghost · peligro · peligro-outline · green. */
 export const Btn = ({ children, onClick, kind = "primary", small, disabled, full, type, busy, "aria-label": ariaLabel, title }) => {
   const kindClass = {
@@ -975,7 +975,7 @@ export const Btn = ({ children, onClick, kind = "primary", small, disabled, full
   const bd = outline ? outlineBorder.replace("1.5px", "1px") : ghost ? "1px solid var(--dc-line)" : "1px solid transparent";
   return <button type={type} className={`dc-btn ${kindClass}${small ? " dc-btn--sm" : ""}`} aria-label={ariaLabel} title={title || ariaLabel} aria-busy={isBusy ? "true" : undefined} onClick={onClick} disabled={off}
     style={{ background: bg, color: fg, border: bd, borderRadius: "var(--dc-r-full)", padding: small ? "5px 14px" : "8px 18px",
-      fontSize: small ? 13 : 14, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.005em", cursor: off ? "not-allowed" : "pointer", width: full ? "100%" : "auto",
+      fontSize: small ? 13 : 14, fontWeight: 500, lineHeight: 1.2, letterSpacing: "-0.005em", cursor: off ? "not-allowed" : "pointer", width: full ? "100%" : "auto",
       minHeight: small ? 32 : "var(--dc-tap-min)", whiteSpace: "nowrap",
       display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
       boxShadow: ghost || outline || off ? "none" : "0 1px 2px rgba(16,24,40,.10)", transition: "filter .15s, background .15s, border-color .15s", opacity: isBusy ? 0.85 : 1 }}
@@ -984,7 +984,7 @@ export const Btn = ({ children, onClick, kind = "primary", small, disabled, full
 };
 export const Field = ({ label, value, onChange, placeholder, type = "text", icon, hint }) => (
   <label style={{ display: "block" }}>
-    {label && <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", display: "block", marginBottom: 6, letterSpacing: .2 }}>{label}</span>}
+    {label && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", display: "block", marginBottom: 6, letterSpacing: .2 }}>{label}</span>}
     <div style={{ position: "relative" }}>
       {icon && <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--dc-ink-500)", display: "grid", placeItems: "center" }}>{icon}</span>}
       <input className="dc-premium-inp" type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
@@ -1011,7 +1011,7 @@ export const tint = (c, a = 0.12) =>
 export const Vacio = ({ icon, titulo, sub }) => (
   <div style={{ padding: 40, textAlign: "center" }}>
     <div style={{ width: 52, height: 52, borderRadius: "var(--dc-r-lg)", background: "var(--dc-bg)", display: "grid", placeItems: "center", margin: "0 auto 12px", color: "var(--dc-brand-soft)" }}>{icon}</div>
-    <div style={{ fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 15 }}>{titulo}</div>
+    <div style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14 }}>{titulo}</div>
     {sub && <div style={{ fontSize: 13, marginTop: 3, color: "var(--dc-ink-500)" }}>{sub}</div>}
   </div>
 );
@@ -1142,7 +1142,7 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div><h2 className="dc-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--dc-ink-900)" }}>{titulo}</h2>{sub && edit && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{sub}</div>}</div>
+        <div><h2 className="dc-title" style={{ margin: 0, fontSize: 14, fontWeight: 500, color: "var(--dc-ink-900)" }}>{titulo}</h2>{sub && edit && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{sub}</div>}</div>
         <div style={{ display: "flex", gap: 8 }}>
           {edit && <Btn small kind="ghost" onClick={() => setLayout(def())}><Repeat size={14} strokeWidth={1.75} /> Restablecer</Btn>}
           <Btn small kind={edit ? "navy" : "ghost"} onClick={() => setEdit((e) => !e)}>{edit ? <><Check size={15} strokeWidth={1.75} /> Listo</> : <><Settings size={15} strokeWidth={1.75} /> Personalizar</>}</Btn>
@@ -1151,11 +1151,11 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
       {edit && (
         <div style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line-alt2)", borderRadius: "var(--dc-r-lg)", padding: "12px 15px", fontSize: 13, color: "var(--dc-info-ink)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Menu size={16} strokeWidth={1.75} /> Arrastra las tarjetas para moverlas. Usa <ArrowUpDown size={13} strokeWidth={1.75} style={{ transform: "rotate(90deg)" }} /> para el ancho y <ArrowUpDown size={13} strokeWidth={1.75} /> para el alto.
-          {hidden.length > 0 && <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>{hidden.map((w) => <button key={w.id} onClick={() => add(w.id)} style={{ fontSize: 12, fontWeight: 600, color: NAVY, background: "var(--dc-white)", border: "1px solid var(--dc-line-alt2)", borderRadius: "var(--dc-r-full)", padding: "4px 10px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={12} strokeWidth={1.75} /> {w.title}</button>)}</span>}
+          {hidden.length > 0 && <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>{hidden.map((w) => <button key={w.id} onClick={() => add(w.id)} style={{ fontSize: 12, fontWeight: 500, color: NAVY, background: "var(--dc-white)", border: "1px solid var(--dc-line-alt2)", borderRadius: "var(--dc-r-full)", padding: "4px 10px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={12} strokeWidth={1.75} /> {w.title}</button>)}</span>}
         </div>
       )}
       {cols === 1 && !edit && todas.length > CORTE_MOVIL && verTodo && (
-        <button onClick={() => setVerTodo(false)} style={{ width: "100%", marginBottom: 12, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: NAVY, boxShadow: "0 1px 2px rgba(16,24,40,.06)" }}>
+        <button onClick={() => setVerTodo(false)} style={{ width: "100%", marginBottom: 12, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: NAVY, boxShadow: "0 1px 2px rgba(16,24,40,.06)" }}>
           Ver solo lo principal
         </button>
       )}
@@ -1166,7 +1166,7 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
             <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "16px 18px", minHeight: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, flexShrink: 0 }}>
                 {Ic && <div style={{ width: 28, height: 28, borderRadius: 999, background: tint(c, 0.09), color: c, display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={15} strokeWidth={1.75} /></div>}
-                <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-ink-900)", flex: 1, minWidth: 0, margin: 0, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{W.title}</h2>
+                <h2 style={{ fontSize: 14, fontWeight: 500, color: "var(--dc-ink-900)", flex: 1, minWidth: 0, margin: 0, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{W.title}</h2>
                 {edit && <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                   <button type="button" className="dc-icon-btn" aria-label="Ancho" title="Ancho" onClick={() => cycleW(l.id)} style={btn}><ArrowUpDown size={13} strokeWidth={1.75} style={{ transform: "rotate(90deg)" }} /></button>
                   <button type="button" className="dc-icon-btn" aria-label="Alto" title="Alto" onClick={() => toggleH(l.id)} style={btn}><ArrowUpDown size={13} strokeWidth={1.75} /></button>
@@ -1181,7 +1181,7 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
         ); })}
       </div>
       {recorta && (
-        <button onClick={() => setVerTodo(true)} style={{ width: "100%", marginTop: 12, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: NAVY, boxShadow: "0 1px 2px rgba(16,24,40,.06)" }}>
+        <button onClick={() => setVerTodo(true)} style={{ width: "100%", marginTop: 12, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: NAVY, boxShadow: "0 1px 2px rgba(16,24,40,.06)" }}>
           Ver las otras {todas.length - CORTE_MOVIL} tarjetas
         </button>
       )}
@@ -1219,7 +1219,7 @@ export const Modal = ({ icon, titulo, sub, onClose, children, footer, maxW, size
       <div className="dc-modal__head" style={{ padding: "20px 24px", background: `linear-gradient(135deg, ${DS.c.primary}, ${DS.c.primaryDark})`, color: "var(--dc-white)", flexShrink: 0, display: "flex", alignItems: "center", gap: 14 }}>
         {icon && <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "rgba(255,255,255,.15)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 id="dc-modal-title" className="dc-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, fontFamily: DISPLAY_FONT, color: "inherit" }}>{titulo}</h2>
+          <h2 id="dc-modal-title" className="dc-title" style={{ margin: 0, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT, color: "inherit" }}>{titulo}</h2>
           {sub && <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>{sub}</div>}
         </div>
         <button type="button" aria-label="Cerrar" className="dc-icon-btn" onClick={onClose} style={{ background: "rgba(255,255,255,.10)", border: "none", borderRadius: "var(--dc-r-full)", width: 44, height: 44, cursor: "pointer", color: "var(--dc-white)", display: "grid", placeItems: "center", flexShrink: 0, transition: "background .15s" }} onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.20)"} onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,.10)"}><X size={17} strokeWidth={2} /></button>
@@ -1273,7 +1273,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
     : { overflowX: "auto" };
   return (
     <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
-      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 15, fontWeight: 600 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? " · filtrado" : ""}{hayMas ? ` · mostrando ${mostradas.length}` : ""}</span></div>{accion && <div>{accion}</div>}</div>}
+      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? " · filtrado" : ""}{hayMas ? ` · mostrando ${mostradas.length}` : ""}</span></div>{accion && <div>{accion}</div>}</div>}
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;
             width: max-content solo cuando minWidth > 0 explícito exige scroll horizontal. */}
@@ -1283,15 +1283,15 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
         <div style={minWidth > 0 ? { minWidth, width: "100%" } : { width: "100%", minWidth: 0, maxWidth: "100%" }}>
           <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 12, padding: "4px 16px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-bg-soft)", ...(maxHeight ? { position: "sticky", top: 0, zIndex: 3 } : {}) }}>
             {cols.map((col) => {
-              if (col.noFilter && col.noSort) return <span key={col.key} style={{ fontSize: 12, fontWeight: 600, letterSpacing: .02, color: "var(--dc-ink-500)", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", alignSelf: "center", paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", ...(col.sticky ? { ...stickyHead, display: "flex", justifyContent: "center" } : {}) }}>{col.label}</span>;
+              if (col.noFilter && col.noSort) return <span key={col.key} style={{ fontSize: 12, fontWeight: 500, letterSpacing: .02, color: "var(--dc-ink-500)", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", alignSelf: "center", paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", ...(col.sticky ? { ...stickyHead, display: "flex", justifyContent: "center" } : {}) }}>{col.label}</span>;
               const isSort = sortCol === col.key; const isFilt = !!(colFilters[col.key] && colFilters[col.key].trim()); const open = activeCol === col.key || isFilt;
               const just = col.a === "left" ? "flex-start" : col.a === "right" ? "flex-end" : "center";
               return (
                 <div key={col.key} style={{ display: "flex", alignItems: "center", justifyContent: just, gap: 4, minWidth: 0, paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, ...(col.sticky ? stickyHead : {}) }}>
                   {open ? (
-                    <input className="dc-th dc-premium-inp" aria-label={`Filtrar ${col.label}`} autoFocus={activeCol === col.key} value={colFilters[col.key] || ""} onChange={(e) => setColFilters((f) => ({ ...f, [col.key]: e.target.value }))} onBlur={() => { if (!(colFilters[col.key] || "").trim()) setActiveCol(null); }} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[col.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} placeholder={col.label} style={{ flex: 1, width: "100%", minWidth: 0, minHeight: 30, textAlign: col.a === "left" ? "left" : "center", fontSize: 12, fontWeight: 600, color: NAVY, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 8px", outline: "none", boxSizing: "border-box" }} />
+                    <input className="dc-th dc-premium-inp" aria-label={`Filtrar ${col.label}`} autoFocus={activeCol === col.key} value={colFilters[col.key] || ""} onChange={(e) => setColFilters((f) => ({ ...f, [col.key]: e.target.value }))} onBlur={() => { if (!(colFilters[col.key] || "").trim()) setActiveCol(null); }} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[col.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} placeholder={col.label} style={{ flex: 1, width: "100%", minWidth: 0, minHeight: 30, textAlign: col.a === "left" ? "left" : "center", fontSize: 12, fontWeight: 500, color: NAVY, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 8px", outline: "none", boxSizing: "border-box" }} />
                   ) : (
-                    <button type="button" onClick={() => !col.noFilter && setActiveCol(col.key)} title={col.noFilter ? col.label : "Clic para filtrar"} style={{ minWidth: 0, textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", fontSize: 12, fontWeight: 600, letterSpacing: .02, color: isFilt || isSort ? "var(--dc-ink-900)" : "var(--dc-ink-500)", background: "transparent", border: "none", cursor: col.noFilter ? "default" : "text", padding: "6px 0", borderRadius: "var(--dc-r-sm)", whiteSpace: "normal", lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{col.label}</button>
+                    <button type="button" onClick={() => !col.noFilter && setActiveCol(col.key)} title={col.noFilter ? col.label : "Clic para filtrar"} style={{ minWidth: 0, textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", fontSize: 12, fontWeight: 500, letterSpacing: .02, color: isFilt || isSort ? "var(--dc-ink-900)" : "var(--dc-ink-500)", background: "transparent", border: "none", cursor: col.noFilter ? "default" : "text", padding: "6px 0", borderRadius: "var(--dc-r-sm)", whiteSpace: "normal", lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{col.label}</button>
                   )}
                   {!col.noSort && <button type="button" className="dc-col-sort" aria-label={`Ordenar ${col.label}`} onClick={() => toggleSort(col.key)} title="Ordenar" style={{ flexShrink: 0, width: 22, height: 22, display: "grid", placeItems: "center", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", background: isSort ? tint(DS.c.primary, 0.12) : "transparent", color: isSort ? DS.c.primary : "var(--dc-ink-400)", transition: "background .12s, color .12s", padding: 0 }}>{isSort ? (sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />) : <ArrowUpDown size={12} strokeWidth={1.75} />}</button>}
                 </div>
@@ -1369,7 +1369,7 @@ export const ModHead = ({ sub, accion }) => (!sub && !accion) ? null : (
 );
 // Barra de paciente unificada para los módulos clínicos.
 export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, accion, sedeLabel = null }) => {
-  const chip = { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, borderRadius: "var(--dc-r-full)", padding: "3px 10px", whiteSpace: "nowrap" };
+  const chip = { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, borderRadius: "var(--dc-r-full)", padding: "3px 10px", whiteSpace: "nowrap" };
   const p = pacientes.find((x) => x.id === pacienteId) || null;
   if (!pacientes.length) {
     return (
@@ -1383,8 +1383,8 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
       <Card style={{ padding: "14px 18px", marginBottom: 16, position: "relative", zIndex: 2 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
-            {modulo && <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{modulo}</div>}
-            <div style={{ fontWeight: 600, color: NAVY, marginBottom: 8 }}>Elige un paciente</div>
+            {modulo && <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{modulo}</div>}
+            <div style={{ fontWeight: 500, color: NAVY, marginBottom: 8 }}>Elige un paciente</div>
             <Select width={280} ariaLabel="Paciente" value="" placeholder="Selecciona un paciente…"
                     onChange={(v) => setPacienteId(/^\d+$/.test(String(v)) ? Number(v) : v)}
                     options={[{ value: "", label: "Selecciona un paciente…", disabled: true }, ...pacientes.map((x) => ({ value: x.id, label: x.nombre }))]} />
@@ -1413,7 +1413,7 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
             trabajar sobre la ficha equivocada al cambiar de uno a otro. */}
         <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPediatrico(p.nacimiento || p.fechaNacimiento)} size={88} radio={22} />
         <div style={{ flex: 1, minWidth: 220 }}>
-          {modulo && <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{modulo}</div>}
+          {modulo && <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{modulo}</div>}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <Select width={230} ariaLabel="Paciente"
                     value={(pacienteId == null || (typeof pacienteId === "number" && Number.isNaN(pacienteId))) ? "" : pacienteId}

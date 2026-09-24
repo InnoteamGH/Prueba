@@ -25,7 +25,7 @@ export async function reniecLookup(dni) {
 export function BtnReniec({ dni, onNombre, notify }) {
   const [loading, setLoading] = useState(false);
   const run = async () => { setLoading(true); const r = await reniecLookup(dni); setLoading(false); if (r.ok) onNombre(r.nombre); notify(r.msg); };
-  return <button type="button" onClick={run} disabled={loading} title="Traer nombres desde RENIEC" style={{ whiteSpace: "nowrap", background: (tint(DS.c.primary, 0.078)), color: DS.c.primary, border: "1.5px solid " + tint("var(--dc-accent-cyan)", 0.2), borderRadius: "var(--dc-r-md)", padding: "0 12px", fontSize: 13, fontWeight: 600, cursor: loading ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: loading ? 0.6 : 1 }}><Search size={14} strokeWidth={1.75} /> {loading ? "Consultando…" : "Autocompletar"}</button>;
+  return <button type="button" onClick={run} disabled={loading} title="Traer nombres desde RENIEC" style={{ whiteSpace: "nowrap", background: (tint(DS.c.primary, 0.078)), color: DS.c.primary, border: "1.5px solid " + tint("var(--dc-accent-cyan)", 0.2), borderRadius: "var(--dc-r-md)", padding: "0 12px", fontSize: 13, fontWeight: 500, cursor: loading ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: loading ? 0.6 : 1 }}><Search size={14} strokeWidth={1.75} /> {loading ? "Consultando…" : "Autocompletar"}</button>;
 }
 
 function citaFueraDeHorario(fecha, hora, duracionMin, horario, feriados, sedeIdNum) {
@@ -109,8 +109,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const pacF = (busca.trim() ? pac.filter((p) => (p.nombre || "").toLowerCase().includes(busca.toLowerCase()) || String(p.dni || "").includes(busca.trim())) : pac).slice(0, 6);
   const medsF = f.especialidadId ? meds.filter((m) => m.especialidadId === f.especialidadId) : meds;
   const pasada = f.fecha < fmt(hoy);
-  const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 15, color: NAVY, outline: "none", boxSizing: "border-box" };
-  const lbl = { fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
+  const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
+  const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
   const req = <span style={{ color: "var(--dc-red)" }}> *</span>;
   const crearNuevo = () => {
     if (!nuevo?.nombre?.trim()) { notify("Ingresa el nombre del paciente."); return; }
@@ -177,14 +177,14 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const canalBtns = (
     <div style={{ display: "flex", gap: 8 }}>
       {[["llamada", "Llamada", <Phone size={14} strokeWidth={1.75} />], ["whatsapp", "WhatsApp", <MessageSquare size={14} strokeWidth={1.75} />], ["presencial", "Presencial", <User size={14} strokeWidth={1.75} />]].map(([k, l, ic]) => { const on = f.canal === k; return (
-        <button key={k} onClick={() => setF({ ...f, canal: k })} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${T}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-accent-soft)" : "var(--dc-white)", color: on ? "var(--dc-brand-600)" : "var(--dc-ink-400)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{ic} {l}</button>
+        <button key={k} onClick={() => setF({ ...f, canal: k })} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${T}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-accent-soft)" : "var(--dc-white)", color: on ? "var(--dc-brand-600)" : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{ic} {l}</button>
       ); })}
     </div>
   );
   return (
     <Modal icon={<Calendar size={20} strokeWidth={1.75} />} titulo="Agendar cita" sub="Registra la cita del paciente" onClose={onClose} maxW={masDatos ? 760 : 460}
       footer={<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-        <button onClick={() => setMasDatos((v) => !v)} style={{ background: "none", border: "none", color: T, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{masDatos ? "‹ Menos datos" : "Más datos ›"}</button>
+        <button onClick={() => setMasDatos((v) => !v)} style={{ background: "none", border: "none", color: T, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>{masDatos ? "‹ Menos datos" : "Más datos ›"}</button>
         <Btn small onClick={guardar} disabled={guardando || !!avisoHorario}><Check size={15} strokeWidth={1.75} /> Agendar</Btn>
       </div>}>
       {avisoHorario && (
@@ -192,7 +192,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <AlertTriangle size={18} strokeWidth={1.75} color="var(--dc-warn-600)" style={{ flexShrink: 0, marginTop: 2 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, color: "var(--dc-warn-ink)", fontSize: 13, marginBottom: 4 }}>Fuera del horario de la clínica</div>
+              <div style={{ fontWeight: 500, color: "var(--dc-warn-ink)", fontSize: 13, marginBottom: 4 }}>Fuera del horario de la clínica</div>
               <div style={{ fontSize: 13, color: "var(--dc-warn-ink)", lineHeight: 1.45 }}>{avisoHorario}</div>
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
                 <Btn small onClick={() => ejecutarGuardado(true)} disabled={guardando}>Confirmar y agendar igual</Btn>
@@ -215,13 +215,13 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
                 <div style={{ padding: 8 }}><input className="dc-premium-inp" autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar paciente" style={{ ...inp, padding: "8px 11px" }} /></div>
                 <div style={{ maxHeight: 190, overflowY: "auto" }}>
                   {pacF.length === 0 && <div style={{ padding: "8px 14px", fontSize: 13, color: "var(--dc-ink-400)" }}>Sin coincidencias.</div>}
-                  {pacF.map((p) => <button key={p.id} onClick={() => { setF({ ...f, pacienteId: p.id }); setAbrePac(false); setBusca(""); }} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: p.id === f.pacienteId ? "var(--dc-bg)" : "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 600 }}>{p.nombre}{p.dni ? <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> · {p.dni}</span> : null}</button>)}
+                  {pacF.map((p) => <button key={p.id} onClick={() => { setF({ ...f, pacienteId: p.id }); setAbrePac(false); setBusca(""); }} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: p.id === f.pacienteId ? "var(--dc-bg)" : "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{p.nombre}{p.dni ? <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> · {p.dni}</span> : null}</button>)}
                 </div>
-                <button onClick={() => setNuevo({ nombre: busca, dni: "" })} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
+                <button onClick={() => setNuevo({ nombre: busca, dni: "" })} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
               </div>}
             </div>
             {nuevo && <div style={{ marginTop: 8, background: "var(--dc-bg-soft2)", border: "1px dashed var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12, display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: NAVY }}>Nuevo paciente</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: NAVY }}>Nuevo paciente</div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input className="dc-premium-inp" value={nuevo.dni} onChange={(e) => setNuevo({ ...nuevo, dni: e.target.value.replace(/[^\d]/g, "").slice(0, 8) })} placeholder="DNI" style={{ ...inp, padding: "8px 11px", flex: 1, minWidth: 0 }} />
                 <BtnReniec dni={nuevo.dni} onNombre={(n) => setNuevo((x) => ({ ...x, nombre: n }))} notify={notify} />
@@ -241,7 +241,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>
           <div>
             <span style={lbl}>Fecha y hora</span>
-            <div style={{ fontSize: 13, fontWeight: 600, color: DS.c.primary, marginBottom: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, marginBottom: 6 }}>
               {fechaLegible(f.fecha)} · {f.hora}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
@@ -249,7 +249,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               <input className="dc-premium-inp" type="date" value={f.fecha} onChange={(e) => { setHoraAuto(true); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
               <input className="dc-premium-inp" type="time" value={f.hora} onChange={(e) => { setHoraAuto(false); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
             </div>
-            {pasada && <div style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 600, marginTop: 5 }}>Fecha pasada</div>}
+            {pasada && <div style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>Fecha pasada</div>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label><span style={lbl}>Duración</span>

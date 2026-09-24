@@ -295,3 +295,11 @@
   .dc-pc .dc-tabla-doc--aus .fila > *:nth-child(5) { display: none; }
   .dc-pc .dc-tabla-doc .qui .ini { display: none; }
 }
+
+/* Barra única: pestañas a la izquierda, descripción a la derecha. */
+.dc-pc .dc-pc-barra { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; border-bottom: 1px solid var(--dc-line); margin-bottom: var(--dc-sp-4); }
+.dc-pc .dc-pc-barra .dc-tabs { border-bottom: 0; margin-bottom: 0; }
+.dc-pc .dc-pc-barra .dc-tab { min-height: 38px; padding: 8px 12px; font-size: 13px; }
+.dc-pc .dc-pc-barra > p { margin: 0 0 10px; font-size: 12.5px; color: var(--dc-ink-500); }
+.dc-pc .dc-kpi__value { font-size: 22px !important; }
+.dc-pc .dc-card__head h2 { font-size: 14.5px !important; font-weight: 600 !important; }

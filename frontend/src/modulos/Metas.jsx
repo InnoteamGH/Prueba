@@ -70,19 +70,19 @@ export default function Metas({ notify = () => {}, can }) {
       {meds.length > 0 && (
         <Card style={{ overflow: "hidden" }}>
           <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--dc-line)" }}>
-            <h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Metas mensuales</h3>
+            <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Metas mensuales</h3>
           </div>
           <div style={{ display: "grid" }}>
             {meds.map((m, i) => (
               <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderTop: i ? "1px solid var(--dc-line)" : "none", flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontWeight: 600, color: NAVY, fontSize: 15 }}>{m.nombre}</div>
+                  <div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{m.nombre}</div>
                   <div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>
                     {[m.especialidad, m.cop].filter(Boolean).join(" · ") || "Sin especialidad"}
                     {m.porcentajeComision != null ? ` · comisión ${m.porcentajeComision}%` : ""}
                   </div>
                 </div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 8 }}>
                   Meta S/
                   <input
                     className="dc-premium-inp"

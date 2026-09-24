@@ -17,9 +17,9 @@ export default function ChipAlergia({ children, onRemove, className = "" }) {
             margin: 0,
             cursor: "pointer",
             color: "inherit",
-            fontSize: 15,
+            fontSize: 14,
             lineHeight: 1,
-            fontWeight: 600,
+            fontWeight: 500,
             minWidth: 20,
             minHeight: 20,
           }}

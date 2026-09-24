@@ -686,8 +686,8 @@
   color: rgba(255,255,255,.78);
 }
 .dc-sb__mark { background: var(--dc-grad-marca); box-shadow: 0 6px 16px -6px rgba(20,163,168,.8), inset 0 1px 0 rgba(255,255,255,.25); width: 36px; height: 36px; border-radius: 12px; }
-.dc-sb__name { color: #fff; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
-.dc-sb__name b { color: #7FE0DD; font-weight: 800; }
+.dc-sb__name { color: #fff; font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.dc-sb__name b { color: #7FE0DD; font-weight: 700; }
 .dc-sb__name small { color: rgba(255,255,255,.55); font-weight: 500; }
 .dc-sb__titulo { color: rgba(255,255,255,.42); }
 .dc-sb__item, .dc-sb__subitem { color: rgba(255,255,255,.78); font-weight: 500; }
@@ -722,7 +722,7 @@
 
 /* ---- Cabecera ---- */
 .dc-top { background: rgba(255,255,255,.86); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); border-bottom-color: var(--dc-line); }
-.dc-top__titulo { font-size: 21px; font-weight: 800; letter-spacing: -.025em; }
+.dc-top__titulo { font-size: 21px; font-weight: 700; letter-spacing: -.025em; }
 .dc-top__onb { background: linear-gradient(135deg, var(--dc-brand-050), #fff); }
 
 /* ---- Botones: primario con degradado de marca ---- */
@@ -737,16 +737,16 @@
 .dc-kpi__icon { width: 40px; height: 40px; border-radius: 14px; }
 .dc-kpi__icon svg { width: 19px; height: 19px; }
 .dc-kpi__label { font-size: 13px; font-weight: 600; color: var(--dc-ink-500); }
-.dc-kpi__value { font-size: 28px; font-weight: 800; letter-spacing: -.03em; margin-top: 8px; }
+.dc-kpi__value { font-size: 28px; font-weight: 700; letter-spacing: -.03em; margin-top: 8px; }
 
 /* ---- Tablas ---- */
 .dc-table-head { background: linear-gradient(180deg, var(--dc-bg-soft), var(--dc-brand-050)) !important; }
 
 /* ---- Barra de página ---- */
-.dc-toolbar__titulo { font-size: 24px; font-weight: 800; letter-spacing: -.03em; }
+.dc-toolbar__titulo { font-size: 24px; font-weight: 700; letter-spacing: -.03em; }
 
 /* ---- Franja de cifras (Agenda) ---- */
-.dc-franja__cifra b { font-size: 28px; font-weight: 800; letter-spacing: -.03em; }
+.dc-franja__cifra b { font-size: 28px; font-weight: 700; letter-spacing: -.03em; }
 .dc-franja__cifra:first-child b { color: var(--dc-brand-600); }
 .dc-franja__avance em { background: var(--dc-grad-marca); }
 .dc-franja__desglose { background: linear-gradient(135deg, var(--dc-brand-050), #fff); }
@@ -769,14 +769,14 @@
 }
 .dc-hero__txt { position: relative; z-index: 1; display: grid; gap: 6px; align-content: center; max-width: 560px; }
 .dc-hero__fecha { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.7); }
-.dc-hero h2 { margin: 0; color: #fff; font-size: 30px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
+.dc-hero h2 { margin: 0; color: #fff; font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .dc-hero p { margin: 0; font-size: 15px; color: rgba(255,255,255,.85); line-height: 1.5; }
 .dc-hero__btn { all: unset; cursor: pointer; justify-self: start; margin-top: 10px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: #fff; color: var(--dc-brand-600); font-size: 13px; font-weight: 700; box-shadow: 0 8px 20px -10px rgba(0,0,0,.4); }
 .dc-hero__btn:hover { background: #F2FBFB; }
 .dc-hero__btn:focus-visible { box-shadow: 0 0 0 3px rgba(255,255,255,.5); }
 .dc-hero__cifras { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 10px; align-content: center; }
 .dc-hero__cifras > div { display: grid; gap: 2px; padding: 14px 18px; border-radius: 16px; background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); backdrop-filter: blur(6px); }
-.dc-hero__cifras b { font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums lining-nums; }
+.dc-hero__cifras b { font-size: 26px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums lining-nums; }
 .dc-hero__cifras span { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.75); }
 @media (max-width: 767px) { .dc-hero { padding: 22px 20px; } .dc-hero h2 { font-size: 24px; } .dc-hero__cifras { width: 100%; } }
 
@@ -790,4 +790,72 @@
 .dc-tarea--aviso .dc-tarea__ico { background: linear-gradient(135deg, #FEF4DC, #FBE5B4); color: #A7650B; }
 .dc-tarea--info .dc-tarea__ico { background: linear-gradient(135deg, #E3F6F6, #C9ECEC); color: var(--dc-brand-600); }
 .dc-tarea__txt b { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
-.dc-cita__hora { font-size: 14px; font-weight: 800; color: var(--dc-brand-600); }
+.dc-cita__hora { font-size: 14px; font-weight: 700; color: var(--dc-brand-600); }
+
+/* ======================================================================
+   ESCALA FINA — densidad y tamaños de una app clínica de uso diario
+   ====================================================================== */
+/* Menú lateral */
+.dc-sb { width: 228px; }
+.dc-sb.is-colap { width: 68px; }
+.dc-sb__brand { height: 56px; padding: 0 14px; }
+.dc-sb__mark { width: 30px; height: 30px; border-radius: 10px; }
+.dc-sb__mark svg { width: 16px; height: 16px; }
+.dc-sb__name { font-size: 15px; font-weight: 700; }
+.dc-sb__name small { font-size: 11px; }
+.dc-sb__nav { padding: 2px 10px 10px; }
+.dc-sb__grupo + .dc-sb__grupo { margin-top: 10px; }
+.dc-sb__titulo { font-size: 10.5px !important; padding: 0 10px 4px; }
+.dc-sb__item, .dc-sb__subitem { height: 32px; font-size: 13px; gap: 9px; padding: 0 10px; border-radius: 9px; margin-bottom: 1px; }
+.dc-sb__item svg { width: 16px; height: 16px; }
+.dc-sb__subitem { height: 30px; font-size: 12.5px; }
+.dc-sb__item.is-on, .dc-sb__subitem.is-on { font-weight: 600; }
+.dc-sb__pie { padding: 10px; gap: 6px; }
+.dc-sb__plan { padding: 7px 10px; font-size: 12.5px; }
+.dc-sb__avatar { width: 30px; height: 30px; font-size: 12px; }
+.dc-sb__uname { font-size: 12.5px; }
+.dc-sb__urol { font-size: 11.5px; }
+.dc-sb__reset { font-size: 11.5px; padding: 4px; }
+
+/* Cabecera */
+.dc-top { height: 56px; padding: 0 28px; }
+.dc-top__titulo { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.dc-top__der { gap: 8px; }
+.dc-top__icono { width: 32px; height: 32px; }
+.dc-top__onb > button:first-child { font-size: 12.5px; }
+.dc-top__onbnum { height: 22px; min-width: 26px; font-size: 10.5px; }
+
+/* Página: menos aire arriba y entre bloques */
+.dc-pagina { padding: 18px 28px 48px; gap: 16px; }
+
+/* Botones */
+.dc-btn { font-size: 13px; }
+.dc-btn--sm { font-size: 12.5px; min-height: 30px; padding: 4px 12px; }
+
+/* Cifras y títulos */
+.dc-kpi { padding: 14px 16px; }
+.dc-kpi__label { font-size: 12.5px; font-weight: 500; }
+.dc-kpi__value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+.dc-kpi__sub { font-size: 12px; }
+.dc-kpi__icon { width: 34px; height: 34px; border-radius: 11px; }
+.dc-kpi__icon svg { width: 16px; height: 16px; }
+.dc-toolbar__titulo { font-size: 19px; font-weight: 700; }
+.dc-franja__cifra b { font-size: 22px; font-weight: 700; }
+.dc-franja__cifra { padding: 14px 18px; }
+.dc-hero { padding: 22px 26px; border-radius: 18px; }
+.dc-hero h2 { font-size: 24px; font-weight: 700; }
+.dc-hero p { font-size: 14px; }
+.dc-hero__cifras b { font-size: 21px; font-weight: 700; }
+.dc-hero__cifras > div { padding: 11px 16px; border-radius: 14px; }
+.dc-hoy__cab { padding: 13px 18px; }
+.dc-hoy__cab h3 { font-size: 14.5px; font-weight: 600; }
+.dc-tarea { padding: 13px 18px; gap: 12px; }
+.dc-tarea__ico { width: 36px; height: 36px; border-radius: 12px; }
+.dc-tarea__ico svg { width: 16px; height: 16px; }
+.dc-tarea__txt b { font-size: 13.5px; font-weight: 600; }
+.dc-tarea__txt span { font-size: 12.5px; }
+.dc-cita { padding: 10px 18px; }
+.dc-cita__hora { font-size: 13px; font-weight: 700; }
+.dc-cita__txt b { font-size: 13px; font-weight: 600; }
+.dc-banda { padding: 10px 14px; font-size: 13px; }
+.dc-seccion { font-size: 14px; }

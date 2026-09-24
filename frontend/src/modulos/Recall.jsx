@@ -137,7 +137,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
         {[["automatizaciones", "Automatizaciones", Zap], ["historial", "Historial de envíos", Send], ["satisfaccion", "Satisfacción", Star]].map(([k, lbl, Ic]) => { const on = subtab === k; return (
-          <button key={k} onClick={() => setSubtab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+          <button key={k} onClick={() => setSubtab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
         ); })}
       </div>
       {subtab === "satisfaccion" ? (() => {
@@ -161,12 +161,12 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
           </div>
           {bajos.length > 0 && (
             <Card style={{ padding: "14px 18px", border: "1.5px solid var(--dc-danger-mid)", background: "var(--dc-bg)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--dc-danger-700)", fontWeight: 700, fontSize: 15, fontFamily: DISPLAY_FONT }}><AlertTriangle size={17} strokeWidth={1.75} /> {bajos.length} paciente(s) con calificación baja — requieren seguimiento</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--dc-danger-700)", fontWeight: 600, fontSize: 14, fontFamily: DISPLAY_FONT }}><AlertTriangle size={17} strokeWidth={1.75} /> {bajos.length} paciente(s) con calificación baja — requieren seguimiento</div>
               <div style={{ fontSize: 13, color: "var(--dc-warn-700)", marginTop: 3 }}>El agente ya se disculpó y ofreció derivar; conviene que una persona del equipo los contacte.</div>
             </Card>
           )}
           <Card style={{ padding: "18px 20px" }}>
-            <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Distribución de opiniones</h3>
+            <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Distribución de opiniones</h3>
             <div style={{ display: "flex", height: 14, borderRadius: "var(--dc-r-full)", overflow: "hidden", background: "var(--dc-line)" }}>
               {prom > 0 && <div style={{ width: `${pct(prom)}%`, background: "var(--dc-ok)" }} title={`Promotores ${pct(prom)}%`} />}
               {pas > 0 && <div style={{ width: `${pct(pas)}%`, background: "var(--dc-warn)" }} title={`Neutrales ${pct(pas)}%`} />}
@@ -179,30 +179,30 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
             </div>
           </Card>
           <Card style={{ overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Comentarios recientes</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Capturados por la encuesta automática de WhatsApp</div></div>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Comentarios recientes</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Capturados por la encuesta automática de WhatsApp</div></div>
             {comentarios.length === 0 && <Vacio icon={<MessageSquare size={24} strokeWidth={1.75} />} titulo="Sin comentarios aún" sub="Aparecerán cuando los pacientes respondan la encuesta." />}
             {comentarios.map((r, i) => { const col = colorDe(r.paciente || "Paciente"); const bajo = r.nps != null && r.nps <= 6; return (
               <div key={r.id || i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none" }}>
-                <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(r.paciente || "P")}</div>
+                <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(r.paciente || "P")}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}><span style={{ fontWeight: 600, color: NAVY }}>{r.paciente || "Paciente"}</span>{r.medico && <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>· {r.medico}</span>}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}><span style={{ fontWeight: 500, color: NAVY }}>{r.paciente || "Paciente"}</span>{r.medico && <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>· {r.medico}</span>}</div>
                   <div style={{ fontSize: 13, color: "var(--dc-ink-700)", marginTop: 2 }}>{r.comentario}</div>
                 </div>
-                {r.nps != null && <span style={{ fontSize: 12, fontWeight: 600, color: bajo ? "var(--dc-danger-700)" : "var(--dc-ok-700)", background: bajo ? "var(--dc-fee2)" : "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{r.nps}/10</span>}
+                {r.nps != null && <span style={{ fontSize: 12, fontWeight: 500, color: bajo ? "var(--dc-danger-700)" : "var(--dc-ok-700)", background: bajo ? "var(--dc-fee2)" : "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{r.nps}/10</span>}
               </div>
             ); })}
           </Card>
         </>
         ); })() : subtab === "historial" ? (
         <Card style={{ overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Historial de envíos</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Mensajes automáticos enviados por WhatsApp · últimos días</div></div>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Historial de envíos</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Mensajes automáticos enviados por WhatsApp · últimos días</div></div>
           {histView.length === 0 && <Vacio icon={<Send size={24} strokeWidth={1.75} />} titulo="Aún sin envíos" sub="Cuando una automatización envíe un WhatsApp, aparecerá aquí." />}
           {histView.map((h, i) => { const es = ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado; const EIc = es.ic; const col = colorDe(h.paciente); return (
             <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(h.paciente)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.paciente}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "inline-flex", alignItems: "center", gap: 5 }}><MessageSquare size={11} strokeWidth={1.75} color="var(--dc-ok-700)" /> {h.regla}</div></div>
+              <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(h.paciente)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.paciente}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "inline-flex", alignItems: "center", gap: 5 }}><MessageSquare size={11} strokeWidth={1.75} color="var(--dc-ok-700)" /> {h.regla}</div></div>
               <div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fechaLegible(h.fecha)} · {h.hora}</div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: es.fg, background: es.bg, padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><EIc size={12} strokeWidth={1.75} /> {es.l}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: es.fg, background: es.bg, padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><EIc size={12} strokeWidth={1.75} /> {es.l}</span>
             </div>
           ); })}
         </Card>
@@ -216,10 +216,10 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
 
       <Card style={{ padding: "20px 22px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
-          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 17, fontWeight: 700, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={18} strokeWidth={1.75} color={DS.c.primary} /> Recorrido automático del paciente</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Cada paso se envía solo por WhatsApp — actívalo o pausa lo que no uses.</div></div>
+          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={18} strokeWidth={1.75} color={DS.c.primary} /> Recorrido automático del paciente</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Cada paso se envía solo por WhatsApp — actívalo o pausa lo que no uses.</div></div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día" style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-line)", padding: "5px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 6 }}><Shield size={13} strokeWidth={1.75} color={DS.c.primary} /> No molestar 21:00–08:00 · máx 3/día</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "5px 12px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: "var(--dc-ok)", animation: "dcBlink 1.6s ease-in-out infinite" }} /> {activas} activas ahora</span>
+            <span title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día" style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-line)", padding: "5px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 6 }}><Shield size={13} strokeWidth={1.75} color={DS.c.primary} /> No molestar 21:00–08:00 · máx 3/día</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "5px 12px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: "var(--dc-ok)", animation: "dcBlink 1.6s ease-in-out infinite" }} /> {activas} activas ahora</span>
           </div>
         </div>
         {/* Siete pasos no caben en una fila de escritorio: se desplaza en horizontal y el
@@ -230,20 +230,20 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
               <div className="dc-rise" onClick={() => abrirCfg(r)} title="Configurar mensaje" style={{ cursor: "pointer", animationDelay: `${i * 0.06}s`, flexShrink: 0, width: 164, background: r.on ? "rgba(255,255,255,0.7)" : "rgba(245,247,250,0.5)", backdropFilter: "blur(12px)", border: "1px solid " + (r.on ? "rgba(255,255,255,0.9)" : "rgba(228,231,236,0.6)"), borderLeft: r.on ? `4px solid ${r.color}` : "4px solid transparent", borderRadius: "var(--dc-r-lg)", padding: 12, display: "flex", flexDirection: "column", gap: 8, opacity: r.on ? 1 : 0.72, transition: "all .2s", boxShadow: r.on ? `0 8px 24px -10px ${tint(r.color, 0.4)}, inset 0 2px 4px rgba(255,255,255,1)` : "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: r.on ? `linear-gradient(135deg, ${tint(r.color, 0.125)}, ${tint(r.color, 0.02)})` : tint(r.color, 0.071), border: `1px solid ${tint(r.color, 0.188)}`, color: r.color, display: "grid", placeItems: "center", filter: r.on ? "none" : "grayscale(.4)" }}><Ic size={17} strokeWidth={1.75} /></div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: r.on ? r.color : "var(--dc-ink-400)", background: r.on ? tint(r.color, 0.071) : "var(--dc-bg)", padding: "3px 8px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap", border: `1px solid ${r.on ? tint(r.color, 0.188) : "transparent"}` }}>{r.timing}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: r.on ? r.color : "var(--dc-ink-400)", background: r.on ? tint(r.color, 0.071) : "var(--dc-bg)", padding: "3px 8px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap", border: `1px solid ${r.on ? tint(r.color, 0.188) : "transparent"}` }}>{r.timing}</span>
                 </div>
-                <div style={{ fontWeight: 600, color: NAVY, fontSize: 13, lineHeight: 1.15, minHeight: 30, letterSpacing: "-0.01em" }}>{r.l}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--dc-ok-700)", fontWeight: 600 }}><MessageSquare size={11} strokeWidth={1.75} /> WhatsApp</div>
-                <div style={{ fontSize: 12, color: r.on ? "var(--dc-ink-700)" : "var(--dc-ink-500)", fontWeight: 600 }}>{r.stat}</div>
+                <div style={{ fontWeight: 500, color: NAVY, fontSize: 13, lineHeight: 1.15, minHeight: 30, letterSpacing: "-0.01em" }}>{r.l}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={11} strokeWidth={1.75} /> WhatsApp</div>
+                <div style={{ fontSize: 12, color: r.on ? "var(--dc-ink-700)" : "var(--dc-ink-500)", fontWeight: 500 }}>{r.stat}</div>
                 <button onClick={(e) => { e.stopPropagation(); toggle(r.clave); }} style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, background: r.on ? tint(r.color, 0.094) : "var(--dc-bg)", border: "1px solid", borderColor: r.on ? `${tint(r.color, 0.251)}` : "transparent", borderRadius: "var(--dc-r-md)", padding: "6px 8px", cursor: "pointer", transition: "all .15s", boxShadow: r.on ? `0 2px 8px -2px ${tint(r.color, 0.251)}` : "none" }}>
                   <span style={{ width: 30, height: 18, borderRadius: "var(--dc-r-full)", background: r.on ? r.color : "var(--dc-line-alt2)", position: "relative", flexShrink: 0, transition: "background .2s", boxShadow: r.on ? `0 0 8px ${tint(r.color, 0.502)}` : "none" }}><span style={{ position: "absolute", top: 2, left: r.on ? 14 : 2, width: 14, height: 14, borderRadius: "var(--dc-r-full)", background: "var(--dc-white)", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} /></span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: r.on ? r.color : "var(--dc-ink-500)" }}>{r.on ? "Activo" : "Activar"}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: r.on ? r.color : "var(--dc-ink-500)" }}>{r.on ? "Activo" : "Activar"}</span>
                 </button>
               </div>
               {i < reglas.length - 1 && (r.antes && !reglas[i + 1].antes ? (
                 <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 10px", alignSelf: "center", gap: 6 }}>
                   <div style={{ width: 48, height: 48, borderRadius: "var(--dc-r-full)", background: "linear-gradient(135deg,var(--dc-warn),var(--dc-warn-700))", display: "grid", placeItems: "center", boxShadow: "0 10px 22px -10px rgba(234,88,12,.8)", color: "var(--dc-white)" }}><CalendarCheck size={22} strokeWidth={1.75} /></div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-warn-600)", whiteSpace: "nowrap" }}>Día de la cita</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", whiteSpace: "nowrap" }}>Día de la cita</span>
                 </div>
               ) : (
                 <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "0 3px", alignSelf: "center" }}>
@@ -258,14 +258,14 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
 
       <Card style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT }}>Recall — pacientes por volver</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Sin control hace más de 6 meses · el recall crea la cita automáticamente.</div></div>
+          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Recall — pacientes por volver</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Sin control hace más de 6 meses · el recall crea la cita automáticamente.</div></div>
           {puedeEnviar && cola.some((c) => c.estado === "por_contactar") && <Btn small onClick={enviarTodos}><Send size={14} strokeWidth={1.75} /> Enviar a todos</Btn>}
         </div>
         {cola.map((p) => { const col = colorDe(p.nombre); return (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: "1px solid var(--dc-line)" }}>
-            <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(p.nombre)}</div>
-            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: NAVY }}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Última visita: {p.ultima}</div></div>
-            {p.estado === "enviado" ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={13} strokeWidth={1.75} /> Enviado</span> : <Btn small kind="ghost" onClick={() => enviar(p.id)}><Send size={13} strokeWidth={1.75} /> Recordar</Btn>}
+            <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.nombre)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Última visita: {p.ultima}</div></div>
+            {p.estado === "enviado" ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={13} strokeWidth={1.75} /> Enviado</span> : <Btn small kind="ghost" onClick={() => enviar(p.id)}><Send size={13} strokeWidth={1.75} /> Recordar</Btn>}
           </div>
         ); })}
         {cola.length === 0 && <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todos al día" sub="No hay pacientes pendientes de recall." />}
@@ -275,15 +275,15 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
         <Modal icon={<Ic size={20} strokeWidth={1.75} />} tone={cfg.color} titulo={cfg.l} sub={`Automatización · se envía ${cfg.timing.toLowerCase()}`} onClose={() => setCfg(null)} maxW={520}
           footer={<><Btn small kind="ghost" onClick={() => setCfg(null)}>Cancelar</Btn><Btn small onClick={guardarCfg}><Check size={15} strokeWidth={1.75} /> Guardar mensaje</Btn></>}>
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-            <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600 }}>Cuándo se envía</div><div style={{ fontSize: 15, fontWeight: 700, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.timing}</div></div>
-            <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600 }}>Canal</div><div style={{ fontSize: 15, fontWeight: 700, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}><MessageSquare size={14} strokeWidth={1.75} /> WhatsApp</div></div>
-            <div style={{ flex: 1, background: cfg.on ? "var(--dc-ok-soft)" : "var(--dc-bg)", border: `1px solid ${cfg.on ? "var(--dc-green-soft)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 600 }}>Estado</div><div style={{ fontSize: 15, fontWeight: 700, color: cfg.on ? "var(--dc-ok-700)" : "var(--dc-ink-500)", fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.on ? "Activo" : "Pausado"}</div></div>
+            <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Cuándo se envía</div><div style={{ fontSize: 14, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.timing}</div></div>
+            <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Canal</div><div style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}><MessageSquare size={14} strokeWidth={1.75} /> WhatsApp</div></div>
+            <div style={{ flex: 1, background: cfg.on ? "var(--dc-ok-soft)" : "var(--dc-bg)", border: `1px solid ${cfg.on ? "var(--dc-green-soft)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Estado</div><div style={{ fontSize: 14, fontWeight: 600, color: cfg.on ? "var(--dc-ok-700)" : "var(--dc-ink-500)", fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.on ? "Activo" : "Pausado"}</div></div>
           </div>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", display: "block", marginBottom: 7 }}>Mensaje <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>· {"{nombre}"}, {"{fecha}"}, {"{hora}"}, {"{doctor}"}, {"{sede}"} se reemplazan solos</span></label>
-          <textarea className="dc-premium-inp" value={cfgMsg} onChange={(e) => setCfgMsg(e.target.value)} rows={4} style={{ width: "100%", padding: "11px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 15, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }} />
+          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 7 }}>Mensaje <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>· {"{nombre}"}, {"{fecha}"}, {"{hora}"}, {"{doctor}"}, {"{sede}"} se reemplazan solos</span></label>
+          <textarea className="dc-premium-inp" value={cfgMsg} onChange={(e) => setCfgMsg(e.target.value)} rows={4} style={{ width: "100%", padding: "11px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }} />
           {/* Vista previa tipo burbuja de WhatsApp */}
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-500)", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} color="var(--dc-ok-700)" /> Vista previa (así le llega al paciente)</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} color="var(--dc-ok-700)" /> Vista previa (así le llega al paciente)</div>
             <div style={{ background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: "14px 12px", display: "flex", justifyContent: "flex-end" }}>
               <div style={{ maxWidth: "82%", background: "var(--dc-ok-soft)", borderRadius: "12px 12px 2px 12px", padding: "8px 11px", boxShadow: "0 1px 1px rgba(0,0,0,.12)", fontSize: 13, color: "var(--dc-ink-900)", whiteSpace: "pre-wrap", lineHeight: 1.4 }}>
                 {previewMsg(cfgMsg) || "…"}
@@ -293,22 +293,22 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
           </div>
           {/* Probar ahora */}
           <div style={{ marginTop: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 13px" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)", marginBottom: 7 }}>Probar ahora <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>· envíate este mensaje a un número real</span></div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 7 }}>Probar ahora <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>· envíate este mensaje a un número real</span></div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <input className="dc-premium-inp" value={probarTel} onChange={(e) => setProbarTel(e.target.value)} placeholder="51987654321" inputMode="tel" style={{ flex: 1, minWidth: 160, padding: "9px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-white)", fontSize: 15, color: INK, outline: "none", boxSizing: "border-box" }} />
+              <input className="dc-premium-inp" value={probarTel} onChange={(e) => setProbarTel(e.target.value)} placeholder="51987654321" inputMode="tel" style={{ flex: 1, minWidth: 160, padding: "9px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-white)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box" }} />
               <Btn small kind="ghost" onClick={probarAhora}><Send size={14} strokeWidth={1.75} /> Enviar prueba</Btn>
             </div>
           </div>
           {/* Plantilla HSM (envíos fuera de la ventana de 24 h de Meta) */}
           <div style={{ marginTop: 14, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-md)", padding: "12px 13px" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--dc-warn-ink)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Shield size={13} strokeWidth={1.75} /> Plantilla aprobada de Meta (HSM)</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-ink)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Shield size={13} strokeWidth={1.75} /> Plantilla aprobada de Meta (HSM)</div>
             <div style={{ fontSize: 12, color: "var(--dc-warn-ink)", marginBottom: 8, lineHeight: 1.4 }}>Necesaria para escribirle al paciente si no nos ha escrito en 24 h. Registra la plantilla en Meta y pon aquí su nombre exacto. Dentro de las 24 h se usa el mensaje de arriba.</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <input className="dc-premium-inp" value={cfgHsm} onChange={(e) => setCfgHsm(e.target.value)} placeholder="nombre_de_plantilla_aprobada" style={{ flex: 1, minWidth: 200, padding: "9px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-amber-soft)", background: "var(--dc-white)", fontSize: 15, color: INK, outline: "none", boxSizing: "border-box" }} />
+              <input className="dc-premium-inp" value={cfgHsm} onChange={(e) => setCfgHsm(e.target.value)} placeholder="nombre_de_plantilla_aprobada" style={{ flex: 1, minWidth: 200, padding: "9px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-amber-soft)", background: "var(--dc-white)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box" }} />
               <Btn small kind="ghost" onClick={probarHsm}><Send size={14} strokeWidth={1.75} /> Probar plantilla</Btn>
             </div>
           </div>
-          {puedeEnviar && <button aria-label="Activar o desactivar" onClick={() => { toggle(cfg.clave); setCfg({ ...cfg, on: !cfg.on }); }} style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 9, background: cfg.on ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", border: "none", borderRadius: "var(--dc-r-md)", padding: "9px 13px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: cfg.on ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}>{cfg.on ? <><Power size={15} strokeWidth={1.75} /> Pausar automatización</> : <><Zap size={15} strokeWidth={1.75} /> Activar automatización</>}</button>}
+          {puedeEnviar && <button aria-label="Activar o desactivar" onClick={() => { toggle(cfg.clave); setCfg({ ...cfg, on: !cfg.on }); }} style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 9, background: cfg.on ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", border: "none", borderRadius: "var(--dc-r-md)", padding: "9px 13px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: cfg.on ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}>{cfg.on ? <><Power size={15} strokeWidth={1.75} /> Pausar automatización</> : <><Zap size={15} strokeWidth={1.75} /> Activar automatización</>}</button>}
         </Modal>
       ); })()}
     </div>

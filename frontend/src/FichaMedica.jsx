@@ -82,7 +82,7 @@ function CieDiagInput({ value, onChange, style, placeholder = "Diagnóstico (CIE
             <button key={x.c} type="button"
               onMouseDown={(e) => { e.preventDefault(); onChange(`${x.c} — ${x.d}`); setOpen(false); }}
               style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", border: "none", background: "transparent", cursor: "pointer", fontSize: 13 }}>
-              <span style={{ fontWeight: 600, color: "var(--dc-primary-alt)" }}>{x.c}</span>
+              <span style={{ fontWeight: 500, color: "var(--dc-primary-alt)" }}>{x.c}</span>
               <span style={{ color: "var(--dc-ink-500)" }}> · {x.d}</span>
             </button>
           ))}
@@ -187,7 +187,7 @@ function SwatchEstado({ e, size = 12 }) {
   return (
     <span aria-hidden style={base}>
       {pat === "cross" && (
-        <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: e?.c, fontSize: Math.max(8, size - 2), fontWeight: 600, lineHeight: 1 }}>✕</span>
+        <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: e?.c, fontSize: Math.max(8, size - 2), fontWeight: 500, lineHeight: 1 }}>✕</span>
       )}
     </span>
   );
@@ -207,7 +207,7 @@ function Diente({ n, data, pincel, onFace, onWhole, editable }) {
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{formatearFDI(n)}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}>{formatearFDI(n)}</span>
       <div onClick={editable && wholeMode ? () => onWhole() : undefined}
         title={whole ? `Pieza ${formatearFDI(n)} · ${ESTADOS[whole]?.l}` : `Pieza ${formatearFDI(n)}`}
         style={{ position: "relative", width: 40, height: 56, borderRadius: "var(--dc-r-sm)", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gridTemplateRows: "1fr 1fr 1fr", cursor: editable && wholeMode ? "pointer" : "default", boxShadow: `0 0 0 1px ${LINE}` }}>
@@ -217,7 +217,7 @@ function Diente({ n, data, pincel, onFace, onWhole, editable }) {
         {cell("right", { gridColumn: "3", gridRow: "2" })}
         {cell("bottom", { gridColumn: "1 / 4", gridRow: "3" })}
         {wEst && wEst.pat === "cross" && (
-          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: wEst.c, fontSize: 24, fontWeight: 600, lineHeight: 1, pointerEvents: "none" }}>✕</div>
+          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: wEst.c, fontSize: 21, fontWeight: 500, lineHeight: 1, pointerEvents: "none" }}>✕</div>
         )}
         {wEst && wEst.pat !== "cross" && (
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", ...estiloPatron(wEst.c, wEst.pat) }} />
@@ -362,7 +362,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
     });
   });
   const piezasMarcadas = Object.entries(piezas).filter(([, d]) => d.estado || Object.keys(d.caras || {}).length);
-  const seg = (active) => ({ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, background: active ? "var(--dc-white)" : "transparent", color: active ? NAVY : "var(--dc-ink-400)", boxShadow: active ? "0 1px 2px rgba(16,24,40,.12)" : "none" });
+  const seg = (active) => ({ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: active ? "var(--dc-white)" : "transparent", color: active ? NAVY : "var(--dc-ink-400)", boxShadow: active ? "0 1px 2px rgba(16,24,40,.12)" : "none" });
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Numeración FDI con punto · R.M. 559-2022-MINSA</div>
@@ -379,8 +379,8 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
           <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
             {DENTICIONES_ODO.map(([k, l]) => <button key={k} onClick={() => setDenticion(k)} style={seg(denticionApi(denticion) === k)}>{l}</button>)}
           </div>
-          <button type="button" onClick={abrirPlanInv} title="Plan de inversión imprimible" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${NAVY}`, background: "var(--dc-white)", color: NAVY, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Printer size={15} strokeWidth={1.75} /> Plan de inversión</button>
-          {editable && <button onClick={generarPlan} title="Crea las fases del plan de tratamiento a partir de los hallazgos" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${TEAL}`, background: "var(--dc-white)", color: TEAL, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><ClipboardList size={15} strokeWidth={1.75} /> Generar plan</button>}
+          <button type="button" onClick={abrirPlanInv} title="Plan de inversión imprimible" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${NAVY}`, background: "var(--dc-white)", color: NAVY, fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Printer size={15} strokeWidth={1.75} /> Plan de inversión</button>
+          {editable && <button onClick={generarPlan} title="Crea las fases del plan de tratamiento a partir de los hallazgos" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${TEAL}`, background: "var(--dc-white)", color: TEAL, fontSize: 13, fontWeight: 500, cursor: "pointer" }}><ClipboardList size={15} strokeWidth={1.75} /> Generar plan</button>}
         </div>
       </div>
       {showPlanInv && (
@@ -419,11 +419,11 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
       {/* Paleta de estados (pincel) — NEW-46: solo si puede escribir */}
       {editable && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {Object.entries(ESTADOS).map(([k, e]) => (
-          <button key={k} onClick={() => setPincel(k)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${pincel === k ? e.c : LINE}`, background: pincel === k ? tint(e.c, 0.094) : "var(--dc-white)", color: pincel === k ? e.c : "var(--dc-ink-400)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          <button key={k} onClick={() => setPincel(k)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${pincel === k ? e.c : LINE}`, background: pincel === k ? tint(e.c, 0.094) : "var(--dc-white)", color: pincel === k ? e.c : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
             <SwatchEstado e={e} size={11} /> {e.l}
           </button>
         ))}
-        <button onClick={() => setPincel(ERASE)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${pincel === ERASE ? NAVY : LINE}`, background: pincel === ERASE ? "var(--dc-bg)" : "var(--dc-white)", color: pincel === ERASE ? NAVY : "var(--dc-ink-400)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={() => setPincel(ERASE)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${pincel === ERASE ? NAVY : LINE}`, background: pincel === ERASE ? "var(--dc-bg)" : "var(--dc-white)", color: pincel === ERASE ? NAVY : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
           <Eraser size={13} strokeWidth={1.75} /> Borrar
         </button>
         <span style={{ fontSize: 12, color: MUTED, alignSelf: "center", marginLeft: 4 }}>Elige un estado y haz clic en la <b>cara</b> del diente (Extraer/Ausente/Borrar marcan la pieza completa).</span>
@@ -433,7 +433,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
       {!editable && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }} aria-label="Leyenda de estados del odontograma">
           {Object.entries(ESTADOS).map(([k, e]) => (
-            <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: MUTED, fontWeight: 600 }}>
+            <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: MUTED, fontWeight: 500 }}>
               <SwatchEstado e={e} size={14} /> {e.l}
             </span>
           ))}
@@ -455,7 +455,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
       )}
       {/* Plan de tratamiento / hallazgos */}
       <div style={{ border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-lg)", overflow: "hidden", background: "var(--dc-white)" }}>
-        <div style={{ background: NAVY, color: "var(--dc-white)", display: "grid", gridTemplateColumns: "70px 1fr 1fr 1.2fr", padding: "10px 14px", fontSize: 12, fontWeight: 600 }}>
+        <div style={{ background: NAVY, color: "var(--dc-white)", display: "grid", gridTemplateColumns: "70px 1fr 1fr 1.2fr", padding: "10px 14px", fontSize: 12, fontWeight: 500 }}>
           <span>N° pieza</span><span>Hallazgo</span><span>Cara</span><span>Nota</span>
         </div>
         {hallazgos.length === 0 && <div style={{ padding: "16px 14px", fontSize: 13, color: MUTED }}>Sin hallazgos registrados en esta etapa.</div>}
@@ -471,7 +471,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
       {/* Notas por pieza */}
       {conectado && piezasMarcadas.length > 0 && (
         <div style={{ border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 14 }}>
-          <div style={{ fontWeight: 600, color: NAVY, fontSize: 13, marginBottom: 10 }}>Notas por pieza</div>
+          <div style={{ fontWeight: 500, color: NAVY, fontSize: 13, marginBottom: 10 }}>Notas por pieza</div>
           <div style={{ display: "grid", gap: 8 }}>
             {piezasMarcadas.map(([n, d]) => (
               <div key={n} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -501,13 +501,13 @@ function Ortodoncia({ pacienteId, notify }) {
       .catch(() => notify("No se pudo guardar."));
   };
   const borrar = (id) => { api.ortodoncia.borrar(id).then(() => { notify("Control eliminado."); cargar(); }).catch(() => notify("No se pudo eliminar.")); };
-  const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: `1px solid ${SOFT}`, fontSize: 15, color: NAVY, outline: "none", boxSizing: "border-box", background: "var(--dc-white)" };
-  const lbl = { fontSize: 13, fontWeight: 600, color: TEXT, display: "block", marginBottom: 6 };
+  const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: `1px solid ${SOFT}`, fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box", background: "var(--dc-white)" };
+  const lbl = { fontSize: 13, fontWeight: 500, color: TEXT, display: "block", marginBottom: 6 };
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={card}>
-        <div style={{ fontWeight: 600, color: NAVY, fontSize: 15, marginBottom: 12 }}>Nuevo control de ortodoncia</div>
+        <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 12 }}>Nuevo control de ortodoncia</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label style={lbl}>Fecha</label><input type="date" style={inp} value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} /></div>
           <div><label style={lbl}>Aparato</label><Select value={f.aparato} onChange={(v) => setF({ ...f, aparato: v })} options={APARATOS.map((a) => ({ value: a, label: a }))} /></div>
@@ -515,19 +515,19 @@ function Ortodoncia({ pacienteId, notify }) {
           <div><label style={lbl}>Próximo control</label><input type="date" style={inp} value={f.proximoControl} onChange={(e) => setF({ ...f, proximoControl: e.target.value })} /></div>
           <div><label style={lbl}>Nota</label><input style={inp} value={f.nota} onChange={(e) => setF({ ...f, nota: e.target.value })} /></div>
         </div>
-        <div style={{ marginTop: 14, textAlign: "right" }}><button onClick={guardar} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: "none", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Plus size={15} strokeWidth={1.75} /> Registrar control</button></div>
+        <div style={{ marginTop: 14, textAlign: "right" }}><button onClick={guardar} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: "none", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Plus size={15} strokeWidth={1.75} /> Registrar control</button></div>
       </div>
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "12px 16px", fontWeight: 600, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Historial de controles ({rows.length})</div>
+        <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Historial de controles ({rows.length})</div>
         {rows.length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Aún no hay controles de ortodoncia.</div>}
         {rows.map((c) => (
           <div key={c.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 16px", borderTop: `1px solid ${LINE}` }}>
-            <div style={{ minWidth: 82 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13 }}>{c.fecha}</div>{c.proximoControl && <div style={{ fontSize: 12, color: WARN, fontWeight: 600 }}>Próx: {c.proximoControl}</div>}</div>
+            <div style={{ minWidth: 82 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.fecha}</div>{c.proximoControl && <div style={{ fontSize: 12, color: WARN, fontWeight: 500 }}>Próx: {c.proximoControl}</div>}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: NAVY, fontWeight: 600 }}>{c.actividad}</div>
+              <div style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{c.actividad}</div>
               <div style={{ fontSize: 12, color: MUTED }}>{c.aparato}{c.nota ? ` · ${c.nota}` : ""}</div>
             </div>
-            <button onClick={() => borrar(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: RED, fontSize: 12, fontWeight: 600 }}>Eliminar</button>
+            <button onClick={() => borrar(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: RED, fontSize: 12, fontWeight: 500 }}>Eliminar</button>
           </div>
         ))}
       </div>
@@ -675,10 +675,10 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={card}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: NAVY, fontSize: 15, marginBottom: 12 }}><Pill size={17} strokeWidth={1.75} color={TEAL} /> Nueva receta</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 12 }}><Pill size={17} strokeWidth={1.75} color={TEAL} /> Nueva receta</div>
         {alergiaPend && (
           <div role="alertdialog" aria-label="Alergia detectada" style={{ background: "var(--dc-danger-soft)", border: "2px solid var(--dc-red)", borderRadius: "var(--dc-r-lg)", padding: 16, marginBottom: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--dc-danger-700)", fontWeight: 600, fontSize: 15, marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--dc-danger-700)", fontWeight: 500, fontSize: 14, marginBottom: 8 }}>
               <AlertTriangle size={20} strokeWidth={2} /> Alergia detectada
             </div>
             <ul style={{ margin: "0 0 12px", paddingLeft: 20, color: "var(--dc-danger-700)", fontSize: 13, lineHeight: 1.6 }}>
@@ -688,7 +688,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
               {/* SPEC clínico: primario = revisar (teal); peligro outline = emitir igual */}
               <button type="button" autoFocus onClick={() => setAlergiaPend(null)}
                 style={{ minHeight: "var(--dc-tap-min)", padding: "9px 16px", borderRadius: "var(--dc-r-md)", border: "none",
-                         background: TEAL, color: "var(--dc-white)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                         background: TEAL, color: "var(--dc-white)", fontWeight: 500, fontSize: 13, cursor: "pointer",
                          fontFamily: "inherit", boxShadow: "0 8px 16px rgba(11,83,102,.25)" }}>
                 Revisar la receta
               </button>
@@ -700,14 +700,14 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
               }}
                 style={{ minHeight: "var(--dc-tap-min)", padding: "9px 16px", borderRadius: "var(--dc-r-md)",
                          border: `1.5px solid ${TEAL}`, background: "var(--dc-white)", color: TEAL,
-                         fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                         fontWeight: 500, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                 Usar alternativa (Clindamicina)
               </button>
               )}
               <button type="button" onClick={() => emitirReceta(alergiaPend.validos, alergiaPend.alertas)}
                 style={{ minHeight: "var(--dc-tap-min)", padding: "9px 16px", borderRadius: "var(--dc-r-md)",
                          border: "1.5px solid var(--dc-danger-700)", background: "var(--dc-white)", color: "var(--dc-danger-700)",
-                         fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                         fontWeight: 500, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                 Emitir de todas formas
               </button>
             </div>
@@ -719,7 +719,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
           </div>
         )}
         {esPediatrico && !sinFechaNac && (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--dc-bg)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-md)", padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "var(--dc-info-ink)", fontWeight: 600 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--dc-bg)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-md)", padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "var(--dc-info-ink)", fontWeight: 500 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             <span>Pediátrico · {edad} años — Dosis ajustadas automáticamente</span>
           </div>
@@ -730,8 +730,8 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
           </div>
         )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: MUTED, fontWeight: 600 }}>Plantillas:</span>
-          {PLANTILLAS_RX.map((pl) => <button key={pl.l} onClick={() => aplicarPlantilla(pl)} style={{ padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${LINE}`, background: "var(--dc-white)", color: TEAL, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{pl.l}</button>)}
+          <span style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>Plantillas:</span>
+          {PLANTILLAS_RX.map((pl) => <button key={pl.l} onClick={() => aplicarPlantilla(pl)} style={{ padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${LINE}`, background: "var(--dc-white)", color: TEAL, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>{pl.l}</button>)}
         </div>
         <div style={{ display: "grid", gap: 10 }}>
           {items.map((it, i) => (
@@ -744,33 +744,33 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
               <button type="button" className="dc-icon-btn" aria-label="Quitar" onClick={() => delItem(i)} title="Quitar" style={{ background: "none", border: "none", cursor: "pointer", color: items.length > 1 ? RED : "var(--dc-line-alt)", display: "grid", placeItems: "center" }}><Trash2 size={16} strokeWidth={1.75} /></button>
             </div>
           ))}
-          <div><button onClick={addItem} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: `1.5px dashed ${LINE}`, background: "var(--dc-white)", color: TEAL, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Plus size={14} strokeWidth={1.75} /> Agregar medicamento</button></div>
+          <div><button onClick={addItem} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: `1.5px dashed ${LINE}`, background: "var(--dc-white)", color: TEAL, fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Plus size={14} strokeWidth={1.75} /> Agregar medicamento</button></div>
           <textarea style={{ ...inp, resize: "vertical" }} rows={2} placeholder="Indicaciones generales (reposo, alimentación, etc.)" value={indicaciones} onChange={(e) => setIndicaciones(e.target.value)} />
           <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <button onClick={guardar} disabled={sinFechaNac} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: "none", background: sinFechaNac ? "var(--dc-line-alt)" : TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 600, cursor: sinFechaNac ? "not-allowed" : "pointer", opacity: sinFechaNac ? 0.6 : 1 }}><Check size={15} strokeWidth={1.75} /> Emitir receta</button>
+            <button onClick={guardar} disabled={sinFechaNac} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: "none", background: sinFechaNac ? "var(--dc-line-alt)" : TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: sinFechaNac ? "not-allowed" : "pointer", opacity: sinFechaNac ? 0.6 : 1 }}><Check size={15} strokeWidth={1.75} /> Emitir receta</button>
             {sinFechaNac && <span style={{ fontSize: 12, color: RED, fontStyle: "italic" }}>Registra la fecha de nacimiento del paciente para habilitar</span>}
           </div>
         </div>
       </div>
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "12px 16px", fontWeight: 600, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Recetas emitidas ({arr(recetas).length})</div>
+        <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Recetas emitidas ({arr(recetas).length})</div>
         {arr(recetas).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Aún no hay recetas emitidas.</div>}
         {arr(recetas).map((r, i) => {
           const its = arr(parseJson(r.items, []));
           return (
             <div key={r.id || i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 16px", borderTop: `1px solid ${LINE}` }}>
-              <div style={{ minWidth: 82 }}><div style={{ fontWeight: 600, color: NAVY, fontSize: 13 }}>{r.fecha}</div><div style={{ fontSize: 12, color: MUTED }}>{r.medico}</div></div>
+              <div style={{ minWidth: 82 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{r.fecha}</div><div style={{ fontSize: 12, color: MUTED }}>{r.medico}</div></div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: NAVY, fontWeight: 600 }}>{its.length ? its.map((x) => x.medicamento).filter(Boolean).join(", ") : "Receta"}</div>
+                <div style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{its.length ? its.map((x) => x.medicamento).filter(Boolean).join(", ") : "Receta"}</div>
                 {r.indicaciones && <div style={{ fontSize: 12, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.indicaciones}</div>}
                 {r.overrideAlergia && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--dc-danger-700)", fontWeight: 600 }}>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--dc-danger-700)", fontWeight: 500 }}>
                     ⚠ Emitida con override de alergia
                     {(() => { const al = arr(typeof r.alertaAlergia === "string" ? parseJson(r.alertaAlergia, []) : r.alertaAlergia); return al.length ? `: ${al.join("; ")}` : ""; })()}
                   </div>
                 )}
               </div>
-              <button onClick={() => printReceta(r)} title="Imprimir" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: `1.5px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", padding: "6px 10px", cursor: "pointer", color: NAVY, fontSize: 12, fontWeight: 600 }}><Printer size={14} strokeWidth={1.75} /> Imprimir</button>
+              <button onClick={() => printReceta(r)} title="Imprimir" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: `1.5px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", padding: "6px 10px", cursor: "pointer", color: NAVY, fontSize: 12, fontWeight: 500 }}><Printer size={14} strokeWidth={1.75} /> Imprimir</button>
               {r.id && conectado && <button type="button" className="dc-icon-btn" aria-label="Eliminar" onClick={() => api.recetas.borrar(r.id).then(() => { notify("Receta eliminada."); onChange && onChange(); }).catch(() => notify("No se pudo eliminar."))} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: RED, display: "grid", placeItems: "center" }}><Trash2 size={16} strokeWidth={1.75} /></button>}
             </div>
           );
@@ -807,17 +807,17 @@ function Periodontograma({ pacienteId, notify }) {
   let sitios4 = 0, sitios6 = 0, bop = 0, sitiosTot = 0, movil = 0;
   Object.values(pz).forEach((d) => { (d.profundidad || []).forEach((v) => { if (v || v === 0) { sitiosTot++; if (v >= 4) sitios4++; if (v >= 6) sitios6++; } }); (d.sangrado || []).forEach((b) => { if (b) bop++; }); if (d.movilidad) movil++; });
   const pctBop = sitiosTot ? Math.round((bop / (Object.keys(pz).length * 6 || 1)) * 100) : 0;
-  const seg = (active) => ({ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, background: active ? "var(--dc-white)" : "transparent", color: active ? NAVY : "var(--dc-ink-400)", boxShadow: active ? "0 1px 2px rgba(16,24,40,.12)" : "none" });
+  const seg = (active) => ({ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: active ? "var(--dc-white)" : "transparent", color: active ? NAVY : "var(--dc-ink-400)", boxShadow: active ? "0 1px 2px rgba(16,24,40,.12)" : "none" });
   const pdInput = (n, i) => { const c = cur(n); const v = (c.profundidad || [])[i]; const r = (c.recesion || [])[i]; const b = (c.sangrado || [])[i]; return (
     <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
       <div onClick={() => toggleBOP(n, i)} title="Sangrado al sondaje" style={{ width: 22, height: 5, borderRadius: "var(--dc-r-sm)", background: b ? "var(--dc-danger)" : "var(--dc-bg)", cursor: "pointer" }} />
-      <input value={v ?? ""} onChange={(e) => pdChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Profundidad de sondaje · " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 26, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: colPD(v), fontWeight: 600, fontSize: 13, outline: "none", background: "var(--dc-white)" }} />
-      <input value={r ?? ""} onChange={(e) => recChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Recesión · " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 20, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: r ? "var(--dc-purple)" : "var(--dc-line-alt)", fontWeight: 600, fontSize: 12, outline: "none", background: "var(--dc-white)" }} />
+      <input value={v ?? ""} onChange={(e) => pdChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Profundidad de sondaje · " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 26, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: colPD(v), fontWeight: 500, fontSize: 13, outline: "none", background: "var(--dc-white)" }} />
+      <input value={r ?? ""} onChange={(e) => recChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Recesión · " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 20, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: r ? "var(--dc-purple)" : "var(--dc-line-alt)", fontWeight: 500, fontSize: 12, outline: "none", background: "var(--dc-white)" }} />
     </div>
   ); };
   const diente = (n) => { const c = cur(n); return (
     <div key={n} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: 4, borderRadius: "var(--dc-r-sm)", background: "var(--dc-white)", border: `1px solid ${LINE}` }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{n}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}>{n}</span>
       <div style={{ display: "flex", gap: 2 }}>{[0, 1, 2].map((i) => pdInput(n, i))}</div>
       <div style={{ display: "flex", gap: 2 }}>{[3, 4, 5].map((i) => pdInput(n, i))}</div>
       {/* Estos dos siguen siendo <select> nativos a proposito, y no el Select propio:
@@ -844,10 +844,10 @@ function Periodontograma({ pacienteId, notify }) {
           {[["adulto", "Adulto"], ["infantil", "Niño"]].map(([k, l]) => <button key={k} onClick={() => setDenticion(k)} style={seg(denticion === k)}>{l}</button>)}
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
-          <span style={{ color: "var(--dc-warn-700)", fontWeight: 600 }}>● Bolsa ≥4mm: {sitios4}</span>
-          <span style={{ color: "var(--dc-danger)", fontWeight: 600 }}>● ≥6mm: {sitios6}</span>
-          <span style={{ color: "var(--dc-red-deep)", fontWeight: 600 }}>Sangrado: {pctBop}%</span>
-          <span style={{ color: "var(--dc-warn-600)", fontWeight: 600 }}>Piezas con movilidad: {movil}</span>
+          <span style={{ color: "var(--dc-warn-700)", fontWeight: 500 }}>● Bolsa ≥4mm: {sitios4}</span>
+          <span style={{ color: "var(--dc-danger)", fontWeight: 500 }}>● ≥6mm: {sitios6}</span>
+          <span style={{ color: "var(--dc-red-deep)", fontWeight: 500 }}>Sangrado: {pctBop}%</span>
+          <span style={{ color: "var(--dc-warn-600)", fontWeight: 500 }}>Piezas con movilidad: {movil}</span>
         </div>
       </div>
       <div style={{ ...card, overflowX: "auto" }}>
@@ -1290,10 +1290,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                  && (k !== "perio" || etapa !== "pediatrico"));
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
   const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: `1px solid ${SOFT}`, fontSize: "var(--dc-ficha-fs)", color: NAVY, outline: "none", boxSizing: "border-box", background: puedeEscribirClinico ? "var(--dc-white)" : "var(--dc-bg)" };
-  const lbl = { fontSize: "var(--dc-ficha-fs)", fontWeight: 600, color: TEXT, display: "block", marginBottom: 6 };
-  const secTitle = { fontWeight: 600, color: NAVY, fontSize: 15, marginBottom: 14, letterSpacing: "-.005em" };
-  const btn = (kind) => ({ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: kind === "ghost" ? `1.5px solid ${LINE}` : "none", background: kind === "ghost" ? "var(--dc-white)" : TEAL, color: kind === "ghost" ? TEXT : "var(--dc-white)", fontSize: 13, fontWeight: 600, cursor: "pointer" });
-  const chipRO = (label) => <span key={label} style={{ display: "inline-flex", alignItems: "center", padding: "5px 11px", borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: NAVY, fontSize: 12, fontWeight: 600 }}>{label}</span>;
+  const lbl = { fontSize: "var(--dc-ficha-fs)", fontWeight: 500, color: TEXT, display: "block", marginBottom: 6 };
+  const secTitle = { fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 14, letterSpacing: "-.005em" };
+  const btn = (kind) => ({ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: kind === "ghost" ? `1.5px solid ${LINE}` : "none", background: kind === "ghost" ? "var(--dc-white)" : TEAL, color: kind === "ghost" ? TEXT : "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer" });
+  const chipRO = (label) => <span key={label} style={{ display: "inline-flex", alignItems: "center", padding: "5px 11px", borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: NAVY, fontSize: 12, fontWeight: 500 }}>{label}</span>;
   // NEW-56: anamnesis/examen solo lectura sin escritura clínica (recepción).
   const ta = (grupo, k, ph, rows = 2) => {
     const val = grupo ? ((F[grupo] || {})[k] || "") : (F[k] || "");
@@ -1305,7 +1305,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       : <textarea style={{ ...inp, resize: "vertical" }} rows={rows} placeholder={ph} value={val} onChange={(e) => setFcField(k, e.target.value)} onBlur={(e) => blurFc(k, e.target.value)} />;
   };
   const chip = (on, onClick, label) => puedeEscribirClinico
-    ? <button key={label} className={on ? "" : "fm-chip"} onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${TEAL}` : `1px solid ${SOFT}`, background: on ? tint(TEAL, 0.078) : "var(--dc-white)", color: on ? TEAL : "var(--dc-ink-400)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{on ? <Check size={13} strokeWidth={1.75} /> : <Plus size={13} strokeWidth={1.75} />} {label}</button>
+    ? <button key={label} className={on ? "" : "fm-chip"} onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${TEAL}` : `1px solid ${SOFT}`, background: on ? tint(TEAL, 0.078) : "var(--dc-white)", color: on ? TEAL : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{on ? <Check size={13} strokeWidth={1.75} /> : <Plus size={13} strokeWidth={1.75} />} {label}</button>
     : (on ? chipRO(label) : null);
   // Sección colapsable (llamada como función, no como componente, para no perder foco al re-render).
   const sec = (id, Ic, title, estado, contenido, defaultOpen = false) => {
@@ -1315,7 +1315,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         <button className="fm-sec-h" onClick={() => setSecOpen((s) => ({ ...s, [id]: !open }))} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
           <span style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: tint(TEAL, 0.071), color: TEAL, display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={16} strokeWidth={1.9} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, color: NAVY, fontSize: 15 }}>{title}</div>
+            <div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{title}</div>
             {estado && <div style={{ fontSize: 12, color: estado.ok ? GREEN : MUTED, marginTop: 1, fontWeight: estado.ok ? 700 : 500 }}>{estado.ok ? "✓ " : ""}{estado.txt}</div>}
           </div>
           <ChevronDown size={18} color={MUTED} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s", flexShrink: 0 }} />
@@ -1353,8 +1353,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </div>
             )}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => setEditEvo(null)} style={{ padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: `1px solid ${SOFT}`, background: "var(--dc-white)", color: TEXT, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
-              <button onClick={guardarEdit} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: "var(--dc-r-sm)", border: "none", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Check size={14} strokeWidth={1.9} /> {editEvo.locked ? "Registrar Adenda" : "Guardar"}</button>
+              <button onClick={() => setEditEvo(null)} style={{ padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: `1px solid ${SOFT}`, background: "var(--dc-white)", color: TEXT, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={guardarEdit} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: "var(--dc-r-sm)", border: "none", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Check size={14} strokeWidth={1.9} /> {editEvo.locked ? "Registrar Adenda" : "Guardar"}</button>
             </div>
           </div>
         </div>
@@ -1372,8 +1372,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: cfg.bg, color: cfg.c, display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={17} strokeWidth={1.75} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: NAVY }}>{titulo}</span>
-            {right ? <span style={{ fontSize: 13, fontWeight: 600, color: GREEN }}>{right}</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{titulo}</span>
+            {right ? <span style={{ fontSize: 13, fontWeight: 500, color: GREEN }}>{right}</span>
               : editable ? <button type="button" className="fm-edit dc-icon-btn" aria-label="Editar evolución" onClick={() => abrirEdit(e.h)} title="Editar evolución" style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 2, display: "inline-flex", flexShrink: 0 }}><Pencil size={14} strokeWidth={1.9} /></button> : null}
           </div>
           {sub && <div style={{ fontSize: 12, color: TEXT, marginTop: 2 }}>{sub}</div>}
@@ -1388,7 +1388,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     evs.forEach((e) => { const g = grupos.find((x) => x.fecha === e.fecha); if (g) g.items.push(e); else grupos.push({ fecha: e.fecha, items: [e] }); });
     return <div style={{ display: "grid", gap: 18 }}>{grupos.map((g) => (
       <div key={g.fecha}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: TEAL, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 10 }}><CalendarDays size={13} strokeWidth={2} /> {fmtFecha(g.fecha)}</div>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: TEAL, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 10 }}><CalendarDays size={13} strokeWidth={2} /> {fmtFecha(g.fecha)}</div>
         <div style={{ display: "grid", gap: 12, borderLeft: `2px solid ${LINE}`, paddingLeft: 14, marginLeft: 6 }}>{g.items.map((e, i) => evItem(e, i))}</div>
       </div>
     ))}</div>;
@@ -1442,13 +1442,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
             <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: `linear-gradient(135deg,${ACCENT},${TEAL})`, display: "grid", placeItems: "center" }}><ClipboardList size={18} color="var(--dc-white)" strokeWidth={2} /></div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, letterSpacing: ".08em", textTransform: "uppercase" }}>Expediente clínico</div>
-              <div style={{ fontSize: 17, fontWeight: 600, color: NAVY, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", lineHeight: 1.1 }}>{p.nombre || "Ficha médica"}</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, marginTop: 2 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: ACCENT, letterSpacing: ".08em", textTransform: "uppercase" }}>Expediente clínico</div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: NAVY, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", lineHeight: 1.1 }}>{p.nombre || "Ficha médica"}</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: MUTED, marginTop: 2 }}>
                 {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null, p.telefono || null].filter(Boolean).join(" · ")}
               </div>
               {errorFicha ? (
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-warn-700)", marginTop: 6 }}>Error al consultar datos clínicos</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-700)", marginTop: 6 }}>Error al consultar datos clínicos</div>
               ) : arr(p.alergias).length > 0 ? (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
                   {arr(p.alergias).map((a) => (
@@ -1456,7 +1456,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-400)", marginTop: 6 }}>Sin alergias registradas</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", marginTop: 6 }}>Sin alergias registradas</div>
               )}
             </div>
           </div>
@@ -1470,7 +1470,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         {errorFicha ? (
           <div style={{ padding: 48, textAlign: "center", display: "grid", gap: 16, justifyItems: "center", background: "var(--dc-white)", flex: 1 }}>
             <AlertTriangle size={42} strokeWidth={1.75} color="var(--dc-warn-600)" />
-            <div style={{ fontSize: 17, fontWeight: 700, color: NAVY }}>No se pudo cargar la información del paciente</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: NAVY }}>No se pudo cargar la información del paciente</div>
             <div style={{ fontSize: 14, color: "var(--dc-ink-500)", maxWidth: 440 }}>
               Ocurrió un error al consultar el expediente clínico en el servidor. Puede reintentar la operación ahora.
             </div>
@@ -1504,9 +1504,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 <button onClick={quitarFoto} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, fontSize: 12, marginBottom: 6 }}>
                   Quitar foto
                 </button>)}
-              <div style={{ fontWeight: 600, color: NAVY, fontSize: 17, lineHeight: 1.25 }}>{p.nombre || "Paciente"}</div>
+              <div style={{ fontWeight: 500, color: NAVY, fontSize: 16, lineHeight: 1.25 }}>{p.nombre || "Paciente"}</div>
               <div style={{ fontSize: 13, color: MUTED }}>{p.fechaNacimiento && edad != null ? `${edad} años` : ""}{p.dni ? (p.fechaNacimiento && edad != null ? ` · DNI ${p.dni}` : `DNI ${p.dni}`) : ""}</div>
-              {esPed && <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, color: PED, fontSize: 12, fontWeight: 600, letterSpacing: ".03em", textTransform: "uppercase" }}>
+              {esPed && <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, color: PED, fontSize: 12, fontWeight: 500, letterSpacing: ".03em", textTransform: "uppercase" }}>
                 <EmblemaNino size={14} /> {enTransicion ? "Pasa pronto a adulto" : "Ficha pediátrica"}
               </div>}
               {enTransicion && (
@@ -1541,18 +1541,18 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   texto suelto dentro del JSON de la historia, donde nadie lo veia. */}
               {esPed && (p.apoderadoNombre
                 ? <div style={{ marginTop: 9, textAlign: "left", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, borderRadius: "var(--dc-r-md)", padding: "8px 10px" }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: PED, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 3 }}>Apoderado</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, lineHeight: 1.3 }}>{p.apoderadoNombre}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: PED, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 3 }}>Apoderado</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, lineHeight: 1.3 }}>{p.apoderadoNombre}</div>
                     <div style={{ fontSize: 12, color: "var(--dc-warn-700)", marginTop: 2 }}>
                       {p.apoderadoParentesco || "Responsable"}{p.apoderadoDni ? ` · DNI ${p.apoderadoDni}` : ""}
                     </div>
-                    {p.apoderadoTelefono && <a href={`tel:${p.apoderadoTelefono}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 12, fontWeight: 600, color: PED, textDecoration: "none" }}><Phone size={11} strokeWidth={2} /> {p.apoderadoTelefono}</a>}
+                    {p.apoderadoTelefono && <a href={`tel:${p.apoderadoTelefono}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 12, fontWeight: 500, color: PED, textDecoration: "none" }}><Phone size={11} strokeWidth={2} /> {p.apoderadoTelefono}</a>}
                   </div>
                 : <div style={{ marginTop: 9, textAlign: "left", background: "var(--dc-warn-soft)", borderRadius: "var(--dc-r-md)", padding: "8px 10px", fontSize: 12, color: "var(--dc-warn-ink)", lineHeight: 1.45 }}>
                     Menor <b>sin apoderado registrado</b>. Nadie puede firmar sus consentimientos.
                   </div>)}
-              <div style={{ marginTop: 10, display: "inline-flex", alignItems: "baseline", gap: 6, background: debe ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", color: debe ? WARN : GREEN, padding: "5px 12px", borderRadius: "var(--dc-r-full)", fontWeight: 600, fontSize: 13, cursor: debe ? "pointer" : "default" }} onClick={debe ? () => setTab("cuenta") : undefined} title={debe ? "Ver estado de cuenta" : undefined}>
-                {money(montoSaldoUi)} <span style={{ fontSize: 12, fontWeight: 600 }}>{saldoAFavor > 0.005 ? "saldo a favor" : "por pagar"}</span>
+              <div style={{ marginTop: 10, display: "inline-flex", alignItems: "baseline", gap: 6, background: debe ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", color: debe ? WARN : GREEN, padding: "5px 12px", borderRadius: "var(--dc-r-full)", fontWeight: 500, fontSize: 13, cursor: debe ? "pointer" : "default" }} onClick={debe ? () => setTab("cuenta") : undefined} title={debe ? "Ver estado de cuenta" : undefined}>
+                {money(montoSaldoUi)} <span style={{ fontSize: 12, fontWeight: 500 }}>{saldoAFavor > 0.005 ? "saldo a favor" : "por pagar"}</span>
               </div>
             </div>
             <div style={{ display: "grid", gap: 4 }}>
@@ -1568,9 +1568,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {/* Encabezado: Etiquetas / Notas / Alergias — tarjetas limpias con acento sutil */}
             {(() => {
               const mini = { ...card, padding: 13 };
-              const head = (Ic, c, txt) => <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}><span style={{ width: 22, height: 22, borderRadius: "var(--dc-r-sm)", background: tint(c, 0.086), color: c, display: "grid", placeItems: "center" }}><Ic size={13} strokeWidth={2} /></span><span style={{ fontWeight: 600, color: NAVY, fontSize: 13 }}>{txt}</span></div>;
+              const head = (Ic, c, txt) => <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}><span style={{ width: 22, height: 22, borderRadius: "var(--dc-r-sm)", background: tint(c, 0.086), color: c, display: "grid", placeItems: "center" }}><Ic size={13} strokeWidth={2} /></span><span style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{txt}</span></div>;
               const addInp = { width: "100%", padding: "7px 10px", borderRadius: "var(--dc-r-sm)", border: `1px solid ${SOFT}`, fontSize: 12, outline: "none", background: "var(--dc-white)", boxSizing: "border-box" };
-              const pill = (c) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: c, background: tint(c, 0.078), padding: "3px 7px 3px 10px", borderRadius: "var(--dc-r-full)" });
+              const pill = (c) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "3px 7px 3px 10px", borderRadius: "var(--dc-r-full)" });
               const hayAlergia = arr(p.alergias).length > 0;
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
@@ -1604,7 +1604,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   <b style={{ color: "var(--dc-warn-600)" }}>Falta la fecha de nacimiento de {p.nombre || "este paciente"}.</b><br />
                   Mientras no esté, la ficha lo trata como <b>adulto</b>: esa es la anamnesis que se abre,
                   el odontograma sale con dentición permanente y las dosis se calculan como tales.
-                  {tab !== "filiacion" && <> <button onClick={() => setTab("filiacion")} style={{ background: "none", border: "none", padding: 0, color: TEAL, fontWeight: 600, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Registrarla en Filiación</button>.</>}
+                  {tab !== "filiacion" && <> <button onClick={() => setTab("filiacion")} style={{ background: "none", border: "none", padding: 0, color: TEAL, fontWeight: 500, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Registrarla en Filiación</button>.</>}
                 </div>
               </div>
             )}
@@ -1626,8 +1626,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     [etiquetaSaldo, money(montoSaldoUi), debe ? "pendiente" : (saldoAFavor > 0.005 ? "crédito" : "al día"), CreditCard, debe ? WARN : GREEN],
                   ].map(([l, v, s, Ic, c]) => { const clickable = l === "Tratamientos" || ((l === "Por pagar" || l === "Saldo a favor") && debe); const titlePorPagar = (l === "Por pagar" || l === "Saldo a favor") && clickable ? "Ver estado de cuenta" : (clickable ? "Ver plan / cuenta" : undefined); return (
                     <div key={l} onClick={clickable ? () => setTab("cuenta") : undefined} style={{ ...card, cursor: clickable ? "pointer" : "default" }} title={titlePorPagar}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em" }}>{React.createElement(Ic, { size: 13, strokeWidth: 1.75 })} {l}</div>
-                      <div style={{ fontSize: 17, fontWeight: 600, color: c, marginTop: 4 }}>{v}{clickable && Number(v) > 0 ? <span style={{ fontSize: 12, color: TEAL, fontWeight: 600 }}> →</span> : null}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em" }}>{React.createElement(Ic, { size: 13, strokeWidth: 1.75 })} {l}</div>
+                      <div style={{ fontSize: 16, fontWeight: 500, color: c, marginTop: 4 }}>{v}{clickable && Number(v) > 0 ? <span style={{ fontSize: 12, color: TEAL, fontWeight: 500 }}> →</span> : null}</div>
                       {s ? <div style={{ fontSize: 12, color: MUTED }}>{s}</div> : null}
                     </div>
                   ); })}
@@ -1636,8 +1636,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   <div style={card}>
                     <div style={secTitle}>Ficha clínica</div>
                     {F.motivoConsulta && <div style={{ fontSize: 13, color: TEXT, marginBottom: 10 }}><b style={{ color: NAVY }}>Motivo:</b> {F.motivoConsulta}</div>}
-                    {anteced.length > 0 && <><div style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: "6px 0" }}>Antecedentes</div><div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>{anteced.map(chipRO)}</div></>}
-                    {arr(F.habitos).length > 0 && <><div style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: "6px 0" }}>Hábitos</div><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{arr(F.habitos).map(chipRO)}</div></>}
+                    {anteced.length > 0 && <><div style={{ fontSize: 12, fontWeight: 500, color: TEXT, margin: "6px 0" }}>Antecedentes</div><div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>{anteced.map(chipRO)}</div></>}
+                    {arr(F.habitos).length > 0 && <><div style={{ fontSize: 12, fontWeight: 500, color: TEXT, margin: "6px 0" }}>Hábitos</div><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{arr(F.habitos).map(chipRO)}</div></>}
                   </div>
                 ) : (
                   <div style={{ ...card, textAlign: "center", color: MUTED, fontSize: 13 }}>Completa la <b style={{ color: TEAL, cursor: "pointer" }} onClick={() => setTab("historia")}>Historia clínica</b> para ver el resumen del paciente.</div>
@@ -1645,7 +1645,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 <div style={card}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <div style={{ ...secTitle, marginBottom: 0 }}>Últimos movimientos</div>
-                    <button onClick={() => setTab("historia")} style={{ background: "none", border: "none", color: TEAL, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Ver historia completa →</button>
+                    <button onClick={() => setTab("historia")} style={{ background: "none", border: "none", color: TEAL, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Ver historia completa →</button>
                   </div>
                   {timelineUI(linea.slice(0, 6), "Aún no hay actividad registrada.")}
                 </div>
@@ -1660,11 +1660,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                         {labOrdenes.map((o) => (
                           <div key={o.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "8px 0", borderTop: "1px solid var(--dc-line)" }}>
                             <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, color: NAVY }}>{o.tipoTrabajo || o.trabajo || "Trabajo"}</div>
+                              <div style={{ fontWeight: 500, color: NAVY }}>{o.tipoTrabajo || o.trabajo || "Trabajo"}</div>
                               <div style={{ fontSize: 12, color: MUTED }}>{o.laboratorio || "—"}</div>
                             </div>
                             <div style={{ textAlign: "right", flexShrink: 0 }}>
-                              <div style={{ fontWeight: 600, color: TEAL, textTransform: "capitalize" }}>{o.estado || "—"}</div>
+                              <div style={{ fontWeight: 500, color: TEAL, textTransform: "capitalize" }}>{o.estado || "—"}</div>
                               <div style={{ fontSize: 12, color: MUTED }}>Retorno: {String(o.fechaEstimada || o.entrega || o.fechaRetorno || "—").slice(0, 10)}</div>
                             </div>
                           </div>
@@ -1683,7 +1683,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       {consentimientos.map((c) => (
                         <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid var(--dc-line)", flexWrap: "wrap" }}>
                           <div>
-                            <div style={{ fontWeight: 600, color: NAVY, fontSize: 13 }}>{c.tipo || c.titulo || "Consentimiento"}</div>
+                            <div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.tipo || c.titulo || "Consentimiento"}</div>
                             <div style={{ fontSize: 12, color: MUTED }}>{(c.fechaFirma || c.creadoEn || "").slice(0, 10) || "—"} · {c.firmado ? "Firmado" : "Pendiente"}</div>
                           </div>
                           {!c.firmado && conectado && (
@@ -1720,7 +1720,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div className="fm-clinico">
                 {puedeEscribirClinico && pendientes.length > 0 && (
                   <div style={{ ...card, border: "1px solid var(--dc-amber-soft)", background: "var(--dc-warn-soft)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--dc-warn-600)", fontSize: 15 }}><Clock size={17} strokeWidth={1.75} /> Evoluciones pendientes por completar ({pendientes.length})</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 500, color: "var(--dc-warn-600)", fontSize: 14 }}><Clock size={17} strokeWidth={1.75} /> Evoluciones pendientes por completar ({pendientes.length})</div>
                     <div style={{ fontSize: 12, color: "var(--dc-warn-600)", margin: "4px 0 12px" }}>Se crearon solas al marcar la cita como atendida. Complétalas para que cuente la producción del doctor.</div>
                     <div style={{ display: "grid", gap: 12 }}>
                       {pendientes.map((h) => { const v = draftEdit[h.id] || {}; return (
@@ -1741,7 +1741,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   </div>
                 )}
                 <div style={card}>
-                  <div style={secTitle}>Motivo de consulta y enfermedad actual {!puedeEscribirClinico && <span style={{ fontWeight: 600, color: MUTED, fontSize: 12 }}>· solo lectura</span>}</div>
+                  <div style={secTitle}>Motivo de consulta y enfermedad actual {!puedeEscribirClinico && <span style={{ fontWeight: 500, color: MUTED, fontSize: 12 }}>· solo lectura</span>}</div>
                   <div style={{ display: "grid", gap: 10 }}>
                     <div className="fm-hist-row"><label style={lbl}>Motivo de consulta</label>{ta(null, "motivoConsulta", "¿Por qué acude el paciente?")}</div>
                     <div className="fm-hist-row"><label style={lbl}>Enfermedad / dolencia actual</label>{ta(null, "enfermedadActual", "Tiempo de enfermedad, síntomas, evolución…")}</div>
@@ -1758,7 +1758,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       {sec("antecedentes", ClipboardList, "Antecedentes y hábitos",
                         { ok: !!antOk, txt: antOk ? "Con datos registrados" : "Toca para registrar" },
                         <>
-                          <div style={{ fontWeight: 600, color: TEXT, fontSize: 13, marginBottom: 8 }}>Antecedentes patológicos</div>
+                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, marginBottom: 8 }}>Antecedentes patológicos</div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                             {/* Embarazo y osteoporosis no se le ofrecen a un menor. Si alguno
                                 estuviera ya marcado se sigue mostrando: es un dato clinico y
@@ -1766,7 +1766,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                             {CONDICIONES.filter((c) => !(etapa === "pediatrico" && CONDICIONES_ADULTO.includes(c)) || anteced.includes(c))
                               .map((c) => chip(anteced.includes(c), () => toggleAntecedente(c), c))}
                           </div>
-                          <div style={{ fontWeight: 600, color: TEXT, fontSize: 13, margin: "4px 0 8px" }}>Hábitos</div>
+                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, margin: "4px 0 8px" }}>Hábitos</div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {/* Tabaco y alcohol solo desde los 13: a un nino de 7 no se le
                                 pregunta, y a un chico de 14 ya si. Los orales de un menor
@@ -1817,31 +1817,31 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                             <div className="fm-hist-row"><label style={lbl}>Embarazo / parto</label>{ta("perinatales", "embarazo", "Controlado, a término…")}</div>
                             <div className="fm-hist-row"><label style={lbl}>Lactancia</label>{ta("perinatales", "lactancia", "Materna / fórmula, duración…")}</div>
                           </div>
-                          <div style={{ fontWeight: 600, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Conducta en el sillón <span style={{ fontWeight: 500, color: MUTED }}>· escala de Frankl</span></div>
+                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Conducta en el sillón <span style={{ fontWeight: 500, color: MUTED }}>· escala de Frankl</span></div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {FRANKL.filter((f) => puedeEscribirClinico || F.frankl === f.v).map((f) => { const on = F.frankl === f.v; return (
                               <button key={f.v} onClick={() => blurFc("frankl", on ? "" : f.v)} title={f.d} disabled={!puedeEscribirClinico}
                                 style={{ textAlign: "left", padding: "8px 12px", borderRadius: "var(--dc-r-md)", cursor: puedeEscribirClinico ? "pointer" : "default",
                                   border: on ? `1.5px solid ${f.c}` : `1.5px solid ${LINE}`, background: on ? tint(f.c, 0.078) : "var(--dc-white)" }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: on ? f.c : TEXT }}>{f.l}</div>
+                                <div style={{ fontSize: 13, fontWeight: 500, color: on ? f.c : TEXT }}>{f.l}</div>
                                 <div style={{ fontSize: 12, color: MUTED, marginTop: 1 }}>{f.d}</div>
                               </button>); })}
                             {!puedeEscribirClinico && !F.frankl && <span style={{ fontSize: 13, color: MUTED }}>Sin registrar</span>}
                           </div>
-                          <div style={{ fontWeight: 600, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Riesgo de caries</div>
+                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Riesgo de caries</div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {RIESGO_CARIES.filter((r) => puedeEscribirClinico || F.riesgoCaries === r.v).map((r) => { const on = F.riesgoCaries === r.v; return (
                               <button key={r.v} onClick={() => blurFc("riesgoCaries", on ? "" : r.v)} disabled={!puedeEscribirClinico}
-                                style={{ padding: "7px 16px", borderRadius: "var(--dc-r-full)", cursor: puedeEscribirClinico ? "pointer" : "default", fontSize: 13, fontWeight: 600,
+                                style={{ padding: "7px 16px", borderRadius: "var(--dc-r-full)", cursor: puedeEscribirClinico ? "pointer" : "default", fontSize: 13, fontWeight: 500,
                                   border: on ? `1.5px solid ${r.c}` : `1.5px solid ${LINE}`, background: on ? tint(r.c, 0.078) : "var(--dc-white)", color: on ? r.c : TEXT }}>
                                 {r.l}
                               </button>); })}
                             {!puedeEscribirClinico && !F.riesgoCaries && <span style={{ fontSize: 13, color: MUTED }}>Sin registrar</span>}
                           </div>
-                          <div style={{ fontWeight: 600, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Prevención aplicada</div>
+                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Prevención aplicada</div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{PREVENCION.map((x) => chip(arr(F.prevencion).includes(x), () => toggleFcList("prevencion", x), x))}</div>
                           <div className="fm-hist-row" style={{ marginTop: 14 }}><label style={lbl}>¿Quién le cepilla o supervisa?</label>{ta(null, "cepilladoSupervisado", "Ej. la madre por la noche, él solo por la mañana…", 1)}</div>
-                          <div style={{ fontWeight: 600, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Hábitos orales</div>
+                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Hábitos orales</div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{HABITOS_ORALES.map((h) => chip(arr(F.habitosOrales).includes(h), () => toggleFcList("habitosOrales", h), h))}</div>
                         </>)}
 
@@ -1862,8 +1862,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 {puedeEscribirClinico && <div style={card}>
                   <div style={secTitle}>Nueva nota de evolución</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: MUTED, fontWeight: 600 }}>Plantillas:</span>
-                    {PLANTILLAS_EVO.map((pl) => <button key={pl.l} onClick={() => setEvo({ diagnostico: pl.diag, detalle: pl.det })} style={{ padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${LINE}`, background: "var(--dc-white)", color: TEAL, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{pl.l}</button>)}
+                    <span style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>Plantillas:</span>
+                    {PLANTILLAS_EVO.map((pl) => <button key={pl.l} onClick={() => setEvo({ diagnostico: pl.diag, detalle: pl.det })} style={{ padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1.5px solid ${LINE}`, background: "var(--dc-white)", color: TEAL, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>{pl.l}</button>)}
                   </div>
                   <div style={{ display: "grid", gap: 10 }}>
                     <div>
@@ -1878,14 +1878,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {vitalesActivos.map(([k, l, ph]) => (
                           <div key={k} style={{ display: "flex", alignItems: "center", gap: 5, border: `1.5px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", padding: "4px 8px", background: "var(--dc-white)" }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{l}</span>
+                            <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}>{l}</span>
                             <input value={vit[k] || ""} onChange={(e) => setVit({ ...vit, [k]: e.target.value })} placeholder={ph} style={{ width: 70, border: "none", outline: "none", fontSize: 13, color: NAVY, background: "transparent" }} />
                           </div>
                         ))}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: `1.5px dashed ${LINE}`, background: "var(--dc-white)", color: evoFile ? TEAL : "var(--dc-ink-400)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: `1.5px dashed ${LINE}`, background: "var(--dc-white)", color: evoFile ? TEAL : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
                         <Paperclip size={14} strokeWidth={1.75} /> {evoFile ? evoFile.name : "Anexar radiografía / foto"}
                         <input type="file" accept="image/*" onChange={(e) => setEvoFile(e.target.files && e.target.files[0])} style={{ display: "none" }} />
                         {evoFile && <X size={13} strokeWidth={2} onClick={(e) => { e.preventDefault(); setEvoFile(null); }} />}
@@ -1912,10 +1912,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   if (filtroMed) filtrada = filtrada.filter((e) => docDe(e) === filtroMed);
                   if (cutoff) filtrada = filtrada.filter((e) => String(e.fecha) >= cutoff);
                   if (q) filtrada = filtrada.filter((e) => textoDe(e).includes(q));
-                  const selStyle = (activo) => ({ padding: "6px 10px", borderRadius: "var(--dc-r-full)", border: activo ? `1.5px solid ${TEAL}` : `1px solid ${SOFT}`, background: activo ? tint(TEAL, 0.063) : "var(--dc-white)", color: activo ? TEAL : "var(--dc-ink-400)", fontSize: 12, fontWeight: 600, cursor: "pointer", outline: "none" });
+                  const selStyle = (activo) => ({ padding: "6px 10px", borderRadius: "var(--dc-r-full)", border: activo ? `1.5px solid ${TEAL}` : `1px solid ${SOFT}`, background: activo ? tint(TEAL, 0.063) : "var(--dc-white)", color: activo ? TEAL : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer", outline: "none" });
                   return (
                     <div style={card}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: NAVY, fontSize: 15 }}><Activity size={17} strokeWidth={1.75} color={TEAL} /> Línea de tiempo del paciente</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 500, color: NAVY, fontSize: 14 }}><Activity size={17} strokeWidth={1.75} color={TEAL} /> Línea de tiempo del paciente</div>
                       <div style={{ fontSize: 12, color: MUTED, margin: "4px 0 12px" }}>Se arma sola con las citas, evoluciones, pagos, recetas y archivos ya registrados — sin volver a capturarlos.</div>
                       <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
                         <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
@@ -1932,8 +1932,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       </div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
                         {FILTROS.map(([k, l, n]) => { const on = filtroTL === k; return (
-                          <button key={k} className={on ? "" : "fm-chip"} onClick={() => setFiltroTL(k)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${TEAL}` : `1px solid ${SOFT}`, background: on ? tint(TEAL, 0.078) : "var(--dc-white)", color: on ? TEAL : "var(--dc-ink-400)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                            {l} <span style={{ fontSize: 12, fontWeight: 600, color: on ? TEAL : MUTED, background: on ? "var(--dc-white)" : "var(--dc-bg-alt)", borderRadius: "var(--dc-r-full)", padding: "0 6px" }}>{n}</span>
+                          <button key={k} className={on ? "" : "fm-chip"} onClick={() => setFiltroTL(k)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${TEAL}` : `1px solid ${SOFT}`, background: on ? tint(TEAL, 0.078) : "var(--dc-white)", color: on ? TEAL : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                            {l} <span style={{ fontSize: 12, fontWeight: 500, color: on ? TEAL : MUTED, background: on ? "var(--dc-white)" : "var(--dc-bg-alt)", borderRadius: "var(--dc-r-full)", padding: "0 6px" }}>{n}</span>
                           </button>
                         ); })}
                       </div>
@@ -1964,11 +1964,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       {labOrdenes.map((o) => (
                         <div key={o.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "8px 0", borderTop: "1px solid var(--dc-line)" }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, color: NAVY }}>{o.tipoTrabajo || o.trabajo || "Trabajo"}</div>
+                            <div style={{ fontWeight: 500, color: NAVY }}>{o.tipoTrabajo || o.trabajo || "Trabajo"}</div>
                             <div style={{ fontSize: 12, color: MUTED }}>{o.laboratorio || "—"}</div>
                           </div>
                           <div style={{ textAlign: "right", flexShrink: 0 }}>
-                            <div style={{ fontWeight: 600, color: TEAL, textTransform: "capitalize" }}>{o.estado || "—"}</div>
+                            <div style={{ fontWeight: 500, color: TEAL, textTransform: "capitalize" }}>{o.estado || "—"}</div>
                             <div style={{ fontSize: 12, color: MUTED }}>Retorno: {String(o.fechaEstimada || o.entrega || o.fechaRetorno || "—").slice(0, 10)}</div>
                           </div>
                         </div>
@@ -1991,28 +1991,28 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     ["Por pagar", money(porPagar), debe ? WARN : GREEN],
                     ...(saldoAFavor > 0.005 ? [["Saldo a favor", money(saldoAFavor), GREEN]] : []),
                   ].map(([l, v, c]) => (
-                    <div key={l} style={card}><div style={{ fontSize: 12, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em" }}>{l}</div><div style={{ fontSize: 24, fontWeight: 600, color: c, marginTop: 3 }}>{v}</div></div>
+                    <div key={l} style={card}><div style={{ fontSize: 12, fontWeight: 500, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em" }}>{l}</div><div style={{ fontSize: 21, fontWeight: 500, color: c, marginTop: 3 }}>{v}</div></div>
                   ))}
                 </div>
                 <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-                  <div style={{ padding: "12px 16px", fontWeight: 600, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Plan de tratamiento</div>
+                  <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Plan de tratamiento</div>
                   {arr(d?.tratamientos).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin plan de tratamiento.</div>}
                   {arr(d?.tratamientos).map((t, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i ? `1px solid ${LINE}` : "none", fontSize: 13 }}>
-                      <span style={{ color: NAVY, fontWeight: 600 }}>{t.nombre}{t.pieza ? ` · pieza ${t.pieza}` : ""}</span>
-                      <span style={{ color: t.estado === "completada" ? GREEN : "var(--dc-ink-400)", fontWeight: 600 }}>{t.estado}</span>
-                      <span style={{ fontWeight: 600 }}>{money(t.costo)}</span>
+                      <span style={{ color: NAVY, fontWeight: 500 }}>{t.nombre}{t.pieza ? ` · pieza ${t.pieza}` : ""}</span>
+                      <span style={{ color: t.estado === "completada" ? GREEN : "var(--dc-ink-400)", fontWeight: 500 }}>{t.estado}</span>
+                      <span style={{ fontWeight: 500 }}>{money(t.costo)}</span>
                     </div>
                   ))}
                 </div>
                 <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-                  <div style={{ padding: "12px 16px", fontWeight: 600, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Pagos ({arr(d?.pagos).length})</div>
+                  <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Pagos ({arr(d?.pagos).length})</div>
                   {arr(d?.pagos).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin pagos registrados.</div>}
                   {arr(d?.pagos).slice(0, 15).map((pg, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i ? `1px solid ${LINE}` : "none", fontSize: 13 }}>
-                      <span style={{ color: NAVY, fontWeight: 600 }}>{pg.fecha || "—"}</span>
+                      <span style={{ color: NAVY, fontWeight: 500 }}>{pg.fecha || "—"}</span>
                       <span style={{ color: "var(--dc-ink-400)", flex: 1, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 10px" }}>{pg.concepto || "—"}</span>
-                      <span style={{ color: GREEN, fontWeight: 600 }}>{money(pg.monto)}</span>
+                      <span style={{ color: GREEN, fontWeight: 500 }}>{money(pg.monto)}</span>
                     </div>
                   ))}
                 </div>
@@ -2021,11 +2021,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
 
             {tab === "archivos" && (
               <div style={card}>
-                <div style={{ fontWeight: 600, color: NAVY, fontSize: 15, marginBottom: 12 }}>Radiografías, fotos y documentos ({rx.length})</div>
+                <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 12 }}>Radiografías, fotos y documentos ({rx.length})</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
                   <Select width={180} value={upTipo} onChange={setUpTipo} options={TIPOS_ARCHIVO.map((t) => ({ value: t, label: t }))} />
                   <input value={upNota} onChange={(e) => setUpNota(e.target.value)} placeholder="Nota (opcional)" style={{ ...inp, flex: 1, minWidth: 160 }} />
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 15px", borderRadius: "var(--dc-r-md)", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 15px", borderRadius: "var(--dc-r-md)", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
                     <Plus size={15} strokeWidth={1.75} /> Subir archivo
                     <input type="file" accept="image/*" onChange={subirArchivo} style={{ display: "none" }} />
                   </label>
@@ -2037,7 +2037,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       <button onClick={() => borrarArchivo(x.id)} title="Eliminar del expediente" aria-label="Eliminar del expediente" style={{ position: "absolute", top: 6, right: 6, zIndex: 2, width: 24, height: 24, borderRadius: "var(--dc-r-full)", border: "none", background: "rgba(0,0,0,.55)", color: "var(--dc-white)", cursor: "pointer", display: "grid", placeItems: "center" }}><Trash2 size={13} strokeWidth={2} /></button>
                       <a href={x.url || undefined} target="_blank" rel="noreferrer" style={{ display: "block", height: 104 }}>{x.url ? <img src={x.url} alt={x.tipo} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ height: "100%", display: "grid", placeItems: "center" }}><Image size={26} color="rgba(255,255,255,.5)" /></div>}</a>
                       <div style={{ padding: "7px 10px", background: "var(--dc-white)" }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.tipo || "Estudio"}</div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.tipo || "Estudio"}</div>
                         <div style={{ fontSize: 12, color: MUTED }}>{x.fecha || ""}{x.nota ? " · " + x.nota : ""}</div>
                       </div>
                     </div>
@@ -2053,7 +2053,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               ya no cabe sin estrujar la zona de trabajo. */}
           <aside className="fm-lateral" style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", display: "grid", gap: 14, alignContent: "start" }}>
             <div>
-              <div style={{ fontWeight: 600, color: NAVY, fontSize: 15, marginBottom: 10 }}>Presupuesto</div>
+              <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 10 }}>Presupuesto</div>
               {arr(d?.tratamientos).length === 0
                 ? <div style={{ fontSize: 13, color: MUTED }}>Sin plan de tratamiento todavía.</div>
                 : <div style={{ display: "grid", gap: 7 }}>
@@ -2063,7 +2063,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                         <span style={{ flex: 1, minWidth: 0, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {t.nombre}{t.pieza ? ` (${t.pieza})` : ""}
                         </span>
-                        <span style={{ color: TEXT, fontWeight: 600, flexShrink: 0 }}>{money(t.costo)}</span>
+                        <span style={{ color: TEXT, fontWeight: 500, flexShrink: 0 }}>{money(t.costo)}</span>
                       </div>
                     ))}
                     {arr(d?.tratamientos).length > 6 && (
@@ -2080,15 +2080,15 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 ...(saldoAFavor > 0.005 ? [["Saldo a favor", money(saldoAFavor), GREEN]] : []),
               ].map(([l, v, c]) => (
                 <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 13 }}>
-                  <span style={{ color: TEXT, fontWeight: 600 }}>{l}:</span>
-                  <b style={{ color: c, fontSize: 15, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>{v}</b>
+                  <span style={{ color: TEXT, fontWeight: 500 }}>{l}:</span>
+                  <b style={{ color: c, fontSize: 14, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>{v}</b>
                 </div>
               ))}
             </div>
 
             <div style={{ borderTop: `1px solid ${SOFT}`, paddingTop: 13 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
-                <span style={{ fontWeight: 600, color: NAVY, fontSize: 15 }}>Nota de evolución</span>
+                <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Nota de evolución</span>
                 <button onClick={() => setTab("historia")} title="Ver todas las evoluciones" aria-label="Ver todas las evoluciones"
                   style={{ background: "none", border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-sm)", width: 26, height: 26, cursor: "pointer", color: TEAL, display: "grid", placeItems: "center" }}>
                   <Plus size={15} strokeWidth={2} />
@@ -2102,7 +2102,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>
                       {fmtFecha(ult.fecha)}{ult.medico ? ` · ${rotuloMedico(ult.medico) || ult.medico}` : ""}
                     </div>
-                    {ult.diagnostico && <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, marginBottom: 4, lineHeight: 1.4 }}>{ult.diagnostico}</div>}
+                    {ult.diagnostico && <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, marginBottom: 4, lineHeight: 1.4 }}>{ult.diagnostico}</div>}
                     {ult.detalle && <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.55 }}>{ult.detalle}</div>}
                   </div>
                 );

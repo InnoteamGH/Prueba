@@ -32,15 +32,15 @@
   /* ---- Tipografía: 8 pasos, ninguno fraccionario ---- */
   --dc-fs-xs:12px;    --dc-lh-xs:16px;   /* etiquetas de tabla, chips */
   --dc-fs-sm:13px;    --dc-lh-sm:18px;   /* meta, ayudas */
-  --dc-fs-md:15px;    --dc-lh-md:22px;   /* CUERPO POR DEFECTO */
-  --dc-fs-lg:17px;    --dc-lh-lg:24px;   /* subtítulos */
-  --dc-fs-xl:20px;    --dc-lh-xl:28px;   /* títulos de tarjeta */
-  --dc-fs-2xl:24px;   --dc-lh-2xl:32px;  /* títulos de pantalla */
-  --dc-fs-3xl:32px;   --dc-lh-3xl:40px;  /* cifras grandes */
+  --dc-fs-md:14px;    --dc-lh-md:21px;   /* CUERPO POR DEFECTO */
+  --dc-fs-lg:16px;    --dc-lh-lg:23px;   /* subtítulos */
+  --dc-fs-xl:18px;    --dc-lh-xl:26px;   /* títulos de tarjeta */
+  --dc-fs-2xl:21px;   --dc-lh-2xl:28px;  /* títulos de pantalla */
+  --dc-fs-3xl:27px;   --dc-lh-3xl:34px;  /* cifras grandes */
   --dc-fs-4xl:44px;   --dc-lh-4xl:52px;  /* cifra protagonista (una por pantalla) */
 
   /* UX-11: densidad de ficha clínica (override por data-densidad en .fm) */
-  --dc-ficha-fs:15px;     /* recepción / admin */
+  --dc-ficha-fs:14px;     /* recepción / admin */
   --dc-ficha-row:56px;
 
   --dc-fw-normal:400;   /* CUERPO. Hoy se usa 1 vez; debe ser el más frecuente. */
