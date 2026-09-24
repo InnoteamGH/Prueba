@@ -938,3 +938,34 @@
 .dc-ag-fila.is-prox > .dc-col-sticky { background: #fff !important; }
 .dc-ag-fila.is-pasada { opacity: .62; }
 .dc-ag-fila > div:first-child > div > div:first-child { font-size: 14px !important; font-weight: 700 !important; color: var(--dc-brand-600) !important; }
+
+/* Cabecera del día compacta: una fila (fecha · cifras · próxima) y la barra debajo. */
+.dc-ag-hero { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 28px; padding: 16px 22px 14px; border-radius: 16px; }
+.dc-ag-hero::after { width: 150px; height: 150px; top: -30px; right: -20px; }
+.dc-ag-hero__dia h2 { font-size: 19px; }
+.dc-ag-hero__dia p { font-size: 12.5px; margin-top: 2px; }
+.dc-ag-hero__cifras { position: relative; z-index: 1; display: flex; gap: 0; justify-content: center; }
+.dc-ag-hero__cifras > div { background: none; box-shadow: none; padding: 0 22px; border-radius: 0; border-left: 1px solid rgba(255,255,255,.18); display: grid; gap: 0; }
+.dc-ag-hero__cifras > div:first-child { border-left: 0; }
+.dc-ag-hero__cifras b { font-size: 20px; }
+.dc-ag-hero__cifras span { font-size: 11.5px; }
+.dc-ag-hero__prox { position: relative; z-index: 1; min-width: 0; max-width: 340px; padding: 8px 12px; border-radius: 12px; }
+.dc-ag-hero__eyebrow { font-size: 10px; margin-bottom: 2px; }
+.dc-ag-hero__hora { font-size: 18px; }
+.dc-ag-hero__prox strong { font-size: 13px; }
+.dc-ag-hero__prox span:not(.dc-ag-hero__eyebrow) { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-ag-hero__prox-fila { gap: 10px; }
+.dc-ag-hero__prox-fila > div { min-width: 0; }
+.dc-ag-hero__estados { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
+.dc-ag-hero__barra { flex: 1; height: 6px; }
+.dc-ag-hero__leyenda { font-size: 11.5px; gap: 4px 12px; flex-shrink: 0; }
+@media (max-width: 1100px) {
+  .dc-ag-hero { grid-template-columns: 1fr auto; }
+  .dc-ag-hero__cifras { grid-column: 1 / -1; order: 3; justify-content: flex-start; }
+  .dc-ag-hero__cifras > div:first-child { padding-left: 0; }
+  .dc-ag-hero__estados { order: 4; flex-wrap: wrap; }
+}
+@media (max-width: 600px) {
+  .dc-ag-hero { grid-template-columns: 1fr; }
+  .dc-ag-hero__cifras > div { padding: 0 12px; }
+}

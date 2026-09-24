@@ -1765,28 +1765,25 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         const segs = desglose.map((a) => ({ ...a, pct: (a.n / total) * 100 }));
         return (
           <section className="dc-ag-hero">
-            <div className="dc-ag-hero__top">
-              <div className="dc-ag-hero__dia">
-                <span className="dc-ag-hero__eyebrow">Agenda de hoy</span>
-                <h2>{fechaLarga}</h2>
-                <p>{pluralEs(todasHoy.length, "cita programada", "citas programadas")}{stats[2][1] ? ` · ${pluralEs(stats[2][1], "paciente por llegar", "pacientes por llegar")}` : ""}</p>
-              </div>
-              {proxima && (
-                <div className="dc-ag-hero__prox">
-                  <span className="dc-ag-hero__eyebrow">Próxima cita</span>
-                  <div className="dc-ag-hero__prox-fila">
-                    <b className="dc-ag-hero__hora">{proxima.hora}</b>
-                    <div><strong>{proxima.paciente}</strong><span>{proxima.motivo}{medProx ? ` · ${medProx}` : ""}</span></div>
-                  </div>
-                </div>
-              )}
+            <div className="dc-ag-hero__dia">
+              <h2>{fechaLarga}</h2>
+              <p>{pluralEs(todasHoy.length, "cita", "citas")} hoy</p>
             </div>
             <div className="dc-ag-hero__cifras">
-              <div><b>{nCitas}</b><span>Citas activas</span></div>
+              <div><b>{nCitas}</b><span>Activas</span></div>
               <div><b>{stats[1][1]}</b><span>Presentes</span></div>
               <div><b>{stats[2][1]}</b><span>Por llegar</span></div>
-              <div><b>{nAv}%</b><span>Avance del día</span></div>
+              <div><b>{nAv}%</b><span>Avance</span></div>
             </div>
+            {proxima && (
+              <div className="dc-ag-hero__prox">
+                <span className="dc-ag-hero__eyebrow">Próxima</span>
+                <div className="dc-ag-hero__prox-fila">
+                  <b className="dc-ag-hero__hora">{proxima.hora}</b>
+                  <div><strong>{proxima.paciente}</strong><span>{proxima.motivo}{medProx ? ` · ${medProx}` : ""}</span></div>
+                </div>
+              </div>
+            )}
             {segs.length > 0 && (
               <div className="dc-ag-hero__estados">
                 <div className="dc-ag-hero__barra" role="img" aria-label={segs.map((a) => `${a.l}: ${a.n}`).join(", ")}>
