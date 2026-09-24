@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {AvatarPaciente, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, calcEdad, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {AvatarPaciente, PACIENTES_INIT, FICHA_CLINICA, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, calcEdad, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -998,6 +998,21 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const [cargandoFicha, setCargandoFicha] = useState(true);
   const [errorFicha, setErrorFicha] = useState(null);
   const cargar = () => {
+    // Modo demostración: arma la ficha con los datos de ejemplo del paciente, para
+    // que la pantalla se pueda revisar sin backend.
+    if (!conectado && pacienteId != null) {
+      const pac = PACIENTES_INIT.find((x) => String(x.id) === String(pacienteId));
+      const fc = FICHA_CLINICA[pacienteId] || {};
+      if (pac) {
+        const trat = (fc.tratamiento || []).map((t) => ({ ...t, estado: t.estado === "atendida" ? "completada" : t.estado }));
+        const total = trat.reduce((a, t) => a + (Number(t.costo) || 0), 0);
+        const pagado = (fc.pagos || []).reduce((a, g) => a + (Number(g.monto) || 0), 0);
+        setD({ paciente: { ...pac, alergias: fc.alergias || [], antecedentes: fc.antecedentes || [] }, resumen: { saldo: total - pagado, total, pagado, planTotal: total, invertido: pagado }, tratamientos: trat, pagos: fc.pagos || [], recetas: fc.recetas || [], historia: fc.historia || [], citas: [] });
+        setFil((f) => ({ ...f, nombre: pac.nombre || "", dni: pac.dni || "", telefono: pac.telefono || "", email: pac.email || "" }));
+      }
+      setCargandoFicha(false);
+      return;
+    }
     if (!conectado || !pacienteId) return;
     setCargandoFicha(true);
     setErrorFicha(null);
@@ -1438,14 +1453,15 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           .fm .fm-reveal { animation: fmIn .18s ease both; }
         `}</style>
         {/* Barra superior */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 22px", background: "var(--dc-white)", borderBottom: `1px solid ${SOFT}` }}>
+        <div className="fm-top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 22px", background: "var(--dc-white)", borderBottom: `1px solid ${SOFT}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
             <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: `linear-gradient(135deg,${ACCENT},${TEAL})`, display: "grid", placeItems: "center" }}><ClipboardList size={18} color="var(--dc-white)" strokeWidth={2} /></div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 500, color: ACCENT, letterSpacing: ".08em", textTransform: "uppercase" }}>Expediente clínico</div>
-              <div style={{ fontSize: 16, fontWeight: 500, color: NAVY, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif", lineHeight: 1.1 }}>{p.nombre || "Ficha médica"}</div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: MUTED, marginTop: 2 }}>
-                {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null, p.telefono || null].filter(Boolean).join(" – ")}
+              <div className="fm-top__eti">Expediente clínico</div>
+              <div className="fm-top__nom">{p.nombre || "Ficha médica"}</div>
+              <div className="fm-top__chips">
+                {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null, p.telefono || null].filter(Boolean).map((t) => <span key={t}>{t}</span>)}
+                {!errorFicha && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias registradas</span>}
               </div>
               {errorFicha ? (
                 <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-700)", marginTop: 6 }}>Error al consultar datos clínicos</div>
@@ -1455,9 +1471,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     <ChipAlergia key={a}>⚠ {a}</ChipAlergia>
                   ))}
                 </div>
-              ) : (
-                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", marginTop: 6 }}>Sin alergias registradas</div>
-              )}
+              ) : null}
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1479,13 +1493,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         ) : (
         <div className="fm-cols" style={{ display: "grid", gridTemplateColumns: "268px minmax(0,1fr) 300px", gap: 0, flex: 1, minHeight: 0 }}>
           {/* Rail izquierdo: tarjeta paciente + sub-nav */}
-          <div style={{ borderRight: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          <div className="fm-rail" style={{ borderRight: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
             <div style={{ textAlign: "center" }}>
               {/* Foto del paciente si la tiene; si no, un avatar generico por edad y
                   genero (comun.jsx: AvatarPaciente). Reconocerlo de un vistazo evita
                   confundir a dos personas con el mismo nombre, que en una clinica pasa. */}
-              <div style={{ position: "relative", width: 128, margin: "0 auto 12px" }}>
-                <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPed} size={128} radio={32} />
+              <div className="fm-rail__foto" style={{ position: "relative", width: 96, margin: "0 auto 10px" }}>
+                <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPed} size={96} radio={28} />
                 {esPed && (
                   <span title="Paciente pediátrico" style={{ position: "absolute", bottom: 2, left: -2, background: "var(--dc-white)", borderRadius: "var(--dc-r-full)", padding: 4, boxShadow: "0 2px 8px rgba(16,24,40,.22)", display: "grid", placeItems: "center", color: PED }}>
                     <EmblemaNino size={22} />
@@ -1504,7 +1518,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 <button onClick={quitarFoto} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, fontSize: 12, marginBottom: 6 }}>
                   Quitar foto
                 </button>)}
-              <div style={{ fontWeight: 500, color: NAVY, fontSize: 16, lineHeight: 1.25 }}>{p.nombre || "Paciente"}</div>
+              <div className="fm-rail__nom">{p.nombre || "Paciente"}</div>
               <div style={{ fontSize: 13, color: MUTED }}>{p.fechaNacimiento && edad != null ? `${edad} años` : ""}{p.dni ? (p.fechaNacimiento && edad != null ? ` – DNI ${p.dni}` : `DNI ${p.dni}`) : ""}</div>
               {esPed && <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, color: PED, fontSize: 12, fontWeight: 500, letterSpacing: ".03em", textTransform: "uppercase" }}>
                 <EmblemaNino size={14} /> {enTransicion ? "Pasa pronto a adulto" : "Ficha pediátrica"}
@@ -1551,14 +1565,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 : <div style={{ marginTop: 9, textAlign: "left", background: "var(--dc-warn-soft)", borderRadius: "var(--dc-r-md)", padding: "8px 10px", fontSize: 12, color: "var(--dc-warn-ink)", lineHeight: 1.45 }}>
                     Menor <b>sin apoderado registrado</b>. Nadie puede firmar sus consentimientos.
                   </div>)}
-              <div style={{ marginTop: 10, display: "inline-flex", alignItems: "baseline", gap: 6, background: debe ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", color: debe ? WARN : GREEN, padding: "5px 12px", borderRadius: "var(--dc-r-full)", fontWeight: 500, fontSize: 13, cursor: debe ? "pointer" : "default" }} onClick={debe ? () => setTab("cuenta") : undefined} title={debe ? "Ver estado de cuenta" : undefined}>
+              <div className={`fm-saldo${debe ? " is-debe" : ""}`} style={{ marginTop: 10, display: "inline-flex", alignItems: "baseline", gap: 6, background: debe ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", color: debe ? WARN : GREEN, padding: "5px 12px", borderRadius: "var(--dc-r-full)", fontWeight: 500, fontSize: 13, cursor: debe ? "pointer" : "default" }} onClick={debe ? () => setTab("cuenta") : undefined} title={debe ? "Ver estado de cuenta" : undefined}>
                 {money(montoSaldoUi)} <span style={{ fontSize: 12, fontWeight: 500 }}>{saldoAFavor > 0.005 ? "saldo a favor" : "por pagar"}</span>
               </div>
             </div>
             <div style={{ display: "grid", gap: 4 }}>
               {NAV.map(([k, l, Ic]) => {
                 const on = tab === k;
-                return <button key={k} className={on ? "" : "fm-nav"} onClick={() => setTab(k)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "none", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 600, background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : TEXT, boxShadow: on ? "0 6px 16px -6px rgba(27,46,94,.5)" : "none" }}><Ic size={17} strokeWidth={1.75} color={on ? ACCENT : MUTED} /> {l}</button>;
+                return <button key={k} className={`fm-navbtn${on ? " is-on" : " fm-nav"}`} onClick={() => setTab(k)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "none", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 600, background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : TEXT, boxShadow: on ? "0 6px 16px -6px rgba(27,46,94,.5)" : "none" }}><Ic size={17} strokeWidth={1.75} color={on ? ACCENT : MUTED} /> {l}</button>;
               })}
             </div>
           </div>
@@ -1573,17 +1587,17 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               const pill = (c) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "3px 7px 3px 10px", borderRadius: "var(--dc-r-full)" });
               const hayAlergia = arr(p.alergias).length > 0;
               return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                  <div style={mini}>
+                <div className="fm-minis" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                  <div className="fm-mini is-tags" style={mini}>
                     {head(Tag, "var(--dc-info-700)", "Etiquetas")}
                     {arr(p.tags).length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{arr(p.tags).map((t) => <span key={t} style={pill("var(--dc-info-700)")}>{t}<X size={12} strokeWidth={2} style={{ cursor: "pointer" }} onClick={() => delTag(t)} /></span>)}</div>}
                     <input value={tagIn} onChange={(e) => setTagIn(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTag(); }} placeholder="Agregar etiqueta…" style={addInp} />
                   </div>
-                  <div style={{ ...mini, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-danger-soft)" }}>
+                  <div className="fm-mini is-notas" style={{ ...mini, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-danger-soft)" }}>
                     {head(FileText, "var(--dc-warn-600)", "Notas")}
                     <textarea defaultValue={p.comentario || ""} onBlur={(e) => { if ((e.target.value || "") !== (p.comentario || "")) savePac({ comentario: e.target.value }); }} rows={2} placeholder="Notas del paciente…" style={{ ...addInp, resize: "vertical", fontFamily: "inherit", color: TEXT }} />
                   </div>
-                  <div style={{ ...mini, background: "var(--dc-bg)", border: `1px solid ${hayAlergia ? "var(--dc-danger-mid)" : "var(--dc-bg)"}` }}>
+                  <div className={`fm-mini is-alerg${hayAlergia ? " is-hay" : ""}`} style={{ ...mini, background: "var(--dc-bg)", border: `1px solid ${hayAlergia ? "var(--dc-danger-mid)" : "var(--dc-bg)"}` }}>
                     {head(AlertTriangle, "var(--dc-danger)", "Alergias")}
                     {hayAlergia && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{arr(p.alergias).map((a) => <span key={a} style={pill("var(--dc-danger)")}>{a}{puedeEscribirClinico && <X size={12} strokeWidth={2} style={{ cursor: "pointer" }} onClick={() => delAlergia(a)} />}</span>)}</div>}
                     {puedeEscribirClinico

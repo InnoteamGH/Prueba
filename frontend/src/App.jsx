@@ -2938,7 +2938,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   }, [pacienteId, edadPac]);
   /* Las tres fases del odontograma (API: fase = inicial | evolucion | alta). */
   const [fase, setFase] = useState("inicial");
-  const [vistaOdo, setVistaOdo] = useState("anatomico");
+  // Solo existe la vista anatómica; la clásica se retiró de la interfaz.
+  const vistaOdo = "anatomico";
   const [showPlanInv, setShowPlanInv] = useState(false);
   const [anexoPlan, setAnexoPlan] = useState(null);
   const anatomicoRef = useRef(null);
@@ -2949,7 +2950,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
         anexo = await anatomicoRef.current.capturarAnexo();
       }
     } catch {
-      notify && notify("No se pudo capturar el odontograma del paciente. Revisa la vista Anatómico.");
+      notify && notify("No se pudo capturar el odontograma del paciente. Revisa el odontograma.");
     }
     setAnexoPlan(anexo);
     setShowPlanInv(true);
@@ -3228,14 +3229,6 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                   ]}
                 />
               )}
-              <div className="dc-odo-bar__modo" style={{ display: "flex", gap: 2, background: "var(--dc-bg-alt)", padding: 3, borderRadius: 999 }}>
-                {[["clasico", "Clásico"], ["anatomico", "Anatómico"]].map(([k, l]) => (
-                  <button key={k} type="button" onClick={() => setVistaOdo(k)} aria-pressed={vistaOdo === k}
-                    style={{ padding: "5px 14px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 13, fontWeight: vistaOdo === k ? 600 : 500,
-                             background: vistaOdo === k ? "#fff" : "transparent", color: vistaOdo === k ? "var(--dc-brand-600)" : "var(--dc-ink-500)",
-                             boxShadow: vistaOdo === k ? "0 1px 2px rgba(16,24,40,.12)" : "none" }}>{l}</button>
-                ))}
-              </div>
               {vistaOdo !== "anatomico" && (
                 <div style={{ display: "flex", gap: 4, background: "var(--dc-bg-alt)", padding: 4, borderRadius: "var(--dc-r-md)" }}>
                   {FASES_ODO.map(([k, l]) => (
@@ -3879,7 +3872,7 @@ const LINKS_DEMO = [
   { id: 2, paciente: "Pedro Gómez", concepto: "Saldo endodoncia", monto: 400, estado: "pendiente", fecha: fmt(hoy) },
 ];
 
-function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {} }) {
+function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null }) {
   // Autorización granular: si llega `can` se usa la matriz; si no, se cae al rol.
   const puedeEgresos = can ? can("facturacion", "aprobar") : rol !== "recepcion" && rol !== "gerencia";
   // Bug #26 re-test: Gerencia debe VER la pestaña Ingresos/egresos (solo lectura), aunque no pueda crear egresos
@@ -3899,7 +3892,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [hist, setHist] = useState([]);
   const [verHist, setVerHist] = useState(false);
   const [pacsHoy, setPacsHoy] = useState(new Set());   // pacientes con cita hoy (para "por cobrar de hoy")
-  const [tab, setTab] = useState("cobros");             // cobros | apertura | cierre | historial | movimientos | links
+  // Las pestañas son submódulos del menú lateral (Caja → Cobros, Apertura…): la vista manda.
+  const [tabLocal, setTabLocal] = useState("cobros");  // cobros | apertura | cierre | historial | movimientos | links
+  const tab = tabProp || tabLocal;
+  const setTab = (t) => (onTab ? onTab(t) : setTabLocal(t));
   // CAJA-01: sede explícita para abrir/cerrar (nunca "all" → primera sede a escondidas).
   const [cajaSedePick, setCajaSedePick] = useState(null); // uuid o null
   const sedeRequierePick = sedeFiltro === "all";
@@ -4343,37 +4339,27 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         </div>
         {puedeConfig && <button type="button" className="dc-esp-hero__agregar" onClick={() => setDatosFact(true)}><FileText size={15} strokeWidth={1.9} /> Datos de facturación</button>}
       </section>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div className="dc-tabs-caja" style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", overflowX: "auto" }}>
-          {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
-            <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)", transition: "background .12s" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
-          ); })}
-        </div>
-      </div>
 
       {tab === "apertura" && (
-        <div style={{ display: "grid", gap: 16, maxWidth: 560 }}>
-          <Card style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 6px", color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Apertura de caja</h3>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 16 }}>{fechaLegible(fmt(hoy))} – {sedeNombre()}</div>
+        <div className="dc-ap" style={{ display: "grid", gap: 16, maxWidth: 820 }}>
+          <Card className="dc-ap-card" style={{ padding: 0 }}>
+            <div className="dc-ap-card__cab">
+              <span className="dc-ap-card__ico"><KeyRound size={18} strokeWidth={1.9} /></span>
+              <div><h3>Apertura de caja</h3><span>{fechaLegible(fmt(hoy))} – {sedeNombre()}</span></div>
+            </div>
+            <div className="dc-ap-card__cuerpo">
             {sedeRequierePick && (
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", display: "block", marginBottom: 6 }}>Sede (obligatoria)</label>
-                <select
-                  aria-label="Sede para abrir caja"
-                  value={cajaSedePick || ""}
-                  onChange={(e) => setCajaSedePick(e.target.value || null)}
-                  style={{ width: "100%", minHeight: "var(--dc-tap-min)", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 14, color: NAVY }}
-                >
-                  <option value="">— Elige una sede —</option>
+                <div className="dc-ap-lbl">Sede donde se abre la caja</div>
+                <div className="dc-ap-sedes" role="radiogroup" aria-label="Sede para abrir caja">
                   {(sedes.length
                     ? sedes.filter((s) => sedesUsuarioUuid().includes(s.id))
                     : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) })).filter((s) => s.id)
                   ).map((s) => (
-                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                    <button key={s.id} type="button" role="radio" aria-checked={cajaSedePick === s.id} className={`dc-ap-chip${cajaSedePick === s.id ? " is-on" : ""}`} onClick={() => setCajaSedePick(s.id)}><MapPin size={14} strokeWidth={1.9} /> {s.nombre}</button>
                   ))}
-                </select>
-                <div style={{ fontSize: 12, color: "var(--dc-warn-ink)", marginTop: 6 }}>Con «Todas las sedes» no se abre caja en plural: elige una sede concreta.</div>
+                </div>
+                <div className="dc-ap-nota">Cada sede tiene su propia caja: elige una.</div>
               </div>
             )}
             {cajaAbierta ? (
@@ -4414,23 +4400,28 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     </div>
                   </div>
                 )}
-                <div style={{ padding: 14, borderRadius: "var(--dc-r-md)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", fontSize: 13, color: "var(--dc-warn-ink)" }}>Debes abrir la caja antes de registrar cobros.</div>
-                <Field label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(v) => setAperturaForm({ ...aperturaForm, fondo: v })} placeholder="100.00" />
-                <Field label="Nota / turno (opcional)" value={aperturaForm.nota} onChange={(v) => setAperturaForm({ ...aperturaForm, nota: v })} placeholder="Ej. Turno mañana – recepción" />
+                <div className="dc-ap-2col">
+                  <Field label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(v) => setAperturaForm({ ...aperturaForm, fondo: v })} placeholder="100.00" />
+                  <Field label="Nota o turno (opcional)" value={aperturaForm.nota} onChange={(v) => setAperturaForm({ ...aperturaForm, nota: v })} placeholder="Ej. Turno mañana, recepción" />
+                </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", marginBottom: 8 }}>Cuentas / destinos activos hoy</div>
-                  <div style={{ display: "grid", gap: 6 }}>
-                    {destinosCatalogo.map((d) => (
-                      <label key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: NAVY, minHeight: 36 }}>
-                        <input type="checkbox" checked={destinosSel.has(d.id)} onChange={() => setDestinosSel((prev) => { const n = new Set(prev); if (n.has(d.id)) n.delete(d.id); else n.add(d.id); return n; })} />
-                        {d.label}{d.detalle ? <span style={{ color: "var(--dc-ink-400)" }}> – {d.detalle}</span> : null}
-                      </label>
-                    ))}
+                  <div className="dc-ap-lbl">Medios de pago activos hoy <span>{destinosSel.size} de {destinosCatalogo.length}</span></div>
+                  <div className="dc-ap-destinos">
+                    {destinosCatalogo.map((d) => { const on = destinosSel.has(d.id); return (
+                      <button key={d.id} type="button" role="checkbox" aria-checked={on} className={`dc-ap-dest${on ? " is-on" : ""}`} onClick={() => setDestinosSel((prev) => { const n = new Set(prev); if (n.has(d.id)) n.delete(d.id); else n.add(d.id); return n; })}>
+                        <span className="dc-ap-dest__check">{on && <Check size={12} strokeWidth={3} />}</span>
+                        <span className="dc-ap-dest__txt"><b>{d.label}</b>{d.detalle ? <small>{d.detalle}</small> : null}</span>
+                      </button>
+                    ); })}
                   </div>
                 </div>
-                <Btn onClick={abrirCaja} disabled={(sedeRequierePick && !cajaSedePick) || !!jornadaAbiertaPrevia?.id}><KeyRound size={15} strokeWidth={1.75} /> Abrir caja</Btn>
+                <div className="dc-ap-pie">
+                  <span>Debes abrir la caja antes de registrar cobros.</span>
+                  <Btn onClick={abrirCaja} disabled={(sedeRequierePick && !cajaSedePick) || !!jornadaAbiertaPrevia?.id}><KeyRound size={15} strokeWidth={1.75} /> Abrir caja</Btn>
+                </div>
               </div>
             )}
+            </div>
           </Card>
           {movForm && (
             <Card style={{ padding: 16 }}>
@@ -4565,7 +4556,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           <div style={{ display: "grid", gap: 16 }}>
             {sedeRequierePick && !cajaSedePick && (
               <Card style={{ padding: 14, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", fontSize: 13, color: "var(--dc-warn-ink)" }}>
-                Elige la sede en la pestaña Apertura para ver el arqueo de una caja concreta.
+                Elige la sede en Caja → Apertura para ver el arqueo de una caja concreta.
               </Card>
             )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -4584,16 +4575,34 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div style={{ marginTop: 10 }}><Btn small onClick={() => setTab("apertura")}><KeyRound size={14} strokeWidth={1.75} /> Ir a apertura</Btn></div>
               </Card>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-              <KpiCard label="Fondo inicial" value={cajaAbierta ? nfmt(fondoIni) : "—"} color={NAVY} icon={<KeyRound size={18} strokeWidth={1.75} />} sub={cajaAbierta ? "caja abierta" : "sin apertura"} />
-              <KpiCard label="Cobrado efectivo" value={nfmt(cobradoEfectivo)} color="var(--dc-ok-700)" icon={<DollarSign size={18} strokeWidth={1.75} />} sub="ingresos en efectivo" />
-              <KpiCard label="Egresos efectivo" value={nfmt(egresosEfectivo)} color={RED} icon={<Wallet size={18} strokeWidth={1.75} />} sub="salidas de caja" />
-              <KpiCard label="Mov. intermedios" value={nfmt(netoMovsCaja)} color={NAVY} icon={<Wallet size={18} strokeWidth={1.75} />} sub="ingresos − retiros" />
-              <KpiCard label="Efectivo esperado" value={esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo)} color="var(--dc-warn-600)" icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub={cajaAbierta ? "F + C − E ± mov" : "requiere apertura"} />
-              <KpiCard label="Total cobrado hoy" value={nfmt(c.total)} color="var(--dc-ok-700)" icon={<DollarSign size={18} strokeWidth={1.75} />} sub={`${c.cantidad} cobros`} />
-              <KpiCard label="Comisión estimada" value={nfmt(totalComision)} color="var(--dc-warn-600)" icon={<Percent size={18} strokeWidth={1.75} />} sub="según método" />
-              <KpiCard label="Neto estimado" value={nfmt(netoHoyCierre)} color={NAVY} icon={<Wallet size={18} strokeWidth={1.75} />} sub="bruto − comisión" />
-              {(metodos.length ? metodos.map(([k]) => k) : ["efectivo", "tarjeta", "yape", "plin", "transferencia", "seguro"]).map((k) => <KpiCard key={k} label={METODO_LBL[k] || k} value={nfmt((c.porMetodo || {})[k] || 0)} color={NAVY} icon={<Wallet size={18} strokeWidth={1.75} />} sub={k === "tarjeta" ? "3.44%+IGV ≈ 4.06%" : (COMISION_PCT[k] != null ? `${COMISION_PCT[k]}% comisión` : "del día")} />)}
+            <div className="dc-cierre">
+              <Card className="dc-cierre__eq">
+                <div className="dc-cierre__tit"><h3>Efectivo esperado en caja</h3><span>Fondo + cobros en efectivo − egresos ± movimientos</span></div>
+                <div className="dc-cierre__fila">
+                  <div className="dc-cierre__t"><span>Fondo inicial</span><b>{cajaAbierta ? nfmt(fondoIni) : "—"}</b></div>
+                  <i>+</i>
+                  <div className="dc-cierre__t is-ok"><span>Cobrado en efectivo</span><b>{nfmt(cobradoEfectivo)}</b></div>
+                  <i>−</i>
+                  <div className="dc-cierre__t is-mal"><span>Egresos en efectivo</span><b>{nfmt(egresosEfectivo)}</b></div>
+                  <i>±</i>
+                  <div className="dc-cierre__t"><span>Movimientos</span><b>{nfmt(netoMovsCaja)}</b></div>
+                  <i>=</i>
+                  <div className="dc-cierre__t is-total"><span>Esperado</span><b>{esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo)}</b><small>{cajaAbierta ? "para el arqueo" : "requiere apertura"}</small></div>
+                </div>
+              </Card>
+              <Card className="dc-cierre__dia">
+                <div className="dc-cierre__tit"><h3>Cobros de hoy</h3><span>{c.cantidad} {c.cantidad === 1 ? "cobro" : "cobros"}</span></div>
+                <div className="dc-cierre__res">
+                  <div><span>Total cobrado</span><b>{nfmt(c.total)}</b></div>
+                  <div><span>Comisión estimada</span><b className="is-mal">− {nfmt(totalComision)}</b></div>
+                  <div className="is-neto"><span>Neto estimado</span><b>{nfmt(netoHoyCierre)}</b></div>
+                </div>
+                <div className="dc-cierre__metodos">
+                  {(metodos.length ? metodos.map(([k]) => k) : ["efectivo", "tarjeta", "yape", "plin", "transferencia", "seguro"]).map((k) => (
+                    <div key={k} className={`dc-cierre__m is-${k}`}><span>{METODO_LBL[k] || k}</span><b>{nfmt((c.porMetodo || {})[k] || 0)}</b><small>{k === "tarjeta" ? "3.44% + IGV" : (COMISION_PCT[k] != null ? `${COMISION_PCT[k]}% comisión` : "del día")}</small></div>
+                  ))}
+                </div>
+              </Card>
             </div>
             {cajaAbierta && (
               <Card style={{ padding: 20, display: "grid", gap: 12, maxWidth: 520 }}>
@@ -4691,7 +4700,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         </div>
       )}
 
-      {tab === "movimientos" && (() => {
+      {tab === "movimientos" && puedeVerMovimientos && (() => {
         if (conectado && cajaError) {
           return (
             <Card style={{ padding: 20, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
@@ -7917,7 +7926,14 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       { id: "laboratorio", label: "Laboratorio", icon: FlaskConical },
     ] },
     { grupo: "Finanzas", items: [
-      { id: "facturacion", label: "Caja", icon: CreditCard },
+      { label: "Caja", icon: CreditCard, children: [
+        { id: "facturacion", label: "Cobros", mod: "facturacion" },
+        { id: "caja_apertura", label: "Apertura", mod: "facturacion" },
+        { id: "caja_cierre", label: "Cierre del día", mod: "facturacion" },
+        { id: "caja_historial", label: "Historial", mod: "facturacion" },
+        ...(can("facturacion", "ver") ? [{ id: "caja_movimientos", label: "Ingresos y egresos", mod: "facturacion" }] : []),
+        { id: "caja_links", label: "Links de pago", mod: "facturacion" },
+      ] },
       { id: "metas", label: "Metas de producción", icon: Target },
       { id: "seguros", label: "Seguros y EPS", icon: Umbrella },
       { id: "miproduccion", label: "Mi producción", icon: TrendingUp },
@@ -7967,6 +7983,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const orgUnaSede = auth.token ? (sedesOrg.length > 0 ? sedesOrg.length === 1 : false) : false;
   const puedeMultisede = multisede && !esSuper && !orgUnaSede && sedesDelSelector.length > 1;
 
+  const irCaja = (t) => setVista({ cobros: "facturacion", apertura: "caja_apertura", cierre: "caja_cierre", historial: "caja_historial", movimientos: "caja_movimientos", links: "caja_links" }[t] || "facturacion");
   const irInventario = (t) => setVista({ productos: "inventario", compras: "inventario_compras", consumo: "inventario_consumo", proveedores: "inventario_prov" }[t] || "inventario");
   const render = () => {
     switch (vista) {
@@ -8004,7 +8021,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "plan": return <Plan notify={notify} plan={plan} setPlan={setPlan} esSuper={esSuper} can={can} />;
       case "espera": return <Espera notify={notify} esp={espera} setEsp={setEspera} />;
       case "tickets": return <Tickets citas={cf} setCitas={setCitas} fichas={fichas} notify={notify} />;
-      case "facturacion": return <Facturacion pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "facturacion": return <Facturacion key="caja" tab="cobros" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_apertura": return <Facturacion key="caja" tab="apertura" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_cierre": return <Facturacion key="caja" tab="cierre" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_historial": return <Facturacion key="caja" tab="historial" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_movimientos": return <Facturacion key="caja" tab="movimientos" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_links": return <Facturacion key="caja" tab="links" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja": return <Facturacion pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "metas": return <Metas notify={notify} can={can} />;
       // Alias históricos → misma pantalla Producción y comisiones (2 pestañas).
