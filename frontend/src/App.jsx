@@ -4322,7 +4322,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const METODO_LBL = { efectivo: "Efectivo", tarjeta: "Tarjeta", yape: "Yape", plin: "Plin", transferencia: "Transferencia", seguro: "Seguro" };
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <section className="dc-esp-hero dc-caja-hero">
+      {tab === "cobros" && <section className="dc-esp-hero dc-caja-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>S/ {montoPorCobrar.toLocaleString("es-PE")}</b><span>por cobrar</span></div>
           <p>{porCobrar.length} {porCobrar.length === 1 ? "plan en curso" : "planes en curso"}, {conectado ? "boleta aún sin envío a SUNAT" : "demo sin envío a SUNAT"}</p>
@@ -4338,15 +4338,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           {!cajaAbierta && <button type="button" className="dc-esp-hero__btn" onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>{jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}</button>}
         </div>
         {puedeConfig && <button type="button" className="dc-esp-hero__agregar" onClick={() => setDatosFact(true)}><FileText size={15} strokeWidth={1.9} /> Datos de facturación</button>}
-      </section>
+      </section>}
 
       {tab === "apertura" && (
-        <div className="dc-ap" style={{ display: "grid", gap: 16, maxWidth: 820 }}>
-          <Card className="dc-ap-card" style={{ padding: 0 }}>
-            <div className="dc-ap-card__cab">
-              <span className="dc-ap-card__ico"><KeyRound size={18} strokeWidth={1.9} /></span>
-              <div><h3>Apertura de caja</h3><span>{fechaLegible(fmt(hoy))} – {sedeNombre()}</span></div>
+        <div className="dc-ap" style={{ display: "grid", gap: 16 }}>
+          <section className="dc-esp-hero dc-caja-sub">
+            <div className="dc-esp-hero__txt">
+              <div className="dc-esp-hero__num"><b>{cajaAbierta ? "Abierta" : "Cerrada"}</b><span>caja del día</span></div>
+              <p>{fechaLegible(fmt(hoy))} – {sedeNombre()}</p>
             </div>
+            <div className="dc-esp-hero__cifras">
+              <div><b>S/ {Number(cajaAbierta ? apertura?.fondo || 0 : aperturaForm.fondo || 0).toLocaleString("es-PE")}</b><span>Fondo inicial</span></div>
+              <div><b>{destinosSel.size}</b><span>Medios activos</span></div>
+              <div><b>{porCobrar.length}</b><span>Planes por cobrar</span></div>
+            </div>
+            <span />
+            {cajaAbierta && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => setTab("cobros")}><CreditCard size={14} strokeWidth={1.9} /> Ir a cobros</button></div>}
+          </section>
+          <div className="dc-ap-grid">
+          <Card className="dc-ap-card" style={{ padding: 0 }}>
             <div className="dc-ap-card__cuerpo">
             {sedeRequierePick && (
               <div style={{ marginBottom: 14 }}>
@@ -4423,6 +4433,17 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             )}
             </div>
           </Card>
+          <aside className="dc-ap-lado">
+            <div className="dc-ap-lado__tit">Resumen de la apertura</div>
+            <ul>
+              <li><MapPin size={14} strokeWidth={1.9} /><span>Sede</span><b>{cajaAbierta ? sedeNombre() : ((sedes.length ? sedes : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) }))).find((x) => x.id === cajaSedePick)?.nombre || (sedeRequierePick ? "Sin elegir" : sedeNombre()))}</b></li>
+              <li><Wallet size={14} strokeWidth={1.9} /><span>Fondo inicial</span><b>S/ {Number(cajaAbierta ? apertura?.fondo || 0 : aperturaForm.fondo || 0).toFixed(2)}</b></li>
+              <li><CreditCard size={14} strokeWidth={1.9} /><span>Medios de pago</span><b>{destinosSel.size}</b></li>
+            </ul>
+            <div className="dc-ap-lado__medios">{destinosCatalogo.filter((d) => destinosSel.has(d.id)).map((d) => <span key={d.id}>{d.label}</span>)}</div>
+            <p>Al cerrar el día, el arqueo compara el efectivo contado con fondo + cobros en efectivo − egresos.</p>
+          </aside>
+          </div>
           {movForm && (
             <Card style={{ padding: 16 }}>
               <h4 style={{ margin: "0 0 10px", color: NAVY }}>Movimiento de efectivo</h4>
@@ -4554,26 +4575,28 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const semaforo = diffNum == null ? null : Math.abs(diffNum) < 0.01 ? "cuadra" : diffNum > 0 ? "sobra" : "falta";
         return (
           <div style={{ display: "grid", gap: 16 }}>
-            {sedeRequierePick && !cajaSedePick && (
-              <Card style={{ padding: 14, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", fontSize: 13, color: "var(--dc-warn-ink)" }}>
-                Elige la sede en Caja → Apertura para ver el arqueo de una caja concreta.
-              </Card>
-            )}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              {!cajaAbierta && c.cantidad === 0 ? (
-                <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>
-                  <span style={{ fontWeight: 500, color: "var(--dc-danger)" }}>Caja cerrada</span> – {sedeNombre()} – {fechaLegible(fmt(hoy))}
-                </div>
-              ) : (
-                <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Arqueo de <b style={{ color: NAVY }}>hoy</b> – {sedeNombre()} – {c.cantidad} movimiento(s){apertura?.abiertaPorNombre ? ` – abierta por ${apertura.abiertaPorNombre}` : ""}</div>
-              )}
-              <div style={{ display: "flex", gap: 8 }}><Btn small kind="ghost" onClick={recargarCierre}><Repeat size={14} strokeWidth={1.75} /> Actualizar</Btn><Btn small kind="ghost" onClick={() => window.print()}><FileText size={14} strokeWidth={1.75} /> Imprimir</Btn></div>
-            </div>
+            <section className="dc-esp-hero dc-caja-sub">
+              <div className="dc-esp-hero__txt">
+                <div className="dc-esp-hero__num"><b>{esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo)}</b><span>efectivo esperado</span></div>
+                <p>{cajaAbierta ? `Arqueo de hoy – ${sedeNombre()}${apertura?.abiertaPorNombre ? `, abierta por ${apertura.abiertaPorNombre}` : ""}` : `Caja cerrada – ${sedeNombre()} – ${fechaLegible(fmt(hoy))}`}</p>
+              </div>
+              <div className="dc-esp-hero__cifras">
+                <div><b>{nfmt(c.total)}</b><span>Cobrado hoy</span></div>
+                <div><b>{nfmt(netoHoyCierre)}</b><span>Neto estimado</span></div>
+                <div><b>{c.cantidad}</b><span>Cobros</span></div>
+              </div>
+              <span />
+              <div className="dc-hero-acc">
+                <button type="button" className="dc-esp-hero__agregar" onClick={recargarCierre}><Repeat size={14} strokeWidth={1.9} /> Actualizar</button>
+                <button type="button" className="dc-esp-hero__agregar" onClick={() => window.print()}><FileText size={14} strokeWidth={1.9} /> Imprimir</button>
+              </div>
+            </section>
             {!cajaAbierta && (
-              <Card style={{ padding: 14, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)" }}>
-                <div style={{ fontSize: 13, color: "var(--dc-warn-ink)" }}>Abre la caja del día para calcular el efectivo esperado (fondo + cobros − egresos ± movimientos). Sin apertura no se muestra un arqueo F+C−E.</div>
-                <div style={{ marginTop: 10 }}><Btn small onClick={() => setTab("apertura")}><KeyRound size={14} strokeWidth={1.75} /> Ir a apertura</Btn></div>
-              </Card>
+              <div className="fm-aviso-edad">
+                <KeyRound size={15} strokeWidth={2} />
+                <span><b>Caja cerrada.</b> {sedeRequierePick && !cajaSedePick ? "Elige la sede y abre la caja" : "Abre la caja"} para calcular el efectivo esperado del arqueo.</span>
+                <button type="button" onClick={() => setTab("apertura")}>Ir a apertura</button>
+              </div>
             )}
             <div className="dc-cierre">
               <Card className="dc-cierre__eq">
@@ -4624,6 +4647,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 </Btn>
               </Card>
             )}
+            {metodos.length > 0 && (
             <Card style={{ padding: "18px 20px" }}>
               <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos por método de pago</h3>
               {metodos.length === 0 && <div style={{ color: "var(--dc-ink-500)", fontSize: 13 }}>Aún no hay cobros registrados hoy.</div>}
@@ -4633,6 +4657,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 ); })}
               </div>
             </Card>
+            )}
             <Card style={{ overflow: "hidden" }}>
               <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--dc-line)", fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>Movimientos del día</div>
               {(c.movimientos || []).length === 0 && <Vacio icon={<Wallet size={22} strokeWidth={1.75} />} titulo="Sin cobros hoy" sub="Los cobros del día aparecerán aquí." />}
@@ -4653,17 +4678,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
 
       {tab === "historial" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <h3 style={{ margin: 0, color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Historial de caja</h3>
-              <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Jornadas por sede – esperado vs contado – cierre admin fuera de fecha</div>
+          {(() => { const js = histCaja || []; const abiertas = js.filter((r) => r.abierta).length; const dif = js.reduce((a, r) => a + (r.diferencia != null ? Number(r.diferencia) : 0), 0); return (
+          <section className="dc-esp-hero dc-caja-sub">
+            <div className="dc-esp-hero__txt">
+              <div className="dc-esp-hero__num"><b>{js.length}</b><span>{js.length === 1 ? "jornada" : "jornadas"}</span></div>
+              <p>Esperado frente a contado por sede</p>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <input type="date" aria-label="Desde" value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} style={{ minHeight: 44, padding: "8px 10px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)" }} />
-              <input type="date" aria-label="Hasta" value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} style={{ minHeight: 44, padding: "8px 10px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)" }} />
-              <Btn small kind="ghost" onClick={recargarHistCaja}><Repeat size={14} strokeWidth={1.75} /> Actualizar</Btn>
+            <div className="dc-esp-hero__cifras">
+              <div><b>{abiertas}</b><span>Abiertas</span></div>
+              <div><b>{js.length - abiertas}</b><span>Cerradas</span></div>
+              <div><b>S/ {dif.toFixed(2)}</b><span>Diferencia total</span></div>
             </div>
-          </div>
+            <span />
+            <div className="dc-hero-acc dc-rango">
+              <label><span>Desde</span><input type="date" aria-label="Desde" value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
+              <label><span>Hasta</span><input type="date" aria-label="Hasta" value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
+              <button type="button" className="dc-esp-hero__btn" onClick={recargarHistCaja}><Repeat size={14} strokeWidth={1.9} /> Actualizar</button>
+            </div>
+          </section>
+          ); })()}
           {cierreAdmin && (
             <Card style={{ padding: 16, display: "grid", gap: 12, maxWidth: 520, border: "1px solid var(--dc-warn-600)" }}>
               <h4 style={{ margin: 0, color: NAVY }}>Cerrar jornada fuera de fecha</h4>
@@ -4676,7 +4709,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               </div>
             </Card>
           )}
-          <DataTable titulo="Jornadas" sub="caja" minWidth={980} rows={histCaja} empty={<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." />} cols={[
+          <DataTable titulo="Jornadas" sub="jornadas" minWidth={900} rows={histCaja} empty={<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." />} cols={[
             { key: "fecha", label: "Fecha", w: "110px", a: "left", get: (r) => r.fecha, cell: (r) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.fecha}</span> },
             { key: "sede", label: "Sede", w: "minmax(120px,1fr)", a: "left", get: (r) => r.sedeId, cell: (r) => <span>{sedes.find((s) => s.id === r.sedeId)?.nombre || "—"}</span> },
             { key: "abrio", label: "Abrió", w: "minmax(120px,1fr)", a: "left", get: (r) => r.abiertaPorNombre, cell: (r) => <span>{r.abiertaPorNombre || "—"}{r.abiertaEn ? ` – ${new Date(r.abiertaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}` : ""}</span> },
@@ -4722,15 +4755,18 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         ];
         return (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos y egresos del día</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Flujo de caja de hoy – {fechaLegible(fmt(hoy))}</div></div>
-            {puedeEgresos && <Btn small kind="red" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo" })}><Plus size={16} strokeWidth={1.75} /> Nuevo egreso</Btn>}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-            <KpiCard label="Ingresos de hoy" value={`S/ ${ingresosHoy.toLocaleString()}`} color="var(--dc-ok-700)" icon={<ArrowUpRight size={18} strokeWidth={1.75} />} sub={`${boletasHoyActivas.length} cobro(s)`} />
-            <KpiCard label="Egresos de hoy" value={`S/ ${totEgresosHoy.toLocaleString()}`} color={RED} icon={<ArrowUpRight size={18} strokeWidth={1.75} style={{ transform: "rotate(90deg)" }} />} sub={`${egresosHoy.length} gasto(s)`} />
-            <KpiCard label="Caja del día (neto)" value={`S/ ${netoHoy.toLocaleString()}`} color={netoHoy >= 0 ? "var(--dc-ok-700)" : RED} icon={<Wallet size={18} strokeWidth={1.75} />} sub={netoHoy >= 0 ? "saldo positivo" : "saldo negativo"} />
-          </div>
+          <section className="dc-esp-hero dc-caja-sub">
+            <div className="dc-esp-hero__txt">
+              <div className="dc-esp-hero__num"><b className={netoHoy < 0 ? "is-neg" : ""}>S/ {netoHoy.toLocaleString("es-PE")}</b><span>neto del día</span></div>
+              <p>Flujo de caja de hoy – {fechaLegible(fmt(hoy))}</p>
+            </div>
+            <div className="dc-esp-hero__cifras">
+              <div><b>S/ {ingresosHoy.toLocaleString("es-PE")}</b><span>Ingresos, {boletasHoyActivas.length} {boletasHoyActivas.length === 1 ? "cobro" : "cobros"}</span></div>
+              <div><b>S/ {totEgresosHoy.toLocaleString("es-PE")}</b><span>Egresos, {egresosHoy.length} {egresosHoy.length === 1 ? "gasto" : "gastos"}</span></div>
+            </div>
+            <span />
+            {puedeEgresos && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn is-coral" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button></div>}
+          </section>
           <DataTable titulo="Movimientos de hoy" sub="movimientos" minWidth={820} rows={movs} empty={<Vacio icon={<Wallet size={22} strokeWidth={1.75} />} titulo="Sin movimientos hoy" sub="Los cobros y egresos del día aparecerán aquí." />} cols={[
             { key: "tipo", label: "Tipo", w: "minmax(110px,0.7fr)", a: "left", get: (m) => m.tipo, cell: (m) => m.tipo === "ingreso" ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><ArrowUpRight size={12} strokeWidth={1.75} /> Ingreso</span> : <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-fee2)", padding: "3px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><ArrowUpRight size={12} strokeWidth={1.75} style={{ transform: "rotate(90deg)" }} /> Egreso</span> },
             { key: "concepto", label: "Concepto", w: "minmax(180px,1.6fr)", a: "left", get: (m) => m.concepto, cell: (m) => <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.concepto}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{m.detalle}</div></div> },
@@ -4747,23 +4783,30 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const pend = activos.reduce((s, l) => s + l.monto, 0);
         return (
         <div style={{ display: "grid", gap: 16 }}>
-          <Card style={{ padding: 16, background: "var(--dc-white)", border: "1px solid var(--dc-sky)" }}><div style={{ display: "flex", gap: 10, alignItems: "center" }}><Zap size={18} strokeWidth={1.75} color="var(--dc-accent-cyan)" /><div style={{ fontSize: 13, color: "var(--dc-brand-500)" }}>Los <strong>links de pago</strong> todavía no están conectados a una pasarela, así que aún no se puede cobrar con ellos. Cuando se conecte (Niubiz, Culqi o similar), el paciente pagará desde su celular y el cobro entrará a Caja.</div></div></Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Links de pago</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{links.length} link(s) – cobra a distancia</div></div>
-            <Btn small onClick={() => setLinkForm({ paciente: "", monto: "", concepto: "" })}><Plus size={16} strokeWidth={1.75} /> Nuevo link</Btn>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-            <KpiCard label="Links activos" value={activos.length} color={DS.c.primary} icon={<Zap size={18} strokeWidth={1.75} />} sub="esperando pago" />
-            <KpiCard label="Cobrado por links" value={`S/ ${cobrado.toLocaleString()}`} color="var(--dc-ok-700)" icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub="pagados" />
-            <KpiCard label="Pendiente" value={`S/ ${pend.toLocaleString()}`} color="var(--dc-warn-600)" icon={<Clock size={18} strokeWidth={1.75} />} sub="por cobrar" />
+          <section className="dc-esp-hero dc-caja-sub">
+            <div className="dc-esp-hero__txt">
+              <div className="dc-esp-hero__num"><b>{links.length}</b><span>{links.length === 1 ? "link de pago" : "links de pago"}</span></div>
+              <p>Cobra a distancia desde el celular del paciente</p>
+            </div>
+            <div className="dc-esp-hero__cifras">
+              <div><b>{activos.length}</b><span>Esperando pago</span></div>
+              <div><b>S/ {cobrado.toLocaleString("es-PE")}</b><span>Cobrado</span></div>
+              <div><b>S/ {pend.toLocaleString("es-PE")}</b><span>Pendiente</span></div>
+            </div>
+            <span />
+            <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => setLinkForm({ paciente: "", monto: "", concepto: "" })}><Plus size={14} strokeWidth={2} /> Nuevo link</button></div>
+          </section>
+          <div className="fm-aviso-edad is-info">
+            <Zap size={15} strokeWidth={2} />
+            <span><b>Pasarela sin conectar.</b> Cuando se conecte (Niubiz, Culqi o similar), el paciente pagará desde su celular y el cobro entrará a Caja.</span>
           </div>
           <Card style={{ overflow: "hidden" }}>
-            <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Links generados</h3></div>
+            <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14.5, fontWeight: 700 }}>Links generados</h3></div>
             {links.length === 0 ? <Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." /> : links.map((l, i) => {
               const url = `pay.dentocheck.pe/${String(l.id).padStart(4, "0")}${l.paciente.split(" ")[0].toLowerCase()}`;
               return (
               <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none", flexWrap: "wrap" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: tint(NAVY, 0.071), color: NAVY, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(l.paciente)}</div>
+                <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12.5, background: `linear-gradient(135deg, ${tint(colorDe(l.paciente), 0.2)}, ${tint(colorDe(l.paciente), 0.08)})`, color: colorDe(l.paciente) }}>{iniciales(l.paciente)}</span>
                 <div style={{ flex: 1, minWidth: 140 }}><div style={{ fontWeight: 500, color: NAVY }}>{l.paciente}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "inline-flex", alignItems: "center", gap: 5 }}><Zap size={11} strokeWidth={1.75} color="var(--dc-blue)" /> {url}</div></div>
                 <span style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {l.monto.toFixed(2)}</span>
                 {l.estado === "pagado"
