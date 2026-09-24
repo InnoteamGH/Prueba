@@ -2024,3 +2024,21 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-cierre__m small { font-size: 10.5px; color: var(--dc-ink-500); }
 .dc-cierre__m.is-efectivo { --m: #16A36A; } .dc-cierre__m.is-tarjeta { --m: #2563EB; } .dc-cierre__m.is-yape { --m: #7C3AED; } .dc-cierre__m.is-plin { --m: #0891B2; } .dc-cierre__m.is-transferencia { --m: #B7791F; } .dc-cierre__m.is-seguro { --m: #C2417A; }
 @media (max-width: 1100px) { .dc-cierre { grid-template-columns: 1fr; } }
+/* Ficha: más espacio para trabajar */
+.fm .fm-cols { grid-template-columns: 236px minmax(0, 1fr) 290px !important; }
+.fm .fm-cols.is-ancho { grid-template-columns: 236px minmax(0, 1fr) !important; }
+.fm .fm-lateral.is-oculta { display: none !important; }
+.fm .fm-rail { padding: 16px 12px !important; }
+.fm .fm-rail .fm-rail__nom, .fm .fm-rail .fm-rail__nom + div { display: none; }
+.fm .fm-top__chips { flex-wrap: wrap; }
+.fm .fm-top > div:first-child > div:last-child > div[style*="flex-wrap"] { display: inline-flex !important; margin: 6px 0 0 6px !important; vertical-align: top; }
+.fm .fm-top > div:first-child > div:last-child { display: block; }
+.fm .fm-top__chips { display: inline-flex; vertical-align: top; }
+.fm-aviso-edad { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; border-radius: 14px; background: #FFF6E3; box-shadow: inset 0 0 0 1px #F6DFA6; color: #946009; font-size: 12.5px; }
+.fm-aviso-edad svg { flex-shrink: 0; }
+.fm-aviso-edad span { flex: 1; }
+.fm-aviso-edad button { all: unset; cursor: pointer; font-weight: 700; color: #0A6C76; padding: 4px 10px; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1px #CFE7E8; }
+/* Odontograma dentro de la ficha: una sola barra */
+.fm .fm-odo-bar > div > div, .fm .fm-odo-bar > div:first-child { border-radius: 999px !important; }
+.fm .fm-odo-bar button { border-radius: 999px !important; }
+.fm .fm-odo-bar > div:first-child { background: #E8F3F3 !important; }

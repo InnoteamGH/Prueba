@@ -231,7 +231,8 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
   const conectado = !!auth.token;
   const editable = conectado && !soloLectura;
   const [fase, setFase] = useState("inicial");
-  const [vistaOdo, setVistaOdo] = useState("anatomico"); // clasico | anatomico
+  // Solo existe la vista anatómica; la clásica se retiró de la interfaz.
+  const vistaOdo = "anatomico";
   const [showPlanInv, setShowPlanInv] = useState(false);
   const [anexoPlan, setAnexoPlan] = useState(null);
   const anatomicoRef = useRef(null);
@@ -365,17 +366,10 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
   const seg = (active) => ({ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: active ? "var(--dc-white)" : "transparent", color: active ? NAVY : "var(--dc-ink-400)", boxShadow: active ? "0 1px 2px rgba(16,24,40,.12)" : "none" });
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Numeración FDI con punto – R.M. 559-2022-MINSA</div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
-          {FASES.map(([k, l]) => <button key={k} onClick={() => setFase(k)} style={seg(fase === k)}>{l}</button>)}
-        </div>
+      <div className="fm-odo-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {/* Las fases se eligen dentro del odontograma (Inicial / Evolución / Alta). */}
+        <span />
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
-            {[["clasico", "Clásico"], ["anatomico", "Anatómico"]].map(([k, l]) => (
-              <button key={k} type="button" onClick={() => setVistaOdo(k)} style={seg(vistaOdo === k)}>{l}</button>
-            ))}
-          </div>
           <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
             {DENTICIONES_ODO.map(([k, l]) => <button key={k} onClick={() => setDenticion(k)} style={seg(denticionApi(denticion) === k)}>{l}</button>)}
           </div>
@@ -397,6 +391,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
       <div style={{ display: vistaOdo === "anatomico" ? "block" : "none" }}>
         <OdontogramaAnatomico
           ref={anatomicoRef}
+          conExpediente={false}
           pacienteId={pacienteId}
           pacienteNombre={pacienteNombre || ""}
           pacienteDni={pacienteDni || ""}
@@ -1491,7 +1486,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <button onClick={cargar} style={{ ...btn("teal"), fontSize: 14, padding: "9px 20px" }}>Reintentar</button>
           </div>
         ) : (
-        <div className="fm-cols" style={{ display: "grid", gridTemplateColumns: "268px minmax(0,1fr) 300px", gap: 0, flex: 1, minHeight: 0 }}>
+        <div className={`fm-cols${["odontograma", "perio"].includes(tab) ? " is-ancho" : ""}`} style={{ display: "grid", gridTemplateColumns: "268px minmax(0,1fr) 300px", gap: 0, flex: 1, minHeight: 0 }}>
           {/* Rail izquierdo: tarjeta paciente + sub-nav */}
           <div className="fm-rail" style={{ borderRight: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
             <div style={{ textAlign: "center" }}>
@@ -1579,8 +1574,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
 
           {/* Contenido */}
           <div className="fm-content" style={{ padding: 22, display: "grid", gap: 14, alignContent: "start", overflowY: "auto" }}>
-            {/* Encabezado: Etiquetas / Notas / Alergias — tarjetas limpias con acento sutil */}
-            {(() => {
+            {/* Etiquetas / Notas / Alergias: solo en el resumen (antes se repetían en todas
+                las secciones y empujaban el contenido casi 300 px hacia abajo). */}
+            {tab === "resumen" && (() => {
               const mini = { ...card, padding: 13 };
               const head = (Ic, c, txt) => <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}><span style={{ width: 22, height: 22, borderRadius: "var(--dc-r-sm)", background: tint(c, 0.086), color: c, display: "grid", placeItems: "center" }}><Ic size={13} strokeWidth={2} /></span><span style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{txt}</span></div>;
               const addInp = { width: "100%", padding: "7px 10px", borderRadius: "var(--dc-r-sm)", border: `1px solid ${SOFT}`, fontSize: 12, outline: "none", background: "var(--dc-white)", boxSizing: "border-box" };
@@ -1611,7 +1607,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {/* Sin fecha de nacimiento la ficha da por adulto al paciente sin decirlo: la
                 anamnesis, el odontograma y las dosis dependen de la edad. Se avisa en
                 todas las pestañas, no solo en el resumen. */}
-            {!p.fechaNacimiento && (
+            {!p.fechaNacimiento && tab !== "resumen" && (
+              <div className="fm-aviso-edad">
+                <AlertTriangle size={15} strokeWidth={2} />
+                <span><b>Sin fecha de nacimiento:</b> la ficha lo trata como adulto.</span>
+                {tab !== "filiacion" && <button type="button" onClick={() => setTab("filiacion")}>Registrarla</button>}
+              </div>
+            )}
+            {!p.fechaNacimiento && tab === "resumen" && (
               <div style={{ ...card, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <AlertTriangle size={18} strokeWidth={1.75} color="var(--dc-warn-600)" style={{ flexShrink: 0, marginTop: 1 }} />
                 <div style={{ fontSize: 13, color: "var(--dc-warn-600)", lineHeight: 1.55 }}>
@@ -1626,12 +1629,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {/* Secciones */}
             {tab === "resumen" && (
               <>
-                {arr(p.alergias).length > 0 && (
-                  <div style={{ ...card, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)", display: "flex", alignItems: "center", gap: 10 }}>
-                    <AlertTriangle size={18} color={RED} strokeWidth={1.9} />
-                    <div style={{ fontSize: 13, color: "var(--dc-red-deep)" }}><b>Alergias:</b> {arr(p.alergias).join(", ")}</div>
-                  </div>
-                )}
+                {/* La alergia ya se ve en la cabecera y en la tarjeta de alergias. */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
                   {[
                     ["Última visita", ultimaVisita ? fmtFecha(ultimaVisita.fecha) : "—", ultimaVisita && ultimaVisita.especialidad !== "—" ? ultimaVisita.especialidad : "", CalendarDays, NAVY],
@@ -2013,9 +2011,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   {arr(d?.tratamientos).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin plan de tratamiento.</div>}
                   {arr(d?.tratamientos).map((t, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i ? `1px solid ${LINE}` : "none", fontSize: 13 }}>
-                      <span style={{ color: NAVY, fontWeight: 500 }}>{t.nombre}{t.pieza ? ` – pieza ${t.pieza}` : ""}</span>
-                      <span style={{ color: t.estado === "completada" ? GREEN : "var(--dc-ink-400)", fontWeight: 500 }}>{t.estado}</span>
-                      <span style={{ fontWeight: 500 }}>{money(t.costo)}</span>
+                      <span style={{ color: NAVY, fontWeight: 600, flex: 1 }}>{t.nombre}{t.pieza ? ` – pieza ${t.pieza}` : ""}</span>
+                      <span className={`dc-pill${t.estado === "completada" ? " is-ok" : " is-aviso"}`} style={{ margin: "0 16px" }}><i /> {t.estado === "completada" ? "Completada" : "Pendiente"}</span>
+                      <span style={{ fontWeight: 700, minWidth: 90, textAlign: "right", fontFamily: "var(--dc-font-title)" }}>{money(t.costo)}</span>
                     </div>
                   ))}
                 </div>
@@ -2024,7 +2022,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   {arr(d?.pagos).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin pagos registrados.</div>}
                   {arr(d?.pagos).slice(0, 15).map((pg, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i ? `1px solid ${LINE}` : "none", fontSize: 13 }}>
-                      <span style={{ color: NAVY, fontWeight: 500 }}>{pg.fecha || "—"}</span>
+                      <span style={{ color: NAVY, fontWeight: 500 }}>{pg.fecha ? new Date(pg.fecha + "T00:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" }) : "—"}</span>
                       <span style={{ color: "var(--dc-ink-400)", flex: 1, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 10px" }}>{pg.concepto || "—"}</span>
                       <span style={{ color: GREEN, fontWeight: 500 }}>{money(pg.monto)}</span>
                     </div>
@@ -2065,7 +2063,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               Estaban en sus pestañas, asi que para saber cuanto debe el paciente habia
               que salir del odontograma y volver. Se oculta por debajo de 1180px, donde
               ya no cabe sin estrujar la zona de trabajo. */}
-          <aside className="fm-lateral" style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", display: "grid", gap: 14, alignContent: "start" }}>
+          <aside className={`fm-lateral${["odontograma", "perio"].includes(tab) ? " is-oculta" : ""}`} style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", display: "grid", gap: 14, alignContent: "start" }}>
             <div>
               <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 10 }}>Presupuesto</div>
               {arr(d?.tratamientos).length === 0
