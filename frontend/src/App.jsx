@@ -702,11 +702,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
           <span className="dc-hero__fecha">{fechaHoy}</span>
           <h2>{saludo}{miNombre ? `, ${miNombre}` : ""}</h2>
           <p>{frase}</p>
-          {!esTI && <button type="button" className="dc-hero__btn" onClick={() => onIr("agenda")}><Calendar size={15} strokeWidth={1.75} /> Ver agenda</button>}
         </div>
         <div className="dc-hero__cifras">
           {cifras.map(([l, v]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}
         </div>
+        {!esTI && <button type="button" className="dc-hero__btn" onClick={() => onIr("agenda")}><Calendar size={15} strokeWidth={1.75} /> Ver agenda</button>}
       </section>
 
       <div className={`dc-hoy__grid${esTI ? " dc-hoy__grid--solo" : ""}`}>
@@ -727,6 +727,29 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
         </Card>
 
         <div className="dc-hoy__lado">
+          {!esTI && ch.length > 0 && (() => {
+            const grupos = [
+              ["Atendidas", ["atendida"], "#16A36A"],
+              ["En clínica", ["en_sala", "en_atencion"], "#F2A531"],
+              ["Confirmadas", ["confirmada"], "#0E8C95"],
+              ["Por confirmar", ["pendiente"], "#9AAAB0"],
+              ["No vinieron", ["no_show", "cancelada"], "#E06A58"],
+            ].map(([l, est, c]) => ({ l, c, n: ch.filter((x) => est.includes(x.estado)).length })).filter((g) => g.n > 0);
+            const tot = grupos.reduce((a, g) => a + g.n, 0) || 1;
+            return (
+              <Card className="dc-hoy__estado">
+                <div className="dc-hoy__cab"><h3>Avance del día</h3><span className="dc-hoy__pct">{avance}%</span></div>
+                <div className="dc-hoy__estado-cuerpo">
+                  <div className="dc-hoy__barra" role="img" aria-label={grupos.map((g) => `${g.l}: ${g.n}`).join(", ")}>
+                    {grupos.map((g) => <i key={g.l} style={{ width: `${(g.n / tot) * 100}%`, background: g.c }} />)}
+                  </div>
+                  <ul className="dc-hoy__ley">
+                    {grupos.map((g) => <li key={g.l}><i style={{ background: g.c }} />{g.l}<b>{g.n}</b></li>)}
+                  </ul>
+                </div>
+              </Card>
+            );
+          })()}
           {!esTI && (
             <Card className="dc-hoy__proximas">
               <div className="dc-hoy__cab"><h3>{esMed ? "Tus próximos pacientes" : "Próximas citas"}</h3><button type="button" className="dc-hoy__link" onClick={() => onIr("agenda")}>Ver todas</button></div>
