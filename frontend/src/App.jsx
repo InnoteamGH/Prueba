@@ -1602,15 +1602,15 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     { key: "paciente", label: "Paciente", get: (c) => c.paciente + " " + c.dni, w: "minmax(160px,1.6fr)", a: "left",
       cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 11, minWidth: 0 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg)" : (c.llegada ? "var(--dc-white)" : tint(NAVY, 0.07)), color: pasada ? "var(--dc-ink-400)" : (c.llegada ? "var(--dc-ok-700)" : NAVY), display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(c.paciente)}</div>
+          <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : c.llegada ? "var(--dc-ok-100)" : "var(--dc-brand-050)", color: pasada ? "var(--dc-ink-400)" : c.llegada ? "var(--dc-ok-700)" : "var(--dc-brand-600)", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(c.paciente)}</div>
           <div style={{ minWidth: 0 }}>
-            <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{c.paciente} <FileText size={11} strokeWidth={1.75} color="var(--dc-line)" style={{ flexShrink: 0 }} />{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
+            <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{c.paciente}{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
             <span style={{ fontSize: 12, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums", display: "inline-flex", alignItems: "center", gap: 5 }}>DNI {c.dni}{c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> IA</span>}</span>
           </div>
         </div>); } },
     { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(128px,1.2fr)", a: "left",
       cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
-    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(84px,0.8fr)", a: "left",
+    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(100px,0.8fr)", a: "left",
       cell: (c) => <div style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 6, minWidth: 0 }}><MapPin size={12} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sedeNombre || cortaSede(c.sede)}</span></div> },
     { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(120px,1.3fr)", a: "left",
       cell: (c) => { const base = c.motivo.replace(/\s*\([^)]*\)\s*/g, " ").trim(); const hasDet = base !== c.motivo; return (
@@ -1690,14 +1690,15 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   return (
     <div style={{ display: "grid", gap: 18 }}>
       {/* Encabezado: la fecha y las acciones del día, sin tarjeta alrededor. */}
-      <div className="dc-toolbar">
-        <div>
+      <div className="dc-toolbar" style={vista === "calendario" ? { justifyContent: "flex-end" } : undefined}>
+        {/* En el calendario la fecha ya está en su propia navegación. */}
+        {vista !== "calendario" && <div>
           <h2 className="dc-toolbar__titulo">{fechaLarga}</h2>
-          <div className="dc-toolbar__sub">{pluralEs(todasHoy.length, "cita programada", "citas programadas")} · haz clic en el título de una columna para filtrar</div>
-        </div>
+          <div className="dc-toolbar__sub">{pluralEs(todasHoy.length, "cita programada", "citas programadas")} para hoy</div>
+        </div>}
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {/* Action Icons */}
-          <div style={{ position: "relative" }}>
+          {/* Action Icons (el calendario trae su propio botón Descargar) */}
+          {vista !== "calendario" && <div style={{ position: "relative" }}>
             <button type="button" className="dc-icon-btn" aria-label="Descargar agenda" onClick={() => setDlOpen((v) => !v)} title="Descargar agenda" style={{ width: 36, height: 36, borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", color: "var(--dc-ink-700)", cursor: "pointer", display: "grid", placeItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><Download size={16} strokeWidth={1.75} /></button>
             {dlOpen && (<>
               <div onClick={() => setDlOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
@@ -1707,7 +1708,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
                 <button onClick={() => descargar("pdf")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 13px", border: "none", borderTop: "1px solid var(--dc-bg)", background: "#fff", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><FileText size={16} strokeWidth={1.75} color="var(--dc-red)" /> PDF (imprimir/guardar)</button>
               </div>
             </>)}
-          </div>
+          </div>}
           {puedeAgendar && <button type="button" className="dc-icon-btn" aria-label="Bloquear horario" onClick={() => setBloqForm({ tipo: "dia", fecha: fmt(hoy), diaSemana: String(hoy.getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" })} title="Bloquear horario" style={{ width: 36, height: 36, borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", color: "var(--dc-ink-700)", cursor: "pointer", display: "grid", placeItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><Lock size={16} strokeWidth={1.75} /></button>}
           {puedeAgendar && <button type="button" className="dc-icon-btn" aria-label="Sala TV" onClick={() => setTv(true)} title="Sala TV" style={{ width: 36, height: 36, borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", color: "var(--dc-ink-700)", cursor: "pointer", display: "grid", placeItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><Monitor size={16} strokeWidth={1.75} /></button>}
           {puedeAgendar && <Btn onClick={() => setAgendar(true)}><Plus size={16} strokeWidth={1.75} /> Agendar cita</Btn>}
@@ -3183,11 +3184,11 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                   ]}
                 />
               )}
-              <div style={{ display: "flex", gap: 4, background: "var(--dc-bg-alt)", padding: 4, borderRadius: "var(--dc-r-md)" }}>
+              <div style={{ display: "flex", gap: 2, background: "var(--dc-bg-alt)", padding: 3, borderRadius: 999 }}>
                 {[["clasico", "Clásico"], ["anatomico", "Anatómico"]].map(([k, l]) => (
                   <button key={k} type="button" onClick={() => setVistaOdo(k)} aria-pressed={vistaOdo === k}
-                    style={{ padding: "6px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500,
-                             background: vistaOdo === k ? "#fff" : "transparent", color: vistaOdo === k ? NAVY : "var(--dc-ink-400)",
+                    style={{ padding: "5px 14px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 13, fontWeight: vistaOdo === k ? 600 : 500,
+                             background: vistaOdo === k ? "#fff" : "transparent", color: vistaOdo === k ? "var(--dc-brand-600)" : "var(--dc-ink-500)",
                              boxShadow: vistaOdo === k ? "0 1px 2px rgba(16,24,40,.12)" : "none" }}>{l}</button>
                 ))}
               </div>
@@ -3201,12 +3202,10 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                   ))}
                 </div>
               )}
-              <button type="button" onClick={abrirPlanInv} title="Plan de inversión imprimible"
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-navy)", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 500, color: NAVY }}>
-                <Printer size={14} strokeWidth={1.75} /> Plan de inversión
-              </button>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "6px 12px", marginLeft: "auto" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)" }}>Zoom</span>
+              {pacienteId && <Btn small kind="ghost" onClick={() => { setFmTab("historia"); setFmOpen(true); }}><FileText size={14} strokeWidth={1.75} /> Ficha del paciente</Btn>}
+              <Btn small kind="ghost" onClick={abrirPlanInv} title="Plan de inversión imprimible"><Printer size={14} strokeWidth={1.75} /> Plan de inversión</Btn>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 999, padding: "4px 12px", marginLeft: "auto" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Zoom</span>
                 <input type="range" min="50" max="130" value={zoom} onChange={(e) => setZoom(Number(e.target.value))}
                   aria-label="Tamaño de los dientes" style={{ width: 110, accentColor: DS.c.primary }} />
                 <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums", width: 36 }}>{zoom}%</span>
@@ -3257,6 +3256,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               zoom={zoom}
               notify={notify}
               editable={conectado}
+              conExpediente={false}
               onFaseChange={(f) => { if (f && f !== fase) setFase(f); }}
               onNavTab={(tab) => {
                 if (!pacienteId) { notify && notify("Elige un paciente primero."); return; }
@@ -7919,6 +7919,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
           <div className="dc-top__izq">
             <button aria-label="Abrir o cerrar el menú" className="dc-burger" onClick={() => setSidebarOpen((s) => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: NAVY, display: "none", minWidth: "var(--dc-tap-min)", minHeight: "var(--dc-tap-min)" }}><Menu size={22} strokeWidth={1.75} /></button>
             <h1 className="dc-top__titulo">{NAV.find((n) => n.id === vista)?.label}</h1>
+            <div id="dc-top-slot" className="dc-top__slot" />
           </div>
           <div className="dc-top__der">
             {/* Bug D11 re-test: Onboarding dismissable permanentemente */}

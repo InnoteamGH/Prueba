@@ -420,7 +420,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         const cfg = { verde: ["var(--dc-ok-700)", "var(--dc-ok-soft)", "IA Conectada"], ambar: ["var(--dc-warn-600)", "var(--dc-warn-soft)", "Con fallos"], rojo: ["var(--dc-red-deep)", "var(--dc-danger-soft)", "Desconectado"], gris: ["var(--dc-ink-400)", "var(--dc-bg)", "Comprobando…"] }[sem];
 
         return (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 12, flexWrap: "wrap", background: "rgba(255,255,255,0.5)", padding: "10px 16px", borderRadius: "var(--dc-r-lg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.9)", boxShadow: "0 4px 20px -10px rgba(16,24,40,.05)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 12, flexWrap: "wrap", background: "var(--dc-surface)", padding: "8px 14px", borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", boxShadow: "0 4px 20px -10px rgba(16,24,40,.05)" }}>
             <div style={{ fontSize: 13, color: "var(--dc-slate)", display: "flex", alignItems: "center", gap: 12, fontWeight: 500 }}>
               <span style={{ fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: "var(--dc-r-full)", background: cfg[1], color: cfg[0], display: "inline-flex", alignItems: "center", gap: 5, letterSpacing: 0, boxShadow: "0 2px 8px -2px "+tint(cfg[0], 0.251) }}>
                 <span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: cfg[0] }}/> {cfg[2]}
@@ -482,9 +482,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           <Btn small onClick={cargarConversaciones}>Reintentar</Btn>
         </div>
       )}
-      <Card style={{ overflow: "hidden", display: "grid", gridTemplateColumns: "290px minmax(0,1fr) 300px", height: "calc(100vh - 132px)", minHeight: 480, padding: 0, background: "transparent", border: "none", boxShadow: "0 10px 40px -10px rgba(16,24,40,.06)" }} className="dc-inbox">
+      <Card style={{ overflow: "hidden", display: "grid", gridTemplateColumns: "290px minmax(0,1fr) 300px", height: "calc(100vh - 150px)", minHeight: 480, padding: 0, background: "transparent", border: "none", boxShadow: "0 10px 40px -10px rgba(16,24,40,.06)" }} className="dc-inbox">
         {/* Columna 1 · lista con búsqueda y filtros */}
-        <div className="dc-inbox-list" style={{ borderRight: "1px solid rgba(16,24,40,.06)", background: "rgba(255,255,255,0.7)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, height: "100%", borderRadius: "20px 0 0 20px" }}>
+        <div className="dc-inbox-list" style={{ borderRight: "1px solid rgba(16,24,40,.06)", background: "var(--dc-surface)", backdropFilter: "none", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, height: "100%", borderRadius: "20px 0 0 20px" }}>
           <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Chats</span>
@@ -540,27 +540,27 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             <div><MessageSquare size={34} strokeWidth={1.75} color="var(--dc-ink-400)" /><div style={{ marginTop: 10 }}>{conectado ? "Selecciona una conversación para verla." : "Sin conversación."}</div></div>
           </div>
         ) : (<>
-        <div className="dc-inbox-thread" style={{ display: "flex", flexDirection: "column", background: "rgba(245,247,250,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", minWidth: 0, minHeight: 0, position: "relative", height: "100%" }}>
-          <div className="dc-inbox-chat-head" style={{ padding: "10px 16px", background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: "1px solid rgba(16,24,40,.06)", position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <div className="dc-inbox-thread" style={{ display: "flex", flexDirection: "column", background: "var(--dc-bg-soft)", minWidth: 0, minHeight: 0, position: "relative", height: "100%" }}>
+          <div className="dc-inbox-chat-head" style={{ padding: "10px 16px", background: "var(--dc-surface)", borderBottom: "1px solid rgba(16,24,40,.06)", flexShrink: 0 }}>
             <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
               {conectado && <Btn small onClick={() => abrirAgendar("Solicitud por WhatsApp")}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
               <Btn small kind={chat.modo === "ia" ? "navy" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>
             </div>
           </div>
-          <div ref={scrollRef} onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }} style={{ width: "100%", height: "100%", overflowY: "auto", padding: "70px 16px 110px 16px", boxSizing: "border-box" }}>{hilo(chat.msgs)}</div>
-          {!atBottom && <button type="button" className="dc-icon-btn" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" style={{ position: "absolute", right: 16, bottom: 78, width: 38, height: 38, borderRadius: "var(--dc-r-full)", border: "1px solid var(--dc-line)", background: "var(--dc-white)", color: NAVY, boxShadow: "0 6px 16px rgba(16,24,40,.22)", cursor: "pointer", display: "grid", placeItems: "center", zIndex: 5 }}><ChevronDown size={20} strokeWidth={1.75} /></button>}
+          <div ref={scrollRef} onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }} style={{ width: "100%", flex: 1, minHeight: 0, overflowY: "auto", padding: "16px", boxSizing: "border-box" }}>{hilo(chat.msgs)}</div>
+          {!atBottom && <button type="button" className="dc-icon-btn" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" style={{ position: "absolute", right: 16, bottom: 150, width: 38, height: 38, borderRadius: "var(--dc-r-full)", border: "1px solid var(--dc-line)", background: "var(--dc-white)", color: NAVY, boxShadow: "0 6px 16px rgba(16,24,40,.22)", cursor: "pointer", display: "grid", placeItems: "center", zIndex: 5 }}><ChevronDown size={20} strokeWidth={1.75} /></button>}
           {chat.modo === "ia" && conectado && !modoDemo ? (
-            <div style={{ padding: "12px 14px", background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderTop: "1px solid rgba(16,24,40,.06)", fontSize: 13, color: "var(--dc-ok-700)", display: "flex", alignItems: "center", gap: 7, position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
+            <div style={{ padding: "12px 14px", background: "var(--dc-surface)", borderTop: "1px solid rgba(16,24,40,.06)", fontSize: 13, color: "var(--dc-ok-700)", display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
               <Bot size={14} strokeWidth={1.75} /> El asistente IA responde automáticamente por WhatsApp. Usa <b>&nbsp;Tomar control&nbsp;</b> para responder tú.
             </div>
           ) : chat.modo === "ia" ? (
-            <div style={{ padding: 12, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderTop: "1px solid rgba(16,24,40,.06)", position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
+            <div style={{ padding: 12, background: "var(--dc-surface)", borderTop: "1px solid rgba(16,24,40,.06)", flexShrink: 0 }}>
               <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}><Bot size={13} strokeWidth={1.75} /> {modoDemo ? "Modo demo: simula un mensaje del paciente (como si escribiera por WhatsApp):" : "La IA responde sola. Simula un mensaje del paciente:"}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{sugs.map((s, i) => <button key={i} onClick={() => recibir(s)} style={{ background: "var(--dc-bg)", color: NAVY, border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-full)", padding: "6px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{s}</button>)}</div>
             </div>
           ) : (
-            <div style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderTop: "1px solid rgba(16,24,40,.06)", padding: "12px 16px", position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
+            <div style={{ background: "var(--dc-surface)", borderTop: "1px solid rgba(16,24,40,.06)", padding: "12px 16px", flexShrink: 0 }}>
               <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, marginBottom: 4, scrollbarWidth: "none" }}>
                 <style>{`div::-webkit-scrollbar { display: none; }`}</style>
                 <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, marginRight: 4, display: "flex", alignItems: "center" }}><Zap size={13} strokeWidth={2} style={{marginRight: 2}}/> Respuestas:</span>
@@ -574,7 +574,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           )}
         </div>
         {/* Columna 3 · panel del contacto */}
-        <div className="dc-inbox-side" style={{ borderLeft: "1px solid rgba(16,24,40,.06)", background: "rgba(255,255,255,0.7)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", overflowY: "auto", minWidth: 0, height: "100%", borderRadius: "0 20px 20px 0" }}>
+        <div className="dc-inbox-side" style={{ borderLeft: "1px solid rgba(16,24,40,.06)", background: "var(--dc-surface)", backdropFilter: "none", WebkitBackdropFilter: "blur(20px)", display: "flex", flexDirection: "column", overflowY: "auto", minWidth: 0, height: "100%", borderRadius: "0 20px 20px 0" }}>
           <div style={{ padding: "32px 20px 24px", textAlign: "center", borderBottom: "1px solid var(--dc-line)" }}>
             <div style={{ width: 84, height: 84, borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: INK, border: "1px solid var(--dc-line)", boxShadow: "0 8px 24px -6px rgba(16,24,40,.08)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 27, margin: "0 auto 16px" }}>{inicial(chat.nombre)}</div>
             <div style={{ fontWeight: 600, color: NAVY, fontSize: 16, fontFamily: DISPLAY_FONT }}>{chat.nombre}</div>

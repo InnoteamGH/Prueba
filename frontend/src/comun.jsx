@@ -10,6 +10,7 @@
    renombres claves, solo valores (misma regla que antes).
    ============================================================================ */
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight, AlertTriangle,ArrowUpDown,ArrowUpRight,Briefcase,Check,ChevronDown,ChevronUp,Clock,Globe,Info,MapPin,Menu,Plus,Repeat,Search,Server,Settings,ShieldCheck,Smile,Stethoscope,UserCheck,UserCog,X,MoreHorizontal } from "lucide-react";
 
 export const NAVY = "var(--dc-navy)", RED = "var(--dc-red)", BG = "var(--dc-bg)", INK = "var(--dc-ink-alt)", TEAL = "var(--dc-teal)", WARM = "var(--dc-warn-700)";
@@ -1318,6 +1319,13 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
       )}
     </div>
   );
+}
+// Lleva controles propios de un módulo (pestañas, estado, filtros) a la cabecera de
+// la app, junto al título, en vez de gastar una fila entera debajo.
+export function EnCabecera({ children }) {
+  const [el, setEl] = useState(null);
+  useEffect(() => { setEl(document.getElementById("dc-top-slot")); }, []);
+  return el ? createPortal(children, el) : null;
 }
 // Menú "⋯" para las acciones secundarias de una fila: deja visible solo la acción
 // principal y evita filas con cuatro botones en línea.

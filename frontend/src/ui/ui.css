@@ -564,7 +564,7 @@
 .dc-contenido { background: var(--dc-bg); }
 .dc-pagina { max-width: 1440px; margin: 0 auto; padding: 24px 32px 56px; box-sizing: border-box; display: grid; gap: 20px; align-content: start; }
 .dc-pagina > * { min-width: 0; }
-.dc-pagina--chat { padding: 16px 32px 16px; }
+.dc-pagina--chat { padding: 16px 28px 16px; }
 
 @media (max-width: 767px) {
   .dc-sb { position: fixed !important; left: 0; top: 0; width: 272px !important; box-shadow: 0 20px 50px rgba(16,24,40,.25); }
@@ -740,7 +740,7 @@
 .dc-kpi__value { font-size: 28px; font-weight: 700; letter-spacing: -.03em; margin-top: 8px; }
 
 /* ---- Tablas ---- */
-.dc-table-head { background: linear-gradient(180deg, var(--dc-bg-soft), var(--dc-brand-050)) !important; }
+.dc-table-head { background: var(--dc-bg-soft) !important; }
 
 /* ---- Barra de página ---- */
 .dc-toolbar__titulo { font-size: 24px; font-weight: 700; letter-spacing: -.03em; }
@@ -859,3 +859,25 @@
 .dc-cita__txt b { font-size: 13px; font-weight: 600; }
 .dc-banda { padding: 10px 14px; font-size: 13px; }
 .dc-seccion { font-size: 14px; }
+
+/* ---- Espacio de la cabecera para controles del módulo ---- */
+.dc-top__izq { flex: 1; min-width: 0; gap: 16px; }
+.dc-top__slot { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.dc-top__slot:empty { display: none; }
+.dc-top__slot .dc-pg--top { display: flex; flex: 1; justify-content: flex-end; }
+.dc-top__slot .dc-head-acc { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.dc-top__slot .dc-reloj { white-space: nowrap; }
+.dc-top__slot .dc-btn--sm { min-height: 30px; padding: 4px 12px; font-size: 12.5px; white-space: nowrap; }
+
+/* Control segmentado (pestañas compactas en píldora) */
+.dc-segmento { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--dc-bg-alt); }
+.dc-segmento > button { all: unset; cursor: pointer; padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--dc-ink-500); white-space: nowrap; }
+.dc-segmento > button:hover { color: var(--dc-ink-900); }
+.dc-segmento > button[aria-selected="true"] { background: #fff; color: var(--dc-brand-600); font-weight: 600; box-shadow: 0 1px 3px rgba(14,42,51,.12); }
+.dc-segmento > button:focus-visible { box-shadow: var(--dc-focus); }
+@media (max-width: 1100px) { .dc-top__slot .dc-reloj { display: none; } }
+.dc-top__slot .dc-pg.dc-pg--top { padding: 0 !important; margin: 0 !important; background: transparent !important; min-width: 0; }
+.dc-top__slot .dc-pg .dc-head-acc { flex-wrap: nowrap !important; gap: 8px !important; }
+.dc-top__slot .dc-pg .dc-chip { white-space: nowrap; }
+@media (max-width: 1440px) { .dc-top__slot .dc-reloj { display: none; } }
+@media (max-width: 1280px) { .dc-top__onb { display: none; } }

@@ -16,10 +16,16 @@
     if (/[?&]bridge=1(?:&|$)/.test(location.search || "")) {
       document.documentElement.setAttribute("data-bridge", "1");
     }
+    // Dentro de la app el paciente y las pestañas del expediente ya están en la
+    // pantalla que lo contiene: no se repiten aquí.
+    if (q.get("expediente") === "0") {
+      document.documentElement.setAttribute("data-sin-expediente", "1");
+    }
   }catch(e){}
 })();
 </script>
 <style>
+html[data-sin-expediente] .exp{display:none!important}
 html[data-bridge] .exp-quien{visibility:hidden}
 html[data-bridge][data-paciente-ready] .exp-quien{visibility:visible}
 html[data-theme="dark"]{background:#0A0F16;color-scheme:dark}

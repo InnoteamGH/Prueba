@@ -21,6 +21,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   notify,
   editable = true,
   onNavTab,
+  conExpediente = true,
   onFaseChange,
 }, ref) {
   const iframeRef = useRef(null);
@@ -42,9 +43,10 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     if (pacienteEdad != null && pacienteEdad !== "") q.set("edad", String(pacienteEdad));
     if (pacienteHc) q.set("hc", String(pacienteHc));
     if (pacienteSede) q.set("sede", String(pacienteSede));
-    q.set("theme", "dark");
+    q.set("theme", "light");
+    if (!conExpediente) q.set("expediente", "0");
     return `${import.meta.env.BASE_URL}odontograma-anatomico/index.html?${q.toString()}`;
-  }, [pacienteId, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede]);
+  }, [pacienteId, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, conExpediente]);
 
   useEffect(() => {
     setFrameReady(false);
@@ -245,7 +247,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
           : "listo";
 
   const hCss = height != null ? height : `${autoH}px`;
-  const seamless = true; // embebido: sin marco blanco que rompa la maqueta oscura
+  const seamless = true; // integrado en la página: sin marco propio
 
   return (
     <div style={{ display: "grid", gap: 0 }}>
@@ -260,8 +262,8 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
               placeItems: "center",
               border: seamless ? "none" : "1px solid var(--dc-line)",
               borderRadius: seamless ? 0 : "var(--dc-r-lg)",
-              background: "#0A0F16",
-              color: "#94A2B8",
+              background: "var(--dc-surface)",
+              color: "var(--dc-ink-500)",
               fontSize: 13,
             }}
           >
@@ -279,7 +281,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
             height: hCss,
             border: seamless ? "none" : "1px solid var(--dc-line)",
             borderRadius: seamless ? 0 : "var(--dc-r-lg)",
-            background: "#0A0F16",
+            background: "var(--dc-surface)",
             opacity: frameReady ? 1 : 0,
             transition: "opacity .12s ease, height .15s ease",
             display: "block",

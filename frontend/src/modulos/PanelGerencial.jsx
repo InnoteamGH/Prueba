@@ -14,7 +14,7 @@ import {
   metaEstado,
   moneyFmt,
 } from "./panelGerencialUtil";
-import { pluralEs } from "../comun";
+import { pluralEs, EnCabecera } from "../comun";
 import "./panelGerencial.css";
 
 const COLORES_ESP = [
@@ -935,12 +935,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
   return (
     <div className="dc-pg">
 
-      <header className="dc-page-head">
-        <div>
-          <p>{subHead}</p>
-        </div>
-        <div className="sp" />
-        <div className="dc-head-acc">
+      {/* Estado y ayuda del panel viven en la cabecera de la app: sin fila extra. */}
+      <EnCabecera>
+        {/* .dc-pg envuelve el portal para que los estilos del panel (chip, botones) sigan aplicando. */}
+        <div className="dc-pg dc-pg--top"><div className="dc-head-acc" title={subHead}>
           <span className="dc-chip dc-chip--vivo"><span className="punto" aria-hidden="true" />EN VIVO</span>
           <span className="dc-reloj">{reloj}</span>
           <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={recargar}>Hoy</button>
@@ -963,8 +961,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           })}>
             <span aria-hidden="true">ℹ</span> Qué mide cada gráfico
           </button>
-        </div>
-      </header>
+        </div></div>
+      </EnCabecera>
 
       <section className="dc-kpis" aria-label="Indicadores">
         <div className="dc-kpi clic" role="button" tabIndex={0} onClick={fichaMeta}

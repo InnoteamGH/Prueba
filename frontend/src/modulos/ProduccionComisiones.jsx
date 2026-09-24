@@ -4,6 +4,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
+import { EnCabecera } from "../comun";
 import { filtraMicro, inicialesDe, layoutProgreso } from "./panelGerencialUtil";
 import {
   UMBRAL_AUSENTISMO,
@@ -791,18 +792,13 @@ export default function ProduccionComisiones({ citas = [], can }) {
 
   return (
     <div className="dc-pc">
-      {/* Pestañas y descripción en una sola línea: el título ya está en la cabecera. */}
-      <div className="dc-pc-barra">
-        <nav className="dc-tabs" role="tablist" aria-label="Vistas">
-          <button type="button" className="dc-tab" role="tab" aria-selected={tab === "resumen"} onClick={() => setTab("resumen")}>
-            Producción y comisiones
-          </button>
-          <button type="button" className="dc-tab" role="tab" aria-selected={tab === "ausencias"} onClick={() => setTab("ausencias")}>
-            Ausentismo por doctor
-          </button>
+      {/* Pestañas en la cabecera de la app, junto al título: sin fila extra. */}
+      <EnCabecera>
+        <nav className="dc-segmento" role="tablist" aria-label="Vistas">
+          <button type="button" role="tab" aria-selected={tab === "resumen"} onClick={() => setTab("resumen")}>Resumen</button>
+          <button type="button" role="tab" aria-selected={tab === "ausencias"} onClick={() => setTab("ausencias")}>Ausentismo</button>
         </nav>
-        <p>Producción, comisión, cobros del periodo y rendimiento por cita de cada persona.</p>
-      </div>
+      </EnCabecera>
 
       {err && <div className="dc-banda dc-banda--peligro" style={{ marginBottom: 16 }}><p>{err}</p></div>}
 

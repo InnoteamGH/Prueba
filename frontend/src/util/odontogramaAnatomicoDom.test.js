@@ -45,7 +45,10 @@ describe("A-1 / A-2 odontograma anatómico HTML", () => {
   it("conserva chrome .exp en bridge y rellena paciente real", () => {
     assert.match(src, /function applyPaciente\(/);
     assert.match(src, /\.exp-nom/);
-    assert.doesNotMatch(src, /\.exp\{display:none/);
+    // La barra del expediente se conserva; solo se oculta cuando la pantalla que lo
+    // contiene ya muestra paciente y pestañas (parámetro expediente=0).
+    assert.doesNotMatch(src, /(^|\})\s*\.exp\{display:none/m);
+    assert.match(src, /html\[data-sin-expediente\] \.exp\{display:none/);
     assert.match(src, /dento-odontograma-nav/);
     assert.match(src, /data-bridge/);
     assert.match(src, /data-paciente-ready/);
