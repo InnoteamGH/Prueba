@@ -6207,12 +6207,14 @@ const CONSUMO_DEMO = [
   { id: 4, fecha: addDays(-1), insumoId: 5, insumo: "Algodón en rollos", cant: 1, unidad: "paq", paciente: "Diego Castro", medico: "Dra. Ana Quispe" },
 ];
 
-function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can }) {
+function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can, tabInicial = "productos", onTab }) {
   // Quien solo puede ver entra a saber si queda material, no a comprarlo. Sin permiso
   // de gestión: nada de valor del almacén, compras, proveedores ni altas de insumo.
   const puedeGestionar = can ? can("inventario", "crear") : true;
   const conectado = !!auth.token;
-  const [tab, setTab] = useState("productos");   // productos | compras | consumo
+  // Cada pestaña es un submódulo del menú lateral (Inventario → Productos, Compras…).
+  const [tab, setTabLocal] = useState(tabInicial);   // productos | compras | consumo | proveedores
+  const setTab = (t) => (onTab ? onTab(t) : setTabLocal(t));
   const mapInv = (i) => ({ id: i.id, nombre: i.nombre, cat: i.categoria || "", unidad: i.unidad || "unid", stock: Number(i.stock) || 0, min: Number(i.stockMinimo) || 0, precio: Number(i.costoUnitario) || 0, dia: 1, lote: i.lote || "", fechaVencimiento: i.fechaVencimiento || "" });
   const [remoto, setRemoto] = useState(null);
   const recargar = () => { if (conectado) api.inventario.listar().then((r) => setRemoto((r || []).map(mapInv))).catch(() => notify("No se pudo cargar el inventario del servidor.")); };
@@ -6342,17 +6344,12 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
   };
   const acBtn = { width: 30, height: 30, borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", cursor: "pointer", color: NAVY, display: "grid", placeItems: "center", flexShrink: 0 };
   const badge = (e) => e === "ok"
-    ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>En stock</span>
-    : e === "bajo" ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}><AlertCircle size={12} strokeWidth={1.75} /> Bajo</span>
-    : <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}><AlertCircle size={12} strokeWidth={1.75} /> Agotado</span>;
+    ? <span className="dc-pill is-ok"><i /> En stock</span>
+    : e === "bajo" ? <span className="dc-pill is-aviso"><i /> Bajo mínimo</span>
+    : <span className="dc-pill" style={{ "--c": "#C0392B" }}><i /> Agotado</span>;
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", gap: 6, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
-        {[["productos", "Productos", Package], ...(puedeGestionar ? [["compras", "Compras", Send]] : []), ["consumo", "Consumo", Activity], ...(puedeGestionar ? [["proveedores", "Proveedores", Building2]] : [])].map(([k, lbl, Ic]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "#fff" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
-        ); })}
-      </div>
-      {tab === "compras" && (() => {
+      {tab === "compras" && puedeGestionar && (() => {
         // Conectado: ordenes REALES. En demostracion se conserva el ejemplo de siempre.
         const filas = conectado
           ? (ordenes || []).map((x) => ({
@@ -6368,27 +6365,36 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
           recibida: { l: "Recibida", c: "var(--dc-ok-700)", bg: "var(--dc-ok-soft)" },
           anulada:  { l: "Anulada",  c: "var(--dc-danger-700)", bg: "var(--dc-fee)" },
         };
+        const totalOC = filas.reduce((a, c) => a + (Number(c.total) || 0), 0);
+        const pendOC = filas.filter((c) => c.estado === "borrador" || c.estado === "enviada" || c.estado === "en_camino").length;
+        const recOC = filas.filter((c) => c.estado === "recibida").length;
+        const OC_COL = { borrador: "#8A9CA1", enviada: "#D97706", en_camino: "#2563EB", recibida: "#16A36A", anulada: "#D0563F" };
         return (
-        <Card style={{ overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Órdenes de compra</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Lo que le has encargado a tus proveedores. El stock sube al marcarla como recibida.</div></div>
-            <Btn small onClick={() => conectado ? setNuevaOC({ proveedor: "", nota: "", lineas: [] }) : notify("Disponible al iniciar sesión.")}><Plus size={15} strokeWidth={1.75} /> Nueva compra</Btn>
+        <>
+        <section className="dc-esp-hero dc-inv-hero">
+          <div className="dc-esp-hero__txt">
+            <div className="dc-esp-hero__num"><b>{filas.length}</b><span>{filas.length === 1 ? "orden de compra" : "órdenes de compra"}</span></div>
+            <p>El stock sube al marcar la orden como recibida</p>
           </div>
-          {filas.length === 0 && (
-            <div style={{ padding: "34px 20px", textAlign: "center", color: "var(--dc-ink-500)", fontSize: 13 }}>
-              Todavía no has registrado ninguna orden de compra.
-            </div>
-          )}
-          {filas.map((c, i) => { const e = EST_OC[c.estado] || EST_OC.borrador; return (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none", flexWrap: "wrap" }}>
-              <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-sm)", background: tint(NAVY, 0.071), color: NAVY, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={17} strokeWidth={1.75} /></div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <div style={{ fontWeight: 500, color: NAVY }}>{c.proveedor}</div>
-                <div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.items}</div>
-              </div>
-              <span style={{ fontSize: 12, color: "var(--dc-ink-400)", whiteSpace: "nowrap" }}>{c.fecha ? fechaLegible(c.fecha) : ""}</span>
-              <span style={{ fontSize: 12, fontWeight: 500, color: e.c, background: e.bg, padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}>{e.l}</span>
-              <span style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {Number(c.total).toFixed(2)}</span>
+          <div className="dc-esp-hero__cifras">
+            <div><b>S/ {totalOC.toLocaleString("es-PE")}</b><span>Total comprado</span></div>
+            <div><b>{pendOC}</b><span>Por recibir</span></div>
+            <div><b>{recOC}</b><span>Recibidas</span></div>
+          </div>
+          <span />
+          <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => conectado ? setNuevaOC({ proveedor: "", nota: "", lineas: [] }) : notify("Disponible al iniciar sesión.")}><Plus size={14} strokeWidth={2} /> Nueva compra</button></div>
+        </section>
+        <Card className="dc-env">
+          <div className="dc-env__cab"><h3>Órdenes de compra</h3></div>
+          {filas.length === 0 && <Vacio icon={<Send size={22} strokeWidth={1.75} />} titulo="Sin órdenes" sub="Todavía no has registrado ninguna orden de compra." />}
+          <div className="dc-oc-lista">
+          {filas.map((c) => { const e = EST_OC[c.estado] || EST_OC.borrador; const col = OC_COL[c.estado] || "#8A9CA1"; return (
+            <div key={c.id} className="dc-oc" style={{ "--c": col }}>
+              <span className="dc-serv-ico" style={{ "--c": col, width: 40, height: 40, borderRadius: 12 }}><Package size={18} strokeWidth={1.8} /></span>
+              <div className="dc-oc__txt"><b>{c.proveedor}</b><span>{c.items}</span></div>
+              <span className="dc-oc__fecha">{c.fecha ? fechaLegible(c.fecha) : ""}</span>
+              <span className="dc-pill" style={{ "--c": col }}><i /> {e.l}</span>
+              <span className="dc-oc__total">S/ {Number(c.total).toFixed(2)}</span>
               {conectado && (
                 <span style={{ display: "inline-flex", gap: 6 }}>
                   {c.estado === "borrador" && <ActionBtn color={DS.c.primary} onClick={() => accionOC(c.id, "enviar", "Orden marcada como enviada al proveedor.")}>Enviar</ActionBtn>}
@@ -6398,31 +6404,58 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
               )}
             </div>
           ); })}
+          </div>
         </Card>
+        </>
         ); })()}
       {tab === "consumo" && (
-        // El consumo no se registra en ninguna parte: el ajuste de stock cambia la
-        // cantidad pero no deja un movimiento con fecha, insumo y quien lo gasto.
-        // Hasta que exista esa tabla, conectado no se inventan movimientos: se dice
-        // que el registro todavia no esta, que es la verdad. En demostracion se
-        // conserva el ejemplo para poder ver como quedara la pantalla.
+        <>
+        {(() => { const movs = conectado ? [] : CONSUMO_DEMO; const porInsumo = {}; movs.forEach((m) => { porInsumo[m.insumo] = (porInsumo[m.insumo] || 0) + m.cant; }); const top = Object.entries(porInsumo).sort((x, y) => y[1] - x[1])[0]; const hoyN = movs.filter((m) => m.fecha === fmt(hoy)).length; return (
+          <section className="dc-esp-hero dc-inv-hero">
+            <div className="dc-esp-hero__txt">
+              <div className="dc-esp-hero__num"><b>{movs.length}</b><span>{movs.length === 1 ? "movimiento de consumo" : "movimientos de consumo"}</span></div>
+              <p>Insumos usados en cada atención</p>
+            </div>
+            <div className="dc-esp-hero__cifras">
+              <div><b>{hoyN}</b><span>Hoy</span></div>
+              <div><b>{new Set(movs.map((m) => m.paciente)).size}</b><span>Pacientes</span></div>
+              <div title={top ? top[0] : undefined}><b>{top ? top[1] : 0}</b><span>{top ? `Más usado: ${top[0]}` : "Más usado"}</span></div>
+            </div>
+          </section>
+        ); })()}
         <DataTable titulo="Consumo de insumos" sub="movimientos" minWidth={820} rows={conectado ? [] : CONSUMO_DEMO} empty={<Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo={conectado ? "Registro de consumo no disponible" : "Sin consumo"} sub={conectado ? "El sistema ajusta el stock pero todavía no guarda un movimiento por cada uso, así que no hay nada que listar aquí. Se verá cuando se registren los movimientos de inventario." : "El uso de insumos por atención aparecerá aquí."} />} cols={[
           { key: "fecha", label: "Fecha", w: "minmax(120px,0.8fr)", a: "left", get: (c) => c.fecha, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(c.fecha)}</span> },
           { key: "insumo", label: "Insumo", w: "minmax(160px,1.3fr)", a: "left", get: (c) => c.insumo, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 500, color: NAVY, fontSize: 13 }}><span style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: (tint(DS.c.primary, 0.078)), color: DS.c.primary, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={15} strokeWidth={1.75} /></span>{c.insumo}</span> },
-          { key: "cant", label: "Cantidad", w: "110px", a: "right", get: (c) => c.cant, cell: (c) => <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-fee2)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>−{c.cant} {c.unidad}</span> },
-          { key: "paciente", label: "Paciente", w: "minmax(140px,1fr)", a: "left", get: (c) => c.paciente, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{c.paciente}</span> },
+          { key: "cant", label: "Cantidad", w: "110px", a: "right", get: (c) => c.cant, cell: (c) => <span className="dc-pill" style={{ "--c": "#D0563F" }}>−{c.cant} {c.unidad}</span> },
+          { key: "paciente", label: "Paciente", w: "minmax(140px,1fr)", a: "left", get: (c) => c.paciente, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 28, height: 28, fontSize: 10.5, background: `linear-gradient(135deg, ${tint(colorDe(c.paciente), 0.2)}, ${tint(colorDe(c.paciente), 0.08)})`, color: colorDe(c.paciente) }}>{iniciales(c.paciente)}</span><span style={{ fontSize: 13, color: "var(--dc-ink-800, #243E45)", fontWeight: 500 }}>{c.paciente}</span></span> },
           { key: "medico", label: "Odontólogo", w: "minmax(140px,1fr)", a: "left", get: (c) => c.medico, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{c.medico}</span> },
         ]} />
+        </>
       )}
-      {tab === "proveedores" && (
+      {tab === "proveedores" && puedeGestionar && (
+        <>
+        {(() => { const provs = conectado ? proveedoresReales : PROVEEDORES_DEMO; const tot = provs.reduce((x, p) => x + (Number(p.total) || 0), 0); const comp = provs.reduce((x, p) => x + (Number(p.compras) || 0), 0); const top = [...provs].sort((x, y) => (y.total || 0) - (x.total || 0))[0]; return (
+          <section className="dc-esp-hero dc-inv-hero">
+            <div className="dc-esp-hero__txt">
+              <div className="dc-esp-hero__num"><b>{provs.length}</b><span>proveedores</span></div>
+              <p>La lista se arma sola con tus órdenes de compra</p>
+            </div>
+            <div className="dc-esp-hero__cifras">
+              <div><b>S/ {tot.toLocaleString("es-PE")}</b><span>Total comprado</span></div>
+              <div><b>{comp}</b><span>Compras</span></div>
+              <div title={top ? top.nombre : undefined}><b>{top ? `S/ ${Number(top.total).toLocaleString("es-PE")}` : "—"}</b><span>{top ? `Principal: ${top.nombre}` : "Principal"}</span></div>
+            </div>
+          </section>
+        ); })()}
         <DataTable titulo="Proveedores" sub="proveedores" minWidth={780} rows={conectado ? proveedoresReales : PROVEEDORES_DEMO} defaultSort={{ key: "total", dir: "desc" }} empty={<Vacio icon={<Building2 size={22} strokeWidth={1.75} />} titulo="Sin proveedores" sub="La lista se arma sola con las órdenes de compra: registra una y el proveedor aparece aquí." />} cols={[
-          { key: "nombre", label: "Proveedor", w: "minmax(180px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(NAVY, 0.071), color: NAVY, display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{p.contacto}</div></div></div> },
-          { key: "categoria", label: "Categoría", w: "minmax(150px,1fr)", a: "left", get: (p) => p.categoria, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.categoria}</span> },
-          { key: "compras", label: "Compras", w: "110px", a: "center", get: (p) => p.compras, cell: (p) => <span style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "3px 11px", borderRadius: "var(--dc-r-full)" }}>{p.compras}</span> },
+          { key: "nombre", label: "Proveedor", w: "minmax(180px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg, ${tint(colorDe(p.nombre), 0.22)}, ${tint(colorDe(p.nombre), 0.08)})`, color: colorDe(p.nombre), fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{p.contacto}</div></div></div> },
+          { key: "categoria", label: "Categoría", w: "minmax(150px,1fr)", a: "left", get: (p) => p.categoria, cell: (p) => p.categoria ? <span className="dc-pill" style={{ "--c": colorDe(p.categoria) }}><i /> {p.categoria}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span> },
+          { key: "compras", label: "Compras", w: "110px", a: "center", get: (p) => p.compras, cell: (p) => <span className="dc-pill">{p.compras} {p.compras === 1 ? "compra" : "compras"}</span> },
           { key: "total", label: "Total comprado", w: "150px", a: "right", get: (p) => p.total, cell: (p) => <span style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {p.total.toLocaleString()}</span> },
         ]} />
+        </>
       )}
-      {tab === "productos" && (<>
+      {(tab === "productos" || (!puedeGestionar && (tab === "compras" || tab === "proveedores"))) && (<>
       {(() => { const totalPedir = requieren.reduce((s, i) => s + pedir(i), 0); return (
         <section className="dc-esp-hero dc-inv-hero">
           <div className="dc-esp-hero__txt">
@@ -6442,8 +6475,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
         </section>
       ); })()}
       <DataTable titulo="Insumos" sub="insumos" minWidth={1040} rows={items} defaultSort={{ key: "cobertura", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub="Agrega tu primer insumo para controlar stock y cobertura." />} cols={[
-        { key: "insumo", label: "Insumo", w: "minmax(220px,1.8fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{it.cat}</div></div></div>; } },
-        { key: "loteVence", label: "Lote / Vence", w: "minmax(140px,1.1fr)", a: "left", get: (it) => it.lote || it.fechaVencimiento || "", cell: (it) => {
+        { key: "insumo", label: "Insumo", w: "minmax(200px,1.7fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{it.cat}</div></div></div>; } },
+        { key: "loteVence", label: "Lote", w: "minmax(96px,0.7fr)", a: "left", get: (it) => it.lote || it.fechaVencimiento || "", cell: (it) => {
           const dv = diasVenc(it.fechaVencimiento);
           const estVenc = dv === null ? null : dv < 0 ? "vencido" : dv <= 60 ? "alerta" : "ok";
           return (
@@ -6466,12 +6499,12 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can 
             </div>
           );
         } },
-        { key: "stock", label: "Stock", w: "minmax(150px,1.1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{it.unidad}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto" }}>mín {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div> : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
-        { key: "cobertura", label: "Cobertura", w: "minmax(120px,0.9fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); if (d >= 999) return <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>—</span>; const c = covColor(d); return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}><Clock size={12} strokeWidth={1.75} /> {d === 0 ? "hoy" : `~${d} d`}</span>; } },
-        { key: "pedir", label: "Sugerido pedir", w: "minmax(130px,0.9fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}>+{q} {it.unidad}</span>; } },
-        { key: "estado", label: "Estado", w: "minmax(110px,0.8fr)", a: "center", get: (it) => ({ ok: "En stock", bajo: "Bajo", agotado: "Agotado" }[estado(it)]), cell: (it) => badge(estado(it)) },
+        { key: "stock", label: "Stock", w: "minmax(140px,1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{it.unidad}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto" }}>mín {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div> : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
+        { key: "cobertura", label: "Cobertura", w: "minmax(100px,0.8fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); if (d >= 999) return <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>—</span>; const c = covColor(d); return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}><Clock size={12} strokeWidth={1.75} /> {d === 0 ? "hoy" : `~${d} d`}</span>; } },
+        { key: "pedir", label: "Pedir", w: "minmax(130px,0.9fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}>+{q} {it.unidad}</span>; } },
+        { key: "estado", label: "Estado", w: "minmax(120px,0.8fr)", a: "center", get: (it) => ({ ok: "En stock", bajo: "Bajo", agotado: "Agotado" }[estado(it)]), cell: (it) => badge(estado(it)) },
         // Ajustar o editar el stock es gestion: quien solo consulta no lo ve.
-        ...(puedeGestionar ? [{ key: "acc", label: "Acciones", w: "150px", a: "center", noFilter: true, noSort: true, cell: (it) => <div style={{ display: "flex", gap: 6, justifyContent: "center" }} onClick={(e) => e.stopPropagation()}><button type="button" className="dc-icon-btn" aria-label="Restar" onClick={() => ajustar(it.id, -1)} title="Restar" style={acBtn}><Minus size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label="Sumar" onClick={() => ajustar(it.id, 1)} title="Sumar" style={acBtn}><Plus size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label="Editar" onClick={() => editar(it)} title="Editar" style={acBtn}><Pencil size={15} strokeWidth={1.75} /></button></div> }] : []),
+        ...(puedeGestionar ? [{ key: "acc", label: "Acciones", w: "136px", a: "center", noFilter: true, noSort: true, cell: (it) => <div style={{ display: "flex", gap: 6, justifyContent: "center" }} onClick={(e) => e.stopPropagation()}><button type="button" className="dc-icon-btn" aria-label="Restar" onClick={() => ajustar(it.id, -1)} title="Restar" style={acBtn}><Minus size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label="Sumar" onClick={() => ajustar(it.id, 1)} title="Sumar" style={acBtn}><Plus size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label="Editar" onClick={() => editar(it)} title="Editar" style={acBtn}><Pencil size={15} strokeWidth={1.75} /></button></div> }] : []),
       ]} />
       </>)}
       {form && <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar insumo" : "Nuevo insumo"} sub={form.id ? "Actualiza los datos del insumo" : "Agrega un insumo al inventario"} onClose={() => setForm(null)} size="corto" maxW={560}
@@ -7875,7 +7908,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     ] },
     { grupo: "Operaciones", items: [
       { id: "servicios", label: "Servicios", icon: ClipboardList },
-      { id: "inventario", label: "Inventario", icon: Package },
+      { label: "Inventario", icon: Package, children: [
+        { id: "inventario", label: "Productos", mod: "inventario" },
+        { id: "inventario_compras", label: "Compras", mod: "inventario" },
+        { id: "inventario_consumo", label: "Consumo", mod: "inventario" },
+        { id: "inventario_prov", label: "Proveedores", mod: "inventario" },
+      ] },
       { id: "laboratorio", label: "Laboratorio", icon: FlaskConical },
     ] },
     { grupo: "Finanzas", items: [
@@ -7929,6 +7967,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const orgUnaSede = auth.token ? (sedesOrg.length > 0 ? sedesOrg.length === 1 : false) : false;
   const puedeMultisede = multisede && !esSuper && !orgUnaSede && sedesDelSelector.length > 1;
 
+  const irInventario = (t) => setVista({ productos: "inventario", compras: "inventario_compras", consumo: "inventario_consumo", proveedores: "inventario_prov" }[t] || "inventario");
   const render = () => {
     switch (vista) {
       case "plataforma": return <Plataforma notify={notify} />;
@@ -7948,7 +7987,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "tratamientos": return <Tratamientos pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} can={can} pacienteActivo={pacienteActivo} consumirInsumos={consumirInsumos} />;
       case "recetas": return <Recetas pacientes={pf} notify={notify} updFicha={updFicha} />;
       case "consentimientos": return <Consentimientos pacientes={pf} notify={notify} />;
-      case "inventario": return <Inventario notify={notify} can={can} items={inventario} setItems={setInventario} />;
+      case "inventario": return <Inventario key="inv-productos" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
+      case "inventario_compras": return <Inventario key="inv-compras" tabInicial="compras" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
+      case "inventario_consumo": return <Inventario key="inv-consumo" tabInicial="consumo" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
+      case "inventario_prov": return <Inventario key="inv-prov" tabInicial="proveedores" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "laboratorio": return <Laboratorio pacientes={pf} notify={notify} can={can} updFicha={updFicha} />;
       case "perio": return <Periodontograma pacientes={pf} />;
       case "radiografias": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} />;

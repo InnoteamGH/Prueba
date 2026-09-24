@@ -1895,3 +1895,16 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-lab-hero > span:empty { display: none; }
 .dc-lab-hero .dc-esp-hero__agregar { grid-column: 4; grid-row: 1; justify-self: end; }
 .dc-lab-hero .dc-lab-flujo { grid-column: 2 / 4; }
+/* ---- Inventario: compras ---- */
+.dc-oc-lista { display: grid; }
+.dc-oc { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-top: 1px solid var(--dc-line); flex-wrap: wrap; transition: background .15s; position: relative; }
+.dc-oc:first-child { border-top: 0; }
+.dc-oc::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--c); }
+.dc-oc:hover { background: #F6FAFA; }
+.dc-oc__txt { flex: 1; min-width: 180px; display: grid; }
+.dc-oc__txt b { font-size: 14px; font-weight: 650; color: var(--dc-ink-900); }
+.dc-oc__txt span { font-size: 12.5px; color: var(--dc-ink-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-oc__fecha { font-size: 12.5px; color: var(--dc-ink-500); white-space: nowrap; }
+.dc-oc__total { font-family: var(--dc-font-title); font-weight: 800; font-size: 15px; color: var(--dc-ink-900); min-width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
+.dc-inv-hero .dc-esp-hero__cifras span { max-width: 190px; }
+.dc-pill { white-space: nowrap; }

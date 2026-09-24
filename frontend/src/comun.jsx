@@ -176,7 +176,7 @@ export const permisosEfectivos = (usuario, rolePerms) => mergePerms((rolePerms &
 export const modulosVisibles = (perms) => MODULOS.filter((m) => (perms?.[m.id] || []).includes("ver")).map((m) => m.id);
 /* Rutas de sub-vista que pertenecen a un módulo (para permisos/validación de navegación). */
 /* Rutas de sub-vista → módulo de permisos (no colapsar agenda_cal en el router). */
-export const VISTA_ALIAS = { agenda_cal: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
+export const VISTA_ALIAS = { agenda_cal: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", inventario_compras: "inventario", inventario_consumo: "inventario", inventario_prov: "inventario", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
 export const modDeVista = (v) => VISTA_ALIAS[v] || v;
 
 /* Catálogo de módulos (para la matriz de permisos y la navegación). */
