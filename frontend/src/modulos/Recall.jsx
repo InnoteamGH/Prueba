@@ -218,17 +218,26 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
           const pctDe = (x) => (histView.length ? Math.round((x / histView.length) * 100) : 0);
           return (
           <>
-            <section className="dc-sat-hero dc-env-hero">
-              <div className="dc-sat-hero__nps">
-                <span className="dc-sat-hero__eti">Mensajes automáticos</span>
-                <b>{histView.length}</b>
-                <span>enviados por WhatsApp en los últimos días</span>
+            <section className="dc-esp-hero dc-env-hero">
+              <div className="dc-esp-hero__txt">
+                <div className="dc-esp-hero__num"><b>{histView.length}</b><span>mensajes automáticos</span></div>
+                <p>Enviados por WhatsApp en los últimos días</p>
               </div>
-              <div className="dc-env-hero__cifras">
-                <div><b>{pctDe(histView.length - cuenta("error"))}%</b><span>Entregados</span></div>
-                <div><b>{pctDe(leidos)}%</b><span>Leídos</span></div>
-                <div><b>{cuenta("respondido")}</b><span>Respondieron</span></div>
-                <div><b>{cuenta("error")}</b><span>No enviados</span></div>
+              <div className="dc-env-hero__estado">
+                <div className="dc-form-hero__barra dc-env-hero__barra" role="img" aria-label="Estado de los envíos">
+                  {[["entregado", "#9AD9D6"], ["leido", "#7FB8FF"], ["respondido", "#6EE7A8"], ["error", "#F59A8D"]].map(([k, c]) => { const n = cuenta(k); return n ? <i key={k} style={{ width: `${pctDe(n)}%`, background: c }} /> : null; })}
+                </div>
+                <div className="dc-env-hero__ley">
+                  <span><i style={{ background: "#9AD9D6" }} />Entregados {cuenta("entregado")}</span>
+                  <span><i style={{ background: "#7FB8FF" }} />Leídos {cuenta("leido")}</span>
+                  <span><i style={{ background: "#6EE7A8" }} />Respondieron {cuenta("respondido")}</span>
+                  <span><i style={{ background: "#F59A8D" }} />No enviados {cuenta("error")}</span>
+                </div>
+              </div>
+              <div className="dc-esp-hero__cifras">
+                <div><b>{pctDe(histView.length - cuenta("error"))}%</b><span>Entrega</span></div>
+                <div><b>{pctDe(leidos)}%</b><span>Lectura</span></div>
+                <div><b>{pctDe(cuenta("respondido"))}%</b><span>Respuesta</span></div>
               </div>
             </section>
             <Card className="dc-env">

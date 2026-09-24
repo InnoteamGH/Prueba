@@ -7675,9 +7675,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const misPasos = PASOS_ONB.filter((p) => mods.includes(p.target) && can(p.target, "crear"));
   // Acciones del botón "Crear", cada una con el módulo que necesita. La de sistemas es
   // dar de alta un usuario; sin ella el desplegable le salía vacío.
-  const ACCIONES_CREAR = [["cita", "Nueva cita", Calendar, "agenda"], ["paciente", "Nuevo paciente", UserPlus, "pacientes"],
-                          ["servicio", "Nuevo servicio", ClipboardList, "servicios"], ["egreso", "Registrar egreso", Wallet, "facturacion"],
-                          ["usuario", "Nuevo usuario", UserPlus, "usuarios"]];
+  const ACCIONES_CREAR = [["cita", "Nueva cita", Calendar, "agenda", "Agenda un paciente", "#0E8C95"], ["paciente", "Nuevo paciente", UserPlus, "pacientes", "Crea su ficha", "#6D4FD1"],
+                          ["servicio", "Nuevo servicio", ClipboardList, "servicios", "Tratamiento y precio", "#2563EB"], ["egreso", "Registrar egreso", Wallet, "facturacion", "Gasto de caja", "#D0563F"],
+                          ["usuario", "Nuevo usuario", UserPlus, "usuarios", "Acceso para el equipo", "#B7791F"]];
   const hayQueCrear = ACCIONES_CREAR.some(([, , , t]) => mods.includes(t) && can(t, "crear"));
   // Si el módulo abierto deja de estar permitido (rol/permiso o plan), redirige al primero disponible.
   useEffect(() => {
@@ -7948,9 +7948,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         <div className={`dc-sb__acc${colap ? " is-colap" : ""}`}>
             {crearMenu && (<>
               <div onClick={() => setCrearMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 140 }} />
-              <div className="dc-sb__crearmenu" style={{ top: crearMenu.top, left: crearMenu.left }}>
-                {ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear")).map(([k, l, Ic, t]) => (
-                  <button key={k} type="button" onClick={() => { setCrearMenu(false); setVista(t); setSidebarOpen(false); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }}><Ic size={16} strokeWidth={1.75} /> {l}</button>
+              <div className="dc-sb__crearmenu" role="menu" style={{ top: crearMenu.top, left: crearMenu.left }}>
+                <div className="dc-sb__crearmenu-tit">Crear nuevo</div>
+                {ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear")).map(([k, l, Ic, t, sub, col]) => (
+                  <button key={k} type="button" role="menuitem" style={{ "--c": col }} onClick={() => { setCrearMenu(false); setVista(t); setSidebarOpen(false); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }}><span className="dc-sb__crearico"><Ic size={16} strokeWidth={1.9} /></span><span className="dc-sb__creartxt"><b>{l}</b><small>{sub}</small></span></button>
                 ))}
               </div>
             </>)}

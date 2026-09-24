@@ -1586,3 +1586,60 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-form-hero__barra i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7FE0DD, #6EE7A8); }
 @media (max-width: 1180px) { .dc-form-hero { grid-template-columns: auto minmax(0, 1fr); } .dc-form-hero__barra { grid-column: 1 / -1; } }
 @media (max-width: 700px) { .dc-form-hero { grid-template-columns: 1fr; } }
+
+/* ======================================================================
+   REFINADO — menú Crear, selector de sede, franjas de color y huecos
+   ====================================================================== */
+/* Menú Crear: iconos en su color y una línea de ayuda */
+.dc-sb__crearmenu { min-width: 250px; padding: 8px; border-radius: 18px; box-shadow: 0 24px 50px -16px rgba(11,52,64,.5), 0 0 0 1px rgba(14,42,51,.06); gap: 2px; animation: dcSelectIn .14s ease; }
+.dc-sb__crearmenu-tit { padding: 6px 10px 8px; font-size: 11.5px; font-weight: 600; color: var(--dc-ink-400); }
+.dc-sb__crearmenu button { gap: 12px; padding: 8px 10px; border-radius: 12px; }
+.dc-sb__crearmenu button:hover, .dc-sb__crearmenu button:focus-visible { background: color-mix(in srgb, var(--c) 7%, #fff); }
+.dc-sb__crearico { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; color: var(--c) !important; background: color-mix(in srgb, var(--c) 13%, #fff); transition: background .15s, color .15s; }
+.dc-sb__crearico svg { color: inherit !important; }
+.dc-sb__crearmenu button:hover .dc-sb__crearico { background: var(--c); color: #fff !important; }
+.dc-sb__creartxt { display: grid; line-height: 1.25; }
+.dc-sb__creartxt b { font-size: 13.5px; font-weight: 600; color: var(--dc-ink-900); }
+.dc-sb__creartxt small { font-size: 11.5px; color: var(--dc-ink-500); }
+
+/* Selector de sede: una sola cápsula fina con el GPS dentro */
+.dc-sb__sedefila { gap: 0; height: 34px; border-radius: 999px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); padding: 0 3px 0 0; transition: background .15s; }
+.dc-sb__sedefila:hover { background: rgba(255,255,255,.1); }
+.dc-sb__sede { background: none; box-shadow: none; padding-left: 11px; height: 100%; gap: 4px; }
+.dc-sb__sede > svg { width: 14px; height: 14px; }
+.dc-sb__sede button { font-size: 12.5px !important; font-weight: 500 !important; min-height: 30px !important; height: 30px !important; color: rgba(255,255,255,.9) !important; }
+.dc-sb__gps { width: 28px; height: 28px; background: none; box-shadow: none; border-left: 0; position: relative; }
+.dc-sb__gps::before { content: ""; position: absolute; left: -2px; top: 7px; bottom: 7px; width: 1px; background: rgba(255,255,255,.14); }
+.dc-sb__gps:hover { background: rgba(127,224,221,.16); }
+.dc-sb__gps svg { width: 14px; height: 14px; }
+
+/* Sin hueco cuando la vista no tiene acciones que mostrar */
+.dc-vista-acc:not(:has(button, .dc-chip, .dc-reloj, input)) { display: none; }
+
+/* Franjas de color: degradado más profundo y luminoso, con brillo suave */
+.dc-hero, .dc-ag-hero, .dc-esp-hero, .dc-sat-hero, .dc-rec__cab {
+  background:
+    radial-gradient(60% 140% at 100% 0%, rgba(110,231,210,.28) 0%, transparent 58%),
+    radial-gradient(45% 120% at 0% 110%, rgba(240,124,108,.18) 0%, transparent 60%),
+    linear-gradient(118deg, #0A2F3A 0%, #0B4F5B 38%, #0B7480 72%, #10969C 100%) !important;
+}
+.dc-hero::before, .dc-ag-hero::before, .dc-esp-hero::before, .dc-sat-hero::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), transparent 40%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+}
+.dc-esp-hero > *, .dc-sat-hero > * { position: relative; z-index: 1; }
+
+/* Historial: barra de estados en el centro de la franja */
+.dc-env-hero { grid-template-columns: auto minmax(220px, 1fr) auto; }
+.dc-env-hero__estado { display: grid; gap: 8px; min-width: 0; }
+.dc-env-hero__barra { display: flex; gap: 3px; }
+.dc-env-hero__barra i { border-radius: 0; }
+.dc-env-hero__barra i:first-child { border-radius: 999px 0 0 999px; }
+.dc-env-hero__barra i:last-child { border-radius: 0 999px 999px 0; }
+.dc-env-hero__ley { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: rgba(255,255,255,.8); }
+.dc-env-hero__ley span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.dc-env-hero__ley i { width: 7px; height: 7px; border-radius: 999px; }
+@media (max-width: 1180px) { .dc-env-hero { grid-template-columns: auto minmax(0, 1fr); } .dc-env-hero__estado { grid-column: 1 / -1; grid-row: 2; } }
+@media (max-width: 700px) { .dc-env-hero { grid-template-columns: 1fr; } .dc-env-hero__estado { grid-row: auto; } }
+.dc-ag-hero > *, .dc-hero > * { position: relative; z-index: 1; }
