@@ -1562,3 +1562,27 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 #dc-main [role="listbox"] button, #dc-main [role="menu"] button, #dc-main [role="option"],
 #dc-main [role="grid"] button { border-radius: 10px !important; }
 .dc-sb__acc.is-colap .dc-sb__crear { width: 34px; height: 34px; }
+
+/* ======================================================================
+   PULIDO PREMIUM — etiquetas, acciones de fila, tablas y tarjetas
+   ====================================================================== */
+/* Etiquetas de estado: tinte suave, sin borde, punto de color. */
+.dc-pill { --c: var(--dc-primary-alt); display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--c); background: color-mix(in srgb, var(--c) 11%, #fff); }
+.dc-pill > i { width: 6px; height: 6px; border-radius: 999px; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
+.dc-pill.is-ok { --c: #15803D; }
+.dc-pill.is-aviso { --c: #B45309; background: #FEF3E2; }
+/* Acción principal de la fila */
+.dc-accion { --c: var(--dc-primary-alt); all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; height: 30px; padding: 0 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; white-space: nowrap; color: var(--c); background: color-mix(in srgb, var(--c) 10%, #fff); transition: background .15s, color .15s, box-shadow .15s; }
+.dc-accion:hover { background: var(--c); color: #fff; box-shadow: 0 6px 14px -8px var(--c); }
+.dc-accion.is-sutil { color: var(--dc-ink-700); background: #fff; box-shadow: inset 0 0 0 1px var(--dc-line); }
+.dc-accion.is-sutil:hover { color: var(--dc-brand-600); background: #E6F6F6; box-shadow: inset 0 0 0 1px #BFE3E4; }
+.dc-accion:focus-visible { box-shadow: var(--dc-focus); }
+/* Tablas: el icono de ordenar solo aparece al pasar por la cabecera (o si está activo). */
+.dc-col-sort[style*="background: transparent"] { opacity: 0; transition: opacity .15s; }
+*:hover > * > .dc-col-sort, .dc-col-sort:focus-visible { opacity: 1 !important; }
+/* Formularios: franja de color con avance */
+.dc-form-hero { grid-template-columns: auto auto minmax(120px, 1fr) auto; }
+.dc-form-hero__barra { height: 8px; border-radius: 999px; background: rgba(255,255,255,.18); overflow: hidden; }
+.dc-form-hero__barra i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7FE0DD, #6EE7A8); }
+@media (max-width: 1180px) { .dc-form-hero { grid-template-columns: auto minmax(0, 1fr); } .dc-form-hero__barra { grid-column: 1 / -1; } }
+@media (max-width: 700px) { .dc-form-hero { grid-template-columns: 1fr; } }

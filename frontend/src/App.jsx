@@ -1643,10 +1643,10 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         </div>); } },
     { key: "llegada", label: "Llegada", get: (c) => (c.llegada ? "Presente" : "Por llegar"), w: "minmax(104px,0.8fr)", a: "center",
       cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return <div style={{ display: "flex", justifyContent: "center" }}>{pasada ? <span style={{ fontSize: 13, color: "var(--dc-line)" }}>—</span> : c.llegada
-        ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "linear-gradient(180deg, var(--dc-white), var(--dc-bg))", border: "1px solid var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><CheckCircle2 size={11} strokeWidth={1.75} /> Presente</span>
-        : <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "linear-gradient(180deg, var(--dc-white), var(--dc-danger-soft))", border: "1px solid var(--dc-amber-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}><Clock size={11} strokeWidth={1.75} /> Por llegar</span>}</div>; } },
+        ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Presente</span>
+        : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Por llegar</span>}</div>; } },
     { key: "estado", label: "Estado", get: (c) => (EST[c.estado] || EST.pendiente).l, w: "minmax(108px,0.8fr)", a: "center",
-      cell: (c) => { const e = EST[c.estado] || EST.pendiente; return <div style={{ display: "flex", justifyContent: "center" }}><span className="dc-chip" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: e.c, background: tint(e.c, 0.1), border: `1px solid ${tint(e.c, 0.25)}`, padding: "5px 12px", borderRadius: "var(--dc-r-full)" }}><span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: e.c }} /> {e.l}</span></div>; } },
+      cell: (c) => { const e = EST[c.estado] || EST.pendiente; return <div style={{ display: "flex", justifyContent: "center" }}><span className="dc-pill" style={{ "--c": e.c }}><i /> {e.l}</span></div>; } },
     // Ancho fijo: cada fila es su propia rejilla, así que un ancho "según contenido"
     // descuadraba la columna de una fila a otra.
     // Una acción principal visible según el estado de la cita; el resto en el menú ⋯.
@@ -1906,7 +1906,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     </div>
   );
 }
-const ActionBtn = ({ children, onClick, color, subtle }) => <button onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }} style={{ background: subtle ? "var(--dc-bg)" : tint(color, 0.078), color: subtle ? "var(--dc-ink-400)" : color, border: subtle ? "1px solid var(--dc-line)" : "1px solid " + tint(color, 0.149), borderRadius: "var(--dc-r-full)", padding: "5px 11px", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", transition: "background .15s, color .15s, border-color .15s" }} onMouseEnter={(e) => { e.currentTarget.style.background = subtle ? tint(color, 0.063) : tint(color, 0.125); e.currentTarget.style.color = color; e.currentTarget.style.borderColor = tint(color, 0.227); }} onMouseLeave={(e) => { e.currentTarget.style.background = subtle ? "var(--dc-bg)" : tint(color, 0.078); e.currentTarget.style.color = subtle ? "var(--dc-ink-400)" : color; e.currentTarget.style.borderColor = subtle ? "var(--dc-line)" : tint(color, 0.149); }}>{children}</button>;
+const ActionBtn = ({ children, onClick, color, subtle }) => <button type="button" className={`dc-accion${subtle ? " is-sutil" : ""}`} style={{ "--c": color }} onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}>{children}</button>;
 
 /* ---- Pacientes ---- */
 const CANALES = ["Recomendación", "Instagram", "Facebook", "Google", "TikTok", "Volante", "Pasó por el local", "Convenio empresa"];
@@ -7189,10 +7189,21 @@ function Formularios({ pacientes: pacProp, notify }) {
   const kpis = [["Completados", docs.filter((d) => d.estado === "completado").length, "var(--dc-ok-700)", <CheckCircle2 size={18} strokeWidth={1.75} />], ["Pendientes", docs.filter((d) => d.estado === "pendiente").length, "var(--dc-warn-600)", <Clock size={18} strokeWidth={1.75} />], ["Total", docs.length, NAVY, <ClipboardList size={18} strokeWidth={1.75} />]];
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-        {kpis.map(([l, v, c, ic]) => <KpiCard key={l} label={l} value={v} color={c} icon={ic} />)}
-      </div>
-      <ModHead icon={<ClipboardList size={20} strokeWidth={1.75} />} color={DS.c.primary} titulo="Formularios digitales" sub="El paciente los llena desde su celular antes de llegar." accion={<Btn small onClick={() => setForm({ paciente: pacientes[0]?.nombre || "", tipo: FORM_TIPOS[0] })}><Plus size={15} strokeWidth={1.75} /> Enviar formulario</Btn>} />
+      {(() => { const nC = docs.filter((d) => d.estado === "completado").length; const pct = docs.length ? Math.round((nC / docs.length) * 100) : 0; return (
+        <section className="dc-esp-hero dc-form-hero">
+          <div className="dc-esp-hero__txt">
+            <div className="dc-esp-hero__num"><b>{pct}%</b><span>completados</span></div>
+            <p>El paciente los llena desde su celular antes de llegar.</p>
+          </div>
+          <div className="dc-esp-hero__cifras">
+            <div><b>{nC}</b><span>Completados</span></div>
+            <div><b>{docs.length - nC}</b><span>Pendientes</span></div>
+            <div><b>{docs.length}</b><span>Enviados</span></div>
+          </div>
+          <div className="dc-form-hero__barra" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
+          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ paciente: pacientes[0]?.nombre || "", tipo: FORM_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> Enviar formulario</button>
+        </section>
+      ); })()}
       {form && (
         <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Enviar formulario" sub="El paciente lo llena desde su celular" onClose={() => setForm(null)} maxW={540} footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={15} strokeWidth={1.75} /> Enviar</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -7212,15 +7223,15 @@ function Formularios({ pacientes: pacProp, notify }) {
         </Modal>
       )}
       <DataTable titulo="Formularios enviados" sub="formularios" minWidth={720} rows={docs} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin formularios" sub="Envía un formulario para que el paciente lo complete desde su celular." />} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(170px,1.3fr)", a: "left", get: (d) => d.paciente, cell: (d) => <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{d.paciente}</span> },
+        { key: "paciente", label: "Paciente", w: "minmax(170px,1.3fr)", a: "left", get: (d) => d.paciente, cell: (d) => { const col = colorDe(d.paciente); return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(d.paciente)}</span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.paciente}</span></span>; } },
         { key: "tipo", label: "Formulario", w: "minmax(190px,1.5fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13 }}><ClipboardList size={15} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} /> {d.tipo}</span> },
         { key: "fecha", label: "Fecha", w: "150px", a: "center", get: (d) => d.fecha, cell: (d) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{fechaLegible(d.fecha)}</span> },
         { key: "estado", label: "Estado", w: "150px", a: "center", get: (d) => d.estado, cell: (d) => d.estado === "completado"
-          ? <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}><CheckCircle2 size={13} strokeWidth={1.75} /> Completado</span>
-          : <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}><Clock size={13} strokeWidth={1.75} /> Pendiente</span> },
+          ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Completado</span>
+          : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Pendiente</span> },
         { key: "acc", label: "Acción", w: "150px", a: "center", noFilter: true, noSort: true, cell: (d) => d.estado === "completado"
-          ? <Btn small kind="ghost" onClick={() => setVerResp(d)}>Ver respuestas</Btn>
-          : <Btn small kind="ghost" onClick={() => { if (conectado) { api.formularios.recordar(d.id).then(() => notify("Recordatorio de formulario reenviado.")).catch(() => notify("No se pudo enviar el recordatorio.")); } else notify("Recordatorio de formulario reenviado."); }}>Recordar</Btn> },
+          ? <ActionBtn subtle onClick={() => setVerResp(d)}>Ver respuestas</ActionBtn>
+          : <ActionBtn color="var(--dc-primary-alt)" onClick={() => { if (conectado) { api.formularios.recordar(d.id).then(() => notify("Recordatorio de formulario reenviado.")).catch(() => notify("No se pudo enviar el recordatorio.")); } else notify("Recordatorio de formulario reenviado."); }}><Send size={12} strokeWidth={2} style={{ marginRight: 6 }} />Recordar</ActionBtn> },
       ]} />
       {verResp && (() => {
         let resp = null; try { resp = verResp.respuestas ? JSON.parse(verResp.respuestas) : null; } catch { resp = verResp.respuestas; }

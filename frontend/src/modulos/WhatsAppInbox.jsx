@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Settings, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, X, Zap } from "lucide-react";
 import api, { auth } from "../api/client";
-import {MenuAcciones, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
+import {MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
 import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";
 import "./whatsappInbox.css";
 
@@ -521,7 +521,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             )}
             {lista.map((c) => (
               <button key={c.id} onClick={() => seleccionar(c.id)} className={`wa-item${activo === c.id ? " is-on" : ""}`}>
-                <div className="wa-av">{inicial(c.nombre)}</div>
+                <div className="wa-av" style={{ "--av": colorDe(c.nombre) }}>{inicial(c.nombre)}</div>
                 {/* Dos líneas como en WhatsApp: nombre + hora arriba; último mensaje + estado abajo. */}
                 <div className="wa-item__cuerpo">
                   <div className="wa-item__fila">
@@ -549,7 +549,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         <div className="dc-inbox-thread">
           <div className="dc-inbox-chat-head">
             <button type="button" className="wa-volver" aria-label="Volver a los chats" onClick={() => setEnHilo(false)}><ArrowLeft size={18} strokeWidth={2} /></button>
-            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm">{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
+            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
               {conectado && <Btn small onClick={() => abrirAgendar("Solicitud por WhatsApp")}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
               {/* Un solo botón: oculta el panel del contacto y, al pulsarlo otra vez, lo muestra. */}
@@ -588,7 +588,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         <div className="dc-inbox-side">
 
           <div style={{ padding: "32px 20px 24px", textAlign: "center", borderBottom: "1px solid var(--dc-line)" }}>
-            <div style={{ width: 84, height: 84, borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: INK, border: "1px solid var(--dc-line)", boxShadow: "0 8px 24px -6px rgba(16,24,40,.08)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 27, margin: "0 auto 16px" }}>{inicial(chat.nombre)}</div>
+            <div className="wa-av wa-av--xl" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div>
             <div style={{ fontWeight: 600, color: NAVY, fontSize: 16, fontFamily: DISPLAY_FONT }}>{chat.nombre}</div>
             <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 4 }}>{chat.tel}</div>
             <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>

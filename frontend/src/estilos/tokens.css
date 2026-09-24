@@ -348,3 +348,10 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc
    en español solo va la primera letra. */
 div[style*="text-transform: capitalize"] { text-transform: none !important; }
 div[style*="text-transform: capitalize"]::first-letter { text-transform: uppercase; }
+/* Superficies premium: esquinas algo más amplias y sombra en capas (suave de cerca,
+   difusa de lejos) en lugar de una sombra dura. */
+:root {
+  --dc-r-lg: 18px;
+  --dc-sh-1: 0 1px 2px rgba(14,42,51,.04), 0 14px 34px -26px rgba(14,42,51,.38);
+  --dc-sh-2: 0 2px 4px rgba(14,42,51,.05), 0 22px 44px -26px rgba(14,42,51,.45);
+}

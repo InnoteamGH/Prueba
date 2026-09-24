@@ -250,3 +250,6 @@
 .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { gap: 4px !important; flex-wrap: nowrap !important; }
 .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 8px !important; font-size: 11.5px !important; gap: 4px !important; white-space: nowrap; }
 .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; } .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 7px !important; flex-shrink: 0; }
+/* Avatares con el color de cada contacto (como en la agenda y pacientes). */
+.wa-av { --av: #0E8C95; color: var(--av); background: linear-gradient(135deg, color-mix(in srgb, var(--av) 22%, #fff), color-mix(in srgb, var(--av) 8%, #fff)); font-family: var(--dc-font-title); font-weight: 750; }
+.wa-av--xl { width: 84px; height: 84px; font-size: 28px; margin: 0 auto 14px; box-shadow: 0 0 0 5px #fff, 0 14px 30px -14px color-mix(in srgb, var(--av) 60%, transparent); }
