@@ -15,7 +15,7 @@ import {
   Images, FileImage, FilePlus, FileMinus, FileCheck, FileX, Folder, FolderOpen, FolderPlus,
   Archive, Inbox, SendHorizonal, Reply, Forward, Bookmark, Flag, Pin, PinOff, ThumbsUp, ThumbsDown,
   Heart, HeartOff, Share2, Printer, Syringe, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown,
-  Megaphone, User, CheckCheck, Monitor, FileSpreadsheet
+  Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale
 } from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
@@ -3863,7 +3863,8 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 /* ---- Caja / Facturación (fuente única: el plan de tratamiento de cada ficha) ---- */
 const EGRESO_CATS = ["Insumos", "Laboratorio", "Alquiler", "Servicios (luz/agua)", "Planilla", "Marketing", "Equipos", "Otros"];
 const EGRESOS_DEMO = [
-  { id: 1, fecha: fmt(hoy), concepto: "Resinas y adhesivos", categoria: "Insumos", monto: 320, metodo: "efectivo" },
+  { id: 3, fecha: fmt(hoy), concepto: "Movilidad y mensajería", categoria: "Otros", monto: 35, metodo: "efectivo" },
+  { id: 1, fecha: fmt(hoy), concepto: "Resinas y adhesivos", categoria: "Insumos", monto: 320, metodo: "transferencia" },
   { id: 2, fecha: fmt(hoy), concepto: "Trabajo de laboratorio — corona zirconio", categoria: "Laboratorio", monto: 180, metodo: "transferencia" },
   { id: 3, fecha: addDays(-1), concepto: "Campaña Instagram Ads", categoria: "Marketing", monto: 150, metodo: "tarjeta" },
 ];
@@ -3871,6 +3872,14 @@ const LINKS_DEMO = [
   { id: 1, paciente: "Rosa Linares", concepto: "Abono ortodoncia", monto: 250, estado: "pagado", fecha: addDays(-1) },
   { id: 2, paciente: "Pedro Gómez", concepto: "Saldo endodoncia", monto: 400, estado: "pendiente", fecha: fmt(hoy) },
 ];
+
+/* Icono y color de cada medio de pago en Caja. */
+const MEDIO_UI = {
+  efectivo: [Banknote, "#16A36A"], pos: [CreditCard, "#2F6FDE"], tarjeta: [CreditCard, "#2F6FDE"],
+  yape: [Smartphone, "#7B3FE4"], plin: [Smartphone, "#0E9EB0"], transferencia: [Landmark, "#28527A"], seguro: [ShieldCheck, "#E0694F"],
+};
+const medioUi = (t) => MEDIO_UI[String(t || "").toLowerCase()] || [Wallet, "#0E9199"];
+const DENOMS = [[200, "b"], [100, "b"], [50, "b"], [20, "b"], [10, "b"], [5, "m"], [2, "m"], [1, "m"], [0.5, "m"], [0.2, "m"], [0.1, "m"]];
 
 function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null }) {
   // Autorización granular: si llega `can` se usa la matriz; si no, se cae al rol.
@@ -4000,6 +4009,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [destinosCatalogo, setDestinosCatalogo] = useState(DESTINOS_BASE);
   const [destinosSel, setDestinosSel] = useState(() => new Set(["efectivo", "yape", "plin", "pos", "transferencia"]));
   const [cierreForm, setCierreForm] = useState({ contado: "", justificacion: "", observaciones: "" });
+  const [denoms, setDenoms] = useState({});
   const [cierreBusy, setCierreBusy] = useState(false);
   const [cajaMovs, setCajaMovs] = useState([]);
   const [movForm, setMovForm] = useState(null); // { tipo, monto, nota }
@@ -4059,6 +4069,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const sid = sedeUuid();
     if (!sid) { notify("Elige una sede concreta antes de abrir la caja. No se puede abrir «todas» a la vez."); return; }
     if (!conectado) {
+      if (MODO_DEMO) {
+        const fondoDemo = Number(aperturaForm.fondo) || 0;
+        setApertura({ id: "demo", abierta: true, fondo: fondoDemo, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: "Recepción", destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) });
+        notify(`Caja abierta (demo) con fondo S/ ${fondoDemo.toFixed(2)}.`);
+        setTab("cobros");
+        return;
+      }
       notify("Conéctate al servidor para abrir caja; las jornadas colgadas se validan ahí.");
       return;
     }
@@ -4357,106 +4374,105 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <span />
             {cajaAbierta && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => setTab("cobros")}><CreditCard size={14} strokeWidth={1.9} /> Ir a cobros</button></div>}
           </section>
-          <div className="dc-ap-grid">
-          <Card className="dc-ap-card" style={{ padding: 0 }}>
-            <div className="dc-ap-card__cuerpo">
-            {sedeRequierePick && (
-              <div className="dc-paso">
-                <span className="dc-paso__n">1</span>
-                <div className="dc-paso__cuerpo">
-                <div className="dc-paso__tit">Elige la sede<small>Cada sede tiene su propia caja</small></div>
-                <div className="dc-ap-sedes" role="radiogroup" aria-label="Sede para abrir caja">
-                  {(sedes.length
-                    ? sedes.filter((s) => sedesUsuarioUuid().includes(s.id))
-                    : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) })).filter((s) => s.id)
-                  ).map((s) => (
-                    <button key={s.id} type="button" role="radio" aria-checked={cajaSedePick === s.id} className={`dc-ap-chip${cajaSedePick === s.id ? " is-on" : ""}`} onClick={() => setCajaSedePick(s.id)}><MapPin size={14} strokeWidth={1.9} /> {s.nombre}</button>
-                  ))}
-                </div>
-                </div>
-              </div>
-            )}
-            {cajaAbierta ? (
-              <div style={{ display: "grid", gap: 14 }}>
-                <div className="dc-ap-abierta">
-                  <span className="dc-ap-abierta__ico"><CheckCircle2 size={22} strokeWidth={2} /></span>
-                  <div>
-                    <b>Caja abierta</b>
-                    <div>Fondo S/ {Number(apertura.fondo || 0).toFixed(2)} – desde {apertura.abiertaEn ? new Date(apertura.abiertaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "—"}{apertura.abiertaPorNombre ? ` – por ${apertura.abiertaPorNombre}` : ""}</div>
-                  </div>
-                </div>
-                {apertura.nota && <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>Nota: {apertura.nota}</div>}
-                {apertura.destinosActivos && (
-                  <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>
-                    Destinos activos: {(() => { try { const arr = typeof apertura.destinosActivos === "string" ? JSON.parse(apertura.destinosActivos) : apertura.destinosActivos; return (arr || []).map((d) => d.label || d.tipo).join(" – ") || "—"; } catch { return "—"; } })()}
-                  </div>
-                )}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <Btn small onClick={() => setTab("cobros")}><CreditCard size={14} strokeWidth={1.75} /> Ir a cobros</Btn>
-                  <Btn small kind="navy" onClick={() => setTab("cierre")}>Ir a cierre / arqueo</Btn>
-                  <Btn small kind="ghost" onClick={() => setMovForm({ tipo: "retiro", monto: "", nota: "" })}>Retiro / ingreso efectivo</Btn>
-                  {puedeAbrirCaja && <Btn small kind="ghost" onClick={registrarCambioTurno}>Registrar cambio de turno</Btn>}
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gap: 14 }}>
-                {jornadaAbiertaPrevia?.id && (
-                  <div style={{ padding: 14, borderRadius: "var(--dc-r-md)", background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)", fontSize: 13, color: "var(--dc-danger-700)" }}>
-                    No se puede abrir una segunda caja en esta sede: hay jornada(s) abierta(s).
-                    <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-                      <li key={jornadaAbiertaPrevia.id}>{jornadaAbiertaPrevia.fecha || "—"} – abierta (cierre pendiente)</li>
-                      {(histCaja || []).filter((h) => h?.abierta && h.id !== jornadaAbiertaPrevia.id).map((h) => (
-                        <li key={h.id || h.fecha}>{h.fecha || "—"}{h.sede ? ` – ${h.sede}` : ""} – abierta</li>
-                      ))}
-                    </ul>
-                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <Btn small kind="navy" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: String(Number(jornadaAbiertaPrevia.fondo) || 0), justificacion: "" }); }}>Ir a cerrar jornada</Btn>
+          {(() => {
+            const sedesOpc = sedes.length
+              ? sedes.filter((x) => sedesUsuarioUuid().includes(x.id))
+              : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) })).filter((x) => x.id);
+            const sedeTxt = cajaAbierta ? sedeNombre() : ((sedes.length ? sedes : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) }))).find((x) => x.id === cajaSedePick)?.nombre || (sedeRequierePick ? "Sin elegir" : sedeNombre()));
+            const fondoVal = Number(cajaAbierta ? apertura?.fondo || 0 : aperturaForm.fondo || 0);
+            const bloqueado = (sedeRequierePick && !cajaSedePick) || !!jornadaAbiertaPrevia?.id;
+            const destActivos = cajaAbierta && apertura?.destinosActivos
+              ? (() => { try { const arr = typeof apertura.destinosActivos === "string" ? JSON.parse(apertura.destinosActivos) : apertura.destinosActivos; return arr || []; } catch { return []; } })()
+              : destinosCatalogo.filter((d) => destinosSel.has(d.id));
+            let n = 0;
+            const Paso = ({ icon: Ico, tono, titulo, sub, children }) => { n += 1; return (
+              <section className="dc-ap2__paso" style={{ "--t": tono }}>
+                <header><span className="dc-ap2__ico"><Ico size={20} strokeWidth={1.9} /><i>{n}</i></span><div><h3>{titulo}</h3><span>{sub}</span></div></header>
+                <div className="dc-ap2__cuerpo">{children}</div>
+              </section>
+            ); };
+            return (
+            <div className="dc-ap2">
+              <div className="dc-ap2__main">
+                {cajaAbierta ? (
+                  <section className="dc-ap2__abierta">
+                    <div className="dc-ap2__ok">
+                      <span><CheckCircle2 size={26} strokeWidth={2} /></span>
+                      <div><small>Caja abierta en {sedeNombre()}</small><b>Lista para cobrar</b><p>Desde {apertura.abiertaEn ? new Date(apertura.abiertaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "—"}{apertura.abiertaPorNombre ? `, por ${apertura.abiertaPorNombre}` : ""}{apertura.nota ? ` – ${apertura.nota}` : ""}</p></div>
                     </div>
-                  </div>
+                    <div className="dc-ap2__atajos">
+                      <button type="button" style={{ "--t": "#0E9199" }} onClick={() => setTab("cobros")}><span><CreditCard size={19} strokeWidth={1.9} /></span><b>Cobrar</b><small>Saldos de pacientes</small></button>
+                      <button type="button" style={{ "--t": "#6D4FD1" }} onClick={() => setTab("cierre")}><span><Calculator size={19} strokeWidth={1.9} /></span><b>Cierre y arqueo</b><small>Cuenta la gaveta</small></button>
+                      <button type="button" style={{ "--t": "#D97706" }} onClick={() => setMovForm({ tipo: "retiro", monto: "", nota: "" })}><span><ArrowUpDown size={19} strokeWidth={1.9} /></span><b>Retiro o ingreso</b><small>Mover efectivo</small></button>
+                      {puedeAbrirCaja && <button type="button" style={{ "--t": "#28527A" }} onClick={registrarCambioTurno}><span><Repeat size={19} strokeWidth={1.9} /></span><b>Cambio de turno</b><small>Registrar relevo</small></button>}
+                    </div>
+                  </section>
+                ) : (
+                  <>
+                    {jornadaAbiertaPrevia?.id && (
+                      <div className="fm-aviso-edad is-mal">
+                        <AlertTriangle size={15} strokeWidth={2} />
+                        <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}{(histCaja || []).filter((h) => h?.abierta && h.id !== jornadaAbiertaPrevia.id).length ? " y otras más" : ""}. Ciérrala antes de abrir otra caja en esta sede.</span>
+                        <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: String(Number(jornadaAbiertaPrevia.fondo) || 0), justificacion: "" }); }}>Cerrar jornada</button>
+                      </div>
+                    )}
+                    {sedeRequierePick && Paso({ icon: Building2, tono: "#0E9199", titulo: "¿En qué sede abres?", sub: "Cada sede lleva su propia caja", children: (
+                      <div className="dc-ap2__sedes" role="radiogroup" aria-label="Sede para abrir caja">
+                        {sedesOpc.map((x) => (
+                          <button key={x.id} type="button" role="radio" aria-checked={cajaSedePick === x.id} className={cajaSedePick === x.id ? "is-on" : ""} onClick={() => setCajaSedePick(x.id)}>
+                            <span><MapPin size={16} strokeWidth={2} /></span><b>{x.nombre}</b>{cajaSedePick === x.id && <Check size={15} strokeWidth={3} />}
+                          </button>
+                        ))}
+                      </div>
+                    ) })}
+                    {Paso({ icon: Coins, tono: "#D97706", titulo: "Fondo inicial", sub: "El sencillo con el que empieza la gaveta", children: (
+                      <>
+                        <div className="dc-ap2__fondo">
+                          <label className="dc-ap2__monto"><span>S/</span><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></label>
+                          <div className="dc-ap2__rapidos">{[50, 100, 150, 200, 300].map((v) => <button key={v} type="button" className={Number(aperturaForm.fondo) === v ? "is-on" : ""} onClick={() => setAperturaForm({ ...aperturaForm, fondo: String(v) })}>S/ {v}</button>)}</div>
+                        </div>
+                        <label className="dc-ap2__nota"><Pencil size={14} strokeWidth={2} /><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Nota o turno (opcional), ej. turno mañana" /></label>
+                      </>
+                    ) })}
+                    {Paso({ icon: Wallet, tono: "#6D4FD1", titulo: "Medios de pago de hoy", sub: `${destinosSel.size} de ${destinosCatalogo.length} activos`, children: (
+                      <div className="dc-ap2__medios">
+                        {destinosCatalogo.map((d) => { const on = destinosSel.has(d.id); const [Ico, col] = medioUi(d.tipo || d.id); return (
+                          <button key={d.id} type="button" role="checkbox" aria-checked={on} className={on ? "is-on" : ""} style={{ "--m": col }} onClick={() => setDestinosSel((prev) => { const nx = new Set(prev); if (nx.has(d.id)) nx.delete(d.id); else nx.add(d.id); return nx; })}>
+                            <span className="dc-ap2__mico"><Ico size={18} strokeWidth={1.9} /></span>
+                            <b>{d.label}</b>
+                            <i>{on && <Check size={11} strokeWidth={3.2} />}</i>
+                          </button>
+                        ); })}
+                      </div>
+                    ) })}
+                  </>
                 )}
-                <div className="dc-paso">
-                <span className="dc-paso__n">{sedeRequierePick ? 2 : 1}</span>
-                <div className="dc-paso__cuerpo">
-                <div className="dc-paso__tit">Cuenta el efectivo inicial<small>El sencillo con el que empieza el día</small></div>
-                <div className="dc-ap-2col">
-                  <Field label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(v) => setAperturaForm({ ...aperturaForm, fondo: v })} placeholder="100.00" />
-                  <Field label="Nota o turno (opcional)" value={aperturaForm.nota} onChange={(v) => setAperturaForm({ ...aperturaForm, nota: v })} placeholder="Ej. Turno mañana, recepción" />
-                </div>
-                </div>
-                </div>
-                <div className="dc-paso">
-                <span className="dc-paso__n">{sedeRequierePick ? 3 : 2}</span>
-                <div className="dc-paso__cuerpo">
-                  <div className="dc-paso__tit">Activa los medios de pago<small>{destinosSel.size} de {destinosCatalogo.length} activos hoy</small></div>
-                  <div className="dc-ap-destinos">
-                    {destinosCatalogo.map((d) => { const on = destinosSel.has(d.id); return (
-                      <button key={d.id} type="button" role="checkbox" aria-checked={on} className={`dc-ap-dest${on ? " is-on" : ""}`} onClick={() => setDestinosSel((prev) => { const n = new Set(prev); if (n.has(d.id)) n.delete(d.id); else n.add(d.id); return n; })}>
-                        <span className="dc-ap-dest__check">{on && <Check size={12} strokeWidth={3} />}</span>
-                        <span className="dc-ap-dest__txt"><b>{d.label}</b>{d.detalle ? <small>{d.detalle}</small> : null}</span>
-                      </button>
-                    ); })}
-                  </div>
-                </div>
-                </div>
-                <div className="dc-ap-pie">
-                  <span>Debes abrir la caja antes de registrar cobros.</span>
-                  <Btn onClick={abrirCaja} disabled={(sedeRequierePick && !cajaSedePick) || !!jornadaAbiertaPrevia?.id}><KeyRound size={15} strokeWidth={1.75} /> Abrir caja</Btn>
-                </div>
               </div>
-            )}
+              <aside className="dc-ap2__ticket">
+                <div className="dc-ap2__tcab">
+                  <span><KeyRound size={18} strokeWidth={2} /></span>
+                  <div><small>{fechaLegible(fmt(hoy))}</small><b>Apertura de caja</b></div>
+                </div>
+                <ul>
+                  <li><span>Sede</span><b className={sedeTxt === "Sin elegir" ? "is-falta" : ""}>{sedeTxt}</b></li>
+                  <li><span>Responsable</span><b>{cajaAbierta ? (apertura?.abiertaPorNombre || "—") : "Tú"}</b></li>
+                  <li><span>Medios activos</span><b>{destActivos.length}</b></li>
+                </ul>
+                <div className="dc-ap2__tmedios">{destActivos.map((d) => { const [Ico, col] = medioUi(d.tipo || d.id); return <span key={d.id || d.label} style={{ "--m": col }}><Ico size={12} strokeWidth={2.2} /> {d.label || d.tipo}</span>; })}</div>
+                <div className="dc-ap2__tcorte" />
+                <div className="dc-ap2__ttotal"><span>Fondo inicial</span><b>S/ {fondoVal.toFixed(2)}</b></div>
+                {cajaAbierta ? (
+                  <button type="button" className="dc-ap2__cta is-alt" onClick={() => setTab("cierre")}><Calculator size={16} strokeWidth={2} /> Ir al cierre del día</button>
+                ) : (
+                  <>
+                    <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>
+                    <p>{sedeRequierePick && !cajaSedePick ? "Elige la sede para continuar." : "Debes abrir la caja antes de registrar cobros."}</p>
+                  </>
+                )}
+              </aside>
             </div>
-          </Card>
-          <aside className="dc-ap-lado">
-            <div className="dc-ap-lado__tit">Resumen de la apertura</div>
-            <ul>
-              <li><MapPin size={14} strokeWidth={1.9} /><span>Sede</span><b>{cajaAbierta ? sedeNombre() : ((sedes.length ? sedes : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) }))).find((x) => x.id === cajaSedePick)?.nombre || (sedeRequierePick ? "Sin elegir" : sedeNombre()))}</b></li>
-              <li><Wallet size={14} strokeWidth={1.9} /><span>Fondo inicial</span><b>S/ {Number(cajaAbierta ? apertura?.fondo || 0 : aperturaForm.fondo || 0).toFixed(2)}</b></li>
-              <li><CreditCard size={14} strokeWidth={1.9} /><span>Medios de pago</span><b>{destinosSel.size}</b></li>
-            </ul>
-            <div className="dc-ap-lado__medios">{destinosCatalogo.filter((d) => destinosSel.has(d.id)).map((d) => <span key={d.id}>{d.label}</span>)}</div>
-            <p>Al cerrar el día, el arqueo compara el efectivo contado con fondo + cobros en efectivo − egresos.</p>
-          </aside>
-          </div>
+            );
+          })()}
           {movForm && (
             <Card style={{ padding: 16 }}>
               <h4 style={{ margin: "0 0 10px", color: NAVY }}>Movimiento de efectivo</h4>
@@ -4603,7 +4619,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       </div>)}
 
       {tab === "cierre" && (() => {
-        const c = cierre || { total: 0, cantidad: 0, porMetodo: {}, movimientos: [] };
+        const c = cierre || (conectado ? { total: 0, cantidad: 0, porMetodo: {}, movimientos: [] } : (() => {
+          const pm = {};
+          boletasHoyActivas.forEach((b) => { const m = String(b.metodo || "efectivo").toLowerCase() === "pos" ? "tarjeta" : String(b.metodo || "efectivo").toLowerCase(); pm[m] = (pm[m] || 0) + b.monto; });
+          return { total: boletasHoyActivas.reduce((a, b) => a + b.monto, 0), cantidad: boletasHoyActivas.length, porMetodo: pm, movimientos: boletasHoyActivas.map((b, i) => ({ id: null, hora: b.hora || "", paciente: b.paciente, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), monto: b.monto, _k: i })) };
+        })());
         const metodos = Object.entries(c.porMetodo || {}).filter(([, v]) => Number(v) > 0);
         const COMISION_PCT = { efectivo: 0, tarjeta: 4.06, yape: 0, plin: 0, transferencia: 0, seguro: 0 };
         const comisionDe = (k, bruto) => Math.round(Number(bruto) * (COMISION_PCT[k] || 0) / 100 * 100) / 100;
@@ -4619,7 +4639,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const diffNum = (contadoNum != null && esperadoEfectivo != null && !Number.isNaN(contadoNum))
           ? Math.round((contadoNum - esperadoEfectivo) * 100) / 100
           : null;
-        const nfmt = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const nfmt = (n) => (Number(n) < 0 ? "− " : "") + "S/ " + Math.abs(Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const semaforo = diffNum == null ? null : Math.abs(diffNum) < 0.01 ? "cuadra" : diffNum > 0 ? "sobra" : "falta";
         return (
           <div style={{ display: "grid", gap: 16 }}>
@@ -4639,87 +4659,103 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <button type="button" className="dc-esp-hero__agregar" onClick={() => window.print()}><FileText size={14} strokeWidth={1.9} /> Imprimir</button>
               </div>
             </section>
-            {!cajaAbierta && (
-              <div className="fm-aviso-edad">
-                <KeyRound size={15} strokeWidth={2} />
-                <span><b>Caja cerrada.</b> {sedeRequierePick && !cajaSedePick ? "Elige la sede y abre la caja" : "Abre la caja"} para calcular el efectivo esperado del arqueo.</span>
-                <button type="button" onClick={() => setTab("apertura")}>Ir a apertura</button>
+            <div className="dc-cz">
+              <div className="dc-cz__main">
+                <Card className="dc-cz__arq">
+                  <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#0E9199" }}><Vault size={20} strokeWidth={1.9} /></span><div><h3>Efectivo que debería haber</h3><span>Fondo + cobros en efectivo − egresos ± movimientos</span></div></div>
+                  <ul className="dc-cz__libro">
+                    <li style={{ "--t": "#0E9199" }}><span className="dc-cz__lico"><Wallet size={16} strokeWidth={2} /></span><div><b>Fondo inicial</b><small>Con el que abriste la caja</small></div><em>{cajaAbierta ? nfmt(fondoIni) : "—"}</em></li>
+                    <li style={{ "--t": "#16A36A" }}><span className="dc-cz__lico"><Banknote size={16} strokeWidth={2} /></span><div><b>Cobros en efectivo</b><small>Pagos recibidos en la gaveta</small></div><em>+ {nfmt(cobradoEfectivo)}</em></li>
+                    <li style={{ "--t": "#E0694F" }}><span className="dc-cz__lico"><ArrowUpRight size={16} strokeWidth={2} /></span><div><b>Egresos en efectivo</b><small>Gastos pagados desde caja</small></div><em>− {nfmt(egresosEfectivo)}</em></li>
+                    <li style={{ "--t": "#6D4FD1" }}><span className="dc-cz__lico"><ArrowUpDown size={16} strokeWidth={2} /></span><div><b>Retiros e ingresos</b><small>Movimientos intermedios</small></div><em>{netoMovsCaja < 0 ? "− " : "+ "}{nfmt(Math.abs(netoMovsCaja))}</em></li>
+                  </ul>
+                  <div className="dc-cz__esp"><div><small>Efectivo esperado</small><span>{cajaAbierta ? "Compáralo con lo que cuentes" : "Se calcula al abrir la caja"}</span></div><b>{esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo)}</b></div>
+                </Card>
+                {cajaAbierta ? (
+                  <Card className="dc-cz__conteo">
+                    <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#D97706" }}><Coins size={20} strokeWidth={1.9} /></span><div><h3>Cuenta la gaveta</h3><span>Suma billetes y monedas, o escribe el total directamente</span></div>
+                      {Object.values(denoms).some((v) => v > 0) && <button type="button" className="dc-cz__limpiar" onClick={() => { setDenoms({}); setCierreForm({ ...cierreForm, contado: "" }); }}>Limpiar</button>}
+                    </div>
+                    {[["b", "Billetes", Banknote], ["m", "Monedas", Coins]].map(([grp, glbl, GIco]) => (
+                    <div key={grp} className="dc-cz__grupo">
+                    <div className="dc-cz__glbl"><GIco size={13} strokeWidth={2} /> {glbl}<span>S/ {DENOMS.filter(([, t]) => t === grp).reduce((a2, [dv]) => a2 + dv * (denoms[dv] || 0), 0).toFixed(2)}</span></div>
+                    <div className={`dc-cz__denoms is-${grp}`}>
+                      {DENOMS.filter(([, t]) => t === grp).map(([v, t]) => { const q = denoms[v] || 0; const set = (nq) => { const nd = { ...denoms, [v]: Math.max(0, nq) }; setDenoms(nd); const tot = DENOMS.reduce((a, [dv]) => a + dv * (nd[dv] || 0), 0); setCierreForm({ ...cierreForm, contado: tot ? tot.toFixed(2) : "" }); }; return (
+                        <div key={v} className={`dc-cz__den is-${t}${q ? " is-on" : ""}`}>
+                          <span className="dc-cz__dval">{v >= 1 ? `S/ ${v}` : `${Math.round(v * 100)} ct`}</span>
+                          <div className="dc-cz__step">
+                            <button type="button" aria-label={`Quitar ${v}`} onClick={() => set(q - 1)} disabled={!q}><Minus size={13} strokeWidth={2.4} /></button>
+                            <input inputMode="numeric" aria-label={`Cantidad de ${v}`} value={q || ""} placeholder="0" onChange={(e) => set(Number(e.target.value.replace(/\D/g, "")) || 0)} />
+                            <button type="button" aria-label={`Agregar ${v}`} onClick={() => set(q + 1)}><Plus size={13} strokeWidth={2.4} /></button>
+                          </div>
+                        </div>
+                      ); })}
+                    </div>
+                    </div>
+                    ))}
+                    <div className="dc-cz__cuadre">
+                      <label className="dc-cz__contado"><small>Efectivo contado</small><div><span>S/</span><input inputMode="decimal" aria-label="Efectivo contado (S/)" value={cierreForm.contado} onChange={(e) => { setDenoms({}); setCierreForm({ ...cierreForm, contado: e.target.value.replace(/[^\d.]/g, "") }); }} placeholder={esperadoEfectivo != null ? esperadoEfectivo.toFixed(2) : "0.00"} /></div></label>
+                      <div className={`dc-cz__res is-${semaforo || "nada"}`}>
+                        <span>{semaforo === "cuadra" ? <CheckCircle2 size={22} strokeWidth={2} /> : semaforo === "falta" ? <TrendingDown size={22} strokeWidth={2} /> : semaforo === "sobra" ? <TrendingUp size={22} strokeWidth={2} /> : <Scale size={22} strokeWidth={2} />}</span>
+                        <div><small>Resultado del arqueo</small><b>{semaforo === "cuadra" ? "Cuadra exacto" : semaforo === "falta" ? `Faltan ${nfmt(Math.abs(diffNum))}` : semaforo === "sobra" ? `Sobran ${nfmt(diffNum)}` : "Esperando el conteo"}</b></div>
+                      </div>
+                    </div>
+                    <div className="dc-cz__notas">
+                      <Field label={Math.abs(diffNum || 0) > 0.009 ? "Justificación (obligatoria)" : "Justificación (si hay descuadre)"} value={cierreForm.justificacion} onChange={(v) => setCierreForm({ ...cierreForm, justificacion: v })} placeholder="Ej. Faltante por cambio no registrado" />
+                      <Field label="Observaciones (opcional)" value={cierreForm.observaciones} onChange={(v) => setCierreForm({ ...cierreForm, observaciones: v })} placeholder="Notas del acta" />
+                    </div>
+                    <div className="dc-cz__pie">
+                      <span><Lock size={13} strokeWidth={2} /> Al cerrar no se registran más cobros hasta reabrir.</span>
+                      <button type="button" className="dc-ap2__cta" disabled={cierreBusy || !puedeAbrirCaja} onClick={() => cerrarApertura(esperadoEfectivo)}><Lock size={15} strokeWidth={2} /> {cierreBusy ? "Cerrando…" : "Cerrar caja del día"}</button>
+                    </div>
+                  </Card>
+                ) : (
+                  <Card className="dc-cz__bloq">
+                    <span><Lock size={24} strokeWidth={1.9} /></span>
+                    <div><b>El arqueo se habilita con la caja abierta</b><p>Abre la caja del día para contar la gaveta y cerrar con el resultado del cuadre.</p></div>
+                    <button type="button" className="dc-ap2__cta" onClick={() => setTab("apertura")}><KeyRound size={15} strokeWidth={2} /> Ir a apertura</button>
+                  </Card>
+                )}
               </div>
-            )}
-            <div className="dc-cierre">
-              <Card className="dc-cierre__eq">
-                <div className="dc-cierre__tit"><h3>Efectivo esperado en caja</h3><span>Fondo + cobros en efectivo − egresos ± movimientos</span></div>
-                <div className="dc-cierre__fila">
-                  <div className="dc-cierre__t"><span>Fondo inicial</span><b>{cajaAbierta ? nfmt(fondoIni) : "—"}</b></div>
-                  <i>+</i>
-                  <div className="dc-cierre__t is-ok"><span>Cobrado en efectivo</span><b>{nfmt(cobradoEfectivo)}</b></div>
-                  <i>−</i>
-                  <div className="dc-cierre__t is-mal"><span>Egresos en efectivo</span><b>{nfmt(egresosEfectivo)}</b></div>
-                  <i>±</i>
-                  <div className="dc-cierre__t"><span>Movimientos</span><b>{nfmt(netoMovsCaja)}</b></div>
-                  <i>=</i>
-                  <div className="dc-cierre__t is-total"><span>Esperado</span><b>{esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo)}</b><small>{cajaAbierta ? "para el arqueo" : "requiere apertura"}</small></div>
-                </div>
-              </Card>
-              <Card className="dc-cierre__dia">
-                <div className="dc-cierre__tit"><h3>Cobros de hoy</h3><span>{c.cantidad} {c.cantidad === 1 ? "cobro" : "cobros"}</span></div>
-                <div className="dc-cierre__res">
-                  <div><span>Total cobrado</span><b>{nfmt(c.total)}</b></div>
-                  <div><span>Comisión estimada</span><b className="is-mal">− {nfmt(totalComision)}</b></div>
-                  <div className="is-neto"><span>Neto estimado</span><b>{nfmt(netoHoyCierre)}</b></div>
-                </div>
-                <div className="dc-cierre__metodos">
-                  {(metodos.length ? metodos.map(([k]) => k) : ["efectivo", "tarjeta", "yape", "plin", "transferencia", "seguro"]).map((k) => (
-                    <div key={k} className={`dc-cierre__m is-${k}`}><span>{METODO_LBL[k] || k}</span><b>{nfmt((c.porMetodo || {})[k] || 0)}</b><small>{k === "tarjeta" ? "3.44% + IGV" : (COMISION_PCT[k] != null ? `${COMISION_PCT[k]}% comisión` : "del día")}</small></div>
-                  ))}
-                </div>
-              </Card>
+              <aside className="dc-cz__lado">
+                <Card className="dc-cz__cobros">
+                  <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#16A36A" }}><Receipt size={20} strokeWidth={1.9} /></span><div><h3>Cobros de hoy</h3><span>{c.cantidad} {c.cantidad === 1 ? "cobro" : "cobros"}</span></div></div>
+                  {(() => {
+                    const lst = metodos.map(([k, v]) => ({ k, v: Number(v), col: medioUi(k)[1], Ico: medioUi(k)[0] }));
+                    let acc = 0;
+                    const grad = lst.length && c.total > 0 ? lst.map((m) => { const a = acc; acc += (m.v / c.total) * 100; return `${m.col} ${a}% ${acc}%`; }).join(", ") : "#E6EEEF 0 100%";
+                    return (
+                      <>
+                        <div className="dc-cz__dona" style={{ background: `radial-gradient(closest-side, #fff 70%, transparent 71% 100%), conic-gradient(${grad})` }}><div><small>Total</small><b>{nfmt(c.total)}</b></div></div>
+                        {lst.length === 0 ? <p className="dc-cz__nada">Aún no hay cobros registrados hoy.</p> : (
+                          <ul className="dc-cz__met">
+                            {lst.map((m) => <li key={m.k} style={{ "--m": m.col }}><span><m.Ico size={14} strokeWidth={2} /></span><b>{METODO_LBL[m.k] || m.k}</b><small>{c.total ? Math.round((m.v / c.total) * 100) : 0}%</small><em>{nfmt(m.v)}</em></li>)}
+                          </ul>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <div className="dc-cz__tot">
+                    <div><span>Comisión estimada</span><b className="is-mal">− {nfmt(totalComision)}</b></div>
+                    <div className="is-neto"><span>Neto estimado</span><b>{nfmt(netoHoyCierre)}</b></div>
+                  </div>
+                </Card>
+                <Card className="dc-cz__movs">
+                  <div className="dc-cz__movcab"><h4>Movimientos del día</h4><span>{(c.movimientos || []).length}</span></div>
+                  {(c.movimientos || []).length === 0 ? <p className="dc-cz__nada">Los cobros del día aparecerán aquí.</p> : (c.movimientos || []).map((m, i) => { const [Ico, col] = medioUi(m.metodo); return (
+                    <div key={m.id || m._k || i} className="dc-cz__mov">
+                      <span className="dc-cz__mico" style={{ "--m": col }}><Ico size={14} strokeWidth={2} /></span>
+                      <div><b>{m.paciente}</b><small>{m.hora ? `${m.hora} – ` : ""}{m.concepto || "Cobro"}</small></div>
+                      <em>{nfmt(m.monto)}</em>
+                      {m.id && <div className="dc-cz__macc">
+                        <button type="button" title="Enviar boleta por WhatsApp" aria-label="Enviar boleta por WhatsApp" onClick={() => api.pagos.enviarWa(m.id).then((r) => notify(r?.ok ? `Boleta enviada a ${m.paciente} por WhatsApp.` : "No se pudo enviar (¿el paciente tiene teléfono?).")).catch(() => notify("No se pudo enviar la boleta."))}><MessageSquare size={13} strokeWidth={2} /></button>
+                        {puedeAbrirCaja && <button type="button" className="is-mal" title="Anular cobro" aria-label="Anular cobro" onClick={() => anularPagoHoy(m.id)}><X size={13} strokeWidth={2.2} /></button>}
+                      </div>}
+                    </div>
+                  ); })}
+                </Card>
+              </aside>
             </div>
-            {cajaAbierta && (
-              <Card style={{ padding: 20, display: "grid", gap: 12, maxWidth: 520 }}>
-                <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Arqueo al cerrar</h3>
-                <Field label="Efectivo contado (S/) *" value={cierreForm.contado} onChange={(v) => setCierreForm({ ...cierreForm, contado: v })} placeholder={esperadoEfectivo != null ? String(esperadoEfectivo.toFixed(2)) : "0.00"} />
-                <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>
-                  Diferencia:{" "}
-                  <strong style={{
-                    color: semaforo === "cuadra" ? "var(--dc-ok-700)" : semaforo === "sobra" ? "var(--dc-warn-600)" : semaforo === "falta" ? RED : "var(--dc-ink-400)",
-                    fontVariantNumeric: "tabular-nums",
-                  }}>
-                    {diffNum == null ? "—" : `${nfmt(diffNum)} – ${semaforo}`}
-                  </strong>
-                </div>
-                <Field label={Math.abs(diffNum || 0) > 0.009 ? "Justificación (obligatoria)" : "Justificación (si hay descuadre)"} value={cierreForm.justificacion} onChange={(v) => setCierreForm({ ...cierreForm, justificacion: v })} placeholder="Ej. Faltante por cambio no registrado" />
-                <Field label="Observaciones (opcional)" value={cierreForm.observaciones} onChange={(v) => setCierreForm({ ...cierreForm, observaciones: v })} placeholder="Notas del acta" />
-                <Btn kind="navy" disabled={cierreBusy || !puedeAbrirCaja} onClick={() => cerrarApertura(esperadoEfectivo)}>
-                  {cierreBusy ? "Cerrando…" : "Cerrar caja del día"}
-                </Btn>
-              </Card>
-            )}
-            {metodos.length > 0 && (
-            <Card style={{ padding: "18px 20px" }}>
-              <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos por método de pago</h3>
-              {metodos.length === 0 && <div style={{ color: "var(--dc-ink-500)", fontSize: 13 }}>Aún no hay cobros registrados hoy.</div>}
-              <div style={{ display: "grid", gap: 8 }}>
-                {metodos.map(([k, v]) => { const pctv = c.total > 0 ? Math.round(Number(v) / Number(c.total) * 100) : 0; const com = comisionDe(k, v); const neto = Math.round((Number(v) - com) * 100) / 100; return (
-                  <div key={k}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}><span style={{ color: NAVY, fontWeight: 500 }}>{METODO_LBL[k] || k}{COMISION_PCT[k] ? <span style={{ fontWeight: 500, color: "var(--dc-ink-400)" }}> – {COMISION_PCT[k]}%</span> : null}</span><span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{nfmt(v)} – neto {nfmt(neto)} – {pctv}%</span></div><div style={{ height: 8, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)" }}><div style={{ width: `${pctv}%`, height: "100%", borderRadius: "var(--dc-r-full)", background: "var(--dc-ok-700)" }} /></div></div>
-                ); })}
-              </div>
-            </Card>
-            )}
-            <Card style={{ overflow: "hidden" }}>
-              <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--dc-line)", fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>Movimientos del día</div>
-              {(c.movimientos || []).length === 0 && <Vacio icon={<Wallet size={22} strokeWidth={1.75} />} titulo="Sin cobros hoy" sub="Los cobros del día aparecerán aquí." />}
-              {(c.movimientos || []).map((m, i) => (
-                <div key={m.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 18px", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
-                  <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums", width: 44 }}>{m.hora}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.paciente}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{m.concepto || "Cobro"}</div></div>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-700)", background: "var(--dc-bg)", padding: "3px 9px", borderRadius: "var(--dc-r-full)" }}>{METODO_LBL[m.metodo] || m.metodo}</span>
-                  <span style={{ fontWeight: 500, color: "var(--dc-ok-700)", fontVariantNumeric: "tabular-nums" }}>{nfmt(m.monto)}</span>
-                  {m.id && puedeAbrirCaja && <button onClick={() => anularPagoHoy(m.id)} style={{ border: "1px solid var(--dc-danger-mid)", background: "#fff", color: "var(--dc-danger-700)", borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>Anular</button>}
-                  {m.id && <button title="Enviar boleta por WhatsApp" aria-label="Enviar boleta por WhatsApp" onClick={() => api.pagos.enviarWa(m.id).then((r) => notify(r?.ok ? `Boleta enviada a ${m.paciente} por WhatsApp.` : "No se pudo enviar (¿el paciente tiene teléfono?).")).catch(() => notify("No se pudo enviar la boleta."))} style={{ border: "1px solid var(--dc-green-soft)", background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}><MessageSquare size={13} strokeWidth={1.75} /> Boleta</button>}
-                </div>
-              ))}
-            </Card>
           </div>
         );
       })()}
