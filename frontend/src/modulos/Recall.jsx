@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, ChevronRight, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap } from "lucide-react";
 import api, { auth } from "../api/client";
-import {Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint} from "../comun";
+import {EnCabecera, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint} from "../comun";
 
 function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
@@ -135,11 +135,15 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
   const histView = (histReal && histReal.length ? histReal : (conectado ? [] : HIST_ENVIOS));
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
-      <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
-        {[["automatizaciones", "Automatizaciones", Zap], ["historial", "Historial de envíos", Send], ["satisfaccion", "Satisfacción", Star]].map(([k, lbl, Ic]) => { const on = subtab === k; return (
-          <button key={k} onClick={() => setSubtab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
-        ); })}
-      </div>
+      <EnCabecera>
+        <div className="dc-rec-top">
+          <nav className="dc-segmento" role="tablist" aria-label="Vistas de recordatorios">
+            {[["automatizaciones", "Automatizaciones"], ["historial", "Historial de envíos"], ["satisfaccion", "Satisfacción"]].map(([k, lbl]) => (
+              <button key={k} type="button" role="tab" aria-selected={subtab === k} onClick={() => setSubtab(k)}>{lbl}</button>
+            ))}
+          </nav>
+        </div>
+      </EnCabecera>
       {subtab === "satisfaccion" ? (() => {
         const fuenteResenas = (resenasNps && resenasNps.length) ? resenasNps : (conectado ? [] : RESENAS_DEMO);
         const rs = fuenteResenas.filter((r) => r.nps != null);
@@ -207,58 +211,39 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
           ); })}
         </Card>
       ) : (<>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        <KpiCard label="Automatizaciones activas" value={`${activas} / ${reglas.length}`} color="var(--dc-ok-700)" icon={<Zap size={18} strokeWidth={1.75} />} sub="funcionando solas" />
-        <KpiCard label="Mensajes este mes" value={resumen ? (resumen.mensajesMes === 0 ? "Sin envíos aún" : resumen.mensajesMes.toLocaleString("es-PE")) : "—"} color={NAVY} icon={<Send size={18} strokeWidth={1.75} />} sub={resumen && resumen.mensajesMes === 0 ? "ningún WhatsApp automático este mes" : "por WhatsApp"} />
-        <KpiCard label="Tasa de entrega" value={resumen && resumen.mensajesMes > 0 ? `${resumen.tasaEntrega}%` : "—"} color={DS.c.primary} icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub={resumen && resumen.mensajesMes > 0 ? "enviados al paciente" : "Sin envíos aún"} />
-        <KpiCard label="Por contactar" value={cola.filter((c) => c.estado === "por_contactar").length} color="var(--dc-warn-600)" icon={<Repeat size={18} strokeWidth={1.75} />} sub="recall pendiente" />
-      </div>
-
-      <Card style={{ padding: "20px 22px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
-          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={18} strokeWidth={1.75} color={DS.c.primary} /> Recorrido automático del paciente</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Cada paso se envía solo por WhatsApp — actívalo o pausa lo que no uses.</div></div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día" style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-line)", padding: "5px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 6 }}><Shield size={13} strokeWidth={1.75} color={DS.c.primary} /> No molestar 21:00–08:00 · máx 3/día</span>
-            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "5px 12px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: "var(--dc-ok)", animation: "dcBlink 1.6s ease-in-out infinite" }} /> {activas} activas ahora</span>
+      <Card className="dc-rec">
+        <div className="dc-rec__cab">
+          <div className="dc-rec__tit">
+            <h3><Sparkles size={16} strokeWidth={1.75} /> Recorrido automático del paciente</h3>
+            <p>Cada paso se envía solo por WhatsApp. Toca uno para editar su mensaje.</p>
+          </div>
+          <div className="dc-rec__cifras">
+            <div><b>{activas}/{reglas.length}</b><span>Activas</span></div>
+            <div><b>{resumen && resumen.mensajesMes > 0 ? resumen.mensajesMes.toLocaleString("es-PE") : "0"}</b><span>Enviados este mes</span></div>
+            <div><b>{resumen && resumen.mensajesMes > 0 ? `${resumen.tasaEntrega}%` : "—"}</b><span>Entrega</span></div>
+            <span className="dc-rec__dnd" title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día"><Shield size={13} strokeWidth={1.75} /> No molestar 21:00–08:00 · máx. 3 al día</span>
           </div>
         </div>
-        {/* Siete pasos no caben en una fila de escritorio: se desplaza en horizontal y el
-            borde derecho se desvanece para que se note que hay más. */}
-        <div className="dc-scroll dc-hscroll" style={{ display: "flex", alignItems: "stretch", overflowX: "auto", paddingBottom: 10, minWidth: 0 }}>
-          {reglas.map((r, i) => { const Ic = r.icon; return (
-            <React.Fragment key={r.clave}>
-              <div className="dc-rise" onClick={() => abrirCfg(r)} title="Configurar mensaje" style={{ cursor: "pointer", animationDelay: `${i * 0.06}s`, flexShrink: 0, width: 164, background: r.on ? "rgba(255,255,255,0.7)" : "rgba(245,247,250,0.5)", backdropFilter: "blur(12px)", border: "1px solid " + (r.on ? "rgba(255,255,255,0.9)" : "rgba(228,231,236,0.6)"), borderLeft: r.on ? `4px solid ${r.color}` : "4px solid transparent", borderRadius: "var(--dc-r-lg)", padding: 12, display: "flex", flexDirection: "column", gap: 8, opacity: r.on ? 1 : 0.72, transition: "all .2s", boxShadow: r.on ? `0 8px 24px -10px ${tint(r.color, 0.4)}, inset 0 2px 4px rgba(255,255,255,1)` : "none" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: r.on ? `linear-gradient(135deg, ${tint(r.color, 0.125)}, ${tint(r.color, 0.02)})` : tint(r.color, 0.071), border: `1px solid ${tint(r.color, 0.188)}`, color: r.color, display: "grid", placeItems: "center", filter: r.on ? "none" : "grayscale(.4)" }}><Ic size={17} strokeWidth={1.75} /></div>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: r.on ? r.color : "var(--dc-ink-400)", background: r.on ? tint(r.color, 0.071) : "var(--dc-bg)", padding: "3px 8px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap", border: `1px solid ${r.on ? tint(r.color, 0.188) : "transparent"}` }}>{r.timing}</span>
+        <div className="dc-rec__fases">
+          {[[true, "Antes de la cita", Clock], [false, "Después de la cita", CalendarCheck]].map(([antes, tit, FIc]) => (
+            <section key={tit} className="dc-rec__fase">
+              <h4><FIc size={14} strokeWidth={1.75} /> {tit}</h4>
+              {reglas.filter((r) => !!r.antes === antes).map((r) => { const Ic = r.icon || (AUT_META[r.clave] || {}).icon || Zap; const color = r.color || (AUT_META[r.clave] || {}).color || DS.c.primary; return (
+                <div key={r.clave} className={`dc-rec__paso${r.on ? " is-on" : ""}`} style={{ "--paso": color }} onClick={() => abrirCfg(r)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") abrirCfg(r); }} title="Editar mensaje">
+                  <span className="dc-rec__ico" style={{ background: tint(color, 0.12), color }}><Ic size={16} strokeWidth={1.75} /></span>
+                  <div className="dc-rec__txt"><b>{r.l}</b><span>{!r.on ? "Pausado" : r.stat === "por WhatsApp" ? "Activo" : r.stat}<em className="dc-rec__cuando-m"> · {r.timing}</em></span></div>
+                  <span className="dc-rec__cuando">{r.timing}</span>
+                  <button type="button" className={`dc-rec__switch${r.on ? " is-on" : ""}`} role="switch" aria-checked={r.on} aria-label={`${r.on ? "Pausar" : "Activar"} ${r.l}`} onClick={(e) => { e.stopPropagation(); toggle(r.clave); }}><i /></button>
                 </div>
-                <div style={{ fontWeight: 500, color: NAVY, fontSize: 13, lineHeight: 1.15, minHeight: 30, letterSpacing: "-0.01em" }}>{r.l}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={11} strokeWidth={1.75} /> WhatsApp</div>
-                <div style={{ fontSize: 12, color: r.on ? "var(--dc-ink-700)" : "var(--dc-ink-500)", fontWeight: 500 }}>{r.stat}</div>
-                <button onClick={(e) => { e.stopPropagation(); toggle(r.clave); }} style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, background: r.on ? tint(r.color, 0.094) : "var(--dc-bg)", border: "1px solid", borderColor: r.on ? `${tint(r.color, 0.251)}` : "transparent", borderRadius: "var(--dc-r-md)", padding: "6px 8px", cursor: "pointer", transition: "all .15s", boxShadow: r.on ? `0 2px 8px -2px ${tint(r.color, 0.251)}` : "none" }}>
-                  <span style={{ width: 30, height: 18, borderRadius: "var(--dc-r-full)", background: r.on ? r.color : "var(--dc-line-alt2)", position: "relative", flexShrink: 0, transition: "background .2s", boxShadow: r.on ? `0 0 8px ${tint(r.color, 0.502)}` : "none" }}><span style={{ position: "absolute", top: 2, left: r.on ? 14 : 2, width: 14, height: 14, borderRadius: "var(--dc-r-full)", background: "var(--dc-white)", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} /></span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: r.on ? r.color : "var(--dc-ink-500)" }}>{r.on ? "Activo" : "Activar"}</span>
-                </button>
-              </div>
-              {i < reglas.length - 1 && (r.antes && !reglas[i + 1].antes ? (
-                <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 10px", alignSelf: "center", gap: 6 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: "var(--dc-r-full)", background: "linear-gradient(135deg,var(--dc-warn),var(--dc-warn-700))", display: "grid", placeItems: "center", boxShadow: "0 10px 22px -10px rgba(234,88,12,.8)", color: "var(--dc-white)" }}><CalendarCheck size={22} strokeWidth={1.75} /></div>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", whiteSpace: "nowrap" }}>Día de la cita</span>
-                </div>
-              ) : (
-                <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "0 3px", alignSelf: "center" }}>
-                  <div style={{ width: 26, height: 2, borderRadius: "var(--dc-r-sm)", background: (reglas[i].on && reglas[i + 1].on) ? `linear-gradient(90deg,${DS.c.primary},var(--dc-accent-cyan))` : "var(--dc-line)" }} />
-                  <ChevronRight size={13} strokeWidth={1.75} color={(reglas[i].on && reglas[i + 1].on) ? DS.c.primary : "var(--dc-line-alt2)"} style={{ marginTop: -1 }} />
-                </div>
-              ))}
-            </React.Fragment>
-          ); })}
+              ); })}
+            </section>
+          ))}
         </div>
       </Card>
 
       <Card style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Recall — pacientes por volver</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Sin control hace más de 6 meses · el recall crea la cita automáticamente.</div></div>
+          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14.5, fontWeight: 700, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}>Pacientes por volver {cola.some((c) => c.estado === "por_contactar") && <span className="dc-rec__pend">{cola.filter((c) => c.estado === "por_contactar").length} por contactar</span>}</h3><div style={{ fontSize: 12.5, color: "var(--dc-ink-500)", marginTop: 2 }}>Sin control hace más de 6 meses. El recall les propone una cita automáticamente.</div></div>
           {puedeEnviar && cola.some((c) => c.estado === "por_contactar") && <Btn small onClick={enviarTodos}><Send size={14} strokeWidth={1.75} /> Enviar a todos</Btn>}
         </div>
         {cola.map((p) => { const col = colorDe(p.nombre); return (
