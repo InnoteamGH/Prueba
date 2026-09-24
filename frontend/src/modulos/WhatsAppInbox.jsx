@@ -34,22 +34,29 @@ function respuestaAgente(texto, ctx) {
   return { texto: "Mmm, déjame ayudarte mejor 😊 Puedo agendarte una cita, darte precios, horarios o cómo llegar. ¿Qué te gustaría hacer? Si lo prefieres, también te derivo con el área de atención.", tools: [] };
 }
 
+// Fechas de la demostración relativas a hoy: un chat de hoy, uno de ayer, uno de
+// esta semana y uno más antiguo, para que la lista muestre los cuatro formatos.
+const haceDias = (n, hm) => { const d = new Date(); d.setDate(d.getDate() - n); const [h, m] = hm.split(":").map(Number); d.setHours(h, m, 0, 0); return d.toISOString(); };
 const CHATS_INIT = [
-  { id: 1, nombre: "Rosa Linares", tel: "+51 987 654 321", modo: "ia", noLeidos: 0, msgs: [
+  { id: 1, nombre: "Rosa Linares", tel: "+51 987 654 321", modo: "ia", noLeidos: 0, actualizado: haceDias(0, "14:03"), msgs: [
     { de: "paciente", txt: "Hola buenas tardes", t: "14:02" },
     { de: "ia", txt: "¡Hola! 👋 Bienvenida a Sonríe+. Soy el asistente virtual. ¿En qué te ayudo hoy?", t: "14:02" },
     { de: "paciente", txt: "Quiero una cita para limpieza", t: "14:03" },
     { de: "ia", txt: "¡Con gusto! Una limpieza cuesta S/ 80. Tengo cupo mañana 09:00 con la Dra. Carla Mendoza en San Isidro. ¿Te lo reservo? 😊", t: "14:03", tools: ["consultar_precio","ver_disponibilidad"] },
   ] },
-  { id: 2, nombre: "Jorge Núñez", tel: "+51 912 887 445", modo: "ia", noLeidos: 2, msgs: [
+  { id: 2, nombre: "Jorge Núñez", tel: "+51 912 887 445", modo: "ia", noLeidos: 2, actualizado: haceDias(1, "13:50"), msgs: [
     { de: "paciente", txt: "cuánto cuestan los brackets?", t: "13:45" },
     { de: "ia", txt: "Una consulta de Ortodoncia cuesta S/ 150. Ahí el especialista evalúa tu caso y te da el plan. ¿Te agendo? 😊", t: "13:45", tools: ["consultar_precio"] },
     { de: "paciente", txt: "sí porfa para el sábado", t: "13:50" },
   ] },
-  { id: 3, nombre: "Ana Beltrán", tel: "+51 998 112 334", modo: "humano", noLeidos: 1, msgs: [
+  { id: 3, nombre: "Ana Beltrán", tel: "+51 998 112 334", modo: "humano", noLeidos: 1, actualizado: haceDias(3, "12:30"), msgs: [
     { de: "paciente", txt: "Estoy muy molesta, esperé 1 hora y no me atendieron", t: "12:30" },
     { de: "ia", txt: "Uy, lamento muchísimo la espera, de verdad no debió pasar 🙏 Ya estoy coordinando con el área de atención al paciente para resolverlo; te escriben enseguida por aquí.", t: "12:30", tools: ["derivar_area"] },
     { de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", t: "12:30" },
+  ] },
+  { id: 4, nombre: "Luis Paredes", tel: "+51 945 330 218", modo: "ia", noLeidos: 0, actualizado: haceDias(12, "10:15"), msgs: [
+    { de: "paciente", txt: "¿Atienden los domingos?", t: "10:14" },
+    { de: "ia", txt: "Atendemos de lunes a sábado de 8:00 a. m. a 6:00 p. m. 🕗 ¿Te busco un horario?", t: "10:15" },
   ] },
 ];
 
@@ -178,6 +185,19 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   // Al llegar un mensaje nuevo: baja solo si ya estabas abajo (como WhatsApp).
   useEffect(() => { if (atBottom) scrollBottom(false); /* eslint-disable-next-line */ }, [chat?.msgs.length]);
   const ahora = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+  // Hora en la lista de chats, como WhatsApp: hoy → hora; ayer → "Ayer"; en los
+  // últimos 7 días → día de la semana; antes → fecha corta.
+  const cuandoLista = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso); if (isNaN(d)) return "";
+    const ahora = new Date();
+    const dia = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const dif = Math.round((dia(ahora) - dia(d)) / 86400000);
+    if (dif <= 0) return d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
+    if (dif === 1) return "Ayer";
+    if (dif < 7) { const w = d.toLocaleDateString("es-PE", { weekday: "long" }); return w.charAt(0).toUpperCase() + w.slice(1); }
+    return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  };
   const hhmm = (iso) => { try { return new Date(iso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
   const fechaDe = (iso) => { try { return new Date(iso).toISOString().slice(0, 10); } catch { return null; } };
   const diaLabel = (f) => {
@@ -254,7 +274,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     return () => { parar(); document.removeEventListener("visibilitychange", alCambiarVisibilidad); };
     /* eslint-disable-next-line */
   }, [conectado, activo]);
-  const seleccionar = (id) => { setActivo(id); setEnHilo(true); if (conectado) cargarMensajes(id); };
+  const seleccionar = (id) => { setActivo(id); setEnHilo(true); if (conectado) cargarMensajes(id); else setChats((cs) => cs.map((c) => c.id === id ? { ...c, noLeidos: 0 } : c)); };
   const eliminarChat = (id) => {
     if (!id) return;
     if (!window.confirm("¿Eliminar esta conversación y sus mensajes? No se puede deshacer.")) return;
@@ -285,7 +305,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
       return;
     }
     // Solo sin backend: simula un mensaje del paciente y la respuesta IA en el cliente.
-    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, msgs: [...c.msgs, { de: "paciente", txt, t: ahora() }] } : c));
+    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: new Date().toISOString(), msgs: [...c.msgs, { de: "paciente", txt, t: ahora() }] } : c));
     if (chat.modo === "humano") return;
     setTimeout(() => {
       const r = respuestaAgente(txt, ctx);
@@ -303,13 +323,13 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     if (!input.trim()) return;
     const txt = input; setInput("");
     if (conectado) {
-      setChats((cs) => cs.map((c) => c.id === activo ? { ...c, msgs: [...c.msgs, { de: "agente", txt, t: ahora(), fecha: fechaDe(new Date().toISOString()) }] } : c));
+      setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: new Date().toISOString(), msgs: [...c.msgs, { de: "agente", txt, t: ahora(), fecha: fechaDe(new Date().toISOString()) }] } : c));
       api.conversaciones.enviar(activo, { emisor: "agente", texto: txt })
         .then(() => cargarMensajes(activo))
         .catch(() => notify("No se pudo enviar el mensaje."));
       return;
     }
-    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, msgs: [...c.msgs, { de: "agente", txt, t: ahora() }] } : c));
+    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: new Date().toISOString(), msgs: [...c.msgs, { de: "agente", txt, t: ahora() }] } : c));
   };
   const tomar = () => {
     if (conectado) {
@@ -398,7 +418,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
 
   const FILTROS = [["todos", "Todos"], ["pendientes", "Por responder"], ["ia", "IA"], ["humano", "Atención"]];
   const normQ = (s) => String(s || "").replace(/\D/g, "");
-  const lista = chats.filter((c) => {
+  // Más reciente arriba, como en WhatsApp.
+  const porFecha = (a, b) => String(b.actualizado || "").localeCompare(String(a.actualizado || ""));
+  const lista = [...chats].sort(porFecha).filter((c) => {
     if (!(filtro === "todos" || (filtro === "pendientes" ? (c.porResponder || 0) > 0 : c.modo === filtro))) return false;
     const raw = q.trim();
     if (!raw) return true;
@@ -523,18 +545,19 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             {lista.map((c) => (
               <button key={c.id} onClick={() => seleccionar(c.id)} className={`wa-item${activo === c.id ? " is-on" : ""}`}>
                 <div className="wa-av">{inicial(c.nombre)}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {/* Dos líneas como en WhatsApp: nombre + hora arriba; último mensaje + estado abajo. */}
+                <div className="wa-item__cuerpo">
+                  <div className="wa-item__fila">
                     <span className="wa-item__nom">{c.nombre}</span>
                     {c.ejemplo && <span className="dc-inbox-ejemplo">Ejemplo</span>}
                     {conectado && <span title={c.esPaciente ? "Paciente registrado" : "Contacto nuevo (lead)"} style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: c.esPaciente ? "var(--dc-ok)" : "var(--dc-line-alt)", flexShrink: 0 }} />}
+                    {c.actualizado && <span className={`wa-item__hora${(conectado ? c.porResponder : c.noLeidos) > 0 ? " is-nuevo" : ""}`}>{cuandoLista(c.actualizado)}</span>}
                   </div>
-                  <div style={{ fontSize: 13, color: c.porResponder > 0 ? "var(--dc-ok-700)" : "var(--dc-ink-400)", fontWeight: c.porResponder > 0 ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.msgs.length ? c.msgs[c.msgs.length - 1].txt : (c.ultimoMensaje || c.tel)}</div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                  {conectado && c.actualizado && <span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{hhmm(c.actualizado)}</span>}
-                  <span style={{ fontSize: 12, fontWeight: 500, padding: "2px 7px", borderRadius: "var(--dc-r-full)", background: c.modo === "ia" ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", color: c.modo === "ia" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>{c.modo === "ia" ? "IA" : "Recepción"}</span>
-                  {conectado && c.porResponder > 0 && <span title="Mensajes por responder" style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", color: INK, fontSize: 12, fontWeight: 500, display: "grid", placeItems: "center" }}>{c.porResponder}</span>}
+                  <div className="wa-item__fila">
+                    <span className={`wa-item__prev${(conectado ? c.porResponder : c.noLeidos) > 0 ? " is-nuevo" : ""}`}>{c.msgs.length ? c.msgs[c.msgs.length - 1].txt : (c.ultimoMensaje || c.tel)}</span>
+                    <span className={`wa-item__modo${c.modo === "ia" ? "" : " is-rec"}`}>{c.modo === "ia" ? "IA" : "Recepción"}</span>
+                    {(conectado ? c.porResponder : c.noLeidos) > 0 && <span className="wa-item__nuevos" title="Mensajes sin leer">{conectado ? c.porResponder : c.noLeidos}</span>}
+                  </div>
                 </div>
               </button>
             ))}
