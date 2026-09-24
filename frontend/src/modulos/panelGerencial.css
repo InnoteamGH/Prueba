@@ -6,10 +6,10 @@
   padding: 0;
   background: transparent;
   color: var(--dc-ink-900);
-  font-family: var(--dc-font, 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif);
+  font-family: var(--dc-font, 'Geist Variable', 'Geist', system-ui, sans-serif);
   font-size: var(--dc-fs-md);
   line-height: var(--dc-lh-md);
-  --dc-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --dc-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
   --g1: var(--dc-accent-cyan);
   --g2: var(--dc-amber-ink);
   --g3: var(--dc-purple);

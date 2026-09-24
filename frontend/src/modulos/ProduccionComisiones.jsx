@@ -276,7 +276,7 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
       ctx.stroke();
       ctx.globalAlpha = 1;
 
-      ctx.font = '400 11px "IBM Plex Mono", monospace';
+      ctx.font = '400 11px "Geist Mono Variable", monospace';
       ctx.fillStyle = fa;
       ctx.textAlign = "center";
       labels.forEach((m, i) => ctx.fillText(m, X(i), H - 24));
@@ -284,16 +284,16 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
         if (i > st.vis + 0.001) return;
         const v = mensuales[i] || 0;
         if (v) {
-          ctx.font = '600 11px "IBM Plex Mono", monospace';
+          ctx.font = '600 11px "Geist Mono Variable", monospace';
           ctx.fillStyle = v >= 1000 ? c1 : cssVar("--dc-warn-700", "#92400E");
           ctx.fillText(`+${Math.round(v).toLocaleString("es-PE").replace(/,/g, " ")}`, X(i), H - 8);
         } else {
-          ctx.font = '400 11px "IBM Plex Mono", monospace';
+          ctx.font = '400 11px "Geist Mono Variable", monospace';
           ctx.fillStyle = cssVar("--dc-ink-200", "#C4CBD6");
           ctx.fillText("0", X(i), H - 8);
         }
       });
-      ctx.font = '400 11px "IBM Plex Mono", monospace';
+      ctx.font = '400 11px "Geist Mono Variable", monospace';
       ctx.fillStyle = fa;
       ctx.textAlign = "left";
       ctx.fillText(`S/ ${Math.round(mx).toLocaleString("es-PE").replace(/,/g, " ")}`, pad.l + 2, pad.t - 5);
@@ -361,7 +361,7 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
         ctx.fillStyle = c1;
         ctx.fill();
         ctx.fillStyle = ink;
-        ctx.font = '600 11px "IBM Plex Mono", monospace';
+        ctx.font = '600 11px "Geist Mono Variable", monospace';
         ctx.textAlign = kx > W * 0.66 ? "right" : "left";
         const extra = mensuales[iR] ? `  (+${Math.round(mensuales[iR])})` : "";
         ctx.fillText(`${labels[iR]}  ${moneyFmt(acum[iR] || 0)}${extra}`, kx + (kx > W * 0.66 ? -10 : 10), pad.t + 2);

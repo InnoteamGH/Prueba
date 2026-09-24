@@ -11,7 +11,8 @@
     "test": "node --test src/util/fechaLima.test.js src/util/formatearFDI.test.js src/util/planInversion.test.js src/util/planInversionPaginacion.test.js src/util/odontogramaBridge.test.js src/util/odontogramaHydrate.test.js src/util/odontogramaAnatomicoDom.test.js src/util/conformanceChecklist.test.js src/api/clientClinicoGuard.test.js src/api/clientClinicaShape.test.js src/FichaMedica.sprint4.test.js src/comun.kpi.test.js src/comun.color.test.js src/sprint0.matriz.test.js src/spec-v7.matriz.test.js src/spec-v8.matriz.test.js src/modulos/panelGerencialUtil.test.js src/modulos/produccionComisionesUtil.test.js"
   },
   "dependencies": {
-    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
     "lucide-react": "^0.383.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

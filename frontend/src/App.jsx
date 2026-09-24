@@ -156,7 +156,7 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1.05fr .95fr", gridTemplateRows: "minmax(100vh,auto)", fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }} className="dc-login">
+    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1.05fr .95fr", gridTemplateRows: "minmax(100vh,auto)", fontFamily: "'Geist Variable', 'Geist', system-ui, sans-serif" }} className="dc-login">
       {/* Panel izquierdo de marca — dental teal, limpio (Apple) */}
       <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, var(--dc-brand-600) 0%, var(--dc-ink-alt) 100%)", minHeight: "100vh", padding: "48px 52px", display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#fff" }} className="dc-login-brand">
         <NeuralDentalBackground />
@@ -7834,7 +7834,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   const RolIcon = R.icon;
   return (
-    <div className="dc-shell" style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div className="dc-shell" style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Geist Variable', 'Geist', system-ui, sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 500, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}
          onBlur={(e) => { e.currentTarget.style.left = "-9999px"; e.currentTarget.style.top = "0"; }}>Saltar al contenido</a>
@@ -9069,7 +9069,7 @@ function PortalPaciente({ usuario, onLogout }) {
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Geist Variable', 'Geist', system-ui, sans-serif" }}>
       {navOpen && <div onClick={() => setNavOpen(false)} className="dc-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.45)", zIndex: 45 }} />}
       <aside className={`dc-side${navOpen ? " open" : ""}`} style={{ width: 230, background: "linear-gradient(180deg,var(--dc-accent-cyan),var(--dc-brand-600))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(100vh - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(14,116,144,.3)", border: "1px solid rgba(255,255,255,.15)", display: "flex", flexDirection: "column", zIndex: 50 }}>
         <div style={{ padding: 18, borderBottom: "1px solid rgba(255,255,255,.15)", display: "flex", alignItems: "center", gap: 10 }}>
@@ -9376,7 +9376,7 @@ const PLANES = [
    PANTALLA DE BIENVENIDA — guía a la clínica que abre el link sin vendedor
    =========================================================================== */
 function Bienvenida({ onEntrar }) {
-  const DISPLAY = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif";
+  const DISPLAY = "'Geist Variable', 'Geist', system-ui, sans-serif";
   const ink = "var(--dc-ink-alt)", navy = NAVY, red = RED, teal = DS.c.primary, wa = "var(--dc-brand-600)";
   const bg = "var(--dc-bg)", line = "var(--dc-line)", muted = "var(--dc-slate)";
   const chat = [
@@ -9409,7 +9409,7 @@ function Bienvenida({ onEntrar }) {
   const eyebrow = (t, c) => <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase", color: c }}>{t}</div>;
   const ctaRed = { background: red, color: "#fff", border: "none", borderRadius: "var(--dc-r-md)", padding: "15px 28px", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 9 };
   return (
-    <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", color: ink }}>
+    <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Geist Variable', 'Geist', system-ui, sans-serif", color: ink }}>
       {/* Barra superior */}
       <header style={{ maxWidth: 1120, margin: "0 auto", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
@@ -9799,7 +9799,7 @@ function BackOfficeAWG({ usuario, onLogout }) {
     }
   };
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Geist Variable', 'Geist', system-ui, sans-serif" }}>
       <aside style={{ width: 236, background: "linear-gradient(180deg,var(--dc-ink-alt),var(--dc-ink-900))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(100vh - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(33,16,66,.4)", border: "1px solid rgba(255,255,255,.1)", display: "flex", flexDirection: "column", zIndex: 50 }}>
         <div style={{ padding: "20px 18px 14px", display: "flex", alignItems: "center", gap: 11 }}>
           <div style={{ background: "linear-gradient(135deg,var(--dc-brand-soft),var(--dc-purple))", borderRadius: "var(--dc-r-md)", width: 38, height: 38, display: "grid", placeItems: "center", boxShadow: "0 8px 18px -8px rgba(124,58,237,.8)" }}><Globe size={21} strokeWidth={1.75} color="#fff" /></div>

@@ -42,7 +42,7 @@ export default class ErrorBoundary extends React.Component {
     return (
       <div style={{ minHeight: "100vh", display: "grid", placeItems: "center",
                     background: "var(--dc-white)", padding: 24,
-                    fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}>
+                    fontFamily: "'Geist Variable', 'Geist', system-ui, -apple-system, sans-serif" }}>
         <div style={{ maxWidth: 520, width: "100%", background: "var(--dc-white)", borderRadius: "var(--dc-r-lg)",
                       border: "1px solid var(--dc-line)", boxShadow: "0 10px 30px rgba(15,23,42,.05)",
                       padding: 32, textAlign: "center" }}>

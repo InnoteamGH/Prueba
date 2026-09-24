@@ -7,19 +7,8 @@
     <meta name="description" content="Software dental para clínicas del Perú: agenda, historia clínica, odontograma, cobros y un asistente con IA en WhatsApp." />
     <meta name="theme-color" content="#087E8B" />
 
-    <!--
-      Las fuentes se piden AQUÍ y no con un @import dentro del <style> que inyecta
-      React al montarse. Con el @import el navegador no se enteraba de que existían
-      hasta ejecutar el JavaScript, así que la pantalla se dibujaba con la tipografía
-      del sistema y los títulos daban un salto al llegar la buena.
-      El preconnect abre la conexión con Google Fonts mientras aún se descarga el JS.
-    -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-    />
+    <!-- Tipografías (Geist y Geist Mono) incluidas en el paquete con @fontsource:
+         no dependen de Google Fonts ni hacen saltar los títulos al cargar. -->
   </head>
   <body>
     <div id="root"></div>

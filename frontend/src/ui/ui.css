@@ -489,9 +489,9 @@
 .dc-sb__brand { height: 64px; display: flex; align-items: center; padding: 0 16px; flex-shrink: 0; }
 .dc-sb__logo { all: unset; display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 12px; padding: 4px; }
 .dc-sb__mark { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--dc-primary-alt); flex-shrink: 0; }
-.dc-sb__name { display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 16px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; line-height: 1.1; }
+.dc-sb__name { display: flex; flex-direction: column; font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 16px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; line-height: 1.1; }
 .dc-sb__name b { color: var(--dc-primary-alt); font-weight: 700; }
-.dc-sb__name small { font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 12px; font-weight: 500; color: var(--dc-ink-500); letter-spacing: 0; margin-top: 2px; }
+.dc-sb__name small { font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 12px; font-weight: 500; color: var(--dc-ink-500); letter-spacing: 0; margin-top: 2px; }
 .dc-sb__nav { flex: 1; overflow-y: auto; padding: 4px 12px 12px; scrollbar-width: thin; scrollbar-color: var(--dc-line) transparent; }
 .dc-sb__grupo + .dc-sb__grupo { margin-top: 14px; }
 .dc-sb__titulo { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dc-ink-400); padding: 0 10px 6px; }
@@ -550,7 +550,7 @@
   border-bottom: 1px solid var(--dc-line);
 }
 .dc-top__izq { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.dc-top__titulo { margin: 0; font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-top__titulo { margin: 0; font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-top__der { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .dc-top__sede { display: flex; align-items: center; gap: 6px; }
 .dc-top__icono { all: unset; box-sizing: border-box; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--dc-line); color: var(--dc-ink-500); cursor: pointer; }
@@ -576,7 +576,7 @@
 /* ---- Barra de página: título de sección + acciones, sin tarjeta ---- */
 .dc-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .dc-toolbar > div:first-child { min-width: 0; }
-.dc-toolbar__titulo { margin: 0; font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); }
+.dc-toolbar__titulo { margin: 0; font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.015em; color: var(--dc-ink-900); }
 .dc-toolbar__sub { font-size: 13px; color: var(--dc-ink-500); margin-top: 2px; }
 
 /* ---- Franja de cifras: varias métricas en una sola tarjeta ---- */
@@ -584,7 +584,7 @@
 .dc-franja__main { display: flex; flex: 1 1 520px; }
 .dc-franja__cifra { flex: 1; padding: 16px 20px; display: grid; gap: 4px; align-content: start; border-right: 1px solid var(--dc-line); }
 .dc-franja__cifra span { font-size: 13px; font-weight: 500; color: var(--dc-ink-500); }
-.dc-franja__cifra b { font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.dc-franja__cifra b { font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .dc-franja__avance i { display: block; height: 6px; border-radius: 999px; background: var(--dc-bg-alt); overflow: hidden; margin-top: 4px; }
 .dc-franja__avance em { display: block; height: 100%; border-radius: 999px; background: var(--dc-primary-alt); transition: width .6s ease; }
 .dc-franja__desglose { flex: 1 1 360px; display: flex; flex-wrap: wrap; align-content: center; gap: 8px; padding: 16px 20px; background: var(--dc-bg-soft); }
@@ -657,7 +657,7 @@
 .dc-hoy__cifras > div:nth-child(odd) { border-right: 1px solid var(--dc-line); }
 .dc-hoy__cifras > div:nth-last-child(-n+2) { border-bottom: 0; }
 .dc-hoy__cifras span { font-size: 13px; font-weight: 500; color: var(--dc-ink-500); }
-.dc-hoy__cifras b { font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.dc-hoy__cifras b { font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
 .dc-cita { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--dc-line); }
 .dc-cita:last-child { border-bottom: 0; }

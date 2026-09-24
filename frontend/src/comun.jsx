@@ -33,8 +33,8 @@ export const DS = {
   f: { hero: 26, h1: 22, h2: 18, body: 15, cap: 13, micro: 11.5 },
   motion: { fast: ".16s ease", base: ".24s ease", slow: ".4s ease", spring: ".26s cubic-bezier(.2,.7,.2,1)" } };
 DS.card = { background: "var(--dc-surface)", borderRadius: 16, border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)" };
-DS.label = { fontSize: DS.f.cap, fontWeight: 500, color: DS.c.ink, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
-export const DISPLAY_FONT = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif";
+DS.label = { fontSize: DS.f.cap, fontWeight: 500, color: DS.c.ink, fontFamily: "'Geist Variable', 'Geist', system-ui, sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
+export const DISPLAY_FONT = "'Geist Variable', 'Geist', system-ui, sans-serif";
 
 /* ============================================================================
    PALETA ESTÁNDAR — tokens semánticos estilo Apple (una sola fuente de verdad).

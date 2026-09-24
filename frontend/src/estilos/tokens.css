@@ -130,8 +130,8 @@
   --dc-violeta:#7C5CD6;
   --dc-violeta-100:#EFEAFC;
   --dc-grad-marca: linear-gradient(135deg, #14A3A8 0%, #0E8C95 45%, #0A6C76 100%);
-  --dc-font: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --dc-font-title: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dc-font: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dc-font-title: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 @media (pointer: coarse) {
   :root { --dc-tap-min:44px; }
@@ -160,9 +160,10 @@ a:focus-visible,
 /* ---- UX-04 / UX-06 / UX-08 tipografía y táctil globales ---- */
 body {
   font-family: var(--dc-font);
-  /* Plus Jakarta Sans trae un espacio entre palabras muy estrecho (0,15 em): sin
-     compensarlo, "Dolor de muela" se leía casi como una sola palabra. */
-  word-spacing: .1em;
+  /* Geist: la tipografía de Vercel, sobria y precisa; activa dígitos alineados y
+     la "l" con cola para no confundirla con el 1 en DNI y teléfonos. */
+  font-feature-settings: "ss01", "cv11";
+  letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: var(--dc-fs-md);
