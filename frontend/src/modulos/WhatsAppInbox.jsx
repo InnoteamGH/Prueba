@@ -178,6 +178,13 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   // el panel del contacto se abre a demanda con el botón de información.
   const [enHilo, setEnHilo] = useState(false);
   const [verInfo, setVerInfo] = useState(false);
+  // En pantallas grandes el panel del contacto está fijo pero se puede ocultar
+  // para dar más ancho a la conversación (se recuerda en este navegador).
+  const [ocultarInfo, setOcultarInfo] = useState(() => { try { return localStorage.getItem("dc_wa_info_oculta") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("dc_wa_info_oculta", ocultarInfo ? "1" : "0"); } catch { /* */ } }, [ocultarInfo]);
+  const PANEL_FIJO = 1500;
+  const alternarInfo = () => { if (window.innerWidth > PANEL_FIJO) setOcultarInfo((v) => !v); else setVerInfo((v) => !v); };
+  const cerrarInfo = () => { if (window.innerWidth > PANEL_FIJO) setOcultarInfo(true); else setVerInfo(false); };
   const chat = chats.find((c) => c.id === activo);
   const scrollBottom = (smooth) => { const el = scrollRef.current; if (el) { el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" }); setAtBottom(true); } };
   // Al abrir una conversación: baja al último mensaje.
@@ -416,7 +423,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     return [...out, ...fijas];
   })();
 
-  const FILTROS = [["todos", "Todos"], ["pendientes", "Por responder"], ["ia", "IA"], ["humano", "Atención"]];
+  const FILTROS = [["todos", "Todos"], ["pendientes", "Pendientes"], ["ia", "IA"], ["humano", "Recepción"]];
   const normQ = (s) => String(s || "").replace(/\D/g, "");
   // Más reciente arriba, como en WhatsApp.
   const porFecha = (a, b) => String(b.actualizado || "").localeCompare(String(a.actualizado || ""));
@@ -510,7 +517,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           <Btn small onClick={cargarConversaciones}>Reintentar</Btn>
         </div>
       )}
-      <Card className={`dc-inbox wa${enHilo && chat ? " is-hilo" : ""}${verInfo ? " is-info" : ""}`}>
+      <Card className={`dc-inbox wa${enHilo && chat ? " is-hilo" : ""}${verInfo ? " is-info" : ""}${ocultarInfo ? " sin-info" : ""}`}>
         {/* Columna 1 · lista con búsqueda y filtros */}
         <div className="dc-inbox-list">
           <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
@@ -575,7 +582,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm">{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
               {conectado && <Btn small onClick={() => abrirAgendar("Solicitud por WhatsApp")}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
-              <button type="button" className="wa-info" aria-label="Datos del contacto" title="Datos del contacto" aria-pressed={verInfo} onClick={() => setVerInfo((v) => !v)}><Info size={17} strokeWidth={1.9} /></button>
+              <button type="button" className="wa-info" aria-label="Datos del contacto" title="Datos del contacto" aria-pressed={verInfo || (!ocultarInfo && window.innerWidth > PANEL_FIJO)} onClick={alternarInfo}><Info size={17} strokeWidth={1.9} /></button>
               <Btn small kind={chat.modo === "ia" ? "primary" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>
             </div>
           </div>
@@ -605,7 +612,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         </div>
         {/* Columna 3 · panel del contacto */}
         <div className="dc-inbox-side">
-          <button type="button" className="wa-info-cerrar" aria-label="Cerrar datos del contacto" onClick={() => setVerInfo(false)}><X size={16} strokeWidth={2} /></button>
+          <button type="button" className="wa-info-cerrar" aria-label="Cerrar datos del contacto" onClick={cerrarInfo}><X size={16} strokeWidth={2} /></button>
           <div style={{ padding: "32px 20px 24px", textAlign: "center", borderBottom: "1px solid var(--dc-line)" }}>
             <div style={{ width: 84, height: 84, borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: INK, border: "1px solid var(--dc-line)", boxShadow: "0 8px 24px -6px rgba(16,24,40,.08)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 27, margin: "0 auto 16px" }}>{inicial(chat.nombre)}</div>
             <div style={{ fontWeight: 600, color: NAVY, fontSize: 16, fontFamily: DISPLAY_FONT }}>{chat.nombre}</div>
