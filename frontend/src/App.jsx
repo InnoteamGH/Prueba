@@ -3704,33 +3704,38 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 
   return (
     <div style={{ overflowX: "auto", maxWidth: "100%", width: "100%" }}>
-      {!embedded && <div className="dc-banda dc-banda--info" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}><Info size={18} strokeWidth={1.75} style={{ flexShrink: 0 }} /><div style={{ fontSize: 14 }}>La lista se ordena por <strong>urgencia</strong>. Al liberarse un cupo, el primer paciente compatible recibe la oferta automática por WhatsApp; si no responde en 15 min, pasa al siguiente.</div></div>
-      </div>}
-      {!embedded && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 16 }}>
-        {[["En espera", esp.length, NAVY, <Bell size={18} strokeWidth={1.75} />], ["Urgencia alta", esp.filter((x) => x.urg === "alta").length, RED, <AlertTriangle size={18} strokeWidth={1.75} />], ["Ofertas activas", esp.filter((x) => x.ofrecido.length).length, "var(--dc-warn-600)", <Send size={18} strokeWidth={1.75} />]].map(([l, v, c, ic]) => (
-          <KpiCard key={l} label={l} value={v} color={c} icon={ic} />
-        ))}
-      </div>}
-      {ordenada.length > 0 && (() => { const top = ordenada[0]; const u = URGENCIA[top.urg]; return (
-        <Card style={{ padding: 16, marginBottom: 16, background: `linear-gradient(120deg,tint("var(--dc-accent-cyan)", 0.059)},${tint(DS.c.primary, 0.059)})`, border: "1px solid var(--dc-bg)", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "linear-gradient(135deg,var(--dc-accent-cyan),var(--dc-brand-600))", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0, boxShadow: "0 8px 18px -8px rgba(14,116,144,.7)" }}><Sparkles size={20} strokeWidth={1.75} /></div>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: .6, textTransform: "uppercase", color: DS.c.primary }}>Sugerencia inteligente · próximo cupo</div>
-            <div style={{ fontSize: 14, color: NAVY, marginTop: 3 }}>Al liberarse un espacio, ofrécelo a <strong>{top.n}</strong> — urgencia <strong>{u.l.toLowerCase()}</strong>, {top.e}, esperando {top.desde}.</div>
+      {!embedded && (
+        <EnCabecera>
+          <div className="dc-esp-top">
+            <span className="dc-esp-chip"><b>{esp.length}</b> en espera</span>
+            {esp.some((x) => x.urg === "alta") && <span className="dc-esp-chip dc-esp-chip--alta"><b>{esp.filter((x) => x.urg === "alta").length}</b> urgente{esp.filter((x) => x.urg === "alta").length === 1 ? "" : "s"}</span>}
+            {esp.some((x) => x.ofrecido.length) && <span className="dc-esp-chip dc-esp-chip--oferta"><b>{esp.filter((x) => x.ofrecido.length).length}</b> con oferta</span>}
+            <span className="dc-esp-ayuda" tabIndex={0} aria-label="Cómo funciona la lista de espera">
+              <Info size={16} strokeWidth={1.75} />
+              <span role="tooltip">La lista se ordena por <strong>urgencia</strong>. Al liberarse un cupo, el primer paciente compatible recibe la oferta por WhatsApp; si no responde en 15 min, pasa al siguiente.</span>
+            </span>
           </div>
-          <Btn small onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer cupo ahora</Btn>
-        </Card>
+        </EnCabecera>
+      )}
+      {ordenada.length > 0 && (() => { const top = ordenada[0]; const u = URGENCIA[top.urg]; return (
+        <div className="dc-esp-sug">
+          <span className="dc-esp-sug__ico"><Sparkles size={15} strokeWidth={1.75} /></span>
+          <div className="dc-esp-sug__txt">
+            <span className="dc-esp-sug__eti">Próximo cupo</span>
+            <span>Ofrécelo a <strong>{top.n}</strong> · urgencia {u.l.toLowerCase()} · {top.e} · espera {top.desde.toLowerCase()}</span>
+          </div>
+          <Btn small onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer cupo</Btn>
+        </div>
       ); })()}
-      <DataTable titulo="Pacientes esperando cupo" sub="en espera" minWidth={1000} rows={ordenada} accion={<Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>} empty={<Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." />} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(158px,1.4fr)", a: "left", get: (p) => p.n, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(NAVY, 0.071), color: NAVY, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.n)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</div>{p.ofrecido.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", display: "flex", alignItems: "center", gap: 4 }}><Bell size={10} strokeWidth={1.75} /> {p.ofrecido.length} oferta(s)</div>}</div></div> },
-        { key: "urg", label: "Urgencia", w: "minmax(104px,0.8fr)", a: "center", get: (p) => URGENCIA[p.urg].l, cell: (p) => { const u = URGENCIA[p.urg]; return <span style={{ fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: u.bg, color: u.fg }}>{u.l}</span>; } },
-        { key: "tel", label: "Contacto", w: "minmax(130px,1fr)", a: "left", get: (p) => p.tel, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Phone size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.tel}</span> },
-        { key: "esp", label: "Especialidad", w: "minmax(130px,1fr)", a: "left", get: (p) => p.e, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><Stethoscope size={13} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.e}</span></span> },
-        { key: "medico", label: "Médico", w: "minmax(120px,1fr)", a: "left", get: (p) => p.medico, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p.medico}</span> },
-        { key: "pref", label: "Preferencia", w: "minmax(110px,1fr)", a: "center", get: (p) => p.pref, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{p.pref}</span> },
-        { key: "desde", label: "Espera", w: "minmax(96px,0.8fr)", a: "center", get: (p) => p.desde, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.desde}</span> },
-        { key: "acc", label: "Acciones", w: "236px", a: "center", noFilter: true, noSort: true, cell: (p) => <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}><Btn small kind="ghost" onClick={() => ofrecer(p)}><Bell size={14} strokeWidth={1.75} /> Ofrecer</Btn><Btn small onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn></div> },
+      <DataTable titulo="Pacientes esperando cupo" sub="en espera" minWidth={940} rows={ordenada} rowClassName={(p) => (ordenada[0] && p.id === ordenada[0].id ? "dc-esp-fila is-sug" : "dc-esp-fila")} accion={<Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>} empty={<Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." />} cols={[
+        { key: "paciente", label: "Paciente", w: "minmax(158px,1.4fr)", a: "left", get: (p) => p.n, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(colorDe(p.n), 0.14), color: colorDe(p.n), display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.n)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</div>{p.ofrecido.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", display: "flex", alignItems: "center", gap: 4 }}><Bell size={10} strokeWidth={1.75} /> {p.ofrecido.length} oferta(s)</div>}</div></div> },
+        { key: "urg", label: "Urgencia", w: "minmax(88px,0.7fr)", a: "center", get: (p) => URGENCIA[p.urg].l, cell: (p) => { const u = URGENCIA[p.urg]; return <span style={{ fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: u.bg, color: u.fg }}>{u.l}</span>; } },
+        { key: "tel", label: "Contacto", w: "minmax(112px,1fr)", a: "left", get: (p) => p.tel, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Phone size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.tel}</span> },
+        { key: "esp", label: "Especialidad", w: "minmax(120px,1fr)", a: "left", get: (p) => p.e, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><Stethoscope size={13} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.e}</span></span> },
+        { key: "medico", label: "Médico", w: "minmax(112px,1fr)", a: "left", get: (p) => p.medico, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p.medico}</span> },
+        { key: "pref", label: "Preferencia", w: "minmax(92px,0.9fr)", a: "center", get: (p) => p.pref, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{p.pref}</span> },
+        { key: "desde", label: "Espera", w: "minmax(80px,0.7fr)", a: "center", get: (p) => p.desde, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.desde}</span> },
+        { key: "acc", label: "Acciones", w: "176px", a: "center", noFilter: true, noSort: true, cell: (p) => <div className="dc-esp-acc"><button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} title="Ofrecer cupo por WhatsApp" aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button><Btn small onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn></div> },
       ]} />
       {asignarBase && <AgendarRecepcionModal base={asignarBase} notify={notify} onClose={() => setAsignarBase(null)} onCreada={() => { const eid = asignarBase._esperaId; setAsignarBase(null); if (conectado && eid) api.espera.resolver(eid).catch(() => {}).finally(recargar); else recargar(); }} />}
       {nuevoEsp && (() => {
