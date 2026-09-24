@@ -999,7 +999,9 @@ export const Field = ({ label, value, onChange, placeholder, type = "text", icon
 /* ---- Sistema visual base (consistencia entre módulos) ---- */
 export const iniciales = (n) => (n || "").split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase();
 // Color estable por nombre — paleta fría de marca (teal/navy/azul), sobria y coherente.
-export const AV_COLORS = [DS.c.primary, "var(--dc-navy)", DS.c.accent, "var(--dc-brand-600)", "var(--dc-info-ink)", "var(--dc-brand-mid)"];
+// Paleta de avatares: tonos variados pero armónicos (todos con contraste AA sobre su
+// propio tinte al 14 %), para distinguir pacientes de un vistazo.
+export const AV_COLORS = ["#0E8C95", "#6D4FD1", "#D0563F", "#B7791F", "#2563EB", "#15803D", "#C2417A", "#0F6E8C"];
 export const colorDe = (s) => AV_COLORS[[...(s || "x")].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 /**
  * Tinte seguro sobre tokens `var(--dc-*)` (UX-22).
@@ -1241,7 +1243,7 @@ function etiquetaCant(n, sub) {
   return sub;
 }
 
-export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight }) {
+export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName }) {
   const [sortCol, setSortCol] = useState(defaultSort?.key ?? null);
   const [sortDir, setSortDir] = useState(defaultSort?.dir ?? "asc");
   const [colFilters, setColFilters] = useState({});
@@ -1300,7 +1302,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
             })}
           </div>
           {lista.length === 0 ? (rows.length > 0 ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." /> : (empty || <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin registros" sub="Aún no hay datos para mostrar." />)) : mostradas.map((r, i) => { return (
-            <div key={r.id ?? i} className="dc-table-row" onClick={onRowClick ? () => onRowClick(r) : undefined} style={{ display: "grid", gridTemplateColumns: COL, gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--dc-line)", cursor: onRowClick ? "pointer" : "default", background: "transparent", transition: "background .15s", position: "relative", zIndex: 1, boxSizing: "border-box", width: "100%", maxWidth: "100%", minWidth: 0 }} onMouseEnter={(ev) => { ev.currentTarget.style.background = "var(--dc-bg-soft2)"; }} onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; }}>
+            <div key={r.id ?? i} className={`dc-table-row${rowClassName ? " " + (rowClassName(r) || "") : ""}`} onClick={onRowClick ? () => onRowClick(r) : undefined} style={{ display: "grid", gridTemplateColumns: COL, gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--dc-line)", cursor: onRowClick ? "pointer" : "default", background: "transparent", transition: "background .15s", position: "relative", zIndex: 1, boxSizing: "border-box", width: "100%", maxWidth: "100%", minWidth: 0 }} onMouseEnter={(ev) => { ev.currentTarget.style.background = "var(--dc-bg-soft2)"; }} onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; }}>
               {cols.map((col) => (
                 <div key={col.key} data-label={col.label || ""} className={col.sticky ? "dc-col-sticky" : undefined} style={{ minWidth: 0, ...(col.sticky ? stickyCell : {}), ...(col.a === "left" ? { paddingLeft: 12 }
                   : col.a === "right" ? { display: "flex", justifyContent: "flex-end", textAlign: "right", paddingRight: 12, fontVariantNumeric: "tabular-nums" }

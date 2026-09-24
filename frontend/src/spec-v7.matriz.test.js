@@ -85,8 +85,8 @@ describe("A27 — producción especialidad", () => {
 
 describe("A33 — dc-kpi__icon en Hoy", () => {
   // El resumen de Hoy es ahora una franja única de cifras (sin iconos gigantes).
-  it("Agenda resumen usa la franja de cifras compartida", () => {
-    assert.match(app, /className="dc-franja"/);
+  it("Agenda resumen usa la cabecera del día", () => {
+    assert.match(app, /className="dc-ag-hero"/);
     assert.doesNotMatch(app, /width: 76, height: 76/);
   });
 });

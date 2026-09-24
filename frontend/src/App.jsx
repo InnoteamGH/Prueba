@@ -57,7 +57,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {MenuAcciones, DIAS_SEM, EDAD_PEDIATRICA, EDAD_TRANSICION, EmblemaNino, HORAS_SEL, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, etapaFicha, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, acentoFicha, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, WARM, addDays, calcEdad, colorDe, cortaSede, espsDe, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, minutosViaje, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
+import {EnCabecera, MenuAcciones, DIAS_SEM, EDAD_PEDIATRICA, EDAD_TRANSICION, EmblemaNino, HORAS_SEL, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, etapaFicha, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, acentoFicha, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, WARM, addDays, calcEdad, colorDe, cortaSede, espsDe, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, minutosViaje, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -1602,7 +1602,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     { key: "paciente", label: "Paciente", get: (c) => c.paciente + " " + c.dni, w: "minmax(160px,1.6fr)", a: "left",
       cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 11, minWidth: 0 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : c.llegada ? "var(--dc-ok-100)" : "var(--dc-brand-050)", color: pasada ? "var(--dc-ink-400)" : c.llegada ? "var(--dc-ok-700)" : "var(--dc-brand-600)", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>{iniciales(c.paciente)}</div>
+          <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : tint(colorDe(c.paciente), 0.14), color: pasada ? "var(--dc-ink-400)" : colorDe(c.paciente), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12.5, flexShrink: 0, boxShadow: pasada ? "none" : `inset 0 0 0 1.5px ${tint(colorDe(c.paciente), 0.25)}` }}>{iniciales(c.paciente)}</div>
           <div style={{ minWidth: 0 }}>
             <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{c.paciente}{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
             <span style={{ fontSize: 12, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums", display: "inline-flex", alignItems: "center", gap: 5 }}>DNI {c.dni}{c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> IA</span>}</span>
@@ -1690,13 +1690,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   return (
     <div style={{ display: "grid", gap: 18 }}>
       {/* Encabezado: la fecha y las acciones del día, sin tarjeta alrededor. */}
-      <div className="dc-toolbar" style={vista === "calendario" ? { justifyContent: "flex-end" } : undefined}>
-        {/* En el calendario la fecha ya está en su propia navegación. */}
-        {vista !== "calendario" && <div>
-          <h2 className="dc-toolbar__titulo">{fechaLarga}</h2>
-          <div className="dc-toolbar__sub">{pluralEs(todasHoy.length, "cita programada", "citas programadas")} para hoy</div>
-        </div>}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      {/* Acciones de la agenda en la cabecera de la app, junto al título. */}
+      <EnCabecera><div className="dc-ag-acc">
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {/* Action Icons (el calendario trae su propio botón Descargar) */}
           {vista !== "calendario" && <div style={{ position: "relative" }}>
             <button type="button" className="dc-icon-btn" aria-label="Descargar agenda" onClick={() => setDlOpen((v) => !v)} title="Descargar agenda" style={{ width: 36, height: 36, borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", color: "var(--dc-ink-700)", cursor: "pointer", display: "grid", placeItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><Download size={16} strokeWidth={1.75} /></button>
@@ -1713,7 +1709,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           {puedeAgendar && <button type="button" className="dc-icon-btn" aria-label="Sala TV" onClick={() => setTv(true)} title="Sala TV" style={{ width: 36, height: 36, borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)", background: "#fff", color: "var(--dc-ink-700)", cursor: "pointer", display: "grid", placeItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><Monitor size={16} strokeWidth={1.75} /></button>}
           {puedeAgendar && <Btn onClick={() => setAgendar(true)}><Plus size={16} strokeWidth={1.75} /> Agendar cita</Btn>}
         </div>
-      </div>
+      </div></EnCabecera>
       {agendar && <AgendarRecepcionModal rol={rol} base={typeof agendar === "object" ? agendar : undefined} onClose={() => setAgendar(false)} onCreada={() => { setAgendar(false); recargar(); recargarAll(); }} notify={notify} />}
       {asignarBase && <AgendarRecepcionModal rol={rol} base={asignarBase} notify={notify} onClose={() => setAsignarBase(null)}
         onCreada={() => { const eid = asignarBase._esperaId; setAsignarBase(null); recargar(); recargarAll();
@@ -1754,44 +1750,61 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         const cnt = (s) => todasHoy.filter((c) => c.estado === s).length;
         const presentes = stats[1][1];
         const desglose = [
-          { l: "Confirmadas", c: DS.c.primary, n: cnt("confirmada") },
-          { l: "Presentes", c: "var(--dc-ok-700)", n: presentes },
-          { l: "Atendidas", c: "var(--dc-warn)", n: atend },
-          { l: "En atención", c: "var(--dc-warn-600)", n: cnt("en_atencion") },
-          { l: "Pendientes", c: "var(--dc-ink-500)", n: cnt("pendiente") },
-          { l: "Canceladas", c: "var(--dc-red)", n: cnt("cancelada") },
+          { l: "Confirmadas", c: "#7FE0DD", n: cnt("confirmada") },
+          { l: "Presentes", c: "#6EE7A8", n: presentes },
+          { l: "En atención", c: "#FBBF5A", n: cnt("en_atencion") },
+          { l: "Atendidas", c: "#A5B4FC", n: atend },
+          { l: "Pendientes", c: "rgba(255,255,255,.45)", n: cnt("pendiente") },
+          { l: "Canceladas", c: "#F59A8D", n: cnt("cancelada") },
         ].filter((x) => x.n > 0);
         // Una sola franja: tres cifras principales y el desglose por estado. Antes eran
         // ocho tarjetas en dos filas que repetían los mismos números.
+        // Cabecera del día con color de marca: fecha, próxima cita, cifras y una barra
+        // que reparte el día por estado. Sustituye a la franja gris.
+        const medProx = proxima ? (proxima.medico || (medicos.find((m) => m.id === proxima.medicoId) || {}).nombre) : null;
+        const segs = desglose.map((a) => ({ ...a, pct: (a.n / total) * 100 }));
         return (
-          <Card className="dc-franja">
-            <div className="dc-franja__main">
-              <div className="dc-franja__cifra"><span>Citas activas</span><b>{nCitas}</b></div>
-              <div className="dc-franja__cifra"><span>Por llegar</span><b>{stats[2][1]}</b></div>
-              <div className="dc-franja__cifra dc-franja__avance">
-                <span>Avance del día</span>
-                <b>{nAv}%</b>
-                <i><em style={{ width: `${Math.min(100, nAv)}%` }} /></i>
+          <section className="dc-ag-hero">
+            <div className="dc-ag-hero__top">
+              <div className="dc-ag-hero__dia">
+                <span className="dc-ag-hero__eyebrow">Agenda de hoy</span>
+                <h2>{fechaLarga}</h2>
+                <p>{pluralEs(todasHoy.length, "cita programada", "citas programadas")}{stats[2][1] ? ` · ${pluralEs(stats[2][1], "paciente por llegar", "pacientes por llegar")}` : ""}</p>
               </div>
-            </div>
-            {desglose.length > 0 && (
-              <div className="dc-franja__desglose">
-                {desglose.map((a) => (
-                  <div key={a.l} className="dc-franja__estado">
-                    <span className="dc-franja__punto" style={{ background: a.c }} />
-                    <span>{a.l}</span>
-                    <b>{a.n}</b>
+              {proxima && (
+                <div className="dc-ag-hero__prox">
+                  <span className="dc-ag-hero__eyebrow">Próxima cita</span>
+                  <div className="dc-ag-hero__prox-fila">
+                    <b className="dc-ag-hero__hora">{proxima.hora}</b>
+                    <div><strong>{proxima.paciente}</strong><span>{proxima.motivo}{medProx ? ` · ${medProx}` : ""}</span></div>
                   </div>
-                ))}
+                </div>
+              )}
+            </div>
+            <div className="dc-ag-hero__cifras">
+              <div><b>{nCitas}</b><span>Citas activas</span></div>
+              <div><b>{stats[1][1]}</b><span>Presentes</span></div>
+              <div><b>{stats[2][1]}</b><span>Por llegar</span></div>
+              <div><b>{nAv}%</b><span>Avance del día</span></div>
+            </div>
+            {segs.length > 0 && (
+              <div className="dc-ag-hero__estados">
+                <div className="dc-ag-hero__barra" role="img" aria-label={segs.map((a) => `${a.l}: ${a.n}`).join(", ")}>
+                  {segs.map((a) => <i key={a.l} style={{ width: `${a.pct}%`, background: a.c }} />)}
+                </div>
+                <div className="dc-ag-hero__leyenda">
+                  {segs.map((a) => <span key={a.l}><i style={{ background: a.c }} />{a.l} <b>{a.n}</b></span>)}
+                </div>
               </div>
             )}
-          </Card>
+          </section>
         );
       })()}
 
       {/* Lista o Calendario según el toggle */}
       {vista !== "calendario" ? (<>
       <DataTable titulo="Citas de hoy" sub="citas" minWidth={980} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
+        rowClassName={(c) => `dc-ag-fila${proxima && c.id === proxima.id && c.estado !== "atendida" ? " is-prox" : ""}${c.estado === "cancelada" || c.estado === "atendida" ? " is-pasada" : ""}`}
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
         cols={COLS_AGENDA} />
