@@ -177,9 +177,9 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
                 {det > 0 && <i style={{ width: `${pct(det)}%`, background: "#F59A8D" }} />}
               </div>
               <div className="dc-sat-hero__grupos">
-                <div><i style={{ background: "#6EE7A8" }} /><b>{pct(prom)}%</b><span>Promotores · 9–10</span></div>
-                <div><i style={{ background: "#FBBF5A" }} /><b>{pct(pas)}%</b><span>Neutrales · 7–8</span></div>
-                <div><i style={{ background: "#F59A8D" }} /><b>{pct(det)}%</b><span>Detractores · 0–6</span></div>
+                <div><i style={{ background: "#6EE7A8" }} /><b>{pct(prom)}%</b><span>Promotores – 9–10</span></div>
+                <div><i style={{ background: "#FBBF5A" }} /><b>{pct(pas)}%</b><span>Neutrales – 7–8</span></div>
+                <div><i style={{ background: "#F59A8D" }} /><b>{pct(det)}%</b><span>Detractores – 0–6</span></div>
               </div>
             </div>
           </section>
@@ -277,7 +277,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
             <div><b>{activas}/{reglas.length}</b><span>Activas</span></div>
             <div><b>{resumen && resumen.mensajesMes > 0 ? resumen.mensajesMes.toLocaleString("es-PE") : "0"}</b><span>Enviados este mes</span></div>
             <div><b>{resumen && resumen.mensajesMes > 0 ? `${resumen.tasaEntrega}%` : "—"}</b><span>Entrega</span></div>
-            <span className="dc-rec__dnd" title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día"><Shield size={13} strokeWidth={1.75} /> No molestar 21:00–08:00 · máx. 3 al día</span>
+            <span className="dc-rec__dnd" title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día"><Shield size={13} strokeWidth={1.75} /> No molestar 21:00–08:00 – máx. 3 al día</span>
           </div>
         </div>
         <div className="dc-rec__fases">
@@ -287,7 +287,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
               {reglas.filter((r) => !!r.antes === antes).map((r) => { const Ic = r.icon || (AUT_META[r.clave] || {}).icon || Zap; const color = r.color || (AUT_META[r.clave] || {}).color || DS.c.primary; return (
                 <div key={r.clave} className={`dc-rec__paso${r.on ? " is-on" : ""}`} style={{ "--paso": color }} onClick={() => abrirCfg(r)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") abrirCfg(r); }} title="Editar mensaje">
                   <span className="dc-rec__ico" style={{ background: tint(color, 0.12), color }}><Ic size={16} strokeWidth={1.75} /></span>
-                  <div className="dc-rec__txt"><b>{r.l}</b><span>{!r.on ? "Pausado" : r.stat === "por WhatsApp" ? "Activo" : r.stat}<em className="dc-rec__cuando-m"> · {r.timing}</em></span></div>
+                  <div className="dc-rec__txt"><b>{r.l}</b><span>{!r.on ? "Pausado" : r.stat === "por WhatsApp" ? "Activo" : r.stat}<em className="dc-rec__cuando-m"> – {r.timing}</em></span></div>
                   <span className="dc-rec__cuando">{r.timing}</span>
                   <button type="button" className={`dc-rec__switch${r.on ? " is-on" : ""}`} role="switch" aria-checked={r.on} aria-label={`${r.on ? "Pausar" : "Activar"} ${r.l}`} onClick={(e) => { e.stopPropagation(); toggle(r.clave); }}><i /></button>
                 </div>
@@ -323,14 +323,14 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
       </Card>
       </>)}
       {cfg && (() => { const Ic = cfg.icon; return (
-        <Modal icon={<Ic size={20} strokeWidth={1.75} />} tone={cfg.color} titulo={cfg.l} sub={`Automatización · se envía ${cfg.timing.toLowerCase()}`} onClose={() => setCfg(null)} maxW={520}
+        <Modal icon={<Ic size={20} strokeWidth={1.75} />} tone={cfg.color} titulo={cfg.l} sub={`Automatización – se envía ${cfg.timing.toLowerCase()}`} onClose={() => setCfg(null)} maxW={520}
           footer={<><Btn small kind="ghost" onClick={() => setCfg(null)}>Cancelar</Btn><Btn small onClick={guardarCfg}><Check size={15} strokeWidth={1.75} /> Guardar mensaje</Btn></>}>
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Cuándo se envía</div><div style={{ fontSize: 14, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.timing}</div></div>
             <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Canal</div><div style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}><MessageSquare size={14} strokeWidth={1.75} /> WhatsApp</div></div>
             <div style={{ flex: 1, background: cfg.on ? "var(--dc-ok-soft)" : "var(--dc-bg)", border: `1px solid ${cfg.on ? "var(--dc-green-soft)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Estado</div><div style={{ fontSize: 14, fontWeight: 600, color: cfg.on ? "var(--dc-ok-700)" : "var(--dc-ink-500)", fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.on ? "Activo" : "Pausado"}</div></div>
           </div>
-          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 7 }}>Mensaje <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>· {"{nombre}"}, {"{fecha}"}, {"{hora}"}, {"{doctor}"}, {"{sede}"} se reemplazan solos</span></label>
+          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 7 }}>Mensaje <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– {"{nombre}"}, {"{fecha}"}, {"{hora}"}, {"{doctor}"}, {"{sede}"} se reemplazan solos</span></label>
           <textarea className="dc-premium-inp" value={cfgMsg} onChange={(e) => setCfgMsg(e.target.value)} rows={4} style={{ width: "100%", padding: "11px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }} />
           {/* Vista previa tipo burbuja de WhatsApp */}
           <div style={{ marginTop: 14 }}>
@@ -344,7 +344,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
           </div>
           {/* Probar ahora */}
           <div style={{ marginTop: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 13px" }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 7 }}>Probar ahora <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>· envíate este mensaje a un número real</span></div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 7 }}>Probar ahora <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– envíate este mensaje a un número real</span></div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <input className="dc-premium-inp" value={probarTel} onChange={(e) => setProbarTel(e.target.value)} placeholder="51987654321" inputMode="tel" style={{ flex: 1, minWidth: 160, padding: "9px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-white)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box" }} />
               <Btn small kind="ghost" onClick={probarAhora}><Send size={14} strokeWidth={1.75} /> Enviar prueba</Btn>

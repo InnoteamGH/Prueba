@@ -331,7 +331,7 @@ function cuadrantes(destino){
   [['Cuadrante 1','5',1,30],['Cuadrante 2','6',0,30],
    ['Cuadrante 4','8',1,VB.h-14],['Cuadrante 3','7',0,VB.h-14]
   ].forEach(q=>{
-    g.appendChild(txt(q[0]+' · temporales '+q[1],{class:'cuad-rot',
+    g.appendChild(txt(q[0]+' – temporales '+q[1],{class:'cuad-rot',
       x:(q[2]?44:VB.w-44), y:q[3], 'text-anchor':q[2]?'start':'end'}));
   });
   g.appendChild(el('line',{class:'cruz',x1:x,y1:20,x2:x,y2:VB.h-28}));

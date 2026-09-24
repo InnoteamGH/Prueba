@@ -671,6 +671,22 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
     padding:10mm 14mm 20mm;break-after:page;page-break-after:always}
   .hoja:last-child{break-after:auto;page-break-after:auto}
 }
+
+/* ---------- Rediseño de la cabecera (fases, conteo, historial) ---------- */
+:root:not([data-theme="dark"]) .tarjeta > header{background:linear-gradient(180deg,#F2FAFA,#fff);border-bottom:1px solid #E1EFEF;padding:12px 16px}
+#seg-fase{background:#E8F3F3;border:0;box-shadow:inset 0 0 0 1px #D6EAEA;padding:4px;gap:4px}
+#seg-fase button{min-height:32px;padding:6px 16px;display:inline-flex;align-items:center;gap:7px;color:#4A6B70}
+#seg-fase button::before{content:"";width:8px;height:8px;border-radius:999px;background:var(--f,#0E9199);opacity:.55;transition:opacity .18s}
+#seg-fase button[data-fase="inicial"]{--f:#0E9199}
+#seg-fase button[data-fase="evolucion"]{--f:#E09A22}
+#seg-fase button[data-fase="alta"]{--f:#16A36A}
+#seg-fase button[aria-pressed="true"]{background:#fff;color:#0B3440;box-shadow:0 1px 2px rgba(11,52,64,.1),0 6px 14px -8px rgba(11,52,64,.35)}
+#seg-fase button[aria-pressed="true"]::before{opacity:1;box-shadow:0 0 0 3px color-mix(in srgb,var(--f) 22%,transparent)}
+#et-piezas{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;background:#fff;color:#0A6C76;box-shadow:inset 0 0 0 1px #CFE7E8;font-weight:600}
+#et-piezas::before{content:"";width:14px;height:14px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230E9199' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 3c-2.2 0-4 1.8-4 4.2 0 2 .8 3.3 1.3 5 .6 2 .7 4.4 1.3 6.3.4 1.3 1 2.5 2 2.5 1.6 0 1.5-3.4 2.1-5.1.3-.9.8-1.4 2.3-1.4s2 .5 2.3 1.4c.6 1.7.5 5.1 2.1 5.1 1 0 1.6-1.2 2-2.5.6-1.9.7-4.3 1.3-6.3.5-1.7 1.3-3 1.3-5C21 4.8 19.2 3 17 3c-2 0-3 1.2-5 1.2S9 3 7 3z'/%3E%3C/svg%3E")}
+.jf .modo .mb{width:34px;height:34px;border-radius:999px;background:#fff;border:0;box-shadow:inset 0 0 0 1px #D6EAEA;color:#0A6C76}
+.jf .modo .mb:not(:disabled):hover{background:#0E9199;color:#fff;box-shadow:none}
+.jf .modo .mb:disabled{opacity:.4}
 </style>
 
 <div class="env">
@@ -710,10 +726,10 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
       if(sub){
         var parts=[];
         if(p.edad) parts.push(/años/i.test(String(p.edad))?String(p.edad):(p.edad+' años'));
-        if(p.dni) parts.push('DNI <b>'+String(p.dni).replace(/(\d{2})(?=\d)/g,'$1·')+'</b>');
+        if(p.dni) parts.push('DNI <b>'+String(p.dni).replace(/(\d{2})(?=\d)/g,'$1 ')+'</b>');
         if(p.hc && !/^[0-9a-f-]{8,}$/i.test(String(p.hc))) parts.push('H.C. <b>'+p.hc+'</b>');
         if(p.sede) parts.push(p.sede);
-        sub.innerHTML=parts.length?parts.join(' · '):'Expediente clínico';
+        sub.innerHTML=parts.length?parts.join(' – '):'Expediente clínico';
       }
       try{ document.documentElement.setAttribute('data-paciente-ready','1'); }catch(e){}
     }
@@ -759,7 +775,7 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
         <svg class="odo" id="odo" viewBox="0 0 1268 560" role="img"
              aria-label="Los cuatro cuadrantes con las posiciones permanentes y temporales, numeración FDI. Elige una pieza o una raíz."></svg>
       </div>
-      <p class="pista" style="padding:0 18px 10px;margin:0">Toca una cara para marcarla y otra vez para borrarla · arrastra para marcar varias · toca la <b>raíz</b> para abscesos o fracturas radiculares</p>
+      <p class="pista" style="padding:0 18px 10px;margin:0">Toca una cara para marcarla y otra vez para borrarla – arrastra para marcar varias – toca la <b>raíz</b> para abscesos o fracturas radiculares</p>
       <div class="leyenda" id="leyenda"></div>
     </main>
 
@@ -833,14 +849,14 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
     </div>
   </div>
 
-  <p class="nota-pie">Simbología según la <b>NTS N.º 188-MINSA/DGIESP-2022</b> · numeración FDI · rojo para el hallazgo o lo pendiente y azul para lo tratado.</p>
+  <p class="nota-pie">Simbología según la <b>NTS N.º 188-MINSA/DGIESP-2022</b> – numeración FDI – rojo para el hallazgo o lo pendiente y azul para lo tratado.</p>
 </div>
 
 <script>
 "use strict";
 /* ===== Catálogo — NTS N.º 188-MINSA/DGIESP-2022 =====
-   col: 'r' rojo (patológico/temporal/por hacer) · 'a' azul (buen estado/ejecutado)
-        'e' lo decide el operador · pc: no verificado contra el texto oficial     */
+   col: 'r' rojo (patológico/temporal/por hacer) – 'a' azul (buen estado/ejecutado)
+        'e' lo decide el operador – pc: no verificado contra el texto oficial     */
 const CATS=[
  {id:'cr', nom:'Caries y restauración'},
  {id:'cp', nom:'Coronas y prótesis'},
@@ -1290,7 +1306,7 @@ function cuadrantes(destino){
   [['Cuadrante 1','5',1,30],['Cuadrante 2','6',0,30],
    ['Cuadrante 4','8',1,VB.h-14],['Cuadrante 3','7',0,VB.h-14]
   ].forEach(q=>{
-    g.appendChild(txt(q[0]+' · temporales '+q[1],{class:'cuad-rot',
+    g.appendChild(txt(q[0]+' – temporales '+q[1],{class:'cuad-rot',
       x:(q[2]?44:VB.w-44), y:q[3], 'text-anchor':q[2]?'start':'end'}));
   });
   g.appendChild(el('line',{class:'cruz',x1:x,y1:20,x2:x,y2:VB.h-28}));
@@ -1493,7 +1509,7 @@ function dibujarLupa(){
   {const NR=nombresRaiz(n);
    Object.keys(r.raices||{}).forEach(ri=>{const m=r.raices[ri],h=POR_ID[m.h];if(!h)return;
     const sp=document.createElement('span'); sp.className='pill pill--'+m.c;
-    sp.textContent=h.nom+' · raíz '+(NR[ri]||ri); cont.appendChild(sp);});}
+    sp.textContent=h.nom+' – raíz '+(NR[ri]||ri); cont.appendChild(sp);});}
   if(!r.pieza.length&&!Object.keys(r.caras).length&&!Object.keys(r.raices||{}).length){
     const s=document.createElement('span'); s.className='pill'; s.style.color='var(--t400)';
     s.style.background='var(--panel-2)'; s.textContent='Sin hallazgos en esta fase';
@@ -1789,9 +1805,9 @@ function construirChips(){
       b.setAttribute('data-h',h.id); b.setAttribute('data-col',h.col);
       b.setAttribute('aria-pressed',String(est.herr===h.id));
       b.style.setProperty('--i',Math.min(i,8));
-      b.title=h.nom+' · '+(h.amb==='cara'?'se marca sobre una cara':'afecta a toda la pieza')+
-              ' · '+(h.col==='r'?'rojo':h.col==='a'?'azul':'rojo o azul según el estado')+
-              (h.pc?' · por confirmar contra la norma':'');
+      b.title=h.nom+' – '+(h.amb==='cara'?'se marca sobre una cara':'afecta a toda la pieza')+
+              ' – '+(h.col==='r'?'rojo':h.col==='a'?'azul':'rojo o azul según el estado')+
+              (h.pc?' – por confirmar contra la norma':'');
       const ic=document.createElement('span'); ic.className='mi'; ic.innerHTML=icono(h);
       const tx=document.createElement('span'); tx.className='nom'; tx.textContent=h.nom;
       b.appendChild(ic); b.appendChild(tx);
@@ -2004,12 +2020,12 @@ function listaHallazgos(){
     Object.keys(r.caras).forEach(cid=>{const m=r.caras[cid],h=POR_ID[m.h];if(!h)return;
       const p=document.createElement('span'); p.className='pill pill--'+m.c;
       p.innerHTML='<span class="c">'+cid+'</span> '+h.nom;
-      p.title=(nom[cid]||cid)+' · '+h.nom; dd.appendChild(p);});
+      p.title=(nom[cid]||cid)+' – '+h.nom; dd.appendChild(p);});
     {const NR=nombresRaiz(+pz);
      Object.keys(r.raices||{}).forEach(ri=>{const m=r.raices[ri],h=POR_ID[m.h];if(!h)return;
       const p=document.createElement('span'); p.className='pill pill--'+m.c;
       p.innerHTML='<span class="c">R</span> '+h.nom;
-      p.title='Raíz '+(NR[ri]||ri)+' · '+h.nom; dd.appendChild(p);});}
+      p.title='Raíz '+(NR[ri]||ri)+' – '+h.nom; dd.appendChild(p);});}
     g.appendChild(n); g.appendChild(dd);
     const ir=()=>{est.sel=+pz;marcarSel();panel();listaHallazgos();dibujarLupa();};
     g.addEventListener('click',ir);
@@ -2162,7 +2178,7 @@ function planLineas(){
     const eleg=opts.filter(function(o){return o.cod===est.opcion[clave];})[0]||opts[0];
     if(eleg.v==null){faltan.push({pz:pz,q:h.nom,ubic:ubic,por:'«'+eleg.t+'» no tiene precio en el catálogo'});return;}
     lineas.push({pz:pz,cod:eleg.cod,t:eleg.t,v:eleg.v,cant:1,ubic:ubic,q:h.nom,
-                 det:h.nom+' · '+ubic,opts:opts,clave:clave});
+                 det:h.nom+' – '+ubic,opts:opts,clave:clave});
   });
   /* y los servicios sueltos que añadió recepción */
   (est.sueltos||[]).forEach(function(x){
@@ -2221,9 +2237,9 @@ function hallazgosLineas(){
    rótulo tiene que decir las del paciente. */
 function denticion(){
   const e=parseInt(PACIENTE.edad,10)||0;
-  if(e>=13) return {tipo:'permanente', n:32, txt:'Boca completa · 32 piezas'};
-  if(e<=5)  return {tipo:'temporal',   n:20, txt:'Boca completa · 20 piezas temporales'};
-  return {tipo:'mixta', n:52, txt:'Dentición mixta · 32 permanentes y 20 temporales'};
+  if(e>=13) return {tipo:'permanente', n:32, txt:'Boca completa – 32 piezas'};
+  if(e<=5)  return {tipo:'temporal',   n:20, txt:'Boca completa – 20 piezas temporales'};
+  return {tipo:'mixta', n:52, txt:'Dentición mixta – 32 permanentes y 20 temporales'};
 }
 /* Índice CPOD (Klein, Palmer y Knutson): dientes permanentes Cariados, Perdidos por
    caries y Obturados. Se mide sobre 28 piezas: excluye los terceros molares.
@@ -2256,7 +2272,7 @@ function presupuesto(){
   const c=document.getElementById('ppto'); if(!c) return; c.innerHTML='';
   const R=planLineas(), lineas=R.lineas, faltan=R.faltan;
   document.getElementById('ppto-sub').textContent =
-    lineas.length ? lineas.length+(lineas.length===1?' línea':' líneas')+' · fase '+NOM_FASE[est.fase]
+    lineas.length ? lineas.length+(lineas.length===1?' línea':' líneas')+' – fase '+NOM_FASE[est.fase]
                   : 'sale del odontograma';
   if(!lineas.length&&!faltan.length){
     const v=document.createElement('div'); v.className='ppto-vacio';
@@ -2274,7 +2290,7 @@ function presupuesto(){
       const c=L.cant||1, sub=L.v*c; tot+=sub;
       const tr=document.createElement('tr'); if(L.pz)tr.setAttribute('data-pz',L.pz);
       const det = L.suelto ? L.det
-                : (c>1 ? L.q+' · '+c+' superficies' : L.q+' · '+L.ubics[0]);
+                : (c>1 ? L.q+' – '+c+' superficies' : L.q+' – '+L.ubics[0]);
       const varios = L.opts && L.opts.length>1;
       tr.innerHTML='<td class="pz">'+esc(ambitoRot(L))+'</td>'+
         '<td class="trat">'+(varios?'':L.t)+
@@ -2284,7 +2300,7 @@ function presupuesto(){
         const sel=document.createElement('select'); sel.className='ppto-tt';
         sel.setAttribute('aria-label','Tratamiento para la pieza '+fdi(L.pz));
         sel.innerHTML=L.opts.map(function(o){
-          const et=o.t+(o.v==null?' · sin precio':' · S/ '+o.v.toFixed(2));
+          const et=o.t+(o.v==null?' – sin precio':' – S/ '+o.v.toFixed(2));
           return '<option value="'+o.cod+'"'+(o.cod===L.cod?' selected':'')+'>'+et+'</option>';
         }).join('');
         sel.addEventListener('click',function(e){e.stopPropagation();});
@@ -2326,9 +2342,9 @@ function presupuesto(){
     const i=document.createElement('i');
     const x=document.createElement('span');
     const g2={}; faltan.forEach(f=>{(g2[f.por]=g2[f.por]||[]).push('pieza '+fdi(f.pz));});
-    x.innerHTML='<b>Aviso interno · no sale en el documento del paciente.</b> '+
+    x.innerHTML='<b>Aviso interno – no sale en el documento del paciente.</b> '+
       faltan.length+(faltan.length===1?' hallazgo no entra':' hallazgos no entran')+
-      ' al plan. '+Object.keys(g2).map(k=>k+': '+g2[k].join(', ')).join(' · ')+'.';
+      ' al plan. '+Object.keys(g2).map(k=>k+': '+g2[k].join(', ')).join(' – ')+'.';
     a.appendChild(i); a.appendChild(x); c.appendChild(a);
   }
   /* El plan de hoy sí sabe meter una consulta o una radiografía, que no salen de ninguna
@@ -2338,13 +2354,13 @@ function presupuesto(){
   const lab=document.createElement('label'); lab.textContent='Agregar un servicio suelto';
   const sel=document.createElement('select'); sel.setAttribute('aria-label','Servicio suelto');
   const alcance=function(x){
-    if(x.amb==='pieza')   return ' · sobre la pieza elegida';
-    if(x.amb==='maxilar') return x.fijo ? ' · ambos maxilares' : ' · por maxilar';
+    if(x.amb==='pieza')   return ' – sobre la pieza elegida';
+    if(x.amb==='maxilar') return x.fijo ? ' – ambos maxilares' : ' – por maxilar';
     return '';
   };
   sel.innerHTML='<option value="">Elige un servicio…</option>'+
     SUELTOS.map(function(x){return '<option value="'+x.id+'">'+x.t+
-      (x.v==null?' · sin precio':' · S/ '+x.v.toFixed(2))+
+      (x.v==null?' – sin precio':' – S/ '+x.v.toFixed(2))+
       alcance(x)+'</option>';}).join('');
   /* La profilaxis, el destartraje o el blanqueamiento no se hacen «en la pieza 1.6»:
      se hacen en un maxilar o en los dos. Por eso el maxilar se elige aquí y la columna
@@ -2388,10 +2404,10 @@ function presupuesto(){
 /* ═════════════════ el documento para el paciente ═════════════════
    La Dra. Cinthya pidió dos cosas que conviene no mezclar:
 
-   · A-6, el resumen del odontograma — «lo que me refiero es cómo sale ese resumen
+   – A-6, el resumen del odontograma — «lo que me refiero es cómo sale ese resumen
      para mi paciente». Es un documento clínico: qué se encontró, en qué pieza y en
      qué cara o raíz, con el índice CPOD y ceod.
-   · A-7, el plan de inversión — «listo para imprimir o enviar por WhatsApp». Es el
+   – A-7, el plan de inversión — «listo para imprimir o enviar por WhatsApp». Es el
      documento comercial: qué se propone hacer y cuánto cuesta.
 
    Los dos se calculan solos mientras se marca, porque lo que ella pidió fue
@@ -2407,8 +2423,8 @@ const CLINICA={
   bajada:'Centro odontológico',
   ruc:'20612478636',
   dir:'Av. Antúnez de Mayolo 1094 A, 2do piso — Los Olivos',
-  tel:'(01) 233 4998 · 997 091 083',
-  horario:'Lun a vie 9:00–19:00 · sáb 9:00–18:00',
+  tel:'(01) 233 4998 – 997 091 083',
+  horario:'Lun a vie 9:00–19:00 – sáb 9:00–18:00',
   web:'odontosonrisa.pe',
   logo:'data:image/png;base64,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'
 };
@@ -2417,11 +2433,11 @@ const PROF={nombre:'Dra. Cinthya Vásquez Pezzutti', cop:'24493', rne:'4141'};
    que no lo tienen, y el campo salía en blanco en la mitad de los documentos. Se
    imprime sólo la colegiatura. Queda como parámetro por si otra sede lo quiere. */
 const MOSTRAR_RNE=false;
-const PACIENTE={nombre:'Carlos Ruiz Mendoza', edad:'36 años', hc:'000412', dni:'41·23·4567',
+const PACIENTE={nombre:'Carlos Ruiz Mendoza', edad:'36 años', hc:'000412', dni:'41 23 4567',
                 esMenor:false, apoderado:null, sede:'Los Olivos'};
 /* quién hizo qué: con nombre de persona, no con el usuario del sistema */
-const TRAZA={creado:'Recepción · Liliana M.', solicitado:PROF.nombre,
-             impreso:'Recepción · Liliana M.'};
+const TRAZA={creado:'Recepción – Liliana M.', solicitado:PROF.nombre,
+             impreso:'Recepción – Liliana M.'};
 const CONDICIONES=[
  ['Alcance','Esta propuesta sale de los hallazgos marcados en mal estado en el odontograma '+
   'del paciente, más los servicios añadidos en recepción. No incluye lo que ya está '+
@@ -2475,15 +2491,15 @@ function fichaPaciente(){
     '<p><b>DNI :</b> '+esc(PACIENTE.dni)+'</p>'+
     '<p><b>Historia clínica :</b> '+esc(PACIENTE.hc)+'</p></div><div>'+
     '<p><b>Profesional :</b> '+esc(PROF.nombre)+'</p>'+
-    '<p><b>'+(MOSTRAR_RNE&&PROF.rne?'COP · RNE :</b> '+esc(PROF.cop)+' · '+esc(PROF.rne)
+    '<p><b>'+(MOSTRAR_RNE&&PROF.rne?'COP – RNE :</b> '+esc(PROF.cop)+' – '+esc(PROF.rne)
                                     :'COP :</b> '+esc(PROF.cop))+'</p>'+
     '<p><b>Sede :</b> '+esc(PACIENTE.sede)+'</p></div></div>';
 }
 /* ── firmas ────────────────────────────────────────────────────────────────
    Tres formas, y ninguna bloquea la impresión:
-     · manuscrita  — se imprime la línea en blanco y se firma a mano
-     · electronica — la imagen de la firma (grafo escaneado o firma en tableta)
-     · digital     — firma con certificado: lleva emisor, fecha y código de verificación
+     – manuscrita  — se imprime la línea en blanco y se firma a mano
+     – electronica — la imagen de la firma (grafo escaneado o firma en tableta)
+     – digital     — firma con certificado: lleva emisor, fecha y código de verificación
    Valen para el profesional y para el paciente por separado: la clínica puede firmar
    digitalmente y el paciente a mano, o al revés. Si el modo es electrónica o digital y
    falta la imagen, se degrada a manuscrita y el documento sale igual.
@@ -2519,7 +2535,7 @@ function firmas(){
   const cols=[
     {rot:'Profesional tratante', f:FIRMA.profesional,
      nom:PROF.nombre,
-     sub:'COP '+PROF.cop+(MOSTRAR_RNE&&PROF.rne?' &nbsp;·&nbsp; RNE '+PROF.rne:''), extra:null},
+     sub:'COP '+PROF.cop+(MOSTRAR_RNE&&PROF.rne?' &nbsp;–&nbsp; RNE '+PROF.rne:''), extra:null},
     {rot: men?'Apoderado':'Paciente', f:FIRMA.paciente,
      nom: men?(ap.nombre||'__________________________'):PACIENTE.nombre,
      sub: 'DNI '+(men?(ap.dni||'____________'):PACIENTE.dni),
@@ -2535,7 +2551,7 @@ function pieDoc(cual,pag){
   return '<div class="doc-pie">'+
     (pag===1 ? '<div class="traza"><div>Creado por : '+esc(TRAZA.creado)+'</div>'+
       '<div style="text-align:center">Solicitado por : '+esc(TRAZA.solicitado)+'</div>'+
-      '<div style="text-align:right">Impreso por : '+esc(TRAZA.impreso)+' · '+hora+'</div></div>' : '')+
+      '<div style="text-align:right">Impreso por : '+esc(TRAZA.impreso)+' – '+hora+'</div></div>' : '')+
     '<div class="pieL"><span></span><span data-pag>Página</span></div></div>';
 }
 /* Cuántas páginas de papel son. No se puede dar por hecho: un plan de 8 líneas entra en
@@ -2571,8 +2587,8 @@ function odoParaDocumento(){
 function hojaOdontograma(titulo,extra){
   const h=document.createElement('div'); h.className='hoja';
   h.innerHTML = membrete(titulo||'ODONTOGRAMA DEL PACIENTE',null,
-      [PACIENTE.nombre+' · H.C. '+PACIENTE.hc, fechaCorta(new Date())])+
-    metaFranja([['Dentición',denticion().txt.replace('Boca completa · ','')],
+      [PACIENTE.nombre+' – H.C. '+PACIENTE.hc, fechaCorta(new Date())])+
+    metaFranja([['Dentición',denticion().txt.replace('Boca completa – ','')],
                 ['Fase',mayus1(NOM_FASE[est.fase])],['Toma',TOMA.id],
                 ['Anexo al documento',NUM_DOC]])+
     '<div class="doc-odo" id="doc-odo-slot"></div>'+
@@ -2614,14 +2630,14 @@ function hojaPlan(){
   h.innerHTML =
     membrete('PLAN DE INVERSIÓN')+
     metaFranja([['Documento',NUM_DOC],['Emitido',fechaCorta(new Date())],
-                ['Válido hasta',fechaCorta(vence)],['Estado','Propuesta · sin aceptar']])+
+                ['Válido hasta',fechaCorta(vence)],['Estado','Propuesta – sin aceptar']])+
     fichaPaciente()+
-    '<h2 class="doc-h2">1 &nbsp;·&nbsp; Tratamientos propuestos</h2>'+
+    '<h2 class="doc-h2">1 &nbsp;–&nbsp; Tratamientos propuestos</h2>'+
     '<table class="doc"><thead><tr><th style="width:88px">Pieza</th><th>Tratamiento</th>'+
     '<th style="width:46px">Cant</th><th style="width:92px">P. unit. S/</th>'+
     '<th style="width:98px">Importe S/</th></tr></thead><tbody>'+filas+'</tbody>'+
     '<tfoot>'+tots+'</tfoot></table>'+
-    '<h2 class="doc-h2">2 &nbsp;·&nbsp; Condiciones</h2><div class="cond">'+
+    '<h2 class="doc-h2">2 &nbsp;–&nbsp; Condiciones</h2><div class="cond">'+
     CONDICIONES.map(function(c,i){
       return '<div class="cl"><span class="cn">'+(i+1)+'</span><span><b>'+esc(c[0])+'.</b> '+
              esc(c[1])+'</span></div>';}).join('')+'</div>'+
@@ -2639,24 +2655,24 @@ function hojaResumen(){
     : '<tr><td colspan="4" class="vacio">Sin hallazgos registrados en esta fase.</td></tr>';
   const idx=function(nom,g,pares,pie){
     return '<div><span>'+nom+'</span><b>'+g.t+'</b><i>'+
-      pares.map(function(p){return p[0]+' '+p[1];}).join(' · ')+'</i>'+
+      pares.map(function(p){return p[0]+' '+p[1];}).join(' – ')+'</i>'+
       '<u>'+pie+'</u></div>';};
   const h=document.createElement('div'); h.className='hoja';
   h.innerHTML =
     membrete('RESUMEN DEL ODONTOGRAMA')+
-    metaFranja([['Dentición',denticion().txt.replace('Boca completa · ','')],
+    metaFranja([['Dentición',denticion().txt.replace('Boca completa – ','')],
                 ['Fase',mayus1(NOM_FASE[est.fase])],['Toma',TOMA.id],
                 ['Fecha',fechaCorta(new Date())]])+
     fichaPaciente()+
-    '<h2 class="doc-h2">Hallazgos · '+L.length+(L.length===1?' registro':' registros')+'</h2>'+
+    '<h2 class="doc-h2">Hallazgos – '+L.length+(L.length===1?' registro':' registros')+'</h2>'+
     '<table class="doc"><thead><tr><th style="width:52px">Pieza</th>'+
     '<th style="width:31%">Ubicación</th><th>Hallazgo</th>'+
     '<th style="width:96px">Estado</th></tr></thead><tbody>'+filas+'</tbody></table>'+
     (MOSTRAR_INDICES ? '<div class="idx">'+
-      idx('Índice CPOD · dentición permanente',I.cpod,
+      idx('Índice CPOD – dentición permanente',I.cpod,
           [['Cariadas',I.cpod.c],['Perdidas',I.cpod.p],['Obturadas',I.cpod.o]],
           'Piezas permanentes afectadas por caries. No incluye los terceros molares.')+
-      idx('Índice ceod · dentición temporal',I.ceod,
+      idx('Índice ceod – dentición temporal',I.ceod,
           [['Cariadas',I.ceod.c],['Con extracción indicada',I.ceod.e],['Obturadas',I.ceod.o]],
           'Piezas de leche afectadas. No cuenta las ausentes: pueden haberse caído solas.')+
     '</div>' : '')+
@@ -2753,7 +2769,7 @@ let avisoT=null;
 /* Dentro de la app (bridge) cada cambio se guarda solo: el estado lo dice así. */
 const EN_APP=document.documentElement.hasAttribute('data-bridge');
 function textoEstado(){
-  if(EN_APP) return 'Los cambios se guardan automáticamente · fase '+NOM_FASE[est.fase]+'.';
+  if(EN_APP) return 'Los cambios se guardan automáticamente – fase '+NOM_FASE[est.fase]+'.';
   return est.sucio?'<b>Cambios sin guardar</b> en la fase '+NOM_FASE[est.fase]+'.':'No hay cambios pendientes.';
 }
 function avisa(t){
@@ -3016,10 +3032,10 @@ construir(); panel();
         var sede=p.sede||(PACIENTE&&PACIENTE.sede)||'';
         var parts=[];
         if(edad) parts.push(/años/i.test(edad)?edad:(edad+' años'));
-        if(dni) parts.push('DNI <b>'+String(dni).replace(/(\d{2})(?=\d)/g,'$1·')+'</b>');
+        if(dni) parts.push('DNI <b>'+String(dni).replace(/(\d{2})(?=\d)/g,'$1 ')+'</b>');
         if(hc && !/^[0-9a-f-]{8,}$/i.test(String(hc))) parts.push('H.C. <b>'+hc+'</b>');
         if(sede) parts.push(sede);
-        sub.innerHTML=parts.length?parts.join(' · '):'Expediente clínico';
+        sub.innerHTML=parts.length?parts.join(' – '):'Expediente clínico';
       }
       try{ document.documentElement.setAttribute('data-paciente-ready','1'); }catch(e){}
       try{ parent.postMessage({ type:'dento-odontograma-resize', ts:Date.now() }, '*'); }catch(e){}

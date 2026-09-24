@@ -28,7 +28,7 @@ export function resumenDispositivo(ua) {
   else if (/safari\//.test(lower) && !/chrome\//.test(lower)) browser = "Safari";
   else if (/firefox\//.test(lower)) browser = "Firefox";
   const mobile = /mobile|android|iphone|ipad/.test(lower) ? "móvil" : "escritorio";
-  return `${browser} · ${os} · ${mobile}`;
+  return `${browser} – ${os} – ${mobile}`;
 }
 
 /** Cuenta filas cuyo ymd coincide con hoy Lima. */

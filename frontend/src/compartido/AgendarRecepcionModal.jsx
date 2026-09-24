@@ -146,7 +146,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     setAvisoHorario(null);
     if (ok === 0) { notify(ultimoError || "No se pudo agendar (¿horario ocupado o bloqueado?)."); return; }
     const avisoTxt = f.avisar
-      ? (avisados > 0 && avisarFail === 0 ? ` · comprobante enviado a ${avisados} paciente(s)` : avisados > 0 ? ` · comprobante enviado a ${avisados}, ${avisarFail} no se pudo enviar` : " · no se pudo enviar el comprobante por WhatsApp")
+      ? (avisados > 0 && avisarFail === 0 ? ` – comprobante enviado a ${avisados} paciente(s)` : avisados > 0 ? ` – comprobante enviado a ${avisados}, ${avisarFail} no se pudo enviar` : " – no se pudo enviar el comprobante por WhatsApp")
       : "";
     notify(fechas.length > 1 ? `${ok} cita(s) agendada(s)${fail ? `, ${fail} no (ocupadas/bloqueadas)` : ""}${avisoTxt}.` : `Cita agendada${avisoTxt}.`);
     onCreada();
@@ -208,14 +208,14 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             <span style={lbl}>Paciente{req}</span>
             <div style={{ position: "relative" }}>
               <div onClick={() => setAbrePac((v) => !v)} style={{ ...inp, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", color: pacSel ? NAVY : "var(--dc-ink-400)", borderColor: abrePac ? T : "var(--dc-line)" }}>
-                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pacSel ? `${pacSel.nombre}${pacSel.dni ? ` · ${pacSel.dni}` : ""}` : "Buscar paciente…"}</span>
+                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pacSel ? `${pacSel.nombre}${pacSel.dni ? ` – ${pacSel.dni}` : ""}` : "Buscar paciente…"}</span>
                 <ChevronRight size={16} strokeWidth={1.75} style={{ transform: `rotate(${tint(abrePac ? -90 : 90, 0.871)}g)`, color: "var(--dc-ink-400)", flexShrink: 0 }} />
               </div>
               {abrePac && <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", boxShadow: "0 18px 40px -18px rgba(16,24,40,.4)", zIndex: 30, overflow: "hidden" }}>
                 <div style={{ padding: 8 }}><input className="dc-premium-inp" autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar paciente" style={{ ...inp, padding: "8px 11px" }} /></div>
                 <div style={{ maxHeight: 190, overflowY: "auto" }}>
                   {pacF.length === 0 && <div style={{ padding: "8px 14px", fontSize: 13, color: "var(--dc-ink-400)" }}>Sin coincidencias.</div>}
-                  {pacF.map((p) => <button key={p.id} onClick={() => { setF({ ...f, pacienteId: p.id }); setAbrePac(false); setBusca(""); }} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: p.id === f.pacienteId ? "var(--dc-bg)" : "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{p.nombre}{p.dni ? <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> · {p.dni}</span> : null}</button>)}
+                  {pacF.map((p) => <button key={p.id} onClick={() => { setF({ ...f, pacienteId: p.id }); setAbrePac(false); setBusca(""); }} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: p.id === f.pacienteId ? "var(--dc-bg)" : "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{p.nombre}{p.dni ? <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> – {p.dni}</span> : null}</button>)}
                 </div>
                 <button onClick={() => setNuevo({ nombre: busca, dni: "" })} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
               </div>}
@@ -242,7 +242,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           <div>
             <span style={lbl}>Fecha y hora</span>
             <div style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, marginBottom: 6 }}>
-              {fechaLegible(f.fecha)} · {f.hora}
+              {fechaLegible(f.fecha)} – {f.hora}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
               <Clock size={16} strokeWidth={1.75} color={pasada ? "var(--dc-red)" : "var(--dc-ink-400)"} style={{ flexShrink: 0 }} />

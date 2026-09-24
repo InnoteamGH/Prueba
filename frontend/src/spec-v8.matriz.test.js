@@ -89,7 +89,7 @@ describe("SPEC v8 A33 KPI plano", () => {
 describe("SPEC v8 INV-01 cobertura nombra insumo", () => {
   it("KPI cobertura incluye nombre", () => {
     assert.match(app, /covMinInsumo/);
-    assert.match(app, /~\$\{covMinHoy\} d · \$\{covMinInsumo\.nombre\}/);
+    assert.match(app, /~\$\{covMinHoy\} d – \$\{covMinInsumo\.nombre\}/);
   });
 });
 

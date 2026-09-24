@@ -1,6 +1,6 @@
 /**
  * Panel Gerencial — sustituye el DashLienzo de #/gerencial.
- * Layout SPEC §3.2 · animaciones HTML §6 · fichas de dato §7.
+ * Layout SPEC §3.2 – animaciones HTML §6 – fichas de dato §7.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api, { auth } from "../api/client";
@@ -194,7 +194,7 @@ function FichaDato({ dato, onClose }) {
           ) : null}
         </div>
         <div className="dc-pg-ficha__footer">
-          <span>{dato.nota || (dato.ejemplo ? "Detalle de ejemplo · los totales son reales" : "Dato de la clínica")}</span>
+          <span>{dato.nota || (dato.ejemplo ? "Detalle de ejemplo – los totales son reales" : "Dato de la clínica")}</span>
           <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={onClose}>Cerrar</button>
         </div>
       </div>
@@ -820,7 +820,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
       const n = new Date();
       const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
       const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
-      setReloj(`${dias[n.getDay()]} ${String(n.getDate()).padStart(2, "0")} ${meses[n.getMonth()]} · ${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}:${String(n.getSeconds()).padStart(2, "0")}`);
+      setReloj(`${dias[n.getDay()]} ${String(n.getDate()).padStart(2, "0")} ${meses[n.getMonth()]} – ${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}:${String(n.getSeconds()).padStart(2, "0")}`);
     };
     tick();
     if (prefersReducedMotion()) return undefined;
@@ -852,10 +852,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
 
   const deuda = ind?.deudaPorAntiguedad || {};
   const agingItems = [
-    { nom: "Corriente · 0–30 d", valor: Number(deuda.hasta30) || 0, color: "var(--dc-ok-700)" },
+    { nom: "Corriente – 0–30 d", valor: Number(deuda.hasta30) || 0, color: "var(--dc-ok-700)" },
     { nom: "31–60 días", valor: Number(deuda.de31a60) || 0, color: "var(--dc-amber-ink)" },
     { nom: "61–90 días", valor: Number(deuda.de61a90) || 0, color: "var(--dc-warn-700)" },
-    { nom: "+90 días · riesgo", valor: Number(deuda.masDe90) || 0, color: "var(--dc-danger-700)" },
+    { nom: "+90 días – riesgo", valor: Number(deuda.masDe90) || 0, color: "var(--dc-danger-700)" },
   ];
   const agingTotal = agingItems.reduce((s, x) => s + x.valor, 0);
 
@@ -900,7 +900,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
   const subHead = [
     nSedes != null ? `${nSedes} sede${nSedes === 1 ? "" : "s"}` : null,
     "datos al día de hoy",
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(" – ");
 
   const guardarMeta = async () => {
     if (!metaEdit?.id) return;
@@ -986,7 +986,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
                   <span className="ritmo" style={{ left: `${ritmo.ritmoPct}%` }} />
                 </div>
                 <div className="dc-kpi__sub">
-                  faltan {moneyFmt(Math.max(0, meta.meta - prodMes))} · <b style={{ color: "var(--dc-danger-700)" }}>ritmo {ritmo.ritmoPct.toFixed(0)}%</b>
+                  faltan {moneyFmt(Math.max(0, meta.meta - prodMes))} – <b style={{ color: "var(--dc-danger-700)" }}>ritmo {ritmo.ritmoPct.toFixed(0)}%</b>
                 </div>
               </>
             )}
@@ -1015,7 +1015,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
               {moneyFmt(prodMes)}
               {dMes != null && <span className={`delta ${dMes >= 0 ? "up" : "down"}`}>{dMes >= 0 ? "▲" : "▼"} {Math.abs(dMes).toFixed(1)}%</span>}
             </div>
-            <div className="dc-kpi__sub">{kd?.citasMes ?? "—"} citas · vs {moneyFmt(kd?.ingresosMesAnterior)} mes ant.</div>
+            <div className="dc-kpi__sub">{kd?.citasMes ?? "—"} citas – vs {moneyFmt(kd?.ingresosMesAnterior)} mes ant.</div>
           </div>
         </div>
 
@@ -1036,7 +1036,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           <div className="dc-kpi__body">
             <div className="dc-kpi__label">Producción del día</div>
             <div className="dc-kpi__value">{moneyFmt(prodDia)}</div>
-            <div className="dc-kpi__sub">{citasHoy.filter((c) => c.estado === "atendida").length} facturadas · {pluralEs(citasHoy.length, "cita", "citas")} en agenda</div>
+            <div className="dc-kpi__sub">{citasHoy.filter((c) => c.estado === "atendida").length} facturadas – {pluralEs(citasHoy.length, "cita", "citas")} en agenda</div>
           </div>
         </div>
 
@@ -1066,7 +1066,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           <div className="dc-kpi__body">
             <div className="dc-kpi__label">Pacientes atendidos hoy</div>
             <div className="dc-kpi__value">{atendidos}</div>
-            <div className="dc-kpi__sub">{pluralEs(citasHoy.length, "cita", "citas")} en agenda · {enSillon} en sillón</div>
+            <div className="dc-kpi__sub">{pluralEs(citasHoy.length, "cita", "citas")} en agenda – {enSillon} en sillón</div>
           </div>
         </div>
       </section>
@@ -1077,7 +1077,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g1)" }} />
             <h2>Caja del día</h2>
-            <span className="dc-card__meta">08:00 – 20:00 · en vivo</span>
+            <span className="dc-card__meta">08:00 – 20:00 – en vivo</span>
             <button type="button" className="dc-info" aria-label="Detalle de caja"
               onClick={() => abrir({
                 t: "Caja del día",
@@ -1200,7 +1200,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
               })}
             </div>
             <div className="dc-split__rule">
-              <p className="dc-rotulo">Antigüedad de la deuda · 100% = {moneyFmt(agingTotal)}</p>
+              <p className="dc-rotulo">Antigüedad de la deuda – 100% = {moneyFmt(agingTotal)}</p>
               <StackSegs items={agingItems} total={agingTotal} />
               <div className="dc-leyenda">
                 {agingItems.map((it, i) => {
@@ -1292,7 +1292,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
               })}>i</button>
           </div>
           <div className="dc-card__body">
-            <p className="dc-rotulo">Reparto de lo propuesto · 100% = {moneyFmt(propuesto)}</p>
+            <p className="dc-rotulo">Reparto de lo propuesto – 100% = {moneyFmt(propuesto)}</p>
             <StackSegs
               items={[
                 { valor: aceptado, color: "var(--g4)" },
@@ -1328,7 +1328,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
       <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--g1)" }} />
-          <h2>Odontología general · por tratamiento</h2>
+          <h2>Odontología general – por tratamiento</h2>
           <span className="dc-card__meta">{tratTotal > 0 ? `100% = ${moneyFmt(tratTotal)}` : "Sin datos aún"}</span>
           {tratTotal <= 0 && (
             <span className="marca-demo" title="Sin ventas enlazadas a servicio del catálogo">sin desglose aún</span>
@@ -1467,7 +1467,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
         <div className="dc-card__body">
           <div className="dc-split" style={{ gridTemplateColumns: "250px 1fr" }}>
             <div>
-              <p className="dc-rotulo">Ocupación · {franjas} franjas</p>
+              <p className="dc-rotulo">Ocupación – {franjas} franjas</p>
               <div className="gate" aria-label={`Ocupación: ${ocupadas} de ${franjas}`}>
                 {Array.from({ length: franjas }, (_, g) => (
                   <i key={g} className={g < ocupadas ? (g === ocupadas - 1 ? "hoy" : "on") : undefined} />
@@ -1502,7 +1502,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
             <button type="button" className="dc-info" aria-label="Cartera"
               onClick={() => abrir({
                 t: "Cartera de pacientes",
-                s: "Color = estado · tamaño = saldo",
+                s: "Color = estado – tamaño = saldo",
                 cifra: String(pacs.length || 0),
                 micro: [
                   ["Al día", String(alDia)],
@@ -1685,7 +1685,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           WhatsApp{" "}
           {waConversaciones || waAgendadas ? (
             <>
-              <b>{waConversaciones}</b> conversaciones · <b>{waAgendadas}</b> citas agendadas por ese canal
+              <b>{waConversaciones}</b> conversaciones – <b>{waAgendadas}</b> citas agendadas por ese canal
             </>
           ) : (
             <b>—</b>
@@ -1693,9 +1693,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
         </span>
         <span>
           <b>{nSedes != null ? nSedes : "—"}</b> sede{nSedes === 1 ? "" : "s"}
-          {" · "}
+          {" – "}
           <b>{nSillones != null ? nSillones : "—"}</b> sillones
-          {" · "}
+          {" – "}
           <b>{ranking.length || "—"}</b> odontólogos
         </span>
       </div>

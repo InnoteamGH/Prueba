@@ -37,7 +37,7 @@ describe("fechaLima NEW-57", () => {
   it("resumenDispositivo resume userAgent (NEW-58b)", () => {
     assert.equal(
       resumenDispositivo("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"),
-      "Chrome · macOS · escritorio"
+      "Chrome – macOS – escritorio"
     );
     assert.equal(resumenDispositivo(""), "—");
   });
@@ -52,6 +52,6 @@ describe("fechaLima NEW-57", () => {
         userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/120.0",
       },
     ]);
-    assert.equal(rows[0].dispositivo, "Firefox · Windows · escritorio");
+    assert.equal(rows[0].dispositivo, "Firefox – Windows – escritorio");
   });
 });

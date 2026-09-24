@@ -3,7 +3,7 @@ import { tint } from "../comun";
 
 /**
  * Tarjeta KPI con estados: cargando | dato | vacio | error.
- * En error NUNCA muestra 0 — muestra "—" + "No se pudo cargar · Reintentar".
+ * En error NUNCA muestra 0 — muestra "—" + "No se pudo cargar – Reintentar".
  */
 export default function TarjetaKPI({
   icon,
@@ -62,7 +62,7 @@ export default function TarjetaKPI({
             No se pudo cargar
             {onRetry ? (
               <>
-                {" · "}
+                {" – "}
                 <button type="button" className="dc-kpi__retry" onClick={(e) => { e.stopPropagation(); onRetry(); }}>
                   Reintentar
                 </button>

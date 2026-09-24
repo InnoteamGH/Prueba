@@ -78,8 +78,8 @@ export default function Metas({ notify = () => {}, can }) {
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{m.nombre}</div>
                   <div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>
-                    {[m.especialidad, m.cop].filter(Boolean).join(" · ") || "Sin especialidad"}
-                    {m.porcentajeComision != null ? ` · comisión ${m.porcentajeComision}%` : ""}
+                    {[m.especialidad, m.cop].filter(Boolean).join(" – ") || "Sin especialidad"}
+                    {m.porcentajeComision != null ? ` – comisión ${m.porcentajeComision}%` : ""}
                   </div>
                 </div>
                 <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 8 }}>

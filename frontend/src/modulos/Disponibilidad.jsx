@@ -347,7 +347,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
                     <button key={d.idx} onClick={() => clickCelda(d, hora)}
                       onMouseEnter={(ev) => { if (e.tipo === "libre" && editableFecha(d.date)) ev.currentTarget.style.background = "var(--dc-accent-soft)"; }}
                       onMouseLeave={(ev) => { if (e.tipo === "libre" && editableFecha(d.date)) ev.currentTarget.style.background = "var(--dc-white)"; }}
-                      title={e.tipo === "cita" ? `Cita: ${e.cita.paciente} · ${nombreSede(e.cita.sede)} · clic para solicitar sustitución` : bloqEdit ? "Dentro de la ventana de 1 semana — no editable" : e.tipo === "bloqueado" ? `${e.motivo}${e.recurrente ? " (cada semana)" : ""} — clic para liberar` : e.tipo === "libre" ? "Clic para bloquear" : e.tipo === "diacerrado" ? "Día cerrado" : "Fuera de jornada"}
+                      title={e.tipo === "cita" ? `Cita: ${e.cita.paciente} – ${nombreSede(e.cita.sede)} – clic para solicitar sustitución` : bloqEdit ? "Dentro de la ventana de 1 semana — no editable" : e.tipo === "bloqueado" ? `${e.motivo}${e.recurrente ? " (cada semana)" : ""} — clic para liberar` : e.tipo === "libre" ? "Clic para bloquear" : e.tipo === "diacerrado" ? "Día cerrado" : "Fuera de jornada"}
                       style={{ ...base, ...st, opacity: bloqEdit ? 0.55 : 1 }}>
                       {e.tipo === "cita"
                         ? <span style={{ display: "flex", alignItems: "center", gap: 3, padding: "0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><MapPin size={9} strokeWidth={1.75} /> {cortaSede(e.cita.sede)}</span>
@@ -364,9 +364,9 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
           <div style={{ padding: "14px 20px", borderTop: "1px solid var(--dc-line)" }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Repeat size={14} strokeWidth={1.75} color={TEAL} /> Bloqueos recurrentes (cada semana)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {recGrupos.map((g, i) => { const dl = g.dias.length === 6 ? "Todos los días" : [...g.dias].sort().map((d) => DIAS[d].slice(0, 3)).join(" · "); return (
+              {recGrupos.map((g, i) => { const dl = g.dias.length === 6 ? "Todos los días" : [...g.dias].sort().map((d) => DIAS[d].slice(0, 3)).join(" – "); return (
                 <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--dc-bg)", border: "1px solid var(--dc-danger-mid)", borderRadius: "var(--dc-r-full)", padding: "6px 8px 6px 12px", fontSize: 13, color: "var(--dc-danger-700)", fontWeight: 500 }}>
-                  <span><strong>{g.motivo}</strong> · {g.ini}–{g.fin} · {dl}</span>
+                  <span><strong>{g.motivo}</strong> – {g.ini}–{g.fin} – {dl}</span>
                   <button onClick={() => quitarGrupo(g.ids)} title="Eliminar" aria-label="Eliminar" style={{ background: "rgba(140,58,51,.12)", border: "none", borderRadius: "var(--dc-r-full)", width: 20, height: 20, cursor: "pointer", color: "var(--dc-danger-700)", display: "grid", placeItems: "center" }}><Trash2 size={12} strokeWidth={1.75} /></button>
                 </span>
               ); })}
@@ -392,7 +392,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
               <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: otro?.color || NAVY, color: "var(--dc-white)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{otro?.foto}</div>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{otro?.nombre} te pide cubrir una cita</div>
-                <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{s.paciente} · {espDeCita(s)} · {fechaLegible(s.fecha)} {s.hora} · {nombreSede(s.sede)} · <em>{s.motivo}</em></div>
+                <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{s.paciente} – {espDeCita(s)} – {fechaLegible(s.fecha)} {s.hora} – {nombreSede(s.sede)} – <em>{s.motivo}</em></div>
                 {s.estado === "pendiente" && (() => { const cv = conflictoViaje(miId, citas.find((c) => c.id === s.citaId) || s); return cv ? <div style={{ fontSize: 12, color: "var(--dc-danger-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-danger-mid)", borderRadius: "var(--dc-r-sm)", padding: "4px 8px", marginTop: 5, display: "inline-flex", alignItems: "center", gap: 5 }}><AlertTriangle size={12} strokeWidth={1.75} /> No alcanzas: ~{cv.viaje} min desde {cortaSede(cv.otra.sede)} y solo {cv.gap} min de margen</div> : null; })()}
               </div>
               {s.estado === "pendiente"
@@ -405,7 +405,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
               <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: "var(--dc-line)", color: "var(--dc-ink-400)", display: "grid", placeItems: "center", flexShrink: 0 }}><Send size={16} strokeWidth={1.75} /></div>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>Pediste a {otro?.nombre} que cubra</div>
-                <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{s.paciente} · {fechaLegible(s.fecha)} {s.hora} · {nombreSede(s.sede)}</div>
+                <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{s.paciente} – {fechaLegible(s.fecha)} {s.hora} – {nombreSede(s.sede)}</div>
               </div>
               <span style={pill(s.estado)}>{s.estado === "pendiente" ? "Esperando respuesta" : s.estado === "aceptada" ? "Aceptada" : "Rechazada"}</span>
             </div>
@@ -423,7 +423,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
           {diasComprometidos.map((fecha) => { const cs = citasDia(fecha); const pend = cs.filter((c) => !yaPedida(c.id)); return (
             <div key={fecha}>
               <div style={{ padding: "10px 20px", background: "var(--dc-bg)", borderTop: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, textTransform: "capitalize" }}>{fechaLegible(fecha)} · {cs.length} cita{cs.length > 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, textTransform: "capitalize" }}>{fechaLegible(fecha)} – {cs.length} cita{cs.length > 1 ? "s" : ""}</div>
                 {pend.length > 1 && <Btn small kind="ghost" onClick={() => abrirDia(fecha)}><Repeat size={13} strokeWidth={1.75} /> Sustituir todo el día</Btn>}
               </div>
               {cs.map((c) => { const env = yaPedida(c.id); const cv = conflictoViaje(miId, c); return (
@@ -431,7 +431,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
                   <div style={{ textAlign: "center", minWidth: 46 }}><div style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{c.hora}</div></div>
                   <div style={{ flex: 1, minWidth: 160 }}>
                     <div style={{ fontWeight: 500, color: NAVY }}>{c.paciente} <span style={{ fontSize: 12, fontWeight: 500, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-full)", padding: "1px 8px", marginLeft: 4 }}>{espDeCita(c)}</span></div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 5 }}><MapPin size={12} strokeWidth={1.75} /> {nombreSede(c.sede)} · {c.motivo}</div>
+                    <div style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 5 }}><MapPin size={12} strokeWidth={1.75} /> {nombreSede(c.sede)} – {c.motivo}</div>
                     {cv && <div style={{ fontSize: 12, color: "var(--dc-danger-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-danger-mid)", borderRadius: "var(--dc-r-sm)", padding: "4px 8px", marginTop: 5, display: "inline-flex", alignItems: "center", gap: 5 }}><AlertTriangle size={12} strokeWidth={1.75} /> Ajustado: ~{cv.viaje} min de viaje desde {cortaSede(cv.otra.sede)} ({cv.gap} min de margen)</div>}
                   </div>
                   {env
@@ -450,7 +450,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--dc-white)", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 460, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .24s cubic-bezier(.2,.7,.2,1)" }}>
             <div style={{ padding: "18px 22px", background: `linear-gradient(120deg,${NAVY},var(--dc-ink-alt))`, color: "var(--dc-white)" }}>
               <div style={{ fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Solicitar sustitución</div>
-              <div style={{ fontSize: 13, color: "var(--dc-brand-soft)", marginTop: 2 }}>{sust.paciente} · {fechaLegible(sust.fecha)} {sust.hora} · {nombreSede(sust.sede)}</div>
+              <div style={{ fontSize: 13, color: "var(--dc-brand-soft)", marginTop: 2 }}>{sust.paciente} – {fechaLegible(sust.fecha)} {sust.hora} – {nombreSede(sust.sede)}</div>
             </div>
             <div style={{ padding: 22, display: "grid", gap: 14 }}>
               {colegasDeCita(sust).length === 0 ? (
@@ -460,7 +460,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
                 <label><span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Colega que la cubrirá</span>
                   <Select value={sustDest} onChange={setSustDest} placeholder="Elige un colega"
                           options={colegasDeCita(sust).map((m) => { const cv = conflictoViaje(m.id, sust);
-                            return { value: m.id, label: `${m.nombre} · ${etiquetaSedes(m.sedes)}${cv ? " ⚠ viaje justo" : ""}` }; })} />
+                            return { value: m.id, label: `${m.nombre} – ${etiquetaSedes(m.sedes)}${cv ? " ⚠ viaje justo" : ""}` }; })} />
                 </label>
                 <label><span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Motivo</span>
                   <input className="dc-premium-inp" value={sustMotivo} onChange={(e) => setSustMotivo(e.target.value)} placeholder="Ej. Capacitación, salud, viaje..." style={{ width: "100%", padding: "11px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" }} />
@@ -489,13 +489,13 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
               {citasDia(sustDia).map((c) => { const cols = colegasDeCita(c); const env = yaPedida(c.id); return (
                 <div key={c.id} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{c.hora} · {c.paciente} <span style={{ fontSize: 12, color: DS.c.primary }}>({espDeCita(c)})</span></div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{c.hora} – {c.paciente} <span style={{ fontSize: 12, color: DS.c.primary }}>({espDeCita(c)})</span></div>
                     <div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 4 }}><MapPin size={11} strokeWidth={1.75} /> {nombreSede(c.sede)}</div>
                   </div>
                   {env ? <div style={{ marginTop: 8, display: "inline-block", ...pill(env.estado) }}>Ya solicitada</div>
                     : cols.length === 0 ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--dc-danger-700)" }}>Sin colega de {espDeCita(c).toLowerCase()} — deberás atenderla.</div>
                     : <Select value={diaDest[c.id] || ""} onChange={(v) => setDiaDest((d) => ({ ...d, [c.id]: v }))} placeholder="Elige un colega"
-                              options={cols.map((m) => ({ value: m.id, label: `${m.nombre} · ${etiquetaSedes(m.sedes)}` }))} />}
+                              options={cols.map((m) => ({ value: m.id, label: `${m.nombre} – ${etiquetaSedes(m.sedes)}` }))} />}
                 </div>
               ); })}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>

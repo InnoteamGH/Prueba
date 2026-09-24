@@ -8,7 +8,7 @@ export default {
     "web": "odontosonrisa.pe",
     "colorAcento": "#B7AEA2",
     "colorFondoSuave": "#F4F1EA",
-    "_paleta": "Negro #1B1614 · Marfil #F4F1EA · Taupe greige #B7AEA2 (manual de marca Odonto Sonrisa)",
+    "_paleta": "Negro #1B1614 – Marfil #F4F1EA – Taupe greige #B7AEA2 (manual de marca Odonto Sonrisa)",
     "nombreParaDocumento": "Odonto Sonrisa"
   },
   "sedes": [
@@ -16,8 +16,8 @@ export default {
       "codigo": "LOS-OLIVOS",
       "nombre": "Los Olivos",
       "direccion": "Av. Antúnez de Mayolo 1094 A, 2do piso — Los Olivos",
-      "telefonos": "(01) 233 4998 · 997 091 083",
-      "horario": "Lun a vie 9:00–19:00 · sáb 9:00–18:00",
+      "telefonos": "(01) 233 4998 – 997 091 083",
+      "horario": "Lun a vie 9:00–19:00 – sáb 9:00–18:00",
       "correo": "",
       "serieDocumento": "PI"
     }

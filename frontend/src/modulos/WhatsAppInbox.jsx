@@ -449,7 +449,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           aquí solo aparecen los avisos cuando hay algo que decir. */}
       {conectado && (Number(salud?.fallos24h) > 0 || probarResultado) && (
         <div className="wa-avisos">
-          {Number(salud?.fallos24h) > 0 && <span className="wa-aviso is-aviso"><AlertTriangle size={14} strokeWidth={2} /> Con fallos · {salud.fallos24h} en 24 h</span>}
+          {Number(salud?.fallos24h) > 0 && <span className="wa-aviso is-aviso"><AlertTriangle size={14} strokeWidth={2} /> Con fallos – {salud.fallos24h} en 24 h</span>}
           {probarResultado && <span className={`wa-aviso ${probarResultado.ok ? "is-ok" : "is-error"}`}>{probarResultado.texto}</span>}
         </div>
       )}
@@ -463,7 +463,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             </div>
           </div>
           <div><b>Número:</b> {conexion?.numero || salud?.numero || "—"}</div>
-          <div><b>Estado:</b> {conexion?.estado || salud?.estado || "—"} · {mensajeSaludUi(conexion || salud)}</div>
+          <div><b>Estado:</b> {conexion?.estado || salud?.estado || "—"} – {mensajeSaludUi(conexion || salud)}</div>
           {(Number(salud?.fallos24h) > 0 || Number(conexion?.fallos24h) > 0) && (
             <div><b>Fallos 24 h:</b> {salud?.fallos24h ?? conexion?.fallos24h}</div>
           )}
@@ -476,7 +476,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         </div>
       )}
       <Card className={`dc-inbox wa${enHilo && chat ? " is-hilo" : ""}${verInfo ? " is-info" : ""}${ocultarInfo ? " sin-info" : ""}`}>
-        {/* Columna 1 · lista con búsqueda y filtros */}
+        {/* Columna 1 – lista con búsqueda y filtros */}
         <div className="dc-inbox-list">
           <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -540,7 +540,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             ))}
           </div>
         </div>
-        {/* Columna 2 · hilo de conversación */}
+        {/* Columna 2 – hilo de conversación */}
         {!chat ? (
           <div className="wa-vacio">
             <div><MessageSquare size={34} strokeWidth={1.75} color="var(--dc-ink-400)" /><div style={{ marginTop: 10 }}>{conectado ? "Selecciona una conversación para verla." : "Sin conversación."}</div></div>
@@ -549,7 +549,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         <div className="dc-inbox-thread">
           <div className="dc-inbox-chat-head">
             <button type="button" className="wa-volver" aria-label="Volver a los chats" onClick={() => setEnHilo(false)}><ArrowLeft size={18} strokeWidth={2} /></button>
-            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` · ${chat.pacientes.length} pacientes` : ""}</div></div></div>
+            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` – ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
               {conectado && <Btn small onClick={() => abrirAgendar("Solicitud por WhatsApp")}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
               {/* Un solo botón: oculta el panel del contacto y, al pulsarlo otra vez, lo muestra. */}
@@ -584,7 +584,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             </div>
           )}
         </div>
-        {/* Columna 3 · panel del contacto */}
+        {/* Columna 3 – panel del contacto */}
         <div className="dc-inbox-side">
 
           <div style={{ padding: "32px 20px 24px", textAlign: "center", borderBottom: "1px solid var(--dc-line)" }}>
@@ -632,7 +632,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
       {agendar && <AgendarRecepcionModal base={agendar} onClose={() => setAgendar(null)} onCreada={() => { setAgendar(null); notify("Cita agendada desde WhatsApp."); }} notify={notify} />}
       {/* Ficha 360 del paciente */}
       {ficha360 && (() => { const p = ficha360.paciente || {}; const EST = { confirmada: ["var(--dc-info-soft)", "var(--dc-info-ink)"], atendida: ["var(--dc-ok-soft)", "var(--dc-ok-700)"], pendiente: ["var(--dc-warn-soft)", "var(--dc-warn-600)"], cancelada: ["var(--dc-fee2)", "var(--dc-danger-700)"], no_show: ["var(--dc-fee2)", "var(--dc-danger-700)"], en_atencion: ["var(--dc-bg)", "var(--dc-accent-cyan)"] }; return (
-        <Modal icon={<User size={20} strokeWidth={1.75} />} titulo={p.nombre || "Paciente"} sub={`DNI ${p.dni || "—"} · ${p.telefono || ""}`} onClose={() => setFicha360(null)} maxW={620}
+        <Modal icon={<User size={20} strokeWidth={1.75} />} titulo={p.nombre || "Paciente"} sub={`DNI ${p.dni || "—"} – ${p.telefono || ""}`} onClose={() => setFicha360(null)} maxW={620}
           footer={<Btn small onClick={() => setFicha360(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
@@ -646,7 +646,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
                 {(ficha360.citas || []).length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Sin citas registradas.</div>}
                 {(ficha360.citas || []).map((c, i) => { const es = EST[c.estado] || ["var(--dc-line)", "var(--dc-ink-700)"]; return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.fecha || "—"} {c.hora ? "· " + c.hora : ""}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{c.especialidad} · {c.medico} · {c.sede}</div></div>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.fecha || "—"} {c.hora ? "– " + c.hora : ""}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{c.especialidad} – {c.medico} – {c.sede}</div></div>
                     <span style={{ fontSize: 12, fontWeight: 500, color: es[1], background: es[0], padding: "3px 9px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{(c.estado || "").replace("_", " ")}</span>
                   </div>
                 ); })}
@@ -659,7 +659,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
                 {(ficha360.resenas || []).map((r, i) => { const bajo = r.nps != null && r.nps <= 6; return (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 11px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
                     {r.nps != null && <span style={{ fontSize: 12, fontWeight: 500, color: bajo ? "var(--dc-danger-700)" : "var(--dc-ok-700)", background: bajo ? "var(--dc-fee2)" : "var(--dc-ok-soft)", padding: "3px 8px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{r.nps}/10</span>}
-                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{r.comentario || "(sin comentario)"}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{r.fecha} · {r.medico}</div></div>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{r.comentario || "(sin comentario)"}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{r.fecha} – {r.medico}</div></div>
                   </div>
                 ); })}
               </div>

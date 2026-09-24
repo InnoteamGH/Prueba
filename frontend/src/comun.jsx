@@ -16,7 +16,7 @@ import { ChevronRight, AlertTriangle,ArrowUpDown,ArrowUpRight,Briefcase,Check,Ch
 export const NAVY = "var(--dc-navy)", RED = "var(--dc-red)", BG = "var(--dc-bg)", INK = "var(--dc-ink-alt)", TEAL = "var(--dc-teal)", WARM = "var(--dc-warn-700)";
 
 /* ============================================================================
- * DENTO CHECK · DESIGN SYSTEM (tokens únicos)
+ * DENTO CHECK – DESIGN SYSTEM (tokens únicos)
  * Fuente única de verdad para color, tipografía, espaciado, radios y sombras.
  * Regla de color: 1 acento de marca (teal). Info=azul, Éxito=verde, Oportunidad=ámbar,
  * Urgente=rojo. Neutros para el resto. La marca del asistente es "Asistente Dento".
@@ -61,10 +61,10 @@ export const UI = {
    - Restricción por SEDES aplicada de forma transversal a todos los módulos.
 
    Dos niveles de administración:
-   - Nivel 1 · Super Admin AWG (rol "superadmin"): administra TODA la plataforma
+   - Nivel 1 – Super Admin AWG (rol "superadmin"): administra TODA la plataforma
      desde un BackOffice separado (tenants, licencias, métricas, soporte). No
      pertenece a ninguna clínica.
-   - Nivel 2 · Roles dentro de cada clínica (tenant): Administrador General,
+   - Nivel 2 – Roles dentro de cada clínica (tenant): Administrador General,
      Gerencia, Administrador de Sede, Administrador TI, Recepcionista (+ Médico).
    ========================================================================== */
 
@@ -308,7 +308,7 @@ export const etiquetaSedes = (v) => {
   const a = normSedes(v);
   if (!a.length) return "—";
   if (a.length === 1) return nombreSede(a[0]);
-  return a.map(cortaSede).join(" · ");
+  return a.map(cortaSede).join(" – ");
 };
 
 /* Personal de la clínica que administra el perfil de TI.
@@ -332,11 +332,11 @@ export const STAFF_INIT = [
 /* Registro de auditoría / accesos (visible para TI). */
 export const AUDITORIA = [
   { fecha: "Hoy 09:42", usuario: "Marco Ticona", rol: "ti", accion: "Inicio de sesión", detalle: "Acceso correcto", ip: "190.234.12.5", nivel: "ok" },
-  { fecha: "Hoy 09:15", usuario: "Roberto Díaz", rol: "admin", accion: "Cobro registrado", detalle: "Boleta B001-1042 · S/ 180", ip: "190.234.12.8", nivel: "ok" },
+  { fecha: "Hoy 09:15", usuario: "Roberto Díaz", rol: "admin", accion: "Cobro registrado", detalle: "Boleta B001-1042 – S/ 180", ip: "190.234.12.8", nivel: "ok" },
   { fecha: "Hoy 08:58", usuario: "—", rol: "recepcion", accion: "Intento fallido", detalle: "Contraseña incorrecta (usuario dperez)", ip: "181.65.44.2", nivel: "warn" },
-  { fecha: "Hoy 08:30", usuario: "Dra. Carla Mendoza", rol: "medico", accion: "Edición de odontograma", detalle: "Paciente Rosa Linares · pieza 16", ip: "190.234.12.9", nivel: "ok" },
+  { fecha: "Hoy 08:30", usuario: "Dra. Carla Mendoza", rol: "medico", accion: "Edición de odontograma", detalle: "Paciente Rosa Linares – pieza 16", ip: "190.234.12.9", nivel: "ok" },
   { fecha: "Ayer 18:20", usuario: "Marco Ticona", rol: "ti", accion: "Integración conectada", detalle: "WhatsApp Business API (Meta)", ip: "190.234.12.5", nivel: "ok" },
-  { fecha: "Ayer 17:05", usuario: "Marco Ticona", rol: "ti", accion: "Usuario creado", detalle: "Karina Soto (Recepción · Surco)", ip: "190.234.12.5", nivel: "ok" },
+  { fecha: "Ayer 17:05", usuario: "Marco Ticona", rol: "ti", accion: "Usuario creado", detalle: "Karina Soto (Recepción – Surco)", ip: "190.234.12.5", nivel: "ok" },
   { fecha: "Ayer 16:40", usuario: "Marco Ticona", rol: "ti", accion: "Cambio de rol", detalle: "Jorge Ramos: Recepción → Odontólogo", ip: "190.234.12.5", nivel: "ok" },
   { fecha: "Ayer 12:11", usuario: "Diana Pérez", rol: "recepcion", accion: "Usuario desactivado", detalle: "Cuenta dada de baja por TI", ip: "190.234.12.5", nivel: "warn" },
   { fecha: "Ayer 09:03", usuario: "Patricia Salas", rol: "gerencia", accion: "Inicio de sesión", detalle: "Acceso correcto", ip: "200.48.10.1", nivel: "ok" },
@@ -410,7 +410,7 @@ export const addDays = (n) => { const d = hoyAhora(); d.setDate(d.getDate() + n)
 export const fmtHoy = () => fmt(hoyAhora());
 
 /* ── Exportación (Excel real .xlsx + PDF) ──
-   columnas: [{ key, label, w? }]  ·  filas: array de objetos por key.
+   columnas: [{ key, label, w? }]  –  filas: array de objetos por key.
    Excel: SheetJS por import dinámico (no engorda el bundle; se carga solo al exportar). */
 export async function exportarExcel({ nombreArchivo, hoja = "Datos", titulo, columnas, filas }) {
   const XLSX = await import("xlsx");
@@ -947,7 +947,7 @@ export const ESTADO_BADGE = {
 // fondo plano el desenfoque solo ensuciaba el color y hacía cada tarjeta distinta.
 export const Card = ({ children, style, ...rest }) => <div {...rest} style={{ background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)", ...style }}>{children}</div>;
 export const Badge = ({ estado }) => { const e = ESTADO_BADGE[estado] || ESTADO_BADGE.pendiente; return <span style={{ background: e.bg, color: e.fg, fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{e.l}</span>; };
-/* Sistema de botones DS: primary · secundario · ghost · peligro · peligro-outline · green. */
+/* Sistema de botones DS: primary – secundario – ghost – peligro – peligro-outline – green. */
 export const Btn = ({ children, onClick, kind = "primary", small, disabled, full, type, busy, "aria-label": ariaLabel, title }) => {
   const kindClass = {
     primary: "dc-btn--primario",
@@ -1006,7 +1006,7 @@ export const colorDe = (s) => AV_COLORS[[...(s || "x")].reduce((a, c) => a + c.c
 /**
  * Tinte seguro sobre tokens `var(--dc-*)` (UX-22).
  * Nunca concatenar hex alfa (`${tint(c, 0.125)}`) a un color CSS variable.
- * Mapa habitual: 05→3% · 1a→10% · 20→12% · 30→19% · 66→40% · CC→80%.
+ * Mapa habitual: 05→3% – 1a→10% – 20→12% – 30→19% – 66→40% – CC→80%.
  */
 export const tint = (c, a = 0.12) =>
   `color-mix(in srgb, ${c} ${Math.round(Number(a) * 100)}%, transparent)`;
@@ -1077,7 +1077,7 @@ export const KpiCard = ({ icon, label, value, color = NAVY, sub, delta, up, onCl
           No se pudo cargar
           {onRetry ? (
             <>
-              {" · "}
+              {" – "}
               <button type="button" className="dc-kpi__retry" onClick={(e) => { e.stopPropagation(); onRetry(); }}>
                 Reintentar
               </button>
@@ -1253,7 +1253,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
   const toggleSort = (key) => { setActiveCol(null); if (sortCol !== key) { setSortCol(key); setSortDir("asc"); } else if (sortDir === "asc") setSortDir("desc"); else setSortCol(null); };
   const COL = cols.map((c) => c.w).join(" ");
   // Ordenar no es filtrar: contarlo hacía que todas las tablas con orden por defecto
-  // -que son casi todas- dijeran "· filtrado" desde el primer render, y un aviso que
+  // -que son casi todas- dijeran "– filtrado" desde el primer render, y un aviso que
   // sale siempre no avisa de nada.
   const anyF = Object.values(colFilters).some((v) => v && v.trim());
   // Filtrar y ordenar es O(filas x columnas) + O(n log n): con useMemo solo se rehace
@@ -1276,7 +1276,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
     : { overflowX: "auto" };
   return (
     <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
-      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? " · filtrado" : ""}{hayMas ? ` · mostrando ${mostradas.length}` : ""}</span></div>{accion && <div>{accion}</div>}</div>}
+      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? " – filtrado" : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span></div>{accion && <div>{accion}</div>}</div>}
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;
             width: max-content solo cuando minWidth > 0 explícito exige scroll horizontal. */}
@@ -1380,13 +1380,13 @@ export const ModHead = ({ sub, accion }) => (!sub && !accion) ? null : (
   </div>
 );
 // Barra de paciente unificada para los módulos clínicos.
-export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, accion, sedeLabel = null }) => {
+export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, accion, sedeLabel = null, extra = null }) => {
   const chip = { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, borderRadius: "var(--dc-r-full)", padding: "3px 10px", whiteSpace: "nowrap" };
   const p = pacientes.find((x) => x.id === pacienteId) || null;
   if (!pacientes.length) {
     return (
       <Card style={{ padding: "14px 18px", marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{modulo ? `${modulo} · ` : ""}No hay pacientes cargados.</div>
+        <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{modulo ? `${modulo} – ` : ""}No hay pacientes cargados.</div>
       </Card>
     );
   }
@@ -1418,12 +1418,12 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
     return "—";
   })();
   return (
-    <Card style={{ padding: "14px 18px", marginBottom: 16, position: "relative", zIndex: 2 }}>
+    <Card className="dc-pbar" style={{ padding: "14px 18px", marginBottom: 16, position: "relative", zIndex: 2 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         {/* La misma imagen que en la ficha: foto si la hay, y si no la silueta que
             corresponde por edad y genero. Reconocer al paciente de un vistazo evita
             trabajar sobre la ficha equivocada al cambiar de uno a otro. */}
-        <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPediatrico(p.nacimiento || p.fechaNacimiento)} size={88} radio={22} />
+        <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPediatrico(p.nacimiento || p.fechaNacimiento)} size={64} radio={20} />
         <div style={{ flex: 1, minWidth: 220 }}>
           {modulo && <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{modulo}</div>}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1433,12 +1433,13 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
                     options={pacientes.map((x) => ({ value: x.id, label: x.nombre }))} />
             <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-700)", background: "var(--dc-bg)" }}>DNI {p.dni}</span>
             <span className="dc-chip" style={{ ...chip, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)" }}><MapPin size={11} strokeWidth={1.75} /> {sedeTxt}</span>
-            {p.ultima && <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-400)", background: "var(--dc-bg)" }}><Clock size={11} strokeWidth={1.75} /> Última: {p.ultima}</span>}
+            {p.ultima && <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-400)", background: "var(--dc-bg)" }}><Clock size={11} strokeWidth={1.75} /> Última visita {/^\d{4}-\d{2}-\d{2}/.test(String(p.ultima)) ? fechaLegible(String(p.ultima).slice(0, 10)) : p.ultima}</span>}
             {alergias.length > 0
-              ? <span className="dc-chip" style={{ ...chip, color: "var(--dc-danger-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-fee)" }}><AlertTriangle size={11} strokeWidth={1.75} /> {alergias.join(", ")}</span>
+              ? <span className="dc-chip is-alerta" style={{ ...chip, color: "var(--dc-danger-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-fee)" }}><AlertTriangle size={11} strokeWidth={1.75} /> {alergias.join(", ")}</span>
               : <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-500)", background: "var(--dc-bg)" }}>Sin alergias</span>}
           </div>
         </div>
+        {extra && <div className="dc-pbar__extra">{extra}</div>}
         {accion && <div style={{ flexShrink: 0 }}>{accion}</div>}
       </div>
     </Card>

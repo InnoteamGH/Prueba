@@ -83,7 +83,7 @@ function CieDiagInput({ value, onChange, style, placeholder = "Diagnóstico (CIE
               onMouseDown={(e) => { e.preventDefault(); onChange(`${x.c} — ${x.d}`); setOpen(false); }}
               style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", border: "none", background: "transparent", cursor: "pointer", fontSize: 13 }}>
               <span style={{ fontWeight: 500, color: "var(--dc-primary-alt)" }}>{x.c}</span>
-              <span style={{ color: "var(--dc-ink-500)" }}> · {x.d}</span>
+              <span style={{ color: "var(--dc-ink-500)" }}> – {x.d}</span>
             </button>
           ))}
         </div>
@@ -123,8 +123,8 @@ function imprimir(titulo, inner, notify) {
 function cabeceraHTML(clinica, titulo) {
   const c = clinica || {};
   return `<div class="hdr"><div><h1>${esc(c.nombre || "Clínica Dental")}</h1>
-    <div class="muted">${esc([c.razonSocial, c.ruc ? "RUC " + c.ruc : "", c.direccion].filter(Boolean).join(" · "))}</div>
-    <div class="muted">${esc([c.telefono, c.email].filter(Boolean).join(" · "))}</div></div>
+    <div class="muted">${esc([c.razonSocial, c.ruc ? "RUC " + c.ruc : "", c.direccion].filter(Boolean).join(" – "))}</div>
+    <div class="muted">${esc([c.telefono, c.email].filter(Boolean).join(" – "))}</div></div>
     <div style="text-align:right"><div style="font-weight:800;font-size:15px;color:var(--dc-primary-alt)">${esc(titulo)}</div>
     <div class="muted">${new Date().toLocaleDateString("es-PE")}</div></div></div>`;
 }
@@ -209,7 +209,7 @@ function Diente({ n, data, pincel, onFace, onWhole, editable }) {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
       <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}>{formatearFDI(n)}</span>
       <div onClick={editable && wholeMode ? () => onWhole() : undefined}
-        title={whole ? `Pieza ${formatearFDI(n)} · ${ESTADOS[whole]?.l}` : `Pieza ${formatearFDI(n)}`}
+        title={whole ? `Pieza ${formatearFDI(n)} – ${ESTADOS[whole]?.l}` : `Pieza ${formatearFDI(n)}`}
         style={{ position: "relative", width: 40, height: 56, borderRadius: "var(--dc-r-sm)", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gridTemplateRows: "1fr 1fr 1fr", cursor: editable && wholeMode ? "pointer" : "default", boxShadow: `0 0 0 1px ${LINE}` }}>
         {cell("top", { gridColumn: "1 / 4", gridRow: "1" })}
         {cell("left", { gridColumn: "1", gridRow: "2" })}
@@ -365,7 +365,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
   const seg = (active) => ({ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: active ? "var(--dc-white)" : "transparent", color: active ? NAVY : "var(--dc-ink-400)", boxShadow: active ? "0 1px 2px rgba(16,24,40,.12)" : "none" });
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Numeración FDI con punto · R.M. 559-2022-MINSA</div>
+      <div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Numeración FDI con punto – R.M. 559-2022-MINSA</div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
           {FASES.map(([k, l]) => <button key={k} onClick={() => setFase(k)} style={seg(fase === k)}>{l}</button>)}
@@ -428,7 +428,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
         </button>
         <span style={{ fontSize: 12, color: MUTED, alignSelf: "center", marginLeft: 4 }}>Elige un estado y haz clic en la <b>cara</b> del diente (Extraer/Ausente/Borrar marcan la pieza completa).</span>
       </div>}
-      {!editable && <div style={{ fontSize: 13, color: "var(--dc-ink-400)", padding: "8px 12px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)" }}>Solo lectura · tu rol no edita el odontograma.</div>}
+      {!editable && <div style={{ fontSize: 13, color: "var(--dc-ink-400)", padding: "8px 12px", background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)" }}>Solo lectura – tu rol no edita el odontograma.</div>}
       {/* Leyenda color — una sola; si hay paleta editable, esa hace de leyenda (DC-49). */}
       {!editable && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }} aria-label="Leyenda de estados del odontograma">
@@ -525,7 +525,7 @@ function Ortodoncia({ pacienteId, notify }) {
             <div style={{ minWidth: 82 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.fecha}</div>{c.proximoControl && <div style={{ fontSize: 12, color: WARN, fontWeight: 500 }}>Próx: {c.proximoControl}</div>}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{c.actividad}</div>
-              <div style={{ fontSize: 12, color: MUTED }}>{c.aparato}{c.nota ? ` · ${c.nota}` : ""}</div>
+              <div style={{ fontSize: 12, color: MUTED }}>{c.aparato}{c.nota ? ` – ${c.nota}` : ""}</div>
             </div>
             <button onClick={() => borrar(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: RED, fontSize: 12, fontWeight: 500 }}>Eliminar</button>
           </div>
@@ -663,7 +663,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
   };
   const printReceta = (r) => {
     const its = arr(parseJson(r.items, []));
-    const filas = its.map((x) => `<div class="rx-item"><b>${esc(x.medicamento)}</b>${x.presentacion ? " — " + esc(x.presentacion) : ""}<div class="muted">${esc([x.dosis && ("Dosis: " + x.dosis), x.frecuencia && ("Frecuencia: " + x.frecuencia), x.duracion && ("Duración: " + x.duracion)].filter(Boolean).join("  ·  "))}</div></div>`).join("");
+    const filas = its.map((x) => `<div class="rx-item"><b>${esc(x.medicamento)}</b>${x.presentacion ? " — " + esc(x.presentacion) : ""}<div class="muted">${esc([x.dosis && ("Dosis: " + x.dosis), x.frecuencia && ("Frecuencia: " + x.frecuencia), x.duracion && ("Duración: " + x.duracion)].filter(Boolean).join("  –  "))}</div></div>`).join("");
     const edad = edadDe(paciente?.fechaNacimiento);
     imprimir("Receta médica", `${cabeceraHTML(clinica, "Receta médica")}
       <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha || "")}</div></div>
@@ -721,7 +721,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
         {esPediatrico && !sinFechaNac && (
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--dc-bg)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-md)", padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "var(--dc-info-ink)", fontWeight: 500 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            <span>Pediátrico · {edad} años — Dosis ajustadas automáticamente</span>
+            <span>Pediátrico – {edad} años — Dosis ajustadas automáticamente</span>
           </div>
         )}
         {arr(paciente?.alergias).length > 0 && (
@@ -811,8 +811,8 @@ function Periodontograma({ pacienteId, notify }) {
   const pdInput = (n, i) => { const c = cur(n); const v = (c.profundidad || [])[i]; const r = (c.recesion || [])[i]; const b = (c.sangrado || [])[i]; return (
     <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
       <div onClick={() => toggleBOP(n, i)} title="Sangrado al sondaje" style={{ width: 22, height: 5, borderRadius: "var(--dc-r-sm)", background: b ? "var(--dc-danger)" : "var(--dc-bg)", cursor: "pointer" }} />
-      <input value={v ?? ""} onChange={(e) => pdChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Profundidad de sondaje · " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 26, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: colPD(v), fontWeight: 500, fontSize: 13, outline: "none", background: "var(--dc-white)" }} />
-      <input value={r ?? ""} onChange={(e) => recChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Recesión · " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 20, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: r ? "var(--dc-purple)" : "var(--dc-line-alt)", fontWeight: 500, fontSize: 12, outline: "none", background: "var(--dc-white)" }} />
+      <input value={v ?? ""} onChange={(e) => pdChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Profundidad de sondaje – " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 26, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: colPD(v), fontWeight: 500, fontSize: 13, outline: "none", background: "var(--dc-white)" }} />
+      <input value={r ?? ""} onChange={(e) => recChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Recesión – " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 20, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: r ? "var(--dc-purple)" : "var(--dc-line-alt)", fontWeight: 500, fontSize: 12, outline: "none", background: "var(--dc-white)" }} />
     </div>
   ); };
   const diente = (n) => { const c = cur(n); return (
@@ -854,7 +854,7 @@ function Periodontograma({ pacienteId, notify }) {
         <div style={{ display: "grid", gap: 12, minWidth: denticion === "adulto" ? 720 : 480, justifyItems: "center" }}>
           {filas.map((fila, i) => <div key={i} style={{ display: "flex", gap: 4 }}>{fila.map((n) => diente(n))}</div>)}
         </div>
-        <div style={{ fontSize: 12, color: MUTED, marginTop: 12 }}>Cada pieza: 3 sitios vestibulares (bloque superior) y 3 palatinos/linguales (bloque inferior). Por sitio: barra roja = <b>sangrado</b> (clic), casilla grande = <b>profundidad de sondaje</b> (verde &lt;4 · ámbar 4-5 · rojo ≥6 mm), casilla pequeña morada = <b>recesión</b> (mm). <b>M</b> = movilidad, <b>F</b> = furca.</div>
+        <div style={{ fontSize: 12, color: MUTED, marginTop: 12 }}>Cada pieza: 3 sitios vestibulares (bloque superior) y 3 palatinos/linguales (bloque inferior). Por sitio: barra roja = <b>sangrado</b> (clic), casilla grande = <b>profundidad de sondaje</b> (verde &lt;4 – ámbar 4-5 – rojo ≥6 mm), casilla pequeña morada = <b>recesión</b> (mm). <b>M</b> = movilidad, <b>F</b> = furca.</div>
       </div>
     </div>
   );
@@ -877,10 +877,10 @@ const HABITOS_ORALES = ["Succión digital", "Uso de chupón", "Biberón nocturno
 // Escala de Frankl: clasifica como se porto el nino en el sillon. No es un adorno,
 // decide si la proxima cita necesita mas tiempo, acompanamiento o derivacion.
 const FRANKL = [
-  { v: "1", l: "1 · Claramente negativo", d: "Rechaza, llora, no colabora", c: "var(--dc-red)" },
-  { v: "2", l: "2 · Negativo", d: "Reticente, poco colaborador", c: "var(--dc-warn-600)" },
-  { v: "3", l: "3 · Positivo", d: "Acepta, algo cauteloso", c: "var(--dc-accent-cyan)" },
-  { v: "4", l: "4 · Claramente positivo", d: "Colabora y viene a gusto", c: "var(--dc-ok-700)" },
+  { v: "1", l: "1 – Claramente negativo", d: "Rechaza, llora, no colabora", c: "var(--dc-red)" },
+  { v: "2", l: "2 – Negativo", d: "Reticente, poco colaborador", c: "var(--dc-warn-600)" },
+  { v: "3", l: "3 – Positivo", d: "Acepta, algo cauteloso", c: "var(--dc-accent-cyan)" },
+  { v: "4", l: "4 – Claramente positivo", d: "Colabora y viene a gusto", c: "var(--dc-ok-700)" },
 ];
 // Marca cada cuanto hay que citarlo a control y si toca fluor o sellantes.
 const RIESGO_CARIES = [{ v: "bajo", l: "Bajo", c: "var(--dc-ok-700)" }, { v: "moderado", l: "Moderado", c: "var(--dc-warn-600)" }, { v: "alto", l: "Alto", c: "var(--dc-red)" }];
@@ -1132,10 +1132,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const guardarEvolucion = async () => {
     if (!evo.diagnostico.trim() && !evo.detalle.trim()) { notify("Escribe el diagnóstico o la evolución."); return; }
     if (medicos.length && !evoMedico) { notify("Indica el doctor que atendió."); return; }
-    const sv = vitalesActivos.map(([k, l]) => (vit[k] ? `${l} ${vit[k]}` : "")).filter(Boolean).join(" · ");
+    const sv = vitalesActivos.map(([k, l]) => (vit[k] ? `${l} ${vit[k]}` : "")).filter(Boolean).join(" – ");
     try {
       await api.historia.crear({ pacienteId, titulo: "Evolución", ...parseDiagnostico(evo.diagnostico), detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || null });
-      if (evoFile) { try { const url = await leerArchivo(evoFile); await crearArchivo(url, "Foto intraoral", "Anexo de evolución" + (evo.diagnostico ? " · " + evo.diagnostico : "")); } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); } }
+      if (evoFile) { try { const url = await leerArchivo(evoFile); await crearArchivo(url, "Foto intraoral", "Anexo de evolución" + (evo.diagnostico ? " – " + evo.diagnostico : "")); } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); } }
       setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify("Evolución registrada."); cargar(); recargarRx();
     } catch { notify("No se pudo guardar la evolución."); }
   };
@@ -1232,7 +1232,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     const piezas = arr(d?.odontograma).filter((o) => o.estado || o.caras);
     const odo = FASES.map(([k, titulo]) => {
       const filas = piezas.filter((o) => (o.fase || "inicial") === k).map(filaOdo).join("");
-      return filas ? `<h2>Odontograma · ${esc(titulo)}</h2><table><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Nota</th></tr></thead><tbody>${filas}</tbody></table>` : "";
+      return filas ? `<h2>Odontograma – ${esc(titulo)}</h2><table><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Nota</th></tr></thead><tbody>${filas}</tbody></table>` : "";
     }).join("");
     imprimir("Historia clínica", `${cabeceraHTML(clinica, "Historia clínica")}
       <h2>Filiación</h2>
@@ -1260,7 +1260,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         // que la imprime y, si el paciente es menor, la del apoderado que la recibe.
         const yo = (auth.sesion && auth.sesion.nombre) || "";
         const firma = (rotulo, sub) => `<div style="width:46%"><div style="border-top:1px solid #333;margin-top:56px;padding-top:6px"><b>${esc(rotulo)}</b>${sub ? `<br><span class="muted">${esc(sub)}</span>` : ""}</div></div>`;
-        return `<div class="row" style="justify-content:space-between;margin-top:26px">${firma(yo || "Profesional tratante", "Firma y sello · COP")}${esPed ? firma(p.apoderadoNombre || "Apoderado", "Firma del apoderado") : firma("Paciente", "Firma")}</div>`;
+        return `<div class="row" style="justify-content:space-between;margin-top:26px">${firma(yo || "Profesional tratante", "Firma y sello – COP")}${esPed ? firma(p.apoderadoNombre || "Apoderado", "Firma del apoderado") : firma("Paciente", "Firma")}</div>`;
       })()}`, notify);
   };
 
@@ -1362,8 +1362,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     }
     let titulo = "", sub = "", right = "";
     let editable = false;
-    if (e.k === "cita") { const c = e.c; titulo = (c.especialidad && c.especialidad !== "—" ? c.especialidad : "Cita") + (c.estado && c.estado !== "—" ? " · " + (ESTADO_CITA[c.estado] || c.estado) : ""); sub = [c.motivo, c.medico && c.medico !== "—" ? rotuloMedico(c.medico) : "", c.hora].filter(Boolean).join(" · "); }
-    else if (e.k === "evolucion") { const h = e.h; const vacia = !(h.diagnostico && String(h.diagnostico).trim()) && !(h.detalle && String(h.detalle).trim()); titulo = vacia ? "Evolución (pendiente de llenar)" : (h.diagnostico || h.titulo || "Evolución"); sub = [h.detalle, h.signosVitales ? "Signos: " + h.signosVitales : "", h.medico && h.medico !== "—" ? rotuloMedico(h.medico) : ""].filter(Boolean).join(" · "); editable = conectado && !!h.id && !vacia; }
+    if (e.k === "cita") { const c = e.c; titulo = (c.especialidad && c.especialidad !== "—" ? c.especialidad : "Cita") + (c.estado && c.estado !== "—" ? " – " + (ESTADO_CITA[c.estado] || c.estado) : ""); sub = [c.motivo, c.medico && c.medico !== "—" ? rotuloMedico(c.medico) : "", c.hora].filter(Boolean).join(" – "); }
+    else if (e.k === "evolucion") { const h = e.h; const vacia = !(h.diagnostico && String(h.diagnostico).trim()) && !(h.detalle && String(h.detalle).trim()); titulo = vacia ? "Evolución (pendiente de llenar)" : (h.diagnostico || h.titulo || "Evolución"); sub = [h.detalle, h.signosVitales ? "Signos: " + h.signosVitales : "", h.medico && h.medico !== "—" ? rotuloMedico(h.medico) : ""].filter(Boolean).join(" – "); editable = conectado && !!h.id && !vacia; }
     else if (e.k === "pago") { const g = e.g; titulo = g.concepto || "Pago"; right = money(g.monto); }
     else if (e.k === "receta") { const r2 = e.r; const its = arr(parseJson(r2.items, [])); titulo = "Receta" + (its.length ? ": " + its.map((x) => x.medicamento).filter(Boolean).join(", ") : ""); sub = r2.indicaciones || (r2.medico && r2.medico !== "—" ? rotuloMedico(r2.medico) : ""); }
     else if (e.k === "archivo") { const x = e.x; titulo = x.tipo || "Archivo"; sub = x.nota || ""; }
@@ -1445,7 +1445,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div style={{ fontSize: 12, fontWeight: 500, color: ACCENT, letterSpacing: ".08em", textTransform: "uppercase" }}>Expediente clínico</div>
               <div style={{ fontSize: 16, fontWeight: 500, color: NAVY, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif", lineHeight: 1.1 }}>{p.nombre || "Ficha médica"}</div>
               <div style={{ fontSize: 13, fontWeight: 500, color: MUTED, marginTop: 2 }}>
-                {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null, p.telefono || null].filter(Boolean).join(" · ")}
+                {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null, p.telefono || null].filter(Boolean).join(" – ")}
               </div>
               {errorFicha ? (
                 <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-700)", marginTop: 6 }}>Error al consultar datos clínicos</div>
@@ -1505,7 +1505,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   Quitar foto
                 </button>)}
               <div style={{ fontWeight: 500, color: NAVY, fontSize: 16, lineHeight: 1.25 }}>{p.nombre || "Paciente"}</div>
-              <div style={{ fontSize: 13, color: MUTED }}>{p.fechaNacimiento && edad != null ? `${edad} años` : ""}{p.dni ? (p.fechaNacimiento && edad != null ? ` · DNI ${p.dni}` : `DNI ${p.dni}`) : ""}</div>
+              <div style={{ fontSize: 13, color: MUTED }}>{p.fechaNacimiento && edad != null ? `${edad} años` : ""}{p.dni ? (p.fechaNacimiento && edad != null ? ` – DNI ${p.dni}` : `DNI ${p.dni}`) : ""}</div>
               {esPed && <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, color: PED, fontSize: 12, fontWeight: 500, letterSpacing: ".03em", textTransform: "uppercase" }}>
                 <EmblemaNino size={14} /> {enTransicion ? "Pasa pronto a adulto" : "Ficha pediátrica"}
               </div>}
@@ -1544,7 +1544,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     <div style={{ fontSize: 12, fontWeight: 500, color: PED, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 3 }}>Apoderado</div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, lineHeight: 1.3 }}>{p.apoderadoNombre}</div>
                     <div style={{ fontSize: 12, color: "var(--dc-warn-700)", marginTop: 2 }}>
-                      {p.apoderadoParentesco || "Responsable"}{p.apoderadoDni ? ` · DNI ${p.apoderadoDni}` : ""}
+                      {p.apoderadoParentesco || "Responsable"}{p.apoderadoDni ? ` – DNI ${p.apoderadoDni}` : ""}
                     </div>
                     {p.apoderadoTelefono && <a href={`tel:${p.apoderadoTelefono}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 12, fontWeight: 500, color: PED, textDecoration: "none" }}><Phone size={11} strokeWidth={2} /> {p.apoderadoTelefono}</a>}
                   </div>
@@ -1588,7 +1588,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     {hayAlergia && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{arr(p.alergias).map((a) => <span key={a} style={pill("var(--dc-danger)")}>{a}{puedeEscribirClinico && <X size={12} strokeWidth={2} style={{ cursor: "pointer" }} onClick={() => delAlergia(a)} />}</span>)}</div>}
                     {puedeEscribirClinico
                       ? <input value={alergIn} onChange={(e) => setAlergIn(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAlergia(); }} placeholder="Agregar alergia…" style={addInp} />
-                      : (!hayAlergia && <div style={{ fontSize: 12, color: MUTED }}>Sin alergias registradas · solo lectura</div>)}
+                      : (!hayAlergia && <div style={{ fontSize: 12, color: MUTED }}>Sin alergias registradas – solo lectura</div>)}
                   </div>
                 </div>
               );
@@ -1684,7 +1684,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                         <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid var(--dc-line)", flexWrap: "wrap" }}>
                           <div>
                             <div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.tipo || c.titulo || "Consentimiento"}</div>
-                            <div style={{ fontSize: 12, color: MUTED }}>{(c.fechaFirma || c.creadoEn || "").slice(0, 10) || "—"} · {c.firmado ? "Firmado" : "Pendiente"}</div>
+                            <div style={{ fontSize: 12, color: MUTED }}>{(c.fechaFirma || c.creadoEn || "").slice(0, 10) || "—"} – {c.firmado ? "Firmado" : "Pendiente"}</div>
                           </div>
                           {!c.firmado && conectado && (
                             <button onClick={() => api.consentimientos.firmar(c.id, `firma://${c.id}`, { firmanteNombre: p.nombre, firmanteDni: p.dni }).then(() => { notify("Consentimiento firmado."); api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])); }).catch(() => notify("No se pudo firmar."))}
@@ -1741,7 +1741,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   </div>
                 )}
                 <div style={card}>
-                  <div style={secTitle}>Motivo de consulta y enfermedad actual {!puedeEscribirClinico && <span style={{ fontWeight: 500, color: MUTED, fontSize: 12 }}>· solo lectura</span>}</div>
+                  <div style={secTitle}>Motivo de consulta y enfermedad actual {!puedeEscribirClinico && <span style={{ fontWeight: 500, color: MUTED, fontSize: 12 }}>– solo lectura</span>}</div>
                   <div style={{ display: "grid", gap: 10 }}>
                     <div className="fm-hist-row"><label style={lbl}>Motivo de consulta</label>{ta(null, "motivoConsulta", "¿Por qué acude el paciente?")}</div>
                     <div className="fm-hist-row"><label style={lbl}>Enfermedad / dolencia actual</label>{ta(null, "enfermedadActual", "Tiempo de enfermedad, síntomas, evolución…")}</div>
@@ -1801,7 +1801,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       {verPediatrico && sec("pediatrico", Baby,
                         esPed ? "Historia pediátrica" : "Historia pediátrica (etapa anterior)",
                         { ok: !!pedOk,
-                          txt: !esPed ? "De cuando era menor · se conserva"
+                          txt: !esPed ? "De cuando era menor – se conserva"
                                : pedOk ? "Con datos registrados" : "Toca para registrar" },
                         <>
                           {!esPed && (
@@ -1817,7 +1817,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                             <div className="fm-hist-row"><label style={lbl}>Embarazo / parto</label>{ta("perinatales", "embarazo", "Controlado, a término…")}</div>
                             <div className="fm-hist-row"><label style={lbl}>Lactancia</label>{ta("perinatales", "lactancia", "Materna / fórmula, duración…")}</div>
                           </div>
-                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Conducta en el sillón <span style={{ fontWeight: 500, color: MUTED }}>· escala de Frankl</span></div>
+                          <div style={{ fontWeight: 500, color: TEXT, fontSize: 13, margin: "18px 0 8px" }}>Conducta en el sillón <span style={{ fontWeight: 500, color: MUTED }}>– escala de Frankl</span></div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {FRANKL.filter((f) => puedeEscribirClinico || F.frankl === f.v).map((f) => { const on = F.frankl === f.v; return (
                               <button key={f.v} onClick={() => blurFc("frankl", on ? "" : f.v)} title={f.d} disabled={!puedeEscribirClinico}
@@ -1999,7 +1999,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   {arr(d?.tratamientos).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin plan de tratamiento.</div>}
                   {arr(d?.tratamientos).map((t, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i ? `1px solid ${LINE}` : "none", fontSize: 13 }}>
-                      <span style={{ color: NAVY, fontWeight: 500 }}>{t.nombre}{t.pieza ? ` · pieza ${t.pieza}` : ""}</span>
+                      <span style={{ color: NAVY, fontWeight: 500 }}>{t.nombre}{t.pieza ? ` – pieza ${t.pieza}` : ""}</span>
                       <span style={{ color: t.estado === "completada" ? GREEN : "var(--dc-ink-400)", fontWeight: 500 }}>{t.estado}</span>
                       <span style={{ fontWeight: 500 }}>{money(t.costo)}</span>
                     </div>
@@ -2038,7 +2038,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       <a href={x.url || undefined} target="_blank" rel="noreferrer" style={{ display: "block", height: 104 }}>{x.url ? <img src={x.url} alt={x.tipo} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ height: "100%", display: "grid", placeItems: "center" }}><Image size={26} color="rgba(255,255,255,.5)" /></div>}</a>
                       <div style={{ padding: "7px 10px", background: "var(--dc-white)" }}>
                         <div style={{ fontSize: 12, fontWeight: 500, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.tipo || "Estudio"}</div>
-                        <div style={{ fontSize: 12, color: MUTED }}>{x.fecha || ""}{x.nota ? " · " + x.nota : ""}</div>
+                        <div style={{ fontSize: 12, color: MUTED }}>{x.fecha || ""}{x.nota ? " – " + x.nota : ""}</div>
                       </div>
                     </div>
                   ))}
@@ -2100,7 +2100,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 return (
                   <div>
                     <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>
-                      {fmtFecha(ult.fecha)}{ult.medico ? ` · ${rotuloMedico(ult.medico) || ult.medico}` : ""}
+                      {fmtFecha(ult.fecha)}{ult.medico ? ` – ${rotuloMedico(ult.medico) || ult.medico}` : ""}
                     </div>
                     {ult.diagnostico && <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, marginBottom: 4, lineHeight: 1.4 }}>{ult.diagnostico}</div>}
                     {ult.detalle && <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.55 }}>{ult.detalle}</div>}

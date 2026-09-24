@@ -34,7 +34,7 @@ function textoCond(txt, dias) {
 function Pie({ n, total, empresa }) {
   return (
     <div className="doc-pie">
-      <span>{empresa.nombreParaDocumento || empresa.nombreComercial} · RUC {empresa.ruc}</span>
+      <span>{empresa.nombreParaDocumento || empresa.nombreComercial} – RUC {empresa.ruc}</span>
       <span data-pie-pagina>{etiquetaPie(n, total)}</span>
     </div>
   );
@@ -218,10 +218,10 @@ export default function PlanInversionDocumento({
             <select value={codAdd} onChange={(e) => setCodAdd(Number(e.target.value))} style={inp}>
               {SUELTOS_PARTIDA.map((s) => (
                 <option key={s.cod} value={s.cod}>
-                  {s.cod} · {s.nom}
-                  {s.amb === "pieza" ? " · sobre la pieza elegida" : ""}
-                  {s.amb === "maxilar" && !s.fijo ? " · por maxilar" : ""}
-                  {s.fijo === "ambos" ? " · ambos maxilares" : ""}
+                  {s.cod} – {s.nom}
+                  {s.amb === "pieza" ? " – sobre la pieza elegida" : ""}
+                  {s.amb === "maxilar" && !s.fijo ? " – por maxilar" : ""}
+                  {s.fijo === "ambos" ? " – ambos maxilares" : ""}
                 </option>
               ))}
             </select>
@@ -237,14 +237,14 @@ export default function PlanInversionDocumento({
           </div>
           {aviso && <div style={{ color: "#b45309", marginTop: 6 }}>{aviso}</div>}
           {planRemote?.numeroDocumento && (
-            <div style={{ marginTop: 6, color: "#166534" }}>Documento {planRemote.numeroDocumento} · {totalPaginas} páginas</div>
+            <div style={{ marginTop: 6, color: "#166534" }}>Documento {planRemote.numeroDocumento} – {totalPaginas} páginas</div>
           )}
           {descartes.length > 0 && (
             <div style={{ marginTop: 10, fontSize: 12 }}>
               <b>Aviso interno:</b>
               <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
                 {descartes.map((d, i) => (
-                  <li key={i}>{formatearFDI(d.pz) || "—"} · {d.h}: {d.motivo}</li>
+                  <li key={i}>{formatearFDI(d.pz) || "—"} – {d.h}: {d.motivo}</li>
                 ))}
               </ul>
             </div>
@@ -336,7 +336,7 @@ export default function PlanInversionDocumento({
 
         {mostrarOdo && (
           <section className="hoja plan-inv-anexo" data-pagina={totalPaginas} data-paginas-totales={totalPaginas}>
-            <h3 style={{ fontSize: 14, fontFamily: "system-ui,sans-serif" }}>Anexo · Odontograma</h3>
+            <h3 style={{ fontSize: 14, fontFamily: "system-ui,sans-serif" }}>Anexo – Odontograma</h3>
             {anexoLive ? (
               <img
                 src={anexoLive}
@@ -350,7 +350,7 @@ export default function PlanInversionDocumento({
             )}
             <p className="plan-inv-muted" style={{ marginTop: 8 }}>
               Sede del documento: {sede.nombre || "—"}
-              {sede.origenSedeDocumento || sedeOrigen ? ` · origen ${sede.origenSedeDocumento || sedeOrigen}` : ""}
+              {sede.origenSedeDocumento || sedeOrigen ? ` – origen ${sede.origenSedeDocumento || sedeOrigen}` : ""}
             </p>
             <Pie n={totalPaginas} total={totalPaginas} empresa={empresa} />
           </section>

@@ -176,16 +176,16 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
               {puedeExportar && <Btn small kind="ghost" onClick={exportarResumen}><FileSpreadsheet size={14} strokeWidth={1.75} /> Exportar Excel</Btn>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-              <KpiCard label="Ingresos · últimos 6 meses" value={nfmt(ingTotal)} color={NAVY} icon={<DollarSign size={18} strokeWidth={1.75} />} sub="cobrado real" />
-              <KpiCard label="Atenciones · últimos 6 meses" value={atendTotal} color={NAVY} icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub="citas atendidas" />
+              <KpiCard label="Ingresos – últimos 6 meses" value={nfmt(ingTotal)} color={NAVY} icon={<DollarSign size={18} strokeWidth={1.75} />} sub="cobrado real" />
+              <KpiCard label="Atenciones – últimos 6 meses" value={atendTotal} color={NAVY} icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub="citas atendidas" />
               {/* El backend lo calcula sobre TODA la historia de la clínica. En el tablero
                   gerencial, "citas que se pierden" mide solo el mes en curso: son dos cifras
                   distintas y ninguna decía su periodo. */}
               <KpiCard label="Ausentismo histórico" value={`${r.ausentismo || 0}%`} color={r.ausentismo >= 15 ? "var(--dc-red)" : NAVY} icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub="canceladas + no-show, desde el inicio" />
-              <KpiCard label="Captación WhatsApp · periodo" value={`${f.agendadas || 0}`} color={NAVY} icon={<MessageSquare size={18} strokeWidth={1.75} />} sub={`${f.conversaciones || 0} conversaciones · ${f.agendadas || 0} citas agendadas`} />
+              <KpiCard label="Captación WhatsApp – periodo" value={`${f.agendadas || 0}`} color={NAVY} icon={<MessageSquare size={18} strokeWidth={1.75} />} sub={`${f.conversaciones || 0} conversaciones – ${f.agendadas || 0} citas agendadas`} />
             </div>
             <Card style={{ padding: "18px 20px" }}>
-              <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos por mes · últimos 6 meses</h3>
+              <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ingresos por mes – últimos 6 meses</h3>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 160 }}>
                 {(() => {
                   const vals = meses.map((m) => Number(m.ingresos) || 0);
@@ -209,14 +209,14 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
             </Card>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
               <Card style={{ padding: "18px 20px" }}>
-                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Producción por especialidad · mismos 6 meses</h3>
+                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Producción por especialidad – mismos 6 meses</h3>
                 <div style={{ display: "grid", gap: 10 }}>
                   {normalizarProduccionEsp(r.porEspecialidad || []).slice(0, 8).map((e, i) => {
                     const maxP = maxSerie((r.porEspecialidad || []).map((x) => Number(x.produccion) || 0));
                     const { dibujar, pct } = (() => { const v = Number(e.produccion) || 0; if (v <= 0 || maxP <= 0) return { dibujar: false, pct: 0 }; const p = Math.min(100, (v / maxP) * 100); return p < 5 ? { dibujar: false, pct: p } : { dibujar: true, pct: p }; })();
                     return (
                     <div key={i}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}><span style={{ color: NAVY, fontWeight: 500 }}>{e.especialidad}</span><span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{nfmt(e.produccion)} · {e.atendidas}</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}><span style={{ color: NAVY, fontWeight: 500 }}>{e.especialidad}</span><span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{nfmt(e.produccion)} – {e.atendidas}</span></div>
                       {dibujar ? <div style={{ height: 8, borderRadius: "var(--dc-r-full)", background: "var(--dc-line)", overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", borderRadius: "var(--dc-r-full)", background: DS.c.primary }} /></div> : <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div>}
                     </div>
                     );
@@ -225,7 +225,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
                 </div>
               </Card>
               <Card style={{ padding: "18px 20px" }}>
-                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 7 }}><MessageSquare size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /> Captación por WhatsApp · periodo</h3>
+                <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 7 }}><MessageSquare size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /> Captación por WhatsApp – periodo</h3>
                 {(() => {
                   const serie = [f.conversaciones || 0, f.agendadas || 0, f.atendidas || 0];
                   const layout = layoutBarras(serie);
@@ -272,7 +272,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
             {/* Es la producción que ya cuenta, no lo que se le paga al doctor: al doctor
                 se le paga su comisión, un porcentaje de esta cifra (pestaña Comisiones). */}
-            <KpiCard label="Valor de tratamientos (con evolución)" value={`S/ ${totalPagar.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} color="var(--dc-ok-700)" icon={<Wallet size={18} strokeWidth={1.75} />} sub={`${conEvol.length} tratamiento(s) · precio de catálogo, no comisión`} />
+            <KpiCard label="Valor de tratamientos (con evolución)" value={`S/ ${totalPagar.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} color="var(--dc-ok-700)" icon={<Wallet size={18} strokeWidth={1.75} />} sub={`${conEvol.length} tratamiento(s) – precio de catálogo, no comisión`} />
             <KpiCard label="Tratamientos terminados" value={rows.length} color={NAVY} icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub="en el periodo" />
             <KpiCard label="Falta evolución" value={pendientes.length} color={pendientes.length ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub={`S/ ${retenido.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sin contar`} />
           </div>
@@ -289,7 +289,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
             <Card style={{ padding: "16px 18px" }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 13 }}>
                 <h4 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Ranking del equipo</h4>
-                <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>por producción con evolución · clic para ver su detalle</span>
+                <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>por producción con evolución – clic para ver su detalle</span>
               </div>
               <div style={{ display: "grid", gap: 11 }}>
                 {rank.map((d, i) => (
@@ -306,7 +306,7 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
                       </span>
                       <span style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--dc-ink-400)" }}>
                         <span>{d.n} tratamiento(s)</span>
-                        {d.retenido > 0 && <span style={{ color: "var(--dc-warn-600)", fontWeight: 500 }}>· S/ {soles(d.retenido)} sin contar por falta de evolución</span>}
+                        {d.retenido > 0 && <span style={{ color: "var(--dc-warn-600)", fontWeight: 500 }}>– S/ {soles(d.retenido)} sin contar por falta de evolución</span>}
                       </span>
                     </span>
                   </button>
@@ -387,9 +387,9 @@ function Reportes({ citas = [], pacientes = [], can, tabInicial }) {
         return (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-              <KpiCard label="Citas perdidas" value={`${tasaPerdidas}%`} color="var(--dc-red)" icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub={`${aus.length} de ${totalCitas} · inasistencias + canceladas`} />
+              <KpiCard label="Citas perdidas" value={`${tasaPerdidas}%`} color="var(--dc-red)" icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub={`${aus.length} de ${totalCitas} – inasistencias + canceladas`} />
               <KpiCard label="Inasistencias (no-show)" value={`${tasaNoShow}%`} color="var(--dc-warn-600)" icon={<UserCheck size={18} strokeWidth={1.75} />} sub={`${noShows.length} cita(s) sin aviso`} />
-              <KpiCard label="Canceladas" value={canceladas.length} color={NAVY} icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub="con aviso · no son inasistencia" />
+              <KpiCard label="Canceladas" value={canceladas.length} color={NAVY} icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub="con aviso – no son inasistencia" />
             </div>
             <DataTable titulo="Ausentismo por doctor" sub="doctores" minWidth={720} rows={rows} empty={<Vacio icon={<CheckCircle2 size={22} strokeWidth={1.75} />} titulo="Sin ausencias" sub="No hay citas canceladas ni no-show en el listado." />} cols={[
               { key: "medico", label: "Doctor", w: "minmax(180px,1.4fr)", a: "left", get: (r) => r.medico, cell: (r) => <span style={{ fontWeight: 500, color: NAVY }}>{r.medico}</span> },

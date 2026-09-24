@@ -1,30 +1,30 @@
 :root{
   /* ---- Marca (SIN CAMBIOS, ya cumplen AA) ---- */
   --dc-brand-900:#0B2F3A;
-  --dc-brand-700:#0F4050;   /* azul Dento Check   · 13.13:1 sobre blanco */
-  --dc-brand-600:#0A6C76;   /* teal de acción     ·  8.59:1 sobre blanco */
+  --dc-brand-700:#0F4050;   /* azul Dento Check   – 13.13:1 sobre blanco */
+  --dc-brand-600:#0A6C76;   /* teal de acción     –  8.59:1 sobre blanco */
   --dc-brand-500:#0C7C86;
   --dc-brand-100:#CFEDEE;
   --dc-brand-050:#EAF7F7;
 
   /* ---- Escala de grises (CORREGIDA para AA) ---- */
   --dc-ink:#0E2A33;
-  --dc-ink-900:#0E2A33;   /* títulos          · 17.75:1 */
-  --dc-ink-700:#33505A;   /* cuerpo           · 10.46:1 */
-  --dc-ink-500:#587079;   /* secundario       ·  5.98:1  ← reemplaza #707B8C */
-  --dc-ink-400:#6B8088;   /* meta, timestamps ·  4.97:1  ← reemplaza #98A2B3 */
+  --dc-ink-900:#0E2A33;   /* títulos          – 17.75:1 */
+  --dc-ink-700:#33505A;   /* cuerpo           – 10.46:1 */
+  --dc-ink-500:#587079;   /* secundario       –  5.98:1  ← reemplaza #707B8C */
+  --dc-ink-400:#6B8088;   /* meta, timestamps –  4.97:1  ← reemplaza #98A2B3 */
   --dc-ink-200:#BFD0D4;   /* SOLO bordes e iconos decorativos. NUNCA texto. */
   --dc-line:#DFEBEC;      /* bordes */
   --dc-surface:#FFFFFF;   /* tarjetas */
   --dc-bg:#F1F7F7;        /* fondo de app: neutro plano, sin degradados */
 
   /* ---- Semánticos (CORREGIDOS) ---- */
-  --dc-ok-700:#15803D;      /* texto y botón verde ·  5.02:1 sobre blanco */
+  --dc-ok-700:#15803D;      /* texto y botón verde –  5.02:1 sobre blanco */
   --dc-ok-100:#E7F7EE;
-  --dc-warn-700:#92400E;    /* texto ámbar         ·  7.09:1 */
-  --dc-warn-600:#B45309;    /* botón ámbar         ·  5.02:1 */
+  --dc-warn-700:#92400E;    /* texto ámbar         –  7.09:1 */
+  --dc-warn-600:#B45309;    /* botón ámbar         –  5.02:1 */
   --dc-warn-100:#FEF3C7;
-  --dc-danger-700:#B42318;  /* rojo                ·  6.57:1 */
+  --dc-danger-700:#B42318;  /* rojo                –  6.57:1 */
   --dc-danger-100:#FEF2F2;
   --dc-info-700:#1D4ED8;
   --dc-info-100:#DBEAFE;

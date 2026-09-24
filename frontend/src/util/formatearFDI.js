@@ -13,7 +13,7 @@ export function recuentoDenticion(piezasConHallazgo) {
   const nums = (piezasConHallazgo || []).map((p) => Number(p)).filter((n) => Number.isFinite(n));
   const perm = nums.some((n) => n >= 11 && n <= 48);
   const temp = nums.some((n) => n >= 51 && n <= 85);
-  if (perm && temp) return "32 piezas · 20 temporales";
+  if (perm && temp) return "32 piezas – 20 temporales";
   if (temp && !perm) return "20 piezas";
   return "32 piezas";
 }

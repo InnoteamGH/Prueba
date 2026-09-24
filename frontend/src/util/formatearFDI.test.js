@@ -22,6 +22,6 @@ describe("recuentoDenticion E1 §4", () => {
   it("permanente / temporal / mixta", () => {
     assert.equal(recuentoDenticion([16, 26]), "32 piezas");
     assert.equal(recuentoDenticion([55, 65]), "20 piezas");
-    assert.equal(recuentoDenticion([16, 55]), "32 piezas · 20 temporales");
+    assert.equal(recuentoDenticion([16, 55]), "32 piezas – 20 temporales");
   });
 });

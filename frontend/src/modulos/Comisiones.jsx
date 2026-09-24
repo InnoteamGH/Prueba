@@ -83,7 +83,7 @@ function Comisiones({ citas, can }) {
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
         <KpiCard label="Producción del mes" value={`S/ ${totalProd.toLocaleString()}`} color={NAVY} icon={<Wallet size={18} strokeWidth={1.75} />} sub={pctMetaGlobal == null ? "sin metas fijadas" : `${pctMetaGlobal}% de la meta`} />
-        <KpiCard label="Proyección de cierre" value={proy == null ? "—" : `S/ ${proy.toLocaleString()}`} color={DS.c.primary} icon={<TrendingUp size={18} strokeWidth={1.75} />} sub={proy == null ? "el mes va muy empezado" : `al ritmo actual · ${Math.round(AVANCE_MES * 100)}% del mes`} />
+        <KpiCard label="Proyección de cierre" value={proy == null ? "—" : `S/ ${proy.toLocaleString()}`} color={DS.c.primary} icon={<TrendingUp size={18} strokeWidth={1.75} />} sub={proy == null ? "el mes va muy empezado" : `al ritmo actual – ${Math.round(AVANCE_MES * 100)}% del mes`} />
         <KpiCard label="Comisiones a pagar" value={`S/ ${totalCom.toLocaleString()}`} color={RED} icon={<Percent size={18} strokeWidth={1.75} />} sub={(() => { const ps = [...new Set(data.map((m) => m.pctCom).filter((x) => x != null))]; return ps.length === 1 ? `${ps[0]}% de producción` : ps.length > 1 ? "según el % de cada doctor" : "sobre la producción del mes"; })()} />
         <KpiCard label="Odontólogos" value={data.length} color={DS.c.primary} icon={<Stethoscope size={18} strokeWidth={1.75} />} sub="activos" />
       </div>
@@ -95,7 +95,7 @@ function Comisiones({ citas, can }) {
       <div className="dc-split">
         <Card style={{ padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}><TrendingUp size={17} strokeWidth={1.75} color={DS.c.primary} /><span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Tendencia de producción</span></div>
-          <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 18 }}>Últimos 6 meses · producción total de la clínica</div>
+          <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 18 }}>Últimos 6 meses – producción total de la clínica</div>
           {(() => {
             const LBL = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
             const trend = (real?.tendencia?.length)
@@ -127,7 +127,7 @@ function Comisiones({ citas, can }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}><CalendarCheck size={17} strokeWidth={1.75} color={TEAL} /><span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Meta global del mes</span></div>
           <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 18 }}>
             {conMeta.length === 0 ? "Nadie tiene meta fijada todavía"
-              : `Suma de metas de ${conMeta.length} odontólogo${conMeta.length === 1 ? "" : "s"}${sinMeta > 0 ? ` · ${sinMeta} sin meta` : ""}`}
+              : `Suma de metas de ${conMeta.length} odontólogo${conMeta.length === 1 ? "" : "s"}${sinMeta > 0 ? ` – ${sinMeta} sin meta` : ""}`}
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 27, fontWeight: 600, color: pctMetaGlobal == null ? "var(--dc-ink-400)" : NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{pctMetaGlobal == null ? "—" : pctMetaGlobal + "%"}</span>
@@ -155,7 +155,7 @@ function Comisiones({ citas, can }) {
         { key: "meta", label: "Meta mensual", w: "minmax(190px,2fr)", a: "left", get: (m) => (m.pct == null ? -1 : m.pct), cell: (m) => {
           if (m.meta == null) return (
             <span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontStyle: "italic" }}>
-              Sin meta{puedeFijarMetas ? " · usa “Ajustar metas”" : ""}
+              Sin meta{puedeFijarMetas ? " – usa “Ajustar metas”" : ""}
             </span>);
           const c = m.pct >= 100 ? "var(--dc-ok-700)" : m.pct >= 70 ? "var(--dc-warn-600)" : "var(--dc-red)";
           return <div style={{ minWidth: 0 }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}><span style={{ color: "var(--dc-ink-500)" }}>meta S/ {m.meta.toLocaleString()}</span><span style={{ fontWeight: 500, color: c }}>{m.pct}%</span></div><div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: Math.min(100, m.pct) + "%", height: "100%", background: c, borderRadius: "var(--dc-r-full)", transition: "width .9s cubic-bezier(.2,.7,.2,1)" }} /></div></div>; } },
