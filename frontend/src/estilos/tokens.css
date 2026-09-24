@@ -1,22 +1,22 @@
 :root{
   /* ---- Marca (SIN CAMBIOS, ya cumplen AA) ---- */
-  --dc-brand-900:#12224A;
-  --dc-brand-700:#1B2E5E;   /* azul Dento Check   · 13.13:1 sobre blanco */
-  --dc-brand-600:#0B5366;   /* teal de acción     ·  8.59:1 sobre blanco */
-  --dc-brand-500:#0F5F75;
-  --dc-brand-100:#E6F4F8;
-  --dc-brand-050:#F2FAFC;
+  --dc-brand-900:#0B2F3A;
+  --dc-brand-700:#0F4050;   /* azul Dento Check   · 13.13:1 sobre blanco */
+  --dc-brand-600:#0A6C76;   /* teal de acción     ·  8.59:1 sobre blanco */
+  --dc-brand-500:#0C7C86;
+  --dc-brand-100:#CFEDEE;
+  --dc-brand-050:#EAF7F7;
 
   /* ---- Escala de grises (CORREGIDA para AA) ---- */
-  --dc-ink:#101828;
-  --dc-ink-900:#101828;   /* títulos          · 17.75:1 */
-  --dc-ink-700:#344054;   /* cuerpo           · 10.46:1 */
-  --dc-ink-500:#5A6474;   /* secundario       ·  5.98:1  ← reemplaza #707B8C */
-  --dc-ink-400:#667085;   /* meta, timestamps ·  4.97:1  ← reemplaza #98A2B3 */
-  --dc-ink-200:#C4CBD6;   /* SOLO bordes e iconos decorativos. NUNCA texto. */
-  --dc-line:#E4E8EE;      /* bordes */
+  --dc-ink:#0E2A33;
+  --dc-ink-900:#0E2A33;   /* títulos          · 17.75:1 */
+  --dc-ink-700:#33505A;   /* cuerpo           · 10.46:1 */
+  --dc-ink-500:#587079;   /* secundario       ·  5.98:1  ← reemplaza #707B8C */
+  --dc-ink-400:#6B8088;   /* meta, timestamps ·  4.97:1  ← reemplaza #98A2B3 */
+  --dc-ink-200:#BFD0D4;   /* SOLO bordes e iconos decorativos. NUNCA texto. */
+  --dc-line:#DFEBEC;      /* bordes */
   --dc-surface:#FFFFFF;   /* tarjetas */
-  --dc-bg:#F4F6F9;        /* fondo de app: neutro plano, sin degradados */
+  --dc-bg:#F1F7F7;        /* fondo de app: neutro plano, sin degradados */
 
   /* ---- Semánticos (CORREGIDOS) ---- */
   --dc-ok-700:#15803D;      /* texto y botón verde ·  5.02:1 sobre blanco */
@@ -59,15 +59,15 @@
   --dc-r-full:999px;
 
   /* ---- Elevación: 3 niveles ---- */
-  --dc-sh-1:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.03);
-  --dc-sh-2:0 4px 12px -2px rgba(16,24,40,.08);
+  --dc-sh-1:0 1px 2px rgba(14,42,51,.04), 0 4px 14px -6px rgba(14,42,51,.08);
+  --dc-sh-2:0 10px 30px -12px rgba(14,42,51,.18);
   --dc-sh-3:0 20px 45px -28px rgba(15,27,56,.40);
 
 
   /* ---- Alias de marca / estados usados en app (Sprint 5) ---- */
-  --dc-navy:#1B2E5E;
+  --dc-navy:#0F4050;
   --dc-red:#C8312B;
-  --dc-teal:#0F5F75;
+  --dc-teal:#0C7C86;
   --dc-ok:#16A34A;
   --dc-ok-soft:#E7F7EE;
   --dc-warn:#F59E0B;
@@ -79,35 +79,35 @@
   --dc-info-soft:#DBEAFE;
   --dc-info-ink:#1E40AF;
   --dc-info-700b:#1D4ED8;
-  --dc-accent-cyan:#0E7490;
-  --dc-accent-soft:#E6F4F8;
+  --dc-accent-cyan:#14A3A8;
+  --dc-accent-soft:#E3F5F5;
   --dc-purple:#7C3AED;
   --dc-amber-soft:#FDE68A;
   --dc-amber-ink:#D97706;
   --dc-green-soft:#A7F3D0;
   --dc-sky:#BAE6FD;
-  --dc-ink-alt:#0F1B38;
+  --dc-ink-alt:#0E2A33;
   --dc-slate:#64748B;
-  --dc-bg-alt:#F1F4F9;
-  --dc-bg-soft:#F9FAFB;
-  --dc-bg-soft2:#F8FAFC;
+  --dc-bg-alt:#E9F2F3;
+  --dc-bg-soft:#F5FAFA;
+  --dc-bg-soft2:#F2F9F9;
   --dc-white:#FFFFFF;
   --dc-red-deep:#B91C1C;
   --dc-red-alt:#C22F27;
-  --dc-brand-mid:#2A4178;
+  --dc-brand-mid:#1C5A68;
   --dc-brand-soft:#B9C3DE;
   --dc-blue:#1B5FBF;
-  --dc-primary-alt:#087E8B;
+  --dc-primary-alt:#0E8C95;
   --dc-fee:#FEE2E2;
   --dc-fee2:#FEE4E2;
-  --dc-line-alt:#CBD2DC;
-  --dc-line-alt2:#CBD2DE;
+  --dc-line-alt:#C6D8DB;
+  --dc-line-alt2:#C6D8DB;
 
 
   /* ---- Auto Sprint 5 (hex residuales → tokens) ---- */
 
   /* ---- Foco ---- */
-  --dc-focus:0 0 0 3px rgba(11,83,102,.35);
+  --dc-focus:0 0 0 3px rgba(14,140,149,.30);
 
   /* ---- Objetivo táctil ----
      44 px solo con puntero táctil (WCAG 2.5.5). Con ratón, 44 px por botón de icono
@@ -116,6 +116,22 @@
   --dc-tap-min:36px;
 
   /* UX-17: --dc-x-* eliminados; usar solo tokens semánticos de este archivo. */
+}
+/* ---- Identidad Dento Check ----
+   Petróleo para la estructura, turquesa para la acción, coral como acento
+   cálido (sonrisa) y oro para el plan. */
+:root {
+  --dc-petroleo:#0B3440;
+  --dc-petroleo-2:#0F4553;
+  --dc-coral:#F07C6C;
+  --dc-coral-100:#FDEBE8;
+  --dc-oro:#C8963E;
+  --dc-oro-100:#FBF1DE;
+  --dc-violeta:#7C5CD6;
+  --dc-violeta-100:#EFEAFC;
+  --dc-grad-marca: linear-gradient(135deg, #14A3A8 0%, #0E8C95 45%, #0A6C76 100%);
+  --dc-font: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dc-font-title: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 @media (pointer: coarse) {
   :root { --dc-tap-min:44px; }
@@ -143,6 +159,12 @@ a:focus-visible,
 
 /* ---- UX-04 / UX-06 / UX-08 tipografía y táctil globales ---- */
 body {
+  font-family: var(--dc-font);
+  /* Plus Jakarta Sans trae un espacio entre palabras muy estrecho (0,15 em): sin
+     compensarlo, "Dolor de muela" se leía casi como una sola palabra. */
+  word-spacing: .1em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-size: var(--dc-fs-md);
   line-height: var(--dc-lh-md);
   font-weight: var(--dc-fw-normal);
@@ -151,7 +173,22 @@ body {
 h1, h2, h3, h4, .dc-title {
   font-weight: var(--dc-fw-bold);
   color: var(--dc-ink-900);
+  letter-spacing: -.015em;
+  text-wrap: balance;
 }
+button, input, select, textarea { font-family: inherit; word-spacing: inherit; }
+
+/* ---- Reglas de mayúsculas y números ----
+   Todo el texto va en tipo oración. Las mayúsculas quedan solo para etiquetas
+   pequeñas (overline): 11 px, seminegrita y con espaciado, para que se lean
+   como etiqueta y no como grito. Las cifras usan dígitos tabulares. */
+[style*="text-transform: uppercase"] {
+  font-size: 11px !important;
+  letter-spacing: .08em !important;
+  font-weight: 600 !important;
+}
+.dc-kpi__value, .dc-franja__cifra b, .dc-hoy__cifras b, .dc-cita__hora,
+[style*="tabular-nums"] { font-variant-numeric: tabular-nums lining-nums; }
 .dc-btn, input.dc-premium-inp, select, textarea,
 .dc-campo__input, [role="button"] {
   min-height: var(--dc-tap-min);

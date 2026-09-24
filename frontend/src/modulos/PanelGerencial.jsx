@@ -285,7 +285,7 @@ function CanvasCaja({ puntos, onOpen }) {
         ctx.lineTo(x, H - pad.b);
         ctx.stroke();
         ctx.fillStyle = ink;
-        ctx.font = "10px Inter, sans-serif";
+        ctx.font = "10px 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(`${String(h).padStart(2, "0")}:00`, x, H - 8);
       }

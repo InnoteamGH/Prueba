@@ -79,7 +79,8 @@ describe("SPEC v8 A16 altura máxima", () => {
 
 describe("SPEC v8 A33 KPI plano", () => {
   it("KpiCard y TarjetaKPI sin linear-gradient en icono", () => {
-    assert.match(comun, /dc-kpi__icon" style=\{\{ background: tint\(/);
+    // Icono en color sólido de la cifra (sin degradado).
+    assert.match(comun, /dc-kpi__icon" style=\{\{ background: color,/);
     assert.doesNotMatch(comun, /dc-kpi__icon" style=\{\{ background: `linear-gradient/);
     assert.doesNotMatch(kpi, /linear-gradient\(135deg, \$\{tint/);
   });

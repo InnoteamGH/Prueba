@@ -32,8 +32,8 @@ export const DS = {
   f: { hero: 26, h1: 22, h2: 18, body: 15, cap: 13, micro: 11.5 },
   motion: { fast: ".16s ease", base: ".24s ease", slow: ".4s ease", spring: ".26s cubic-bezier(.2,.7,.2,1)" } };
 DS.card = { background: "var(--dc-surface)", borderRadius: 16, border: "1px solid var(--dc-line)", boxShadow: "var(--dc-sh-1)" };
-DS.label = { fontSize: DS.f.cap, fontWeight: 600, color: DS.c.ink, fontFamily: "'Bricolage Grotesque','Inter',sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
-export const DISPLAY_FONT = "'Bricolage Grotesque', 'Inter', sans-serif";
+DS.label = { fontSize: DS.f.cap, fontWeight: 600, color: DS.c.ink, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", display: "flex", alignItems: "center", gap: 8, marginBottom: 14 };
+export const DISPLAY_FONT = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif";
 
 /* ============================================================================
    PALETA ESTÁNDAR — tokens semánticos estilo Apple (una sola fuente de verdad).
@@ -1058,8 +1058,8 @@ export const KpiCard = ({ icon, label, value, color = NAVY, sub, delta, up, onCl
   }
   const clickable = typeof onClick === "function" && (st === "dato" || st === "vacio");
   return (
-  <div onClick={clickable ? onClick : undefined} className={`dc-kpi dc-kpi--${st}${clickable ? " dc-kpi--click" : ""}`} style={{ cursor: clickable ? "pointer" : "default", minWidth: 0, maxWidth: "100%" }}>
-    {icon && <div className="dc-kpi__icon" style={{ background: tint(color, 0.1), color }}>{icon}</div>}
+  <div onClick={clickable ? onClick : undefined} className={`dc-kpi dc-kpi--${st}${clickable ? " dc-kpi--click" : ""}`} style={{ cursor: clickable ? "pointer" : "default", minWidth: 0, maxWidth: "100%", "--kpi-tinte": tint(color, 0.16) }}>
+    {icon && <div className="dc-kpi__icon" style={{ background: color, color: "#fff", boxShadow: `0 8px 18px -8px ${color}` }}>{icon}</div>}
     <div className="dc-kpi__body">
       <div className="dc-kpi__label">{label}</div>
       {st === "cargando" ? (

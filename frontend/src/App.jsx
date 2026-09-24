@@ -156,7 +156,7 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1.05fr .95fr", gridTemplateRows: "minmax(100vh,auto)", fontFamily: "'Inter',sans-serif" }} className="dc-login">
+    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1.05fr .95fr", gridTemplateRows: "minmax(100vh,auto)", fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }} className="dc-login">
       {/* Panel izquierdo de marca — dental teal, limpio (Apple) */}
       <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, var(--dc-brand-600) 0%, var(--dc-ink-alt) 100%)", minHeight: "100vh", padding: "48px 52px", display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#fff" }} className="dc-login-brand">
         <NeuralDentalBackground />
@@ -697,15 +697,19 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
     : [["Citas hoy", citasHoyKpi.length], ["Atendidas", atendidasHoy], ["Por confirmar", sinConfirmar], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE")}`]];
   return (
     <div className="dc-hoy">
-      <div className="dc-toolbar">
-        <div>
-          <h2 className="dc-toolbar__titulo">{saludo}{miNombre ? `, ${miNombre}` : ""}</h2>
-          <div className="dc-toolbar__sub">{fechaHoy} · {frase}</div>
+      <section className="dc-hero">
+        <div className="dc-hero__txt">
+          <span className="dc-hero__fecha">{fechaHoy}</span>
+          <h2>{saludo}{miNombre ? `, ${miNombre}` : ""}</h2>
+          <p>{frase}</p>
+          {!esTI && <button type="button" className="dc-hero__btn" onClick={() => onIr("agenda")}><Calendar size={15} strokeWidth={1.75} /> Ver agenda</button>}
         </div>
-        {!esTI && <Btn small kind="ghost" onClick={() => onIr("agenda")}><Calendar size={15} strokeWidth={1.75} /> Ver agenda</Btn>}
-      </div>
+        <div className="dc-hero__cifras">
+          {cifras.map(([l, v]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}
+        </div>
+      </section>
 
-      <div className="dc-hoy__grid">
+      <div className={`dc-hoy__grid${esTI ? " dc-hoy__grid--solo" : ""}`}>
         <Card className="dc-hoy__tareas">
           <div className="dc-hoy__cab">
             <h3>Por hacer</h3>
@@ -723,9 +727,6 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
         </Card>
 
         <div className="dc-hoy__lado">
-          <Card className="dc-hoy__cifras">
-            {cifras.map(([l, v]) => <div key={l}><span>{l}</span><b>{v}</b></div>)}
-          </Card>
           {!esTI && (
             <Card className="dc-hoy__proximas">
               <div className="dc-hoy__cab"><h3>{esMed ? "Tus próximos pacientes" : "Próximas citas"}</h3><button type="button" className="dc-hoy__link" onClick={() => onIr("agenda")}>Ver todas</button></div>
@@ -7832,7 +7833,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   const RolIcon = R.icon;
   return (
-    <div className="dc-shell" style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter',sans-serif" }}>
+    <div className="dc-shell" style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 600, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}
          onBlur={(e) => { e.currentTarget.style.left = "-9999px"; e.currentTarget.style.top = "0"; }}>Saltar al contenido</a>
@@ -9066,7 +9067,7 @@ function PortalPaciente({ usuario, onLogout }) {
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter',sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>
       {navOpen && <div onClick={() => setNavOpen(false)} className="dc-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.45)", zIndex: 45 }} />}
       <aside className={`dc-side${navOpen ? " open" : ""}`} style={{ width: 230, background: "linear-gradient(180deg,var(--dc-accent-cyan),var(--dc-brand-600))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(100vh - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(14,116,144,.3)", border: "1px solid rgba(255,255,255,.15)", display: "flex", flexDirection: "column", zIndex: 50 }}>
         <div style={{ padding: 18, borderBottom: "1px solid rgba(255,255,255,.15)", display: "flex", alignItems: "center", gap: 10 }}>
@@ -9373,7 +9374,7 @@ const PLANES = [
    PANTALLA DE BIENVENIDA — guía a la clínica que abre el link sin vendedor
    =========================================================================== */
 function Bienvenida({ onEntrar }) {
-  const DISPLAY = "'Bricolage Grotesque', 'Inter', sans-serif";
+  const DISPLAY = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif";
   const ink = "var(--dc-ink-alt)", navy = NAVY, red = RED, teal = DS.c.primary, wa = "var(--dc-brand-600)";
   const bg = "var(--dc-bg)", line = "var(--dc-line)", muted = "var(--dc-slate)";
   const chat = [
@@ -9406,7 +9407,7 @@ function Bienvenida({ onEntrar }) {
   const eyebrow = (t, c) => <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", color: c }}>{t}</div>;
   const ctaRed = { background: red, color: "#fff", border: "none", borderRadius: "var(--dc-r-md)", padding: "15px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 9 };
   return (
-    <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Inter',sans-serif", color: ink }}>
+    <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", color: ink }}>
       {/* Barra superior */}
       <header style={{ maxWidth: 1120, margin: "0 auto", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
@@ -9796,7 +9797,7 @@ function BackOfficeAWG({ usuario, onLogout }) {
     }
   };
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter',sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>
       <aside style={{ width: 236, background: "linear-gradient(180deg,var(--dc-ink-alt),var(--dc-ink-900))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(100vh - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(33,16,66,.4)", border: "1px solid rgba(255,255,255,.1)", display: "flex", flexDirection: "column", zIndex: 50 }}>
         <div style={{ padding: "20px 18px 14px", display: "flex", alignItems: "center", gap: 11 }}>
           <div style={{ background: "linear-gradient(135deg,var(--dc-brand-soft),var(--dc-purple))", borderRadius: "var(--dc-r-md)", width: 38, height: 38, display: "grid", placeItems: "center", boxShadow: "0 8px 18px -8px rgba(124,58,237,.8)" }}><Globe size={21} strokeWidth={1.75} color="#fff" /></div>
@@ -10083,7 +10084,7 @@ export default function App() {
       <style>{`
         /* Las fuentes se enlazan en index.html: con @import aqui el navegador no
            las descubria hasta ejecutar el JS y los titulos daban un salto. */
-        *{box-sizing:border-box;} body{margin:0;font-size:var(--dc-fs-md);line-height:var(--dc-lh-md);font-weight:var(--dc-fw-normal);color:var(--dc-ink-700);}
+        *{box-sizing:border-box;} body{margin:0;font-family:var(--dc-font);background:var(--dc-bg);font-size:var(--dc-fs-md);line-height:var(--dc-lh-md);font-weight:var(--dc-fw-normal);color:var(--dc-ink-700);}
         .dc-money,.dc-tabular{font-variant-numeric:tabular-nums;}
         .dc-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
         .dc-scroll::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.12); border-radius: 99px; }

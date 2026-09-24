@@ -1443,7 +1443,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: `linear-gradient(135deg,${ACCENT},${TEAL})`, display: "grid", placeItems: "center" }}><ClipboardList size={18} color="var(--dc-white)" strokeWidth={2} /></div>
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, letterSpacing: ".08em", textTransform: "uppercase" }}>Expediente clínico</div>
-              <div style={{ fontSize: 17, fontWeight: 600, color: NAVY, fontFamily: "'Bricolage Grotesque','Inter',sans-serif", lineHeight: 1.1 }}>{p.nombre || "Ficha médica"}</div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: NAVY, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif", lineHeight: 1.1 }}>{p.nombre || "Ficha médica"}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, marginTop: 2 }}>
                 {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null, p.telefono || null].filter(Boolean).join(" · ")}
               </div>
@@ -2081,7 +2081,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               ].map(([l, v, c]) => (
                 <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 13 }}>
                   <span style={{ color: TEXT, fontWeight: 600 }}>{l}:</span>
-                  <b style={{ color: c, fontSize: 15, fontFamily: "'Bricolage Grotesque','Inter',sans-serif" }}>{v}</b>
+                  <b style={{ color: c, fontSize: 15, fontFamily: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif" }}>{v}</b>
                 </div>
               ))}
             </div>

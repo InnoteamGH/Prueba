@@ -6,7 +6,7 @@
   padding: 0;
   background: transparent;
   color: var(--dc-ink-900);
-  font-family: var(--dc-font, "Inter", system-ui, sans-serif);
+  font-family: var(--dc-font, 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif);
   font-size: var(--dc-fs-md);
   line-height: var(--dc-lh-md);
   --dc-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -19,7 +19,7 @@
 }
 .dc-pg *, .dc-pg *::before, .dc-pg *::after { box-sizing: border-box; }
 .dc-pg h1, .dc-pg h2, .dc-pg h3, .dc-pg h4 {
-  font-family: var(--dc-font-title, "Bricolage Grotesque", "Inter", sans-serif);
+  font-family: var(--dc-font-title);
   font-weight: var(--dc-fw-bold);
   color: var(--dc-ink-900);
   margin: 0;
