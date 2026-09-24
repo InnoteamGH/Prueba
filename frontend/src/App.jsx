@@ -3708,11 +3708,16 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
   return (
     <div style={{ overflowX: "auto", maxWidth: "100%", width: "100%" }}>
       {!embedded && (() => { const top = ordenada[0]; const u = top ? URGENCIA[top.urg] : null; const nAlta = esp.filter((x) => x.urg === "alta").length; const nOf = esp.filter((x) => x.ofrecido.length).length; const nEsp = new Set(esp.map((x) => x.e)).size; return (
+        <>
+        <EnCabecera>
+          <div className="dc-esp-top dc-slot-movil">
+            <Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>
+          </div>
+        </EnCabecera>
         <section className="dc-esp-hero">
           <div className="dc-esp-hero__txt">
-            <span className="dc-sat-hero__eti">Lista de espera</span>
-            <div className="dc-esp-hero__num"><b>{esp.length}</b><span>{esp.length === 1 ? "paciente esperando cupo" : "pacientes esperando cupo"}</span></div>
-            <p>Ordenada por urgencia. Si se libera un cupo, se ofrece por WhatsApp al primero compatible; si no responde en 15 min, pasa al siguiente.</p>
+            <div className="dc-esp-hero__num"><b>{esp.length}</b><span>en espera</span></div>
+            <p title="Si se libera un cupo, se ofrece por WhatsApp al primero compatible; si no responde en 15 min, pasa al siguiente.">Ordenados por urgencia · oferta automática por WhatsApp</p>
           </div>
           <div className="dc-esp-hero__cifras">
             <div><b>{nAlta}</b><span>Urgentes</span></div>
@@ -3721,15 +3726,13 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
           </div>
           {top && (
             <div className="dc-esp-hero__prox">
-              <span className="dc-sat-hero__eti"><Sparkles size={12} strokeWidth={2} /> Próximo cupo para</span>
-              <div className="dc-esp-hero__prox-fila">
-                <span className="dc-rec__av" style={{ width: 38, height: 38, background: "rgba(255,255,255,.18)", color: "#fff" }}>{iniciales(top.n)}</span>
-                <div><b>{top.n}</b><span>{top.e} · urgencia {u.l.toLowerCase()}</span></div>
-              </div>
-              <button type="button" className="dc-esp-hero__btn" onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer cupo</button>
+              <span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: "rgba(255,255,255,.18)", color: "#fff" }}>{iniciales(top.n)}</span>
+              <div className="dc-esp-hero__prox-txt"><span><Sparkles size={11} strokeWidth={2} /> Próximo cupo</span><b>{top.n}</b></div>
+              <button type="button" className="dc-esp-hero__btn" onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer</button>
             </div>
           )}
         </section>
+        </>
       ); })()}
       {embedded ? (
       <DataTable titulo="Pacientes esperando cupo" sub="en espera" minWidth={940} rows={ordenada} rowClassName={(p) => (ordenada[0] && p.id === ordenada[0].id ? "dc-esp-fila is-sug" : "dc-esp-fila")} accion={<Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>} empty={<Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." />} cols={[
@@ -3744,10 +3747,6 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
       ]} />
       ) : (
         <Card className="dc-esp-tablero">
-          <div className="dc-esp-tablero__cab">
-            <div><h3>Pacientes esperando cupo</h3><span>Toca la campana para ofrecer un cupo por WhatsApp o asígnalo directo en la agenda.</span></div>
-            <Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>
-          </div>
           {ordenada.length === 0 ? <Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." /> : (
             <div className="dc-esp-cols">
               {["alta", "media", "baja"].map((k) => { const u = URGENCIA[k]; const lista = ordenada.filter((p) => p.urg === k); return (

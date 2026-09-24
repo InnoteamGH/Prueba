@@ -1434,3 +1434,39 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
   .dc-esp-hero__prox { grid-row: auto; grid-column: auto; }
   .dc-esp-hero__cifras { grid-row: auto; }
 }
+/* Lista de espera: franja compacta (sin repetir el título de la vista). */
+.dc-esp-hero { grid-template-columns: auto auto minmax(0, 1fr); padding: 12px 14px 12px 22px; gap: 10px 28px; border-radius: 16px; margin-bottom: 14px; }
+.dc-esp-hero__txt { gap: 0; }
+.dc-esp-hero__num { gap: 8px; }
+.dc-esp-hero__num b { font-size: 26px; line-height: 1.1; }
+.dc-esp-hero__num span { font-size: 13.5px; }
+.dc-esp-hero__txt p { margin: 0; font-size: 12px; white-space: nowrap; cursor: help; }
+.dc-esp-hero__cifras > div { padding: 0 16px; }
+.dc-esp-hero__cifras > div:first-child { padding-left: 18px; border-left: 1px solid rgba(255,255,255,.18); }
+.dc-esp-hero__cifras b { font-size: 19px; line-height: 1.15; }
+.dc-esp-hero__cifras span { font-size: 11.5px; }
+.dc-esp-hero__prox { justify-self: end; display: flex; align-items: center; gap: 10px; padding: 7px 7px 7px 8px; border-radius: 999px; min-width: 0; max-width: 360px; }
+.dc-esp-hero__prox-txt { display: grid; min-width: 0; line-height: 1.2; }
+.dc-esp-hero__prox-txt span { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: rgba(255,255,255,.72); }
+.dc-esp-hero__prox-txt b { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-esp-hero__btn { flex-shrink: 0; height: 30px; }
+.dc-esp-cols { border-top: 0; }
+@media (max-width: 1180px) {
+  .dc-esp-hero { grid-template-columns: auto minmax(0, 1fr); }
+  .dc-esp-hero__cifras { grid-column: auto; grid-row: auto; }
+  .dc-esp-hero__prox { grid-column: 1 / -1; grid-row: auto; justify-self: start; }
+}
+@media (max-width: 700px) {
+  .dc-esp-hero { grid-template-columns: 1fr; padding: 14px 16px; }
+  .dc-esp-hero__cifras > div:first-child { padding-left: 0; border-left: 0; }
+  .dc-esp-hero__txt p { white-space: normal; }
+  .dc-esp-hero__prox { max-width: none; justify-self: stretch; }
+  .dc-esp-hero__prox-txt { flex: 1; }
+}
+/* Móvil: acciones de cabecera marcadas como imprescindibles se muestran igual. */
+@media (max-width: 767px) {
+  .dc-top__slot:has(.dc-slot-movil) { display: flex !important; flex: 1 1 100%; order: 5; }
+  .dc-top__izq:has(.dc-slot-movil) { flex-wrap: wrap; row-gap: 6px; }
+  .dc-top__izq:has(.dc-slot-movil) .dc-top__slot { flex-basis: 100%; }
+  .dc-slot-movil { justify-content: flex-start !important; }
+}
