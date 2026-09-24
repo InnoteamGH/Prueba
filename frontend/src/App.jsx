@@ -2446,18 +2446,25 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   ];
   return (
     <div className="dc-pacientes-root" style={{ display: "grid", gap: 16, minWidth: 0, width: "100%", overflowX: "hidden" }}>
-      <ModHead icon={<Users size={20} strokeWidth={1.75} />} titulo="Pacientes" sub={listaError && !lista.length ? "Sin datos · no se pudo cargar el directorio" : `${lista.length} en el directorio · clic en una fila para abrir la ficha`} accion={puedeGestionar ? <Btn small onClick={nuevo}><Plus size={16} strokeWidth={1.75} /> Nuevo paciente</Btn> : null} />
-      {/* NAV-04: si ACTIVOS = total del directorio, no duplicar la cifra de ModHead. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(170px,100%),1fr))", gap: 12, minWidth: 0 }}>
-        {activos < lista.length ? (
-          <KpiCard label="Activos" value={activos} color="var(--dc-ok-700)" icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub="≤ 6 meses sin venir" />
-        ) : (
-          <KpiCard label="Cumpleaños del mes" value={cumpleMes} color={DS.c.primary} icon={<Calendar size={18} strokeWidth={1.75} />} sub="oportunidad de contacto" />
-        )}
-        <KpiCard label="Para reactivar" value={reactivar} color="var(--dc-warn-600)" icon={<BellRing size={18} strokeWidth={1.75} />} sub="+6 meses sin venir" />
-        <KpiCard label="Nuevos" value={nuevos} color={DS.c.primary} icon={<UserPlus size={18} strokeWidth={1.75} />} sub="últimos 30 días" />
-      </div>
-      {reactivar > 0 && <div className="dc-banda dc-banda--aviso"><BellRing size={18} strokeWidth={1.75} /><p><strong>{pluralEs(reactivar, "paciente", "pacientes")}</strong> {reactivar === 1 ? "lleva" : "llevan"} más de 6 meses sin venir. Reactívalos con una campaña de control.</p>{puedeGestionar && <Btn small onClick={enviarRecordatoriosReactivar} disabled={enviandoRec}><Send size={14} strokeWidth={1.75} /> {enviandoRec ? "Enviando…" : "Enviar recordatorio"}</Btn>}</div>}
+      <section className="dc-esp-hero dc-pac-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{listaError && !lista.length ? "—" : lista.length}</b><span>pacientes</span></div>
+          <p>{listaError && !lista.length ? "No se pudo cargar el directorio" : "En el directorio · toca una fila para abrir la ficha"}</p>
+        </div>
+        <div className="dc-esp-hero__cifras">
+          {activos < lista.length ? <div><b>{activos}</b><span>Activos</span></div> : <div><b>{cumpleMes}</b><span>Cumpleaños del mes</span></div>}
+          <div><b>{nuevos}</b><span>Nuevos · 30 días</span></div>
+          {reactivar === 0 && <div><b>0</b><span>Para reactivar</span></div>}
+        </div>
+        {reactivar > 0 ? (
+          <div className="dc-esp-hero__prox dc-pac-hero__reac">
+            <span className="dc-pac-hero__ico"><BellRing size={15} strokeWidth={1.75} /></span>
+            <div className="dc-esp-hero__prox-txt"><span>+6 meses sin venir</span><b>{reactivar} por reactivar</b></div>
+            {puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={enviarRecordatoriosReactivar} disabled={enviandoRec}><Send size={13} strokeWidth={1.75} /> {enviandoRec ? "Enviando…" : "Recordar"}</button>}
+          </div>
+        ) : <span />}
+        {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
+      </section>
       <DataTable titulo="Directorio de pacientes" maxHeight={560} sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
       <h2 className="dc-seccion">Marketing</h2>
       <div className="dc-split">
@@ -6972,6 +6979,7 @@ function Resenas({ notify, citas = [], can }) {
   useEffect(() => { recargar(); }, []); // eslint-disable-line
   const [resp, setResp] = useState({});
   const [sel, setSel] = useState(null); // reseña abierta en modal de detalle/respuesta
+  const [filtroRes, setFiltroRes] = useState("todas");
   const prom = (reviews.reduce((a, r) => a + r.estrellas, 0) / reviews.length).toFixed(1);
   const dist = [5, 4, 3, 2, 1].map((s) => ({ s, n: reviews.filter((r) => r.estrellas === s).length }));
   const recomiendan = reviews.length ? Math.round((reviews.filter((r) => r.estrellas >= 4).length / reviews.length) * 100) : 0;
@@ -6980,42 +6988,51 @@ function Resenas({ notify, citas = [], can }) {
   const estrellas = (n, size = 15) => [1, 2, 3, 4, 5].map((i) => <Star key={i} size={size} strokeWidth={1.75} color="var(--dc-warn)" fill={i <= n ? "var(--dc-warn)" : "none"} />);
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        <KpiCard label="Calificación" value={prom} color="var(--dc-warn)" icon={<Star size={18} strokeWidth={1.75} />} sub={`${reviews.length} reseñas`} />
-        <KpiCard label="Recomiendan" value={`${recomiendan}%`} color="var(--dc-ok-700)" icon={<TrendingUp size={18} strokeWidth={1.75} />} sub="4★ o más" />
-        <KpiCard label="Sin responder" value={sinResp} color={sinResp ? "var(--dc-red)" : "var(--dc-ok-700)"} icon={<MessageSquare size={18} strokeWidth={1.75} />} sub="requieren respuesta" />
-        <KpiCard label="Encuestas NPS" value={encuestasAuto} color={NAVY} icon={<Send size={18} strokeWidth={1.75} />} sub="enviadas automático" />
-      </div>
-      <div className="dc-gerencial-row" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
-        <Card style={{ padding: 22, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", background: "linear-gradient(160deg,var(--dc-white),#fff)" }}>
-          <div style={{ fontSize: 44, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>{prom}</div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 2, margin: "8px 0 6px" }}>{estrellas(Math.round(prom), 18)}</div>
-          <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{reviews.length} reseñas · <strong style={{ color: "var(--dc-ok-700)" }}>{recomiendan}%</strong> recomiendan</div>
-        </Card>
-        <Card style={{ padding: 22 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, marginBottom: 12, fontFamily: DISPLAY_FONT }}>Distribución de calificaciones</div>
-          <div style={{ display: "grid", gap: 9 }}>
-            {dist.map(({ s, n }) => { const pct = Math.round((n / reviews.length) * 100); return (
-              <div key={s} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-                <span style={{ width: 34, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 3, fontWeight: 500 }}>{s} <Star size={12} strokeWidth={1.75} color="var(--dc-warn)" fill="var(--dc-warn)" /></span>
-                <div style={{ flex: 1, height: 8, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: "var(--dc-warn)", borderRadius: "var(--dc-r-full)", transition: "width .8s cubic-bezier(.2,.7,.2,1)" }} /></div>
-                <span style={{ width: 28, textAlign: "right", color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>{n}</span>
-              </div>
+      <section className="dc-sat-hero dc-res-hero">
+        <div className="dc-sat-hero__nps">
+          <span className="dc-sat-hero__eti">Calificación de pacientes</span>
+          <b>{reviews.length ? prom : "—"}</b>
+          <span className="dc-res-hero__stars">{estrellas(Math.round(prom), 14)} <em>{reviews.length} reseñas</em></span>
+        </div>
+        <div className="dc-res-hero__dist">
+          {dist.map(({ s: st, n }) => { const pct = reviews.length ? Math.round((n / reviews.length) * 100) : 0; return (
+            <div key={st}><span>{st}<Star size={10} strokeWidth={2} fill="#FBBF5A" color="#FBBF5A" /></span><div><i style={{ width: `${pct}%` }} /></div><b>{n}</b></div>
+          ); })}
+        </div>
+        <div className="dc-esp-hero__cifras dc-res-hero__cifras">
+          <div><b>{recomiendan}%</b><span>Recomiendan</span></div>
+          <div><b>{sinResp}</b><span>Por responder</span></div>
+          <div><b>{encuestasAuto}</b><span>Encuestas</span></div>
+        </div>
+        {puedeResponder && <button type="button" className="dc-esp-hero__btn" onClick={solicitarResenas} disabled={solicitando}><Send size={14} strokeWidth={1.75} /> {solicitando ? "Enviando…" : "Solicitar reseñas"}</button>}
+      </section>
+      <Card className="dc-env">
+        <div className="dc-env__cab">
+          <h3>Reseñas de pacientes</h3>
+          <div className="dc-env__filtros" role="tablist" aria-label="Filtrar reseñas">
+            {[["todas", "Todas", reviews.length], ["pendientes", "Por responder", sinResp], ["respondidas", "Respondidas", reviews.length - sinResp]].map(([k, l, c]) => (
+              <button key={k} type="button" role="tab" aria-selected={filtroRes === k} onClick={() => setFiltroRes(k)}>{l} <span>{c}</span></button>
+            ))}
+          </div>
+        </div>
+        {(() => { const lista = [...reviews].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).filter((r) => filtroRes === "todas" ? true : filtroRes === "pendientes" ? !r.resp : !!r.resp); return lista.length === 0
+          ? <Vacio icon={<Star size={22} strokeWidth={1.75} />} titulo={reviews.length ? "Nada con este filtro" : "Sin reseñas"} sub={reviews.length ? "Prueba con otro filtro." : "Solicita reseñas a tus pacientes recientes para construir tu reputación."} />
+          : (
+          <div className="dc-sat__grid">
+            {lista.map((r) => { const col = colorDe(r.nombre); const tono = r.estrellas >= 5 ? "prom" : r.estrellas <= 3 ? "det" : "neutro"; return (
+              <figure key={r.id} className={`dc-sat__com is-${tono} dc-res-card`} onClick={() => setSel(r)}>
+                <div className="dc-res-card__top"><span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span><span className="dc-res-card__fecha">{fechaLegible(r.fecha)}</span></div>
+                <blockquote>{r.texto}</blockquote>
+                <figcaption>
+                  <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.nombre)}</span>
+                  <div><b>{r.nombre}</b>{r.resp ? <span className="dc-res-card__ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-res-card__pend">Esperando respuesta</span>}</div>
+                  {!r.resp && puedeResponder ? <button type="button" className="dc-accion" onClick={(e) => { e.stopPropagation(); setSel(r); }}>Responder</button> : <button type="button" className="dc-accion is-sutil" onClick={(e) => { e.stopPropagation(); setSel(r); }}>Ver</button>}
+                </figcaption>
+              </figure>
             ); })}
           </div>
-          {puedeResponder && <div style={{ marginTop: 16, textAlign: "right" }}><Btn small onClick={solicitarResenas} disabled={solicitando}><Send size={15} strokeWidth={1.75} /> {solicitando ? "Enviando…" : "Solicitar reseñas"}</Btn></div>}
-        </Card>
-      </div>
-      <DataTable titulo="Reseñas de pacientes" sub="reseñas" minWidth={860} rows={reviews} onRowClick={(r) => setSel(r)} defaultSort={{ key: "fecha", dir: "desc" }}
-        empty={<Vacio icon={<Star size={22} strokeWidth={1.75} />} titulo="Sin reseñas" sub="Solicita reseñas a tus pacientes recientes para construir tu reputación." />}
-        cols={[
-          { key: "nombre", label: "Paciente", w: "minmax(140px,1.1fr)", a: "left", get: (r) => r.nombre, cell: (r) => { const col = colorDe(r.nombre); return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{r.nombre[0]}</div><span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{r.nombre}</span></div>; } },
-          { key: "estrellas", label: "Calificación", w: "minmax(120px,0.8fr)", a: "center", get: (r) => r.estrellas, cell: (r) => <span style={{ display: "inline-flex", gap: 1 }}>{estrellas(r.estrellas, 13)}</span> },
-          { key: "texto", label: "Reseña", w: "minmax(200px,2fr)", a: "left", get: (r) => r.texto, cell: (r) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{r.texto}</span> },
-          { key: "estado", label: "Estado", w: "minmax(120px,0.8fr)", a: "center", get: (r) => r.resp ? "Respondida" : "Pendiente", cell: (r) => r.resp ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><CheckCircle2 size={12} strokeWidth={1.75} /> Respondida</span> : <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><MessageSquare size={12} strokeWidth={1.75} /> Pendiente</span> },
-          { key: "fecha", label: "Fecha", w: "minmax(110px,0.7fr)", a: "center", get: (r) => r.fecha, cell: (r) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{fechaLegible(r.fecha)}</span> },
-          { key: "acc", label: "Acción", w: "120px", a: "center", noFilter: true, noSort: true, cell: (r) => <Btn small kind="ghost" onClick={(e) => { e.stopPropagation(); setSel(r); }}>{(r.resp || !puedeResponder) ? "Ver" : "Responder"}</Btn> },
-        ]} />
+        ); })()}
+      </Card>
       {sel && (() => { const r = reviews.find((x) => x.id === sel.id) || sel; const col = colorDe(r.nombre); return (
         <Modal icon={<Star size={20} strokeWidth={1.75} />} tone="var(--dc-warn-600)" titulo={r.nombre} sub={`${fechaLegible(r.fecha)} · reseña pública`} onClose={() => setSel(null)} maxW={520}
           footer={r.resp ? <Btn small kind="ghost" onClick={() => setSel(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setSel(null)}>Cancelar</Btn><Btn small onClick={() => { responder(r.id); setSel(null); }}><Send size={15} strokeWidth={1.75} /> Publicar respuesta</Btn></>}>
