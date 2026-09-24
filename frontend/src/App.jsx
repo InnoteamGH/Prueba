@@ -3643,6 +3643,9 @@ const ESPERA_INIT = [
   { id: 1, n: "Lucía Vargas", tel: "987 111 222", e: "Ortodoncia", medico: "Dr. Luis Paredes", pref: "Tardes", urg: "media", desde: "2 días", ofrecido: [] },
   { id: 2, n: "Andrés Soto", tel: "912 333 444", e: "Odontología general", medico: "Cualquiera", pref: "Mañanas", urg: "baja", desde: "1 día", ofrecido: [] },
   { id: 3, n: "Elena Ríos", tel: "998 555 666", e: "Endodoncia", medico: "Dra. Ana Quispe", pref: "Indiferente", urg: "alta", desde: "Hoy", ofrecido: ["Cupo 09:00 (rechazado)"] },
+  { id: 4, n: "Marco Salas", tel: "956 204 118", e: "Cirugía oral", medico: "Dr. Jorge Ramos", pref: "Mañanas", urg: "alta", desde: "1 día", ofrecido: [] },
+  { id: 5, n: "Valeria Núñez", tel: "944 870 312", e: "Odontopediatría", medico: "Cualquiera", pref: "Tardes", urg: "media", desde: "3 días", ofrecido: [] },
+  { id: 6, n: "Óscar Medina", tel: "981 445 097", e: "Limpieza dental", medico: "Cualquiera", pref: "Sábados", urg: "baja", desde: "5 días", ofrecido: [] },
 ];
 function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pacientes = [], setPacientes = () => {} }) {
   const conectado = !!auth.token;
@@ -3704,29 +3707,31 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 
   return (
     <div style={{ overflowX: "auto", maxWidth: "100%", width: "100%" }}>
-      {!embedded && (
-        <EnCabecera>
-          <div className="dc-esp-top">
-            <span className="dc-esp-chip"><b>{esp.length}</b> en espera</span>
-            {esp.some((x) => x.urg === "alta") && <span className="dc-esp-chip dc-esp-chip--alta"><b>{esp.filter((x) => x.urg === "alta").length}</b> urgente{esp.filter((x) => x.urg === "alta").length === 1 ? "" : "s"}</span>}
-            {esp.some((x) => x.ofrecido.length) && <span className="dc-esp-chip dc-esp-chip--oferta"><b>{esp.filter((x) => x.ofrecido.length).length}</b> con oferta</span>}
-            <span className="dc-esp-ayuda" tabIndex={0} aria-label="Cómo funciona la lista de espera">
-              <Info size={16} strokeWidth={1.75} />
-              <span role="tooltip">La lista se ordena por <strong>urgencia</strong>. Al liberarse un cupo, el primer paciente compatible recibe la oferta por WhatsApp; si no responde en 15 min, pasa al siguiente.</span>
-            </span>
+      {!embedded && (() => { const top = ordenada[0]; const u = top ? URGENCIA[top.urg] : null; const nAlta = esp.filter((x) => x.urg === "alta").length; const nOf = esp.filter((x) => x.ofrecido.length).length; const nEsp = new Set(esp.map((x) => x.e)).size; return (
+        <section className="dc-esp-hero">
+          <div className="dc-esp-hero__txt">
+            <span className="dc-sat-hero__eti">Lista de espera</span>
+            <div className="dc-esp-hero__num"><b>{esp.length}</b><span>{esp.length === 1 ? "paciente esperando cupo" : "pacientes esperando cupo"}</span></div>
+            <p>Ordenada por urgencia. Si se libera un cupo, se ofrece por WhatsApp al primero compatible; si no responde en 15 min, pasa al siguiente.</p>
           </div>
-        </EnCabecera>
-      )}
-      {ordenada.length > 0 && (() => { const top = ordenada[0]; const u = URGENCIA[top.urg]; return (
-        <div className="dc-esp-sug">
-          <span className="dc-esp-sug__ico"><Sparkles size={15} strokeWidth={1.75} /></span>
-          <div className="dc-esp-sug__txt">
-            <span className="dc-esp-sug__eti">Próximo cupo</span>
-            <span>Ofrécelo a <strong>{top.n}</strong> · urgencia {u.l.toLowerCase()} · {top.e} · espera {top.desde.toLowerCase()}</span>
+          <div className="dc-esp-hero__cifras">
+            <div><b>{nAlta}</b><span>Urgentes</span></div>
+            <div><b>{nOf}</b><span>Con oferta</span></div>
+            <div><b>{nEsp}</b><span>Especialidades</span></div>
           </div>
-          <Btn small onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer cupo</Btn>
-        </div>
+          {top && (
+            <div className="dc-esp-hero__prox">
+              <span className="dc-sat-hero__eti"><Sparkles size={12} strokeWidth={2} /> Próximo cupo para</span>
+              <div className="dc-esp-hero__prox-fila">
+                <span className="dc-rec__av" style={{ width: 38, height: 38, background: "rgba(255,255,255,.18)", color: "#fff" }}>{iniciales(top.n)}</span>
+                <div><b>{top.n}</b><span>{top.e} · urgencia {u.l.toLowerCase()}</span></div>
+              </div>
+              <button type="button" className="dc-esp-hero__btn" onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer cupo</button>
+            </div>
+          )}
+        </section>
       ); })()}
+      {embedded ? (
       <DataTable titulo="Pacientes esperando cupo" sub="en espera" minWidth={940} rows={ordenada} rowClassName={(p) => (ordenada[0] && p.id === ordenada[0].id ? "dc-esp-fila is-sug" : "dc-esp-fila")} accion={<Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>} empty={<Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." />} cols={[
         { key: "paciente", label: "Paciente", w: "minmax(158px,1.4fr)", a: "left", get: (p) => p.n, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(colorDe(p.n), 0.14), color: colorDe(p.n), display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.n)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</div>{p.ofrecido.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", display: "flex", alignItems: "center", gap: 4 }}><Bell size={10} strokeWidth={1.75} /> {p.ofrecido.length} oferta(s)</div>}</div></div> },
         { key: "urg", label: "Urgencia", w: "minmax(88px,0.7fr)", a: "center", get: (p) => URGENCIA[p.urg].l, cell: (p) => { const u = URGENCIA[p.urg]; return <span style={{ fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: u.bg, color: u.fg }}>{u.l}</span>; } },
@@ -3737,6 +3742,43 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
         { key: "desde", label: "Espera", w: "minmax(80px,0.7fr)", a: "center", get: (p) => p.desde, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.desde}</span> },
         { key: "acc", label: "Acciones", w: "176px", a: "center", noFilter: true, noSort: true, cell: (p) => <div className="dc-esp-acc"><button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} title="Ofrecer cupo por WhatsApp" aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button><Btn small onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn></div> },
       ]} />
+      ) : (
+        <Card className="dc-esp-tablero">
+          <div className="dc-esp-tablero__cab">
+            <div><h3>Pacientes esperando cupo</h3><span>Toca la campana para ofrecer un cupo por WhatsApp o asígnalo directo en la agenda.</span></div>
+            <Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>
+          </div>
+          {ordenada.length === 0 ? <Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." /> : (
+            <div className="dc-esp-cols">
+              {["alta", "media", "baja"].map((k) => { const u = URGENCIA[k]; const lista = ordenada.filter((p) => p.urg === k); return (
+                <section key={k} className={`dc-esp-col is-${k}`}>
+                  <h4><i /> Urgencia {u.l.toLowerCase()} <span>{lista.length}</span></h4>
+                  {lista.length === 0 && <div className="dc-esp-col__vacio">Sin pacientes</div>}
+                  {lista.map((p) => { const col = colorDe(p.n); const sug = ordenada[0] && p.id === ordenada[0].id; return (
+                    <article key={p.id} className={`dc-esp-card${sug ? " is-sug" : ""}`}>
+                      <div className="dc-esp-card__top">
+                        <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12.5, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(p.n)}</span>
+                        <div className="dc-esp-card__nom"><b>{p.n}</b><span><Phone size={11} strokeWidth={1.75} /> {p.tel}</span></div>
+                        {sug && <span className="dc-esp-card__sug"><Sparkles size={11} strokeWidth={2} /> Siguiente</span>}
+                      </div>
+                      <ul className="dc-esp-card__meta">
+                        <li><Stethoscope size={13} strokeWidth={1.75} /> {p.e}</li>
+                        <li><User size={13} strokeWidth={1.75} /> {p.medico}</li>
+                        <li><Clock size={13} strokeWidth={1.75} /> Espera {String(p.desde).toLowerCase()} · {p.pref}</li>
+                      </ul>
+                      {p.ofrecido.length > 0 && <div className="dc-esp-card__oferta"><Bell size={12} strokeWidth={1.75} /> {p.ofrecido.length === 1 ? "1 oferta enviada" : `${p.ofrecido.length} ofertas enviadas`}{p.ofrecido[p.ofrecido.length - 1] ? ` · ${p.ofrecido[p.ofrecido.length - 1]}` : ""}</div>}
+                      <div className="dc-esp-card__acc">
+                        <button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} title="Ofrecer cupo por WhatsApp" aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button>
+                        <Btn small kind={sug ? undefined : "ghost"} onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn>
+                      </div>
+                    </article>
+                  ); })}
+                </section>
+              ); })}
+            </div>
+          )}
+        </Card>
+      )}
       {asignarBase && <AgendarRecepcionModal base={asignarBase} notify={notify} onClose={() => setAsignarBase(null)} onCreada={() => { const eid = asignarBase._esperaId; setAsignarBase(null); if (conectado && eid) api.espera.resolver(eid).catch(() => {}).finally(recargar); else recargar(); }} />}
       {nuevoEsp && (() => {
         const selSty = { width: "100%", padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, fontWeight: 500, cursor: "pointer", boxSizing: "border-box" };
