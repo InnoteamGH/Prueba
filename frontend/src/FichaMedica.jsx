@@ -1449,25 +1449,37 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         `}</style>
         {/* Barra superior */}
         <div className="fm-top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 22px", background: "var(--dc-white)", borderBottom: `1px solid ${SOFT}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-            <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: `linear-gradient(135deg,${ACCENT},${TEAL})`, display: "grid", placeItems: "center" }}><ClipboardList size={18} color="var(--dc-white)" strokeWidth={2} /></div>
-            <div>
-              <div className="fm-top__eti">Expediente clínico</div>
+          <div className="fm-id">
+            {/* Foto (o avatar por edad y género) en la cabecera: reconocer al paciente de un
+                vistazo evita trabajar sobre la ficha equivocada. */}
+            <div className="fm-id__foto">
+              <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPed} size={68} radio={22} />
+              {conectado && (
+                <button onClick={() => fotoRef.current && fotoRef.current.click()} disabled={subiendoFoto} className="fm-id__cam"
+                  title={p.fotoUrl ? "Cambiar la foto" : "Subir una foto"} aria-label={p.fotoUrl ? "Cambiar la foto" : "Subir una foto"}>
+                  <Camera size={13} strokeWidth={2} />
+                </button>)}
+              <input ref={fotoRef} type="file" accept="image/*" onChange={cambiarFoto} style={{ display: "none" }} />
+            </div>
+            <div className="fm-id__txt">
+              <div className="fm-top__eti">Expediente clínico{esPed ? " pediátrico" : ""}</div>
               <div className="fm-top__nom">{p.nombre || "Ficha médica"}</div>
               <div className="fm-top__chips">
-                {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null, p.telefono || null].filter(Boolean).map((t) => <span key={t}>{t}</span>)}
-                {!errorFicha && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias registradas</span>}
+                {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null].filter(Boolean).map((t) => <span key={t}>{t}</span>)}
+                {!errorFicha && <span className={debe ? "is-debe" : "is-ok"}>{money(montoSaldoUi)} {saldoAFavor > 0.005 ? "a favor" : debe ? "por pagar" : "al día"}</span>}
+                {!errorFicha && arr(p.alergias).map((a) => <ChipAlergia key={a}>⚠ {a}</ChipAlergia>)}
+                {!errorFicha && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias</span>}
+                {esPed && (p.apoderadoNombre ? <span>Apoderado: {p.apoderadoNombre}</span> : <span className="is-debe">Menor sin apoderado</span>)}
+                {errorFicha && <span className="is-debe">Error al consultar datos clínicos</span>}
               </div>
-              {errorFicha ? (
-                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-700)", marginTop: 6 }}>Error al consultar datos clínicos</div>
-              ) : arr(p.alergias).length > 0 ? (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
-                  {arr(p.alergias).map((a) => (
-                    <ChipAlergia key={a}>⚠ {a}</ChipAlergia>
-                  ))}
-                </div>
-              ) : null}
             </div>
+            {(p.telefono || p.email) && (
+              <div className="fm-id__contacto">
+                {p.telefono && <a href={`https://wa.me/51${String(p.telefono).replace(/\D/g, "").slice(-9)}`} target="_blank" rel="noopener noreferrer" title="Escribir por WhatsApp" aria-label="Escribir por WhatsApp" className="is-wa"><MessageSquare size={15} strokeWidth={1.9} /></a>}
+                {p.telefono && <a href={`tel:${p.telefono}`} title={`Llamar al ${p.telefono}`} aria-label="Llamar"><Phone size={15} strokeWidth={1.9} /></a>}
+                {p.email && <a href={`mailto:${p.email}`} title="Escribir un correo" aria-label="Escribir un correo"><Mail size={15} strokeWidth={1.9} /></a>}
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {onAgendar && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
@@ -1476,6 +1488,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>
           </div>
         </div>
+        {!errorFicha && (
+          <nav className="fm-tabs" aria-label="Secciones del expediente">
+            {NAV.map(([k2, l, Ic]) => (
+              <button key={k2} type="button" className={`fm-tab${tab === k2 ? " is-on" : ""}`} aria-current={tab === k2 ? "page" : undefined} onClick={() => setTab(k2)}><Ic size={15} strokeWidth={1.9} /> {l}</button>
+            ))}
+          </nav>
+        )}
         {errorFicha ? (
           <div style={{ padding: 48, textAlign: "center", display: "grid", gap: 16, justifyItems: "center", background: "var(--dc-white)", flex: 1 }}>
             <AlertTriangle size={42} strokeWidth={1.75} color="var(--dc-warn-600)" />
@@ -1486,92 +1505,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <button onClick={cargar} style={{ ...btn("teal"), fontSize: 14, padding: "9px 20px" }}>Reintentar</button>
           </div>
         ) : (
-        <div className={`fm-cols${["odontograma", "perio"].includes(tab) ? " is-ancho" : ""}`} style={{ display: "grid", gridTemplateColumns: "268px minmax(0,1fr) 300px", gap: 0, flex: 1, minHeight: 0 }}>
-          {/* Rail izquierdo: tarjeta paciente + sub-nav */}
-          <div className="fm-rail" style={{ borderRight: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
-            <div style={{ textAlign: "center" }}>
-              {/* Foto del paciente si la tiene; si no, un avatar generico por edad y
-                  genero (comun.jsx: AvatarPaciente). Reconocerlo de un vistazo evita
-                  confundir a dos personas con el mismo nombre, que en una clinica pasa. */}
-              <div className="fm-rail__foto" style={{ position: "relative", width: 96, margin: "0 auto 10px" }}>
-                <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPed} size={96} radio={28} />
-                {esPed && (
-                  <span title="Paciente pediátrico" style={{ position: "absolute", bottom: 2, left: -2, background: "var(--dc-white)", borderRadius: "var(--dc-r-full)", padding: 4, boxShadow: "0 2px 8px rgba(16,24,40,.22)", display: "grid", placeItems: "center", color: PED }}>
-                    <EmblemaNino size={22} />
-                  </span>)}
-                {conectado && (
-                  <button onClick={() => fotoRef.current && fotoRef.current.click()} disabled={subiendoFoto}
-                    title={p.fotoUrl ? "Cambiar la foto" : "Subir una foto"} aria-label={p.fotoUrl ? "Cambiar la foto" : "Subir una foto"}
-                    style={{ position: "absolute", bottom: 2, right: -2, width: 32, height: 32, borderRadius: "var(--dc-r-full)", background: "var(--dc-white)",
-                             border: `1px solid ${SOFT}`, boxShadow: "0 2px 6px rgba(16,24,40,.18)", cursor: subiendoFoto ? "wait" : "pointer",
-                             color: TEAL, display: "grid", placeItems: "center" }}>
-                    <Camera size={16} strokeWidth={1.9} />
-                  </button>)}
-                <input ref={fotoRef} type="file" accept="image/*" onChange={cambiarFoto} style={{ display: "none" }} />
-              </div>
-              {conectado && p.fotoUrl && (
-                <button onClick={quitarFoto} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, fontSize: 12, marginBottom: 6 }}>
-                  Quitar foto
-                </button>)}
-              <div className="fm-rail__nom">{p.nombre || "Paciente"}</div>
-              <div style={{ fontSize: 13, color: MUTED }}>{p.fechaNacimiento && edad != null ? `${edad} años` : ""}{p.dni ? (p.fechaNacimiento && edad != null ? ` – DNI ${p.dni}` : `DNI ${p.dni}`) : ""}</div>
-              {esPed && <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, color: PED, fontSize: 12, fontWeight: 500, letterSpacing: ".03em", textTransform: "uppercase" }}>
-                <EmblemaNino size={14} /> {enTransicion ? "Pasa pronto a adulto" : "Ficha pediátrica"}
-              </div>}
-              {enTransicion && (
-                <div style={{ marginTop: 7, fontSize: 12, color: PED, lineHeight: 1.45, textAlign: "left", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, borderRadius: "var(--dc-r-md)", padding: "8px 10px" }}>
-                  En {faltanAnios} año{faltanAnios === 1 ? "" : "s"} su ficha pasa a ser de adulto. La historia pediátrica <b>se conserva</b>.
-                </div>
-              )}
-              {(p.telefono || p.email) && (
-                <div style={{ display: "flex", gap: 7, justifyContent: "center", marginTop: 10 }}>
-                  {p.telefono && (
-                    <a href={`https://wa.me/51${String(p.telefono).replace(/D/g, "").slice(-9)}`} target="_blank" rel="noopener noreferrer"
-                      title="Escribir por WhatsApp" aria-label="Escribir por WhatsApp"
-                      style={{ width: 32, height: 32, borderRadius: "var(--dc-r-full)", border: `1px solid ${SOFT}`, display: "grid", placeItems: "center", color: "var(--dc-ok-700)", textDecoration: "none" }}>
-                      <MessageSquare size={15} strokeWidth={1.9} />
-                    </a>)}
-                  {p.email && (
-                    <a href={`mailto:${p.email}`} title="Escribir un correo" aria-label="Escribir un correo"
-                      style={{ width: 32, height: 32, borderRadius: "var(--dc-r-full)", border: `1px solid ${SOFT}`, display: "grid", placeItems: "center", color: TEAL, textDecoration: "none" }}>
-                      <Mail size={15} strokeWidth={1.9} />
-                    </a>)}
-                  {p.telefono && (
-                    <a href={`tel:${p.telefono}`} title="Llamar" aria-label="Llamar"
-                      style={{ width: 32, height: 32, borderRadius: "var(--dc-r-full)", border: `1px solid ${SOFT}`, display: "grid", placeItems: "center", color: NAVY, textDecoration: "none" }}>
-                      <Phone size={15} strokeWidth={1.9} />
-                    </a>)}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 8, flexWrap: "wrap", fontSize: 12, color: TEXT }}>
-                {p.telefono && <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Phone size={12} strokeWidth={1.75} color={TEAL} /> {p.telefono}</span>}
-              </div>
-              {/* Apoderado del menor: quien firma y a quien se llama. Estaba solo como
-                  texto suelto dentro del JSON de la historia, donde nadie lo veia. */}
-              {esPed && (p.apoderadoNombre
-                ? <div style={{ marginTop: 9, textAlign: "left", background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, borderRadius: "var(--dc-r-md)", padding: "8px 10px" }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: PED, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 3 }}>Apoderado</div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, lineHeight: 1.3 }}>{p.apoderadoNombre}</div>
-                    <div style={{ fontSize: 12, color: "var(--dc-warn-700)", marginTop: 2 }}>
-                      {p.apoderadoParentesco || "Responsable"}{p.apoderadoDni ? ` – DNI ${p.apoderadoDni}` : ""}
-                    </div>
-                    {p.apoderadoTelefono && <a href={`tel:${p.apoderadoTelefono}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 12, fontWeight: 500, color: PED, textDecoration: "none" }}><Phone size={11} strokeWidth={2} /> {p.apoderadoTelefono}</a>}
-                  </div>
-                : <div style={{ marginTop: 9, textAlign: "left", background: "var(--dc-warn-soft)", borderRadius: "var(--dc-r-md)", padding: "8px 10px", fontSize: 12, color: "var(--dc-warn-ink)", lineHeight: 1.45 }}>
-                    Menor <b>sin apoderado registrado</b>. Nadie puede firmar sus consentimientos.
-                  </div>)}
-              <div className={`fm-saldo${debe ? " is-debe" : ""}`} style={{ marginTop: 10, display: "inline-flex", alignItems: "baseline", gap: 6, background: debe ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", color: debe ? WARN : GREEN, padding: "5px 12px", borderRadius: "var(--dc-r-full)", fontWeight: 500, fontSize: 13, cursor: debe ? "pointer" : "default" }} onClick={debe ? () => setTab("cuenta") : undefined} title={debe ? "Ver estado de cuenta" : undefined}>
-                {money(montoSaldoUi)} <span style={{ fontSize: 12, fontWeight: 500 }}>{saldoAFavor > 0.005 ? "saldo a favor" : "por pagar"}</span>
-              </div>
-            </div>
-            <div style={{ display: "grid", gap: 4 }}>
-              {NAV.map(([k, l, Ic]) => {
-                const on = tab === k;
-                return <button key={k} className={`fm-navbtn${on ? " is-on" : " fm-nav"}`} onClick={() => setTab(k)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "none", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 600, background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : TEXT, boxShadow: on ? "0 6px 16px -6px rgba(27,46,94,.5)" : "none" }}><Ic size={17} strokeWidth={1.75} color={on ? ACCENT : MUTED} /> {l}</button>;
-              })}
-            </div>
-          </div>
-
+        <div className={`fm-cols${["odontograma", "perio"].includes(tab) ? " is-ancho" : ""}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 0, flex: 1, minHeight: 0 }}>
+          {/* El rail izquierdo se retiró: la identidad va en la cabecera y las secciones en pestañas. */}
           {/* Contenido */}
           <div className="fm-content" style={{ padding: 22, display: "grid", gap: 14, alignContent: "start", overflowY: "auto" }}>
             {/* Etiquetas / Notas / Alergias: solo en el resumen (antes se repetían en todas
