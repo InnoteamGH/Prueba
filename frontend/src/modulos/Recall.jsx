@@ -121,7 +121,8 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
     notify(`Recordatorio enviado a ${pend.length} paciente(s).`);
   };
   const activas = reglas.filter((r) => r.on).length;
-  const [subtab, setSubtab] = useState("automatizaciones");   // automatizaciones | historial
+  const [subtab, setSubtab] = useState("automatizaciones");
+  const [filtroEnv, setFiltroEnv] = useState("todos");   // automatizaciones | historial
   const HIST_ENVIOS = [
     { id: 1, paciente: "Rosa Linares", regla: "Recordatorio 48 h antes", fecha: fmt(hoy), hora: "08:12", estado: "leido" },
     { id: 2, paciente: "Pedro Gómez", regla: "Confirmación al agendar", fecha: fmt(hoy), hora: "08:05", estado: "entregado" },
@@ -130,7 +131,15 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
     { id: 5, paciente: "Diego Castro", regla: "Recall de control", fecha: addDays(-1), hora: "10:15", estado: "entregado" },
     { id: 6, paciente: "Lucía Vega", regla: "Recordatorio 48 h antes", fecha: addDays(-2), hora: "09:00", estado: "leido" },
   ];
-  const RESENAS_DEMO = HIST_ENVIOS.filter((h) => h.estado === "respondido" && h.nps != null).map((h) => ({ paciente: h.paciente, nps: h.nps, calificacion: h.calificacion, comentario: h.comentario }));
+  const RESENAS_DEMO = [
+    ...HIST_ENVIOS.filter((h) => h.estado === "respondido" && h.nps != null).map((h) => ({ paciente: h.paciente, nps: h.nps, calificacion: h.calificacion, comentario: h.comentario })),
+    // Solo para la demostración: variedad de respuestas para ver la pantalla completa.
+    { paciente: "Javier Soto", nps: 10, calificacion: 5, comentario: "Me atendieron puntual y sin dolor. El recordatorio por WhatsApp me salvó, lo había olvidado." },
+    { paciente: "Rosa Linares", nps: 9, calificacion: 5, comentario: "La limpieza fue rapidísima y me explicaron cómo cuidar mis encías." },
+    { paciente: "Carlos Ruiz", nps: 8, calificacion: 4, comentario: "Buena atención, aunque esperé unos 15 minutos en recepción." },
+    { paciente: "Sofía Herrera", nps: 5, calificacion: 2, comentario: "Me cambiaron la hora dos veces y nadie me avisó a tiempo." },
+    { paciente: "Lucía Vega", nps: 9, calificacion: 5, comentario: "La endodoncia me daba miedo y fue muy tranquila. Gracias, Dra. Quispe." },
+  ];
   const ESTADO_ENVIO = { entregado: { l: "Entregado", bg: "var(--dc-line)", fg: "var(--dc-ink-700)", ic: Check }, leido: { l: "Leído", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)", ic: CheckCircle2 }, respondido: { l: "Respondió", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)", ic: MessageSquare }, error: { l: "No enviado", bg: "var(--dc-fee2)", fg: "var(--dc-danger-700)", ic: AlertTriangle } };
   const histView = (histReal && histReal.length ? histReal : (conectado ? [] : HIST_ENVIOS));
   return (
@@ -155,61 +164,107 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can }) {
         const comentarios = fuenteResenas.filter((r) => r.comentario && r.comentario.trim()).slice(0, 12);
         const bajos = rs.filter((r) => r.nps <= 6);
         const npsColor = nps >= 50 ? "var(--dc-ok-700)" : nps >= 0 ? "var(--dc-warn-600)" : "var(--dc-red)";
+        const estrellas = (v) => <span className="dc-sat__estrellas" aria-label={`${v} de 5`}>{[1, 2, 3, 4, 5].map((k) => <Star key={k} size={13} strokeWidth={1.75} className={k <= Math.round(Number(v) || 0) ? "is-on" : ""} />)}</span>;
         return (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-            <KpiCard label="NPS" value={n ? (nps > 0 ? `+${nps}` : `${nps}`) : "—"} color={npsColor} icon={<Star size={18} strokeWidth={1.75} />} sub={`${n} respuestas`} />
-            <KpiCard label="Calificación media" value={califAvg} color={NAVY} icon={<Star size={18} strokeWidth={1.75} />} sub="de 1 a 5" />
-            <KpiCard label="Promotores" value={`${pct(prom)}%`} color="var(--dc-ok-700)" icon={<Smile size={18} strokeWidth={1.75} />} sub={`${prom} pacientes (9-10)`} />
-            <KpiCard label="Detractores" value={`${pct(det)}%`} color="var(--dc-red)" icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub={`${det} pacientes (0-6)`} />
-          </div>
-          {bajos.length > 0 && (
-            <Card style={{ padding: "14px 18px", border: "1.5px solid var(--dc-danger-mid)", background: "var(--dc-bg)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--dc-danger-700)", fontWeight: 600, fontSize: 14, fontFamily: DISPLAY_FONT }}><AlertTriangle size={17} strokeWidth={1.75} /> {bajos.length} paciente(s) con calificación baja — requieren seguimiento</div>
-              <div style={{ fontSize: 13, color: "var(--dc-warn-700)", marginTop: 3 }}>El agente ya se disculpó y ofreció derivar; conviene que una persona del equipo los contacte.</div>
-            </Card>
-          )}
-          <Card style={{ padding: "18px 20px" }}>
-            <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Distribución de opiniones</h3>
-            <div style={{ display: "flex", height: 14, borderRadius: "var(--dc-r-full)", overflow: "hidden", background: "var(--dc-line)" }}>
-              {prom > 0 && <div style={{ width: `${pct(prom)}%`, background: "var(--dc-ok)" }} title={`Promotores ${pct(prom)}%`} />}
-              {pas > 0 && <div style={{ width: `${pct(pas)}%`, background: "var(--dc-warn)" }} title={`Neutrales ${pct(pas)}%`} />}
-              {det > 0 && <div style={{ width: `${pct(det)}%`, background: "var(--dc-red)" }} title={`Detractores ${pct(det)}%`} />}
+          <section className="dc-sat-hero">
+            <div className="dc-sat-hero__nps">
+              <span className="dc-sat-hero__eti">NPS de la clínica</span>
+              <b>{n ? (nps > 0 ? `+${nps}` : `${nps}`) : "—"}</b>
+              <span>{n ? `${n} ${n === 1 ? "respuesta" : "respuestas"} a la encuesta` : "Aún sin respuestas"}</span>
             </div>
-            <div style={{ display: "flex", gap: 16, marginTop: 10, fontSize: 12, color: "var(--dc-ink-700)", flexWrap: "wrap" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: "var(--dc-ok)" }} /> Promotores {pct(prom)}%</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: "var(--dc-warn)" }} /> Neutrales {pct(pas)}%</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: "var(--dc-red)" }} /> Detractores {pct(det)}%</span>
+            <div className="dc-sat-hero__calif">
+              <span className="dc-sat-hero__eti">Calificación media</span>
+              <div><b>{califAvg}</b><small>/5</small></div>
+              {n > 0 && estrellas(califAvg)}
             </div>
-          </Card>
-          <Card style={{ overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Comentarios recientes</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Capturados por la encuesta automática de WhatsApp</div></div>
-            {comentarios.length === 0 && <Vacio icon={<MessageSquare size={24} strokeWidth={1.75} />} titulo="Sin comentarios aún" sub="Aparecerán cuando los pacientes respondan la encuesta." />}
-            {comentarios.map((r, i) => { const col = colorDe(r.paciente || "Paciente"); const bajo = r.nps != null && r.nps <= 6; return (
-              <div key={r.id || i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none" }}>
-                <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(r.paciente || "P")}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}><span style={{ fontWeight: 500, color: NAVY }}>{r.paciente || "Paciente"}</span>{r.medico && <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>· {r.medico}</span>}</div>
-                  <div style={{ fontSize: 13, color: "var(--dc-ink-700)", marginTop: 2 }}>{r.comentario}</div>
-                </div>
-                {r.nps != null && <span style={{ fontSize: 12, fontWeight: 500, color: bajo ? "var(--dc-danger-700)" : "var(--dc-ok-700)", background: bajo ? "var(--dc-fee2)" : "var(--dc-ok-soft)", padding: "4px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{r.nps}/10</span>}
+            <div className="dc-sat-hero__dist">
+              <div className="dc-sat-hero__barra" role="img" aria-label={`Promotores ${pct(prom)}%, neutrales ${pct(pas)}%, detractores ${pct(det)}%`}>
+                {prom > 0 && <i style={{ width: `${pct(prom)}%`, background: "#6EE7A8" }} />}
+                {pas > 0 && <i style={{ width: `${pct(pas)}%`, background: "#FBBF5A" }} />}
+                {det > 0 && <i style={{ width: `${pct(det)}%`, background: "#F59A8D" }} />}
               </div>
-            ); })}
+              <div className="dc-sat-hero__grupos">
+                <div><i style={{ background: "#6EE7A8" }} /><b>{pct(prom)}%</b><span>Promotores · 9–10</span></div>
+                <div><i style={{ background: "#FBBF5A" }} /><b>{pct(pas)}%</b><span>Neutrales · 7–8</span></div>
+                <div><i style={{ background: "#F59A8D" }} /><b>{pct(det)}%</b><span>Detractores · 0–6</span></div>
+              </div>
+            </div>
+          </section>
+          {bajos.length > 0 && (
+            <div className="dc-banda dc-banda--peligro dc-sat-alerta">
+              <AlertTriangle size={17} strokeWidth={1.75} />
+              <div><b>{bajos.length === 1 ? "1 paciente calificó bajo" : `${bajos.length} pacientes calificaron bajo`}</b><span>El asistente ya se disculpó y ofreció derivar; conviene que alguien del equipo los llame.</span></div>
+            </div>
+          )}
+          <Card className="dc-sat">
+            <div className="dc-sat__cab"><h3>Comentarios recientes</h3><span>Respuestas de la encuesta automática por WhatsApp</span></div>
+            {comentarios.length === 0 ? <Vacio icon={<MessageSquare size={24} strokeWidth={1.75} />} titulo="Sin comentarios aún" sub="Aparecerán cuando los pacientes respondan la encuesta." /> : (
+              <div className="dc-sat__grid">
+                {comentarios.map((r, i) => { const col = colorDe(r.paciente || "Paciente"); const tono = r.nps == null ? "neutro" : r.nps >= 9 ? "prom" : r.nps <= 6 ? "det" : "neutro"; return (
+                  <figure key={r.id || i} className={`dc-sat__com is-${tono}`}>
+                    <blockquote>{r.comentario}</blockquote>
+                    <figcaption>
+                      <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 11.5, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente || "P")}</span>
+                      <div><b>{r.paciente || "Paciente"}</b>{r.calificacion ? estrellas(r.calificacion) : r.medico ? <span>{r.medico}</span> : null}</div>
+                      {r.nps != null && <span className="dc-sat__nps">{r.nps}<small>/10</small></span>}
+                    </figcaption>
+                  </figure>
+                ); })}
+              </div>
+            )}
           </Card>
         </>
         ); })() : subtab === "historial" ? (
-        <Card style={{ overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Historial de envíos</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Mensajes automáticos enviados por WhatsApp · últimos días</div></div>
-          {histView.length === 0 && <Vacio icon={<Send size={24} strokeWidth={1.75} />} titulo="Aún sin envíos" sub="Cuando una automatización envíe un WhatsApp, aparecerá aquí." />}
-          {histView.map((h, i) => { const es = ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado; const EIc = es.ic; const col = colorDe(h.paciente); return (
-            <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(h.paciente)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.paciente}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "inline-flex", alignItems: "center", gap: 5 }}><MessageSquare size={11} strokeWidth={1.75} color="var(--dc-ok-700)" /> {h.regla}</div></div>
-              <div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fechaLegible(h.fecha)} · {h.hora}</div>
-              <span style={{ fontSize: 12, fontWeight: 500, color: es.fg, background: es.bg, padding: "4px 11px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><EIc size={12} strokeWidth={1.75} /> {es.l}</span>
-            </div>
-          ); })}
-        </Card>
+        (() => {
+          const cuenta = (e) => histView.filter((h) => h.estado === e).length;
+          const leidos = cuenta("leido") + cuenta("respondido");
+          const filtrados = filtroEnv === "todos" ? histView : histView.filter((h) => (filtroEnv === "leido" ? h.estado === "leido" || h.estado === "respondido" : h.estado === filtroEnv));
+          const dias = [];
+          filtrados.forEach((h) => { const d = String(h.fecha || "").slice(0, 10); let g = dias.find((x) => x.d === d); if (!g) { g = { d, items: [] }; dias.push(g); } g.items.push(h); });
+          const etiquetaDia = (d) => (d === fmt(hoy) ? "Hoy" : d === addDays(-1) ? "Ayer" : (() => { const t = fechaLegible(d); return t.charAt(0).toUpperCase() + t.slice(1); })());
+          const pctDe = (x) => (histView.length ? Math.round((x / histView.length) * 100) : 0);
+          return (
+          <>
+            <section className="dc-sat-hero dc-env-hero">
+              <div className="dc-sat-hero__nps">
+                <span className="dc-sat-hero__eti">Mensajes automáticos</span>
+                <b>{histView.length}</b>
+                <span>enviados por WhatsApp en los últimos días</span>
+              </div>
+              <div className="dc-env-hero__cifras">
+                <div><b>{pctDe(histView.length - cuenta("error"))}%</b><span>Entregados</span></div>
+                <div><b>{pctDe(leidos)}%</b><span>Leídos</span></div>
+                <div><b>{cuenta("respondido")}</b><span>Respondieron</span></div>
+                <div><b>{cuenta("error")}</b><span>No enviados</span></div>
+              </div>
+            </section>
+            <Card className="dc-env">
+              <div className="dc-env__cab">
+                <h3>Historial de envíos</h3>
+                <div className="dc-env__filtros" role="tablist" aria-label="Filtrar por estado">
+                  {[["todos", "Todos", histView.length], ["leido", "Leídos", leidos], ["respondido", "Respondieron", cuenta("respondido")], ["error", "No enviados", cuenta("error")]].map(([k, l, c]) => (
+                    <button key={k} type="button" role="tab" aria-selected={filtroEnv === k} onClick={() => setFiltroEnv(k)}>{l} <span>{c}</span></button>
+                  ))}
+                </div>
+              </div>
+              {filtrados.length === 0 && <Vacio icon={<Send size={24} strokeWidth={1.75} />} titulo={histView.length ? "Nada con este filtro" : "Aún sin envíos"} sub={histView.length ? "Prueba con otro estado." : "Cuando una automatización envíe un WhatsApp, aparecerá aquí."} />}
+              {dias.map((g) => (
+                <div key={g.d} className="dc-env__dia">
+                  <div className="dc-env__fecha">{etiquetaDia(g.d)}</div>
+                  {g.items.map((h) => { const es = ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado; const EIc = es.ic; const col = colorDe(h.paciente); const rg = reglas.find((r) => r.l === h.regla); const RIc = (rg && rg.icon) || MessageSquare; const rc = (rg && rg.color) || DS.c.primary; return (
+                    <div key={h.id} className="dc-env__fila">
+                      <span className="dc-env__hora">{h.hora}</span>
+                      <span className="dc-rec__av" style={{ width: 36, height: 36, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(h.paciente)}</span>
+                      <div className="dc-env__txt"><b>{h.paciente}</b><span style={{ "--paso": rc }}><RIc size={12} strokeWidth={2} /> {h.regla}</span></div>
+                      <span className={`dc-env__estado is-${h.estado}`}><EIc size={13} strokeWidth={2} /> {es.l}</span>
+                    </div>
+                  ); })}
+                </div>
+              ))}
+            </Card>
+          </>
+          ); })()
       ) : (<>
       <Card className="dc-rec">
         <div className="dc-rec__cab">
