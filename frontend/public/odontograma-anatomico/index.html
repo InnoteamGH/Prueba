@@ -26,6 +26,8 @@
 </script>
 <style>
 html[data-sin-expediente] .exp{display:none!important}
+/* Dentro de la app cada cambio se sincroniza solo: el botón Guardar de la maqueta sobra. */
+html[data-bridge] #b-guardar{display:none!important}
 html[data-bridge] .exp-quien{visibility:hidden}
 html[data-bridge][data-paciente-ready] .exp-quien{visibility:visible}
 html[data-theme="dark"]{background:#0A0F16;color-scheme:dark}
@@ -139,6 +141,7 @@ button{font-family:inherit}
 .tarjeta > header h2{margin:0;font-size:14px;font-weight:700;letter-spacing:-.01em}
 .tarjeta > header .norma{font-size:11.5px;color:var(--t400);font-family:var(--mono)}
 .et{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t400)}
+#et-piezas{font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--t500);background:var(--panel-2);border:1px solid var(--linea);border-radius:999px;padding:4px 10px}
 .jf{display:flex;align-items:center;gap:9px;flex-wrap:wrap;flex:1;min-width:0}
 .jf .modo{margin-left:auto}
 
@@ -174,9 +177,12 @@ button{font-family:inherit}
 :root[data-theme="dark"] .mb[aria-pressed="true"]{color:#062029}
 
 /* abajo: pieza grande + herramientas + hallazgos */
-.abajo{display:grid;grid-template-columns:404px minmax(0,1fr) 396px;gap:18px;align-items:start}
-@media (max-width:1400px){.abajo{grid-template-columns:360px minmax(0,1fr)}}
-@media (max-width:940px){.abajo{grid-template-columns:1fr}}
+/* Pieza y hallazgos del paciente apilados a la izquierda; la paleta a la derecha.
+   Antes, en pantallas medianas, "Hallazgos del paciente" caía sola a una tercera
+   fila y dejaba un hueco blanco al lado. */
+.abajo{display:grid;grid-template-columns:340px minmax(0,1fr) 340px;grid-template-areas:"foco herr hall";gap:16px;align-items:start}
+@media (max-width:1400px){.abajo{grid-template-columns:320px minmax(0,1fr);grid-template-areas:"foco herr" "hall herr"}}
+@media (max-width:940px){.abajo{grid-template-columns:1fr;grid-template-areas:"foco" "herr" "hall"}}
 .rail{padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0;
   border-bottom:1px solid var(--linea)}
 .foco-cuerpo{padding:8px 18px 14px;display:grid;place-items:center}
@@ -735,8 +741,7 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
     <main class="tarjeta">
       <header>
         <div class="jf">
-          <span class="et">Fase</span>
-          <div class="seg" role="group" id="seg-fase">
+          <div class="seg" role="group" id="seg-fase" aria-label="Fase del odontograma">
             <button type="button" data-fase="inicial"   aria-pressed="true">Inicial</button>
             <button type="button" data-fase="evolucion" aria-pressed="false">Evolución</button>
             <button type="button" data-fase="alta"      aria-pressed="false">Alta</button>
@@ -754,12 +759,12 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
         <svg class="odo" id="odo" viewBox="0 0 1268 560" role="img"
              aria-label="Los cuatro cuadrantes con las posiciones permanentes y temporales, numeración FDI. Elige una pieza o una raíz."></svg>
       </div>
-      <p class="pista" style="padding:0 16px 10px;margin:0">Toca una cara para marcarla y vuelve a tocarla para borrarla · arrastra para varias · para un absceso o una fractura radicular, toca la <b>raíz</b> · <kbd>Alt</kbd>+clic borra</p>
+      <p class="pista" style="padding:0 18px 10px;margin:0">Toca una cara para marcarla y otra vez para borrarla · arrastra para marcar varias · toca la <b>raíz</b> para abscesos o fracturas radiculares</p>
       <div class="leyenda" id="leyenda"></div>
     </main>
 
     <div class="abajo">
-      <section class="tarjeta foco">
+      <section class="tarjeta foco" style="grid-area:foco">
         <header><h2 id="foco-tit">Pieza</h2><span class="norma" id="foco-sub"></span></header>
         <div class="foco-cuerpo">
           <svg id="lupa" viewBox="0 0 300 344" role="img" aria-label="Pieza seleccionada en detalle"></svg>
@@ -767,7 +772,7 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
         <div class="foco-marcas" id="foco-marcas"></div>
       </section>
 
-      <section class="tarjeta">
+      <section class="tarjeta" style="grid-area:herr">
         <header>
           <h2>Hallazgo a aplicar</h2>
           <div class="seg" role="group" id="seg-modo" aria-label="Qué hace el clic">
@@ -788,7 +793,7 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
         <div id="panel"></div>
       </section>
 
-      <section class="tarjeta tarjeta--hall">
+      <section class="tarjeta tarjeta--hall" style="grid-area:hall">
         <header><h2>Hallazgos del paciente</h2><span class="norma" id="cuenta">0 piezas</span>
           <button type="button" class="btn btn--min" id="b-resumen" style="margin-left:auto">Ver resumen</button></header>
         <div class="hall-caja despl" id="hall-caja"><div class="hall" id="hall"></div></div>
@@ -821,21 +826,14 @@ table.doc tfoot tr.tot td{border-color:#1B1614;border-top:1.5px solid #1B1614;
   </dialog>
 
   <div class="pie">
-    <span class="estado" id="estado">Sin cambios sin guardar.</span>
+    <span class="estado" id="estado">No hay cambios pendientes.</span>
     <div style="display:flex;gap:10px">
       <button type="button" class="btn" id="b-limpiar">Limpiar fase</button>
       <button type="button" class="btn btn--pri" id="b-guardar">Guardar odontograma</button>
     </div>
   </div>
 
-  <p class="nota-pie">Maqueta sobre datos de ejemplo · simbología según la
-    <b>NTS N.º 188-MINSA/DGIESP-2022</b>, con los criterios de dibujo del odontograma
-    digital (numeración FDI, rojo para el hallazgo y azul para lo tratado, símbolo propio
-    por hallazgo y diente dibujado entero, con su raíz).<br>
-    Esta versión recoge lo que pidió la <b>Dra. Cinthya Vásquez</b> el 12 de setiembre:
-    un solo odontograma en lugar de tres vistas, la boca dividida en sus cuatro cuadrantes,
-    lesiones marcables sobre la raíz, más espacio entre piezas, la prótesis removible con
-    las dos líneas continuas y el plan de inversión que sale del propio odontograma.</p>
+  <p class="nota-pie">Simbología según la <b>NTS N.º 188-MINSA/DGIESP-2022</b> · numeración FDI · rojo para el hallazgo o lo pendiente y azul para lo tratado.</p>
 </div>
 
 <script>
@@ -1932,7 +1930,7 @@ function construirInfo(){
     c.appendChild(p);
     const n2=document.createElement('p'); n2.className='mi-nota';
     n2.textContent='Llevan un punto ámbar en la paleta. Su grafía no se pudo verificar en las '+
-      'fuentes accesibles de la norma, así que la representación que usa la maqueta está a '+
+      'fuentes accesibles de la norma, así que su representación está a '+
       'confirmar con el área clínica antes de darla por buena.';
     c.appendChild(n2);
   }
@@ -2382,12 +2380,8 @@ function presupuesto(){
   bi.textContent='Ver e imprimir el documento';
   bi.addEventListener('click',()=>abrirDocumento('plan'));
   acc.appendChild(bi);
-  [['Enviar por WhatsApp','En la maqueta no se envía. Ojo: ese mensaje tiene cobro de Meta.'],
-   ['Guardar como presupuesto','En la maqueta no se guarda. Según D-6, lo que sale del '+
-    'odontograma es una propuesta: alguien la aprueba y recién ahí se convierte en '+
-    'presupuesto con número.']].forEach(([t,m])=>{
-    const b=document.createElement('button'); b.type='button'; b.className='btn';
-    b.textContent=t; b.addEventListener('click',()=>avisa(m)); acc.appendChild(b);});
+  /* "Enviar por WhatsApp" y "Guardar como presupuesto" eran botones de maqueta que
+     solo mostraban un aviso: se quitan hasta que existan de verdad. */
   c.appendChild(acc);
 }
 
@@ -2756,15 +2750,20 @@ function rehacer(){if(!HIST.adelante.length)return;HIST.atras.push(foto());
 
 /* ---- aplicar ---- */
 let avisoT=null;
+/* Dentro de la app (bridge) cada cambio se guarda solo: el estado lo dice así. */
+const EN_APP=document.documentElement.hasAttribute('data-bridge');
+function textoEstado(){
+  if(EN_APP) return 'Los cambios se guardan automáticamente · fase '+NOM_FASE[est.fase]+'.';
+  return est.sucio?'<b>Cambios sin guardar</b> en la fase '+NOM_FASE[est.fase]+'.':'No hay cambios pendientes.';
+}
 function avisa(t){
   const e=document.getElementById('estado'); if(!e)return;
   e.innerHTML='<b>'+t+'</b>';
   clearTimeout(avisoT);
-  avisoT=setTimeout(()=>{e.textContent=est.sucio?'':'Sin cambios sin guardar.';
-    if(est.sucio)e.innerHTML='<b>Cambios sin guardar</b> en la fase '+NOM_FASE[est.fase]+'.';},3200);
+  avisoT=setTimeout(()=>{e.innerHTML=textoEstado();},3200);
 }
 function sucio(){est.sucio=true;
-  document.getElementById('estado').innerHTML='<b>Cambios sin guardar</b> en la fase '+NOM_FASE[est.fase]+'.';}
+  document.getElementById('estado').innerHTML=textoEstado();}
 function aplicar(pz,caraId,nodo,opt){
   opt=opt||{};
   if(opt.tocadas){const k=pz+':'+(caraId||'*');
@@ -2941,19 +2940,20 @@ document.getElementById('b-limpiar').addEventListener('click',()=>{
 document.getElementById('b-guardar').addEventListener('click',()=>{
   est.sucio=false;
   const h=new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
-  document.getElementById('estado').innerHTML='Guardado a las <b>'+h+'</b>. Maqueta: no envía nada al servidor. '+
+  document.getElementById('estado').innerHTML='Guardado a las <b>'+h+'</b>. '+
     '<button type="button" class="btn btn--min" id="b-tras-guardar">Ver el resumen del paciente</button>';
   const bg=document.getElementById('b-tras-guardar');
   if(bg)bg.addEventListener('click',()=>abrirDocumento('ambos'));});
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   if(t.getAttribute('aria-current')==='page')return;
-  document.getElementById('estado').textContent='En la maqueta sólo está montada la pestaña de Odontograma.';}));
+  document.getElementById('estado').textContent='Esa sección se abre desde la ficha del paciente.';}));
 
 /* ---- arranque ---- */
 construirChips(); construirLeyenda(); opciones(); botonesHist();
 document.getElementById('et-piezas').textContent=denticion().txt;
 document.getElementById('hall').addEventListener('scroll',avisaMas,{passive:true});
 document.getElementById('b-resumen').addEventListener('click',()=>abrirDocumento('resumen'));
+{const e0=document.getElementById('estado'); if(e0&&EN_APP) e0.innerHTML=textoEstado();}
 document.getElementById('chips').addEventListener('scroll',avisaPaleta,{passive:true});
 addEventListener('resize',()=>{avisaMas();avisaPaleta();},{passive:true});
 est.sel=46;

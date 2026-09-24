@@ -3203,7 +3203,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                 </div>
               )}
               {pacienteId && <Btn small kind="ghost" onClick={() => { setFmTab("historia"); setFmOpen(true); }}><FileText size={14} strokeWidth={1.75} /> Ficha del paciente</Btn>}
-              <Btn small kind="ghost" onClick={abrirPlanInv} title="Plan de inversión imprimible"><Printer size={14} strokeWidth={1.75} /> Plan de inversión</Btn>
+              {/* En la vista anatómica el plan de inversión ya está dentro del odontograma. */}
+              {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Plan de inversión imprimible"><Printer size={14} strokeWidth={1.75} /> Plan de inversión</Btn>}
               <label style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 999, padding: "4px 12px", marginLeft: "auto" }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Zoom</span>
                 <input type="range" min="50" max="130" value={zoom} onChange={(e) => setZoom(Number(e.target.value))}
