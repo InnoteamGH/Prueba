@@ -342,7 +342,7 @@
   z-index:200;padding:24px;animation:dcBackdropFade .22s ease-out forwards}
 .dc-pg .dc-modal-backdrop[hidden]{display:none!important}
 @keyframes dcBackdropFade{from{opacity:0}to{opacity:1}}
-.dc-pg .dc-modal{background:var(--dc-surface);width:min(880px,96vw);max-height:min(800px,92vh);
+.dc-pg .dc-modal{background:var(--dc-surface);width:min(880px,96vw);max-height:min(800px,calc(92vh / var(--dc-z, 1)));
   border-radius:20px;overflow:hidden;display:flex;flex-direction:column;
   box-shadow:0 40px 80px -28px rgba(15,35,42,.42), 0 0 0 1px rgba(15,35,42,.07);
   animation:dcModalSlide .26s cubic-bezier(.22,1,.36,1)}
@@ -451,7 +451,7 @@
 .dc-pg .mdl-falta b{color:var(--dc-warn-700);font-weight:var(--dc-fw-bold)}
 @media (max-width:640px){
 .dc-pg .dc-modal-backdrop{padding:0;place-items:end stretch}
-.dc-pg .dc-modal{width:100%;max-height:94vh;border-radius:20px 20px 0 0}
+.dc-pg .dc-modal{width:100%;max-height:calc(94vh / var(--dc-z, 1));border-radius:20px 20px 0 0}
 .dc-pg .dc-modal__head{padding:20px 20px 16px}
 .dc-pg .dc-modal__body{padding:4px 20px 22px}
 .dc-pg .dc-modal__footer{padding:13px 20px}
@@ -503,7 +503,7 @@
 }
 .dc-pg-ficha {
   width: min(880px, 100%);
-  max-height: min(88vh, 720px);
+  max-height: min(calc(88vh / var(--dc-z, 1)), 720px);
   background: var(--dc-surface);
   border-radius: var(--dc-r-lg);
   box-shadow: var(--dc-sh-2);
@@ -592,7 +592,7 @@
 @media (max-width: 640px) {
   .dc-pg-ficha-backdrop { align-items: end; padding: 0; }
   .dc-pg-ficha {
-    width: 100%; max-height: 92vh;
+    width: 100%; max-height: calc(92vh / var(--dc-z, 1));
     border-radius: var(--dc-r-lg) var(--dc-r-lg) 0 0;
   }
 }

@@ -40,7 +40,7 @@ export default class ErrorBoundary extends React.Component {
       .test(String(this.state.error?.message || ""));
 
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center",
+      <div style={{ minHeight: "calc(100vh / var(--dc-z, 1))", display: "grid", placeItems: "center",
                     background: "var(--dc-white)", padding: 24,
                     fontFamily: "'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif" }}>
         <div style={{ maxWidth: 520, width: "100%", background: "var(--dc-white)", borderRadius: "var(--dc-r-lg)",

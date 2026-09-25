@@ -15,7 +15,7 @@ import {
   Images, FileImage, FilePlus, FileMinus, FileCheck, FileX, Folder, FolderOpen, FolderPlus,
   Archive, Inbox, SendHorizonal, Reply, Forward, Bookmark, Flag, Pin, PinOff, ThumbsUp, ThumbsDown,
   Heart, HeartOff, Share2, Printer, Syringe, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown,
-  Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale
+  Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag
 } from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
@@ -156,9 +156,9 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1.05fr .95fr", gridTemplateRows: "minmax(100vh,auto)", fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }} className="dc-login">
+    <div style={{ minHeight: "calc(100vh / var(--dc-z, 1))", display: "grid", gridTemplateColumns: "1.05fr .95fr", gridTemplateRows: "minmax(calc(100vh / var(--dc-z, 1)),auto)", fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }} className="dc-login">
       {/* Panel izquierdo de marca — dental teal, limpio (Apple) */}
-      <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, var(--dc-brand-600) 0%, var(--dc-ink-alt) 100%)", minHeight: "100vh", padding: "48px 52px", display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#fff" }} className="dc-login-brand">
+      <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg, var(--dc-brand-600) 0%, var(--dc-ink-alt) 100%)", minHeight: "calc(100vh / var(--dc-z, 1))", padding: "48px 52px", display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#fff" }} className="dc-login-brand">
         <NeuralDentalBackground />
         <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", justifyContent: "space-between" }}>
         
@@ -935,7 +935,7 @@ function FichaPaciente({ nombre, onClose, fichas, cita }) {
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "grid", placeItems: "center", zIndex: 200, padding: 20 }}>
-      <div className="dc-modal dc-ficha-modal" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", width: "min(860px,96vw)", maxHeight: "92vh", borderRadius: "var(--dc-r-lg)", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 44px 110px -34px rgba(15,27,56,.62)", animation: "dcModal .28s cubic-bezier(.2,.7,.2,1)" }}>
+      <div className="dc-modal dc-ficha-modal" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", width: "min(860px,96vw)", maxHeight: "calc(92vh / var(--dc-z, 1))", borderRadius: "var(--dc-r-lg)", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 44px 110px -34px rgba(15,27,56,.62)", animation: "dcModal .28s cubic-bezier(.2,.7,.2,1)" }}>
         <div className="dc-modal__head" style={{ position: "relative", padding: "22px 26px", color: "#fff", flexShrink: 0 }}>
           <button aria-label="Cerrar" className="dc-modal__x" onClick={onClose} style={{ position: "absolute", top: 18, right: 18, background: "rgba(255,255,255,.15)", border: "none", borderRadius: "var(--dc-r-sm)", width: 30, height: 30, cursor: "pointer", color: "#fff", display: "grid", placeItems: "center" }}><X size={16} strokeWidth={1.75} /></button>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -1401,8 +1401,8 @@ function SalaTV({ onClose, citasDemo = [] }) {
   const hh = reloj.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
   const fecha = reloj.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 400, background: "radial-gradient(1200px 700px at 20% -10%, var(--dc-brand-700), var(--dc-ink-900) 60%)", color: "#fff", display: "flex", flexDirection: "column", padding: "3vh 3vw", fontFamily: DISPLAY_FONT }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3vh" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 400, background: "radial-gradient(1200px 700px at 20% -10%, var(--dc-brand-700), var(--dc-ink-900) 60%)", color: "#fff", display: "flex", flexDirection: "column", padding: "calc(3vh / var(--dc-z, 1)) 3vw", fontFamily: DISPLAY_FONT }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "calc(3vh / var(--dc-z, 1))" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ width: 54, height: 54, borderRadius: "var(--dc-r-lg)", background: `linear-gradient(135deg, ${DS.c.accent}, ${DS.c.primary})`, display: "grid", placeItems: "center" }}><Smile size={30} strokeWidth={1.75} color="#fff" /></div>
           <div><div style={{ fontSize: "clamp(20px,2.2vw,34px)", fontWeight: 500 }}>Dento Check</div><div style={{ fontSize: "clamp(11px,1vw,15px)", color: "var(--dc-brand-soft)", textTransform: "capitalize" }}>{fecha}</div></div>
@@ -1414,8 +1414,8 @@ function SalaTV({ onClose, citasDemo = [] }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "3vw", flex: 1, minHeight: 0 }}>
         <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: "clamp(14px,1.3vw,20px)", fontWeight: 500, color: "var(--dc-green-soft)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "1.6vh", display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: "var(--dc-r-full)", background: "var(--dc-ok)", boxShadow: "0 0 0 6px rgba(34,197,94,.25)" }} /> Llamando – en atención</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,320px),1fr))", gap: "1.6vh", overflowY: "auto", alignContent: "start" }}>
+          <div style={{ fontSize: "clamp(14px,1.3vw,20px)", fontWeight: 500, color: "var(--dc-green-soft)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "calc(1.6vh / var(--dc-z, 1))", display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: "var(--dc-r-full)", background: "var(--dc-ok)", boxShadow: "0 0 0 6px rgba(34,197,94,.25)" }} /> Llamando – en atención</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,320px),1fr))", gap: "calc(1.6vh / var(--dc-z, 1))", overflowY: "auto", alignContent: "start" }}>
             {enAtencion.length === 0 ? <div style={{ color: "var(--dc-slate)", fontSize: "clamp(16px,1.6vw,24px)", fontWeight: 500 }}>Sin pacientes en atención por ahora.</div> : enAtencion.map((c) => (
               <div key={c.id} style={{ background: "linear-gradient(135deg,var(--dc-ok),var(--dc-ok-700))", borderRadius: "var(--dc-r-lg)", padding: "clamp(14px,1.8vw,26px)", boxShadow: "0 18px 40px -18px rgba(22,163,74,.6)" }}>
                 <div style={{ fontSize: "clamp(24px,2.6vw,44px)", fontWeight: 500, lineHeight: 1.05 }}>{corto(c.paciente)}</div>
@@ -1425,8 +1425,8 @@ function SalaTV({ onClose, citasDemo = [] }) {
           </div>
         </div>
         <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: "clamp(14px,1.3vw,20px)", fontWeight: 500, color: "var(--dc-amber-soft)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "1.6vh" }}>En espera ({enEspera.length})</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.1vh", overflowY: "auto" }}>
+          <div style={{ fontSize: "clamp(14px,1.3vw,20px)", fontWeight: 500, color: "var(--dc-amber-soft)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: "calc(1.6vh / var(--dc-z, 1))" }}>En espera ({enEspera.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "calc(1.1vh / var(--dc-z, 1))", overflowY: "auto" }}>
             {enEspera.length === 0 ? <div style={{ color: "var(--dc-slate)", fontSize: "clamp(15px,1.4vw,20px)", fontWeight: 500 }}>Nadie en espera.</div> : enEspera.map((c, i) => (
               <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 16, background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)", borderRadius: "var(--dc-r-lg)", padding: "clamp(10px,1.2vw,18px)" }}>
                 <div style={{ fontSize: "clamp(16px,1.5vw,26px)", fontWeight: 500, color: "var(--dc-amber-soft)", fontVariantNumeric: "tabular-nums", minWidth: "2.5ch" }}>{c.hora}</div>
@@ -2468,37 +2468,6 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
       </section>
       <DataTable titulo="Directorio de pacientes" maxHeight={560} sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
-      <section className="dc-mkt">
-        <header className="dc-mkt__cab"><span><Megaphone size={16} strokeWidth={2} /></span><div><h3>Marketing</h3><small>De dónde llegan tus pacientes y a quién escribirle hoy{!conectado ? " (datos de ejemplo)" : ""}</small></div></header>
-        <div className="dc-mkt__grid">
-          <div className="dc-mkt__canal">
-            <h4>Cómo nos conocen</h4>
-            {canalTop.length === 0 || (canalTop.length === 1 && canalTop[0][0] === "Sin registrar") ? (
-              <p className="dc-mkt__nada">Aún no registramos el canal de captación. Al dar de alta, indica «¿Cómo nos conoció?».</p>
-            ) : (() => { const tot = canalTop.reduce((x, [, n]) => x + n, 0) || 1; let acc = 0; const grad = canalTop.map(([c, n]) => { const a0 = acc; acc += (n / tot) * 100; return `${canalCol[c] || "#9AAEB2"} ${a0}% ${acc}%`; }).join(", "); const top = canalTop.find(([c]) => c !== "Sin registrar"); return (
-              <div className="dc-mkt__canalin">
-                <div className="dc-mkt__dona" style={{ background: `radial-gradient(closest-side, #fff 64%, transparent 66% 100%), conic-gradient(${grad})` }}><div><b>{top ? Math.round((top[1] / tot) * 100) : 0}%</b><small>{top ? top[0] : "—"}</small></div></div>
-                <ul>
-                  {canalTop.map(([c, n]) => (
-                    <li key={c} style={{ "--c": canalCol[c] || "#9AAEB2" }}><i /><span>{c}</span><b>{n}</b><small>{Math.round((n / tot) * 100)}%</small></li>
-                  ))}
-                </ul>
-              </div>
-            ); })()}
-          </div>
-          <div className="dc-mkt__segs">
-            <h4>Segmentos para campaña</h4>
-            {segmentos.map((sg) => (
-              <div key={sg.k} className={`dc-mkt__seg${sg.n ? "" : " is-vacio"}`} style={{ "--c": sg.color }}>
-                <span className="dc-mkt__sico">{sg.icon}</span>
-                <div><b>{sg.label}</b><small>{sg.sub}</small></div>
-                <em>{sg.n}</em>
-                {puedeGestionar && <button type="button" onClick={() => setCamp({ ...sg, canal: "ambos", msg: sg.plantilla })} disabled={!sg.n}><Send size={13} strokeWidth={2} /> Enviar</button>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
       {ficha && <FichaPaciente nombre={ficha} onClose={() => setFicha(null)} fichas={fichas} />}
       {ficha360 && <FichaReal data={ficha360} onClose={() => setFicha360(null)} notify={notify} />}
       {fmId && (
@@ -3284,6 +3253,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
             <OdontogramaAnatomico
               ref={anatomicoRef}
               pacienteId={pacienteId}
+              demoEstados={conectado ? null : estados}
               pacienteNombre={(pacientes.find((x) => x.id === pacienteId) || {}).nombre || ""}
               pacienteDni={(pacientes.find((x) => x.id === pacienteId) || {}).dni || ""}
               pacienteEdad={edadPac != null ? edadPac : ""}
@@ -5302,29 +5272,26 @@ function Integraciones({ notify }) {
         <button type="button" role="tab" aria-selected={catSel === "todas"} className={catSel === "todas" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setCatSel("todas")}><Plug size={13} strokeWidth={2} /> Todas <i>{its.length}</i></button>
         {cats.map((c) => { const CI = c.ic; return <button key={c.cat} type="button" role="tab" aria-selected={catSel === c.cat} className={catSel === c.cat ? "is-on" : ""} style={{ "--c": c.c }} onClick={() => setCatSel(c.cat)}><CI size={13} strokeWidth={2} /> {c.cat} <i>{c.items.length}</i></button>; })}
       </div>
-      {cats.filter((c) => catSel === "todas" || catSel === c.cat).map((c) => { const CI = c.ic; return (
-        <section key={c.cat} className="dc-int__cat" style={{ "--c": c.c }}>
-          <div className="dc-int__cab"><span><CI size={15} strokeWidth={2} /></span><h3>{c.cat}</h3><small>{c.items.filter((x) => x.estado === "conectado").length} de {c.items.length} conectadas</small></div>
-          <div className="dc-int__grid">
-            {c.items.map((it) => { const [el, ec] = EST_INT[it.estado] || EST_INT.disponible; const col = colorDe(it.n); return (
-              <article key={it.n} className={`dc-int__card is-${it.estado}`} onClick={() => setDetInt({ ...it, cat: c.cat })} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setDetInt({ ...it, cat: c.cat }); }}>
-                <div className="dc-int__top">
-                  <span className="dc-int__logo" style={{ background: `linear-gradient(135deg, ${col}, ${tint(col, 0.75)})` }}>{it.n.replace(/[^A-Za-z ]/g, "").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
-                  <div><b>{it.n}</b>{it.rec && <small className="dc-int__rec"><Star size={10} strokeWidth={2.4} /> Recomendado</small>}</div>
-                  <span className={`dc-int__est ${ec}`}><i />{el}</span>
+      {(() => {
+        const ORD = { conectado: 0, pendiente: 1, disponible: 2 };
+        const lista = cats.filter((c) => catSel === "todas" || catSel === c.cat).flatMap((c) => c.items.map((it) => ({ ...it, cat: c.cat, cc: c.c, CI: c.ic }))).sort((x, y) => (ORD[x.estado] ?? 3) - (ORD[y.estado] ?? 3));
+        return (
+          <div className="dc-int2">
+            {lista.map((it) => { const [el, ec] = EST_INT[it.estado] || EST_INT.disponible; const col = colorDe(it.n); const CI = it.CI; return (
+              <article key={it.n} className={`dc-int2__card is-${it.estado}`} onClick={() => setDetInt(it)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setDetInt(it); }}>
+                <span className="dc-int__logo" style={{ background: `linear-gradient(135deg, ${col}, ${tint(col, 0.75)})` }}>{it.n.replace(/[^A-Za-z ]/g, "").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+                <div className="dc-int2__txt">
+                  <b>{it.n}{it.rec && <Star size={11} strokeWidth={2.4} className="dc-int2__rec" aria-label="Recomendado" />}</b>
+                  <small style={{ "--c": it.cc }}><CI size={11} strokeWidth={2.2} /> {it.cat}</small>
                 </div>
-                <p>{it.d}</p>
-                <div className="dc-int__pie">
-                  {it.estado === "conectado"
-                    ? <span className="dc-int__ok"><CheckCircle2 size={14} strokeWidth={2} /> Funcionando</span>
-                    : <button type="button" className={it.estado === "pendiente" ? "is-warn" : ""} onClick={(e) => { e.stopPropagation(); setDetInt({ ...it, cat: c.cat }); }}><Plug size={13} strokeWidth={2} /> {it.estado === "pendiente" ? "Terminar conexión" : "Conectar"}</button>}
-                  <em>Ver detalle <ChevronRight size={13} strokeWidth={2.2} /></em>
-                </div>
+                {it.estado === "conectado"
+                  ? <span className={`dc-int__est ${ec}`}><i />{el}</span>
+                  : <button type="button" className={it.estado === "pendiente" ? "is-warn" : ""} onClick={(e) => { e.stopPropagation(); setDetInt(it); }}>{it.estado === "pendiente" ? "Terminar" : "Conectar"}</button>}
               </article>
             ); })}
           </div>
-        </section>
-      ); })}
+        );
+      })()}
       {its.length === 0 && <Card style={{ padding: 0 }}><Vacio icon={<Plug size={22} strokeWidth={1.75} />} titulo="Sin integraciones" sub="No hay conectores disponibles por ahora." /></Card>}
       {detInt && <Modal icon={<Plug size={20} strokeWidth={1.75} />} tone={detInt.estado === "conectado" ? "var(--dc-ok-700)" : NAVY} titulo={detInt.n} sub={detInt.cat} onClose={() => setDetInt(null)} maxW={480}
         footer={detInt.estado === "conectado" ? <Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
@@ -5500,7 +5467,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         {form && permOpen && (
           <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo={`Permisos de ${form.nombre || "usuario"}`} sub="Ajusta qué puede hacer esta persona en cada módulo. Sobrescribe los permisos de su rol." onClose={() => setPermOpen(false)} maxW={860}
             footer={<><Btn small kind="ghost" onClick={() => { setForm({ ...form, permisos: undefined }); setPermOpen(false); }}><Repeat size={14} strokeWidth={1.75} /> Restaurar rol</Btn><Btn small onClick={() => setPermOpen(false)}><Check size={15} strokeWidth={1.75} /> Listo</Btn></>}>
-            <PermisosGrupos perms={form.permisos || {}} onToggle={(mod, acc) => setForm((f) => ({ ...f, permisos: togglePermAccion(f.permisos || (rolePerms[f.rol] || ROL_PERMS[f.rol] || {}), mod, acc) }))} />
+            <PermisosGrupos perms={form.permisos || {}} onSet={(mod, acts) => setForm((f) => ({ ...f, permisos: { ...(f.permisos || (rolePerms[f.rol] || ROL_PERMS[f.rol] || {})), [mod]: ACCION_IDS.filter((a) => acts.includes(a)) } }))} onToggle={(mod, acc) => setForm((f) => ({ ...f, permisos: togglePermAccion(f.permisos || (rolePerms[f.rol] || ROL_PERMS[f.rol] || {}), mod, acc) }))} />
           </Modal>
         )}
 
@@ -5571,48 +5538,66 @@ const GRUPOS_PERM = [
   { id: "caja", label: "Caja y recursos", icon: Wallet, c: "#D97706", mods: ["facturacion", "seguros", "servicios", "inventario"] },
   { id: "admin", label: "Administración", icon: Settings, c: "#E0694F", mods: ["plan", "integraciones", "config", "usuarios", "permisos", "auditoria"] },
 ];
-function PermisosGrupos({ perms, onToggle, lockVer, onGrupo }) {
+const MOD_ICO = { gerencial: BarChart3, reportes: TrendingUp, dashboard: LayoutDashboard, whatsapp: MessageSquare, agenda: Calendar, disponibilidad: CalendarClock, pacientes: Users, odontograma: Smile, tratamientos: ClipboardList, recetas: Pill, consentimientos: FileCheck, servicios: Tag, inventario: Package, laboratorio: FlaskConical, perio: HeartPulse, radiografias: Scan, recall: BellRing, formularios: ClipboardList, seguros: Umbrella, resenas: Star, plan: CreditCard, espera: Hourglass, tickets: Ticket, facturacion: Wallet, comisiones: Percent, metas: Target, miproduccion: TrendingUp, integraciones: Plug, config: Settings, usuarios: UserCog, permisos: Shield, auditoria: ShieldCheck };
+const NIVELES_PERM = [["oculto", "Oculto"], ["ver", "Ver"], ["editar", "Editar"], ["total", "Total"]];
+const accionesDeNivel = (n) => (n === "oculto" ? [] : n === "ver" ? ["ver"] : n === "editar" ? ["ver", "crear", "editar"] : [...ACCION_IDS]);
+const nivelDe = (acts = []) => { const k = [...acts].sort().join(","); for (const [n] of NIVELES_PERM) if ([...accionesDeNivel(n)].sort().join(",") === k) return n; return "personal"; };
+function PermisosGrupos({ perms, onToggle, lockVer, onGrupo, onSet }) {
   const [q, setQ] = useState("");
-  const [abiertos, setAbiertos] = useState(() => new Set(GRUPOS_PERM.map((g) => g.id)));
+  const [grupoSel, setGrupoSel] = useState("todos");
+  const [abierto, setAbierto] = useState(null);
   const otros = MODULOS.filter((m) => !GRUPOS_PERM.some((g) => g.mods.includes(m.id))).map((m) => m.id);
   const grupos = otros.length ? [...GRUPOS_PERM, { id: "otros", label: "Otros", icon: Layers, c: "#28527A", mods: otros }] : GRUPOS_PERM;
   const extra = ACCIONES.filter((a) => a.id !== "ver");
   const txt = q.trim().toLowerCase();
+  const fijar = (mid, nivel) => {
+    const acts = accionesDeNivel(nivel);
+    if (lockVer && lockVer(mid) && !acts.includes("ver")) acts.unshift("ver");
+    if (onSet) { onSet(mid, acts); return; }
+    const cur = perms[mid] || [];
+    ACCION_IDS.forEach((a) => { if (cur.includes(a) !== acts.includes(a)) onToggle(mid, a); });
+  };
   return (
-    <div className="dc-pg2">
-      <label className="dc-cob__buscar dc-pg2__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar módulo" aria-label="Buscar módulo" /></label>
-      {grupos.map((g) => {
+    <div className="dc-pg3">
+      <div className="dc-pg3__barra">
+        <label className="dc-cob__buscar dc-pg2__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar módulo" aria-label="Buscar módulo" /></label>
+        <div className="dc-us__roles" role="tablist" aria-label="Área">
+          <button type="button" role="tab" aria-selected={grupoSel === "todos"} className={grupoSel === "todos" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setGrupoSel("todos")}>Todas las áreas</button>
+          {grupos.map((g) => { const GI = g.icon; return <button key={g.id} type="button" role="tab" aria-selected={grupoSel === g.id} className={grupoSel === g.id ? "is-on" : ""} style={{ "--c": g.c }} onClick={() => setGrupoSel(g.id)}><GI size={13} strokeWidth={2} /> {g.label}</button>; })}
+        </div>
+      </div>
+      {grupos.filter((g) => grupoSel === "todos" || grupoSel === g.id).map((g) => {
         const mods = g.mods.map((id) => MODULOS.find((m) => m.id === id)).filter(Boolean).filter((m) => !txt || m.label.toLowerCase().includes(txt));
         if (!mods.length) return null;
         const vis = mods.filter((m) => (perms[m.id] || []).includes("ver")).length;
-        const abierto = abiertos.has(g.id) || !!txt;
         const GI = g.icon;
         return (
-          <section key={g.id} className="dc-pg2__grupo" style={{ "--c": g.c }}>
+          <section key={g.id} className="dc-pg3__grupo" style={{ "--c": g.c }}>
             <header>
-              <button type="button" className="dc-pg2__plegar" aria-expanded={abierto} onClick={() => setAbiertos((s0) => { const n = new Set(s0); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })}>
-                <span className="dc-pg2__gico"><GI size={16} strokeWidth={2} /></span>
-                <b>{g.label}</b>
-                <small>{vis} de {mods.length} visibles</small>
-                <ChevronDown size={15} strokeWidth={2.2} className={abierto ? "is-abierto" : ""} />
-              </button>
-              {onGrupo && <div className="dc-pg2__gacc"><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "todo")}>Dar todo</button><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "ver")}>Solo ver</button><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "nada")}>Quitar</button></div>}
+              <span className="dc-pg2__gico"><GI size={15} strokeWidth={2} /></span>
+              <b>{g.label}</b>
+              <small>{vis} de {mods.length} visibles</small>
+              {onGrupo && <div className="dc-pg2__gacc"><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "todo")}>Todo</button><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "ver")}>Solo ver</button><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "nada")}>Ocultar</button></div>}
             </header>
-            {abierto && (
-              <div className="dc-pg2__filas">
-                {mods.map((m) => { const acts = perms[m.id] || []; const ver = acts.includes("ver"); const locked = lockVer && lockVer(m.id); return (
-                  <div key={m.id} className={`dc-pg2__fila${ver ? " is-ver" : ""}`}>
-                    <button type="button" role="switch" aria-checked={ver} aria-label={`${ver ? "Ocultar" : "Mostrar"} ${m.label}`} className={`dc-mini-btn dc-pg2__sw${ver ? " is-on" : ""}${locked ? " is-lock" : ""}`} onClick={() => { if (!locked) onToggle(m.id, "ver"); }} title={locked ? "Obligatorio para este rol" : ver ? "Visible: toca para ocultar" : "Oculto: toca para mostrar"}><i>{locked && <Lock size={9} strokeWidth={2.6} />}</i></button>
-                    <div className="dc-pg2__mod"><b>{m.label}</b><small>{ver ? `${acts.length - 1} de ${extra.length} acciones` : "Oculto para este rol"}</small></div>
-                    <div className="dc-pg2__acts">
-                      {extra.map((a) => { const on = acts.includes(a.id); return (
-                        <button key={a.id} type="button" className={`dc-mini-btn dc-pg2__chip${on ? " is-on" : ""}`} aria-pressed={on} aria-label={`${on ? "Quitar" : "Dar"} ${a.label} en ${m.label}`} onClick={() => onToggle(m.id, a.id)}>{a.label}</button>
-                      ); })}
-                    </div>
+            <div className="dc-pg3__mods">
+              {mods.map((m) => { const acts = perms[m.id] || []; const niv = nivelDe(acts); const MI = MOD_ICO[m.id] || Layers; const locked = lockVer && lockVer(m.id); const esAb = abierto === m.id; return (
+                <article key={m.id} className={`dc-pg3__mod is-${niv}`}>
+                  <div className="dc-pg3__mtop">
+                    <span className="dc-pg3__mico"><MI size={16} strokeWidth={2} /></span>
+                    <div><b>{m.label}</b><small>{niv === "oculto" ? "No lo ve este rol" : `${acts.length - 1} de ${extra.length} acciones${niv === "personal" ? ", personalizado" : ""}`}{locked ? " – obligatorio" : ""}</small></div>
+                    <button type="button" className={`dc-mini-btn dc-pg3__mas${esAb ? " is-on" : ""}`} aria-expanded={esAb} aria-label={`Personalizar ${m.label}`} title="Personalizar acciones" onClick={() => setAbierto(esAb ? null : m.id)}><SlidersHorizontal size={13} strokeWidth={2.2} /></button>
                   </div>
-                ); })}
-              </div>
-            )}
+                  <div className="dc-pg3__niv" role="radiogroup" aria-label={`Nivel de acceso a ${m.label}`}>
+                    {NIVELES_PERM.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={niv === k} className={`dc-mini-btn${niv === k ? " is-on" : ""} is-${k}`} disabled={k === "oculto" && locked} onClick={() => fijar(m.id, k)}>{l}</button>)}
+                  </div>
+                  {esAb && (
+                    <div className="dc-pg2__acts dc-pg3__chips">
+                      {extra.map((a) => { const on = acts.includes(a.id); return <button key={a.id} type="button" className={`dc-mini-btn dc-pg2__chip${on ? " is-on" : ""}`} aria-pressed={on} onClick={() => onToggle(m.id, a.id)}>{a.label}</button>; })}
+                    </div>
+                  )}
+                </article>
+              ); })}
+            </div>
           </section>
         );
       })}
@@ -5644,6 +5629,7 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
     setRolePerms((p) => ({ ...p, [rolSel]: togglePermAccion(p[rolSel] || ROL_PERMS[rolSel] || {}, mod, acc) }));
   };
   const restaurar = () => { setRolePerms((p) => ({ ...p, [rolSel]: JSON.parse(JSON.stringify(ROL_PERMS[rolSel] || {})) })); notify(`Permisos de ${ROLES[rolSel].label} restaurados por defecto.`); };
+  const onSet = (mod, acts) => setRolePerms((p) => ({ ...p, [rolSel]: { ...(p[rolSel] || ROL_PERMS[rolSel] || {}), [mod]: ACCION_IDS.filter((a) => acts.includes(a)) } }));
   const onGrupo = (mods, modo) => setRolePerms((p) => {
     const cur = { ...(p[rolSel] || ROL_PERMS[rolSel] || {}) };
     mods.forEach((m) => { cur[m] = modo === "todo" ? [...ACCION_IDS] : modo === "ver" || lockVer(m) ? ["ver"] : []; });
@@ -5681,22 +5667,22 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
           <button type="button" className="dc-esp-hero__btn" onClick={guardar} disabled={guardando}><Check size={14} strokeWidth={2} /> {guardando ? "Guardando…" : auth.token ? "Guardar en el servidor" : "Guardar"}</button>
         </div>
       </section>
-      <div className="dc-perm">
-        <aside className="dc-perm__roles" role="tablist" aria-label="Rol">
-          {ROLES_ASIGNABLES.map((r) => { const RR = ROLES[r]; const Ic = RR.icon; const on = r === rolSel; const pr = rolePerms[r] || ROL_PERMS[r] || {}; const vis = modulosVisibles(pr).length; return (
-            <button key={r} type="button" role="tab" aria-selected={on} className={on ? "is-on" : ""} style={{ "--c": RR.color }} onClick={() => setRolSel(r)}>
-              <span className="dc-perm__rico"><Ic size={16} strokeWidth={2} /></span>
-              <div><b>{RR.label}</b><small>{vis} de {MODULOS.length} módulos</small><span className="dc-perm__mini"><i style={{ width: `${Math.round((vis / MODULOS.length) * 100)}%` }} /></span></div>
+      <div className="dc-perm dc-perm--h">
+        <div className="dc-perm__rolesh" role="tablist" aria-label="Rol">
+          {ROLES_ASIGNABLES.map((r) => { const RR = ROLES[r]; const Ic = RR.icon; const on = r === rolSel; const pr = rolePerms[r] || ROL_PERMS[r] || {}; const vis = modulosVisibles(pr).length; const pct = Math.round((vis / MODULOS.length) * 100); return (
+            <button key={r} type="button" role="tab" aria-selected={on} className={on ? "is-on" : ""} style={{ "--c": RR.color, "--p": pct }} onClick={() => setRolSel(r)}>
+              <span className="dc-perm__ranillo"><Ic size={16} strokeWidth={2} /></span>
+              <div><b>{RR.label}</b><small>{vis} de {MODULOS.length} módulos</small></div>
             </button>
           ); })}
-        </aside>
+        </div>
         <section className="dc-perm__main" style={{ "--c": R.color }}>
           <header className="dc-perm__cab">
             <span className="dc-perm__rico is-grande"><RIc size={20} strokeWidth={2} /></span>
             <div><b>{R.label}</b><p>{R.desc}</p></div>
             <div className="dc-perm__nums"><div><b>{nMods}</b><small>Visibles</small></div><div><b>{nAcc}</b><small>Permisos</small></div></div>
           </header>
-          <PermisosGrupos perms={perms} onToggle={onToggle} lockVer={lockVer} onGrupo={onGrupo} />
+          <PermisosGrupos perms={perms} onToggle={onToggle} lockVer={lockVer} onGrupo={onGrupo} onSet={onSet} />
         </section>
       </div>
     </div>
@@ -7924,7 +7910,14 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [crearMenu, setCrearMenu] = useState(false);
   const [crearIntent, setCrearIntent] = useState(null); // "paciente" | "servicio"
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [colap, setColap] = usePersist("sidebar_colap", false);
+  const [colapPref, setColapPref] = usePersist("sidebar_colap", false);
+  // Tablet y laptop pequeña: el menú arranca como riel de íconos para dejar espacio al contenido.
+  const [anchoVp, setAnchoVp] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1366));
+  useEffect(() => { const f = () => setAnchoVp(window.innerWidth); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
+  const colapAuto = anchoVp >= 768 && anchoVp < 1200;
+  const [expandTab, setExpandTab] = useState(false);
+  const colap = colapAuto ? !expandTab : colapPref;
+  const setColap = (f) => (colapAuto ? setExpandTab((e) => !e) : setColapPref(f));
   const [subAbierto, setSubAbierto] = useState({}); // submenús del sidebar abiertos (por etiqueta del padre)
   const [toast, setToast] = useState(null);
   const notify = (m) => { setToast(m); setTimeout(() => setToast(null), 4200); };
@@ -8322,7 +8315,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   const RolIcon = R.icon;
   return (
-    <div className="dc-shell" style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
+    <div className="dc-shell" style={{ display: "flex", height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 500, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}
          onBlur={(e) => { e.currentTarget.style.left = "-9999px"; e.currentTarget.style.top = "0"; }}>Saltar al contenido</a>
@@ -8449,7 +8442,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         </div>
       </aside>
 
-      <main id="dc-main" style={{ flex: 1, minWidth: 0, height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
+      <main id="dc-main" style={{ flex: 1, minWidth: 0, height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
         {/* Solo en celular: botón del menú y nombre de la vista. En escritorio la vista
             ya se ve marcada en el menú lateral y la barra se quitaba espacio a todas. */}
         <header className="dc-top">
@@ -9356,7 +9349,7 @@ function AgendarCitaModal({ paciente, onClose, onConfirm, base, citas = CITAS_IN
   const inp = { width: "100%", padding: "11px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.45)", display: "grid", placeItems: "center", zIndex: 200, padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 600, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 30px 70px -20px rgba(15,27,56,.5)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 600, maxHeight: "calc(92vh / var(--dc-z, 1))", overflowY: "auto", boxShadow: "0 30px 70px -20px rgba(15,27,56,.5)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
         <div style={{ padding: "22px 24px", background: `linear-gradient(125deg,${TEAL},var(--dc-brand-600))`, color: "#fff", position: "relative" }}>
           <button aria-label="Cerrar" onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,.16)", border: "none", borderRadius: "var(--dc-r-sm)", width: 30, height: 30, cursor: "pointer", color: "#fff", display: "grid", placeItems: "center" }}><X size={16} strokeWidth={1.75} /></button>
           <div style={{ fontSize: 18, fontWeight: 600, fontFamily: DISPLAY_FONT }}>{esReprog ? "Reprogramar cita" : "Reservar una cita"}</div>
@@ -9559,9 +9552,9 @@ function PortalPaciente({ usuario, onLogout }) {
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: "flex", height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
       {navOpen && <div onClick={() => setNavOpen(false)} className="dc-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.45)", zIndex: 45 }} />}
-      <aside className={`dc-side${navOpen ? " open" : ""}`} style={{ width: 230, background: "linear-gradient(180deg,var(--dc-accent-cyan),var(--dc-brand-600))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(100vh - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(14,116,144,.3)", border: "1px solid rgba(255,255,255,.15)", display: "flex", flexDirection: "column", zIndex: 50 }}>
+      <aside className={`dc-side${navOpen ? " open" : ""}`} style={{ width: 230, background: "linear-gradient(180deg,var(--dc-accent-cyan),var(--dc-brand-600))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(calc(100vh / var(--dc-z, 1)) - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(14,116,144,.3)", border: "1px solid rgba(255,255,255,.15)", display: "flex", flexDirection: "column", zIndex: 50 }}>
         <div style={{ padding: 18, borderBottom: "1px solid rgba(255,255,255,.15)", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ background: "#fff", borderRadius: "var(--dc-r-sm)", width: 34, height: 34, display: "grid", placeItems: "center" }}><Smile size={19} strokeWidth={1.75} color={DS.c.primary} /></div>
           <div><div style={{ fontWeight: 500, fontSize: 14 }}>Mi Sonríe+</div><div style={{ fontSize: 12, color: "var(--dc-sky)" }}>Portal del paciente</div></div>
@@ -9580,7 +9573,7 @@ function PortalPaciente({ usuario, onLogout }) {
         </div>
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0, height: "100vh", overflowY: "auto", position: "relative" }}>
+      <main style={{ flex: 1, minWidth: 0, height: "calc(100vh / var(--dc-z, 1))", overflowY: "auto", position: "relative" }}>
         <header style={{ background: "#fff", borderBottom: "1px solid var(--dc-line)", padding: "14px 22px", position: "sticky", top: 0, zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             <button className="dc-burger" onClick={() => setNavOpen((s) => !s)} aria-label="Abrir menú" style={{ background: "none", border: "none", cursor: "pointer", color: NAVY, display: "none", padding: 0, minWidth: "var(--dc-tap-min)", minHeight: "var(--dc-tap-min)" }}><Menu size={22} strokeWidth={1.75} /></button>
@@ -9899,7 +9892,7 @@ function Bienvenida({ onEntrar }) {
   const eyebrow = (t, c) => <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase", color: c }}>{t}</div>;
   const ctaRed = { background: red, color: "#fff", border: "none", borderRadius: "var(--dc-r-md)", padding: "15px 28px", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 9 };
   return (
-    <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif", color: ink }}>
+    <div style={{ minHeight: "calc(100vh / var(--dc-z, 1))", background: bg, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif", color: ink }}>
       {/* Barra superior */}
       <header style={{ maxWidth: 1120, margin: "0 auto", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
@@ -10289,8 +10282,8 @@ function BackOfficeAWG({ usuario, onLogout }) {
     }
   };
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
-      <aside style={{ width: 236, background: "linear-gradient(180deg,var(--dc-ink-alt),var(--dc-ink-900))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(100vh - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(33,16,66,.4)", border: "1px solid rgba(255,255,255,.1)", display: "flex", flexDirection: "column", zIndex: 50 }}>
+    <div style={{ display: "flex", height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
+      <aside style={{ width: 236, background: "linear-gradient(180deg,var(--dc-ink-alt),var(--dc-ink-900))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(calc(100vh / var(--dc-z, 1)) - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(33,16,66,.4)", border: "1px solid rgba(255,255,255,.1)", display: "flex", flexDirection: "column", zIndex: 50 }}>
         <div style={{ padding: "20px 18px 14px", display: "flex", alignItems: "center", gap: 11 }}>
           <div style={{ background: "linear-gradient(135deg,var(--dc-brand-soft),var(--dc-purple))", borderRadius: "var(--dc-r-md)", width: 38, height: 38, display: "grid", placeItems: "center", boxShadow: "0 8px 18px -8px rgba(124,58,237,.8)" }}><Globe size={21} strokeWidth={1.75} color="#fff" /></div>
           <div><div style={{ fontWeight: 600, fontSize: 14, fontFamily: DISPLAY_FONT }}>BackOffice</div><div style={{ fontSize: 12, color: "var(--dc-brand-soft)", fontWeight: 500, letterSpacing: 1 }}>AWG – PLATAFORMA</div></div>
@@ -10310,7 +10303,7 @@ function BackOfficeAWG({ usuario, onLogout }) {
           </div>
         </div>
       </aside>
-      <main style={{ flex: 1, minWidth: 0, height: "100vh", overflowY: "auto", position: "relative" }}>
+      <main style={{ flex: 1, minWidth: 0, height: "calc(100vh / var(--dc-z, 1))", overflowY: "auto", position: "relative" }}>
         <header style={{ background: "#fff", borderBottom: "1px solid var(--dc-line)", padding: "12px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
           <div><div style={{ fontSize: 16, fontWeight: 500, color: NAVY }}>{SECC.find((s) => s.id === secc)?.label}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 5 }}><Globe size={12} strokeWidth={1.75} /> Administración global de la plataforma SaaS</div></div>
           <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--dc-purple)", fontSize: 13, fontWeight: 500 }}><ShieldCheck size={15} strokeWidth={1.75} /> AWG Technology Group</div>

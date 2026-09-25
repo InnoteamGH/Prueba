@@ -479,7 +479,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
       {/* Modal: sustituir el día completo (cada cita → colega de su especialidad) */}
       {sustDia && (
         <div onClick={() => setSustDia(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.5)", display: "grid", placeItems: "center", zIndex: 200, padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--dc-white)", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .24s cubic-bezier(.2,.7,.2,1)" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--dc-white)", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 560, maxHeight: "calc(90vh / var(--dc-z, 1))", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .24s cubic-bezier(.2,.7,.2,1)" }}>
             <div style={{ padding: "18px 22px", background: `linear-gradient(120deg,${NAVY},var(--dc-ink-alt))`, color: "var(--dc-white)" }}>
               <div style={{ fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Sustituir el día completo</div>
               <div style={{ fontSize: 13, color: "var(--dc-brand-soft)", marginTop: 2, textTransform: "capitalize" }}>{fechaLegible(sustDia)}</div>

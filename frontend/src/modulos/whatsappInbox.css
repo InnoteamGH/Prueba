@@ -75,7 +75,7 @@
 .dc-inbox.wa {
   display: grid;
   grid-template-columns: 290px minmax(0, 1fr) 280px;
-  height: calc(100dvh - 56px - 32px);
+  height: calc(calc(100dvh / var(--dc-z, 1)) - 56px - 32px);
   min-height: 460px;
   padding: 0 !important;
   overflow: hidden;
@@ -195,7 +195,7 @@
 }
 /* Móvil: lista o conversación, una a la vez. */
 @media (max-width: 767px) {
-  .dc-inbox.wa { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); height: calc(100dvh - 128px); border-radius: 12px; }
+  .dc-inbox.wa { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); height: calc(calc(100dvh / var(--dc-z, 1)) - 128px); border-radius: 12px; }
   .dc-inbox.wa > .dc-inbox-list, .dc-inbox.wa.is-hilo > .dc-inbox-thread { height: 100%; }
   .dc-inbox-chat-head { padding: 6px 8px !important; gap: 4px !important; }
   .dc-inbox-chat-head-actions { gap: 2px !important; }
@@ -229,7 +229,7 @@
 .dc-inbox-list > div:first-child > div:last-child > button { padding: 4px 8px !important; font-size: 11.5px !important; white-space: nowrap; flex-shrink: 0; }
 
 /* Sin barra superior: la bandeja ocupa toda la altura. */
-@media (min-width: 768px) { .dc-inbox.wa { height: calc(100dvh - 36px); } }
+@media (min-width: 768px) { .dc-inbox.wa { height: calc(calc(100dvh / var(--dc-z, 1)) - 36px); } }
 .wa-lista__tit { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wa-lista__tit > span:first-child { font-family: var(--dc-font-title); font-size: 15px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; }
 .wa-canal { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: #E3F7EC; color: #15803D; }

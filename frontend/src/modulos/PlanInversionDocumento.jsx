@@ -179,7 +179,7 @@ export default function PlanInversionDocumento({
   return (
     <div className="plan-inv-root" style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(15,23,42,.45)", display: "grid", placeItems: "center", padding: 16 }}>
       <style>{`
-        .plan-inv-scroll { width:min(920px,96vw); max-height:92vh; overflow:auto; }
+        .plan-inv-scroll { width:min(920px,96vw); max-height:calc(92vh / var(--dc-z, 1)); overflow:auto; }
         .plan-inv-toolbar { display:flex; gap:8px; justify-content:flex-end; padding:10px 14px; border-bottom:1px solid #e5e2dc; background:#F4F1EA; position:sticky; top:0; z-index:2; border-radius:12px 12px 0 0; }
         .hoja { position:relative; background:#fff; color:#1B1614; width:210mm; max-width:100%; min-height:294mm; margin:0 auto 16px; padding:14mm 14mm 18mm; box-sizing:border-box; box-shadow:0 8px 28px rgba(0,0,0,.18); border-radius:4px; page-break-after:always; }
         .hoja:last-child { page-break-after:auto; }

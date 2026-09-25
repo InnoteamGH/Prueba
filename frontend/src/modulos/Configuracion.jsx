@@ -188,7 +188,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   const [edit, setEdit] = useState(null);   // { tipo, item }
   const [medHor, setMedHor] = useState("");  // médico seleccionado en Horarios
   const [disp, setDisp] = useState([]);
-  const [promos, setPromos] = useState([]);
+  const [promos, setPromos] = useState(() => (auth.token ? [] : [
+    { id: "p1", titulo: "Blanqueamiento con 20% de descuento", descripcion: "Solo pacientes con limpieza reciente", descuento: "20%", activa: true, desde: "", hasta: "" },
+    { id: "p2", titulo: "Evaluación de ortodoncia gratis", descripcion: "Incluye fotografías y plan de tratamiento", descuento: "Gratis", activa: true, desde: "", hasta: "" },
+  ]));
   const [goLive, setGoLive] = useState(null);
   const [wizard, setWizard] = useState(false);
   const [clinica, setClinica] = useState(() => {
@@ -367,57 +370,40 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       <div className="dc-cfg__main">
       {!conectado && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>Datos de ejemplo. Inicia sesión con una cuenta de la clínica para editar la configuración.</span></div>}
 
-      {tab === "puesta" && (
-        <div style={{ display: "grid", gap: 16 }}>
-          {(() => {
-            const listo = goLive?.listoParaOperar;
-            const total = goLive?.total || 0; const hechos = goLive?.completados || 0;
-            const pct = total ? Math.round(hechos * 100 / total) : 0;
-            return (
-              <div style={{ ...card, overflow: "hidden", background: listo ? "linear-gradient(90deg,var(--dc-ok-soft),var(--dc-white))" : "linear-gradient(90deg,var(--dc-bg),var(--dc-white))", border: `1px solid ${listo ? "var(--dc-green-soft)" : "var(--dc-sky)"}` }}>
-                <div style={{ padding: "18px 20px", display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                  <div style={{ background: listo ? "var(--dc-ok)" : NAVY, borderRadius: "var(--dc-r-md)", width: 48, height: 48, display: "grid", placeItems: "center", flexShrink: 0 }}>{listo ? <CheckCircle2 size={26} strokeWidth={1.75} color="var(--dc-white)" /> : <Navigation size={24} strokeWidth={1.75} color="var(--dc-white)" />}</div>
-                  <div style={{ flex: 1, minWidth: 240 }}>
-                    <h3 style={{ margin: 0, color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>{listo ? "¡Todo listo para operar! 🎉" : "Puesta en marcha de la clínica"}</h3>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-700)", marginTop: 3 }}>{listo ? "Checklist de la clínica (sedes, servicios, doctores, horarios). No es el contador de «Primeros pasos» de la barra." : `${goLive?.obligatoriosPendientes || 0} punto(s) obligatorio(s) pendiente(s) para que el asistente pueda agendar y atender.`}</div>
-                    <div style={{ marginTop: 10, height: 8, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: listo ? "var(--dc-ok)" : NAVY, transition: "width .4s" }} /></div>
-                    <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 5 }}>{total ? `${hechos} de ${total} del checklist de clínica (${pct}%)` : "Cargando checklist de la clínica…"}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <Btn small onClick={() => setWizard(true)}><Sparkles size={15} strokeWidth={1.75} /> Configurar en 4 pasos</Btn>
-                    <Btn small kind="ghost" onClick={cargarGoLive}><Repeat size={14} strokeWidth={1.75} /> Actualizar</Btn>
-                  </div>
-                </div>
+      {tab === "puesta" && (() => {
+        const listo = goLive?.listoParaOperar;
+        const total = goLive?.total || 0; const hechos = goLive?.completados || 0;
+        const pct = total ? Math.round(hechos * 100 / total) : 0;
+        const ICO = { sedes: Building2, especialidades: ClipboardList, servicios: ClipboardList, doctores: Stethoscope, horarios: Clock, promos: Megaphone };
+        return (
+          <section className="dc-cfg__panel">
+            <div className={`dc-go${listo ? " is-listo" : ""}`}>
+              <span className="dc-go__anillo" style={{ "--p": pct }}><b>{pct}%</b></span>
+              <div className="dc-go__txt">
+                <h3>{listo ? "Todo listo para operar" : "Puesta en marcha de la clínica"}</h3>
+                <p>{listo ? "Sedes, servicios, doctores y horarios están configurados." : `${goLive?.obligatoriosPendientes || 0} punto(s) obligatorio(s) pendiente(s) para que el asistente pueda agendar y atender.`}</p>
+                <small>{total ? `${hechos} de ${total} pasos completos` : "Cargando checklist…"}</small>
               </div>
-            );
-          })()}
-          {!conectado && <Card style={{ padding: 16 }}><div style={{ color: "var(--dc-warn-600)", fontSize: 13 }}>Inicia sesión para ver el estado real.</div></Card>}
-          <div style={{ display: "grid", gap: 10 }}>
-            {(goLive?.items || []).map((it) => (
-              <div key={it.clave} style={{ ...card, padding: "14px 16px", display: "flex", gap: 13, alignItems: "flex-start", borderLeft: `4px solid ${it.ok ? "var(--dc-ok)" : (it.obligatorio ? "var(--dc-danger)" : "var(--dc-warn)")}` }}>
-                <div style={{ flexShrink: 0, marginTop: 1 }}>{it.ok ? <CheckCircle2 size={22} strokeWidth={1.75} color="var(--dc-ok-700)" /> : (it.obligatorio ? <AlertCircle size={22} strokeWidth={1.75} color="var(--dc-danger)" /> : <Clock size={22} strokeWidth={1.75} color="var(--dc-warn-700)" />)}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{it.titulo}</span>
-                    {it.obligatorio && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-red-deep)", background: "var(--dc-fee)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>OBLIGATORIO</span>}
-                    {!it.obligatorio && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", background: "var(--dc-bg)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>OPCIONAL</span>}
-                  </div>
-                  <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{it.descripcion}</div>
-                  <div style={{ fontSize: 13, color: it.ok ? "var(--dc-ok-700)" : "var(--dc-ink-400)", marginTop: 3, fontWeight: 500 }}>{it.detalle}</div>
-                </div>
-                {!it.ok && it.modulo && ["config", "whatsapp", "recall", "facturacion"].includes(it.modulo) && (
-                  <div style={{ flexShrink: 0 }}>
-                    {["sedes", "doctores", "especialidades", "horarios", "promos"].includes(it.clave)
-                      ? <Btn small kind="ghost" onClick={() => setTab(it.clave === "especialidades" ? "servicios" : it.clave === "promos" ? "promos" : it.clave)}>Configurar</Btn>
-                      : null}
-                  </div>
-                )}
+              <div className="dc-go__acc">
+                <button type="button" className="dc-cfg__nuevo" onClick={() => setWizard(true)}><Sparkles size={14} strokeWidth={2.2} /> Configurar en 4 pasos</button>
+                <button type="button" className="dc-row-action" aria-label="Actualizar" title="Actualizar" onClick={cargarGoLive}><Repeat size={14} strokeWidth={2} /></button>
               </div>
-            ))}
-            {conectado && !goLive && <Card style={{ padding: 20, textAlign: "center", color: "var(--dc-ink-400)" }}>Cargando estado…</Card>}
-          </div>
-        </div>
-      )}
+            </div>
+            <div className="dc-go__pasos">
+              {(goLive?.items || []).map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["sedes", "doctores", "especialidades", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave === "especialidades" ? "servicios" : it.clave) : null; return (
+                <div key={it.clave} className={`dc-go__paso ${it.ok ? "is-ok" : it.obligatorio ? "is-falta" : "is-opc"}`}>
+                  <span className="dc-go__n">{it.ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
+                  <span className="dc-go__ico"><I size={16} strokeWidth={2} /></span>
+                  <div><b>{it.titulo}</b><small>{it.detalle || it.descripcion}</small></div>
+                  <span className="dc-go__tag">{it.obligatorio ? "Obligatorio" : "Opcional"}</span>
+                  {!it.ok && ir && <button type="button" onClick={ir}>Configurar</button>}
+                </div>
+              ); })}
+              {conectado && !goLive && <p className="dc-cfg__nada">Cargando estado…</p>}
+            </div>
+          </section>
+        );
+      })()}
       {wizard && <OnboardingWizard sedes={sedes} esps={esps} meds={meds} onClose={() => { setWizard(false); cargar(); }} onDone={cargar} notify={notify} />}
 
       {tab === "empresa" && (() => {
@@ -425,7 +411,6 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         const set = (k, v) => setClinica((c) => ({ ...c, [k]: v }));
         return (
         <div style={{ display: "grid", gap: 16 }}>
-          {!conectado && <div className="dc-banda dc-banda--info"><Info size={18} strokeWidth={1.75} /><p>Inicia sesión con una cuenta de la clínica para editar estos datos.</p></div>}
           {fiscalReadOnly && conectado && <Card style={{ padding: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-sky)" }}><div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>RUC, razón social y datos fiscales son de solo lectura para tu rol. Contacta a administración para cambios.</div></Card>}
           {/* Ficha fiscal */}
           <div style={{ ...card, overflow: "hidden" }}>
@@ -542,7 +527,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 };
         return (
         <div style={{ display: "grid", gap: 16 }}>
-          {!conectado && <Card style={{ padding: 16 }}><div style={{ color: "var(--dc-warn-600)", fontSize: 13 }}>Sin sesión, el horario se guarda solo en este navegador — suficiente para probarlo: al guardar cambian la agenda, la capacidad del día y la disponibilidad de los doctores.</div></Card>}
+          {!conectado && <div className="fm-aviso-edad"><Clock size={15} strokeWidth={2} /><span>Sin sesión, el horario se guarda en este navegador. Al guardar cambian la agenda, la capacidad del día y la disponibilidad de los doctores.</span></div>}
           {/* Horario general por día */}
           <div style={{ ...card, overflow: "hidden" }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)" }}>
