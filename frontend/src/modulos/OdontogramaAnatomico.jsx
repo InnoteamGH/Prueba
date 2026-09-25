@@ -63,6 +63,13 @@ html,body{background:transparent!important;font-family:var(--ui)!important}
 .lienzo{background:radial-gradient(60% 70% at 50% 45%,#F7FBFB 0%,#FFFFFF 70%)!important;border-radius:16px}
 .cruz{stroke:#CFE3E4!important}
 button{font-family:var(--ui)!important}
+th,.ppto th,[class*="et"]{text-transform:none!important;letter-spacing:0!important}
+.abajo > *, .ppto, .pie{background:#fff!important;border:0!important;border-radius:18px!important;box-shadow:inset 0 0 0 1px #E3EFEF,0 12px 26px -24px rgba(14,42,51,.55)!important}
+.malla{gap:14px!important}
+.abajo > * > header,.ppto > header,.abajo header{padding:12px 16px!important}
+.abajo{gap:14px!important;align-items:start!important}
+.ppto th{background:#F4F9F9!important;color:#5B7075!important;font-size:12px!important}
+.ppto button,.pie button{border-radius:999px!important}
 `;
     doc.head.appendChild(st);
     const g = doc.querySelector('link[href*="fonts.googleapis"]');
@@ -92,7 +99,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   const iframeRef = useRef(null);
   const [syncState, setSyncState] = useState("idle");
   const [frameReady, setFrameReady] = useState(false);
-  const [autoH, setAutoH] = useState(1100);
+  const [autoH, setAutoH] = useState(860);
   const lastJson = useRef("");
   const hydrated = useRef(false);
   const faseDesdeIframe = useRef(null);
@@ -127,12 +134,11 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     try {
       const doc = iframeRef.current?.contentDocument;
       if (!doc?.documentElement) return;
-      const h = Math.max(
-        doc.documentElement.scrollHeight || 0,
-        doc.body?.scrollHeight || 0,
-        900,
-      );
-      setAutoH(Math.min(Math.max(h + 8, 900), 4200));
+      // Alto real del contenido (no el del documento, que nunca baja del alto del iframe).
+      const env = doc.querySelector(".env") || doc.body;
+      const h = Math.ceil(env ? env.getBoundingClientRect().height : 0) || doc.body?.scrollHeight || 0;
+      if (!h) return;
+      setAutoH((prev) => { const n = Math.min(Math.max(h + 4, 420), 5000); return Math.abs(n - prev) > 2 ? n : prev; });
     } catch { /* cross-origin unlikely same-origin */ }
   }, []);
 
@@ -326,7 +332,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
 
   return (
     <div style={{ display: "grid", gap: 0 }}>
-      <div style={{ position: "relative", minHeight: height != null ? height : 480 }}>
+      <div style={{ position: "relative", minHeight: frameReady ? 0 : (height != null ? height : 480) }}>
         {!frameReady && (
           <div
             style={{

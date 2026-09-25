@@ -793,7 +793,9 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
     <div className="dc-pc">
       {/* Resumen y Ausentismo son submódulos del menú lateral (sin fila de pestañas). */}
 
-      {err && <div className="dc-banda dc-banda--peligro" style={{ marginBottom: 16 }}><p>{err}</p></div>}
+      {err && (/conectar con el servidor/i.test(String(err))
+        ? <div className="fm-aviso-edad is-info" style={{ marginBottom: 16 }}><span><b>Sin datos del servidor.</b> Producción y comisiones se calculan con las citas atendidas reales; en la demostración no hay servidor conectado.</span></div>
+        : <div className="dc-banda dc-banda--peligro" style={{ marginBottom: 16 }}><p>{err}</p></div>)}
 
       {tab === "ausencias" ? (
         <AusentismoTab

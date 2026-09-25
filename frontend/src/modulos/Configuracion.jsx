@@ -1,6 +1,6 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect } from "react";
-import { AlertCircle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag } from "lucide-react";
+import { AlertCircle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone } from "lucide-react";
 import api, { auth } from "../api/client";
 import {Btn, Card, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales} from "../comun";
 
@@ -307,6 +307,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       notify(edit.tipo === "sede" ? "Ponle un nombre a la sede." : edit.tipo === "servicio" ? "Ponle un nombre al servicio." : "Escribe el nombre del doctor.");
       return;
     }
+    if (edit.tipo === "sede" && !auth.token) {
+      setSedes((ss) => (it.id ? ss.map((x) => (x.id === it.id ? { ...x, ...it } : x)) : [...ss, { ...it, id: Date.now() }]));
+      notify("Sede guardada (demo)."); setEdit(null); return;
+    }
     if (edit.tipo === "sede") {
       const payload = { nombre: it.nombre, direccion: it.direccion, telefono: it.telefono, activa: it.activa !== false };
       (it.id ? api.sedes.actualizar(it.id, payload) : api.sedes.crear(payload)).then(() => done("Sede guardada.")).catch(err);
@@ -407,118 +411,107 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       {wizard && <OnboardingWizard sedes={sedes} esps={esps} meds={meds} onClose={() => { setWizard(false); cargar(); }} onDone={cargar} notify={notify} />}
 
       {tab === "empresa" && (() => {
-        const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 5 };
         const set = (k, v) => setClinica((c) => ({ ...c, [k]: v }));
+        const ro = fiscalReadOnly ? { readOnly: true, className: "is-ro" } : {};
+        const campo = (label, input, span) => <label className={`dc-emp__campo${span ? ` is-${span}` : ""}`}><span>{label}</span>{input}</label>;
+        const SEDE_COL = ["#0E9199", "#D97706", "#6D4FD1", "#2F6FDE", "#E0694F"];
         return (
-        <div style={{ display: "grid", gap: 16 }}>
-          {fiscalReadOnly && conectado && <Card style={{ padding: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-sky)" }}><div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>RUC, razón social y datos fiscales son de solo lectura para tu rol. Contacta a administración para cambios.</div></Card>}
-          {/* Ficha fiscal */}
-          <div style={{ ...card, overflow: "hidden" }}>
-            <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)" }}>
-              <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Datos de la empresa</h3>
-              <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Se usan en boletas/facturas y para que el asistente sepa quién es la clínica.</div>
+        <div className="dc-emp">
+          {fiscalReadOnly && conectado && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>RUC, razón social y datos fiscales son de solo lectura para tu rol.</span></div>}
+          <section className="dc-emp__id">
+            <span className="dc-emp__logo">{(clinica.nombre || "Clínica").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+            <div>
+              <small>Tu clínica</small>
+              <b>{clinica.nombre || "Nombre comercial"}</b>
+              <span>{clinica.razonSocial || "Razón social"}{clinica.ruc ? ` – RUC ${clinica.ruc}` : ""}</span>
             </div>
-            <div style={{ padding: 18, display: "grid", gap: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div><label style={lbl}>Nombre comercial</label><input className="dc-premium-inp" style={inp} value={clinica.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Odonto Sonrisa" /></div>
-                <div><label style={lbl}>Razón social</label><input className="dc-premium-inp" style={{ ...inp, ...(fiscalReadOnly ? { background: "var(--dc-bg)", color: "var(--dc-ink-400)" } : {}) }} readOnly={fiscalReadOnly} value={clinica.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} placeholder="Odonto Sonrisa S.A.C." /></div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14 }}>
-                <div><label style={lbl}>RUC</label><div style={{ display: "flex", gap: 8 }}><input className="dc-premium-inp" style={{ ...inp, flex: 1, minWidth: 0, ...(fiscalReadOnly ? { background: "var(--dc-bg)", color: "var(--dc-ink-400)" } : {}) }} readOnly={fiscalReadOnly} value={clinica.ruc} onChange={(e) => set("ruc", e.target.value.replace(/\D/g, "").slice(0, 11))} placeholder="20512345678" />{!fiscalReadOnly && <Btn small kind="ghost" onClick={consultarRucClinica} disabled={rucBusy}><Search size={14} strokeWidth={1.75} /> {rucBusy ? "…" : "Consultar"}</Btn>}</div></div>
-                <div><label style={lbl}>Dirección fiscal</label><input className="dc-premium-inp" style={{ ...inp, ...(fiscalReadOnly ? { background: "var(--dc-bg)", color: "var(--dc-ink-400)" } : {}) }} readOnly={fiscalReadOnly} value={clinica.direccion} onChange={(e) => set("direccion", e.target.value)} placeholder="Av. Javier Prado 1540, San Isidro" /></div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-                <div><label style={lbl}>Teléfono</label><input className="dc-premium-inp" style={inp} value={clinica.telefono} onChange={(e) => set("telefono", e.target.value)} placeholder="01 234 5678" /></div>
-                <div><label style={lbl}>Correo</label><input className="dc-premium-inp" style={inp} value={clinica.email} onChange={(e) => set("email", e.target.value)} placeholder="contacto@clinica.pe" /></div>
-                <div><label style={lbl}>Web</label><input className="dc-premium-inp" style={inp} value={clinica.web} onChange={(e) => set("web", e.target.value)} placeholder="www.clinica.pe" /></div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, alignItems: "end" }}>
-                <div><label style={lbl}>Tipo de cambio (PEN por 1 USD)</label><input className="dc-premium-inp" style={inp} type="number" step="0.01" min="0.01" value={clinica.tipoCambio ?? 3.75} onChange={(e) => set("tipoCambio", Number(e.target.value) || 3.75)} /></div>
-                <div style={{ fontSize: 13, color: "var(--dc-ink-500)", paddingBottom: 10 }}>Compartido en Caja para cobros en dólares. Cada cajero lo ve al abrir el cobro.</div>
-              </div>
+            <div className="dc-emp__chips">
+              <span><Building2 size={13} strokeWidth={2} /> {sedes.length} {sedes.length === 1 ? "sede" : "sedes"}</span>
+              <span><Briefcase size={13} strokeWidth={2} /> {(clinica.cuentas || []).length} cuentas</span>
+              <span><Phone size={13} strokeWidth={2} /> {(clinica.billeteras || []).length} Yape/Plin</span>
             </div>
-          </div>
-          {/* Cuentas bancarias */}
-          <div style={{ ...card, overflow: "hidden" }}>
-            <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Cuentas bancarias</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Para cobros por transferencia. El asistente de WhatsApp puede compartirlas.</div></div>
-              <Btn small kind="ghost" onClick={addCuenta}><Plus size={15} strokeWidth={1.75} /> Agregar cuenta</Btn>
-            </div>
-            <div style={{ padding: 18, display: "grid", gap: 12 }}>
-              {(clinica.cuentas || []).length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Aún no hay cuentas registradas.</div>}
-              {(clinica.cuentas || []).map((c, i) => {
-                const banco = BANCOS_PE.find((b) => b.id === c.banco);
-                const numLen = (c.numero || "").replace(/\D/g, "").length;
-                const cciLen = (c.cci || "").replace(/\D/g, "").length;
-                const numMal = banco && banco.cuenta.length > 0 && numLen > 0 && !banco.cuenta.includes(numLen);
-                const cciMal = cciLen > 0 && cciLen !== 20;
-                const hint = { fontSize: 12, marginTop: 3 };
-                return (
-                <div key={i} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12, background: "var(--dc-white)", display: "grid", gap: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 10 }}>
-                    <div><label style={lbl}>Banco</label>
-                      <Select value={c.banco || ""} onChange={(v) => setCuenta(i, "banco", v)} placeholder="— Selecciona el banco —"
-                              options={BANCOS_PE.map((b) => ({ value: b.id, label: b.nombre }))} />
-                    </div>
-                    <div><label style={lbl}>Moneda</label><Select value={c.moneda || "PEN"} onChange={(v) => setCuenta(i, "moneda", v)} options={[{ value: "PEN", label: "Soles (S/)" }, { value: "USD", label: "Dólares ($)" }]} /></div>
-                    <div style={{ display: "flex", alignItems: "flex-end" }}><button type="button" className="dc-icon-btn" aria-label="Eliminar" onClick={() => delCuenta(i)} title="Eliminar" style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-danger-soft)", color: "var(--dc-danger)", borderRadius: "var(--dc-r-sm)", padding: "9px 11px", cursor: "pointer" }}><Trash2 size={15} strokeWidth={1.75} /></button></div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.2fr", gap: 10 }}>
-                    <div>
-                      <label style={lbl}>N° de cuenta</label>
-                      <input className="dc-premium-inp" style={{ ...inp, borderColor: numMal ? "var(--dc-warn)" : "var(--dc-line)" }} value={c.numero || ""} onChange={(e) => setCuenta(i, "numero", e.target.value)} placeholder={banco && banco.cuenta.length ? `${banco.cuenta.join(" o ")} dígitos` : "N° de cuenta"} />
-                      {banco && banco.cuenta.length > 0 && <div style={{ ...hint, color: numMal ? "var(--dc-warn-600)" : "var(--dc-ink-400)" }}>{numMal ? `⚠ ${banco.nombre.split(" —")[0]} suele usar ${banco.cuenta.join(" o ")} dígitos (tienes ${numLen}).` : `${banco.cuenta.join(" o ")} dígitos`}</div>}
-                    </div>
-                    <div>
-                      <label style={lbl}>CCI <span style={{ fontWeight: 500, color: "var(--dc-ink-400)" }}>(20 díg.)</span></label>
-                      <input className="dc-premium-inp" style={{ ...inp, borderColor: cciMal ? "var(--dc-warn)" : "var(--dc-line)" }} value={c.cci || ""} onChange={(e) => setCuenta(i, "cci", e.target.value.replace(/\D/g, "").slice(0, 20))} placeholder="00219100123456701234" />
-                      {cciMal && <div style={{ ...hint, color: "var(--dc-warn-600)" }}>⚠ El CCI tiene 20 dígitos (tienes {cciLen}).</div>}
-                    </div>
-                    <div><label style={lbl}>Titular</label><input className="dc-premium-inp" style={inp} value={c.titular || ""} onChange={(e) => setCuenta(i, "titular", e.target.value)} placeholder="Razón social o nombre del titular" /></div>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-          </div>
+          </section>
 
-          {/* Yape / Plin */}
-          <div style={{ ...card, overflow: "hidden" }}>
-            <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Yape / Plin</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Billeteras digitales para pagos rápidos. Número de celular (9 dígitos) y titular.</div></div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <Btn small kind="ghost" onClick={() => addBilletera("yape")}><Plus size={15} strokeWidth={1.75} /> Yape</Btn>
-                <Btn small kind="ghost" onClick={() => addBilletera("plin")}><Plus size={15} strokeWidth={1.75} /> Plin</Btn>
+          <section className="dc-cfg__panel">
+            {cab("Datos fiscales y de contacto", "Se usan en boletas y facturas, y para que el asistente sepa quién es la clínica.")}
+            <div className="dc-emp__form">
+              {campo("Nombre comercial", <input value={clinica.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Odonto Sonrisa" />, 2)}
+              {campo("Razón social", <input {...ro} value={clinica.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} placeholder="Odonto Sonrisa S.A.C." />, 2)}
+              {campo("RUC", <div className="dc-emp__ruc"><input {...ro} value={clinica.ruc} onChange={(e) => set("ruc", e.target.value.replace(/\D/g, "").slice(0, 11))} placeholder="20512345678" />{!fiscalReadOnly && <button type="button" onClick={consultarRucClinica} disabled={rucBusy}><Search size={13} strokeWidth={2.2} /> {rucBusy ? "…" : "SUNAT"}</button>}</div>, 1)}
+              {campo("Dirección fiscal", <input {...ro} value={clinica.direccion} onChange={(e) => set("direccion", e.target.value)} placeholder="Av. Javier Prado 1540, San Isidro" />, 3)}
+              {campo("Teléfono", <input value={clinica.telefono} onChange={(e) => set("telefono", e.target.value)} placeholder="01 234 5678" />, 1)}
+              {campo("Correo", <input value={clinica.email} onChange={(e) => set("email", e.target.value)} placeholder="contacto@clinica.pe" />, 2)}
+              {campo("Web", <input value={clinica.web} onChange={(e) => set("web", e.target.value)} placeholder="www.clinica.pe" />, 1)}
+              {campo("Tipo de cambio (S/ por 1 US$)", <input type="number" step="0.01" min="0.01" value={clinica.tipoCambio ?? 3.75} onChange={(e) => set("tipoCambio", Number(e.target.value) || 3.75)} />, 1)}
+              <p className="dc-emp__nota is-3">Se usa en Caja para cobros en dólares.</p>
+            </div>
+          </section>
+
+          <section className="dc-cfg__panel">
+            {cab("Sedes", "Cada sede tiene su propia dirección, teléfono, caja y agenda.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
+            <div className="dc-emp__sedes">
+              {sedes.map((sd, k) => (
+                <button key={sd.id} type="button" className="dc-emp__sede" style={{ "--c": SEDE_COL[k % SEDE_COL.length] }} onClick={() => setEdit({ tipo: "sede", item: { ...sd } })}>
+                  <span className="dc-cfg__sico is-grande"><Building2 size={17} strokeWidth={2} /></span>
+                  <div><b>{sd.nombre}</b><small><MapPin size={11} strokeWidth={2.2} /> {sd.direccion || "Agrega la dirección"}</small><small><Phone size={11} strokeWidth={2.2} /> {sd.telefono || "Agrega el teléfono"}</small></div>
+                  <i className="dc-cfg__edit"><Pencil size={13} strokeWidth={2} /></i>
+                </button>
+              ))}
+              <button type="button" className="dc-emp__sede is-nueva" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={18} strokeWidth={2.2} /><b>Agregar otra sede</b></button>
+            </div>
+          </section>
+
+          <section className="dc-cfg__panel">
+            {cab("Cuentas bancarias", "Para cobros por transferencia; el asistente de WhatsApp puede compartirlas.", <button type="button" className="dc-cfg__nuevo is-sec" onClick={addCuenta}><Plus size={14} strokeWidth={2.2} /> Agregar cuenta</button>)}
+            {(clinica.cuentas || []).length === 0 ? <p className="dc-cfg__nada">Aún no hay cuentas registradas.</p> : (
+              <div className="dc-emp__cuentas">
+                {(clinica.cuentas || []).map((c, i) => {
+                  const banco = BANCOS_PE.find((b) => b.id === c.banco);
+                  const numLen = (c.numero || "").replace(/\D/g, "").length;
+                  const cciLen = (c.cci || "").replace(/\D/g, "").length;
+                  const numMal = banco && banco.cuenta.length > 0 && numLen > 0 && !banco.cuenta.includes(numLen);
+                  const cciMal = cciLen > 0 && cciLen !== 20;
+                  return (
+                  <div key={i} className="dc-emp__cuenta">
+                    <div className="dc-emp__ctop">
+                      <span className="dc-emp__banco">{banco ? banco.nombre.split(" ")[0].replace(/—/, "").slice(0, 4).toUpperCase() : <Briefcase size={15} strokeWidth={2} />}</span>
+                      <div className="dc-emp__cselect"><Select value={c.banco || ""} onChange={(v) => setCuenta(i, "banco", v)} placeholder="Elige el banco" options={BANCOS_PE.map((b) => ({ value: b.id, label: b.nombre }))} /></div>
+                      <div className="dc-emp__cmon"><Select value={c.moneda || "PEN"} onChange={(v) => setCuenta(i, "moneda", v)} options={[{ value: "PEN", label: "Soles" }, { value: "USD", label: "Dólares" }]} /></div>
+                      <button type="button" className="dc-row-action is-mal" aria-label="Eliminar cuenta" title="Eliminar" onClick={() => delCuenta(i)}><Trash2 size={14} strokeWidth={2} /></button>
+                    </div>
+                    <div className="dc-emp__form is-cuenta">
+                      {campo("N° de cuenta", <><input className={numMal ? "is-warn" : ""} value={c.numero || ""} onChange={(e) => setCuenta(i, "numero", e.target.value)} placeholder={banco && banco.cuenta.length ? `${banco.cuenta.join(" o ")} dígitos` : "N° de cuenta"} />{numMal && <em>Este banco usa {banco.cuenta.join(" o ")} dígitos (tienes {numLen}).</em>}</>, 1)}
+                      {campo("CCI (20 dígitos)", <><input className={cciMal ? "is-warn" : ""} value={c.cci || ""} onChange={(e) => setCuenta(i, "cci", e.target.value.replace(/\D/g, "").slice(0, 20))} placeholder="00219100123456701234" />{cciMal && <em>Tienes {cciLen} de 20 dígitos.</em>}</>, 1)}
+                      {campo("Titular", <input value={c.titular || ""} onChange={(e) => setCuenta(i, "titular", e.target.value)} placeholder="Razón social o nombre" />, 1)}
+                    </div>
+                  </div>
+                  );
+                })}
               </div>
-            </div>
-            <div style={{ padding: 18, display: "grid", gap: 12 }}>
-              {(clinica.billeteras || []).length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Aún no hay Yape ni Plin registrados.</div>}
-              {(clinica.billeteras || []).map((b, i) => {
-                const numLen = (b.numero || "").replace(/\D/g, "").length;
-                const numMal = numLen > 0 && numLen !== 9;
-                const es = (b.tipo || "yape").toLowerCase();
-                const col = es === "yape" ? "var(--dc-ink-500)" : "var(--dc-primary-alt)";
-                return (
-                <div key={i} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12, background: "var(--dc-white)", display: "grid", gridTemplateColumns: "auto 1fr 1.2fr auto", gap: 10, alignItems: "flex-end" }}>
-                  <div style={{ minWidth: 70 }}><label style={lbl}>Tipo</label>
-                    <div style={{ padding: "8px 12px", borderRadius: "var(--dc-r-full)", background: tint(col, 0.094), color: col, fontWeight: 500, fontSize: 13, textAlign: "center" }}>{es === "yape" ? "Yape" : "Plin"}</div>
+            )}
+          </section>
+
+          <section className="dc-cfg__panel">
+            {cab("Yape y Plin", "Billeteras para pagos rápidos: celular de 9 dígitos y titular.", <div className="dc-emp__bacc"><button type="button" className="dc-emp__yape" onClick={() => addBilletera("yape")}><Plus size={13} strokeWidth={2.4} /> Yape</button><button type="button" className="dc-emp__plin" onClick={() => addBilletera("plin")}><Plus size={13} strokeWidth={2.4} /> Plin</button></div>)}
+            {(clinica.billeteras || []).length === 0 ? <p className="dc-cfg__nada">Aún no hay Yape ni Plin registrados.</p> : (
+              <div className="dc-emp__bills">
+                {(clinica.billeteras || []).map((bl, i) => {
+                  const numLen = (bl.numero || "").replace(/\D/g, "").length;
+                  const numMal = numLen > 0 && numLen !== 9;
+                  const es = (bl.tipo || "yape").toLowerCase();
+                  return (
+                  <div key={i} className={`dc-emp__bill is-${es}`}>
+                    <span className="dc-emp__bico"><Smartphone size={16} strokeWidth={2} /><b>{es === "yape" ? "Yape" : "Plin"}</b></span>
+                    {campo("Celular", <><input className={numMal ? "is-warn" : ""} value={bl.numero || ""} onChange={(e) => setBilletera(i, "numero", e.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="987654321" />{numMal && <em>Debe tener 9 dígitos.</em>}</>)}
+                    {campo("A nombre de", <input value={bl.titular || ""} onChange={(e) => setBilletera(i, "titular", e.target.value)} placeholder="Titular" />)}
+                    <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => delBilletera(i)}><Trash2 size={14} strokeWidth={2} /></button>
                   </div>
-                  <div>
-                    <label style={lbl}>Número (celular)</label>
-                    <input className="dc-premium-inp" style={{ ...inp, borderColor: numMal ? "var(--dc-warn)" : "var(--dc-line)" }} value={b.numero || ""} onChange={(e) => setBilletera(i, "numero", e.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="987654321" />
-                    {numMal && <div style={{ fontSize: 12, marginTop: 3, color: "var(--dc-warn-600)" }}>⚠ Debe tener 9 dígitos.</div>}
-                  </div>
-                  <div><label style={lbl}>A nombre de</label><input className="dc-premium-inp" style={inp} value={b.titular || ""} onChange={(e) => setBilletera(i, "titular", e.target.value)} placeholder="Nombre del titular de la cuenta" /></div>
-                  <button type="button" className="dc-icon-btn" aria-label="Eliminar" onClick={() => delBilletera(i)} title="Eliminar" style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-danger-soft)", color: "var(--dc-danger)", borderRadius: "var(--dc-r-sm)", padding: "9px 11px", cursor: "pointer" }}><Trash2 size={15} strokeWidth={1.75} /></button>
-                </div>
-                );
-              })}
-            </div>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>💡 Las <b>sedes y sus direcciones</b> se gestionan en la pestaña <b>Sedes</b>.</div>
-            <Btn onClick={guardarClinica}><Check size={15} strokeWidth={1.75} /> Guardar datos</Btn>
-          </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+          <div className="dc-emp__guardar"><span>Los cambios se aplican en boletas, Caja y el asistente de WhatsApp.</span><button type="button" className="dc-cfg__nuevo" onClick={guardarClinica}><Check size={15} strokeWidth={2.2} /> Guardar datos</button></div>
         </div>
         );
       })()}
@@ -746,8 +739,9 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--dc-ink-700)", cursor: "pointer" }}><input type="checkbox" checked={it.activo !== false} onChange={(e) => set("activo", e.target.checked)} /> Activo (visible en agenda y WhatsApp)</label>
               </>}
               {edit.tipo === "sede" && <>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Dirección<input className="dc-premium-inp" value={it.direccion || ""} onChange={(e) => set("direccion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Av. ..." /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Dirección<input className="dc-premium-inp" value={it.direccion || ""} onChange={(e) => set("direccion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Av. Conquistadores 145, San Isidro" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Teléfono<input className="dc-premium-inp" value={it.telefono || ""} onChange={(e) => set("telefono", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="01 234 5678" /></label>
+                {it.direccion && <a className="dc-emp__mapa" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(it.direccion)}`} target="_blank" rel="noreferrer"><MapPin size={14} strokeWidth={2} /> Ver en Google Maps</a>}
               </>}
             </div>
           </Modal>

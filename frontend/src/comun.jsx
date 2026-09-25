@@ -1061,7 +1061,7 @@ export const KpiCard = ({ icon, label, value, color = NAVY, sub, delta, up, onCl
   }
   const clickable = typeof onClick === "function" && (st === "dato" || st === "vacio");
   return (
-  <div onClick={clickable ? onClick : undefined} className={`dc-kpi dc-kpi--${st}${clickable ? " dc-kpi--click" : ""}`} style={{ cursor: clickable ? "pointer" : "default", minWidth: 0, maxWidth: "100%", "--kpi-tinte": tint(color, 0.16) }}>
+  <div onClick={clickable ? onClick : undefined} className={`dc-kpi dc-kpi--${st}${clickable ? " dc-kpi--click" : ""}`} style={{ "--k": color, cursor: clickable ? "pointer" : "default", minWidth: 0, maxWidth: "100%", "--kpi-tinte": tint(color, 0.16) }}>
     {icon && <div className="dc-kpi__icon" style={{ background: color, color: "#fff", boxShadow: `0 8px 18px -8px ${color}` }}>{icon}</div>}
     <div className="dc-kpi__body">
       <div className="dc-kpi__label">{label}</div>
@@ -1219,7 +1219,7 @@ export const Modal = ({ icon, titulo, sub, onClose, children, footer, maxW, size
   return (
   <div className="dc-modal-backdrop" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15, 35, 42, 0.35)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", display: "grid", placeItems: "center", zIndex: 200, padding: 20, animation: "dcBackdropFade 0.2s ease-out forwards" }}>
     <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dc-modal-title" tabIndex={-1} className="dc-modal" onClick={(e) => e.stopPropagation()} style={{ background: "var(--dc-white)", width: `min(${widthPx}px,96vw)`, maxHeight: "min(680px, 88vh)", borderRadius: "var(--dc-r-lg)", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(15, 35, 42, 0.4), 0 0 0 1px rgba(15, 35, 42, 0.05)", animation: "dcModalSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards", transform: "translateZ(0)", outline: "none" }}>
-      <div className="dc-modal__head" style={{ padding: "20px 24px", background: `linear-gradient(135deg, ${DS.c.primary}, ${DS.c.primaryDark})`, color: "var(--dc-white)", flexShrink: 0, display: "flex", alignItems: "center", gap: 14 }}>
+      <div className="dc-modal__head" style={{ "--tono": tone === NAVY ? "#0E9199" : tone, padding: "20px 24px", background: `linear-gradient(135deg, ${DS.c.primary}, ${DS.c.primaryDark})`, color: "var(--dc-white)", flexShrink: 0, display: "flex", alignItems: "center", gap: 14 }}>
         {icon && <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "rgba(255,255,255,.15)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 id="dc-modal-title" className="dc-title" style={{ margin: 0, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT, color: "inherit" }}>{titulo}</h2>

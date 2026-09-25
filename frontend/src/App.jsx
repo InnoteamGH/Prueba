@@ -3351,8 +3351,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
           </>)}
         </Card>
 
-        {/* Hallazgos listados */}
-        <Card style={{ padding: 0, overflow: "hidden" }}>
+        {/* Hallazgos listados (vista clásica; el anatómico trae los suyos) */}
+        {vistaOdo !== "anatomico" && <Card style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 7 }}><ClipboardList size={15} strokeWidth={1.75} color={NAVY} /> Hallazgos del paciente</h3>
             {piezasAfectadas.length > 0 && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", background: "var(--dc-line)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{piezasAfectadas.length} pieza(s)</span>}
@@ -3389,7 +3389,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               </div>
             );
           })}
-        </Card>
+        </Card>}
       </div>
 
       {/* Panel lateral: solo en vista clásica (la anatómica trae lupa/hallazgos propios). */}
@@ -5416,7 +5416,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
 
         {/* Formulario alta/edición */}
         {form && (
-          <Modal icon={form.id ? <Pencil size={20} strokeWidth={1.75} /> : <UserPlus size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar usuario" : "Nuevo usuario"} sub={ROLES[form.rol].desc} onClose={() => setForm(null)} maxW={620}
+          <Modal icon={form.id ? <Pencil size={20} strokeWidth={1.75} /> : <UserPlus size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar usuario" : "Nuevo usuario"} sub={form.id ? "Actualiza sus datos, rol y sedes" : "Crea la cuenta y asigna su rol y sedes"} tone={ROLES[form.rol].color} onClose={() => setForm(null)} maxW={620}
             footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}><Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn><Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
               <Field label="Nombre completo" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Ana Torres" />
@@ -8830,15 +8830,15 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   const parcial = netPen > 0 && netPen < saldoMax - 0.009;
 
   const METODOS = [
-    { k: "tarjeta", label: "Tarjeta (POS)", sub: "Visa – Mastercard – Amex", color: DS.c.primary, icon: <CreditCard size={22} strokeWidth={1.75} color="#fff" /> },
-    { k: "yape", label: "Yape / QR", sub: "Valida en el POS", color: "var(--dc-ink-500)", icon: <YapeGlyph /> },
-    { k: "plin", label: "Plin / QR", sub: "Valida en el POS", color: "var(--dc-primary-alt)", icon: <YapeGlyph /> },
-    { k: "transferencia", label: "Transferencia", sub: "Código + foto – interbancaria", color: DS.c.primary, icon: <Building2 size={22} strokeWidth={1.75} color="#fff" /> },
-    { k: "efectivo", label: "Efectivo", sub: "Se contabiliza en caja", color: "var(--dc-ok-700)", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> },
+    { k: "tarjeta", label: "Tarjeta (POS)", sub: "Visa – Mastercard – Amex", color: "#2F6FDE", icon: <CreditCard size={22} strokeWidth={1.75} color="#fff" /> },
+    { k: "yape", label: "Yape / QR", sub: "Valida en el POS", color: "#7B3FE4", icon: <YapeGlyph /> },
+    { k: "plin", label: "Plin / QR", sub: "Valida en el POS", color: "#0E9EB0", icon: <YapeGlyph /> },
+    { k: "transferencia", label: "Transferencia", sub: "Código + foto – interbancaria", color: "#28527A", icon: <Building2 size={22} strokeWidth={1.75} color="#fff" /> },
+    { k: "efectivo", label: "Efectivo", sub: "Se contabiliza en caja", color: "#16A36A", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> },
   ];
   const BANCOS = ["BCP", "Interbank", "BBVA", "Scotiabank", "BanBif", "Interbancaria (CCI)"];
   const metaMet = metodo === "mixto"
-    ? { k: "mixto", label: "Pago mixto", color: "var(--dc-ink-alt)", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> }
+    ? { k: "mixto", label: "Pago mixto", color: "#D97706", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> }
     : (METODOS.find((m) => m.k === metodo) || {});
 
   const aprobado = (res) => { setResultado(res); setPaso("aprobado"); closeRef.current = setTimeout(() => onAprobado && onAprobado(res), 2800); };
@@ -9024,11 +9024,11 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   const inp2 = { padding: "7px 10px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", boxSizing: "border-box" };
 
   const wrap = (children, pad = 22) => (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.55)", zIndex: 200, display: "grid", placeItems: "center", padding: 16 }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 460, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
-        <div style={{ background: "linear-gradient(105deg,var(--dc-primary-alt),var(--dc-ink-alt))", padding: "18px 22px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(8,36,44,.42)", backdropFilter: "blur(10px)", zIndex: 200, display: "grid", placeItems: "center", padding: 16 }} onClick={onClose}>
+      <div className="dc-cobro" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 460, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
+        <div className="dc-cobro__head" style={{ background: "radial-gradient(55% 150% at 100% 0%, rgba(125,240,215,.4) 0%, transparent 60%), linear-gradient(118deg, #0C5A3E 0%, #15803D 45%, #22A565 100%)", padding: "18px 22px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 12, opacity: .82, letterSpacing: 1, fontWeight: 500 }}>{auth.token ? "COBRO – COMPROBANTE" : "COBRO – DEMO"}</div>
+            <div style={{ fontSize: 12.5, opacity: .85, fontWeight: 600 }}>{auth.token ? "Cobro con comprobante" : "Cobro de demostración"}</div>
             <div style={{ fontSize: 21, fontWeight: 600, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{sym} {aUi(netPen).toFixed(2)}</div>
             {parcial && <div style={{ fontSize: 12, opacity: .9 }}>Abono – saldo {sym} {aUi(saldoMax).toFixed(2)}</div>}
             {moneda === "USD" && <div style={{ fontSize: 12, opacity: .85 }}>≈ S/ {Number(netPen).toFixed(2)} – TC {TC_USD}</div>}

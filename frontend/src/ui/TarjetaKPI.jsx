@@ -35,7 +35,7 @@ export default function TarjetaKPI({
     <div
       className={`dc-kpi dc-kpi--${st} ${className}`.trim()}
       onClick={onClick}
-      style={onClick ? { cursor: "pointer" } : undefined}
+      style={{ "--k": color, ...(onClick ? { cursor: "pointer" } : {}) }}
       role={onClick ? "button" : undefined}
     >
       {icon && (
