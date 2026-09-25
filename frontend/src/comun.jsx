@@ -1243,28 +1243,82 @@ function etiquetaCant(n, sub) {
   return sub;
 }
 
-export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName }) {
+/* Filtro por columna y orden, el mismo de la tabla de Pacientes, para cualquier lista.
+   cols: [{ key, label, get:(r)=>texto, sortVal?:(r)=>valor, noFilter, noSort }]
+   Devuelve la lista filtrada y ordenada y el estado que usa <FiltroCabecera>. */
+export function useFiltroTabla(rows, cols, defaultSort) {
   const [sortCol, setSortCol] = useState(defaultSort?.key ?? null);
   const [sortDir, setSortDir] = useState(defaultSort?.dir ?? "asc");
   const [colFilters, setColFilters] = useState({});
   const [activeCol, setActiveCol] = useState(null);
+  const toggleSort = (key) => { setActiveCol(null); if (sortCol !== key) { setSortCol(key); setSortDir("asc"); } else if (sortDir === "asc") setSortDir("desc"); else setSortCol(null); };
+  const anyF = Object.values(colFilters).some((v) => v && v.trim());
+  const lista = useMemo(() => {
+    const base = (rows || []).filter((r) => cols.every((c) => { if (c.noFilter || !c.get) return true; const f = (colFilters[c.key] || "").trim().toLowerCase(); return !f || String(c.get(r) ?? "").toLowerCase().includes(f); }));
+    const sc = cols.find((c) => c.key === sortCol && (c.sortVal || c.get));
+    if (!sc) return base;
+    const val = sc.sortVal || sc.get;
+    return [...base].sort((a, b) => {
+      const x = val(a), y = val(b);
+      const r = typeof x === "number" && typeof y === "number" ? x - y : String(x ?? "").localeCompare(String(y ?? ""), "es", { numeric: true, sensitivity: "base" });
+      return sortDir === "asc" ? r : -r;
+    });
+  }, [rows, cols, colFilters, sortCol, sortDir]);
+  const limpiar = () => { setColFilters({}); setActiveCol(null); };
+  return { lista, anyF, limpiar, st: { cols, sortCol, sortDir, colFilters, setColFilters, activeCol, setActiveCol, toggleSort } };
+}
+/* Cabecera de filtros para listas en tarjetas: cada columna es una pastilla que se
+   convierte en buscador al tocarla y lleva su botón de orden, igual que en las tablas. */
+export function FiltroCabecera({ st, total, filtradas, sub = "registros", className = "", extra = null }) {
+  const { cols, sortCol, sortDir, colFilters, setColFilters, activeCol, setActiveCol, toggleSort } = st;
+  const anyF = Object.values(colFilters).some((v) => v && v.trim());
+  return (
+    <div className={`dc-fcab ${className}`}>
+      <span className="dc-fcab__cant">{filtradas} {sub}{anyF ? ` de ${total}` : ""}</span>
+      <div className="dc-fcab__cols">
+        {cols.filter((c) => !(c.noFilter && c.noSort)).map((c) => {
+          const isSort = sortCol === c.key; const isFilt = !!(colFilters[c.key] && colFilters[c.key].trim()); const open = activeCol === c.key || isFilt;
+          return (
+            <div key={c.key} className={`dc-fcab__col${isFilt || isSort ? " is-on" : ""}`}>
+              {open && !c.noFilter ? (
+                <input aria-label={`Filtrar ${c.label}`} autoFocus={activeCol === c.key} value={colFilters[c.key] || ""} placeholder={c.label}
+                  onChange={(e) => setColFilters((f) => ({ ...f, [c.key]: e.target.value }))}
+                  onBlur={() => { if (!(colFilters[c.key] || "").trim()) setActiveCol(null); }}
+                  onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[c.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} />
+              ) : (
+                <button type="button" className="dc-fcab__lbl" onClick={() => !c.noFilter && setActiveCol(c.key)} title={c.noFilter ? c.label : "Clic para filtrar"}>{c.label}</button>
+              )}
+              {!c.noSort && <button type="button" className="dc-fcab__ord" aria-label={`Ordenar ${c.label}`} title="Ordenar" onClick={() => toggleSort(c.key)}>{isSort ? (sortDir === "asc" ? <ChevronUp size={13} strokeWidth={2.2} /> : <ChevronDown size={13} strokeWidth={2.2} />) : <ArrowUpDown size={11} strokeWidth={1.9} />}</button>}
+            </div>
+          );
+        })}
+        {anyF && <button type="button" className="dc-fcab__limpiar" onClick={() => { setColFilters({}); setActiveCol(null); }}>Limpiar</button>}
+      </div>
+      {extra}
+    </div>
+  );
+}
+
+/* Envoltorio para listas en tarjetas: pone la cabecera de filtros y entrega la lista
+   ya filtrada y ordenada a children(lista). Es componente (no hook suelto) para poder
+   usarse dentro de ramas condicionales sin romper el orden de los hooks. */
+export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, children }) {
+  const { lista, st } = useFiltroTabla(rows, cols, defaultSort);
+  return (
+    <div className={`dc-lf ${className}`}>
+      <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub} extra={extra} />
+      {lista.length === 0 && (rows || []).length > 0
+        ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." />
+        : children(lista)}
+    </div>
+  );
+}
+
+export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName }) {
+  const { lista, anyF, st: { sortCol, sortDir, colFilters, setColFilters, activeCol, setActiveCol, toggleSort } } = useFiltroTabla(rows, cols, defaultSort);
   const [visible, setVisible] = useState(pageSize);
   useEffect(() => { setVisible(pageSize); }, [rows, pageSize, colFilters, sortCol, sortDir]);
-  const toggleSort = (key) => { setActiveCol(null); if (sortCol !== key) { setSortCol(key); setSortDir("asc"); } else if (sortDir === "asc") setSortDir("desc"); else setSortCol(null); };
   const COL = cols.map((c) => c.w).join(" ");
-  // Ordenar no es filtrar: contarlo hacía que todas las tablas con orden por defecto
-  // -que son casi todas- dijeran "– filtrado" desde el primer render, y un aviso que
-  // sale siempre no avisa de nada.
-  const anyF = Object.values(colFilters).some((v) => v && v.trim());
-  // Filtrar y ordenar es O(filas x columnas) + O(n log n): con useMemo solo se rehace
-  // cuando cambian los datos, el filtro o el orden, no en cada render del padre
-  // (antes se recalculaba hasta al abrir el desplegable de una columna).
-  const lista = useMemo(() => {
-    const base = rows.filter((r) => cols.every((c) => { if (c.noFilter || !c.get) return true; const f = (colFilters[c.key] || "").trim().toLowerCase(); return !f || String(c.get(r)).toLowerCase().includes(f); }));
-    const sc = cols.find((c) => c.key === sortCol && c.get);
-    if (!sc) return base;
-    return [...base].sort((a, b) => { const r = String(sc.get(a)).localeCompare(String(sc.get(b)), "es", { numeric: true, sensitivity: "base" }); return sortDir === "asc" ? r : -r; });
-  }, [rows, cols, colFilters, sortCol, sortDir]);
   const mostradas = lista.slice(0, visible);
   const hayMas = lista.length > visible;
   // Columna fija a la derecha (acciones): fondo opaco y sombra para que, al hacer

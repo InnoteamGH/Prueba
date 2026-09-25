@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone} from "lucide-react";
 import api, { auth } from "../api/client";
-import {Btn, Card, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales} from "../comun";
+import {Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales} from "../comun";
 
 const BANCOS_PE = [
   { id: "bcp", nombre: "BCP — Banco de Crédito", cuenta: [14] },
@@ -599,8 +599,13 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         <section className="dc-cfg__panel">
           {cab("Servicios y precios", "El agente de WhatsApp y los presupuestos usan estos precios.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "servicio", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo servicio</button>)}
           {esps.length === 0 ? <p className="dc-cfg__nada">Sin servicios aún.</p> : (
+            <ListaFiltrable rows={esps} sub="servicios" defaultSort={{ key: "nombre", dir: "asc" }} cols={[
+              { key: "nombre", label: "Servicio", get: (e) => e.nombre || "" },
+              { key: "dur", label: "Duración", get: (e) => String(e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin || ""), sortVal: (e) => Number(e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin) || 0 },
+              { key: "precio", label: "Precio", get: (e) => String(Number(e.precioBase) || 0), sortVal: (e) => Number(e.precioBase) || 0 },
+            ]}>{(lstS) => (
             <div className="dc-cfg__servs">
-              {esps.map((e) => { const col = colorDe(e.nombre); const dur = e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin; return (
+              {lstS.map((e) => { const col = colorDe(e.nombre); const dur = e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin; return (
                 <button key={e.id} type="button" className="dc-cfg__serv" style={{ "--c": col }} onClick={() => setEdit({ tipo: "servicio", item: { ...e } })}>
                   <span className="dc-cfg__sico"><Tag size={15} strokeWidth={2} /></span>
                   <div><b>{e.nombre}</b>{dur ? <small><Clock size={11} strokeWidth={2.2} /> {dur} min</small> : <small>Sin duración</small>}</div>
@@ -609,6 +614,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 </button>
               ); })}
             </div>
+            )}</ListaFiltrable>
           )}
         </section>
       )}
@@ -617,8 +623,14 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         <section className="dc-cfg__panel">
           {cab("Doctores", "Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "doctor", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo doctor</button>)}
           {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : (
+            <ListaFiltrable rows={meds} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} cols={[
+              { key: "nombre", label: "Doctor", get: (m) => m.nombre || "" },
+              { key: "esp", label: "Especialidad", get: (m) => espNombre(m.especialidadId) || "" },
+              { key: "estado", label: "Estado", get: (m) => (m.activo ? "Activo" : "Inactivo") },
+              { key: "com", label: "Comisión", get: (m) => (m.porcentajeComision != null ? String(m.porcentajeComision) : ""), sortVal: (m) => Number(m.porcentajeComision) || 0 },
+            ]}>{(lstD) => (
             <div className="dc-cfg__docs">
-              {meds.map((m) => { const col = colorDe(m.nombre); return (
+              {lstD.map((m) => { const col = colorDe(m.nombre); return (
                 <article key={m.id} className={`dc-cfg__doc${m.activo ? "" : " is-off"}`}>
                   <div className="dc-cfg__dtop">
                     <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.22)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(String(m.nombre).replace(/^Dra?\.\s*/, ""))}</span>
@@ -633,6 +645,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 </article>
               ); })}
             </div>
+            )}</ListaFiltrable>
           )}
         </section>
       )}

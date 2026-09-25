@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Check, Target, TrendingUp, Trophy, Users } from "lucide-react";
 import api, { auth } from "../api/client";
-import { Card, ESPECIALIDADES, MEDICOS, Vacio, colorDe, iniciales, tint } from "../comun";
+import { Card, ListaFiltrable, ESPECIALIDADES, MEDICOS, Vacio, colorDe, iniciales, tint } from "../comun";
 
 export default function Metas({ notify = () => {}, can }) {
   const conectado = !!auth.token;
@@ -87,8 +87,15 @@ export default function Metas({ notify = () => {}, can }) {
         <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>
       )}
       {meds.length > 0 && (
+        <ListaFiltrable rows={meds} sub="odontólogos" cols={[
+          { key: "nombre", label: "Odontólogo", get: (m) => m.nombre || "" },
+          { key: "esp", label: "Especialidad", get: (m) => m.especialidad || "" },
+          { key: "prod", label: "Producción", get: (m) => (m.prodMes != null ? String(m.prodMes) : ""), sortVal: (m) => Number(m.prodMes) || 0 },
+          { key: "meta", label: "Meta", get: (m) => String(m.metaMensual ?? ""), sortVal: (m) => Number(m.metaMensual) || 0 },
+          { key: "pct", label: "Avance", get: (m) => { const mt = Number(m.metaMensual) || 0; return m.prodMes != null && mt ? `${Math.round((Number(m.prodMes) / mt) * 100)}%` : ""; }, sortVal: (m) => { const mt = Number(m.metaMensual) || 0; return m.prodMes != null && mt ? Number(m.prodMes) / mt : -1; } },
+        ]}>{(lstM) => (
         <div className="dc-metas">
-          {meds.map((m) => {
+          {lstM.map((m) => {
             const col = colorDe(m.nombre);
             const meta = Number(m.metaMensual) || 0;
             const prod = m.prodMes != null ? Number(m.prodMes) : null;
@@ -116,6 +123,7 @@ export default function Metas({ notify = () => {}, can }) {
             );
           })}
         </div>
+        )}</ListaFiltrable>
       )}
       {conProd && meds.length > 0 && (
         <div className="fm-aviso-edad is-info"><Trophy size={15} strokeWidth={2} /><span>La línea sobre cada barra marca el ritmo esperado a hoy ({ritmo}% del mes). Verde va al día, ámbar un poco atrás y coral necesita empuje.</span></div>

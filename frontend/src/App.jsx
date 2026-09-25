@@ -40,7 +40,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {EnCabecera, MenuAcciones, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
+import {EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -963,9 +963,18 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
       ) : modo === "tabla" ? (() => {
         const ESTC = { pendiente: "#8FA3A7", confirmada: "#0E9199", en_atencion: "#D97706", atendida: "#16A36A", cancelada: "#D2463A", no_show: "#E0694F", reprogramada: "#6D4FD1", cerrada_sistema: "#7C9499" };
         const rows = semana.flatMap((d) => citasDe(iso(d)).map((c) => ({ ...c, _d: d }))).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
-        const dias = [];
-        rows.forEach((c) => { const k = iso(c._d); let g = dias.find((x) => x.k === k); if (!g) { g = { k, d: c._d, items: [] }; dias.push(g); } g.items.push(c); });
         const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+        const FCOLS = [
+          { key: "fecha", label: "Día", get: (c) => `${NOM[(c._d.getDay() + 6) % 7]} ${c._d.getDate()}`, sortVal: (c) => `${iso(c._d)} ${c.hora || ""}` },
+          { key: "hora", label: "Hora", get: (c) => c.hora || "" },
+          { key: "paciente", label: "Paciente", get: (c) => c.paciente || "" },
+          { key: "motivo", label: "Motivo", get: (c) => c.motivo || "" },
+          { key: "medico", label: "Doctor", get: (c) => c.medico || "" },
+          { key: "estado", label: "Estado", get: (c) => EST_LABEL[c.estado] || c.estado || "" },
+        ];
+        return (
+        <ListaFiltrable rows={rows} cols={FCOLS} sub="citas" className="dc-agt__lf">{(lista) => { const dias = [];
+        lista.forEach((c) => { const k = iso(c._d); let g = dias.find((x) => x.k === k); if (!g) { g = { k, d: c._d, items: [] }; dias.push(g); } g.items.push(c); });
         return (
         <div className="dc-agt">
           {dias.length === 0 && <p className="dc-agt__nada">Sin citas en esta semana.</p>}
@@ -990,6 +999,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
             </section>
           ); })}
         </div>
+        ); }}</ListaFiltrable>
         );
       })() : (
         <div style={{ overflowX: "auto" }}>
@@ -2987,22 +2997,17 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
         )}
         {fases.length === 0 && !nueva && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Sin tratamiento" sub="Agrega la primera fase, o créalas desde el odontograma." />}
         {fases.length > 0 && (
-          <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: "40px minmax(0,1.6fr) 64px 72px 96px 150px", gap: 8, padding: "8px 20px", borderBottom: "1px solid var(--dc-line)", fontSize: 11, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-            <span>#</span><span>Procedimiento</span><span>Pieza</span><span>Cara</span><span style={{ textAlign: "right" }}>Costo</span><span style={{ textAlign: "right" }}>Estado</span>
-          </div>
+          <DataTable bare minWidth={640} sub="fases" onRowClick={(f) => setDetF(f)} rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} cols={[
+            { key: "n", label: "#", w: "44px", a: "center", noFilter: true, get: (f) => f._n, cell: (f) => <div className="dc-trat-num" style={{ width: 28, height: 28, borderRadius: "var(--dc-r-sm)", background: f.estado === "atendida" ? "var(--dc-ok-soft)" : "var(--dc-line)", color: f.estado === "atendida" ? "var(--dc-ok-700)" : "var(--dc-ink-500)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13 }}>{f.estado === "atendida" ? "✓" : f._n}</div> },
+            { key: "proc", label: "Procedimiento", w: "minmax(0,1.6fr)", a: "left", get: (f) => nombreFaseLimpio(f), cell: (f) => <div style={{ minWidth: 0, fontWeight: 500, color: NAVY }}>{nombreFaseLimpio(f)} {f.origen === "odontograma" && <span style={{ fontSize: 12, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-full)", padding: "1px 7px", fontWeight: 500 }}>del odontograma</span>}</div> },
+            { key: "pieza", label: "Pieza", w: "80px", get: (f) => String(piezaDeFase(f) ?? "") },
+            { key: "cara", label: "Cara", w: "90px", get: (f) => String(caraDeFase(f) ?? "") },
+            { key: "costo", label: "Costo", w: "110px", a: "right", get: (f) => `S/ ${f.costo.toFixed(2)}` },
+            { key: "estado", label: "Estado", w: "170px", a: "right", get: (f) => (f.estado === "atendida" ? "Atendida" : "Pendiente"), cell: (f) => f.estado === "atendida"
+              ? <Badge estado={f.estado} />
+              : <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>{puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button><button type="button" className="dc-icon-btn" aria-label="Quitar" onClick={() => quitarFase(f)} title="Quitar" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dc-ink-500)" }}><X size={16} strokeWidth={1.75} /></button></> : <Badge estado={f.estado} />}</div> },
+          ]} />
         )}
-        {fases.map((f, i) => (
-          <div key={f.id} className={`dc-trat-fila${f.estado === "atendida" ? " is-ok" : ""}`} onClick={() => setDetF(f)} title="Ver detalle" style={{ cursor: "pointer", display: "grid", gridTemplateColumns: "40px minmax(0,1.6fr) 64px 72px 96px 150px", gap: 8, alignItems: "center", padding: "14px 20px", borderBottom: i < fases.length - 1 ? "1px solid var(--dc-line)" : "none" }}>
-            <div className="dc-trat-num" style={{ width: 28, height: 28, borderRadius: "var(--dc-r-sm)", background: f.estado === "atendida" ? "var(--dc-ok-soft)" : "var(--dc-line)", color: f.estado === "atendida" ? "var(--dc-ok-700)" : "var(--dc-ink-500)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{f.estado === "atendida" ? "✓" : i + 1}</div>
-            <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }}>{nombreFaseLimpio(f)} {f.origen === "odontograma" && <span style={{ fontSize: 12, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-full)", padding: "1px 7px", fontWeight: 500 }}>del odontograma</span>}</div></div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, fontVariantNumeric: "tabular-nums" }}>{piezaDeFase(f)}</div>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{caraDeFase(f)}</div>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-700)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>S/ {f.costo.toFixed(2)}</div>
-            {f.estado === "atendida"
-              ? <div style={{ display: "flex", justifyContent: "flex-end" }}><Badge estado={f.estado} /></div>
-              : <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>{puedeCobrar && <button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>}{puedeCobrar && <button type="button" className="dc-icon-btn" aria-label="Quitar" onClick={() => quitarFase(f)} title="Quitar" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dc-ink-500)" }}><X size={16} strokeWidth={1.75} /></button>}</div>}
-          </div>
-        ))}
       </Card>
       {detF && (() => { const f = fases.find((x) => x.id === detF.id) || detF; return (
         <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} tone={NAVY} titulo={f.nombre} sub={`Fase del plan – ${paciente.nombre}`} onClose={() => setDetF(null)} maxW={460}
@@ -3286,8 +3291,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [pacsHoy, setPacsHoy] = useState(new Set());   // pacientes con cita hoy (para "por cobrar de hoy")
   // Las pestañas son submódulos del menú lateral (Caja → Cobros, Apertura…): la vista manda.
   const [tabLocal, setTabLocal] = useState("cobros");  // cobros | apertura | cierre | historial | movimientos | links
-  const [busCob, setBusCob] = useState("");
-  const [ordCob, setOrdCob] = useState("saldo");
   const tab = tabProp || tabLocal;
   const setTab = (t) => (onTab ? onTab(t) : setTabLocal(t));
   // CAJA-01: sede explícita para abrir/cerrar (nunca "all" → primera sede a escondidas).
@@ -3915,18 +3918,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         <Card className="dc-cob__lista">
           <div className="dc-cob__cab">
             <div><h3>Saldos por cobrar</h3><span>{porCobrar.length} {porCobrar.length === 1 ? "paciente" : "pacientes"} con plan en curso</span></div>
-            <div className="dc-cob__herr">
-              <label className="dc-cob__buscar"><Search size={15} strokeWidth={1.9} /><input value={busCob} onChange={(e) => setBusCob(e.target.value)} placeholder="Buscar paciente" aria-label="Buscar paciente" /></label>
-              <div className="dc-env__filtros" role="tablist" aria-label="Ordenar">
-                {[["saldo", "Mayor saldo"], ["avance", "Menor avance"], ["nombre", "A–Z"]].map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={ordCob === k} onClick={() => setOrdCob(k)}>{l}</button>)}
-              </div>
-            </div>
           </div>
-          {conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : (() => {
-            const q = busCob.trim().toLowerCase();
-            const lista = porCobrar.filter((x) => !q || String(x.p.nombre || "").toLowerCase().includes(q)).sort((a, b) => ordCob === "nombre" ? String(a.p.nombre).localeCompare(String(b.p.nombre)) : ordCob === "avance" ? (a.pagado / (a.total || 1)) - (b.pagado / (b.total || 1)) : b.saldo - a.saldo);
-            if (!lista.length) return <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo={q ? "Sin resultados" : "Todo cobrado"} sub={q ? "Prueba con otro nombre." : "No hay saldos pendientes en esta sede."} />;
-            return (
+          {conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : !porCobrar.length ? <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todo cobrado" sub="No hay saldos pendientes en esta sede." /> : (
+            <ListaFiltrable rows={porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} cols={[
+              { key: "paciente", label: "Paciente", get: (x) => x.p.nombre || "" },
+              { key: "sede", label: "Sede", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") },
+              { key: "fases", label: "Fases pendientes", get: (x) => String(x.pend), sortVal: (x) => x.pend },
+              { key: "avance", label: "Cobrado", get: (x) => `${x.total ? Math.round((x.pagado / x.total) * 100) : 0}%`, sortVal: (x) => (x.total ? x.pagado / x.total : 0) },
+              { key: "saldo", label: "Saldo", get: (x) => x.saldo.toFixed(2), sortVal: (x) => x.saldo },
+            ]}>{(lista) => (
               <div className="dc-cob__filas">
                 {lista.map((x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; const col = colorDe(x.p.nombre); const pc = pct >= 75 ? "#16A36A" : pct >= 40 ? "#0E9199" : "#D97706"; return (
                   <div key={x.p.id} className="dc-cob__fila">
@@ -3941,8 +3941,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   </div>
                 ); })}
               </div>
-            );
-          })()}
+            )}</ListaFiltrable>
+          )}
         </Card>
         <aside className="dc-cob__lado">
           <div className={`dc-cob__estado${cajaAbierta ? " is-abierta" : ""}`}>
@@ -3991,7 +3991,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               { key: "concepto", label: "Concepto", w: "minmax(160px,1.4fr)", a: "left", get: (p) => p.concepto, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.concepto}</span> },
               { key: "metodo", label: "Método", w: "130px", a: "center", get: (p) => p.metodo, cell: (p) => { const c = { tarjeta: DS.c.primary, yape: "var(--dc-ink-500)", efectivo: "var(--dc-ok-700)", transferencia: "var(--dc-navy)" }[p.metodo] || "var(--dc-ink-400)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "3px 10px", borderRadius: "var(--dc-r-full)", textTransform: "capitalize" }}>{p.metodo}</span>; } },
               { key: "comprobante", label: "Comprobante", w: "130px", a: "center", get: (p) => p.comprobante, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", textTransform: "capitalize" }}>{p.comprobante || "—"}</span> },
-              { key: "boleta", label: "Boleta", w: "100px", a: "center", noFilter: true, noSort: true, cell: (p) => (p.comprobanteSerie && p.comprobanteNumero != null) ? (
+              { key: "boleta", label: "Boleta", w: "100px", a: "center", get: (p) => (p.comprobanteSerie && p.comprobanteNumero != null ? `${p.comprobanteSerie}-${p.comprobanteNumero}` : ""), cell: (p) => (p.comprobanteSerie && p.comprobanteNumero != null) ? (
                 <button onClick={(e) => { e.stopPropagation(); abrirBoleta({ paciente: p.paciente, comprobanteSerie: p.comprobanteSerie, comprobanteNumero: p.comprobanteNumero, fecha: p.fecha, monto: p.monto, concepto: p.concepto, metodo: p.metodo }); }} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", color: DS.c.primary, fontWeight: 500, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}><FileText size={13} strokeWidth={1.75} /> Ver</button>
               ) : <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</span> },
               { key: "monto", label: "Monto", w: "120px", a: "right", get: (p) => p.monto, cell: (p) => <span style={{ fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {p.monto.toFixed(2)}</span> },
@@ -4125,7 +4125,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 </Card>
                 <Card className="dc-cz__movs">
                   <div className="dc-cz__movcab"><h4>Movimientos del día</h4><span>{(c.movimientos || []).length}</span></div>
-                  {(c.movimientos || []).length === 0 ? <p className="dc-cz__nada">Los cobros del día aparecerán aquí.</p> : (c.movimientos || []).map((m, i) => { const [Ico, col] = medioUi(m.metodo); return (
+                  {(c.movimientos || []).length === 0 ? <p className="dc-cz__nada">Los cobros del día aparecerán aquí.</p> : <ListaFiltrable rows={c.movimientos} sub="cobros" className="dc-cz__lf" cols={[
+                    { key: "paciente", label: "Paciente", get: (m) => m.paciente || "" },
+                    { key: "hora", label: "Hora", get: (m) => m.hora || "" },
+                    { key: "metodo", label: "Medio", get: (m) => m.metodo || "" },
+                    { key: "monto", label: "Monto", get: (m) => Number(m.monto || 0).toFixed(2), sortVal: (m) => Number(m.monto) || 0 },
+                  ]}>{(lista) => lista.map((m, i) => { const [Ico, col] = medioUi(m.metodo); return (
                     <div key={m.id || m._k || i} className="dc-cz__mov">
                       <span className="dc-cz__mico" style={{ "--m": col }}><Ico size={14} strokeWidth={2} /></span>
                       <div><b>{m.paciente}</b><small>{m.hora ? `${m.hora} – ` : ""}{m.concepto || "Cobro"}</small></div>
@@ -4135,7 +4140,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                         {puedeAbrirCaja && <button type="button" className="dc-mini-btn is-mal" title="Anular cobro" aria-label="Anular cobro" onClick={() => anularPagoHoy(m.id)}><X size={13} strokeWidth={2.2} /></button>}
                       </div>}
                     </div>
-                  ); })}
+                  ); })}</ListaFiltrable>}
                 </Card>
               </aside>
             </div>
@@ -4177,8 +4182,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </Card>
           )}
           {(histCaja || []).length === 0 ? <Card><Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (
+          <ListaFiltrable rows={histCaja} sub="jornadas" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+            { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
+            { key: "sede", label: "Sede", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "" },
+            { key: "quien", label: "Responsable", get: (r) => [r.abiertaPorNombre, r.cerradaPorNombre].filter(Boolean).join(" ") },
+            { key: "estado", label: "Estado", get: (r) => { const d = r.diferencia != null ? Number(r.diferencia) : null; return r.abierta ? "Abierta" : d == null ? "Cerrada" : Math.abs(d) < 0.01 ? "Cuadra" : d < 0 ? "Faltante" : "Sobrante"; } },
+            { key: "dif", label: "Diferencia", get: (r) => (r.diferencia != null ? Number(r.diferencia).toFixed(2) : ""), sortVal: (r) => Math.abs(Number(r.diferencia) || 0) },
+          ]}>{(lista) => (
           <div className="dc-jor">
-            {histCaja.map((r) => {
+            {lista.map((r) => {
               const f = new Date(`${r.fecha}T12:00:00`);
               const hora = (x) => x ? new Date(x).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "—";
               const d = r.diferencia != null ? Number(r.diferencia) : null;
@@ -4207,6 +4219,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               );
             })}
           </div>
+          )}</ListaFiltrable>
           )}
         </div>
       )}
@@ -4245,9 +4258,16 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <span />
             {puedeEgresos && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn is-coral" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button></div>}
           </section>
+          <ListaFiltrable rows={movs} sub="movimientos" cols={[
+            { key: "tipo", label: "Tipo", get: (m) => (m.tipo === "ingreso" ? "Ingreso" : "Egreso") },
+            { key: "concepto", label: "Concepto", get: (m) => m.concepto || "" },
+            { key: "detalle", label: "Paciente o categoría", get: (m) => m.detalle || "" },
+            { key: "metodo", label: "Medio", get: (m) => m.metodo || "" },
+            { key: "monto", label: "Monto", get: (m) => Number(m.monto || 0).toFixed(2), sortVal: (m) => Number(m.monto) || 0 },
+          ]}>{(flt) => (
           <div className="dc-flujo">
             {[["ingreso", "Ingresos", "Cobros a pacientes", ingresosHoy, ArrowDownRight], ["egreso", "Egresos", "Gastos de la clínica", totEgresosHoy, ArrowUpRight]].map(([t, tit, sub, tot, Ico]) => {
-              const lista = movs.filter((m) => m.tipo === t);
+              const lista = flt.filter((m) => m.tipo === t);
               return (
               <section key={t} className={`dc-flujo__col is-${t}`}>
                 <header>
@@ -4274,6 +4294,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               );
             })}
           </div>
+          )}</ListaFiltrable>
         </div>
         );
       })()}
@@ -4302,8 +4323,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <span><b>Pasarela sin conectar.</b> Cuando se conecte (Niubiz, Culqi o similar), el paciente pagará desde su celular y el cobro entrará a Caja.</span>
           </div>
           {links.length === 0 ? <Card><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." /></Card> : (
+          <ListaFiltrable rows={links} sub="links" cols={[
+            { key: "paciente", label: "Paciente", get: (l) => l.paciente || "" },
+            { key: "concepto", label: "Concepto", get: (l) => l.concepto || "Pago de tratamiento" },
+            { key: "estado", label: "Estado", get: (l) => (l.estado === "pagado" ? "Pagado" : "Pendiente") },
+            { key: "monto", label: "Monto", get: (l) => Number(l.monto || 0).toFixed(2), sortVal: (l) => Number(l.monto) || 0 },
+          ]}>{(listaL) => (
           <div className="dc-tickets">
-            {links.map((l) => {
+            {listaL.map((l) => {
               const url = `pay.dentocheck.pe/${String(l.id).padStart(4, "0")}${l.paciente.split(" ")[0].toLowerCase()}`;
               const pagado = l.estado === "pagado";
               const col = colorDe(l.paciente);
@@ -4327,6 +4354,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               );
             })}
           </div>
+          )}</ListaFiltrable>
           )}
         </div>
         );
@@ -5229,13 +5257,20 @@ function Plataforma({ notify }) {
 /* Registro de auditoría como línea de tiempo agrupada por día. */
 function AuditoriaVista({ rows, hoyN, usuarios, alertas, sub, onDet, niv }) {
   const [filtro, setFiltro] = useState("todos");
-  const [q, setQ] = useState("");
   const tipoDe = (a) => { const t = String(a.accion || "").toLowerCase(); return a.nivel === "warn" ? "alerta" : t.includes("sesión") || t.includes("sesion") ? "sesion" : t.includes("historia") || t.includes("odontograma") || t.includes("paciente") ? "clinico" : "cambio"; };
   const TIPOS = { sesion: [LogOut, "#2F6FDE", "Sesiones"], clinico: [Stethoscope, "#0E9199", "Clínico"], cambio: [Settings, "#6D4FD1", "Cambios"], alerta: [AlertTriangle, "#E0694F", "Alertas"] };
-  const txt = q.trim().toLowerCase();
-  const lista = rows.filter((a) => (filtro === "todos" || tipoDe(a) === filtro) && (!txt || `${a.usuario} ${a.accion} ${a.detalle} ${a.ip}`.toLowerCase().includes(txt)));
-  const grupos = [];
+  const base = rows.filter((a) => filtro === "todos" || tipoDe(a) === filtro);
+  const agrupar = (lista) => { const grupos = [];
   lista.forEach((a) => { const f = String(a.fecha || "—"); const k = f.lastIndexOf(" "); const dia = k > 0 ? f.slice(0, k).replace(/,$/, "") : f; const hora = k > 0 ? f.slice(k + 1) : ""; const g = grupos.find((x) => x.dia === dia); const it = { ...a, _hora: hora }; if (g) g.items.push(it); else grupos.push({ dia, items: [it] }); });
+  return grupos; };
+  const FCOLS = [
+    { key: "fecha", label: "Fecha", get: (a) => a.fecha || "", sortVal: (a) => (a.orden != null ? a.orden : -(Number(a.id) || 0)) },
+    { key: "usuario", label: "Usuario", get: (a) => a.usuario || "" },
+    { key: "rol", label: "Rol", get: (a) => ROLES[a.rol]?.label || a.rol || "" },
+    { key: "accion", label: "Acción", get: (a) => a.accion || "" },
+    { key: "detalle", label: "Detalle", get: (a) => a.detalle || "" },
+    { key: "ip", label: "IP", get: (a) => a.ip || "" },
+  ];
   return (
     <>
       <section className="dc-esp-hero">
@@ -5251,13 +5286,12 @@ function AuditoriaVista({ rows, hoyN, usuarios, alertas, sub, onDet, niv }) {
         <span />
       </section>
       <div className="dc-us__barra">
-        <label className="dc-cob__buscar dc-us__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar usuario, acción o IP" aria-label="Buscar en auditoría" /></label>
         <div className="dc-us__roles" role="tablist" aria-label="Tipo de evento">
           <button type="button" role="tab" aria-selected={filtro === "todos"} className={filtro === "todos" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setFiltro("todos")}>Todos <i>{rows.length}</i></button>
           {Object.entries(TIPOS).map(([k, [TI, c, l]]) => { const n = rows.filter((a) => tipoDe(a) === k).length; return n ? <button key={k} type="button" role="tab" aria-selected={filtro === k} className={filtro === k ? "is-on" : ""} style={{ "--c": c }} onClick={() => setFiltro(k)}><TI size={13} strokeWidth={2} /> {l} <i>{n}</i></button> : null; })}
         </div>
       </div>
-      {grupos.length === 0 ? <Card><Vacio icon={<ShieldCheck size={22} strokeWidth={1.75} />} titulo="Sin eventos" sub="No hay registros que coincidan." /></Card> : grupos.map((g) => (
+      {base.length === 0 ? <Card><Vacio icon={<ShieldCheck size={22} strokeWidth={1.75} />} titulo="Sin eventos" sub="No hay registros que coincidan." /></Card> : <ListaFiltrable rows={base} cols={FCOLS} sub="eventos" defaultSort={{ key: "fecha", dir: "desc" }}>{(lista) => agrupar(lista).map((g) => (
         <section key={g.dia} className="dc-aud__dia">
           <div className="dc-aud__dtit"><b>{g.dia}</b><span>{g.items.length} {g.items.length === 1 ? "evento" : "eventos"}</span></div>
           <div className="dc-aud__lista">
@@ -5273,7 +5307,7 @@ function AuditoriaVista({ rows, hoyN, usuarios, alertas, sub, onDet, niv }) {
             ); })}
           </div>
         </section>
-      ))}
+      ))}</ListaFiltrable>}
     </>
   );
 }
@@ -5469,8 +5503,14 @@ function Recetas({ pacientes: pacProp, notify, updFicha }) {
       <div style={{ display: "grid", gap: 12 }}>
         {recetas.length === 0 && !form && <Card style={{ padding: 0 }}><Vacio icon={<FileText size={22} strokeWidth={1.75} />} titulo="Sin recetas" sub="Emite la primera receta; queda firmada en la historia del paciente." /></Card>}
         {recetas.length > 0 && (
+          <ListaFiltrable rows={recetas} sub="recetas" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+            { key: "paciente", label: "Paciente", get: (r) => r.paciente || "" },
+            { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
+            { key: "med", label: "Medicamento", get: (r) => (r.items || []).map((it) => it.med).join(" ") },
+            { key: "indic", label: "Indicaciones", get: (r) => r.indic || "" },
+          ]}>{(listaRx) => (
           <div className="dc-rx-grid">
-            {recetas.map((r) => { const col = colorDe(r.paciente); return (
+            {listaRx.map((r) => { const col = colorDe(r.paciente); return (
               <article key={r.id} className="dc-rx">
                 <header className="dc-rx__cab">
                   <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente)}</span>
@@ -5484,6 +5524,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha }) {
               </article>
             ); })}
           </div>
+          )}</ListaFiltrable>
         )}
       </div>
     </div>
@@ -6057,8 +6098,15 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         <Card className="dc-env">
           <div className="dc-env__cab"><h3>Órdenes de compra</h3></div>
           {filas.length === 0 && <Vacio icon={<Send size={22} strokeWidth={1.75} />} titulo="Sin órdenes" sub="Todavía no has registrado ninguna orden de compra." />}
+          {filas.length > 0 && <ListaFiltrable rows={filas} sub="órdenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+            { key: "proveedor", label: "Proveedor", get: (c) => c.proveedor || "" },
+            { key: "items", label: "Productos", get: (c) => c.items || "" },
+            { key: "fecha", label: "Fecha", get: (c) => c.fecha || "" },
+            { key: "estado", label: "Estado", get: (c) => (EST_OC[c.estado] || EST_OC.borrador).l },
+            { key: "total", label: "Total", get: (c) => Number(c.total || 0).toFixed(2), sortVal: (c) => Number(c.total) || 0 },
+          ]}>{(listaOC) => (
           <div className="dc-oc-lista">
-          {filas.map((c) => { const e = EST_OC[c.estado] || EST_OC.borrador; const col = OC_COL[c.estado] || "#8A9CA1"; return (
+          {listaOC.map((c) => { const e = EST_OC[c.estado] || EST_OC.borrador; const col = OC_COL[c.estado] || "#8A9CA1"; return (
             <div key={c.id} className="dc-oc" style={{ "--c": col }}>
               <span className="dc-serv-ico" style={{ "--c": col, width: 40, height: 40, borderRadius: 12 }}><Package size={18} strokeWidth={1.8} /></span>
               <div className="dc-oc__txt"><b>{c.proveedor}</b><span>{c.items}</span></div>
@@ -6075,6 +6123,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             </div>
           ); })}
           </div>
+          )}</ListaFiltrable>}
         </Card>
         </>
         ); })()}
@@ -6732,8 +6781,14 @@ function Resenas({ notify, citas = [], can }) {
         {(() => { const lista = [...reviews].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).filter((r) => filtroRes === "todas" ? true : filtroRes === "pendientes" ? !r.resp : !!r.resp); return lista.length === 0
           ? <Vacio icon={<Star size={22} strokeWidth={1.75} />} titulo={reviews.length ? "Nada con este filtro" : "Sin reseñas"} sub={reviews.length ? "Prueba con otro filtro." : "Solicita reseñas a tus pacientes recientes para construir tu reputación."} />
           : (
+          <ListaFiltrable rows={lista} sub="reseñas" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+            { key: "nombre", label: "Paciente", get: (r) => r.nombre || "" },
+            { key: "estrellas", label: "Estrellas", get: (r) => String(r.estrellas), sortVal: (r) => Number(r.estrellas) || 0 },
+            { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
+            { key: "texto", label: "Comentario", get: (r) => r.texto || "" },
+          ]}>{(listaR) => (
           <div className="dc-sat__grid">
-            {lista.map((r) => { const col = colorDe(r.nombre); const tono = r.estrellas >= 5 ? "prom" : r.estrellas <= 3 ? "det" : "neutro"; return (
+            {listaR.map((r) => { const col = colorDe(r.nombre); const tono = r.estrellas >= 5 ? "prom" : r.estrellas <= 3 ? "det" : "neutro"; return (
               <figure key={r.id} className={`dc-sat__com is-${tono} dc-res-card`} onClick={() => setSel(r)}>
                 <div className="dc-res-card__top"><span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span><span className="dc-res-card__fecha">{fechaLegible(r.fecha)}</span></div>
                 <blockquote>{r.texto}</blockquote>
@@ -6745,6 +6800,7 @@ function Resenas({ notify, citas = [], can }) {
               </figure>
             ); })}
           </div>
+          )}</ListaFiltrable>
         ); })()}
       </Card>
       {sel && (() => { const r = reviews.find((x) => x.id === sel.id) || sel; const col = colorDe(r.nombre); return (
@@ -6869,8 +6925,14 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
           </div>
         )}
       </section>
+      <ListaFiltrable rows={liqView} sub="liquidaciones" cols={[
+        { key: "paciente", label: "Paciente", get: (x) => x.paciente || "" },
+        { key: "aseg", label: "Aseguradora", get: (x) => x.aseg || "" },
+        { key: "cob", label: "Cubre seguro", get: (x) => Number(x.cob || 0).toFixed(2), sortVal: (x) => Number(x.cob) || 0 },
+        { key: "total", label: "Total", get: (x) => Number(x.total || 0).toFixed(2), sortVal: (x) => Number(x.total) || 0 },
+      ]}>{(listaLq) => (
       <div className="dc-seg__tablero">
-        {COLS_LIQ.map(([k, tit, sub, col, Ico]) => { const items = liqView.filter((l) => l.estado === k); const tot = items.reduce((a, l) => a + (Number(l.cob) || 0), 0); return (
+        {COLS_LIQ.map(([k, tit, sub, col, Ico]) => { const items = listaLq.filter((l) => l.estado === k); const tot = items.reduce((a, l) => a + (Number(l.cob) || 0), 0); return (
           <section key={k} className="dc-seg__col" style={{ "--c": col }}>
             <header><span className="dc-seg__cico"><Ico size={16} strokeWidth={2} /></span><div><h4>{tit} <i>{items.length}</i></h4><small>{sub}</small></div><b>S/ {tot.toLocaleString("es-PE")}</b></header>
             {items.length === 0 ? <p className="dc-seg__nada">Sin liquidaciones aquí.</p> : items.map((x) => { const pc = x.total ? Math.round((x.cob / x.total) * 100) : 0; return (
@@ -6888,6 +6950,7 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
           </section>
         ); })}
       </div>
+      )}</ListaFiltrable>
       {detalleLiq && (() => { const x = detalleLiq; const I = LI[x.estado]; return (
         <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={x.estado !== "pagado" ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
@@ -7091,8 +7154,14 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
           {base.length === 0 ? (
             <Vacio icon={soloFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={soloFotos ? "Sin fotos" : "Sin estudios"} sub={soloFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía o foto de este paciente."} />
           ) : (
+            <ListaFiltrable rows={base} sub="imágenes" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+              { key: "tipo", label: "Tipo", get: (s) => RX_TIPOS[s.tipo] || s.tipo || "" },
+              { key: "fecha", label: "Fecha", get: (s) => s.fecha || "" },
+              { key: "sede", label: "Sede", get: (s) => nombreSede(s.sede) || "" },
+              { key: "nota", label: "Nota", get: (s) => s.nota || "" },
+            ]}>{(listaG) => (
             <div className="dc-gal__grid">
-              {base.map((s) => { const esFoto = s.tipo === "foto"; return (
+              {listaG.map((s) => { const esFoto = s.tipo === "foto"; return (
                 <article key={s.id} className={`dc-gal__item${esFoto ? " is-foto" : ""}`}>
                   <button type="button" className="dc-gal__img" onClick={() => setVisor(s)} aria-label={`Abrir ${RX_TIPOS[s.tipo]}`}>
                     {s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} /> : (esFoto ? <Camera size={34} strokeWidth={1.5} /> : <Scan size={34} strokeWidth={1.5} />)}
@@ -7106,6 +7175,7 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
                 </article>
               ); })}
             </div>
+            )}</ListaFiltrable>
           )}
         </Card>
       ); })()}

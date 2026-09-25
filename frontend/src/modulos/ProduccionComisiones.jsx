@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
-import { EnCabecera } from "../comun";
+import { EnCabecera, ListaFiltrable } from "../comun";
 import { filtraMicro, inicialesDe, layoutProgreso } from "./panelGerencialUtil";
 import {
   UMBRAL_AUSENTISMO,
@@ -644,6 +644,13 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
           })}>i</button>
         </div>
         <div className="dc-card__body">
+          <ListaFiltrable rows={rows} sub="odontólogos" cols={[
+            { key: "nombre", label: "Odontólogo", get: (r) => r.nombre || "" },
+            { key: "agenda", label: "Agenda", get: (r) => String(r.agenda ?? ""), sortVal: (r) => Number(r.agenda) || 0 },
+            { key: "perdidas", label: "Se pierden", get: (r) => String(r.perdidas ?? ""), sortVal: (r) => Number(r.perdidas) || 0 },
+            { key: "tasa", label: "%", get: (r) => (r.tasa == null ? "" : String(r.tasa)), sortVal: (r) => (r.tasa == null ? -1 : Number(r.tasa)) },
+            { key: "coste", label: "Coste", get: (r) => (r.coste != null ? String(r.coste) : ""), sortVal: (r) => Number(r.coste) || 0 },
+          ]}>{(lstA) => (
           <div className="dc-tabla-doc dc-tabla-doc--aus" role="table" aria-label="Ausentismo por odontólogo">
             <div className="fila cab" role="row">
               <span>Odontólogo</span>
@@ -653,7 +660,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
               <span className="der">%</span>
               <span className="der">Coste</span>
             </div>
-            {rows.map((r) => (
+            {lstA.map((r) => (
               <div
                 key={r.id}
                 className={`fila${r.perdidas === 0 ? " nula" : ""}`}
@@ -704,6 +711,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
               </div>
             )}
           </div>
+          )}</ListaFiltrable>
         </div>
         <p className="dc-card__foot">
           Agrupado real por odontólogo a partir de la agenda (<b>médico</b> y <b>estado</b> de cada cita).
@@ -911,12 +919,19 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
               })}>i</button>
             </div>
             <div className="dc-card__body">
+              <ListaFiltrable rows={porMedico} sub="odontólogos" cols={[
+                { key: "nombre", label: "Odontólogo", get: (m) => m.nombre || "" },
+                { key: "esp", label: "Especialidad", get: (m) => m.especialidad || "" },
+                { key: "citas", label: "Citas", get: (m) => String(m.atendidas || 0), sortVal: (m) => Number(m.atendidas) || 0 },
+                { key: "prod", label: "Producción", get: (m) => String(m.produccion || 0), sortVal: (m) => Number(m.produccion) || 0 },
+                { key: "com", label: "Comisión", get: (m) => String(m.comision || 0), sortVal: (m) => Number(m.comision) || 0 },
+              ]}>{(lstP) => (
               <div className="dc-tabla-doc" role="table" aria-label="Producción y comisión por odontólogo">
                 <div className="fila cab" role="row">
                   <span>Odontólogo</span><span className="der">Citas</span><span>Parte del total</span>
                   <span className="der">Producción</span><span className="der">%</span><span className="der">Comisión</span>
                 </div>
-                {porMedico.map((m, i) => {
+                {lstP.map((m) => { const i = porMedico.indexOf(m);
                   const lay = layoutProgreso(m.produccion, totalProd);
                   const color = COLORES[i % COLORES.length];
                   const nula = !(Number(m.produccion) > 0);
@@ -960,6 +975,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
                   <span className="der num">{moneyFmt(totalCom)}</span>
                 </div>
               </div>
+              )}</ListaFiltrable>
             </div>
             <p className="dc-card__foot">
               Misma regla que el panel gerencial (atendidas × precio base). El <b>{moneyFmt(totalProd)}</b> coincide

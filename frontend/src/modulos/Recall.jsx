@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
-import {EnCabecera, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint} from "../comun";
+import {EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint} from "../comun";
 
 function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
@@ -212,8 +212,8 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
           const cuenta = (e) => histView.filter((h) => h.estado === e).length;
           const leidos = cuenta("leido") + cuenta("respondido");
           const filtrados = filtroEnv === "todos" ? histView : histView.filter((h) => (filtroEnv === "leido" ? h.estado === "leido" || h.estado === "respondido" : h.estado === filtroEnv));
-          const dias = [];
-          filtrados.forEach((h) => { const d = String(h.fecha || "").slice(0, 10); let g = dias.find((x) => x.d === d); if (!g) { g = { d, items: [] }; dias.push(g); } g.items.push(h); });
+          const agrupar = (lst) => { const dias = [];
+          lst.forEach((h) => { const d = String(h.fecha || "").slice(0, 10); let g = dias.find((x) => x.d === d); if (!g) { g = { d, items: [] }; dias.push(g); } g.items.push(h); }); return dias; };
           const etiquetaDia = (d) => (d === fmt(hoy) ? "Hoy" : d === addDays(-1) ? "Ayer" : (() => { const t = fechaLegible(d); return t.charAt(0).toUpperCase() + t.slice(1); })());
           const pctDe = (x) => (histView.length ? Math.round((x / histView.length) * 100) : 0);
           return (
@@ -250,7 +250,12 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
                 </div>
               </div>
               {filtrados.length === 0 && <Vacio icon={<Send size={24} strokeWidth={1.75} />} titulo={histView.length ? "Nada con este filtro" : "Aún sin envíos"} sub={histView.length ? "Prueba con otro estado." : "Cuando una automatización envíe un WhatsApp, aparecerá aquí."} />}
-              {dias.map((g) => (
+              {filtrados.length > 0 && <ListaFiltrable rows={filtrados} sub="envíos" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+                { key: "fecha", label: "Fecha", get: (h) => String(h.fecha || "").slice(0, 10), sortVal: (h) => `${String(h.fecha || "").slice(0, 10)} ${h.hora || ""}` },
+                { key: "paciente", label: "Paciente", get: (h) => h.paciente || "" },
+                { key: "regla", label: "Mensaje", get: (h) => h.regla || "" },
+                { key: "estado", label: "Estado", get: (h) => (ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado).l },
+              ]}>{(lst) => agrupar(lst).map((g) => (
                 <div key={g.d} className="dc-env__dia">
                   <div className="dc-env__fecha">{etiquetaDia(g.d)}</div>
                   {g.items.map((h) => { const es = ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado; const EIc = es.ic; const col = colorDe(h.paciente); const rg = reglas.find((r) => r.l === h.regla); const RIc = (rg && rg.icon) || MessageSquare; const rc = (rg && rg.color) || DS.c.primary; return (
@@ -262,7 +267,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
                     </div>
                   ); })}
                 </div>
-              ))}
+              ))}</ListaFiltrable>}
             </Card>
           </>
           ); })()
@@ -304,8 +309,13 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
           {puedeEnviar && cola.some((c) => c.estado === "por_contactar") && <Btn small onClick={enviarTodos}><Send size={14} strokeWidth={1.75} /> Enviar a todos</Btn>}
         </div>
         {cola.length > 0 && (
+          <ListaFiltrable rows={cola} sub="pacientes" className="dc-lf--dentro dc-rec__lf" cols={[
+            { key: "nombre", label: "Paciente", get: (p) => p.nombre || "" },
+            { key: "ultima", label: "Última visita", get: (p) => String(p.ultima || "").slice(0, 10) },
+            { key: "estado", label: "Estado", get: (p) => (p.estado === "enviado" ? "Enviado" : "Por contactar") },
+          ]}>{(lstC) => (
           <div className="dc-rec__cola">
-            {cola.map((p) => { const col = colorDe(p.nombre); const f = p.ultima ? new Date(String(p.ultima).slice(0, 10) + "T00:00:00") : null; const meses = f && !isNaN(f) ? Math.max(0, Math.round((hoy - f) / 2629800000)) : null; return (
+            {lstC.map((p) => { const col = colorDe(p.nombre); const f = p.ultima ? new Date(String(p.ultima).slice(0, 10) + "T00:00:00") : null; const meses = f && !isNaN(f) ? Math.max(0, Math.round((hoy - f) / 2629800000)) : null; return (
               <div key={p.id} className={`dc-rec__pac${p.estado === "enviado" ? " is-enviado" : ""}`}>
                 <span className="dc-rec__av" style={{ background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(p.nombre)}</span>
                 <div className="dc-rec__pac-txt">
@@ -318,6 +328,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
               </div>
             ); })}
           </div>
+          )}</ListaFiltrable>
         )}
         {cola.length === 0 && <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todos al día" sub="No hay pacientes pendientes de recall." />}
       </Card>

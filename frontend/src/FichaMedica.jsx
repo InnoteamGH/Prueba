@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {AvatarPaciente, PACIENTES_INIT, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {AvatarPaciente, DataTable, PACIENTES_INIT, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -2217,25 +2217,24 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 </div>
                 <div style={{ ...card, padding: 0, overflow: "hidden" }}>
                   <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Plan de tratamiento</div>
-                  {arr(d?.tratamientos).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin plan de tratamiento.</div>}
-                  {arr(d?.tratamientos).map((t, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i ? `1px solid ${LINE}` : "none", fontSize: 13 }}>
-                      <span style={{ color: NAVY, fontWeight: 600, flex: 1 }}>{t.nombre}{t.pieza ? ` – pieza ${t.pieza}` : ""}</span>
-                      <span className={`dc-pill${t.estado === "completada" ? " is-ok" : " is-aviso"}`} style={{ margin: "0 16px" }}><i /> {t.estado === "completada" ? "Completada" : "Pendiente"}</span>
-                      <span style={{ fontWeight: 700, minWidth: 90, textAlign: "right", fontFamily: "var(--dc-font-title)" }}>{money(t.costo)}</span>
-                    </div>
-                  ))}
+                  {arr(d?.tratamientos).length === 0 ? <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin plan de tratamiento.</div> : (
+                    <DataTable bare minWidth={0} sub="tratamientos" rows={arr(d?.tratamientos).map((t, i) => ({ ...t, id: t.id ?? i }))} cols={[
+                      { key: "nombre", label: "Tratamiento", w: "minmax(0,2fr)", a: "left", get: (t) => `${t.nombre}${t.pieza ? ` – pieza ${t.pieza}` : ""}`, cell: (t) => <span style={{ color: NAVY, fontWeight: 600, fontSize: 13 }}>{t.nombre}{t.pieza ? ` – pieza ${t.pieza}` : ""}</span> },
+                      { key: "estado", label: "Estado", w: "130px", get: (t) => (t.estado === "completada" ? "Completada" : "Pendiente"), cell: (t) => <span className={`dc-pill${t.estado === "completada" ? " is-ok" : " is-aviso"}`}><i /> {t.estado === "completada" ? "Completada" : "Pendiente"}</span> },
+                      { key: "costo", label: "Costo", w: "110px", a: "right", get: (t) => money(t.costo), sortVal: (t) => Number(t.costo) || 0, cell: (t) => <span style={{ fontWeight: 700, fontFamily: "var(--dc-font-title)", fontSize: 13 }}>{money(t.costo)}</span> },
+                    ]} />
+                  )}
                 </div>
                 <div style={{ ...card, padding: 0, overflow: "hidden" }}>
                   <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Pagos ({arr(d?.pagos).length})</div>
-                  {arr(d?.pagos).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin pagos registrados.</div>}
-                  {arr(d?.pagos).slice(0, 15).map((pg, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: i ? `1px solid ${LINE}` : "none", fontSize: 13 }}>
-                      <span style={{ color: NAVY, fontWeight: 500 }}>{pg.fecha ? new Date(pg.fecha + "T00:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" }) : "—"}</span>
-                      <span style={{ color: "var(--dc-ink-400)", flex: 1, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 10px" }}>{pg.concepto || "—"}</span>
-                      <span style={{ color: GREEN, fontWeight: 500 }}>{money(pg.monto)}</span>
-                    </div>
-                  ))}
+                  {arr(d?.pagos).length === 0 ? <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin pagos registrados.</div> : (
+                    <DataTable bare minWidth={0} sub="pagos" defaultSort={{ key: "fecha", dir: "desc" }} rows={arr(d?.pagos).map((pg, i) => ({ ...pg, id: pg.id ?? i }))} cols={[
+                      { key: "fecha", label: "Fecha", w: "140px", a: "left", get: (pg) => pg.fecha || "", cell: (pg) => <span style={{ color: NAVY, fontWeight: 500, fontSize: 13 }}>{pg.fecha ? new Date(pg.fecha + "T00:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" }) : "—"}</span> },
+                      { key: "concepto", label: "Concepto", w: "minmax(0,2fr)", get: (pg) => pg.concepto || "" },
+                      { key: "metodo", label: "Medio", w: "110px", get: (pg) => pg.metodo || "" },
+                      { key: "monto", label: "Monto", w: "110px", a: "right", get: (pg) => money(pg.monto), sortVal: (pg) => Number(pg.monto) || 0, cell: (pg) => <span style={{ color: GREEN, fontWeight: 500, fontSize: 13 }}>{money(pg.monto)}</span> },
+                    ]} />
+                  )}
                 </div>
               </>
             )}
