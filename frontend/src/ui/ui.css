@@ -3062,3 +3062,38 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-aud__ev code { font-size: 11.5px; color: var(--dc-ink-500); background: #F4F7F8; padding: 3px 8px; border-radius: 8px; justify-self: start; }
 .dc-aud__ev .dc-int__est { justify-self: end; }
 @media (max-width: 900px) { .dc-aud__ev { grid-template-columns: 44px 32px minmax(0, 1fr) auto; } .dc-aud__quien, .dc-aud__ev code { display: none; } }
+
+/* ---- Pacientes: marketing ---- */
+.dc-mkt { padding: 14px 16px 16px; border-radius: 20px; background: #fff; box-shadow: inset 0 0 0 1px #E3EFEF, 0 12px 26px -24px rgba(14,42,51,.55); }
+.dc-mkt__cab { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.dc-mkt__cab > span { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #E0487A, #F07C6C); box-shadow: 0 8px 16px -10px #E0487A; }
+.dc-mkt__cab h3 { margin: 0; font-size: 15px; font-weight: 800; color: var(--dc-ink-900); }
+.dc-mkt__cab small { font-size: 12.5px; color: var(--dc-ink-500); }
+.dc-mkt__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.dc-mkt h4 { margin: 0 0 10px; font-size: 13px; font-weight: 750; color: var(--dc-ink-700); }
+.dc-mkt__canal, .dc-mkt__segs { padding: 12px 14px; border-radius: 16px; background: #F7FAFA; box-shadow: inset 0 0 0 1px #EAF1F2; }
+.dc-mkt__canalin { display: flex; align-items: center; gap: 18px; }
+.dc-mkt__dona { width: 132px; height: 132px; flex-shrink: 0; border-radius: 999px; display: grid; place-items: center; }
+.dc-mkt__dona div { display: grid; justify-items: center; text-align: center; max-width: 80px; }
+.dc-mkt__dona b { font-family: var(--dc-font-title); font-size: 20px; font-weight: 800; color: var(--dc-ink-900); }
+.dc-mkt__dona small { font-size: 10.5px; line-height: 1.2; color: var(--dc-ink-500); }
+.dc-mkt__canalin ul { flex: 1; list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-width: 0; }
+.dc-mkt__canalin li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 38px; align-items: center; gap: 8px; font-size: 12.5px; }
+.dc-mkt__canalin li i { width: 10px; height: 10px; border-radius: 4px; background: var(--c); }
+.dc-mkt__canalin li span { color: var(--dc-ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-mkt__canalin li b { font-weight: 800; color: var(--dc-ink-900); }
+.dc-mkt__canalin li small { text-align: right; font-weight: 650; color: var(--dc-ink-500); }
+.dc-mkt__nada { margin: 0; font-size: 12.5px; color: var(--dc-ink-500); }
+.dc-mkt__segs { display: grid; gap: 8px; align-content: start; }
+.dc-mkt__segs h4 { margin-bottom: 2px; }
+.dc-mkt__seg { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px #E6EEEF; border-left: 3px solid var(--c); }
+.dc-mkt__seg > div { flex: 1; display: grid; min-width: 0; }
+.dc-mkt__seg b { font-size: 13px; font-weight: 700; color: var(--dc-ink-900); }
+.dc-mkt__seg small { font-size: 11.5px; color: var(--dc-ink-500); }
+.dc-mkt__sico { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; color: var(--c); background: color-mix(in srgb, var(--c) 12%, #fff); }
+.dc-mkt__seg em { font-style: normal; font-family: var(--dc-font-title); font-size: 20px; font-weight: 800; color: var(--c); min-width: 28px; text-align: right; }
+.dc-mkt__seg button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 750; color: #fff; background: var(--c); box-shadow: 0 8px 14px -10px var(--c); }
+.dc-mkt__seg button:disabled { cursor: default; color: var(--dc-ink-400); background: #EEF3F4; box-shadow: none; }
+.dc-mkt__seg button:focus-visible { box-shadow: var(--dc-focus); }
+.dc-mkt__seg.is-vacio em { color: var(--dc-ink-400); }
+@media (max-width: 900px) { .dc-mkt__grid { grid-template-columns: 1fr; } .dc-mkt__canalin { flex-direction: column; align-items: stretch; } .dc-mkt__dona { align-self: center; } }

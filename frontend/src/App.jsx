@@ -2364,27 +2364,29 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       if (meses >= 6 && alta > 30) reactivar++;
       if (d <= 30 || alta <= 30) nuevos++;
       if (p.nacimiento && new Date(p.nacimiento + "T00:00:00").getMonth() === mesHoy) cumpleMes++;
-      if (p.marketing) optIn++;
-      const canalKey = p.canal && String(p.canal).trim() ? p.canal : "Sin registrar";
+      if (p.marketing || (!conectado && (Number(p.id) || 0) % 3 !== 0)) optIn++;
+      // Demo: canal de ejemplo repartido por id para que la vista no salga vacía.
+      const CANAL_DEMO = ["Recomendación", "Instagram", "Google", "Recomendación", "Facebook", "Pasó por el local", "Instagram", "Convenio empresa", "TikTok"];
+      const canalKey = p.canal && String(p.canal).trim() ? p.canal : (!conectado ? CANAL_DEMO[(Number(p.id) || 0) % CANAL_DEMO.length] : "Sin registrar");
       canalCount[canalKey] = (canalCount[canalKey] || 0) + 1;
     }
     return { activos, reactivar, nuevos, cumpleMes, optIn,
              canalTop: Object.entries(canalCount).sort((a, b) => b[1] - a[1]).slice(0, 8) };
   }, [lista, ultimaVisita]); // eslint-disable-line
   const canalMax = Math.max(1, ...canalTop.map((c) => c[1]));
-  const canalCol = { "Recomendación": "var(--dc-ok-700)", "Instagram": "var(--dc-red)", "Facebook": DS.c.primary, "Google": "var(--dc-warn)", "TikTok": "var(--dc-ink-alt)", "Volante": "var(--dc-warn-600)", "Pasó por el local": DS.c.primary, "Convenio empresa": "var(--dc-purple)", "Sin registrar": "var(--dc-ink-200)" };
+  const canalCol = { "Recomendación": "#16A36A", "Instagram": "#E0487A", "Facebook": "#2F6FDE", "Google": "#F2A93B", "TikTok": "#1F3A40", "Volante": "#D97706", "Pasó por el local": "#0E9199", "Convenio empresa": "#6D4FD1", "Sin registrar": "#B7C8CB" };
   const segmentos = [
-    { k: "cumple", label: "Cumpleaños este mes", n: cumpleMes, color: DS.c.primary, icon: <Sparkles size={16} strokeWidth={1.75} />,
+    { k: "cumple", label: "Cumpleaños este mes", sub: "Saludo con descuento", n: cumpleMes, color: "#E0487A", icon: <Sparkles size={16} strokeWidth={1.75} />,
       plantilla: "¡Feliz cumpleaños, {nombre}! 🎉 En Sonríe+ queremos celebrar contigo: este mes tienes 20% de descuento en tu limpieza dental. Escríbenos para agendar." },
-    { k: "react", label: "Para reactivar", n: reactivar, color: "var(--dc-warn-600)", icon: <BellRing size={16} strokeWidth={1.75} />,
+    { k: "react", label: "Para reactivar", sub: "Más de 6 meses sin venir", n: reactivar, color: "#D97706", icon: <BellRing size={16} strokeWidth={1.75} />,
       plantilla: "Hola {nombre}, ¡te extrañamos en Sonríe+! Hace más de 6 meses de tu última visita. Reserva tu control con 15% de descuento este mes. Tu sonrisa lo agradecerá 😁" },
-    { k: "opt", label: "Aceptan campañas", n: optIn, color: TEAL, icon: <Megaphone size={16} strokeWidth={1.75} />,
+    { k: "opt", label: "Aceptan campañas", sub: "Dieron su consentimiento", n: optIn, color: "#0E9199", icon: <Megaphone size={16} strokeWidth={1.75} />,
       plantilla: "Hola {nombre}, en Sonríe+ tenemos una promoción especial para ti este mes. Escríbenos y agenda tu cita con beneficios exclusivos. ¡Te esperamos!" },
   ];
   const segmentoPac = (k) => lista.filter((p) => p.telefono && String(p.telefono).trim() && (
     k === "cumple" ? (p.nacimiento && new Date(p.nacimiento + "T00:00:00").getMonth() === hoy.getMonth())
     : k === "react" ? (dias(p) > 180 && diasDesdeAlta(p) > 30)
-    : k === "opt" ? p.marketing : false));
+    : k === "opt" ? (p.marketing || (!conectado && (Number(p.id) || 0) % 3 !== 0)) : false));
   const enviarCamp = async () => {
     const canalTxt = camp.canal === "ambos" ? "WhatsApp y email" : camp.canal === "email" ? "email" : "WhatsApp";
     // Envío REAL por WhatsApp (salvo canal solo-email, que aún no está integrado).
@@ -2466,39 +2468,37 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
       </section>
       <DataTable titulo="Directorio de pacientes" maxHeight={560} sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
-      <h2 className="dc-seccion">Marketing</h2>
-      <div className="dc-split">
-        <Card style={{ padding: "18px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}><BarChart3 size={17} strokeWidth={1.75} color={TEAL} /><span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Cómo nos conocen</span></div>
-          <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 16 }}>Canal de captación – sirve para decidir dónde invertir en marketing</div>
-          {canalTop.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--dc-ink-400)", padding: "12px 0", lineHeight: 1.5 }}>Aún no registramos el canal de captación de estos pacientes. Al dar de alta, indica «¿Cómo nos conoció?».</div>
-          ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {canalTop.map(([c, n]) => { const col = canalCol[c] || "var(--dc-ink-200)"; const pct = Math.round((n / Math.max(1, lista.length)) * 100); return (
-              <div key={c} className="dc-rise" style={{ display: "grid", gridTemplateColumns: "148px 1fr 42px", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: "var(--dc-r-md)", transition: "background .16s", cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.background = "rgba(15,27,56,0.02)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c}</span>
-                {(() => { const lp = layoutProgreso(pct); if (!lp.dibujar && !lp.soloTexto) return <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div>; if (lp.soloTexto) return <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div>; return <div style={{ height: 9, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${lp.pct}%`, height: "100%", background: col, borderRadius: "var(--dc-r-full)" }} /></div>; })()}
-                <span style={{ fontSize: 13, fontWeight: 500, color: NAVY, textAlign: "right", fontVariantNumeric: "tabular-nums" }} title={`${n} de ${lista.length} pacientes`}>{n}</span>
+      <section className="dc-mkt">
+        <header className="dc-mkt__cab"><span><Megaphone size={16} strokeWidth={2} /></span><div><h3>Marketing</h3><small>De dónde llegan tus pacientes y a quién escribirle hoy{!conectado ? " (datos de ejemplo)" : ""}</small></div></header>
+        <div className="dc-mkt__grid">
+          <div className="dc-mkt__canal">
+            <h4>Cómo nos conocen</h4>
+            {canalTop.length === 0 || (canalTop.length === 1 && canalTop[0][0] === "Sin registrar") ? (
+              <p className="dc-mkt__nada">Aún no registramos el canal de captación. Al dar de alta, indica «¿Cómo nos conoció?».</p>
+            ) : (() => { const tot = canalTop.reduce((x, [, n]) => x + n, 0) || 1; let acc = 0; const grad = canalTop.map(([c, n]) => { const a0 = acc; acc += (n / tot) * 100; return `${canalCol[c] || "#9AAEB2"} ${a0}% ${acc}%`; }).join(", "); const top = canalTop.find(([c]) => c !== "Sin registrar"); return (
+              <div className="dc-mkt__canalin">
+                <div className="dc-mkt__dona" style={{ background: `radial-gradient(closest-side, #fff 64%, transparent 66% 100%), conic-gradient(${grad})` }}><div><b>{top ? Math.round((top[1] / tot) * 100) : 0}%</b><small>{top ? top[0] : "—"}</small></div></div>
+                <ul>
+                  {canalTop.map(([c, n]) => (
+                    <li key={c} style={{ "--c": canalCol[c] || "#9AAEB2" }}><i /><span>{c}</span><b>{n}</b><small>{Math.round((n / tot) * 100)}%</small></li>
+                  ))}
+                </ul>
               </div>
-            ); })}
+            ); })()}
           </div>
-          )}
-        </Card>
-        <Card style={{ padding: "18px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}><Megaphone size={17} strokeWidth={1.75} color={DS.c.primary} /><span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Segmentos para campaña</span></div>
-          <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 16 }}>Grupos listos para una acción de marketing hoy</div>
-          <div style={{ display: "grid" }}>
-            {segmentos.map((s) => (
-              <div key={s.k} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderTop: "1px solid var(--dc-line)" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 999, background: tint(s.color, 0.09), color: s.color, display: "grid", placeItems: "center", flexShrink: 0 }}>{s.icon}</div>
-                <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 14, fontWeight: 500, color: "var(--dc-ink-700)" }}>{s.label}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{pluralEs(s.n, "paciente", "pacientes")}</div></div>
-                {puedeGestionar && <button onClick={() => setCamp({ ...s, canal: "ambos", msg: s.plantilla })} disabled={!s.n} style={{ fontSize: 13, fontWeight: 500, color: s.n ? s.color : "var(--dc-ink-400)", background: s.n ? tint(s.color, 0.078) : "var(--dc-line)", border: "none", borderRadius: "var(--dc-r-sm)", padding: "8px 12px", cursor: s.n ? "pointer" : "default", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", flexShrink: 0 }}><Send size={13} strokeWidth={1.75} /> Campaña</button>}
+          <div className="dc-mkt__segs">
+            <h4>Segmentos para campaña</h4>
+            {segmentos.map((sg) => (
+              <div key={sg.k} className={`dc-mkt__seg${sg.n ? "" : " is-vacio"}`} style={{ "--c": sg.color }}>
+                <span className="dc-mkt__sico">{sg.icon}</span>
+                <div><b>{sg.label}</b><small>{sg.sub}</small></div>
+                <em>{sg.n}</em>
+                {puedeGestionar && <button type="button" onClick={() => setCamp({ ...sg, canal: "ambos", msg: sg.plantilla })} disabled={!sg.n}><Send size={13} strokeWidth={2} /> Enviar</button>}
               </div>
             ))}
           </div>
-        </Card>
-      </div>
+        </div>
+      </section>
       {ficha && <FichaPaciente nombre={ficha} onClose={() => setFicha(null)} fichas={fichas} />}
       {ficha360 && <FichaReal data={ficha360} onClose={() => setFicha360(null)} notify={notify} />}
       {fmId && (
