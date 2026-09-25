@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft} from "lucide-react";
+import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
@@ -2997,16 +2997,67 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
         )}
         {fases.length === 0 && !nueva && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Sin tratamiento" sub="Agrega la primera fase, o créalas desde el odontograma." />}
         {fases.length > 0 && (
-          <DataTable bare minWidth={640} sub="fases" onRowClick={(f) => setDetF(f)} rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} cols={[
-            { key: "n", label: "#", w: "44px", a: "center", noFilter: true, get: (f) => f._n, cell: (f) => <div className="dc-trat-num" style={{ width: 28, height: 28, borderRadius: "var(--dc-r-sm)", background: f.estado === "atendida" ? "var(--dc-ok-soft)" : "var(--dc-line)", color: f.estado === "atendida" ? "var(--dc-ok-700)" : "var(--dc-ink-500)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13 }}>{f.estado === "atendida" ? "✓" : f._n}</div> },
-            { key: "proc", label: "Procedimiento", w: "minmax(0,1.6fr)", a: "left", get: (f) => nombreFaseLimpio(f), cell: (f) => <div style={{ minWidth: 0, fontWeight: 500, color: NAVY }}>{nombreFaseLimpio(f)} {f.origen === "odontograma" && <span style={{ fontSize: 12, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-full)", padding: "1px 7px", fontWeight: 500 }}>del odontograma</span>}</div> },
-            { key: "pieza", label: "Pieza", w: "80px", get: (f) => String(piezaDeFase(f) ?? "") },
-            { key: "cara", label: "Cara", w: "90px", get: (f) => String(caraDeFase(f) ?? "") },
-            { key: "costo", label: "Costo", w: "110px", a: "right", get: (f) => `S/ ${f.costo.toFixed(2)}` },
-            { key: "estado", label: "Estado", w: "170px", a: "right", get: (f) => (f.estado === "atendida" ? "Atendida" : "Pendiente"), cell: (f) => f.estado === "atendida"
-              ? <Badge estado={f.estado} />
-              : <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>{puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button><button type="button" className="dc-icon-btn" aria-label="Quitar" onClick={() => quitarFase(f)} title="Quitar" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dc-ink-500)" }}><X size={16} strokeWidth={1.75} /></button></> : <Badge estado={f.estado} />}</div> },
-          ]} />
+          <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="fases" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
+            vistas={[{ id: "tabla", label: "Tabla", icon: Table2 }, { id: "recorrido", label: "Recorrido", icon: Route }, { id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} cols={[
+              { key: "proc", label: "Procedimiento", get: (f) => nombreFaseLimpio(f) },
+              { key: "pieza", label: "Pieza", get: (f) => String(piezaDeFase(f) ?? "") },
+              { key: "costo", label: "Costo", get: (f) => f.costo.toFixed(2), sortVal: (f) => f.costo },
+              { key: "estado", label: "Estado", get: (f) => (f.estado === "atendida" ? "Atendida" : "Pendiente") },
+            ]}>{(lst, vista) => {
+              const hecho = (f) => f.estado === "atendida";
+              const siguiente = fases.find((f) => !hecho(f));
+              const acciones = (f) => hecho(f) ? <Badge estado={f.estado} /> : (
+                <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
+                  {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
+                  <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button></> : <Badge estado={f.estado} />}
+                </div>
+              );
+              const origen = (f) => f.origen === "odontograma" && <span className="dc-tr__orig"><Smile size={11} strokeWidth={2} /> del odontograma</span>;
+              if (vista === "recorrido") return (
+                <ol className="dc-tr__ruta">
+                  {lst.map((f) => { const est = hecho(f) ? "is-ok" : siguiente && siguiente.id === f.id ? "is-sig" : "is-pend"; return (
+                    <li key={f.id} className={est} onClick={() => setDetF(f)}>
+                      <span className="dc-tr__nodo">{hecho(f) ? <Check size={15} strokeWidth={3} /> : f._n}</span>
+                      <div className="dc-tr__paso">
+                        <div className="dc-tr__ptxt">
+                          {est === "is-sig" && <em>Siguiente paso</em>}
+                          <b>{nombreFaseLimpio(f)}</b>
+                          <span>{[piezaDeFase(f) && piezaDeFase(f) !== "—" ? `Pieza ${piezaDeFase(f)}` : null, caraDeFase(f) && caraDeFase(f) !== "—" ? `Cara ${caraDeFase(f)}` : null].filter(Boolean).join(" · ") || "Boca completa"} {origen(f)}</span>
+                        </div>
+                        <b className="dc-tr__pcosto">S/ {f.costo.toFixed(2)}</b>
+                        {acciones(f)}
+                      </div>
+                    </li>
+                  ); })}
+                </ol>
+              );
+              if (vista === "tarjetas") return (
+                <div className="dc-tr__cards">
+                  {lst.map((f) => (
+                    <article key={f.id} className={`dc-tr__card${hecho(f) ? " is-ok" : ""}`} onClick={() => setDetF(f)}>
+                      <header><span className="dc-tr__nodo">{hecho(f) ? <Check size={14} strokeWidth={3} /> : f._n}</span><b>{nombreFaseLimpio(f)}</b></header>
+                      <div className="dc-tr__cdat"><div><small>Pieza</small><b>{piezaDeFase(f)}</b></div><div><small>Cara</small><b>{caraDeFase(f)}</b></div><div><small>Costo</small><b>S/ {f.costo.toFixed(2)}</b></div></div>
+                      <footer>{origen(f) || <span />}{acciones(f)}</footer>
+                    </article>
+                  ))}
+                </div>
+              );
+              return (
+                <div className="dc-tr__tabla">
+                  <div className="dc-tr__th"><span>#</span><span>Procedimiento</span><span>Pieza</span><span>Cara</span><span>Costo</span><span>Estado</span></div>
+                  {lst.map((f) => (
+                    <div key={f.id} className={`dc-tr__tr${hecho(f) ? " is-ok" : ""}`} onClick={() => setDetF(f)}>
+                      <span className="dc-tr__nodo">{hecho(f) ? <Check size={14} strokeWidth={3} /> : f._n}</span>
+                      <span className="dc-tr__proc"><b>{nombreFaseLimpio(f)}</b>{origen(f)}</span>
+                      <span>{piezaDeFase(f)}</span>
+                      <span>{caraDeFase(f)}</span>
+                      <span className="dc-tr__costo">S/ {f.costo.toFixed(2)}</span>
+                      <span>{acciones(f)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            }}</ListaFiltrable>
         )}
       </Card>
       {detF && (() => { const f = fases.find((x) => x.id === detF.id) || detF; return (
@@ -5503,28 +5554,62 @@ function Recetas({ pacientes: pacProp, notify, updFicha }) {
       <div style={{ display: "grid", gap: 12 }}>
         {recetas.length === 0 && !form && <Card style={{ padding: 0 }}><Vacio icon={<FileText size={22} strokeWidth={1.75} />} titulo="Sin recetas" sub="Emite la primera receta; queda firmada en la historia del paciente." /></Card>}
         {recetas.length > 0 && (
-          <ListaFiltrable rows={recetas} sub="recetas" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+          <ListaFiltrable rows={recetas} sub="recetas" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="recetas"
+            vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "paciente", label: "Por paciente", icon: Users }]} cols={[
             { key: "paciente", label: "Paciente", get: (r) => r.paciente || "" },
             { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
             { key: "med", label: "Medicamento", get: (r) => (r.items || []).map((it) => it.med).join(" ") },
             { key: "indic", label: "Indicaciones", get: (r) => r.indic || "" },
-          ]}>{(listaRx) => (
-          <div className="dc-rx-grid">
-            {listaRx.map((r) => { const col = colorDe(r.paciente); return (
-              <article key={r.id} className="dc-rx">
-                <header className="dc-rx__cab">
-                  <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente)}</span>
-                  <div className="dc-rx__quien"><b>{r.paciente}</b><span><Calendar size={12} strokeWidth={1.75} /> {fechaLegible(r.fecha)}</span></div>
+          ]}>{(listaRx, vista) => {
+            const av = (nom, sz = 40) => { const col = colorDe(nom); return <span className="dc-rec__av" style={{ width: sz, height: sz, fontSize: sz > 36 ? 13 : 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(nom)}</span>; };
+            const tarjeta = (r) => (
+              <article key={r.id} className="dc-rx2">
+                <header>
+                  {av(r.paciente)}
+                  <div><b>{r.paciente}</b><span><Calendar size={12} strokeWidth={1.9} /> {fechaLegible(r.fecha)}{r.medico ? ` · ${r.medico}` : ""}</span></div>
                   <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
                 </header>
-                <ul className="dc-rx__items">
-                  {r.items.map((it, i) => <li key={i}><span className="dc-rx__rx">℞</span><div><b>{it.med}</b>{it.detalle && <span>{it.detalle}</span>}</div></li>)}
+                <ul>
+                  {(r.items || []).map((it, k) => <li key={k}><span className="dc-rx2__rx">℞</span><div><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div></li>)}
                 </ul>
-                {r.indic && <p className="dc-rx__indic">{r.indic}</p>}
+                {r.indic && <p className="dc-rx2__indic"><Info size={13} strokeWidth={2} /> {r.indic}</p>}
               </article>
-            ); })}
-          </div>
-          )}</ListaFiltrable>
+            );
+            if (vista === "lista") return (
+              <div className="dc-rx2__lista">
+                {listaRx.map((r) => (
+                  <div key={r.id} className="dc-rx2__fila">
+                    {av(r.paciente, 36)}
+                    <div className="dc-rx2__quien"><b>{r.paciente}</b><span>{fechaLegible(r.fecha)}</span></div>
+                    <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div>
+                    <span className="dc-rx2__n">{(r.items || []).length} {(r.items || []).length === 1 ? "medicamento" : "medicamentos"}</span>
+                    <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
+                  </div>
+                ))}
+              </div>
+            );
+            if (vista === "paciente") {
+              const grupos = []; listaRx.forEach((r) => { const g = grupos.find((x) => x.p === r.paciente); if (g) g.items.push(r); else grupos.push({ p: r.paciente, items: [r] }); });
+              return (
+                <div className="dc-rx2__grupos">
+                  {grupos.map((g) => (
+                    <section key={g.p} className="dc-rx2__grupo">
+                      <header>{av(g.p, 38)}<div><b>{g.p}</b><span>{g.items.length} {g.items.length === 1 ? "receta" : "recetas"} · última {fechaLegible(g.items[0].fecha)}</span></div></header>
+                      <ol>
+                        {g.items.map((r) => (
+                          <li key={r.id}>
+                            <span className="dc-rx2__gf">{fechaLegible(r.fecha)}</span>
+                            <div>{(r.items || []).map((it, k) => <div key={k} className="dc-rx2__gm"><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div>)}{r.indic && <small className="dc-rx2__gi">{r.indic}</small>}</div>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  ))}
+                </div>
+              );
+            }
+            return <div className="dc-rx2__grid">{listaRx.map(tarjeta)}</div>;
+          }}</ListaFiltrable>
         )}
       </div>
     </div>
@@ -5678,22 +5763,66 @@ function Consentimientos({ pacientes: pacProp, notify }) {
           </div>
         </Modal>
       )}
-      <DataTable titulo="Consentimientos" sub="documentos" minWidth={680} rows={docs} empty={<Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo="Sin consentimientos" sub="Envía el primer consentimiento para que el paciente lo firme en línea." />} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(160px,1.3fr)", a: "left", get: (d) => d.paciente, cell: (d) => { const col = colorDe(d.paciente); return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(d.paciente)}</span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.paciente}</span></span>; } },
-        { key: "tipo", label: "Documento", w: "minmax(190px,1.6fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span> },
-        { key: "fecha", label: "Fecha", w: "150px", a: "center", get: (d) => d.fecha, cell: (d) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{fechaLegible(d.fecha)}</span> },
-        { key: "estado", label: "Estado", w: "140px", a: "center", get: (d) => d.estado, cell: (d) => d.estado === "firmado"
-          ? <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmado</span>
-          : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Por firmar</span> },
-        { key: "acc", label: "Acción", w: "140px", a: "center", noFilter: true, noSort: true, cell: (d) => d.estado === "pendiente"
-          ? <ActionBtn color="var(--dc-primary-alt)" onClick={() => abrirFirma(d)}><Pencil size={12} strokeWidth={2} style={{ marginRight: 6 }} />Firmar</ActionBtn>
-          : <ActionBtn subtle onClick={() => {
+      {(() => {
+        const verPdf = (d) => {
               const w = window.open("", "_blank"); if (!w) { notify("Permite ventanas emergentes para descargar el PDF."); return; }
               const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
               w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.tipo)} - ${esc(d.paciente)}</title><style>*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--dc-brand-900);padding:40px;max-width:720px;margin:0 auto}h1{font-size:20px;color:var(--dc-teal);margin:0 0 4px}.meta{color:var(--dc-slate);font-size:13px;margin-bottom:24px}.box{border:1px solid var(--dc-line);border-radius:12px;padding:20px;font-size:13.5px;line-height:1.7}.firma{margin-top:28px;border-top:1px solid var(--dc-line);padding-top:14px}img{max-width:280px;border:1px solid var(--dc-line);border-radius:8px}@media print{@page{margin:16mm}}</style></head><body><h1>${esc(d.tipo)}</h1><div class="meta">Paciente: <b>${esc(d.paciente)}</b> &middot; Fecha: ${esc(d.fecha)} &middot; Estado: ${esc(d.estado)}</div><div class="box">${d.contenido ? esc(d.contenido) : "El paciente firmó y aceptó este consentimiento informado de forma electrónica."}</div>${d.firmaUrl ? `<div class="firma"><div style="font-size:12px;color:var(--dc-slate);margin-bottom:6px">${d.firmanteNombre ? "Firma del apoderado:" : "Firma del paciente:"}</div><img src="${d.firmaUrl}"/>${d.firmanteNombre ? `<div style="font-size:12.5px;color:var(--dc-brand-900);margin-top:8px">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteRelacion ? ` (${esc(d.firmanteRelacion.toLowerCase())})` : ""}${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}, en representación del paciente por ser menor de edad.</div>` : ""}</div>` : ""}<div class="firma" style="color:var(--dc-ink-400);font-size:11px;border:none">Generado por Dento Check</div><script>window.onload=function(){setTimeout(function(){window.print();},250);};<\/script></body></html>`);
               w.document.close();
-            }}><FileText size={12} strokeWidth={2} style={{ marginRight: 6 }} />PDF</ActionBtn> },
-      ]} />
+            };
+        const firmado = (d) => d.estado === "firmado";
+        const accion = (d) => !firmado(d)
+          ? <ActionBtn color="var(--dc-primary-alt)" onClick={() => abrirFirma(d)}><Pencil size={12} strokeWidth={2} style={{ marginRight: 6 }} />Firmar</ActionBtn>
+          : <ActionBtn subtle onClick={() => verPdf(d)}><FileText size={12} strokeWidth={2} style={{ marginRight: 6 }} />PDF</ActionBtn>;
+        const pill = (d) => firmado(d) ? <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmado</span> : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Por firmar</span>;
+        const av = (nom, sz = 34) => { const col = colorDe(nom); return <span className="dc-rec__av" style={{ width: sz, height: sz, fontSize: sz > 36 ? 13 : 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(nom)}</span>; };
+        const tarjeta = (d) => (
+          <article key={d.id} className={`dc-cns__card${firmado(d) ? " is-ok" : " is-pend"}`}>
+            <header>{av(d.paciente, 38)}<div><b>{d.paciente}</b><span><Calendar size={12} strokeWidth={2} /> {fechaLegible(d.fecha)}</span></div>{pill(d)}</header>
+            <div className="dc-cns__doc"><span><Shield size={15} strokeWidth={1.9} /></span><b>{d.tipo}</b></div>
+            <footer><small>{firmado(d) ? "Archivado con fecha y hora" : "Esperando la firma del paciente"}</small>{accion(d)}</footer>
+          </article>
+        );
+        if (!docs.length) return <Card><Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo="Sin consentimientos" sub="Envía el primer consentimiento para que el paciente lo firme en línea." /></Card>;
+        return (
+          <Card className="dc-env">
+            <div className="dc-env__cab"><h3>Consentimientos</h3></div>
+            <ListaFiltrable rows={docs} sub="documentos" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="consentimientos"
+              vistas={[{ id: "tabla", label: "Tabla", icon: Table2 }, { id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }, { id: "estado", label: "Por estado", icon: Columns3 }]} cols={[
+                { key: "paciente", label: "Paciente", get: (d) => d.paciente || "" },
+                { key: "tipo", label: "Documento", get: (d) => d.tipo || "" },
+                { key: "fecha", label: "Fecha", get: (d) => d.fecha || "" },
+                { key: "estado", label: "Estado", get: (d) => (firmado(d) ? "Firmado" : "Por firmar") },
+              ]}>{(lst, vista) => {
+                if (vista === "tarjetas") return <div className="dc-cns__grid">{lst.map(tarjeta)}</div>;
+                if (vista === "estado") return (
+                  <div className="dc-cns__kanban">
+                    {[["pend", "Por firmar", "Esperan la firma del paciente", "#D97706", Clock, lst.filter((d) => !firmado(d))], ["ok", "Firmados", "Archivados con fecha y hora", "#16A36A", ShieldCheck, lst.filter(firmado)]].map(([k, t, sub2, c, I, items]) => (
+                      <section key={k} className="dc-cns__col" style={{ "--c": c }}>
+                        <header><span><I size={16} strokeWidth={2} /></span><div><h4>{t} <i>{items.length}</i></h4><small>{sub2}</small></div></header>
+                        {items.length ? items.map(tarjeta) : <p className="dc-cns__nada">Nada por aquí.</p>}
+                      </section>
+                    ))}
+                  </div>
+                );
+                return (
+                  <div className="dc-cns__tabla">
+                    <div className="dc-cns__th"><span>Paciente</span><span>Documento</span><span>Fecha</span><span>Estado</span><span>Acción</span></div>
+                    {lst.map((d) => (
+                      <div key={d.id} className="dc-cns__tr">
+                        <span className="dc-cns__pac">{av(d.paciente)}<b>{d.paciente}</b></span>
+                        <span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span>
+                        <span className="dc-cns__fecha">{fechaLegible(d.fecha)}</span>
+                        <span>{pill(d)}</span>
+                        <span>{accion(d)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }}</ListaFiltrable>
+          </Card>
+        );
+      })()}
       {firmaDoc && <FirmaModal doc={firmaDoc} onClose={() => setFirmaDoc(null)} onConfirm={confirmarFirma} esMenor={firmaEsDeMenor} firmante={firmante} setFirmante={setFirmante} />}
     </div>
   );
@@ -7154,28 +7283,72 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
           {base.length === 0 ? (
             <Vacio icon={soloFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={soloFotos ? "Sin fotos" : "Sin estudios"} sub={soloFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía o foto de este paciente."} />
           ) : (
-            <ListaFiltrable rows={base} sub="imágenes" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+            <ListaFiltrable rows={base} sub="imágenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="radiografias"
+              vistas={[{ id: "galeria", label: "Galería", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "linea", label: "Línea de tiempo", icon: History }]} cols={[
               { key: "tipo", label: "Tipo", get: (s) => RX_TIPOS[s.tipo] || s.tipo || "" },
               { key: "fecha", label: "Fecha", get: (s) => s.fecha || "" },
               { key: "sede", label: "Sede", get: (s) => nombreSede(s.sede) || "" },
               { key: "nota", label: "Nota", get: (s) => s.nota || "" },
-            ]}>{(listaG) => (
-            <div className="dc-gal__grid">
-              {listaG.map((s) => { const esFoto = s.tipo === "foto"; return (
-                <article key={s.id} className={`dc-gal__item${esFoto ? " is-foto" : ""}`}>
-                  <button type="button" className="dc-gal__img" onClick={() => setVisor(s)} aria-label={`Abrir ${RX_TIPOS[s.tipo]}`}>
-                    {s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} /> : (esFoto ? <Camera size={34} strokeWidth={1.5} /> : <Scan size={34} strokeWidth={1.5} />)}
-                    <span className="dc-gal__tipo">{esFoto ? <Camera size={12} strokeWidth={2} /> : <Scan size={12} strokeWidth={2} />} {RX_TIPOS[s.tipo]}</span>
-                  </button>
-                  <div className="dc-gal__pie">
-                    <div className="dc-gal__meta"><b>{fechaLegible(s.fecha)}</b>{s.sede ? <span><MapPin size={11} strokeWidth={2} /> {cortaSede(s.sede)}</span> : null}</div>
-                    <button type="button" className="dc-gal__btn" onClick={() => setVisor(s)} title="Abrir visor" aria-label="Abrir visor"><Eye size={15} strokeWidth={1.9} /></button>
-                    {puedeBorrarRx && <button type="button" className="dc-gal__btn is-del" onClick={() => setBorrarRx(s)} title="Eliminar estudio" aria-label="Eliminar estudio"><Trash2 size={15} strokeWidth={1.9} /></button>}
-                  </div>
-                </article>
-              ); })}
-            </div>
-            )}</ListaFiltrable>
+            ]}>{(listaG, vista) => {
+              const Ic = (s) => (s.tipo === "foto" ? Camera : Scan);
+              const miniatura = (s, size) => { const I = Ic(s); return <span className={`dc-rxv__thumb${s.tipo === "foto" ? " is-foto" : ""}`} style={size ? { width: size, height: size } : undefined}>{s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} /> : <I size={size ? Math.round(size / 2.6) : 34} strokeWidth={1.5} />}</span>; };
+              const acciones = (s) => (
+                <div className="dc-rxv__acc">
+                  <button type="button" onClick={() => setVisor(s)} title="Abrir visor" aria-label="Abrir visor"><Eye size={15} strokeWidth={1.9} /></button>
+                  {puedeBorrarRx && <button type="button" className="is-del" onClick={() => setBorrarRx(s)} title="Eliminar estudio" aria-label="Eliminar estudio"><Trash2 size={15} strokeWidth={1.9} /></button>}
+                </div>
+              );
+              if (vista === "lista") return (
+                <div className="dc-rxv__lista">
+                  {listaG.map((s) => { const I = Ic(s); return (
+                    <div key={s.id} className="dc-rxv__fila" onClick={() => setVisor(s)}>
+                      {miniatura(s, 56)}
+                      <div className="dc-rxv__ftxt"><b><I size={13} strokeWidth={2} /> {RX_TIPOS[s.tipo]}</b><span>{s.nota || "Sin nota"}</span></div>
+                      <span className="dc-rxv__fdato"><Calendar size={13} strokeWidth={2} /> {fechaLegible(s.fecha)}</span>
+                      <span className="dc-rxv__fdato"><MapPin size={13} strokeWidth={2} /> {s.sede ? nombreSede(s.sede) : "—"}</span>
+                      <div onClick={(e) => e.stopPropagation()}>{acciones(s)}</div>
+                    </div>
+                  ); })}
+                </div>
+              );
+              if (vista === "linea") {
+                const grupos = []; listaG.forEach((s) => { const g = grupos.find((x) => x.f === s.fecha); if (g) g.items.push(s); else grupos.push({ f: s.fecha, items: [s] }); });
+                return (
+                  <ol className="dc-rxv__tl">
+                    {grupos.map((g) => (
+                      <li key={g.f}>
+                        <div className="dc-rxv__tlf"><b>{fechaLegible(g.f)}</b><span>{g.items.length} {g.items.length === 1 ? "imagen" : "imágenes"}</span></div>
+                        <div className="dc-rxv__tli">
+                          {g.items.map((s) => (
+                            <button key={s.id} type="button" className="dc-rxv__tlc" onClick={() => setVisor(s)}>
+                              {miniatura(s, 88)}
+                              <span><b>{RX_TIPOS[s.tipo]}</b><small>{s.nota || (s.sede ? cortaSede(s.sede) : "")}</small></span>
+                            </button>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                );
+              }
+              return (
+                <div className="dc-rxv__grid">
+                  {listaG.map((s) => { const I = Ic(s); return (
+                    <article key={s.id} className={`dc-rxv__card${s.tipo === "foto" ? " is-foto" : ""}`}>
+                      <button type="button" className="dc-rxv__img" onClick={() => setVisor(s)} aria-label={`Abrir ${RX_TIPOS[s.tipo]}`}>
+                        {s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} /> : <I size={40} strokeWidth={1.3} />}
+                        <span className="dc-rxv__tipo"><I size={12} strokeWidth={2} /> {RX_TIPOS[s.tipo]}</span>
+                        <span className="dc-rxv__ver"><Eye size={14} strokeWidth={2} /> Ver</span>
+                      </button>
+                      <div className="dc-rxv__pie">
+                        <div><b>{fechaLegible(s.fecha)}</b><span>{s.nota || (s.sede ? `Sede ${cortaSede(s.sede)}` : "Sin nota")}</span></div>
+                        {acciones(s)}
+                      </div>
+                    </article>
+                  ); })}
+                </div>
+              );
+            }}</ListaFiltrable>
           )}
         </Card>
       ); })()}

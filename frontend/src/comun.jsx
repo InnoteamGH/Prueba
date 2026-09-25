@@ -1299,17 +1299,44 @@ export function FiltroCabecera({ st, total, filtradas, sub = "registros", classN
   );
 }
 
+/* Selector de forma de ver una lista (tarjetas, lista, tabla, por estado…). Cada
+   pantalla ofrece las que le sirven y se recuerda la que elige cada persona.
+   opciones: [{ id, label, icon }] */
+export function SelectorVista({ opciones = [], valor, onChange }) {
+  if (opciones.length < 2) return null;
+  return (
+    <div className="dc-vsel" role="tablist" aria-label="Forma de ver">
+      {opciones.map(({ id, label, icon: Ic }) => (
+        <button key={id} type="button" role="tab" aria-selected={valor === id} className={valor === id ? "is-on" : ""} title={`Ver como ${label.toLowerCase()}`} onClick={() => onChange(id)}>
+          {Ic && <Ic size={14} strokeWidth={2} />}<span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+export function useVista(clave, opciones) {
+  const [v, setV] = usePersist("vista_" + clave, opciones[0]?.id);
+  let valor = opciones.some((o) => o.id === v) ? v : opciones[0]?.id;
+  // En celular una tabla ancha obliga a desplazarse de lado: si hay tarjetas, se usan.
+  const movil = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
+  if (movil && valor === "tabla" && opciones.some((o) => o.id === "tarjetas")) valor = "tarjetas";
+  return [valor, setV];
+}
+
 /* Envoltorio para listas en tarjetas: pone la cabecera de filtros y entrega la lista
-   ya filtrada y ordenada a children(lista). Es componente (no hook suelto) para poder
-   usarse dentro de ramas condicionales sin romper el orden de los hooks. */
-export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, children }) {
+   ya filtrada y ordenada a children(lista, vista). Con `vistas` y `vistaClave` suma el
+   selector de forma de ver. Es componente (no hook suelto) para poder usarse dentro de
+   ramas condicionales sin romper el orden de los hooks. */
+export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", children }) {
   const { lista, st } = useFiltroTabla(rows, cols, defaultSort);
+  const [vista, setVista] = useVista(vistaClave || "x", vistas || []);
   return (
     <div className={`dc-lf ${className}`}>
-      <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub} extra={extra} />
+      <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub}
+        extra={<>{extra}{vistas && <SelectorVista opciones={vistas} valor={vista} onChange={setVista} />}</>} />
       {lista.length === 0 && (rows || []).length > 0
         ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." />
-        : children(lista)}
+        : children(lista, vista)}
     </div>
   );
 }
