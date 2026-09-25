@@ -1,7 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import {
-  Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag,
-} from "lucide-react";
+import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
@@ -7163,15 +7161,30 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
 // Cada paso declara el módulo que necesita: quien no lo tiene, no ve el paso. Antes se
 // enseñaban los cinco a todos, y quien lleva el sistema -que no tiene agenda, ni
 // pacientes, ni caja- se quedaba mirando cinco tareas imposibles en "0/5" para siempre.
-const PASOS_ONB = [
-  { id: "cita", label: "Crear cita", desc: "Agenda la primera cita de la clínica", icon: CalendarCheck, target: "agenda" },
-  { id: "paciente", label: "Crear paciente", desc: "Registra a un paciente nuevo", icon: UserPlus, target: "pacientes" },
-  { id: "presupuesto", label: "Crear presupuesto", desc: "Arma un plan de tratamiento", icon: ClipboardList, target: "tratamientos" },
-  { id: "pago", label: "Registrar un pago", desc: "Cobra un saldo en Caja", icon: CreditCard, target: "facturacion" },
-  { id: "evolucion", label: "Registrar evolución", desc: "Anota en el odontograma / historia", icon: Smile, target: "odontograma" },
-  // Los de sistemas: es por donde empieza quien administra la plataforma.
-  { id: "usuario", label: "Dar de alta un usuario", desc: "Crea la cuenta de alguien del equipo", icon: UserPlus, target: "usuarios" },
-  { id: "integracion", label: "Conectar una integración", desc: "WhatsApp, pagos o facturación electrónica", icon: Plug, target: "integraciones" },
+/* Guía del sistema: el recorrido real de un paciente por Dento Check, paso a paso.
+   Cada paso dice dónde está en el menú, qué se hace ahí y lleva al módulo. Se filtra
+   por lo que el rol puede ver, así nadie recibe pasos de módulos que no tiene. */
+const GUIA_PASOS = [
+  { id: "agenda", titulo: "Agenda la cita", donde: "Atención › Agenda", icon: CalendarCheck, color: "#0E9199", target: "agenda_cal",
+    tips: ["Toca un hueco libre del calendario o usa + › Nueva cita.", "Cada doctor tiene su color; arrastra una cita para reprogramarla.", "La confirmación sale sola por WhatsApp."] },
+  { id: "recepcion", titulo: "Recibe al paciente", donde: "Atención › Pendientes de hoy", icon: UserCheck, color: "#2563EB", target: "dashboard",
+    tips: ["Aquí ves quién llegó, quién falta confirmar y quién debe.", "Marca la llegada en la Agenda de hoy; si no hay sillón, pásalo a Lista de espera."] },
+  { id: "historia", titulo: "Abre su historia clínica", donde: "Clínico › Pacientes", icon: FileText, color: "#7C3AED", target: "pacientes",
+    tips: ["Toca al paciente: la ficha reúne anamnesis, alergias, evoluciones, recetas y archivos.", "Cada evolución queda firmada; para corregirla se agrega una adenda.", "La pestaña Registro muestra quién abrió o cambió la historia."] },
+  { id: "odontograma", titulo: "Marca el odontograma", donde: "Clínico › Odontograma", icon: Smile, color: "#DC2626", target: "odontograma",
+    tips: ["Elige el hallazgo y toca la cara del diente.", "Inicial es lo encontrado, Evolución lo pendiente y Alta lo realizado.", "Desde ahí sale el plan de inversión para el paciente."] },
+  { id: "plan", titulo: "Arma el plan de tratamiento", donde: "Clínico › Tratamientos", icon: ClipboardList, color: "#D97706", target: "tratamientos",
+    tips: ["Agrega los procedimientos con su precio de Servicios.", "El presupuesto aceptado se vuelve el saldo del paciente."] },
+  { id: "caja", titulo: "Cobra y cuadra la caja", donde: "Finanzas › Caja", icon: Wallet, color: "#16A36A", target: "facturacion",
+    tips: ["Abre la caja con el fondo del día.", "Cobra en efectivo, Yape, Plin o tarjeta; sale el comprobante.", "Al cerrar, cuenta billetes y monedas: el sistema te dice si cuadra."] },
+  { id: "whatsapp", titulo: "Deja que WhatsApp trabaje", donde: "Atención › WhatsApp + IA", icon: MessageSquare, color: "#0B8F5A", target: "whatsapp",
+    tips: ["El asistente responde y agenda las 24 horas.", "En Recordatorios eliges qué avisos salen solos: confirmaciones, controles y cumpleaños."] },
+  { id: "numeros", titulo: "Revisa tus números", donde: "General › Dashboard gerencial", icon: BarChart3, color: "#1E3A5F", target: "gerencial",
+    tips: ["Producción, cobros, ocupación y deuda del día y del mes.", "Metas de producción muestra cómo va cada doctor."] },
+  { id: "equipo", titulo: "Da acceso a tu equipo", donde: "Administración › Usuarios", icon: Users, color: "#B7791F", target: "usuarios",
+    tips: ["Crea la cuenta de cada persona con su rol.", "En Permisos por rol decides qué ve y qué edita cada uno."] },
+  { id: "clinica", titulo: "Deja lista la clínica", donde: "Administración › Configuración", icon: Settings, color: "#475569", target: "config",
+    tips: ["Datos de la empresa y de cada sede, horarios, servicios y doctores.", "Puesta en marcha lleva la lista completa de lo que falta."] },
 ];
 
 /**
@@ -7298,6 +7311,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [pasos, setPasos] = usePersist("onboarding", () => ({}));
   const [onbDismissed, setOnbDismissed] = usePersist("onboarding_dismissed", false);
   const [showPasos, setShowPasos] = useState(false);
+  const [pasoAbierto, setPasoAbierto] = useState(null);
   // Botón global "Crear"
   const [crearMenu, setCrearMenu] = useState(false);
   const [crearIntent, setCrearIntent] = useState(null); // "paciente" | "servicio"
@@ -7424,9 +7438,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     window.addEventListener("dc-reintentar-vista", onRetry);
     return () => window.removeEventListener("dc-reintentar-vista", onRetry);
   }, []);
-  // Solo los primeros pasos que este rol puede completar. Con la lista entera, quien no
-  // tiene el módulo veía la tarea en gris y nunca llegaba al 100%.
-  const misPasos = PASOS_ONB.filter((p) => mods.includes(p.target) && can(p.target, "crear"));
+  // Solo los pasos de módulos que este rol ve: con la lista entera, quien no tenía el
+  // módulo veía el paso en gris y nunca llegaba al 100 %.
+  const misPasos = GUIA_PASOS.filter((p) => { const m = modDeVista(p.target); return mods.includes(m) && modAllowed(m) && can(m, "ver"); });
   // Acciones del botón "Crear", cada una con el módulo que necesita. La de sistemas es
   // dar de alta un usuario; sin ella el desplegable le salía vacío.
   const ACCIONES_CREAR = [["cita", "Nueva cita", Calendar, "agenda", "Agenda un paciente", "#0E8C95"], ["paciente", "Nuevo paciente", UserPlus, "pacientes", "Crea su ficha", "#6D4FD1"],
@@ -7811,23 +7825,21 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         </nav>
         <div className="dc-sb__pie">
             {rol !== "superadmin" && !onbDismissed && misPasos.length > 0 && (() => { const done = misPasos.filter((p) => pasos[p.id]).length; if (done >= misPasos.length) return null; return (
-              <div className="dc-sb__onb">
-                <button type="button" onClick={() => setShowPasos(true)} title="Tus tareas de primeros pasos (el checklist de la clínica está en Configuración)">
-                  <span className="dc-sb__onbnum">{done}/{misPasos.length}</span>{!colap && " Primeros pasos"}
+              <div className="dc-sb__guia">
+                <button type="button" onClick={() => setShowPasos(true)} title="Guía del sistema: el recorrido de un paciente, paso a paso">
+                  <span className="dc-sb__guiaico"><Compass size={16} strokeWidth={2} /></span>
+                  {!colap && <span className="dc-sb__guiatxt"><b>Guía del sistema</b><small>{done} de {misPasos.length} vistos</small><i><em style={{ width: `${(done / misPasos.length) * 100}%` }} /></i></span>}
                 </button>
-                <button type="button" className="dc-mini-btn dc-sb__onbx" aria-label="Ocultar primeros pasos" title="Ocultar primeros pasos" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }}><X size={14} strokeWidth={2} /></button>
+                {!colap && <button type="button" className="dc-mini-btn dc-sb__onbx" aria-label="Ocultar la guía" title="Ocultar la guía" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }}><X size={13} strokeWidth={2} /></button>}
               </div>
             ); })()}
-          {!esSuper && (mods.includes("plan") ? (
-            <button type="button" className="dc-sb__plan" title={`Plan ${PLAN_NOMBRE[plan]}`} aria-label={`Plan ${PLAN_NOMBRE[plan]}`} onClick={() => { setVista("plan"); setSidebarOpen(false); }}>
-              <Crown size={15} strokeWidth={1.75} />{!colap && <><span>Plan <b>{PLAN_NOMBRE[plan]}</b></span><ChevronRight size={14} strokeWidth={1.75} /></>}
-            </button>
-          ) : (
-            <div className="dc-sb__plan" title={`Plan ${PLAN_NOMBRE[plan]}`}><Crown size={15} strokeWidth={1.75} />{!colap && <span>Plan <b>{PLAN_NOMBRE[plan]}</b></span>}</div>
-          ))}
           <div className="dc-sb__user">
             <div className="dc-sb__avatar" title={usuario.nombre} style={{ background: R.color }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
-            {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{R.label}</div></div>}
+            {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{R.label}</div>
+              {!esSuper && (mods.includes("plan")
+                ? <button type="button" className="dc-sb__planchip" title="Ver mi plan" onClick={() => { setVista("plan"); setSidebarOpen(false); }}><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</button>
+                : <span className="dc-sb__planchip"><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</span>)}
+            </div>}
             <button type="button" className="dc-mini-btn dc-sb__out" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={onLogout}><LogOut size={15} strokeWidth={2} /></button>
           </div>
         </div>
@@ -7847,31 +7859,44 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
       {showPasos && (() => {
         const done = misPasos.filter((p) => pasos[p.id]).length;
-        const irPaso = (p) => { setPasos((s) => ({ ...s, [p.id]: true })); if (mods.includes(p.target)) setVista(p.target); setShowPasos(false); notify(`«${p.label}» — ¡empecemos!`); };
-        const marcar = (p) => setPasos((s) => ({ ...s, [p.id]: !s[p.id] }));
+        const abierto = misPasos.find((p) => p.id === pasoAbierto) || misPasos.find((p) => !pasos[p.id]) || misPasos[0];
+        const ir = (p) => { setPasos((s2) => ({ ...s2, [p.id]: true })); setVista(p.target); setShowPasos(false); setSidebarOpen(false); };
+        const marcar = (p) => setPasos((s2) => ({ ...s2, [p.id]: !s2[p.id] }));
+        const pct = misPasos.length ? Math.round((done / misPasos.length) * 100) : 0;
         return (
-        <div onClick={() => setShowPasos(false)} style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.42)", zIndex: 130, display: "flex", justifyContent: "flex-end" }}>
-          <div onClick={(e) => e.stopPropagation()} className="dc-onb-panel" style={{ width: 400, maxWidth: "92vw", height: "100%", background: "#fff", display: "flex", flexDirection: "column", boxShadow: "-24px 0 60px rgba(0,0,0,.22)" }}>
-            <div style={{ background: "linear-gradient(135deg,var(--dc-primary-alt),var(--dc-ink-alt))", color: "#fff", padding: "20px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: "rgba(255,255,255,.16)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{done}/{misPasos.length}</div>
-                <div><div style={{ fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Primeros pasos</div><div style={{ fontSize: 13, opacity: .85 }}>Tareas tuyas ({done} de {misPasos.length}). El checklist de la clínica está en Configuración › Puesta en marcha.</div></div>
+        <div className="dc-guia__velo" onClick={() => setShowPasos(false)}>
+          <aside className="dc-guia" onClick={(e) => e.stopPropagation()} aria-label="Guía del sistema">
+            <header className="dc-guia__head">
+              <div className="dc-guia__anillo" style={{ "--p": pct }}><span>{done}/{misPasos.length}</span></div>
+              <div className="dc-guia__tit">
+                <h3>Guía del sistema</h3>
+                <p>El recorrido de un paciente por Dento Check, de la cita al cobro. Abre cada paso para ver dónde está y cómo se usa.</p>
               </div>
-              <button aria-label="Cerrar los primeros pasos" onClick={() => setShowPasos(false)} style={{ background: "rgba(255,255,255,.18)", border: "none", borderRadius: "var(--dc-r-sm)", width: 32, height: 32, cursor: "pointer", color: "#fff", display: "grid", placeItems: "center" }}><X size={18} strokeWidth={1.75} /></button>
-            </div>
-            <div style={{ height: 5, background: "var(--dc-line)" }}><div style={{ width: `${misPasos.length ? (done / misPasos.length) * 100 : 0}%`, height: "100%", background: "linear-gradient(90deg,var(--dc-primary-alt),var(--dc-ok))", transition: "width .3s" }} /></div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
-              {misPasos.map((p) => { const on = !!pasos[p.id]; const Ic = p.icon; const disp = mods.includes(p.target); return (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderRadius: "var(--dc-r-lg)", border: "1px solid " + (on ? "var(--dc-green-soft)" : "var(--dc-line)"), background: on ? "var(--dc-white)" : "#fff" }}>
-                  <button type="button" className="dc-icon-btn" aria-label={on ? "Marcar pendiente" : "Marcar hecho"} onClick={() => marcar(p)} title={on ? "Marcar pendiente" : "Marcar hecho"} style={{ width: 24, height: 24, borderRadius: "var(--dc-r-full)", border: on ? "none" : "2px solid var(--dc-line-alt2)", background: on ? "var(--dc-ok)" : "#fff", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>{on && <Check size={14} color="#fff" strokeWidth={3.5} />}</button>
-                  <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: on ? tint("var(--dc-ok)", 0.094) : (tint(DS.c.primary, 0.078)), color: on ? "var(--dc-ok-700)" : DS.c.primary, display: "grid", placeItems: "center", flexShrink: 0 }}><Ic size={17} strokeWidth={1.75} /></div>
-                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, textDecoration: on ? "line-through" : "none", opacity: on ? .7 : 1 }}>{p.label}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{p.desc}</div></div>
-                  {!on && <button onClick={() => irPaso(p)} style={{ background: disp ? DS.c.primary : "var(--dc-line)", color: disp ? "#fff" : "var(--dc-ink-400)", border: "none", borderRadius: "var(--dc-r-sm)", padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0 }}>Iniciar</button>}
-                </div>
+              <button type="button" className="dc-guia__x" aria-label="Cerrar la guía" onClick={() => setShowPasos(false)}><X size={18} strokeWidth={2} /></button>
+            </header>
+            <ol className="dc-guia__pasos">
+              {misPasos.map((p, n) => { const on = !!pasos[p.id]; const open = abierto && abierto.id === p.id; const Ic = p.icon; return (
+                <li key={p.id} className={`dc-guia__paso${on ? " is-hecho" : ""}${open ? " is-abierto" : ""}`} style={{ "--c": p.color }}>
+                  <button type="button" className="dc-guia__fila" aria-expanded={open} onClick={() => setPasoAbierto(open ? "__ninguno" : p.id)}>
+                    <span className="dc-guia__num">{on ? <Check size={14} strokeWidth={3} /> : n + 1}</span>
+                    <span className="dc-guia__ico"><Ic size={16} strokeWidth={2} /></span>
+                    <span className="dc-guia__txt"><b>{p.titulo}</b><small>{p.donde}</small></span>
+                    <ChevronDown size={16} strokeWidth={2} className="dc-guia__chev" />
+                  </button>
+                  {open && (
+                    <div className="dc-guia__cuerpo">
+                      <ul>{p.tips.map((t) => <li key={t}>{t}</li>)}</ul>
+                      <div className="dc-guia__acc">
+                        <button type="button" className="dc-guia__ir" onClick={() => ir(p)}>Ir a {p.donde.split("› ").pop()} <ArrowRight size={14} strokeWidth={2.2} /></button>
+                        <button type="button" className="dc-guia__marca" onClick={() => marcar(p)}>{on ? "Marcar como pendiente" : "Ya lo vi"}</button>
+                      </div>
+                    </div>
+                  )}
+                </li>
               ); })}
-            </div>
-            {done >= misPasos.length && <div style={{ padding: "14px 18px", background: "var(--dc-white)", borderTop: "1px solid var(--dc-green-soft)", color: "var(--dc-ok-700)", fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={17} strokeWidth={1.75} /> ¡Completaste tus primeros pasos! 🎉</div>}
-          </div>
+            </ol>
+            <footer className="dc-guia__pie">{done >= misPasos.length ? <><CheckCircle2 size={16} strokeWidth={2} /> Recorriste toda la guía. Puedes volver cuando quieras desde el menú.</> : <>La lista de lo que falta configurar en la clínica está en <b>Configuración › Puesta en marcha</b>.</>}</footer>
+          </aside>
         </div>
         );
       })()}

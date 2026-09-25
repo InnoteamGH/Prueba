@@ -449,8 +449,9 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
       {fase === "evolucion" && Object.keys(piezas).length === 0 && (
         <div style={{ padding: "12px 14px", fontSize: 13, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", borderRadius: "var(--dc-r-md)" }}>Sin toma de evolución aún.</div>
       )}
-      {/* Plan de tratamiento / hallazgos */}
-      <div style={{ border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-lg)", overflow: "hidden", background: "var(--dc-white)" }}>
+      {/* Tabla de hallazgos: solo en la vista clásica. El odontograma anatómico ya los
+          lista dentro de su propio panel, así que aquí se repetían. */}
+      {vistaOdo === "clasico" && <div style={{ border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-lg)", overflow: "hidden", background: "var(--dc-white)" }}>
         <div style={{ background: NAVY, color: "var(--dc-white)", display: "grid", gridTemplateColumns: "70px 1fr 1fr 1.2fr", padding: "10px 14px", fontSize: 12, fontWeight: 500 }}>
           <span>N° pieza</span><span>Hallazgo</span><span>Cara</span><span>Nota</span>
         </div>
@@ -463,7 +464,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
             <span style={{ color: h.nota ? TEXT : "var(--dc-line-alt)" }}>{h.nota || "—"}</span>
           </div>
         ))}
-      </div>
+      </div>}
       {/* Notas por pieza */}
       {conectado && piezasMarcadas.length > 0 && (
         <div style={{ border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 14 }}>
