@@ -1279,7 +1279,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                     options={[{ value: "all", label: "Todas las sedes" },
                               ...sedesCal.map((s) => ({ value: s, label: s }))]} />
           )}
-          <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
+          <div className="dc-cal-modos" style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
             {[["mes", "Mes"], ["semana", "Semana"], ["dia", "Día"], ["doctores", "Doctores"], ["sillon", "Sillón"], ["tabla", "Tabla"]].map(([k, lbl]) => (
               <button key={k} onClick={() => setModo(k)} style={{ padding: "6px 13px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: modo === k ? "#fff" : "transparent", color: modo === k ? DS.c.primary : "var(--dc-ink-400)", boxShadow: modo === k ? "0 1px 2px rgba(16,24,40,.12)" : "none" }}>{lbl}</button>
             ))}
@@ -1327,27 +1327,34 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           </div>
         </div>
       ) : modo === "tabla" ? (() => {
-        const ESTC = { pendiente: "var(--dc-ink-200)", confirmada: DS.c.primary, en_atencion: "var(--dc-warn)", atendida: "var(--dc-ok-700)", cancelada: "var(--dc-red)", no_show: "var(--dc-warn-600)", reprogramada: "var(--dc-purple)", cerrada_sistema: "var(--dc-ink-400)" };
+        const ESTC = { pendiente: "#8FA3A7", confirmada: "#0E9199", en_atencion: "#D97706", atendida: "#16A36A", cancelada: "#D2463A", no_show: "#E0694F", reprogramada: "#6D4FD1", cerrada_sistema: "#7C9499" };
         const rows = semana.flatMap((d) => citasDe(iso(d)).map((c) => ({ ...c, _d: d }))).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
+        const dias = [];
+        rows.forEach((c) => { const k = iso(c._d); let g = dias.find((x) => x.k === k); if (!g) { g = { k, d: c._d, items: [] }; dias.push(g); } g.items.push(c); });
+        const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
         return (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 13 }}>
-            <thead><tr style={{ background: "var(--dc-bg-soft2)" }}>
-              {["Día", "Hora", "Paciente", "Doctor", "Estado"].map((h) => <th key={h} style={{ textAlign: "left", padding: "12px 18px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".04em", borderBottom: "1px solid var(--dc-line)", whiteSpace: "nowrap" }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {rows.map((c) => { const col = colorDe(c); const ec = ESTC[c.estado] || "var(--dc-ink-200)"; const cancel = c.estado === "cancelada"; return (
-                <tr key={c.id} onClick={() => onCita && onCita(c)} style={{ cursor: "pointer", borderBottom: "1px solid var(--dc-bg)", opacity: cancel ? 0.6 : 1 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg-soft)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  <td style={{ padding: "12px 18px", color: iso(c._d) === hoyISO ? DS.c.primary : "var(--dc-ink-700)", fontWeight: iso(c._d) === hoyISO ? 700 : 500, whiteSpace: "nowrap" }}>{NOM[(c._d.getDay() + 6) % 7]} {c._d.getDate()}</td>
-                  <td style={{ padding: "12px 18px", fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>{c.hora}</td>
-                  <td style={{ padding: "12px 18px", fontWeight: 500, color: NAVY, textDecoration: cancel ? "line-through" : "none" }}>{c.paciente}</td>
-                  <td style={{ padding: "12px 18px", color: "var(--dc-ink-700)" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: col, flexShrink: 0 }} />{c.medico || c.motivo || "—"}</span></td>
-                  <td style={{ padding: "12px 18px" }}><span style={{ fontSize: 12, fontWeight: 500, color: ec, background: tint(ec, 0.094), padding: "3px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{EST_LABEL[c.estado] || c.estado}</span></td>
-                </tr>
-              ); })}
-              {rows.length === 0 && <tr><td colSpan={5} style={{ padding: "34px 18px", textAlign: "center", color: "var(--dc-ink-400)" }}>Sin citas en esta semana.</td></tr>}
-            </tbody>
-          </table>
+        <div className="dc-agt">
+          {dias.length === 0 && <p className="dc-agt__nada">Sin citas en esta semana.</p>}
+          {dias.map((g) => { const esHoy = g.k === hoyISO; const cnt = {}; g.items.forEach((c) => { cnt[c.estado] = (cnt[c.estado] || 0) + 1; }); return (
+            <section key={g.k} className={`dc-agt__dia${esHoy ? " is-hoy" : ""}`}>
+              <header>
+                <span className="dc-agt__fecha"><b>{g.d.getDate()}</b><small>{NOM[(g.d.getDay() + 6) % 7]}</small></span>
+                <div><h4>{esHoy ? "Hoy" : `${NOM[(g.d.getDay() + 6) % 7]} ${g.d.getDate()} de ${MES[g.d.getMonth()]}`}</h4><span>{g.items.length} {g.items.length === 1 ? "cita" : "citas"}</span></div>
+                <div className="dc-agt__cnt">{Object.entries(cnt).map(([e, n]) => <span key={e} style={{ "--e": ESTC[e] || "#8FA3A7" }}><i />{n} {(EST_LABEL[e] || e).toLowerCase()}</span>)}</div>
+              </header>
+              <div className="dc-agt__filas">
+                {g.items.map((c) => { const col = colorDe(c); const ec = ESTC[c.estado] || "#8FA3A7"; const cancel = c.estado === "cancelada"; return (
+                  <button type="button" key={c.id} className={`dc-agt__fila${cancel ? " is-cancel" : ""}`} style={{ "--e": ec, "--d": col }} onClick={() => onCita && onCita(c)}>
+                    <span className="dc-agt__hora">{c.hora}</span>
+                    <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 11.5, background: `linear-gradient(135deg, ${tint(ec, 0.22)}, ${tint(ec, 0.08)})`, color: ec }}>{iniciales(c.paciente)}</span>
+                    <span className="dc-agt__pac"><b>{c.paciente}</b>{c.motivo && <small>{c.motivo}</small>}</span>
+                    <span className="dc-agt__doc"><i />{c.medico || "—"}</span>
+                    <span className="dc-agt__est">{EST_LABEL[c.estado] || c.estado}</span>
+                  </button>
+                ); })}
+              </div>
+            </section>
+          ); })}
         </div>
         );
       })() : (
@@ -8436,9 +8443,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
           <div className="dc-sb__user">
             <div className="dc-sb__avatar" title={usuario.nombre} style={{ background: R.color }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
             {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{R.label}</div></div>}
-            <button type="button" className="dc-icon-btn dc-sb__out" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={onLogout}><LogOut size={16} strokeWidth={1.75} /></button>
+            <button type="button" className="dc-mini-btn dc-sb__out" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={onLogout}><LogOut size={15} strokeWidth={2} /></button>
           </div>
-          {!colap && !auth.token && !usuario?.conectado && <button type="button" className="dc-sb__reset" onClick={() => { if (confirm("¿Restablecer los datos de demostración? Se perderán los cambios guardados en este navegador.")) { Object.keys(localStorage).filter((k) => k.startsWith("dc_data_")).forEach((k) => localStorage.removeItem(k)); location.reload(); } }} title="Volver a los datos de demo"><Repeat size={13} strokeWidth={1.75} /> Restablecer datos de demo</button>}
         </div>
       </aside>
 
