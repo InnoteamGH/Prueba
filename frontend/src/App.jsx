@@ -5408,27 +5408,29 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
   const resetPass = (u) => notify(`Se envió un enlace para restablecer la contraseña de ${u.nombre} a ${u.email || u.user}. (Help Desk TI)`);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
-        <KpiCard label="Usuarios totales" value={cargaFallida ? "—" : staff.length} color={NAVY} icon={<Users size={18} strokeWidth={1.75} />} />
-        <KpiCard label="Activos" value={cargaFallida ? "—" : activos} color="var(--dc-ok-700)" icon={<UserCheck size={18} strokeWidth={1.75} />} />
-        <KpiCard label="Inactivos" value={cargaFallida ? "—" : staff.length - activos} color="var(--dc-ink-500)" icon={<Power size={18} strokeWidth={1.75} />} />
-        <KpiCard label="Roles en uso" value={cargaFallida ? "—" : porRol.filter((x) => x.n > 0).length} color={DS.c.primary} icon={<Shield size={18} strokeWidth={1.75} />} />
-      </div>
-      {cargaFallida && (
-        <Card style={{ padding: 14, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
-          <div style={{ fontSize: 13, color: "var(--dc-danger-700)", lineHeight: 1.5 }}><b>Módulo usuarios sin API.</b> {usuariosError} Los KPIs no son un padrón vacío: el listado no pudo cargarse del servidor.</div>
-        </Card>
-      )}
-      <ModHead icon={<UserCog size={20} strokeWidth={1.75} />} titulo="Usuarios del sistema" sub="Crea cuentas y asigna a cada persona el rol con sus permisos." accion={<Btn small onClick={nuevo}><UserPlus size={15} strokeWidth={1.75} /> Nuevo usuario</Btn>} />
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
-          <span style={{ position: "absolute", left: 12, top: 11, color: "var(--dc-ink-500)" }}><Search size={16} strokeWidth={1.75} /></span>
-          <input className="dc-premium-inp" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, usuario o correo" style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", boxSizing: "border-box", color: NAVY }} />
+    <div style={{ display: "grid", gap: 14 }}>
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{cargaFallida ? "—" : staff.length}</b><span>{staff.length === 1 ? "usuario" : "usuarios"}</span></div>
+          <p>Crea cuentas y asigna a cada persona el rol con sus permisos</p>
         </div>
-        <Select width={200} ariaLabel="Filtrar por rol" value={filtroRol} onChange={setFiltroRol} placeholder="Todos los roles"
-                options={[{ value: "todos", label: "Todos los roles" }, ...ROLES_ASIGNABLES.map((r) => ({ value: r, label: ROLES[r].label }))]} />
+        <div className="dc-esp-hero__cifras">
+          <div><b>{cargaFallida ? "—" : activos}</b><span>Activos</span></div>
+          <div><b>{cargaFallida ? "—" : staff.length - activos}</b><span>Inactivos</span></div>
+          <div><b>{cargaFallida ? "—" : porRol.filter((x) => x.n > 0).length}</b><span>Roles en uso</span></div>
+        </div>
+        <span />
+        <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={nuevo}><UserPlus size={14} strokeWidth={2} /> Nuevo usuario</button></div>
+      </section>
+      {cargaFallida && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span><b>Usuarios sin API.</b> {usuariosError} No es un padrón vacío: el listado no pudo cargarse.</span></div>}
+      <div className="dc-us__barra">
+        <label className="dc-cob__buscar dc-us__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, usuario o correo" aria-label="Buscar usuario" /></label>
+        <div className="dc-us__roles" role="tablist" aria-label="Filtrar por rol">
+          <button type="button" role="tab" aria-selected={filtroRol === "todos"} className={filtroRol === "todos" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setFiltroRol("todos")}>Todos <i>{staff.length}</i></button>
+          {porRol.filter((x) => x.n > 0).map(({ r, n }) => { const R = ROLES[r]; const RIc = R.icon; return (
+            <button key={r} type="button" role="tab" aria-selected={filtroRol === r} className={filtroRol === r ? "is-on" : ""} style={{ "--c": R.color }} onClick={() => setFiltroRol(r)}><RIc size={13} strokeWidth={2} /> {R.label} <i>{n}</i></button>
+          ); })}
+        </div>
       </div>
 
         {/* Formulario alta/edición */}
@@ -5489,12 +5491,12 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         )}
 
         <DataTable titulo="Directorio de usuarios" sub="usuarios" minWidth={880} maxHeight={560} rows={lista} defaultSort={{ key: "usuario", dir: "asc" }} empty={<Vacio icon={<UserCog size={22} strokeWidth={1.75} />} titulo="Sin usuarios" sub="No hay usuarios que coincidan." />} cols={[
-          { key: "usuario", label: "Usuario", w: "minmax(220px,1.8fr)", a: "left", get: (u) => u.nombre + " " + u.user + " " + u.email, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: R.color, color: "#fff", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{u.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{u.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{u.user} – {u.email}</div></div></div>; } },
+          { key: "usuario", label: "Usuario", w: "minmax(220px,1.8fr)", a: "left", get: (u) => u.nombre + " " + u.user + " " + u.email, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(R.color, 0.22)}, ${tint(R.color, 0.08)})`, color: R.color, flexShrink: 0 }}>{iniciales(u.nombre.replace(/^Dra?\.\s*/, ""))}</span><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{u.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{u.user} – {u.email}</div></div></div>; } },
           { key: "rol", label: "Rol", w: "minmax(140px,1fr)", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
           { key: "sede", label: "Sede", w: "minmax(120px,1fr)", a: "center", get: (u) => etiquetaSedes(u.sedes), cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span> },
           { key: "ultimo", label: "Último acceso", w: "150px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
-          { key: "estado", label: "Estado", w: "110px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => u.activo ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Activo</span> : <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-line)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Inactivo</span> },
-          { key: "acc", label: "Acciones", w: "140px", a: "center", noFilter: true, noSort: true, cell: (u) => <div style={{ display: "flex", gap: 6, justifyContent: "center" }}><button type="button" className="dc-icon-btn" aria-label="Editar" onClick={() => editar(u)} title="Editar" style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: 7, cursor: "pointer", color: NAVY, display: "grid", placeItems: "center" }}><Pencil size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)} title={u.activo ? "Desactivar" : "Activar"} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: 7, cursor: "pointer", color: u.activo ? "var(--dc-warn-600)" : "var(--dc-ok-700)", display: "grid", placeItems: "center" }}><Power size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label="Eliminar" onClick={() => eliminar(u)} title="Eliminar" style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: 7, cursor: "pointer", color: RED, display: "grid", placeItems: "center" }}><Trash2 size={15} strokeWidth={1.75} /></button></div> },
+          { key: "estado", label: "Estado", w: "110px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
+          { key: "acc", label: "Acciones", w: "130px", a: "center", noFilter: true, noSort: true, cell: (u) => <div className="dc-us__acc"><button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button><button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button><button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button></div> },
         ]} />
     </div>
   );
@@ -5520,24 +5522,22 @@ const togglePermAccion = (perms, mod, acc) => {
 function MatrizPermisos({ perms, onToggle, lockVer, solo }) {
   const lista = solo ? MODULOS.filter((m) => solo.includes(m.id)) : MODULOS;
   return (
-    <div style={{ overflowX: "auto", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
+    <div className="dc-mp">
+      <table>
         <thead>
-          <tr style={{ background: "var(--dc-bg)" }}>
-            <th style={{ padding: "10px 14px", textAlign: "left", fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, textTransform: "uppercase", position: "sticky", left: 0, background: "var(--dc-bg)", zIndex: 1 }}>Módulo</th>
-            {ACCIONES.map((a) => <th key={a.id} style={{ padding: "10px 6px", textAlign: "center", fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, textTransform: "uppercase", minWidth: 62 }}>{a.label}</th>)}
+          <tr>
+            <th>Módulo</th>
+            {ACCIONES.map((a) => <th key={a.id}>{a.label}</th>)}
           </tr>
         </thead>
         <tbody>
-          {lista.map((m) => { const acts = perms[m.id] || []; return (
-            <tr key={m.id} style={{ borderTop: "1px solid var(--dc-line)" }}>
-              <td style={{ padding: "7px 14px", fontWeight: 500, color: NAVY, position: "sticky", left: 0, background: "#fff", whiteSpace: "nowrap" }}>{m.label}</td>
-              {ACCIONES.map((a) => { const on = acts.includes(a.id); const locked = a.id === "ver" && lockVer && lockVer(m.id); return (
-                <td key={a.id} style={{ padding: "6px", textAlign: "center" }}>
-                  <button type="button" className="dc-icon-btn" aria-label={locked ? "Obligatorio (no editable)" : on ? `Quitar ${a.label}` : `Dar ${a.label}`} onClick={() => { if (!locked) onToggle(m.id, a.id); }} title={locked ? "Obligatorio (no editable)" : on ? `Quitar ${a.label}` : `Dar ${a.label}`}
-                    style={{ width: 27, height: 27, borderRadius: "var(--dc-r-sm)", border: "none", cursor: locked ? "not-allowed" : "pointer", display: "inline-grid", placeItems: "center",
-                      background: on ? (locked ? "var(--dc-line)" : a.id === "ver" ? "var(--dc-info-soft)" : "var(--dc-ok-soft)") : "var(--dc-bg)", color: on ? (locked ? "var(--dc-slate)" : a.id === "ver" ? "var(--dc-info-700b)" : "var(--dc-ok-700)") : "var(--dc-line-alt)" }}>
-                    {on ? (locked ? <Lock size={13} strokeWidth={1.75} /> : <Check size={15} strokeWidth={1.75} />) : <span style={{ fontSize: 12, color: "var(--dc-line-alt)" }}>–</span>}
+          {lista.map((m) => { const acts = perms[m.id] || []; const visible = acts.includes("ver"); return (
+            <tr key={m.id} className={visible ? "" : "is-oculto"}>
+              <td><span className="dc-mp__mod"><i className={visible ? "is-on" : ""} />{m.label}</span><small>{visible ? `${acts.length}/${ACCIONES.length}` : "Oculto"}</small></td>
+              {ACCIONES.map((a) => { const on = acts.includes(a.id); const locked = a.id === "ver" && lockVer && lockVer(m.id); const lbl = locked ? "Obligatorio (no editable)" : on ? `Quitar ${a.label}` : `Dar ${a.label}`; return (
+                <td key={a.id}>
+                  <button type="button" className={`dc-mini-btn dc-mp__t${on ? " is-on" : ""}${a.id === "ver" ? " is-ver" : ""}${locked ? " is-lock" : ""}`} aria-label={lbl} title={lbl} aria-pressed={on} onClick={() => { if (!locked) onToggle(m.id, a.id); }}>
+                    {on ? (locked ? <Lock size={11} strokeWidth={2.4} /> : <Check size={12} strokeWidth={3} />) : null}
                   </button>
                 </td>
               ); })}
@@ -5587,42 +5587,43 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {!!auth.token && matrizError && (
-        <Card style={{ padding: 14, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
-          <div style={{ fontSize: 13, color: "var(--dc-danger-700)", lineHeight: 1.5 }}><b>Error al cargar permisos.</b> {matrizError}</div>
-        </Card>
-      )}
-      {!!auth.token && (
-        <Card style={{ padding: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-sky)" }}>
-          <div style={{ fontSize: 13, color: "var(--dc-info-ink)", lineHeight: 1.5 }}>
-            <b>Fuente de verdad: el servidor.</b> {matrizError
-              ? "No se pudo cargar la matriz del servidor. Lo que ves puede ser solo local — no asumas que refleja producción."
-              : desdeServidor
-              ? "La matriz se cargó de GET /permisos. Pulsa «Guardar en el servidor» para persistir. Los permisos del menú se refrescan al volver a esta pestaña (o al guardar)."
-              : "Cargando matriz del servidor… El menú usa los permisos del login y se refresca al volver a la pestaña."}
-          </div>
-        </Card>
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-        <KpiCard label="Roles configurables" value={ROLES_ASIGNABLES.length} color={NAVY} icon={<UserCog size={18} strokeWidth={1.75} />} sub="del personal" />
-        <KpiCard label="Módulos del sistema" value={MODULOS.length} color={TEAL} icon={<LayoutDashboard size={18} strokeWidth={1.75} />} sub="asignables" />
-        <KpiCard label="Acciones granulares" value={ACCIONES.length} color={DS.c.primary} icon={<Shield size={18} strokeWidth={1.75} />} sub="por módulo" />
-        <KpiCard label={`Visibles – ${R.label}`} value={nMods} color={R.color} icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub={`${nAcc} permisos activos`} />
-      </div>
-      <ModHead icon={<Shield size={20} strokeWidth={1.75} />} titulo="Permisos por rol" sub="Define, por rol, qué puede hacer en cada módulo (ver, crear, editar, eliminar, aprobar, exportar…). Quitar «Ver» oculta el módulo. Se puede afinar por usuario en Gestión de usuarios." accion={<div style={{ display: "flex", gap: 8 }}><Btn small kind="ghost" onClick={restaurar}><Repeat size={14} strokeWidth={1.75} /> Restaurar rol</Btn><Btn small onClick={guardar} disabled={guardando}><Check size={14} strokeWidth={1.75} /> {guardando ? "Guardando…" : "Guardar en el servidor"}</Btn></div>} />
-      {/* Selector de rol */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {ROLES_ASIGNABLES.map((r) => { const RR = ROLES[r]; const Ic = RR.icon; const on = r === rolSel; return (
-          <button key={r} onClick={() => setRolSel(r)} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${RR.color}` : "1.5px solid var(--dc-line)", background: on ? tint(RR.color, 0.071) : "#fff", color: on ? RR.color : "var(--dc-ink-400)", fontWeight: 500, fontSize: 13, cursor: "pointer" }}><Ic size={15} strokeWidth={1.75} /> {RR.label}</button>
-        ); })}
-      </div>
-      <Card style={{ padding: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, color: "var(--dc-ink-700)", fontSize: 13 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-md)", background: tint(R.color, 0.086), color: R.color, display: "grid", placeItems: "center", flexShrink: 0 }}><RIc size={18} strokeWidth={1.75} /></div>
-          <div><strong style={{ color: R.color }}>{R.label}</strong> — {R.desc}</div>
+      {!!auth.token && matrizError && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span><b>Error al cargar permisos.</b> {matrizError} Lo que ves puede ser solo local.</span></div>}
+      {!!auth.token && !matrizError && <div className="fm-aviso-edad is-info"><Shield size={15} strokeWidth={2} /><span><b>Fuente de verdad: el servidor.</b> {desdeServidor ? "Matriz cargada del servidor. Pulsa «Guardar en el servidor» para persistir; el menú se refresca al guardar." : "Cargando la matriz del servidor…"}</span></div>}
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{ROLES_ASIGNABLES.length}</b><span>roles del personal</span></div>
+          <p>Qué puede hacer cada rol en cada módulo</p>
         </div>
-        <MatrizPermisos perms={perms} onToggle={onToggle} lockVer={lockVer} />
-      </Card>
+        <div className="dc-esp-hero__cifras">
+          <div><b>{MODULOS.length}</b><span>Módulos</span></div>
+          <div><b>{ACCIONES.length}</b><span>Acciones por módulo</span></div>
+          <div><b>{nAcc}</b><span>Permisos de {R.label.toLowerCase()}</span></div>
+        </div>
+        <span />
+        <div className="dc-hero-acc">
+          <button type="button" className="dc-esp-hero__agregar" onClick={restaurar}><Repeat size={14} strokeWidth={1.9} /> Restaurar rol</button>
+          <button type="button" className="dc-esp-hero__btn" onClick={guardar} disabled={guardando}><Check size={14} strokeWidth={2} /> {guardando ? "Guardando…" : auth.token ? "Guardar en el servidor" : "Guardar"}</button>
+        </div>
+      </section>
+      <div className="dc-perm">
+        <aside className="dc-perm__roles" role="tablist" aria-label="Rol">
+          {ROLES_ASIGNABLES.map((r) => { const RR = ROLES[r]; const Ic = RR.icon; const on = r === rolSel; const pr = rolePerms[r] || ROL_PERMS[r] || {}; const vis = modulosVisibles(pr).length; return (
+            <button key={r} type="button" role="tab" aria-selected={on} className={on ? "is-on" : ""} style={{ "--c": RR.color }} onClick={() => setRolSel(r)}>
+              <span className="dc-perm__rico"><Ic size={16} strokeWidth={2} /></span>
+              <div><b>{RR.label}</b><small>{vis} de {MODULOS.length} módulos</small><span className="dc-perm__mini"><i style={{ width: `${Math.round((vis / MODULOS.length) * 100)}%` }} /></span></div>
+            </button>
+          ); })}
+        </aside>
+        <section className="dc-perm__main" style={{ "--c": R.color }}>
+          <header className="dc-perm__cab">
+            <span className="dc-perm__rico is-grande"><RIc size={20} strokeWidth={2} /></span>
+            <div><b>{R.label}</b><p>{R.desc}</p></div>
+            <div className="dc-perm__nums"><div><b>{nMods}</b><small>Visibles</small></div><div><b>{nAcc}</b><small>Permisos</small></div></div>
+          </header>
+          <div className="dc-perm__ley"><span><i className="is-ver" /> Ver (muestra el módulo)</span><span><i className="is-on" /> Acción permitida</span><span><i className="is-lock" /> Obligatorio</span><span><i /> Sin permiso</span></div>
+          <MatrizPermisos perms={perms} onToggle={onToggle} lockVer={lockVer} />
+        </section>
+      </div>
     </div>
   );
 }
@@ -6929,103 +6930,97 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
     { l: "Usuarios de apoyo", ic: <Users size={18} strokeWidth={1.75} />, c: DS.c.primary, v: usuariosStaff == null ? "—" : `${usuariosStaff} – Ilimitados`, sub: usuariosStaff == null ? SIN_CONTEO : "Recepción, admin, TI…" },
     { l: "Pacientes", ic: <Smile size={18} strokeWidth={1.75} />, c: "var(--dc-ok)", v: totalPacientes == null ? "—" : `${totalPacientes} – Ilimitados`, sub: totalPacientes == null ? (consumoReal?.pacientes === undefined ? SIN_PERM : SIN_CONTEO) : "Con auto-registro por link" },
   ];
+  const TONO_PLAN = ["#0E9199", "#6D4FD1", "#D97706", "#E0694F"];
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {/* Banner de prueba de 14 días. Los "11 de 14 días" y el 78% de la barra son fijos:
-          no cuentan nada, así que con sesión no se enseña: hablaría del contrato real. */}
-      {!conectado && <Card style={{ padding: "14px 18px", background: "linear-gradient(100deg,rgba(254,243,199,0.7),rgba(253,230,138,0.5))", border: "1px solid rgba(253,230,138,0.8)", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: "linear-gradient(135deg,var(--dc-warn),var(--dc-warn-600))", display: "grid", placeItems: "center", flexShrink: 0 }}><Sparkles size={20} strokeWidth={1.75} color="#fff" /></div>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <div style={{ fontWeight: 600, color: "var(--dc-warn-600)", fontFamily: DISPLAY_FONT, fontSize: 14 }}>Prueba PRO – 14 días gratis</div>
-          <div style={{ fontSize: 13, color: "var(--dc-warn-600)" }}>Estás probando funciones del plan Clínica. Te quedan <strong>11 de 14 días</strong> – hasta <strong>{PACIENTES_TRIAL} pacientes</strong> en la prueba. Sin tarjeta hasta que decidas.</div>
+    <div style={{ display: "grid", gap: 14 }}>
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{actual.nombre}</b><span>tu plan</span></div>
+          <p>S/ {actual.precio}/mes – {totalMods(actual.id)} módulos activos – renueva el {fechaLegible(addDays(26))}</p>
         </div>
-        <div style={{ minWidth: 140 }}>
-          <div style={{ height: 8, background: "var(--dc-amber-soft)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: "78%", height: "100%", background: "var(--dc-warn-600)" }} /></div>
-          <div style={{ fontSize: 12, color: "var(--dc-warn-600)", marginTop: 4, fontWeight: 500 }}>11 días restantes</div>
+        <div className="dc-esp-hero__cifras">
+          <div><b>{sedesUsadas == null ? "—" : `${sedesUsadas}/${actual.sedesIncl}`}</b><span>Sedes incluidas</span></div>
+          <div><b>{odontologos == null ? "—" : actual.odontologos === "ilim" ? odontologos : `${odontologos}/${actual.odontologos}`}</b><span>Odontólogos</span></div>
+          <div><b>{totalPacientes == null ? "—" : totalPacientes}</b><span>Pacientes, ilimitados</span></div>
         </div>
-        <Btn small kind="navy" onClick={() => notify("Activa tu plan cuando quieras para no perder acceso.")}>Activar plan</Btn>
-      </Card>}
+        <span />
+        <div className="dc-hero-acc"><span className="dc-plan__activo"><CheckCircle2 size={14} strokeWidth={2.2} /> Activo</span></div>
+      </section>
 
-      {/* Tu cuenta hoy — se factura por sede y por odontólogo; pacientes ilimitados */}
-      <Card style={{ padding: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-          <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Tu cuenta hoy</h3>
-          <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Se factura por <strong>sede</strong> y por <strong>odontólogo</strong>. El staff de apoyo y los pacientes son ilimitados.</span>
+      {/* Banner de prueba: los "11 de 14 días" son de ejemplo, con sesión no se enseña. */}
+      {!conectado && (
+        <div className="dc-plan__trial">
+          <span className="dc-plan__trial-ico"><Sparkles size={17} strokeWidth={2} /></span>
+          <div><b>Prueba PRO, 14 días gratis</b><span>Te quedan <strong>11 de 14 días</strong> y hasta <strong>{PACIENTES_TRIAL} pacientes</strong>. Sin tarjeta hasta que decidas.</span></div>
+          <div className="dc-plan__trial-barra"><i style={{ width: "78%" }} /><small>11 días restantes</small></div>
+          <button type="button" onClick={() => notify("Activa tu plan cuando quieras para no perder acceso.")}>Activar plan</button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
-          {cuenta.map((x) => (
-            <div key={x.l} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>{x.l}</div>
-                <div style={{ background: tint(x.c, 0.082), color: x.c, width: 32, height: 32, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center" }}>{x.ic}</div>
+      )}
+
+      <div className="dc-plan__grid">
+        <section className="dc-plan__panel">
+          <div className="dc-plan__tit"><h3>Tu cuenta hoy</h3><span>Se factura por sede y por odontólogo; el equipo de apoyo y los pacientes son ilimitados</span></div>
+          <div className="dc-plan__cuenta">
+            {cuenta.map((x, k) => (
+              <div key={x.l} style={{ "--c": ["#0E9199", "#6D4FD1", "#2F6FDE", "#16A36A"][k] }}>
+                <span className="dc-plan__cico">{x.ic}</span>
+                <div><small>{x.l}</small><b>{x.v}</b><span>{x.sub}</span></div>
               </div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 6 }}>{x.v}</div>
-              <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 2 }}>{x.sub}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card style={{ padding: 24, background: `linear-gradient(150deg, ${INK}, ${NAVY})`, color: "#fff", border: "none" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 13, color: "var(--dc-sky)", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>Tu plan actual</div>
-            <div style={{ fontSize: 27, fontWeight: 600, fontFamily: DISPLAY_FONT, marginTop: 4 }}>{actual.nombre}</div>
-            <div style={{ fontSize: 13, color: "var(--dc-brand-soft)", marginTop: 2 }}>S/ {actual.precio}/mes – {totalMods(actual.id)} módulos activos – renueva el {fechaLegible(addDays(26))}</div>
+            ))}
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 13, color: "var(--dc-sky)" }}>Estado</div>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: "var(--dc-green-soft)", marginTop: 4 }}><CheckCircle2 size={15} strokeWidth={1.75} /> Activo</span>
-          </div>
-        </div>
-        {uso.length > 0 && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16, marginTop: 22 }}>
-          {uso.map((x) => { const pct = Math.round((x.u / x.lim) * 100); const alto = pct >= 80; return (
-            <div key={x.l}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "var(--dc-line-alt2)" }}>{x.l}</span><span style={{ fontWeight: 500 }}>{x.u}<span style={{ color: "var(--dc-slate)" }}>/{x.lim}</span></span></div>
-              <div style={{ height: 8, background: "rgba(255,255,255,.14)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: pct + "%", height: "100%", background: alto ? "var(--dc-amber-soft)" : "var(--dc-green-soft)" }} /></div>
+        </section>
+        <section className="dc-plan__panel">
+          <div className="dc-plan__tit"><h3>Consumo del mes</h3><span>Bolsas incluidas en tu plan</span></div>
+          {uso.length === 0 ? <p className="dc-seg__nada">El consumo real todavía no se mide desde el servidor.</p> : (
+            <div className="dc-plan__uso">
+              {uso.map((x, k) => { const pct = Math.round((x.u / x.lim) * 100); const col = pct >= 80 ? "#D97706" : ["#0E9199", "#16A36A", "#6D4FD1"][k % 3]; return (
+                <div key={x.l} style={{ "--c": col }}>
+                  <span className="dc-plan__anillo" style={{ "--p": pct }}><b>{pct}%</b></span>
+                  <div><b>{x.l}</b><span>{x.u.toLocaleString("es-PE")} de {x.lim.toLocaleString("es-PE")}</span></div>
+                </div>
+              ); })}
+              <p>Al superar las bolsas, el consumo extra se factura al cierre del mes.</p>
             </div>
-          ); })}
-        </div>}
-        {uso.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-slate)", marginTop: 14 }}>Al superar las bolsas incluidas, el consumo extra se factura al cierre del mes.</div>}
-      </Card>
-
-      <div>
-        <h3 style={{ color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT, margin: "4px 0 4px" }}>Elige tu plan</h3>
-        <p style={{ color: "var(--dc-ink-400)", fontSize: 13, margin: "0 0 14px" }}>Cada plan incluye todo lo del anterior y desbloquea más módulos. Cámbialo y verás el menú actualizarse al instante.</p>
-        <div className="dc-gerencial-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 14 }}>
-          {PLANES.map((p) => { const esActual = p.id === actual.id; const sube = p.precio > actual.precio; return (
-            <Card key={p.id} style={{ padding: 20, border: esActual ? `2px solid ${NAVY}` : "1px solid var(--dc-line)", position: "relative", display: "flex", flexDirection: "column" }}>
-              {p.destacado && !esActual && <span style={{ position: "absolute", top: -10, right: 16, fontSize: 12, fontWeight: 500, color: "#fff", background: RED, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Más elegido</span>}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14 }}>{p.nombre}</div>
-                {esActual && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 9px", borderRadius: "var(--dc-r-full)" }}>Actual</span>}
-              </div>
-              <div style={{ margin: "8px 0 6px", fontFamily: DISPLAY_FONT, fontSize: 21, fontWeight: 600, color: NAVY }}>S/ {p.precio}<span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-500)" }}>/mes</span></div>
-              <div style={{ fontSize: 13, color: "var(--dc-ink-400)", minHeight: 30 }}>{p.tagline}</div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-full)", padding: "3px 9px", margin: "8px 0 12px", alignSelf: "flex-start" }}><Zap size={12} strokeWidth={1.75} /> {totalMods(p.id)} módulos</div>
-              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 14px", display: "grid", gap: 6, flex: 1 }}>
-                {p.incluye.slice(0, 5).map((f, i) => <li key={i} style={{ display: "flex", gap: 7, fontSize: 13, color: "var(--dc-ink-700)" }}><Check size={14} strokeWidth={1.75} color="var(--dc-ok-700)" style={{ flexShrink: 0, marginTop: 2 }} /> {f}</li>)}
-              </ul>
-              {esActual
-                ? <Btn small full kind="ghost" onClick={() => {}} disabled>Plan actual</Btn>
-                : <Btn small full kind={sube ? "navy" : "ghost"} onClick={() => setConfirmP(p)}>{sube ? "Subir a este plan" : "Cambiar a este plan"}</Btn>}
-            </Card>
-          ); })}
-        </div>
+          )}
+        </section>
       </div>
 
-      <Card style={{ overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Historial de facturación</h3></div>
-        {facturas.map((f, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none" }}>
-            <div style={{ background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", width: 34, height: 34, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center" }}><CheckCircle2 size={17} strokeWidth={1.75} /></div>
-            <div style={{ flex: 1 }}><div style={{ fontWeight: 500, color: NAVY }}>Plan {actual.nombre} — mensualidad</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{fechaLegible(f.fecha)}</div></div>
-            <div style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>S/ {actual.precio}</div>
-            <button onClick={() => notify("Descargando comprobante...")} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", color: DS.c.primary, fontWeight: 500, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}><FileText size={14} strokeWidth={1.75} /> Comprobante</button>
+      <section>
+        <div className="dc-plan__tit"><h3>Elige tu plan</h3><span>Cada plan incluye todo lo del anterior; el menú se actualiza al instante</span></div>
+        <div className="dc-plan__planes">
+          {PLANES.map((p, k) => { const esActual = p.id === actual.id; const sube = p.precio > actual.precio; return (
+            <article key={p.id} className={`dc-plan__card${esActual ? " is-actual" : ""}`} style={{ "--c": TONO_PLAN[k % TONO_PLAN.length] }}>
+              <header>
+                <div><b>{p.nombre}</b>{esActual ? <span className="dc-plan__cinta">Tu plan</span> : p.destacado ? <span className="dc-plan__cinta is-dest">Más elegido</span> : null}</div>
+                <div className="dc-plan__precio"><b>S/ {p.precio}</b><span>/mes</span></div>
+                <small>{p.tagline}</small>
+              </header>
+              <div className="dc-plan__mods"><Zap size={12} strokeWidth={2.2} /> {totalMods(p.id)} módulos</div>
+              <ul>{p.incluye.slice(0, 5).map((f, i) => <li key={i}><Check size={13} strokeWidth={2.6} /> {f}</li>)}</ul>
+              {esActual
+                ? <button type="button" className="dc-plan__cta is-actual" disabled><CheckCircle2 size={14} strokeWidth={2.2} /> Plan actual</button>
+                : <button type="button" className={`dc-plan__cta${sube ? " is-sube" : ""}`} onClick={() => setConfirmP(p)}>{sube ? "Subir a este plan" : "Cambiar a este plan"}</button>}
+            </article>
+          ); })}
+        </div>
+      </section>
+
+      <section className="dc-plan__panel">
+        <div className="dc-plan__tit"><h3>Historial de facturación</h3><span>{facturas.length} {facturas.length === 1 ? "pago" : "pagos"}</span></div>
+        {facturas.length === 0 ? <p className="dc-seg__nada">{conectado ? "El historial de cobros de tu membresía todavía no está conectado." : "Aún no hay cobros de tu membresía."}</p> : (
+          <div className="dc-plan__facts">
+            {facturas.map((f, i) => (
+              <div key={i}>
+                <span className="dc-plan__fico"><Receipt size={15} strokeWidth={2} /></span>
+                <div><b>Plan {actual.nombre}, mensualidad</b><span>{fechaLegible(f.fecha)}</span></div>
+                <span className="dc-pill is-ok">Pagado</span>
+                <em>S/ {actual.precio}</em>
+                <button type="button" onClick={() => notify("Descargando comprobante...")}><Download size={13} strokeWidth={2.2} /> Comprobante</button>
+              </div>
+            ))}
           </div>
-        ))}
-        {facturas.length === 0 && <Vacio icon={<CreditCard size={22} strokeWidth={1.75} />} titulo="Sin facturas" sub={conectado ? "El historial de cobros de tu membresía todavía no está conectado." : "Aún no hay cobros de tu membresía."} />}
-      </Card>
+        )}
+      </section>
       {confirmP && (() => { const sube = confirmP.precio > actual.precio; const gana = PLAN_MODULOS[confirmP.id].filter((m) => !PLAN_MODULOS[actual.id].includes(m)); const pierde = PLAN_MODULOS[actual.id].filter((m) => !PLAN_MODULOS[confirmP.id].includes(m)); return (
         <Modal icon={<CreditCard size={20} strokeWidth={1.75} />} tone={sube ? "var(--dc-ok)" : NAVY} titulo={`Cambiar a plan ${confirmP.nombre}`} sub={`S/ ${confirmP.precio}/mes – ${confirmP.tagline}`} onClose={() => setConfirmP(null)}
           footer={<><Btn small kind="ghost" onClick={() => setConfirmP(null)}>Cancelar</Btn><Btn small kind={sube ? "navy" : "red"} onClick={() => { cambiarPlan(confirmP); setConfirmP(null); }}><Check size={15} strokeWidth={1.75} /> Confirmar cambio</Btn></>}>
@@ -7365,44 +7360,59 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
       const cob = vals.length ? Math.round(vals.reduce((s, x) => s + x, 0) / vals.length) : 0;
       return { n, cob, estado: "activo" };
     });
+  const iniAseg = (n) => String(n || "").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
+  const COLS_LIQ = [["enviado", "Enviadas", "Esperan respuesta de la aseguradora", "#2F6FDE", Send], ["aprobado", "Aprobadas", "Listas para cobrar", "#6D4FD1", CheckCircle2], ["pagado", "Pagadas", "Ya recuperadas", "#16A36A", Wallet]];
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {segurosError && (
-        <Card style={{ padding: 14, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
-          <div style={{ fontSize: 13, color: "var(--dc-danger-700)", lineHeight: 1.5 }}><b>Módulo no conectado.</b> {segurosError} Lo que ves abajo no es «clínica sin convenios»: es ausencia de API.</div>
-        </Card>
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        {kpis.map(([l, v, c, ic]) => <KpiCard key={l} label={l} value={v} color={c} icon={ic} />)}
-      </div>
-      <Card style={{ overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Convenios y coberturas</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Cobertura y monto pendiente de liquidar por aseguradora.</div></div>
-        <div style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
-          {conveniosVista.length === 0 && (
-            <div style={{ gridColumn: "1/-1", padding: "18px 4px", color: "var(--dc-ink-400)", fontSize: 13, lineHeight: 1.55 }}>
-              Todavía no hay convenios cargados. Cada clínica pacta los suyos con cada aseguradora;
-              aquí aparecerán con su cobertura y lo que queda por liquidar.
-            </div>
-          )}
-          {conveniosVista.map((c) => { const col = colorDe(c.n); const pend = pendConv(c.n); return (
-            <div key={c.n} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: 16, background: "var(--dc-bg)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: tint(col, 0.094), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Umbrella size={19} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.n}</div><span style={{ fontSize: 12, fontWeight: 500, color: c.estado === "activo" ? "var(--dc-ok-700)" : "var(--dc-warn-600)", background: c.estado === "activo" ? "var(--dc-ok-soft)" : "var(--dc-warn-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{c.estado === "activo" ? "Activo" : "En evaluación"}</span></div></div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}><span style={{ color: "var(--dc-ink-500)" }}>Cobertura</span><span style={{ fontWeight: 500, color: col }}>{c.cob}%</span></div>
-              <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden", marginBottom: 10 }}><div style={{ width: c.cob + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)" }} /></div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--dc-ink-400)" }}><span>{nLiq(c.n)} caso(s)</span><span style={{ fontWeight: 500, color: pend > 0 ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}>{pend > 0 ? `S/ ${pend.toLocaleString()} pend.` : "Al día"}</span></div>
-            </div>
-          ); })}
+    <div style={{ display: "grid", gap: 14 }}>
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{segurosError ? "—" : `S/ ${porCobrar.toLocaleString("es-PE")}`}</b><span>por liquidar</span></div>
+          <p>{liqView.length} {liqView.length === 1 ? "liquidación" : "liquidaciones"} con aseguradoras y EPS</p>
         </div>
-      </Card>
-      <DataTable titulo="Liquidaciones" sub="liquidaciones" empty={<Vacio icon={<Umbrella size={22} strokeWidth={1.75} />} titulo="Sin liquidaciones" sub="No hay liquidaciones con aseguradoras por ahora." />} minWidth={760} rows={liqView} onRowClick={(x) => setDetalleLiq(x)} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(160px,1.4fr)", a: "left", get: (x) => x.paciente, cell: (x) => <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{x.paciente}</span> },
-        { key: "aseg", label: "Aseguradora", w: "minmax(140px,1.2fr)", a: "left", get: (x) => x.aseg, cell: (x) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{x.aseg}</span> },
-        { key: "total", label: "Total", w: "110px", a: "right", get: (x) => x.total, cell: (x) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>S/ {x.total}</span> },
-        { key: "cob", label: "Cubierto", w: "110px", a: "center", get: (x) => x.cob, cell: (x) => <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)" }}>S/ {x.cob}</span> },
-        { key: "copago", label: "Copago", w: "110px", a: "center", get: (x) => x.copago, cell: (x) => <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>S/ {x.copago}</span> },
-        { key: "estado", label: "Estado", w: "120px", a: "center", get: (x) => LI[x.estado].l, cell: (x) => { const I = LI[x.estado]; return <span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>; } },
-        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (x) => x.estado !== "pagado" ? <Btn small kind="ghost" onClick={() => avanzar(x.id)}>Avanzar <ChevronRight size={13} strokeWidth={1.75} /></Btn> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>—</span> },
-      ]} />
+        <div className="dc-esp-hero__cifras">
+          <div><b>{segurosError ? "—" : `S/ ${recuperado.toLocaleString("es-PE")}`}</b><span>Recuperado</span></div>
+          <div><b>{segurosError ? "—" : (cobVals.length ? `${cobProm}%` : "—")}</b><span>Cobertura promedio</span></div>
+          <div><b>{segurosError ? "—" : conveniosVista.length}</b><span>Aseguradoras</span></div>
+        </div>
+        <span />
+      </section>
+      {segurosError && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span><b>Módulo no conectado.</b> {segurosError} No significa que la clínica no tenga convenios.</span><button type="button" onClick={recargarLiq}>Reintentar</button></div>}
+      <section className="dc-seg__conv">
+        <div className="dc-seg__tit"><h3>Convenios</h3><span>Cobertura pactada y lo pendiente por aseguradora</span></div>
+        {conveniosVista.length === 0 ? <p className="dc-seg__nada">Todavía no hay convenios cargados. Cada clínica pacta los suyos; aquí aparecerán con su cobertura y lo que queda por liquidar.</p> : (
+          <div className="dc-seg__convs">
+            {conveniosVista.map((c) => { const col = colorDe(c.n); const pend = pendConv(c.n); return (
+              <article key={c.n} className="dc-seg__card" style={{ "--c": col }}>
+                <div className="dc-seg__top">
+                  <span className="dc-seg__logo">{iniAseg(c.n)}</span>
+                  <div><b>{c.n}</b><span className={`dc-pill ${c.estado === "activo" ? "is-ok" : "is-warn"}`}>{c.estado === "activo" ? "Activo" : "En evaluación"}</span></div>
+                  <span className="dc-seg__anillo" style={{ "--p": c.cob }}><b>{c.cob}%</b></span>
+                </div>
+                <div className="dc-seg__pie"><span>{nLiq(c.n)} {nLiq(c.n) === 1 ? "caso" : "casos"}</span><b className={pend > 0 ? "is-pend" : "is-ok"}>{pend > 0 ? `S/ ${pend.toLocaleString("es-PE")} por liquidar` : "Al día"}</b></div>
+              </article>
+            ); })}
+          </div>
+        )}
+      </section>
+      <div className="dc-seg__tablero">
+        {COLS_LIQ.map(([k, tit, sub, col, Ico]) => { const items = liqView.filter((l) => l.estado === k); const tot = items.reduce((a, l) => a + (Number(l.cob) || 0), 0); return (
+          <section key={k} className="dc-seg__col" style={{ "--c": col }}>
+            <header><span className="dc-seg__cico"><Ico size={16} strokeWidth={2} /></span><div><h4>{tit} <i>{items.length}</i></h4><small>{sub}</small></div><b>S/ {tot.toLocaleString("es-PE")}</b></header>
+            {items.length === 0 ? <p className="dc-seg__nada">Sin liquidaciones aquí.</p> : items.map((x) => { const pc = x.total ? Math.round((x.cob / x.total) * 100) : 0; return (
+              <article key={x.id} className="dc-seg__liq" onClick={() => setDetalleLiq(x)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setDetalleLiq(x); }}>
+                <div className="dc-seg__lq1"><b>{x.paciente}</b><span>{x.aseg}</span></div>
+                <div className="dc-seg__split" title={`Seguro ${pc}%, copago ${100 - pc}%`}><i style={{ width: `${pc}%` }} /></div>
+                <div className="dc-seg__lq2">
+                  <span>Seguro <b className="is-ok">S/ {Number(x.cob).toLocaleString("es-PE")}</b></span>
+                  <span>Copago <b className="is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</b></span>
+                  <span>Total <b>S/ {Number(x.total).toLocaleString("es-PE")}</b></span>
+                </div>
+                {x.estado !== "pagado" && <button type="button" className="dc-seg__av" onClick={(e) => { e.stopPropagation(); avanzar(x.id); }}>{x.estado === "enviado" ? "Marcar aprobada" : "Marcar pagada"} <ChevronRight size={13} strokeWidth={2.2} /></button>}
+              </article>
+            ); })}
+          </section>
+        ); })}
+      </div>
       {detalleLiq && (() => { const x = detalleLiq; const I = LI[x.estado]; return (
         <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={x.estado !== "pagado" ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>

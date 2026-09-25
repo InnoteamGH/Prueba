@@ -1,8 +1,8 @@
 /* Pantalla #/metas — meta mensual por médico (DC-41 / DC-09). */
 import React, { useEffect, useState } from "react";
-import { Check, Target } from "lucide-react";
+import { Check, Target, TrendingUp, Trophy, Users } from "lucide-react";
 import api, { auth } from "../api/client";
-import { Btn, Card, DISPLAY_FONT, DS, KpiCard, ModHead, NAVY, Vacio } from "../comun";
+import { Card, ESPECIALIDADES, MEDICOS, Vacio, colorDe, iniciales, tint } from "../comun";
 
 export default function Metas({ notify = () => {}, can }) {
   const conectado = !!auth.token;
@@ -13,7 +13,15 @@ export default function Metas({ notify = () => {}, can }) {
   const [error, setError] = useState(null);
 
   const cargar = () => {
-    if (!conectado) return;
+    if (!conectado) {
+      // Demo: odontólogos de ejemplo con su producción del mes.
+      const list = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: ESPECIALIDADES.find((e) => e.id === m.esp)?.nombre, metaMensual: m.meta, prodMes: m.prodDemo, citasMes: m.citasDemo, porcentajeComision: 30 }));
+      setMeds(list);
+      const d = {};
+      list.forEach((m) => { d[m.id] = String(m.metaMensual); });
+      setDraft(d);
+      return;
+    }
     setError(null);
     api.catalogo.medicos()
       .then((rows) => {
@@ -37,6 +45,11 @@ export default function Metas({ notify = () => {}, can }) {
     const raw = draft[m.id];
     const n = raw === "" || raw == null ? null : Number(raw);
     if (n != null && (!Number.isFinite(n) || n < 0)) { notify("Meta inválida."); return; }
+    if (!conectado) {
+      setMeds((ms) => ms.map((x) => (x.id === m.id ? { ...x, metaMensual: n } : x)));
+      notify(`Meta de ${m.nombre} guardada (demo).`);
+      return;
+    }
     setSaving(m.id);
     api.catalogo.fijarMeta(m.id, n)
       .then(() => { notify(`Meta de ${m.nombre} guardada.`); cargar(); })
@@ -45,66 +58,67 @@ export default function Metas({ notify = () => {}, can }) {
   };
 
   const conMeta = meds.filter((m) => Number(m.metaMensual) > 0).length;
-  const inp = { width: "100%", maxWidth: 160, padding: "8px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
+  const metaTotal = meds.reduce((a, m) => a + (Number(m.metaMensual) || 0), 0);
+  const conProd = meds.some((m) => m.prodMes != null);
+  const prodTotal = meds.reduce((a, m) => a + (Number(m.prodMes) || 0), 0);
+  const pctTotal = metaTotal ? Math.round((prodTotal / metaTotal) * 100) : 0;
+  const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
+  const dia = new Date().getDate();
+  const diasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const ritmo = Math.round((dia / diasMes) * 100);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <ModHead icon={<Target size={20} strokeWidth={1.75} />} color={DS.c.primary} titulo="Metas de producción" sub="Meta mensual (S/) por odontólogo — se usa en reportes y comisiones." />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-        <KpiCard label="Médicos" value={error ? "—" : meds.length} color={NAVY} icon={<Target size={18} strokeWidth={1.75} />} />
-        <KpiCard label="Con meta" value={error ? "—" : conMeta} color={DS.c.primary} icon={<Check size={18} strokeWidth={1.75} />} />
-      </div>
-      {error && (
-        <Card style={{ padding: 14, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
-          <div style={{ fontSize: 13, color: "var(--dc-danger-700)" }}>{error}</div>
-        </Card>
-      )}
-      {!conectado && (
-        <Card style={{ padding: 16 }}>
-          <div style={{ fontSize: 13, color: "var(--dc-warn-600)" }}>Inicia sesión para ver y editar metas reales de la clínica.</div>
-        </Card>
-      )}
+    <div style={{ display: "grid", gap: 14 }}>
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{error ? "—" : soles(metaTotal)}</b><span>meta del mes</span></div>
+          <p>Meta mensual por odontólogo, se usa en reportes y comisiones</p>
+        </div>
+        <div className="dc-esp-hero__cifras">
+          <div><b>{error ? "—" : meds.length}</b><span>Odontólogos</span></div>
+          <div><b>{error ? "—" : conMeta}</b><span>Con meta</span></div>
+          {conProd && <div><b>{pctTotal}%</b><span>Avance, día {dia} de {diasMes}</span></div>}
+        </div>
+        <span />
+      </section>
+      {error && <div className="fm-aviso-edad is-mal"><Target size={15} strokeWidth={2} /><span>{error}</span><button type="button" onClick={cargar}>Reintentar</button></div>}
+      {!conectado && <div className="fm-aviso-edad is-info"><Target size={15} strokeWidth={2} /><span><b>Datos de ejemplo.</b> Inicia sesión para ver y editar las metas reales de la clínica.</span></div>}
       {conectado && !error && meds.length === 0 && (
-        <Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin médicos" sub="Registra odontólogos en Configuración → Doctores." />
+        <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>
       )}
       {meds.length > 0 && (
-        <Card style={{ overflow: "hidden" }}>
-          <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--dc-line)" }}>
-            <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Metas mensuales</h3>
-          </div>
-          <div style={{ display: "grid" }}>
-            {meds.map((m, i) => (
-              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderTop: i ? "1px solid var(--dc-line)" : "none", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{m.nombre}</div>
-                  <div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>
-                    {[m.especialidad, m.cop].filter(Boolean).join(" – ") || "Sin especialidad"}
-                    {m.porcentajeComision != null ? ` – comisión ${m.porcentajeComision}%` : ""}
+        <div className="dc-metas">
+          {meds.map((m) => {
+            const col = colorDe(m.nombre);
+            const meta = Number(m.metaMensual) || 0;
+            const prod = m.prodMes != null ? Number(m.prodMes) : null;
+            const pct = prod != null && meta ? Math.round((prod / meta) * 100) : null;
+            const est = pct == null ? "" : pct >= ritmo ? "is-ok" : pct >= ritmo - 15 ? "is-warn" : "is-mal";
+            const cambio = String(draft[m.id] ?? "") !== String(m.metaMensual ?? "");
+            return (
+              <article key={m.id} className={`dc-meta ${est}`}>
+                <header>
+                  <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12.5, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(m.nombre.replace(/^Dra?\.\s*/, ""))}</span>
+                  <div><b>{m.nombre}</b><span>{m.especialidad || "Sin especialidad"}{m.porcentajeComision != null ? ` – comisión ${m.porcentajeComision}%` : ""}</span></div>
+                  {pct != null && <em className="dc-meta__pct">{pct}%</em>}
+                </header>
+                {pct != null ? (
+                  <div className="dc-meta__avance">
+                    <div className="dc-meta__barra"><i style={{ width: `${Math.min(pct, 100)}%` }} /><s style={{ left: `${ritmo}%` }} title={`Ritmo esperado al día ${dia}: ${ritmo}%`} /></div>
+                    <div className="dc-meta__cifras"><span><TrendingUp size={12} strokeWidth={2.2} /> {soles(prod)} producidos</span><span>{m.citasMes != null ? <><Users size={12} strokeWidth={2.2} /> {m.citasMes} citas</> : null}</span></div>
                   </div>
+                ) : <p className="dc-meta__nota">El avance se ve en Producción y comisiones.</p>}
+                <div className="dc-meta__pie">
+                  <label className="dc-meta__inp"><span>Meta S/</span><input type="number" min="0" step="100" disabled={!puedeEditar} value={draft[m.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [m.id]: e.target.value }))} placeholder="Sin meta" aria-label={`Meta mensual de ${m.nombre}`} /></label>
+                  {puedeEditar && <button type="button" className={`dc-meta__btn${cambio ? " is-on" : ""}`} disabled={saving === m.id || !cambio} onClick={() => guardar(m)}><Check size={14} strokeWidth={2.2} /> {saving === m.id ? "Guardando…" : "Guardar"}</button>}
                 </div>
-                <label style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 8 }}>
-                  Meta S/
-                  <input
-                    className="dc-premium-inp"
-                    type="number"
-                    min="0"
-                    step="100"
-                    disabled={!puedeEditar}
-                    value={draft[m.id] ?? ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, [m.id]: e.target.value }))}
-                    placeholder="Sin meta"
-                    style={inp}
-                  />
-                </label>
-                {puedeEditar && (
-                  <Btn small disabled={saving === m.id} onClick={() => guardar(m)}>
-                    <Check size={14} strokeWidth={1.75} /> {saving === m.id ? "…" : "Guardar"}
-                  </Btn>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {conProd && meds.length > 0 && (
+        <div className="fm-aviso-edad is-info"><Trophy size={15} strokeWidth={2} /><span>La línea sobre cada barra marca el ritmo esperado a hoy ({ritmo}% del mes). Verde va al día, ámbar un poco atrás y coral necesita empuje.</span></div>
       )}
     </div>
   );
