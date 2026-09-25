@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass} from "lucide-react";
+import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
@@ -7250,6 +7250,57 @@ function AvisoBackend({ vista, onReintentar }) {
   );
 }
 
+/* Buscador global (Ctrl + K): módulos, pacientes y acciones de crear, con teclado. */
+function Buscador({ onClose, grupos, modAllowed, pacientes = [], onIr, acciones = [], onCrear }) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(0);
+  const inRef = useRef(null);
+  useEffect(() => { inRef.current && inRef.current.focus(); }, []);
+  const norm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const nq = norm(q.trim());
+  const mods = [];
+  grupos.forEach((g) => g.items.forEach((it) => {
+    if (it.children) it.children.forEach((c) => modAllowed(c.mod) && mods.push({ tipo: "mod", id: c.id, label: `${it.corto || it.label} › ${c.label}`, sub: g.grupo, Icon: it.icon }));
+    else if (modAllowed(modDeVista(it.id))) mods.push({ tipo: "mod", id: it.id, label: it.label, sub: g.grupo, Icon: it.icon });
+  }));
+  const pacs = nq.length >= 2 ? pacientes.filter((p) => norm(p.nombre).includes(nq) || String(p.dni || "").includes(nq)).slice(0, 6).map((p) => ({ tipo: "pac", id: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : "Paciente", Icon: User })) : [];
+  const res = [
+    ...pacs,
+    ...acciones.map(([k, l, Ic, t, sub]) => ({ tipo: "crear", id: k, t, label: l, sub, Icon: Ic })),
+    ...mods,
+  ].filter((r) => !nq || r.tipo === "pac" || norm(`${r.label} ${r.sub}`).includes(nq)).slice(0, nq ? 14 : 10);
+  const elegir = (r) => { if (!r) return; if (r.tipo === "crear") onCrear(r.id, r.t); else if (r.tipo === "pac") onIr("pacientes", { pacienteId: r.id }); else onIr(r.id); };
+  const onKey = (e) => {
+    if (e.key === "Escape") onClose();
+    else if (e.key === "ArrowDown") { e.preventDefault(); setSel((x) => Math.min(res.length - 1, x + 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSel((x) => Math.max(0, x - 1)); }
+    else if (e.key === "Enter") { e.preventDefault(); elegir(res[sel]); }
+  };
+  const ETQ = { crear: "Crear", mod: "Ir a", pac: "Paciente" };
+  let ultimo = null;
+  return (
+    <div className="dc-kbar__velo" onMouseDown={onClose}>
+      <div className="dc-kbar" role="dialog" aria-label="Buscar" onMouseDown={(e) => e.stopPropagation()}>
+        <label className="dc-kbar__in"><Search size={18} strokeWidth={2} /><input ref={inRef} value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} onKeyDown={onKey} placeholder="Busca un módulo, un paciente o qué quieres crear…" /><kbd>Esc</kbd></label>
+        <div className="dc-kbar__lista" role="listbox">
+          {res.length === 0 && <div className="dc-kbar__vacio">Nada coincide con «{q}».</div>}
+          {res.map((r, i) => { const Ic = r.Icon; const cab = r.tipo !== ultimo; ultimo = r.tipo; return (
+            <React.Fragment key={r.tipo + r.id}>
+              {cab && <div className="dc-kbar__sec">{r.tipo === "crear" ? "Crear" : r.tipo === "pac" ? "Pacientes" : "Módulos"}</div>}
+              <button type="button" role="option" aria-selected={i === sel} className={`dc-kbar__op is-${r.tipo}${i === sel ? " is-sel" : ""}`} onMouseEnter={() => setSel(i)} onClick={() => elegir(r)}>
+                <span className="dc-kbar__ico">{Ic ? <Ic size={16} strokeWidth={1.9} /> : null}</span>
+                <span className="dc-kbar__txt"><b>{r.label}</b><small>{r.sub}</small></span>
+                <span className="dc-kbar__etq">{ETQ[r.tipo]} {i === sel && <CornerDownLeft size={12} strokeWidth={2} />}</span>
+              </button>
+            </React.Fragment>
+          ); })}
+        </div>
+        <div className="dc-kbar__pie"><span><kbd>↑</kbd><kbd>↓</kbd> moverse</span><span><kbd>Enter</kbd> abrir</span><span><kbd>Ctrl</kbd><kbd>K</kbd> abrir o cerrar</span></div>
+      </div>
+    </div>
+  );
+}
+
 function MainApp({ usuario, setUsuario, onLogout }) {
   const globalStyles = "\n<style>{`\n  @keyframes dcBackdropFade {\n    from { opacity: 0; }\n    to { opacity: 1; }\n  }\n  @keyframes dcModalSlide {\n    from { opacity: 0; transform: translateY(8px) scale(0.985); }\n    to { opacity: 1; transform: translateY(0) scale(1); }\n  }\n  @keyframes dcTabSlide {\n    from { opacity: 0; transform: translateX(6px); }\n    to { opacity: 1; transform: translateX(0); }\n  }\n  @media (prefers-reduced-motion: reduce) {\n    * {\n      animation-duration: 0.01ms !important;\n      animation-iteration-count: 1 !important;\n      transition-duration: 0.01ms !important;\n      scroll-behavior: auto !important;\n    }\n  }\n`}</style>\n";
   const rol = usuario.rol;
@@ -7325,6 +7376,18 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const colap = colapAuto ? !expandTab : colapPref;
   const setColap = (f) => (colapAuto ? setExpandTab((e) => !e) : setColapPref(f));
   const [subAbierto, setSubAbierto] = useState({}); // submenús del sidebar abiertos (por etiqueta del padre)
+  // Menú por rol: grupos plegables (se recuerda lo que cada quien abre o cierra),
+  // favoritos fijados arriba y buscador con Ctrl + K.
+  const GRUPOS_ROL = { recepcion: ["Atención", "Clínico"], medico: ["Atención", "Clínico"], admin_sede: ["Atención", "Clínico", "Finanzas"], gerencia: ["General", "Finanzas"], admin: ["General", "Atención", "Clínico"], ti: ["Administración"] };
+  const FAVS_ROL = { recepcion: ["agenda_cal", "pacientes", "facturacion"], medico: ["agenda", "pacientes", "odontograma"], admin_sede: ["dashboard", "agenda_cal", "facturacion"], gerencia: ["gerencial", "reportes", "metas"], admin: ["dashboard", "agenda_cal", "pacientes", "facturacion"], ti: ["usuarios", "permisos", "integraciones"] };
+  const [gruposAb, setGruposAb] = usePersist("sb_grupos_" + rol, () => (GRUPOS_ROL[rol] || null));
+  const [favs, setFavs] = usePersist("sb_favs_" + rol, () => (FAVS_ROL[rol] || []));
+  const [buscador, setBuscador] = useState(false);
+  useEffect(() => {
+    const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); setBuscador((v) => !v); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [toast, setToast] = useState(null);
   const notify = (m) => { setToast(m); setTimeout(() => setToast(null), 4200); };
 
@@ -7564,7 +7627,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       { label: "Producción y comisiones", icon: TrendingUp, children: [
         { id: "reportes", label: "Resumen", mod: "reportes" },
         { id: "reportes_aus", label: "Ausentismo", mod: "reportes" },
-      ] },
+      ], corto: "Producción" },
       // NAV-11: #/comisiones es alias de reportes (sin segunda entrada de menú)
     ] },
     { grupo: "Atención", items: [
@@ -7765,63 +7828,109 @@ function MainApp({ usuario, setUsuario, onLogout }) {
           ) : rol === "superadmin" ? (
             <div style={{ display: "flex", alignItems: "center", gap: 7, color: DS.c.primary, fontSize: 13, fontWeight: 500 }}><Globe size={15} strokeWidth={1.75} /> Plataforma global – AWG</div>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13, fontWeight: 500 }}><MapPin size={15} strokeWidth={1.75} color={NAVY} /> {etiquetaSedeActiva}</div>
+            <div className="dc-sb__sedefija" title="Tu sede"><MapPin size={14} strokeWidth={2} /> <span>{etiquetaSedeActiva}</span></div>
           )}
             </div>
             )}
         </div>
+        {!colap && (
+          <button type="button" className="dc-sb__buscar" onClick={() => setBuscador(true)} title="Buscar módulo o paciente (Ctrl + K)">
+            <Search size={14} strokeWidth={2} /><span>Buscar…</span><kbd>Ctrl K</kbd>
+          </button>
+        )}
         <nav className="dc-sb__nav" aria-label="Módulos">
-          {NAV_GRUPOS.map((g) => (
-            <div key={g.grupo} className="dc-sb__grupo">
-              {NAV_GRUPOS.length > 1 && !colap && <div className="dc-sb__titulo">{g.grupo}</div>}
-              {g.items.map((it) => {
-                if (it.children) {
-                  const Icon = it.icon;
-                  const algunActivo = it.children.some((c) => c.id === vista);
-                  if (colap) {
-                    return (
-                      <button type="button" key={it.label} className={`dc-sb__item${algunActivo ? " is-on" : ""}`} aria-label={it.label} title={it.label} onClick={() => { setVista(it.children[0].id); setSidebarOpen(false); }}>
-                        <Icon size={18} strokeWidth={1.75} />
+          {(() => {
+            const ir = (id) => { setVista(id); setSidebarOpen(false); };
+            // Índice id → {label, icono, padre} para favoritos y buscador.
+            const idx = {};
+            NAV_GRUPOS.forEach((g) => g.items.forEach((it) => {
+              if (it.children) it.children.forEach((c) => { idx[c.id] = { id: c.id, label: c.label, padre: it.corto || it.label, icon: it.icon, mod: c.mod, grupo: g.grupo }; });
+              else idx[it.id] = { id: it.id, label: it.label, icon: it.icon, mod: modDeVista(it.id), grupo: g.grupo };
+            }));
+            const esFav = (id) => favs.includes(id);
+            const togFav = (id) => setFavs((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id].slice(-6)));
+            const pin = (id) => !colap && (
+              <span role="button" tabIndex={-1} className={`dc-sb__pin${esFav(id) ? " is-on" : ""}`} title={esFav(id) ? "Quitar de favoritos" : "Fijar en favoritos"} aria-label={esFav(id) ? "Quitar de favoritos" : "Fijar en favoritos"}
+                onClick={(e) => { e.stopPropagation(); togFav(id); }}>{esFav(id) ? <PinOff size={12} strokeWidth={2} /> : <Pin size={12} strokeWidth={2} />}</span>
+            );
+            const bloqueados = [];
+            const libre = (it) => { const locked = !modAllowed(it.children ? it.children[0].mod : modDeVista(it.id)); if (locked) bloqueados.push(it); return !locked; };
+            // Lo fijado en favoritos sale de su grupo: el menú no repite entradas.
+            const grupos = NAV_GRUPOS.map((g) => ({ ...g, items: g.items.filter(libre).filter((it) => it.children || !favs.includes(it.id)) })).filter((g) => g.items.length);
+            const favItems = favs.map((id) => idx[id]).filter((x) => x && modAllowed(x.mod));
+            const activoEn = (g) => g.items.some((it) => it.children ? it.children.some((c) => c.id === vista) : it.id === vista);
+            const abiertoG = (g) => colap || activoEn(g) || !gruposAb || gruposAb.includes(g.grupo);
+            const togG = (g) => setGruposAb((cur) => { const base = cur || grupos.map((x) => x.grupo); return base.includes(g.grupo) ? base.filter((x) => x !== g.grupo) : [...base, g.grupo]; });
+            const item = (it) => {
+              if (it.children) {
+                const Icon = it.icon;
+                const algunActivo = it.children.some((c) => c.id === vista);
+                if (colap) return <button type="button" key={it.label} className={`dc-sb__item${algunActivo ? " is-on" : ""}`} aria-label={it.label} title={it.label} onClick={() => ir(it.children[0].id)}><Icon size={18} strokeWidth={1.75} /></button>;
+                const abierto = subAbierto[it.label] ?? algunActivo;
+                return (
+                  <div key={it.label}>
+                    <button type="button" className={`dc-sb__item${algunActivo && !abierto ? " is-on" : ""}`} aria-expanded={abierto} title={it.label} onClick={() => {
+                        const next = !abierto;
+                        setSubAbierto((x) => ({ ...x, [it.label]: next }));
+                        if (next && !algunActivo) ir(it.children[0].id);
+                      }}>
+                      <Icon size={18} strokeWidth={1.75} />
+                      <span className="dc-sb__label">{it.corto || it.label}</span>
+                      <ChevronDown size={15} strokeWidth={1.75} className="dc-sb__chev" style={{ transform: abierto ? "none" : "rotate(-90deg)" }} />
+                    </button>
+                    {abierto && <div className="dc-sb__sub">{it.children.map((c) => { const active = vista === c.id && !esFav(c.id); return (
+                      <button type="button" key={c.id} className={`dc-sb__subitem${active ? " is-on" : ""}`} aria-current={active ? "page" : undefined} title={c.label} onClick={() => ir(c.id)}>
+                        <span className="dc-sb__label">{c.label}</span>{pin(c.id)}
                       </button>
-                    );
-                  }
-                  const abierto = subAbierto[it.label] ?? algunActivo;
-                  return (
-                    <div key={it.label}>
-                      <button type="button" className={`dc-sb__item${algunActivo && !abierto ? " is-on" : ""}`} aria-expanded={abierto} onClick={() => {
-                          const next = !abierto;
-                          setSubAbierto((s) => ({ ...s, [it.label]: next }));
-                          // DC-03: primer clic también navega al primer hijo desbloqueado
-                          if (next && !algunActivo) {
-                            const dest = it.children.find((c) => modAllowed(c.mod));
-                            if (dest) { setVista(dest.id); setSidebarOpen(false); }
-                          }
-                        }}>
-                        <Icon size={18} strokeWidth={1.75} />
-                        <span className="dc-sb__label">{it.label}</span>
-                        <ChevronDown size={15} strokeWidth={1.75} className="dc-sb__chev" style={{ transform: abierto ? "none" : "rotate(-90deg)" }} />
-                      </button>
-                      {abierto && <div className="dc-sb__sub">{it.children.map((c) => { const locked = !modAllowed(c.mod); const active = vista === c.id && !locked; return (
-                        <button type="button" key={c.id} className={`dc-sb__subitem${active ? " is-on" : ""}${locked ? " is-locked" : ""}`} aria-current={active ? "page" : undefined} title={locked ? `Disponible desde el plan ${PLAN_NOMBRE[planMinimo(c.mod)]}` : c.label} onClick={() => { if (locked) { setVista("plan"); notify(`“${c.label}” se desbloquea desde el plan ${PLAN_NOMBRE[planMinimo(c.mod)]}.`); } else { setVista(c.id); } setSidebarOpen(false); }}>
-                          <span className="dc-sb__label">{c.label}</span>
-                          {locked && <Lock size={12} strokeWidth={1.75} />}
-                        </button>
-                      ); })}</div>}
-                    </div>
-                  );
-                }
-                const Icon = it.icon; const locked = !modAllowed(modDeVista(it.id)); const active = vista === it.id && !locked; return (
-                <button type="button" key={it.id} className={`dc-sb__item${active ? " is-on" : ""}${locked ? " is-locked" : ""}`} aria-label={colap ? it.label : undefined} title={locked ? `Disponible desde el plan ${PLAN_NOMBRE[planMinimo(it.id)]}` : it.label} aria-current={active ? "page" : undefined} onClick={() => { if (locked) { setVista("plan"); notify(`“${it.label}” se desbloquea desde el plan ${PLAN_NOMBRE[planMinimo(it.id)]}.`); } else { setVista(it.id); } setSidebarOpen(false); }}>
+                    ); })}</div>}
+                  </div>
+                );
+              }
+              // Si está en favoritos, el resaltado va allí: una sola marca de "estás aquí".
+              const Icon = it.icon; const active = vista === it.id && !esFav(it.id);
+              return (
+                <button type="button" key={it.id} className={`dc-sb__item${active ? " is-on" : ""}`} aria-label={colap ? it.label : undefined} title={it.label} aria-current={active ? "page" : undefined} onClick={() => ir(it.id)}>
                   <span className="dc-sb__ico"><Icon size={18} strokeWidth={1.75} />{colap && it.id === "whatsapp" && waUnread > 0 && <span className="dc-sb__dot" />}</span>
                   {!colap && <>
                     <span className="dc-sb__label">{it.label}</span>
                     {it.id === "whatsapp" && waUnread > 0 && <span className="dc-sb__count" title="Mensajes por responder">{waUnread}</span>}
-                    {locked ? <Lock size={13} strokeWidth={1.75} /> : it.tag && <span className="dc-sb__tag">{it.tag}</span>}
+                    {it.tag && !(it.id === "whatsapp" && waUnread > 0) && <span className="dc-sb__tag">{it.tag}</span>}
+                    {pin(it.id)}
                   </>}
                 </button>
+              );
+            };
+            return (<>
+              {favItems.length > 0 && (
+                <div className="dc-sb__grupo dc-sb__grupo--fav">
+                  {!colap && <div className="dc-sb__titulo"><span>Favoritos</span></div>}
+                  {favItems.map((f) => { const Icon = f.icon; const active = vista === f.id; return (
+                    <button type="button" key={"fav-" + f.id} className={`dc-sb__item${active ? " is-on" : ""}`} title={f.padre ? `${f.padre} › ${f.label}` : f.label} aria-label={colap ? f.label : undefined} aria-current={active ? "page" : undefined} onClick={() => ir(f.id)}>
+                      <span className="dc-sb__ico"><Icon size={18} strokeWidth={1.75} /></span>
+                      {!colap && <><span className="dc-sb__label">{f.padre ? <>{f.label} <small>{f.padre}</small></> : f.label}</span>{pin(f.id)}</>}
+                    </button>
+                  ); })}
+                </div>
+              )}
+              {grupos.map((g) => { const ab = abiertoG(g); return (
+                <div key={g.grupo} className={`dc-sb__grupo${ab ? "" : " is-plegado"}`}>
+                  {!colap && (
+                    <button type="button" className="dc-sb__titulo" aria-expanded={ab} onClick={() => togG(g)} title={ab ? `Plegar ${g.grupo}` : `Mostrar ${g.grupo}`}>
+                      <span>{g.grupo}</span>{!ab && <i>{g.items.length}</i>}<ChevronDown size={13} strokeWidth={2} style={{ transform: ab ? "none" : "rotate(-90deg)" }} />
+                    </button>
+                  )}
+                  {ab && g.items.map(item)}
+                </div>
               ); })}
-            </div>
-          ))}
+              {bloqueados.length > 0 && !colap && (
+                <button type="button" className="dc-sb__mas-plan" onClick={() => { ir("plan"); }} title={`Disponibles con un plan superior: ${bloqueados.map((b) => b.corto || b.label).join(", ")}`}>
+                  <Lock size={13} strokeWidth={2} />
+                  <span><b>{bloqueados.length} módulo{bloqueados.length > 1 ? "s" : ""} más</b><small>{bloqueados.map((b) => b.corto || b.label).join(" · ")}</small></span>
+                  <ChevronRight size={14} strokeWidth={2} />
+                </button>
+              )}
+            </>);
+          })()}
         </nav>
         <div className="dc-sb__pie">
             {rol !== "superadmin" && !onbDismissed && misPasos.length > 0 && (() => { const done = misPasos.filter((p) => pasos[p.id]).length; if (done >= misPasos.length) return null; return (
@@ -7857,6 +7966,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         <div data-dc-scroll className="dc-contenido" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}><div className={`dc-pagina${vista === "whatsapp" ? " dc-pagina--chat" : ""}`}><div id="dc-top-slot" className="dc-vista-acc" /><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 14 }}>Cargando módulo…</div>}><React.Fragment key={retryTick}>{render()}</React.Fragment></React.Suspense></div></div>
       </main>
 
+      {buscador && <Buscador onClose={() => setBuscador(false)} grupos={NAV_GRUPOS} modAllowed={modAllowed} pacientes={pf}
+        onIr={(id, extra) => { setBuscador(false); setSidebarOpen(false); setVista(id, extra); }}
+        acciones={ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear"))}
+        onCrear={(k, t) => { setBuscador(false); setSidebarOpen(false); setVista(t); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }} />}
       {showPasos && (() => {
         const done = misPasos.filter((p) => pasos[p.id]).length;
         const abierto = misPasos.find((p) => p.id === pasoAbierto) || misPasos.find((p) => !pasos[p.id]) || misPasos[0];
