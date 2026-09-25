@@ -4,6 +4,7 @@ import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, 
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
 const FichaMedica = React.lazy(() => import("./FichaMedica"));
+const PeriodontogramaClinico = React.lazy(() => import("./modulos/Periodontograma"));
 const Reportes = React.lazy(() => import("./modulos/ProduccionComisiones"));
 const Disponibilidad = React.lazy(() => import("./modulos/Disponibilidad"));
 const Configuracion = React.lazy(() => import("./modulos/Configuracion"));
@@ -6714,12 +6715,11 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
   );
 }
 
-/* ---- Periodontograma (sondaje) — clínico premium ---- */
-function Periodontograma({ pacientes: pacProp, notify }) {
-  const DIENTES = [18, 17, 16, 15, 14, 13, 12, 11];
+/* ---- Periodontograma: pantalla del módulo (el sondaje vive en modulos/Periodontograma) ---- */
+function Periodontograma({ pacientes: pacProp, notify, can }) {
   const conectado = !!auth.token;
   const [pacRemoto, setPacRemoto] = useState(null);
-  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); }, []); // eslint-disable-line
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni, fechaNacimiento: p.fechaNacimiento })))).catch(() => {}); }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
   const [pid, setPid] = useState(auth.token ? null : (pacProp[0]?.id || null));
   useEffect(() => {
@@ -6727,134 +6727,13 @@ function Periodontograma({ pacientes: pacProp, notify }) {
     if (!pacRemoto.length) { setPid(null); return; }
     if (pid && !pacRemoto.some((p) => p.id === pid)) setPid(null);
   }, [pacRemoto]); // eslint-disable-line
-  // Sondaje de ejemplo para la demostración. Con sesión NO se usa: alimentaba el
-  // diagnóstico que la propia pantalla emite —"Periodontitis", "7 bolsas ≥4 mm"— así que
-  // un paciente al que nadie ha sondado aparecía con periodontitis diagnosticada.
-  const seed = () => Object.fromEntries(DIENTES.map((n) => [n, { d: [2 + (n % 3), 2 + (n % 2), 3 + (n % 2)], bleed: n === 16 || n === 14 }]));
-  const enBlanco = () => Object.fromEntries(DIENTES.map((n) => [n, { d: [0, 0, 0], bleed: false }]));
-  const [datos, setDatos] = useState(() => (auth.token ? enBlanco() : seed()));
-  // Filas crudas del backend: se guardan para no perder, al escribir, lo que este
-  // modulo no captura (cara palatina, recesion, movilidad y furca).
-  const [filasPerio, setFilasPerio] = useState([]);
-  const jsonSeguro = (v, porDefecto) => { try { const x = JSON.parse(v); return Array.isArray(x) ? x : porDefecto; } catch { return porDefecto; } };
-  useEffect(() => {
-    if (conectado && pid) {
-      api.perio.porPaciente(pid).then((rows) => {
-        const filas = rows || [];
-        setFilasPerio(filas);
-        // Una fila por pieza, con 6 sitios. Aqui solo se pintan los 3 vestibulares.
-        const m = {};
-        for (const r of filas) {
-          if (!DIENTES.includes(Number(r.numeroPieza))) continue;
-          const prof = jsonSeguro(r.profundidad, []);
-          const sang = jsonSeguro(r.sangrado, []);
-          m[Number(r.numeroPieza)] = {
-            d: [Number(prof[0]) || 0, Number(prof[1]) || 0, Number(prof[2]) || 0],
-            bleed: !!(sang[0] || sang[1] || sang[2]),
-          };
-        }
-        // Sin sondaje guardado se queda en blanco, no se inventa uno.
-        setDatos(DIENTES.every((n) => m[n]) ? m : enBlanco());
-      // Si la peticion falla tampoco se inventa un sondaje: seria diagnosticar
-      // periodontitis a un paciente al que nadie ha sondado.
-      }).catch(() => { setFilasPerio([]); setDatos(enBlanco()); });
-    } else { setFilasPerio([]); setDatos(seed()); }
-  }, [pid, conectado]); // eslint-disable-line
-  const paciente = pacientes.find((p) => p.id === pid) || { id: pid, nombre: "Paciente" };
-  const color = (v) => v >= 6 ? "var(--dc-red)" : v >= 4 ? "var(--dc-warn-600)" : "var(--dc-ok-700)";
-  const setD = (n, i, v) => setDatos((s) => ({ ...s, [n]: { ...s[n], d: s[n].d.map((x, j) => j === i ? Math.max(0, Math.min(12, Number(v) || 0)) : x) } }));
-  const toggleB = (n) => setDatos((s) => ({ ...s, [n]: { ...s[n], bleed: !s[n].bleed } }));
-  const todos = Object.values(datos).flatMap((x) => x.d);
-  const prom = (todos.reduce((a, b) => a + b, 0) / todos.length).toFixed(1);
-  const bolsas = todos.filter((v) => v >= 4).length;
-  const sangrado = Object.values(datos).filter((x) => x.bleed).length;
-  const isb = Math.round((sangrado / DIENTES.length) * 100);
-  // Sin ningun valor registrado no se dice "Sano": a un paciente al que nadie ha
-  // sondado no se le puede dar un alta periodontal. Se dice que falta el sondaje.
-  // Bug #34 re-test: No auto-etiquetar "Periodontitis", solo mostrar métricas numéricas
-  const haySondaje = todos.some((v) => v > 0) || sangrado > 0;
-  // Calculamos los indicadores pero NO emitimos diagnóstico automático
-  const estadoSondaje = !haySondaje ? "sin_sondaje" : (bolsas >= 6 || Number(prom) >= 5) ? "grave" : (isb > 20 || bolsas > 0) ? "moderado" : "sano";
-  const estadoColor = estadoSondaje === "grave" ? "var(--dc-red)" : estadoSondaje === "moderado" ? "var(--dc-warn-600)" : estadoSondaje === "sin_sondaje" ? "var(--dc-ink-500)" : "var(--dc-ok-700)";
-  const [informe, setInforme] = useState(false);
-  const recomend = estadoSondaje === "grave" ? ["Raspado y alisado radicular por cuadrantes", "Reevaluación a las 4–6 semanas", "Refuerzo de higiene y control de placa"] : estadoSondaje === "moderado" ? ["Profilaxis y destartraje", "Instrucción de higiene bucal", "Control en 3 meses"] : ["Mantenimiento cada 6 meses", "Seguir con buena higiene"];
-  // Se guarda PIEZA POR PIEZA (asi esta la tabla desde la migracion 0031), fusionando
-  // con lo que ya hubiera: este modulo solo mide la cara vestibular, y la palatina,
-  // la recesion, la movilidad y la furca vienen de la Ficha medica.
-  const guardarPerio = () => {
-    if (!conectado) { notify("Sondaje periodontal guardado."); return; }
-    const previa = Object.fromEntries(filasPerio.map((r) => [Number(r.numeroPieza), r]));
-    Promise.all(DIENTES.map((n) => {
-      const ant = previa[n] || {};
-      const prof = jsonSeguro(ant.profundidad, []);
-      const sang = jsonSeguro(ant.sangrado, []);
-      const d = datos[n]?.d || [0, 0, 0];
-      const sangra = !!datos[n]?.bleed;
-      return api.perio.guardar({
-        pacienteId: pid,
-        numeroPieza: n,
-        profundidad: JSON.stringify([d[0], d[1], d[2], prof[3] ?? 0, prof[4] ?? 0, prof[5] ?? 0]),
-        recesion: ant.recesion ?? JSON.stringify([0, 0, 0, 0, 0, 0]),
-        sangrado: JSON.stringify([sangra, sangra, sangra, sang[3] ?? false, sang[4] ?? false, sang[5] ?? false]),
-        movilidad: ant.movilidad ?? null,
-        furca: ant.furca ?? null,
-      });
-    }))
-      .then(() => { notify("Sondaje guardado en el expediente del paciente."); return api.perio.porPaciente(pid); })
-      .then((rows) => setFilasPerio(rows || []))
-      .catch(() => notify("No se pudo guardar el sondaje."));
-  };
+  const paciente = pacientes.find((p) => p.id === pid) || null;
+  const soloLectura = conectado && can ? !can("perio", "editar") : false;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
+    <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
       <PacienteBar pacientes={pacientes} pacienteId={pid} setPacienteId={setPid} modulo="Periodontograma" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-        {/* Bug #34 re-test: No mostrar diagnóstico auto-etiquetado, solo métricas */}
-        <KpiCard label="Profundidad prom." value={`${prom} mm`} color={NAVY} icon={<Activity size={18} strokeWidth={1.75} />} sub="al sondaje" />
-        <KpiCard label="Bolsas ≥4mm" value={bolsas} color={bolsas ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} icon={<AlertCircle size={18} strokeWidth={1.75} />} sub="sitios comprometidos" />
-        <KpiCard label="Índice de sangrado" value={`${isb}%`} color={isb > 20 ? "var(--dc-red)" : "var(--dc-ok-700)"} icon={<Activity size={18} strokeWidth={1.75} />} sub="ISB al sondaje" />
-        <KpiCard label="Estado" value={!haySondaje ? "Sin sondaje" : "Medido"} color={estadoColor} icon={<Stethoscope size={18} strokeWidth={1.75} />} sub={haySondaje ? "registrado" : "registra el sondaje"} />
-      </div>
-      <Card style={{ padding: 20, overflowX: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-          <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Sondaje — arcada superior derecha</h3>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 12, color: "var(--dc-ink-400)" }}>
-            {[["≤3", "var(--dc-ok-700)"], ["4–5", "var(--dc-warn-600)"], ["≥6", "var(--dc-red)"]].map(([l, c]) => <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: "var(--dc-r-sm)", background: c }} /> {l} mm</span>)}
-            <Btn small kind="ghost" onClick={() => setInforme(true)}><FileText size={14} strokeWidth={1.75} /> Ver informe</Btn>
-            <Btn small onClick={guardarPerio}><Check size={14} strokeWidth={1.75} /> Guardar sondaje</Btn>
-          </div>
-        </div>
-        <div style={{ minWidth: 560, display: "grid", gridTemplateColumns: "72px repeat(8,1fr)", gap: 5, alignItems: "center" }}>
-          <div />
-          {DIENTES.map((n) => <div key={n} style={{ textAlign: "center", fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>{n}</div>)}
-          {["Mesial", "Central", "Distal"].map((cara, ci) => (
-            <React.Fragment key={cara}>
-              <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, textAlign: "right", paddingRight: 4 }}>{cara}</div>
-              {DIENTES.map((n) => { const v = datos[n].d[ci]; return (
-                <input className="dc-premium-inp" key={n} type="number" value={v} onChange={(e) => setD(n, ci, e.target.value)} style={{ width: "100%", textAlign: "center", padding: "7px 2px", borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", fontSize: 13, fontWeight: 500, color: color(v), background: tint(color(v), 0.071), outline: "none", boxSizing: "border-box" }} />
-              ); })}
-            </React.Fragment>
-          ))}
-          <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, textAlign: "right", paddingRight: 4 }}>Sangrado</div>
-          {DIENTES.map((n) => (
-            <button type="button" key={n} className="dc-icon-btn" aria-label="Sangrado al sondaje" onClick={() => toggleB(n)} title="Sangrado al sondaje" style={{ height: 26, borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", cursor: "pointer", background: datos[n].bleed ? "var(--dc-fee)" : "#fff", display: "grid", placeItems: "center" }}>{datos[n].bleed && <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: "var(--dc-red)" }} />}</button>
-          ))}
-        </div>
-      </Card>
-      {informe && (
-        <Modal icon={<Activity size={20} strokeWidth={1.75} />} tone={estadoColor} titulo="Informe periodontal" sub={paciente?.nombre} onClose={() => setInforme(false)} maxW={500} footer={<Btn small kind="ghost" onClick={() => setInforme(false)}>Cerrar</Btn>}>
-          {/* Bug #34 re-test: Informe sin auto-diagnóstico, solo métricas */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, background: tint(estadoColor, 0.071), border: `1px solid ${tint(estadoColor, 0.2)}`, borderRadius: "var(--dc-r-lg)", padding: "13px 15px", marginBottom: 16 }}>
-            <Stethoscope size={22} strokeWidth={1.75} color={estadoColor} /><div><div style={{ fontSize: 16, fontWeight: 600, color: estadoColor, fontFamily: DISPLAY_FONT, lineHeight: 1 }}>Sondaje registrado</div><div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 3 }}>Métricas periodontales medidas</div></div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
-            {[["Profundidad prom.", `${prom} mm`], ["Bolsas ≥4mm", bolsas], ["ISB", `${isb}%`]].map(([l, v]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px", textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>{v}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>{l}</div></div>)}
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, marginBottom: 8 }}>Recomendaciones</div>
-          <div style={{ display: "grid", gap: 7 }}>
-            {recomend.map((r, i) => <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13, color: "var(--dc-ink-700)" }}><CheckCircle2 size={16} strokeWidth={1.75} color={TEAL} style={{ flexShrink: 0, marginTop: 1 }} /> {r}</div>)}
-          </div>
-        </Modal>
-      )}
+      {!pid ? <Card><Vacio icon={<HeartPulse size={24} strokeWidth={1.75} />} titulo="Elige un paciente" sub="Selecciónalo arriba para ver o registrar su sondaje periodontal." /></Card>
+        : <PeriodontogramaClinico key={pid} pacienteId={pid} pacienteNombre={paciente?.nombre || ""} notify={notify} soloLectura={soloLectura} />}
     </div>
   );
 }
@@ -8036,7 +7915,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "inventario_consumo": return <Inventario key="inv-consumo" tabInicial="consumo" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_prov": return <Inventario key="inv-prov" tabInicial="proveedores" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "laboratorio": return <Laboratorio pacientes={pf} notify={notify} can={can} updFicha={updFicha} />;
-      case "perio": return <Periodontograma pacientes={pf} />;
+      case "perio": return <Periodontograma pacientes={pf} notify={notify} can={can} />;
       case "radiografias": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} />;
       case "fotos": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} soloFotos />;
       case "recall": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} />;

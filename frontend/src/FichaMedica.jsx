@@ -17,6 +17,7 @@ import { puedeEscribirClinico as puedeEscribirClinicoDe } from "./util/clinicoWr
 import { formatearFDI } from "./util/formatearFDI";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
+import PeriodontogramaClinico from "./modulos/Periodontograma";
 import PlanInversionDocumento from "./modulos/PlanInversionDocumento";
 import {
   X, User, Phone, Stethoscope, Smile, ClipboardList, CreditCard,
@@ -772,86 +773,6 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-/* ── Periodontograma: sondaje por pieza (6 sitios) + sangrado, movilidad y furca ── */
-const SITIOS = ["Vestibular mesial", "Vestibular", "Vestibular distal", "Palatino/Lingual mesial", "Palatino/Lingual", "Palatino/Lingual distal"];
-const colPD = (v) => (!v && v !== 0 ? "var(--dc-line-alt)" : v >= 6 ? "var(--dc-danger)" : v >= 4 ? "var(--dc-warn-700)" : "var(--dc-ok-700)");
-function Periodontograma({ pacienteId, notify }) {
-  const conectado = !!auth.token;
-  const [denticion, setDenticion] = useState("adulto");
-  const [pz, setPz] = useState({});
-  const cargar = () => {
-    if (!conectado || !pacienteId) return;
-    api.perio.porPaciente(pacienteId).then((rows) => {
-      const m = {}; (rows || []).forEach((r) => { m[r.numeroPieza] = { profundidad: arr(parseJson(r.profundidad, [])), sangrado: arr(parseJson(r.sangrado, [])), recesion: arr(parseJson(r.recesion, [])), movilidad: r.movilidad, furca: r.furca, nota: r.nota || "" }; }); setPz(m);
-    }).catch(() => { });
-  };
-  useEffect(() => { cargar(); }, [pacienteId]); // eslint-disable-line
-  const cur = (n) => pz[n] || { profundidad: [], sangrado: [], recesion: [], movilidad: null, furca: null, nota: "" };
-  const persist = (n, next) => { if (conectado) api.perio.guardar({ pacienteId, numeroPieza: n, profundidad: JSON.stringify(next.profundidad || []), recesion: JSON.stringify(next.recesion || []), sangrado: JSON.stringify(next.sangrado || []), movilidad: next.movilidad ?? null, furca: next.furca ?? null, nota: next.nota || null }).catch(() => notify && notify("No se pudo guardar la pieza.")); };
-  const set6 = (a, i, v) => { const x = [...(a || [])]; while (x.length < 6) x.push(undefined); x[i] = v; return x; };
-  const pdChange = (n, i, val) => { const c = cur(n); const v = val === "" ? undefined : Math.max(0, Math.min(20, parseInt(val, 10) || 0)); const next = { ...c, profundidad: set6(c.profundidad, i, v) }; setPz((p) => ({ ...p, [n]: next })); };
-  const recChange = (n, i, val) => { const c = cur(n); const v = val === "" ? undefined : Math.max(0, Math.min(20, parseInt(val, 10) || 0)); const next = { ...c, recesion: set6(c.recesion, i, v) }; setPz((p) => ({ ...p, [n]: next })); };
-  const pdBlur = (n) => persist(n, cur(n));
-  const toggleBOP = (n, i) => { const c = cur(n); const s = set6(c.sangrado, i, !(c.sangrado || [])[i]); const next = { ...c, sangrado: s }; setPz((p) => ({ ...p, [n]: next })); persist(n, next); };
-  const setMF = (n, campo, v) => { const c = cur(n); const next = { ...c, [campo]: c[campo] === v ? null : v }; setPz((p) => ({ ...p, [n]: next })); persist(n, next); };
-  const filas = denticion === "adulto" ? [D_AD_SUP, D_AD_INF] : [D_NI_SUP, D_NI_INF];
-  // Resumen
-  let sitios4 = 0, sitios6 = 0, bop = 0, sitiosTot = 0, movil = 0;
-  Object.values(pz).forEach((d) => { (d.profundidad || []).forEach((v) => { if (v || v === 0) { sitiosTot++; if (v >= 4) sitios4++; if (v >= 6) sitios6++; } }); (d.sangrado || []).forEach((b) => { if (b) bop++; }); if (d.movilidad) movil++; });
-  const pctBop = sitiosTot ? Math.round((bop / (Object.keys(pz).length * 6 || 1)) * 100) : 0;
-  const seg = (active) => ({ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: active ? "var(--dc-white)" : "transparent", color: active ? NAVY : "var(--dc-ink-400)", boxShadow: active ? "0 1px 2px rgba(16,24,40,.12)" : "none" });
-  const pdInput = (n, i) => { const c = cur(n); const v = (c.profundidad || [])[i]; const r = (c.recesion || [])[i]; const b = (c.sangrado || [])[i]; return (
-    <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
-      <div onClick={() => toggleBOP(n, i)} title="Sangrado al sondaje" style={{ width: 22, height: 5, borderRadius: "var(--dc-r-sm)", background: b ? "var(--dc-danger)" : "var(--dc-bg)", cursor: "pointer" }} />
-      <input value={v ?? ""} onChange={(e) => pdChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Profundidad de sondaje – " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 26, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: colPD(v), fontWeight: 500, fontSize: 13, outline: "none", background: "var(--dc-white)" }} />
-      <input value={r ?? ""} onChange={(e) => recChange(n, i, e.target.value)} onBlur={() => pdBlur(n)} disabled={!conectado} title={"Recesión – " + SITIOS[i]} inputMode="numeric" style={{ width: 26, height: 20, textAlign: "center", border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: r ? "var(--dc-purple)" : "var(--dc-line-alt)", fontWeight: 500, fontSize: 12, outline: "none", background: "var(--dc-white)" }} />
-    </div>
-  ); };
-  const diente = (n) => { const c = cur(n); return (
-    <div key={n} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: 4, borderRadius: "var(--dc-r-sm)", background: "var(--dc-white)", border: `1px solid ${LINE}` }}>
-      <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}>{n}</span>
-      <div style={{ display: "flex", gap: 2 }}>{[0, 1, 2].map((i) => pdInput(n, i))}</div>
-      <div style={{ display: "flex", gap: 2 }}>{[3, 4, 5].map((i) => pdInput(n, i))}</div>
-      {/* Estos dos siguen siendo <select> nativos a proposito, y no el Select propio:
-          son controles de 10px que se repiten por cada uno de los 32 dientes. El
-          componente propio los haria mas altos, metenria 64 desplegables con estado
-          en una rejilla ya muy densa, y en el movil el nativo abre el selector del
-          sistema, que aqui se maneja mejor. Lo que si faltaba era decir de que diente
-          es cada uno: "M" y "F" no significan nada para un lector de pantalla. */}
-      <div style={{ display: "flex", gap: 3, marginTop: 1 }}>
-        <select aria-label={`Movilidad del diente ${n}`} value={c.movilidad ?? ""} onChange={(e) => setMF(n, "movilidad", e.target.value === "" ? null : parseInt(e.target.value, 10))} disabled={!conectado} title="Movilidad" style={{ fontSize: 12, border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: c.movilidad ? "var(--dc-warn-600)" : MUTED, background: "var(--dc-white)", cursor: "pointer", padding: "1px" }}>
-          <option value="">M</option>{[0, 1, 2, 3].map((x) => <option key={x} value={x}>M{x}</option>)}
-        </select>
-        <select aria-label={`Furca del diente ${n}`} value={c.furca ?? ""} onChange={(e) => setMF(n, "furca", e.target.value === "" ? null : parseInt(e.target.value, 10))} disabled={!conectado} title="Furca" style={{ fontSize: 12, border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", color: c.furca ? "var(--dc-purple)" : MUTED, background: "var(--dc-white)", cursor: "pointer", padding: "1px" }}>
-          <option value="">F</option>{[0, 1, 2, 3].map((x) => <option key={x} value={x}>F{x}</option>)}
-        </select>
-      </div>
-    </div>
-  ); };
-  const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
-  return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
-          {[["adulto", "Adulto"], ["infantil", "Niño"]].map(([k, l]) => <button key={k} onClick={() => setDenticion(k)} style={seg(denticion === k)}>{l}</button>)}
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
-          <span style={{ color: "var(--dc-warn-700)", fontWeight: 500 }}>● Bolsa ≥4mm: {sitios4}</span>
-          <span style={{ color: "var(--dc-danger)", fontWeight: 500 }}>● ≥6mm: {sitios6}</span>
-          <span style={{ color: "var(--dc-red-deep)", fontWeight: 500 }}>Sangrado: {pctBop}%</span>
-          <span style={{ color: "var(--dc-warn-600)", fontWeight: 500 }}>Piezas con movilidad: {movil}</span>
-        </div>
-      </div>
-      <div style={{ ...card, overflowX: "auto" }}>
-        <div style={{ display: "grid", gap: 12, minWidth: denticion === "adulto" ? 720 : 480, justifyItems: "center" }}>
-          {filas.map((fila, i) => <div key={i} style={{ display: "flex", gap: 4 }}>{fila.map((n) => diente(n))}</div>)}
-        </div>
-        <div style={{ fontSize: 12, color: MUTED, marginTop: 12 }}>Cada pieza: 3 sitios vestibulares (bloque superior) y 3 palatinos/linguales (bloque inferior). Por sitio: barra roja = <b>sangrado</b> (clic), casilla grande = <b>profundidad de sondaje</b> (verde &lt;4 – ámbar 4-5 – rojo ≥6 mm), casilla pequeña morada = <b>recesión</b> (mm). <b>M</b> = movilidad, <b>F</b> = furca.</div>
       </div>
     </div>
   );
@@ -2167,7 +2088,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
 
             {tab === "odontograma" && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} sedeId={sedeId} /></div>}
 
-            {tab === "perio" && puedePerio && <div style={card}><Periodontograma pacienteId={pacienteId} notify={notify} /></div>}
+            {tab === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} notify={notify} soloLectura={!puedeEscribirClinico} />}
 
             {tab === "receta" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
 
