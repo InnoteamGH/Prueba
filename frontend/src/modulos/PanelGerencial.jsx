@@ -16,6 +16,7 @@ import {
 } from "./panelGerencialUtil";
 import { pluralEs, EnCabecera } from "../comun";
 import "./panelGerencial.css";
+import ResumenMes from "./ResumenMes";
 
 const COLORES_ESP = [
   "var(--dc-accent-cyan)",
@@ -964,60 +965,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
         </div></div>
       </EnCabecera>
 
-      <section className="dc-kpis" aria-label="Indicadores">
-        <div className="dc-kpi clic" role="button" tabIndex={0} onClick={fichaMeta}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fichaMeta()}>
-          <span className="dc-kpi__icon" style={{ background: "var(--dc-brand-100)", color: "var(--dc-brand-600)" }} aria-hidden="true">◎</span>
-          <div className="dc-kpi__body">
-            <div className="dc-kpi__label">Meta del mes</div>
-            {meta.vacia ? (
-              <>
-                <div className="dc-kpi__value" style={{ color: "var(--dc-ink-400)", fontSize: 18 }}>{meta.label}</div>
-                <div className="dc-kpi__sub">Define metas en Equipo o Configuración</div>
-              </>
-            ) : (
-              <>
-                <div className="dc-kpi__value">
-                  {meta.label}
-                  <span className={`delta ${avanceMeta < ritmo.ritmoPct ? "down" : "up"}`}>{avanceMeta.toFixed(1)}%</span>
-                </div>
-                <div className="dc-meta-barra" role="img" aria-label={`Avance ${avanceMeta.toFixed(1)}%`}>
-                  <i data-w={Math.min(100, avanceMeta)} style={{ width: `${Math.min(100, avanceMeta)}%`, ["--w"]: `${Math.min(100, avanceMeta)}%` }} />
-                  <span className="ritmo" style={{ left: `${ritmo.ritmoPct}%` }} />
-                </div>
-                <div className="dc-kpi__sub">
-                  faltan {moneyFmt(Math.max(0, meta.meta - prodMes))} – <b style={{ color: "var(--dc-danger-700)" }}>ritmo {ritmo.ritmoPct.toFixed(0)}%</b>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+      <ResumenMes kd={kd} />
 
-        <div className="dc-kpi clic" role="button" tabIndex={0}
-          onClick={() => abrir({
-            t: "Producción del mes",
-            s: "Trabajo facturado del 1 al día de hoy",
-            cifra: moneyFmt(prodMes),
-            parte: dMes != null ? `${dMes >= 0 ? "▲" : "▼"} ${Math.abs(dMes).toFixed(1)}%` : undefined,
-            sub: "No es cobro de caja: es el valor del trabajo emitido.",
-            como: "Suma de citas atendidas × precio base de especialidad (misma regla que Producción y comisiones). Comparada con el mismo tramo del mes anterior.",
-            micro: [["Mes anterior", moneyFmt(kd?.ingresosMesAnterior)], ["Citas del mes", String(kd?.citasMes ?? "—")]],
-            cols: [["Concepto"], ["Importe", "n"]],
-            filas: [["Producción del mes", moneyFmt(prodMes)]],
-            total: moneyFmt(prodMes),
-            fuente: "Citas atendidas del mes × precio base de especialidad (misma definición que comisiones).",
-            tono: "brand",
-          })}>
-          <span className="dc-kpi__icon" style={{ background: "var(--dc-brand-100)", color: "var(--dc-brand-600)" }} aria-hidden="true">↗</span>
-          <div className="dc-kpi__body">
-            <div className="dc-kpi__label">Producción del mes</div>
-            <div className="dc-kpi__value">
-              {moneyFmt(prodMes)}
-              {dMes != null && <span className={`delta ${dMes >= 0 ? "up" : "down"}`}>{dMes >= 0 ? "▲" : "▼"} {Math.abs(dMes).toFixed(1)}%</span>}
-            </div>
-            <div className="dc-kpi__sub">{kd?.citasMes ?? "—"} citas – vs {moneyFmt(kd?.ingresosMesAnterior)} mes ant.</div>
-          </div>
-        </div>
+      <section className="dc-kpis" aria-label="Indicadores">
 
         <div className="dc-kpi clic" role="button" tabIndex={0}
           onClick={() => abrir({

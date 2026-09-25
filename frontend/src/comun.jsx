@@ -176,7 +176,7 @@ export const permisosEfectivos = (usuario, rolePerms) => mergePerms((rolePerms &
 export const modulosVisibles = (perms) => MODULOS.filter((m) => (perms?.[m.id] || []).includes("ver")).map((m) => m.id);
 /* Rutas de sub-vista que pertenecen a un módulo (para permisos/validación de navegación). */
 /* Rutas de sub-vista → módulo de permisos (no colapsar agenda_cal en el router). */
-export const VISTA_ALIAS = { agenda_cal: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", inventario_compras: "inventario", inventario_consumo: "inventario", inventario_prov: "inventario", caja_apertura: "facturacion", caja_cierre: "facturacion", caja_historial: "facturacion", caja_movimientos: "facturacion", caja_links: "facturacion", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
+export const VISTA_ALIAS = { agenda_cal: "agenda", agenda_consolidado: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", inventario_compras: "inventario", inventario_consumo: "inventario", inventario_prov: "inventario", caja_apertura: "facturacion", caja_cierre: "facturacion", caja_historial: "facturacion", caja_movimientos: "facturacion", caja_links: "facturacion", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
 export const modDeVista = (v) => VISTA_ALIAS[v] || v;
 
 /* Catálogo de módulos (para la matriz de permisos y la navegación). */
@@ -817,7 +817,7 @@ export const FICHA_CLINICA = {
     tratamiento: [
       { id: 1, nombre: "Limpieza y profilaxis", costo: 80, estado: "atendida" },
       { id: 2, nombre: "Curación pieza 16", costo: 120, estado: "atendida" },
-      { id: 3, nombre: "Endodoncia pieza 26", costo: 350, estado: "pendiente" },
+      { id: 3, nombre: "Endodoncia pieza 26", costo: 350, estado: "terminada", terminadaEn: new Date(new Date().setHours(10, 40, 0, 0)).toISOString() },
       { id: 4, nombre: "Corona pieza 36", costo: 450, estado: "pendiente" },
     ],
     pagos: [
@@ -857,7 +857,7 @@ export const FICHA_CLINICA = {
     notas: { 16: "Caries inicial, control en próxima visita." }, alergias: [], antecedentes: [],
     tratamiento: [
       { id: 1, nombre: "Sellantes preventivos", costo: 120, estado: "atendida" },
-      { id: 2, nombre: "Curación pieza 16", costo: 90, estado: "pendiente" },
+      { id: 2, nombre: "Curación pieza 16", costo: 90, estado: "terminada", terminadaEn: new Date(new Date().setHours(9, 25, 0, 0)).toISOString() },
     ],
     pagos: [{ fecha: "2026-06-10", concepto: "Sellantes preventivos", monto: 120, metodo: "Efectivo" }],
     ahorro: 30, recetas: [],
@@ -936,6 +936,7 @@ export const ESTADO_BADGE = {
   en_sala: { l: "En sala", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" },
   en_atencion: { l: "En atención", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" },
   atendida: { l: "Atendida", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)" },
+  terminada: { l: "Terminado · por cobrar", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" },
   cancelada: { l: "Cancelada", bg: "var(--dc-fee)", fg: "var(--dc-danger-700)" },
   no_show: { l: "No asistió", bg: "var(--dc-danger-soft)", fg: "var(--dc-warn-600)" },
   reprogramada: { l: "Reprogramada", bg: "var(--dc-bg)", fg: "var(--dc-purple)" },

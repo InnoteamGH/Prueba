@@ -378,6 +378,8 @@ export const api = {
   egresos: {
     listar: () => request("GET", "/egresos"),
     crear: (e) => request("POST", "/egresos", e),
+    // Reclasificar (categoría) o corregir un egreso. Body parcial: { categoria?, concepto?, monto?, moneda? }
+    actualizar: (id, e) => request("PUT", `/egresos/${id}`, e),
     eliminar: (id) => request("DELETE", `/egresos/${id}`),
   },
   espera: {

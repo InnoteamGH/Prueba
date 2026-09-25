@@ -5,6 +5,7 @@ import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routi
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
 const FichaMedica = React.lazy(() => import("./FichaMedica"));
 const PeriodontogramaClinico = React.lazy(() => import("./modulos/Periodontograma"));
+const ConsolidadoCitas = React.lazy(() => import("./modulos/ConsolidadoCitas"));
 const Reportes = React.lazy(() => import("./modulos/ProduccionComisiones"));
 const Disponibilidad = React.lazy(() => import("./modulos/Disponibilidad"));
 const Configuracion = React.lazy(() => import("./modulos/Configuracion"));
@@ -2902,6 +2903,7 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
   // Cobrar una fase es caja, no plan de tratamiento. Gerencia consulta el plan; el
   // cobro lo hace quien tiene caja (recepción, administración).
   const puedeCobrar = can ? can("facturacion", "crear") : true;
+  const puedeTerminar = can ? can("tratamientos", "editar") || can("tratamientos", "crear") : true;
   const conectado = !!auth.token;
   const [pacRemoto, setPacRemoto] = useState(null);
   const [sedes, setSedes] = useState([]);
@@ -2949,6 +2951,20 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
   };
   const quitarFase = (f) => { if (conectado) { api.tratamientos.borrarFase(f.id).then(() => { notify("Fase eliminada del plan."); recargarTrat(); }).catch(() => notify("Error al eliminar la fase.")); return; } setTrat((t) => t.filter((x) => x.id !== f.id)); notify("Fase eliminada del plan."); };
   const esInvasivo = (nom) => /endodoncia|cirug|implante|extracci|bracket|ortodoncia/i.test(nom || "");
+  // El doctor marca la fase como terminada: el cobro queda generado solo en Caja
+  // (bloque «Tratamientos terminados por cobrar»), sin que recepción lo digite.
+  const terminarFase = (f) => {
+    const cuando = new Date().toISOString();
+    if (conectado) {
+      api.tratamientos.actualizarFase(f.id, { estado: "terminada", terminadaEn: cuando })
+        .then(() => { notify(`${f.nombre} terminado. El cobro de S/ ${f.costo.toFixed(2)} ya está en Caja.`); recargarTrat(); })
+        .catch((err) => notify((err && err.message) || "No se pudo marcar la fase como terminada."));
+      return;
+    }
+    setTrat((t) => t.map((x) => (x.id === f.id ? { ...x, estado: "terminada", terminadaEn: cuando } : x)));
+    consumirInsumos && consumirInsumos(f.nombre);
+    notify(`${f.nombre} terminado. El cobro de S/ ${f.costo.toFixed(2)} ya está en Caja para recepción.`);
+  };
   const cobrarFase = (f) => {
     if (conectado) {
       api.tratamientos.actualizarFase(f.id, { estado: "atendida" })
@@ -2960,7 +2976,7 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
     if (esInvasivo(f.nombre)) {
       notify(`Aviso: ${f.nombre} es un procedimiento invasivo. Asegúrate de que el consentimiento informado esté firmado.`);
     }
-    setTrat((t) => t.map((x) => x.id === f.id ? { ...x, estado: "atendida" } : x)); addPago(f.nombre, f.costo); consumirInsumos && consumirInsumos(f.nombre); notify(`Cobrado: ${f.nombre} — S/ ${f.costo.toFixed(2)}. Boleta emitida – insumos descontados.`);
+    setTrat((t) => t.map((x) => x.id === f.id ? { ...x, estado: "atendida" } : x)); addPago(f.nombre, f.costo); if (f.estado !== "terminada") consumirInsumos && consumirInsumos(f.nombre); notify(`Cobrado: ${f.nombre} — S/ ${f.costo.toFixed(2)}. Boleta emitida – insumos descontados.`);
   };
   const cobrarSaldo = () => { const pend = fases.filter((f) => f.estado !== "atendida"); if (!pend.length) { notify("No hay saldo por cobrar."); return; } if (conectado) { Promise.all(pend.map((f) => api.tratamientos.actualizarFase(f.id, { estado: "atendida" }))).then(() => api.pagos.registrar({ pacienteId, sedeId: sedePago(), concepto: "Saldo del plan de tratamiento", monto: saldo, metodo: "efectivo" })).then(() => { notify(`Pago registrado: S/ ${saldo.toFixed(2)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); }).catch(() => notify("Error al cobrar el saldo.")); return; } pend.forEach((f) => consumirInsumos && consumirInsumos(f.nombre)); setTrat((t) => t.map((x) => x.estado !== "atendida" ? { ...x, estado: "atendida" } : x)); addPago("Saldo del plan de tratamiento", saldo); notify(`Pago registrado: S/ ${saldo.toFixed(2)}. Boleta emitida – insumos descontados.`); };
   const atendidas = fases.filter((f) => f.estado === "atendida").length;
@@ -3000,29 +3016,33 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
         {fases.length > 0 && (
           <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="fases" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
             vistas={[{ id: "recorrido", label: "Recorrido", icon: Route }, { id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]}
-            tabla={{ primero: true, minWidth: 700, onRowClick: (f) => setDetF(f), cols: [
+            tabla={{ primero: true, minWidth: 720, onRowClick: (f) => setDetF(f), cols: [
               { key: "n", label: "#", w: "48px", a: "center", cell: (f) => <span className={`dc-tr__nodo${f.estado === "atendida" ? " is-okn" : ""}`}>{f.estado === "atendida" ? <Check size={14} strokeWidth={3} /> : f._n}</span> },
-              { key: "proc", label: "Procedimiento", w: "minmax(200px,1.6fr)", cell: (f) => <span className="dc-tr__proc"><b>{nombreFaseLimpio(f)}</b>{f.origen === "odontograma" && <span className="dc-tr__orig"><Smile size={11} strokeWidth={2} /> del odontograma</span>}</span> },
-              { key: "pieza", label: "Pieza", w: "80px", a: "center", cell: (f) => <span className="dc-tp__sub">{piezaDeFase(f)}</span> },
-              { key: "cara", label: "Cara", w: "80px", a: "center", cell: (f) => <span className="dc-tp__sub">{caraDeFase(f)}</span> },
-              { key: "costo", label: "Costo", w: "110px", a: "right", cell: (f) => <span className="dc-tp__num">S/ {f.costo.toFixed(2)}</span> },
-              { key: "estado", label: "Estado", w: "170px", a: "right", cell: (f) => f.estado === "atendida" ? <Badge estado={f.estado} /> : (
+              { key: "proc", label: "Procedimiento", w: "minmax(150px,1.6fr)", cell: (f) => <span className="dc-tr__proc"><b>{nombreFaseLimpio(f)}</b>{f.origen === "odontograma" && <span className="dc-tr__orig"><Smile size={11} strokeWidth={2} /> del odontograma</span>}</span> },
+              { key: "pieza", label: "Pieza", w: "64px", a: "center", cell: (f) => <span className="dc-tp__sub">{piezaDeFase(f)}</span> },
+              { key: "cara", label: "Cara", w: "60px", a: "center", cell: (f) => <span className="dc-tp__sub">{caraDeFase(f)}</span> },
+              { key: "costo", label: "Costo", w: "96px", a: "right", cell: (f) => <span className="dc-tp__num">S/ {f.costo.toFixed(2)}</span> },
+              { key: "estado", label: "Estado", w: "minmax(240px,1.4fr)", a: "right", cell: (f) => f.estado === "atendida" ? <Badge estado={f.estado} /> : (
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
+                  {f.estado !== "terminada" && puedeTerminar && <button type="button" className="dc-accion dc-accion--fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={13} strokeWidth={2} style={{ marginRight: 4 }} />Terminar</button>}
+                  {f.estado === "terminada" && <Badge estado="terminada" />}
                   {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
-                  <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button></> : <Badge estado={f.estado} />}
+                  {f.estado !== "terminada" && <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button>}</> : (f.estado !== "terminada" && !puedeTerminar) ? <Badge estado={f.estado} /> : null}
                 </div>) },
             ] }} cols={[
               { key: "proc", label: "Procedimiento", get: (f) => nombreFaseLimpio(f) },
               { key: "pieza", label: "Pieza", get: (f) => String(piezaDeFase(f) ?? "") },
               { key: "costo", label: "Costo", get: (f) => f.costo.toFixed(2), sortVal: (f) => f.costo },
-              { key: "estado", label: "Estado", get: (f) => (f.estado === "atendida" ? "Atendida" : "Pendiente") },
+              { key: "estado", label: "Estado", get: (f) => (f.estado === "atendida" ? "Atendida" : f.estado === "terminada" ? "Terminada, por cobrar" : "Pendiente") },
             ]}>{(lst, vista) => {
               const hecho = (f) => f.estado === "atendida";
               const siguiente = fases.find((f) => !hecho(f));
               const acciones = (f) => hecho(f) ? <Badge estado={f.estado} /> : (
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
+                  {f.estado !== "terminada" && puedeTerminar && <button type="button" className="dc-accion dc-accion--fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={13} strokeWidth={2} style={{ marginRight: 4 }} />Terminar</button>}
+                  {f.estado === "terminada" && <Badge estado="terminada" />}
                   {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
-                  <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button></> : <Badge estado={f.estado} />}
+                  {f.estado !== "terminada" && <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button>}</> : (f.estado !== "terminada" && !puedeTerminar) ? <Badge estado={f.estado} /> : null}
                 </div>
               );
               const origen = (f) => f.origen === "odontograma" && <span className="dc-tr__orig"><Smile size={11} strokeWidth={2} /> del odontograma</span>;
@@ -3301,10 +3321,16 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 /* ---- Caja / Facturación (fuente única: el plan de tratamiento de cada ficha) ---- */
 const EGRESO_CATS = ["Insumos", "Laboratorio", "Alquiler", "Servicios (luz/agua)", "Planilla", "Marketing", "Equipos", "Otros"];
 const EGRESOS_DEMO = [
-  { id: 3, fecha: fmt(hoy), concepto: "Movilidad y mensajería", categoria: "Otros", monto: 35, metodo: "efectivo" },
-  { id: 1, fecha: fmt(hoy), concepto: "Resinas y adhesivos", categoria: "Insumos", monto: 320, metodo: "transferencia" },
-  { id: 2, fecha: fmt(hoy), concepto: "Trabajo de laboratorio — corona zirconio", categoria: "Laboratorio", monto: 180, metodo: "transferencia" },
-  { id: 3, fecha: addDays(-1), concepto: "Campaña Instagram Ads", categoria: "Marketing", monto: 150, metodo: "tarjeta" },
+  { id: 1, fecha: fmt(hoy), concepto: "Movilidad y mensajería", categoria: "Otros", monto: 35, metodo: "efectivo" },
+  { id: 2, fecha: fmt(hoy), concepto: "Resinas y adhesivos", categoria: "Insumos", monto: 320, metodo: "transferencia" },
+  { id: 3, fecha: fmt(hoy), concepto: "Trabajo de laboratorio — corona zirconio", categoria: "Laboratorio", monto: 180, metodo: "transferencia" },
+  { id: 4, fecha: fmt(hoy), concepto: "Repuesto de micromotor (proveedor en dólares)", categoria: "Equipos", monto: 40, metodo: "efectivo", moneda: "USD" },
+  { id: 5, fecha: addDays(-1), concepto: "Campaña Instagram Ads", categoria: "Marketing", monto: 150, metodo: "tarjeta" },
+  { id: 6, fecha: addDays(-3), concepto: "Guantes, mascarillas y eyectores", categoria: "Insumos", monto: 410, metodo: "transferencia" },
+  { id: 7, fecha: addDays(-5), concepto: "Luz y agua del local", categoria: "Servicios (luz/agua)", monto: 385, metodo: "transferencia" },
+  { id: 8, fecha: addDays(-6), concepto: "Alquiler del consultorio", categoria: "Alquiler", monto: 2800, metodo: "transferencia" },
+  { id: 9, fecha: addDays(-8), concepto: "Prótesis parcial — laboratorio", categoria: "Laboratorio", monto: 520, metodo: "transferencia" },
+  { id: 10, fecha: addDays(-9), concepto: "Compra varios", categoria: "Otros", monto: 260, metodo: "efectivo" },
 ];
 const LINKS_DEMO = [
   { id: 1, paciente: "Rosa Linares", concepto: "Abono ortodoncia", monto: 250, estado: "pagado", fecha: addDays(-1) },
@@ -3314,9 +3340,10 @@ const LINKS_DEMO = [
 /* Icono y color de cada medio de pago en Caja. */
 const MEDIO_UI = {
   efectivo: [Banknote, "#16A36A"], pos: [CreditCard, "#2F6FDE"], tarjeta: [CreditCard, "#2F6FDE"],
-  yape: [Smartphone, "#7B3FE4"], plin: [Smartphone, "#0E9EB0"], transferencia: [Landmark, "#28527A"], seguro: [ShieldCheck, "#E0694F"],
+  yape: [Smartphone, "#7B3FE4"], plin: [Smartphone, "#0E9EB0"], transferencia: [Landmark, "#28527A"], seguro: [ShieldCheck, "#E0694F"], efectivo_usd: [DollarSign, "#15803D"],
 };
 const medioUi = (t) => MEDIO_UI[String(t || "").toLowerCase()] || [Wallet, "#0E9199"];
+const DENOMS_USD = [100, 50, 20, 10, 5, 1];
 const DENOMS = [[200, "b"], [100, "b"], [50, "b"], [20, "b"], [10, "b"], [5, "m"], [2, "m"], [1, "m"], [0.5, "m"], [0.2, "m"], [0.1, "m"]];
 
 function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null }) {
@@ -3408,6 +3435,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         id: r.id,
         abierta: false,
         fondo: Number(r.fondo) || 0,
+      fondoUsd: Number(r.fondoUsd) || 0,
+        fondoUsd: Number(r.fondoUsd) || 0,
         nota: r.nota || "",
         abiertaEn: r.abiertaEn || null,
         abiertaPorNombre: r.abiertaPorNombre || null,
@@ -3426,6 +3455,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       id: r.id,
       abierta: true,
       fondo: Number(r.fondo) || 0,
+      fondoUsd: Number(r.fondoUsd) || 0,
       nota: r.nota || "",
       abiertaEn: r.abiertaEn || null,
       abiertaPorNombre: r.abiertaPorNombre || null,
@@ -3446,6 +3476,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [destinosSel, setDestinosSel] = useState(() => new Set(["efectivo", "yape", "plin", "pos", "transferencia"]));
   const [cierreForm, setCierreForm] = useState({ contado: "", justificacion: "", observaciones: "" });
   const [denoms, setDenoms] = useState({});
+  const [denomsUsd, setDenomsUsd] = useState({});
   const [cierreBusy, setCierreBusy] = useState(false);
   const [cajaMovs, setCajaMovs] = useState([]);
   const [movForm, setMovForm] = useState(null); // { tipo, monto, nota }
@@ -3499,7 +3530,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   useEffect(() => { recargarApertura(); }, [conectado, sedeActiva, sedes.length, cajaSedePick]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { recargarCajaMovs(); }, [conectado, apertura?.id, apertura?.abierta]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "historial" && conectado) recargarHistCaja(); }, [tab, histCajaRango.desde, histCajaRango.hasta, cajaSedePick, sedeActiva]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [aperturaForm, setAperturaForm] = useState({ fondo: "100", nota: "" });
+  const [aperturaForm, setAperturaForm] = useState({ fondo: "100", fondoUsd: "", nota: "" });
   const abrirCaja = () => {
     if (!puedeAbrirCaja) { notify("Tu rol solo consulta la caja; recepción o administración la abren."); return; }
     const sid = sedeUuid();
@@ -3507,7 +3538,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     if (!conectado) {
       if (MODO_DEMO) {
         const fondoDemo = Number(aperturaForm.fondo) || 0;
-        setApertura({ id: "demo", abierta: true, fondo: fondoDemo, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: "Recepción", destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) });
+        setApertura({ id: "demo", abierta: true, fondo: fondoDemo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: "Recepción", destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) });
         notify(`Caja abierta (demo) con fondo S/ ${fondoDemo.toFixed(2)}.`);
         setTab("cobros");
         return;
@@ -3523,7 +3554,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     }
     const fondo = Number(aperturaForm.fondo) || 0;
     const destinosActivos = JSON.stringify(destinosCatalogo.filter((d) => destinosSel.has(d.id)));
-    api.cajaApertura.abrir({ sedeId: sid, fondo, nota: aperturaForm.nota || null, fecha: ymdLima(new Date()) || fmt(hoy), destinosActivos })
+    api.cajaApertura.abrir({ sedeId: sid, fondo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || null, fecha: ymdLima(new Date()) || fmt(hoy), destinosActivos })
       .then((r) => { setApertura(mapAperturaApi({ ...r, abierta: true })); setJornadaAbiertaPrevia(null); notify(`Caja abierta en ${sedeNombre()} con fondo S/ ${fondo.toFixed(2)}.`); setTab("cobros"); })
       .catch((e) => {
         notify(e?.message || "No se pudo abrir la caja en el servidor.");
@@ -3593,7 +3624,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       .then(() => { notify("Pago anulado."); recargarCaja(); recargarCierre(); recargarHist(); })
       .catch((e) => notify(e?.message || "No se pudo anular el pago."));
   };
-  const cerrarApertura = (esperadoEfectivo) => {
+  const cerrarApertura = (esperadoEfectivo, usdCierre = null) => {
     if (!puedeAbrirCaja) { notify("Tu rol no puede cerrar la caja."); return; }
     if (cierreForm.contado === "" || cierreForm.contado == null) { notify("Indica el efectivo contado antes de cerrar."); return; }
     const contado = Number(cierreForm.contado);
@@ -3604,11 +3635,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       notify("La justificación es obligatoria cuando hay descuadre.");
       return;
     }
-    const resumen = `Esperado S/ ${esperado.toFixed(2)} – Contado S/ ${contado.toFixed(2)} – Diferencia S/ ${diff.toFixed(2)}${diff === 0 ? " (cuadra)" : diff > 0 ? " (sobra)" : " (falta)"}`;
+    const resumen = `Esperado S/ ${esperado.toFixed(2)} – Contado S/ ${contado.toFixed(2)} – Diferencia S/ ${diff.toFixed(2)}${diff === 0 ? " (cuadra)" : diff > 0 ? " (sobra)" : " (falta)"}${usdCierre ? ` · Dólares: esperado US$ ${usdCierre.esperado.toFixed(2)}, contado US$ ${usdCierre.contado.toFixed(2)}` : ""}`;
     if (!confirm(`¿Cerrar la caja del día?\n\n${resumen}\n\nNo se podrán registrar más cobros hasta reabrir.`)) return;
     const body = {
       efectivoContado: contado,
       efectivoEsperado: esperado,
+      ...(usdCierre ? { efectivoContadoUsd: usdCierre.contado, efectivoEsperadoUsd: usdCierre.esperado } : {}),
       justificacion: (cierreForm.justificacion || "").trim() || null,
     };
     setCierreBusy(true);
@@ -3649,11 +3681,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   };
   const [cierre, setCierre] = useState(null);
   const recargarCierre = () => { if (conectado) api.pagos.cierre().then(setCierre).catch(() => {}); };
-  const [egresosDemo, setEgresosDemo] = usePersist("egresos_demo", EGRESOS_DEMO);
+  const [egresosDemo, setEgresosDemo] = usePersist("egresos_demo_v2", EGRESOS_DEMO);
   const [egresosApi, setEgresosApi] = useState([]);
   const egresos = conectado ? egresosApi : egresosDemo;
   const setEgresos = conectado ? setEgresosApi : setEgresosDemo;
-  const recargarEgresos = () => { if (conectado) api.egresos.listar().then((r) => setEgresos((r || []).map((e) => ({ id: e.id, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo" })))).catch(() => {}); };
+  const recargarEgresos = () => { if (conectado) api.egresos.listar().then((r) => setEgresos((r || []).map((e) => ({ id: e.id, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo", moneda: e.moneda || "PEN" })))).catch(() => {}); };
   const [egForm, setEgForm] = useState(null);           // { concepto, categoria, monto, metodo }
   // Con sesión se arranca vacío: los dos cobros de ejemplo alimentaban el KPI "Cobrado
   // por links S/ 250 – pagados", dinero que nadie ha pagado.
@@ -3705,8 +3737,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     ? (caja.porCobrar || []).map((r) => ({ p: { id: r.pacienteId, nombre: r.paciente, dni: "", sedes: "", sedeNombre: r.sede || "" }, total: Number(r.total) || 0, pagado: Number(r.pagado) || 0, saldo: Number(r.saldo) || 0, pend: r.pend || 0 }))
     : pacientes.map((p) => ({ p, ...saldoDe(p.id) })).filter((x) => x.saldo > 0).sort((a, b) => b.saldo - a.saldo);
   const porCobrarHoy = conectado ? porCobrar.filter((x) => pacsHoy.has(x.p.id)) : [];
+  // Tratamientos que el doctor marcó como terminados: el cobro se genera solo.
+  // Conectado: caja.terminados = [{ pacienteId, paciente, faseId, nombre, costo, medico, terminadaEn }].
+  const terminados = conectado
+    ? (caja.terminados || []).map((t) => ({ pid: t.pacienteId, paciente: t.paciente, faseId: t.faseId, nombre: t.nombre, costo: Number(t.costo) || 0, medico: t.medico || "", terminadaEn: t.terminadaEn || null }))
+    : pacientes.flatMap((p) => (fichas[p.id]?.tratamiento || []).filter((f) => f.estado === "terminada").map((f) => ({ pid: p.id, paciente: p.nombre, faseId: f.id, nombre: f.nombre, costo: Number(f.costo) || 0, medico: f.medico || "", terminadaEn: f.terminadaEn || null })));
+  const terminadosPorPac = terminados.reduce((m, t) => { const x = m.get(t.pid) || { pid: t.pid, paciente: t.paciente, fases: [], total: 0 }; x.fases.push(t); x.total += t.costo; m.set(t.pid, x); return m; }, new Map());
   const boletasHoy = conectado
-    ? (caja.boletasHoy || []).map((b) => ({ id: b.id, paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "" }))
+    ? (caja.boletasHoy || []).map((b) => ({ id: b.id, paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null }))
     : pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).filter((pg) => pg.fecha === fmt(hoy)).map((pg) => ({ ...pg, paciente: p.nombre, anulado: false })));
   const boletasHoyActivas = boletasHoy.filter((b) => !b.anulado);
   const montoPorCobrar = conectado ? (Number(caja.montoPorCobrar) || 0) : porCobrar.reduce((s, x) => s + x.saldo, 0);
@@ -3743,9 +3781,16 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     }
     // Demo: abona; salda las fases solo si el pago cubre todo el saldo.
     // Ítems para la boleta: los tratamientos que se saldan (solo en cobro total).
+    if (pago.faseIds && !esParcial) {
+      const ids = new Set(pago.faseIds);
+      updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (ids.has(f.id) ? { ...f, estado: "atendida" } : f)), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: "Tratamiento terminado", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: pago.items }] }));
+      notify(`Cobrado S/ ${cobrado.toFixed(2)} de ${pago.nombre}. ${textoComprobante}`);
+      setPago(null);
+      return;
+    }
     const itemsFact = !esParcial ? (fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) : null;
     if (!esParcial) (fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").forEach((f) => consumirInsumos && consumirInsumos(f.nombre));
-    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && f.estado !== "atendida") ? { ...f, estado: "atendida" } : f), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: esParcial ? "Abono en caja" : "Cobro de saldo en caja", monto: cobrado, metodo: metodoLabel[met] || "Cobro", items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
+    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && f.estado !== "atendida") ? { ...f, estado: "atendida" } : f), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: esParcial ? "Abono en caja" : "Cobro de saldo en caja", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
     notify(`Cobrado S/ ${cobrado.toFixed(2)} de ${pago.nombre}${esParcial ? " (abono)" : ""}. ${textoComprobante}`);
     setPago(null);
   };
@@ -3756,19 +3801,28 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const pctCobradoGlobal = planTotalGlobal ? Math.round((porCobrar.reduce((s, x) => s + x.pagado, 0) / planTotalGlobal) * 100) : 0;
   // Ingresos y egresos del día (ledger)
   const egresosHoy = egresos.filter((e) => e.fecha === fmt(hoy));
-  const totEgresosHoy = egresosHoy.reduce((s, e) => s + e.monto, 0);
+  const totEgresosHoy = egresosHoy.filter((e) => e.moneda !== "USD").reduce((s, e) => s + e.monto, 0);
+  const totEgresosHoyUsd = egresosHoy.filter((e) => e.moneda === "USD").reduce((s, e) => s + e.monto, 0);
+  const [catPeriodo, setCatPeriodo] = usePersist("caja_cat_periodo", "mes");
+  const [catAbierta, setCatAbierta] = useState(null);
+  const reclasificarEgreso = (e, categoria) => {
+    if (categoria === e.categoria) return;
+    const hecho = () => { setEgresos((es) => es.map((x) => (x.id === e.id ? { ...x, categoria } : x))); notify(`«${e.concepto}» pasó a ${categoria}.`); };
+    if (conectado) { api.egresos.actualizar(e.id, { categoria }).then(hecho).catch(() => notify("No se pudo reclasificar el egreso.")); return; }
+    hecho();
+  };
   const ingresosHoy = montoHoy;
   const netoHoy = ingresosHoy - totEgresosHoy;
   const guardarEgreso = () => {
     if (!egForm.concepto.trim() || !(Number(egForm.monto) > 0)) { notify("Completa concepto y monto del egreso."); return; }
     if (conectado) {
-      api.egresos.crear({ fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo })
-        .then(() => { notify(`Egreso registrado: ${egForm.concepto} – S/ ${Number(egForm.monto).toFixed(2)}.`); setEgForm(null); recargarEgresos(); })
+      api.egresos.crear({ fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" })
+        .then(() => { notify(`Egreso registrado: ${egForm.concepto} – ${egForm.moneda === "USD" ? "US$" : "S/"} ${Number(egForm.monto).toFixed(2)}.`); setEgForm(null); recargarEgresos(); })
         .catch(() => notify("No se pudo registrar el egreso."));
       return;
     }
-    setEgresos((es) => [{ id: Math.max(0, ...es.map((e) => e.id)) + 1, fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo }, ...es]);
-    notify(`Egreso registrado: ${egForm.concepto} – S/ ${Number(egForm.monto).toFixed(2)}.`);
+    setEgresos((es) => [{ id: Math.max(0, ...es.map((e) => e.id)) + 1, fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" }, ...es]);
+    notify(`Egreso registrado: ${egForm.concepto} – ${egForm.moneda === "USD" ? "US$" : "S/"} ${Number(egForm.monto).toFixed(2)}.`);
     setEgForm(null);
   };
   const eliminarEgreso = (id) => { if (conectado) { api.egresos.eliminar(id).then(() => { notify("Egreso eliminado."); recargarEgresos(); }).catch(() => notify("No se pudo eliminar.")); return; } setEgresos((es) => es.filter((e) => e.id !== id)); };
@@ -3779,7 +3833,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     setLinkForm(null);
   };
   const TABS = [["apertura", "Apertura", KeyRound], ["cobros", "Cobros", CreditCard], ["cierre", "Cierre del día", DollarSign], ["historial", "Historial", Clock], ...(puedeVerMovimientos ? [["movimientos", "Ingresos y egresos", Wallet]] : []), ["links", "Links de pago", Zap]];
-  const METODO_LBL = { efectivo: "Efectivo", tarjeta: "Tarjeta", yape: "Yape", plin: "Plin", transferencia: "Transferencia", seguro: "Seguro" };
+  const METODO_LBL = { efectivo: "Efectivo", tarjeta: "Tarjeta", yape: "Yape", plin: "Plin", transferencia: "Transferencia", seguro: "Seguro", efectivo_usd: "Efectivo en dólares" };
   return (
     <div style={{ display: "grid", gap: 16 }}>
       {tab === "cobros" && <section className="dc-esp-hero dc-caja-hero">
@@ -3867,6 +3921,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                           <label className="dc-ap2__monto"><span>S/</span><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></label>
                           <div className="dc-ap2__rapidos">{[50, 100, 150, 200, 300].map((v) => <button key={v} type="button" className={Number(aperturaForm.fondo) === v ? "is-on" : ""} onClick={() => setAperturaForm({ ...aperturaForm, fondo: String(v) })}>S/ {v}</button>)}</div>
                         </div>
+                        <div className="dc-ap2__fondo dc-ap2__fondo--usd">
+                          <label className="dc-ap2__monto"><span>US$</span><input inputMode="decimal" aria-label="Fondo inicial en dólares (US$)" value={aperturaForm.fondoUsd} onChange={(e) => setAperturaForm({ ...aperturaForm, fondoUsd: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></label>
+                          <p className="dc-ap2__usdnota">Si la gaveta también guarda dólares, anótalos aquí. Se cuentan aparte al cerrar.</p>
+                        </div>
                         <label className="dc-ap2__nota"><Pencil size={14} strokeWidth={2} /><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Nota o turno (opcional), ej. turno mañana" /></label>
                       </>
                     ) })}
@@ -3948,6 +4006,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
         </Card>
       )}
+      {terminadosPorPac.size > 0 && (
+        <Card className="dc-term">
+          <div className="dc-term__cab">
+            <span className="dc-term__ico"><CheckCheck size={18} strokeWidth={2} /></span>
+            <div><h3>Tratamientos terminados por cobrar</h3><span>El doctor los marcó como realizados. El cobro ya está listo: solo confirma el medio de pago.</span></div>
+            <b>S/ {terminados.reduce((a, t) => a + t.costo, 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b>
+          </div>
+          <ul>
+            {[...terminadosPorPac.values()].map((x) => (
+              <li key={x.pid}>
+                <PersonaCelda nombre={x.paciente} sub={x.fases.map((f) => f.nombre).join(" · ")} />
+                <span className="dc-term__cuando">{x.fases[0].terminadaEn ? `Terminado ${new Date(x.fases[0].terminadaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}` : "Terminado"}</span>
+                <em>S/ {x.total.toFixed(2)}</em>
+                {puedeAbrirCaja && <button type="button" className="dc-term__btn" onClick={() => setPago({ pid: x.pid, nombre: x.paciente, monto: x.total, faseIds: x.fases.map((f) => f.faseId), items: x.fases.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) })}><DollarSign size={14} strokeWidth={2} /> Cobrar</button>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {conectado && porCobrarHoy.length > 0 && (
         <Card style={{ overflow: "hidden", border: "1px solid var(--dc-amber-soft)" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-warn-soft)", background: "var(--dc-white)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
@@ -4008,7 +4085,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
           <div className="dc-cob__hoy">
             <div><small>Cobrado hoy</small><b>S/ {montoHoy.toLocaleString("es-PE")}</b></div>
-            <div><small>Boletas hoy</small><b className="is-neutro">{boletasHoyActivas.length}</b></div>
+            <div><small>Boletas hoy</small><b className="is-neutro">{boletasHoyActivas.length}</b></div>            {boletasHoyActivas.some((b) => b.moneda === "USD") && <div className="dc-cob__usd"><small>Recibido en dólares</small><b>US$ {boletasHoyActivas.filter((b) => b.moneda === "USD").reduce((a, b) => a + (Number(b.montoOriginal) || 0), 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Ya sumado en soles al tipo de cambio del cobro</span></div>}
           </div>
           <Card className="dc-cob__boletas">
             <div className="dc-cob__boletas-cab"><h4>Boletas de hoy</h4><span>{boletasHoy.length}</span></div>
@@ -4017,7 +4094,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <div key={b.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none", opacity: b.anulado ? 0.65 : 1 }}>
               <div style={{ background: b.anulado ? "var(--dc-danger-soft)" : "var(--dc-ok-soft)", color: b.anulado ? "var(--dc-danger-700)" : "var(--dc-ok-700)", width: 34, height: 34, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center", flexShrink: 0 }}><CheckCircle2 size={17} strokeWidth={1.75} /></div>
               <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }}>{b.paciente}{b.anulado ? <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-danger-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>Anulado</span> : null}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{b.concepto} – {b.metodo}{b.anulado && b.anuladoMotivo ? ` – ${b.anuladoMotivo}` : ""}</div></div>
-              <div style={{ fontWeight: 600, color: b.anulado ? "var(--dc-ink-400)" : NAVY, fontFamily: DISPLAY_FONT, textDecoration: b.anulado ? "line-through" : "none" }}>S/ {b.monto.toFixed(2)}</div>
+              <div style={{ fontWeight: 600, color: b.anulado ? "var(--dc-ink-400)" : NAVY, fontFamily: DISPLAY_FONT, textDecoration: b.anulado ? "line-through" : "none", textAlign: "right" }}>S/ {b.monto.toFixed(2)}{b.moneda === "USD" && b.montoOriginal != null && <small className="dc-usd-chip">US$ {Number(b.montoOriginal).toFixed(2)}</small>}</div>
               <button onClick={() => abrirBoleta(b)} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", color: DS.c.primary, fontWeight: 500, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}><FileText size={14} strokeWidth={1.75} /> Boleta</button>
               {conectado && puedeAbrirCaja && b.id && !b.anulado && (
                 <button onClick={() => anularPagoHoy(b.id)} style={{ background: "none", border: "1px solid var(--dc-danger-mid)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", color: "var(--dc-danger-700)", fontWeight: 500, fontSize: 13 }}>Anular</button>
@@ -4060,7 +4137,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {tab === "cierre" && (() => {
         const c = cierre || (conectado ? { total: 0, cantidad: 0, porMetodo: {}, movimientos: [] } : (() => {
           const pm = {};
-          boletasHoyActivas.forEach((b) => { const m = String(b.metodo || "efectivo").toLowerCase() === "pos" ? "tarjeta" : String(b.metodo || "efectivo").toLowerCase(); pm[m] = (pm[m] || 0) + b.monto; });
+          boletasHoyActivas.forEach((b) => { const m = String(b.metodo || "efectivo").toLowerCase() === "pos" ? "tarjeta" : String(b.metodo || "efectivo").toLowerCase(); const k = m === "efectivo" && b.moneda === "USD" ? "efectivo_usd" : m; pm[k] = (pm[k] || 0) + b.monto; });
           return { total: boletasHoyActivas.reduce((a, b) => a + b.monto, 0), cantidad: boletasHoyActivas.length, porMetodo: pm, movimientos: boletasHoyActivas.map((b, i) => ({ id: null, hora: b.hora || "", paciente: b.paciente, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), monto: b.monto, _k: i })) };
         })());
         const metodos = Object.entries(c.porMetodo || {}).filter(([, v]) => Number(v) > 0);
@@ -4069,8 +4146,19 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const totalComision = metodos.reduce((s, [k, v]) => s + comisionDe(k, v), 0);
         const netoHoyCierre = Math.round((Number(c.total) - totalComision) * 100) / 100;
         const fondoIni = Number(apertura?.fondo) || 0;
-        const cobradoEfectivo = Number((c.porMetodo || {}).efectivo) || 0;
-        const egresosEfectivo = egresosHoy.filter((e) => (e.metodo || "efectivo") === "efectivo").reduce((s, e) => s + e.monto, 0);
+        // Dólares: se cuentan en una gaveta aparte. El backend puede mandar `usd: { efectivo }`
+        // (en US$) y entonces `porMetodo` trae solo soles; si no, se deduce de los cobros del día.
+        const boletasUsdEf = boletasHoyActivas.filter((b) => b.moneda === "USD" && String(b.metodo || "").toLowerCase() === "efectivo");
+        const cobradoEfectivoUsd = c.usd ? Number(c.usd.efectivo) || 0 : Math.round(boletasUsdEf.reduce((s, b) => s + (Number(b.montoOriginal) || 0), 0) * 100) / 100;
+        const usdEnSolesDelBackend = conectado && !c.usd ? boletasUsdEf.reduce((s, b) => s + b.monto, 0) : 0;
+        const cobradoEfectivo = (Number((c.porMetodo || {}).efectivo) || 0) - usdEnSolesDelBackend;
+        const egresosEfectivo = egresosHoy.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda !== "USD").reduce((s, e) => s + e.monto, 0);
+        const egresosEfectivoUsd = egresosHoy.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda === "USD").reduce((s, e) => s + e.monto, 0);
+        const fondoUsd = Number(apertura?.fondoUsd) || 0;
+        const usdActivo = !!(fondoUsd || cobradoEfectivoUsd || egresosEfectivoUsd || cierreForm.contadoUsd);
+        const esperadoUsd = Math.round((fondoUsd + cobradoEfectivoUsd - egresosEfectivoUsd) * 100) / 100;
+        const contadoUsdNum = cierreForm.contadoUsd === "" || cierreForm.contadoUsd == null ? null : Number(cierreForm.contadoUsd);
+        const diffUsd = contadoUsdNum == null || Number.isNaN(contadoUsdNum) ? null : Math.round((contadoUsdNum - esperadoUsd) * 100) / 100;
         const esperadoEfectivo = cajaAbierta
           ? Math.round((fondoIni + cobradoEfectivo - egresosEfectivo + netoMovsCaja) * 100) / 100
           : null;
@@ -4145,10 +4233,43 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     </div>
                     <div className="dc-cz__pie">
                       <span><Lock size={13} strokeWidth={2} /> Al cerrar no se registran más cobros hasta reabrir.</span>
-                      <button type="button" className="dc-ap2__cta" disabled={cierreBusy || !puedeAbrirCaja} onClick={() => cerrarApertura(esperadoEfectivo)}><Lock size={15} strokeWidth={2} /> {cierreBusy ? "Cerrando…" : "Cerrar caja del día"}</button>
+                      <button type="button" className="dc-ap2__cta" disabled={cierreBusy || !puedeAbrirCaja} onClick={() => cerrarApertura(esperadoEfectivo, usdActivo ? { contado: Number(cierreForm.contadoUsd) || 0, esperado: esperadoUsd } : null)}><Lock size={15} strokeWidth={2} /> {cierreBusy ? "Cerrando…" : "Cerrar caja del día"}</button>
                     </div>
                   </Card>
-                ) : (
+                ) : null}
+                {cajaAbierta && usdActivo && (
+                  <Card className="dc-cz__conteo dc-cz__usd">
+                    <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#16A36A" }}><DollarSign size={20} strokeWidth={1.9} /></span><div><h3>Gaveta en dólares</h3><span>Se cuadra aparte de los soles</span></div></div>
+                    <ul className="dc-cz__libro">
+                      <li style={{ "--t": "#0E9199" }}><span className="dc-cz__lico"><Wallet size={16} strokeWidth={2} /></span><div><b>Fondo en dólares</b><small>Al abrir la caja</small></div><em>US$ {fondoUsd.toFixed(2)}</em></li>
+                      <li style={{ "--t": "#16A36A" }}><span className="dc-cz__lico"><Banknote size={16} strokeWidth={2} /></span><div><b>Cobros en dólares</b><small>{boletasUsdEf.length} pago{boletasUsdEf.length === 1 ? "" : "s"} en efectivo</small></div><em>+ US$ {cobradoEfectivoUsd.toFixed(2)}</em></li>
+                      <li style={{ "--t": "#E0694F" }}><span className="dc-cz__lico"><ArrowUpRight size={16} strokeWidth={2} /></span><div><b>Egresos en dólares</b><small>Pagados desde la gaveta</small></div><em>− US$ {egresosEfectivoUsd.toFixed(2)}</em></li>
+                    </ul>
+                    <div className="dc-cz__grupo">
+                      <div className="dc-cz__glbl"><Banknote size={13} strokeWidth={2} /> Billetes en dólares<span>US$ {DENOMS_USD.reduce((a, v) => a + v * (denomsUsd[v] || 0), 0).toFixed(2)}</span></div>
+                      <div className="dc-cz__denoms is-b">
+                        {DENOMS_USD.map((v) => { const q = denomsUsd[v] || 0; const set = (nq) => { const nd = { ...denomsUsd, [v]: Math.max(0, nq) }; setDenomsUsd(nd); setCierreForm({ ...cierreForm, contadoUsd: String(DENOMS_USD.reduce((a, dv) => a + dv * (nd[dv] || 0), 0)) }); }; return (
+                          <div key={v} className={`dc-cz__den is-b${q ? " is-on" : ""}`}>
+                            <span className="dc-cz__dval">US$ {v}</span>
+                            <div className="dc-cz__step">
+                              <button type="button" className="dc-mini-btn" aria-label={`Quitar billete de ${v} dólares`} onClick={() => set(q - 1)} disabled={!q}><Minus size={13} strokeWidth={2.4} /></button>
+                              <input inputMode="numeric" aria-label={`Billetes de ${v} dólares`} value={q || ""} placeholder="0" onChange={(e) => set(Number(e.target.value.replace(/\D/g, "")) || 0)} />
+                              <button type="button" className="dc-mini-btn" aria-label={`Agregar billete de ${v} dólares`} onClick={() => set(q + 1)}><Plus size={13} strokeWidth={2.4} /></button>
+                            </div>
+                          </div>
+                        ); })}
+                      </div>
+                    </div>
+                    <div className="dc-cz__cuadre">
+                      <label className="dc-cz__contado"><small>Dólares contados</small><div><span>US$</span><input inputMode="decimal" aria-label="Dólares contados (US$)" value={cierreForm.contadoUsd || ""} onChange={(e) => { setDenomsUsd({}); setCierreForm({ ...cierreForm, contadoUsd: e.target.value.replace(/[^\d.]/g, "") }); }} placeholder={esperadoUsd.toFixed(2)} /></div></label>
+                      <div className={`dc-cz__res is-${diffUsd == null ? "nada" : Math.abs(diffUsd) < 0.01 ? "cuadra" : diffUsd > 0 ? "sobra" : "falta"}`}>
+                        <span>{diffUsd == null ? <Scale size={22} strokeWidth={2} /> : Math.abs(diffUsd) < 0.01 ? <CheckCircle2 size={22} strokeWidth={2} /> : diffUsd > 0 ? <TrendingUp size={22} strokeWidth={2} /> : <TrendingDown size={22} strokeWidth={2} />}</span>
+                        <div><small>Esperado US$ {esperadoUsd.toFixed(2)}</small><b>{diffUsd == null ? "Esperando el conteo" : Math.abs(diffUsd) < 0.01 ? "Cuadra exacto" : diffUsd > 0 ? `Sobran US$ ${diffUsd.toFixed(2)}` : `Faltan US$ ${Math.abs(diffUsd).toFixed(2)}`}</b></div>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+                {!cajaAbierta && (
                   <Card className="dc-cz__bloq">
                     <span><Lock size={24} strokeWidth={1.9} /></span>
                     <div><b>El arqueo se habilita con la caja abierta</b><p>Abre la caja del día para contar la gaveta y cerrar con el resultado del cuadre.</p></div>
@@ -4306,7 +4427,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const metCol = { tarjeta: DS.c.primary, yape: "var(--dc-ink-500)", efectivo: "var(--dc-ok-700)", transferencia: "var(--dc-navy)" };
         const movs = [
           ...boletasHoyActivas.map((b, i) => ({ id: "i" + i, tipo: "ingreso", concepto: b.concepto || "Cobro", detalle: b.paciente, monto: b.monto, metodo: String(b.metodo || "").toLowerCase() })),
-          ...egresosHoy.map((e) => ({ id: "e" + e.id, tipo: "egreso", concepto: e.concepto, detalle: e.categoria, monto: e.monto, metodo: e.metodo })),
+          ...egresosHoy.map((e) => ({ id: "e" + e.id, tipo: "egreso", concepto: e.concepto, detalle: e.categoria, monto: e.monto, metodo: e.metodo, moneda: e.moneda })),
         ];
         return (
         <div style={{ display: "grid", gap: 16 }}>
@@ -4317,10 +4438,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </div>
             <div className="dc-esp-hero__cifras">
               <div><b>S/ {ingresosHoy.toLocaleString("es-PE")}</b><span>Ingresos, {boletasHoyActivas.length} {boletasHoyActivas.length === 1 ? "cobro" : "cobros"}</span></div>
-              <div><b>S/ {totEgresosHoy.toLocaleString("es-PE")}</b><span>Egresos, {egresosHoy.length} {egresosHoy.length === 1 ? "gasto" : "gastos"}</span></div>
+              <div><b>S/ {totEgresosHoy.toLocaleString("es-PE")}</b><span>Egresos, {egresosHoy.length} {egresosHoy.length === 1 ? "gasto" : "gastos"}{totEgresosHoyUsd ? ` + US$ ${totEgresosHoyUsd.toFixed(2)}` : ""}</span></div>
             </div>
             <span />
-            {puedeEgresos && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn is-coral" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button></div>}
+            {puedeEgresos && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn is-coral" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button></div>}
           </section>
           <ListaFiltrable rows={movs} sub="movimientos" cols={[
             { key: "tipo", label: "Tipo", get: (m) => (m.tipo === "ingreso" ? "Ingreso" : "Egreso") },
@@ -4341,7 +4462,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 </header>
                 {lista.length === 0 ? (
                   <div className="dc-flujo__vacio">{t === "ingreso" ? "Aún no hay cobros hoy." : "Sin gastos registrados hoy."}
-                    {t === "egreso" && puedeEgresos && <button type="button" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo" })}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
+                    {t === "egreso" && puedeEgresos && <button type="button" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" })}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
                   </div>
                 ) : (
                   <ul>
@@ -4349,7 +4470,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                       <li key={m.id}>
                         <div className="dc-flujo__txt"><b>{m.concepto}</b><span>{m.detalle}</span></div>
                         <span className="dc-flujo__met" style={{ color: c, background: tint(c, 0.08) }}>{m.metodo || "—"}</span>
-                        <b className="dc-flujo__monto">{t === "ingreso" ? "+" : "−"} S/ {Number(m.monto).toFixed(2)}</b>
+                        <b className="dc-flujo__monto">{t === "ingreso" ? "+" : "−"} {m.moneda === "USD" ? "US$" : "S/"} {Number(m.monto).toFixed(2)}</b>
                       </li>
                     ); })}
                   </ul>
@@ -4359,6 +4480,56 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             })}
           </div>
           )}</ListaFiltrable>
+          {(() => {
+            const ym = fmt(hoy).slice(0, 7);
+            const base = egresos.filter((e) => (catPeriodo === "hoy" ? e.fecha === fmt(hoy) : (e.fecha || "").slice(0, 7) === ym));
+            const grupos = EGRESO_CATS.map((cat) => {
+              const items = base.filter((e) => (EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros") === cat);
+              return { cat, items, pen: items.filter((e) => e.moneda !== "USD").reduce((a, e) => a + e.monto, 0), usd: items.filter((e) => e.moneda === "USD").reduce((a, e) => a + e.monto, 0) };
+            }).filter((g) => g.items.length).sort((a, b) => b.pen - a.pen);
+            const totPen = grupos.reduce((a, g) => a + g.pen, 0) || 1;
+            const otros = grupos.find((g) => g.cat === "Otros");
+            const CAT_COL = { Insumos: "#0E9199", Laboratorio: "#6D4FD1", Alquiler: "#1E3A5F", "Servicios (luz/agua)": "#D97706", Planilla: "#2563EB", Marketing: "#DB2777", Equipos: "#16A36A", Otros: "#64748B" };
+            return (
+              <Card className="dc-egcat">
+                <div className="dc-egcat__cab">
+                  <div><h3>Egresos por categoría</h3><span>Revisa en qué se va el dinero y corrige la categoría si un gasto quedó mal clasificado.</span></div>
+                  <div className="dc-moneda-sel" role="radiogroup" aria-label="Periodo">
+                    {[["hoy", "Hoy"], ["mes", "Este mes"]].map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={catPeriodo === k} className={catPeriodo === k ? "is-on" : ""} onClick={() => setCatPeriodo(k)}>{l}</button>)}
+                  </div>
+                </div>
+                {otros && otros.items.length > 0 && <div className="fm-aviso-edad is-info" style={{ margin: "0 0 12px" }}><Tag size={15} strokeWidth={2} /><span><b>{otros.items.length} {otros.items.length === 1 ? "egreso" : "egresos"} en «Otros».</b> Revísalos y asígnales una categoría para que el reporte del mes sea útil.</span></div>}
+                {grupos.length === 0 ? <Vacio icon={<Tag size={22} strokeWidth={1.75} />} titulo="Sin egresos en el periodo" sub="Los gastos que registres aparecerán agrupados aquí." /> : (
+                  <ul className="dc-egcat__lista">
+                    {grupos.map((g) => { const col = CAT_COL[g.cat] || "#64748B"; const abierta = catAbierta === g.cat; const pct = Math.round((g.pen / totPen) * 100); return (
+                      <li key={g.cat} className={abierta ? "is-open" : ""} style={{ "--c": col }}>
+                        <button type="button" className="dc-egcat__fila" aria-expanded={abierta} onClick={() => setCatAbierta(abierta ? null : g.cat)}>
+                          <span className="dc-egcat__dot" />
+                          <b>{g.cat}</b>
+                          <small>{g.items.length} {g.items.length === 1 ? "gasto" : "gastos"}</small>
+                          <span className="dc-egcat__bar"><i style={{ width: `${Math.max(pct, 2)}%` }} /></span>
+                          <em>S/ {g.pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}{g.usd ? <small> + US$ {g.usd.toFixed(2)}</small> : null}</em>
+                          <span className="dc-egcat__pct">{pct}%</span>
+                          <ChevronDown size={16} strokeWidth={2} className="dc-egcat__chev" />
+                        </button>
+                        {abierta && (
+                          <div className="dc-egcat__det">
+                            {g.items.map((e) => (
+                              <div key={e.id} className="dc-egcat__item">
+                                <div><b>{e.concepto}</b><span>{fechaLegible(e.fecha)} – {e.metodo}</span></div>
+                                <strong>{e.moneda === "USD" ? "US$" : "S/"} {Number(e.monto).toFixed(2)}</strong>
+                                {puedeEgresos ? <select aria-label={`Categoría de ${e.concepto}`} value={EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros"} onChange={(ev) => reclasificarEgreso(e, ev.target.value)}>{EGRESO_CATS.map((c) => <option key={c} value={c}>{c}</option>)}</select> : <span className="dc-pill">{e.categoria}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    ); })}
+                  </ul>
+                )}
+              </Card>
+            );
+          })()}
         </div>
         );
       })()}
@@ -4429,7 +4600,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         );
       })()}
 
-      {pago && <ModalCobro monto={pago.monto} pacienteId={conectado ? pago.pid : null} sedeId={sedeUuid()} paciente={pago.nombre} items={itemsDe(pago.pid)} concepto="Cobro de saldo en caja" onClose={() => setPago(null)} onAprobado={aprobar} notify={notify} />}
+      {pago && <ModalCobro monto={pago.monto} pacienteId={conectado ? pago.pid : null} sedeId={sedeUuid()} paciente={pago.nombre} items={pago.items || itemsDe(pago.pid)} faseIds={pago.faseIds || null} concepto={pago.faseIds ? "Tratamiento terminado" : "Cobro de saldo en caja"} onClose={() => setPago(null)} onAprobado={aprobar} notify={notify} />}
       {boletaVer && <BoletaView boleta={boletaVer} onClose={() => setBoletaVer(null)} />}
       {datosFact && <DatosFacturacion onClose={() => setDatosFact(false)} notify={notify} readOnly={fiscalReadOnly} />}
       {egForm && (() => {
@@ -4444,7 +4615,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <Select value={egForm.categoria} onChange={(v) => setEgForm({ ...egForm, categoria: v })}
                       options={EGRESO_CATS.map((c) => ({ value: c, label: c }))} />
             </div>
-            <Field label="Monto (S/)" value={egForm.monto} onChange={(v) => setEgForm({ ...egForm, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
+            <Field label={`Monto (${egForm.moneda === "USD" ? "US$" : "S/"})`} value={egForm.monto} onChange={(v) => setEgForm({ ...egForm, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
+          </div>
+          <div className="dc-moneda-sel" role="radiogroup" aria-label="Moneda del egreso" style={{ marginTop: 14 }}>
+            {[["PEN", "Soles (S/)"], ["USD", "Dólares (US$)"]].map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={(egForm.moneda || "PEN") === k} className={(egForm.moneda || "PEN") === k ? "is-on" : ""} onClick={() => setEgForm({ ...egForm, moneda: k })}>{l}</button>)}
           </div>
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", margin: "16px 0 7px" }}>Método de pago</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -7801,6 +7975,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       { label: "Agenda", icon: Calendar, children: [
         { id: "agenda", label: "Hoy", mod: "agenda" },
         { id: "agenda_cal", label: "Calendario", mod: "agenda" },
+        { id: "agenda_consolidado", label: "Consolidado de citas", mod: "agenda" },
       ] },
       { id: "espera", label: "Lista de espera", icon: Bell },
       { id: "disponibilidad", label: "Mi disponibilidad", icon: Clock },
@@ -7820,6 +7995,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       { id: "recetas", label: "Recetas", icon: Pill },
       { id: "consentimientos", label: "Consentimientos", icon: ShieldPlus },
       { id: "radiografias", label: "Radiografías", icon: Scan },
+      { id: "fotos", label: "Fotografías", icon: Camera },
     ] },
     { grupo: "Operaciones", items: [
       { id: "servicios", label: "Servicios", icon: ClipboardList },
@@ -7901,6 +8077,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
       case "agenda": return <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />;
+      case "agenda_consolidado": return <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={MEDICOS} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense>;
       case "agenda_cal": return <Agenda key="agenda-cal" vistaInicial="calendario" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />;
       case "disponibilidad": return <Disponibilidad notify={notify} usuario={usuario} citas={citas} setCitas={setCitas} horarioClinica={horarioClinica} />;
       case "pacientes": return <PacientesView pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
@@ -8472,7 +8649,7 @@ function DatosFacturacion({ onClose, notify = () => {}, readOnly = false }) {
   );
 }
 
-function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", email, paciente, dni, items = null, onClose, onAprobado, notify = () => {} }) {
+function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", email, paciente, dni, items = null, faseIds = null, onClose, onAprobado, notify = () => {} }) {
   const real = !!auth.token && !!pacienteId;
   const [idempotencyKey] = useState(() => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `pay-${Date.now()}-${Math.random().toString(36).slice(2)}`));
   const [posting, setPosting] = useState(false);
@@ -8519,7 +8696,11 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   const aUi = (pen) => moneda === "USD" ? Math.round((Number(pen) / TC_USD) * 100) / 100 : Number(pen) || 0;
   const aPen = (ui) => moneda === "USD" ? Math.round((Number(ui) * TC_USD) * 100) / 100 : Number(ui) || 0;
   const net = Math.max(0, Math.round(((Number(montoCobrar) || 0) - (Number(desc) || 0)) * 100) / 100);
-  const netPen = aPen(net);                                  // backend siempre en soles
+  // Backend siempre en soles. Si en dólares se paga el saldo completo, el redondeo
+  // (350 / 3.75 = 93.33 → S/ 349.99) no debe convertirlo en abono: se registra el saldo exacto.
+  const netPen = moneda === "USD" && Math.abs(net - aUi(saldoMax)) < 0.006 ? saldoMax : aPen(net);
+  // Moneda en la que pagó el paciente. `monto` sigue en soles; el original y el TC quedan registrados.
+  const monCampos = { ...(moneda === "USD" ? { moneda: "USD", montoOriginal: net, tipoCambio: TC_USD } : { moneda: "PEN" }), ...(faseIds && faseIds.length ? { faseIds } : {}) };
   const conceptoFull = cuotas > 1 ? `${concepto} – Cuota 1 de ${cuotas}` : concepto;
   const parcial = netPen > 0 && netPen < saldoMax - 0.009;
 
@@ -8549,8 +8730,8 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
     let concept = conceptoFull;
     if (m === "transferencia") { if (ref.trim()) concept += ` – Op. ${ref.trim()}`; if (banco) concept += ` – ${banco}`; }
     if (moneda === "USD") concept += ` – US$ ${net.toFixed(2)} (TC ${TC_USD})`;
-    if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor().serie); aprobado({ metodo: m, referencia: ref, banco, montoCobrado: netPen, parcial, moneda, comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
-    api.pagos.registrar({ pacienteId, sedeId, concepto: concept, monto: netPen, metodo: m, descuento: aPen(Number(desc) || 0) }, { headers: { "Idempotency-Key": idempotencyKey } })
+    if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor().serie); aprobado({ metodo: m, referencia: ref, banco, montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
+    api.pagos.registrar({ pacienteId, sedeId, concepto: concept, monto: netPen, metodo: m, descuento: aPen(Number(desc) || 0), ...monCampos }, { headers: { "Idempotency-Key": idempotencyKey } })
       .then((r) => {
         if (r?.comprobanteNumero == null || r?.comprobanteNumero === "") {
           liberar();
@@ -8558,7 +8739,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
           return;
         }
         liberar();
-        aprobado({ metodo: m, referencia: ref, banco, montoCobrado: netPen, parcial, moneda, comprobanteSerie: r?.comprobanteSerie, comprobanteNumero: r?.comprobanteNumero, pagoId: r?.id });
+        aprobado({ metodo: m, referencia: ref, banco, montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, comprobanteSerie: r?.comprobanteSerie, comprobanteNumero: r?.comprobanteNumero, pagoId: r?.id });
       })
       .catch((e) => {
         liberar();
@@ -8586,7 +8767,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
             liberar();
             if (!(r && r.aprobado)) return fallo(r && r.mensaje);
             if (r.comprobanteNumero == null || r.comprobanteNumero === "") return fallo("El servidor no asignó número de comprobante.");
-            return aprobado({ metodo: m, pagoId: r.pagoId, montoCobrado: netPen, parcial, moneda, comprobanteSerie: r.comprobanteSerie, comprobanteNumero: r.comprobanteNumero });
+            return aprobado({ metodo: m, pagoId: r.pagoId, montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, comprobanteSerie: r.comprobanteSerie, comprobanteNumero: r.comprobanteNumero });
           }).catch((e) => {
             liberar();
             const st = e?.status;
@@ -8615,7 +8796,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
               .then((r) => {
                 if (!(r && r.aprobado)) return fallo(r && r.mensaje);
                 if (r.comprobanteNumero == null || r.comprobanteNumero === "") return fallo("El servidor no asignó número de comprobante.");
-                return aprobado({ metodo: m, pagoId: r.pagoId, montoCobrado: netPen, parcial, moneda, comprobanteSerie: r.comprobanteSerie, comprobanteNumero: r.comprobanteNumero });
+                return aprobado({ metodo: m, pagoId: r.pagoId, montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, comprobanteSerie: r.comprobanteSerie, comprobanteNumero: r.comprobanteNumero });
               });
           } });
         window.VisanetCheckout.open();
@@ -8671,11 +8852,11 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
       setTimeout(() => {
         liberar();
         const loc = nextBoletaLocal(getEmisor().serie);
-        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero });
+        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero });
       }, 700);
       return;
     }
-    api.pagos.registrar({ pacienteId, sedeId, concepto: `${conceptBase} – Efectivo`, monto: efPen, metodo: "efectivo", descuento: 0 }, { headers: { "Idempotency-Key": idempotencyKey } })
+    api.pagos.registrar({ pacienteId, sedeId, concepto: `${conceptBase} – Efectivo`, monto: efPen, metodo: "efectivo", descuento: 0, ...(moneda === "USD" ? { moneda: "USD", montoOriginal: aUi(efPen), tipoCambio: TC_USD } : { moneda: "PEN" }) }, { headers: { "Idempotency-Key": idempotencyKey } })
       .then((r1) => {
         if (r1?.comprobanteNumero == null || r1?.comprobanteNumero === "") {
           liberar();
@@ -8683,7 +8864,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
           return null;
         }
         return api.pagos.registrar(
-          { pacienteId, sedeId, concepto: `${conceptBase} – ${mixOtroMetodo}`, monto: otPen, metodo: mixOtroMetodo, descuento: aPen(Number(desc) || 0) },
+          { pacienteId, sedeId, concepto: `${conceptBase} – ${mixOtroMetodo}`, monto: otPen, metodo: mixOtroMetodo, descuento: aPen(Number(desc) || 0), ...(moneda === "USD" ? { moneda: "USD", montoOriginal: aUi(otPen), tipoCambio: TC_USD } : { moneda: "PEN" }) },
           { headers: { "Idempotency-Key": key2 } }
         ).then((r2) => ({ r1, r2 }));
       })
@@ -8695,7 +8876,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
           fallo("Se registró la parte en efectivo, pero falló el segundo método. Revisa el historial de caja.");
           return;
         }
-        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), comprobanteSerie: r2?.comprobanteSerie || r1?.comprobanteSerie, comprobanteNumero: r2?.comprobanteNumero || r1?.comprobanteNumero, pagoId: r2?.id || r1?.id });
+        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), comprobanteSerie: r2?.comprobanteSerie || r1?.comprobanteSerie, comprobanteNumero: r2?.comprobanteNumero || r1?.comprobanteNumero, pagoId: r2?.id || r1?.id });
       })
       .catch((e) => {
         liberar();
@@ -8958,12 +9139,12 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
               const liberar = () => { postingRef.current = false; setPosting(false); };
               let concept = `${prevConcepto} – Vuelto ${sym} ${vuelto.toFixed(2)}`;
               if (moneda === "USD") concept += ` – US$ ${net.toFixed(2)} (TC ${TC_USD})`;
-              if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor().serie); aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, vuelto: aPen(vuelto), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
-              api.pagos.registrar({ pacienteId, sedeId, concepto: concept, monto: netPen, metodo: "efectivo", descuento: aPen(Number(desc) || 0) }, { headers: { "Idempotency-Key": idempotencyKey } })
+              if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor().serie); aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
+              api.pagos.registrar({ pacienteId, sedeId, concepto: concept, monto: netPen, metodo: "efectivo", descuento: aPen(Number(desc) || 0), ...monCampos }, { headers: { "Idempotency-Key": idempotencyKey } })
                 .then((r) => {
                   if (r?.comprobanteNumero == null || r?.comprobanteNumero === "") { liberar(); fallo("El servidor no asignó número de comprobante."); return; }
                   liberar();
-                  aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, vuelto: aPen(vuelto), comprobanteSerie: r?.comprobanteSerie, comprobanteNumero: r?.comprobanteNumero, pagoId: r?.id });
+                  aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), comprobanteSerie: r?.comprobanteSerie, comprobanteNumero: r?.comprobanteNumero, pagoId: r?.id });
                 })
                 .catch((e) => {
                   liberar();

@@ -12,7 +12,7 @@ export const HASH_ALIAS = {
 };
 
 const MOD_IDS = new Set([
-  "dashboard", "gerencial", "reportes", "comisiones", "metas", "miproduccion", "agenda", "agenda_cal",
+  "dashboard", "gerencial", "reportes", "comisiones", "metas", "miproduccion", "agenda", "agenda_cal", "agenda_consolidado",
   "espera", "pacientes", "odontograma", "periodontograma", "perio", "ortodoncia", "facturacion", "caja",
   "inventario", "laboratorio", "consentimientos", "resenas", "whatsapp", "integraciones",
   "config", "usuarios", "permisos", "auditoria", "plan", "plataforma", "servicios",
