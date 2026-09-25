@@ -1,8 +1,8 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect } from "react";
-import { AlertCircle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2 } from "lucide-react";
+import { AlertCircle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag } from "lucide-react";
 import api, { auth } from "../api/client";
-import {Btn, Card, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint} from "../comun";
+import {Btn, Card, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales} from "../comun";
 
 const BANCOS_PE = [
   { id: "bcp", nombre: "BCP — Banco de Crédito", cuenta: [14] },
@@ -270,7 +270,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
     if (!conectado) {
       setSedes(SEDES.map((s) => ({ id: s.id, nombre: s.nombre, direccion: s.dir, telefono: "" })));
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, precioBase: e.precio })));
-      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: null, activo: true })));
+      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: null, activo: true, porcentajeComision: 30, metaMensual: m.meta })));
       setGoLive({
         listoParaOperar: true, total: 4, completados: 4, obligatoriosPendientes: 0,
         items: [
@@ -343,7 +343,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   };
   const delHorario = (id) => api.disponibilidad.borrar(id).then(() => { notify("Horario eliminado."); cargarDisp(medHor); }).catch(() => {});
 
-  const TABS = [["puesta", "Puesta en marcha", Navigation], ["empresa", "Datos de la clínica", Briefcase], ["atencion", "Horario de atención", Clock], ["servicios", "Servicios y precios", ClipboardList], ["doctores", "Doctores", Stethoscope], ["sedes", "Sedes", Building2], ["horarios", "Horarios por doctor", Clock], ["promos", "Promociones", Megaphone]];
+  const TABS = [["puesta", "Puesta en marcha", Navigation, "Pasos para operar", "#0E9199"], ["empresa", "Datos de la clínica", Briefcase, "RUC, logo y facturación", "#28527A"], ["atencion", "Horario de atención", Clock, "Días y horas de la clínica", "#2F6FDE"], ["servicios", "Servicios y precios", ClipboardList, "Catálogo y tarifas", "#16A36A"], ["doctores", "Doctores", Stethoscope, "Equipo clínico", "#6D4FD1"], ["sedes", "Sedes", Building2, "Locales de atención", "#D97706"], ["horarios", "Horarios por doctor", Clock, "Disponibilidad de agenda", "#0E9EB0"], ["promos", "Promociones", Megaphone, "Ofertas del agente IA", "#E0694F"]];
+  const cab = (titulo, sub, accion) => (
+    <div className="dc-cfg__cab"><div><h3>{titulo}</h3><span>{sub}</span></div>{accion}</div>
+  );
   const card = { background: "var(--dc-white)", borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", boxShadow: "0 1px 2px rgba(16,24,40,.04)" };
   const th = { textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: .4, borderBottom: "1px solid var(--dc-line)" };
   const td = { padding: "12px 16px", fontSize: 14, color: NAVY, borderTop: "1px solid var(--dc-bg)" };
@@ -351,13 +354,18 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
     <button onClick={() => setEdit({ tipo, item: { ...item } })} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--dc-line)", background: "var(--dc-white)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: DS.c.primary }}><Pencil size={13} strokeWidth={1.75} /> Editar</button>
   );
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {!conectado && <div className="dc-banda dc-banda--info"><Info size={18} strokeWidth={1.75} /><p>Inicia sesión con una cuenta de la clínica para editar la configuración.</p></div>}
-      <div style={{ display: "flex", gap: 6, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: 22, padding: 4, boxShadow: "0 1px 2px rgba(16,24,40,.04)", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
-        {TABS.map(([k, lbl, Ic]) => { const on = tab === k; return (
-          <button key={k} onClick={() => setTab(k)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: "var(--dc-r-full)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", background: on ? NAVY : "transparent", color: on ? "var(--dc-white)" : "var(--dc-ink-400)" }}><Ic size={15} strokeWidth={1.75} /> {lbl}</button>
+    <div className="dc-cfg">
+      <nav className="dc-cfg__nav" aria-label="Secciones de configuración">
+        <div className="dc-cfg__navtit"><Settings size={15} strokeWidth={2} /> Configuración</div>
+        {TABS.map(([k, lbl, Ic, sub, col]) => { const on = tab === k; return (
+          <button key={k} type="button" aria-current={on ? "page" : undefined} className={on ? "is-on" : ""} style={{ "--c": col }} onClick={() => setTab(k)}>
+            <span className="dc-cfg__ico"><Ic size={16} strokeWidth={2} /></span>
+            <div><b>{lbl}</b><small>{sub}</small></div>
+          </button>
         ); })}
-      </div>
+      </nav>
+      <div className="dc-cfg__main">
+      {!conectado && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>Datos de ejemplo. Inicia sesión con una cuenta de la clínica para editar la configuración.</span></div>}
 
       {tab === "puesta" && (
         <div style={{ display: "grid", gap: 16 }}>
@@ -610,52 +618,62 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       })()}
 
       {tab === "servicios" && (
-        <div style={{ ...card, overflow: "hidden" }}>
-          <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Servicios y precios</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>El agente de WhatsApp y los presupuestos usan estos precios.</div></div>
-            <Btn small onClick={() => setEdit({ tipo: "servicio", item: {} })}><Plus size={15} strokeWidth={1.75} /> Nuevo servicio</Btn>
-          </div>
-          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Servicio</th><th style={th}>Precio</th><th style={{ ...th, textAlign: "right" }}></th></tr></thead>
-            <tbody>{esps.map((e) => (
-              <tr key={e.id}><td style={{ ...td, fontWeight: 500 }}>{e.nombre}</td><td style={td}>S/ {Number(e.precioBase) || 0}</td><td style={{ ...td, textAlign: "right" }}>{rowBtns("servicio", e)}</td></tr>
-            ))}{esps.length === 0 && <tr><td style={td} colSpan={3}>Sin servicios aún.</td></tr>}</tbody>
-          </table></div>
-        </div>
+        <section className="dc-cfg__panel">
+          {cab("Servicios y precios", "El agente de WhatsApp y los presupuestos usan estos precios.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "servicio", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo servicio</button>)}
+          {esps.length === 0 ? <p className="dc-cfg__nada">Sin servicios aún.</p> : (
+            <div className="dc-cfg__servs">
+              {esps.map((e) => { const col = colorDe(e.nombre); const dur = e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin; return (
+                <button key={e.id} type="button" className="dc-cfg__serv" style={{ "--c": col }} onClick={() => setEdit({ tipo: "servicio", item: { ...e } })}>
+                  <span className="dc-cfg__sico"><Tag size={15} strokeWidth={2} /></span>
+                  <div><b>{e.nombre}</b>{dur ? <small><Clock size={11} strokeWidth={2.2} /> {dur} min</small> : <small>Sin duración</small>}</div>
+                  <em>S/ {Number(e.precioBase) || 0}</em>
+                  <i className="dc-cfg__edit"><Pencil size={13} strokeWidth={2} /></i>
+                </button>
+              ); })}
+            </div>
+          )}
+        </section>
       )}
 
       {tab === "doctores" && (
-        <div style={{ ...card, overflow: "hidden" }}>
-          <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Doctores</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.</div></div>
-            <Btn small onClick={() => setEdit({ tipo: "doctor", item: {} })}><Plus size={15} strokeWidth={1.75} /> Nuevo doctor</Btn>
-          </div>
-          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Doctor</th><th style={th}>Especialidad</th><th style={th}>CMP/COP</th><th style={th}>Comisión</th><th style={th}>Meta</th><th style={th}>Estado</th><th style={{ ...th, textAlign: "right" }}></th></tr></thead>
-            <tbody>{meds.map((m) => (
-              <tr key={m.id}><td style={{ ...td, fontWeight: 500 }}>{m.nombre}</td><td style={td}>{espNombre(m.especialidadId)}</td><td style={td}>{m.cop || "—"}</td>
-                <td style={td}>{m.porcentajeComision != null ? `${m.porcentajeComision}%` : "—"}</td>
-                <td style={td}>{m.metaMensual != null ? `S/ ${Number(m.metaMensual).toLocaleString()}` : "—"}</td>
-                <td style={td}><span style={{ fontSize: 12, fontWeight: 500, padding: "3px 9px", borderRadius: "var(--dc-r-full)", background: m.activo ? "var(--dc-ok-soft)" : "var(--dc-fee2)", color: m.activo ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>{m.activo ? "Activo" : "Inactivo"}</span></td>
-                <td style={{ ...td, textAlign: "right" }}>{rowBtns("doctor", m)}</td></tr>
-            ))}{meds.length === 0 && <tr><td style={td} colSpan={7}>Sin doctores aún.</td></tr>}</tbody>
-          </table></div>
-        </div>
+        <section className="dc-cfg__panel">
+          {cab("Doctores", "Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "doctor", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo doctor</button>)}
+          {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : (
+            <div className="dc-cfg__docs">
+              {meds.map((m) => { const col = colorDe(m.nombre); return (
+                <article key={m.id} className={`dc-cfg__doc${m.activo ? "" : " is-off"}`}>
+                  <div className="dc-cfg__dtop">
+                    <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.22)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(String(m.nombre).replace(/^Dra?\.\s*/, ""))}</span>
+                    <div><b>{m.nombre}</b><small>{espNombre(m.especialidadId)}{m.cop ? ` – ${m.cop}` : ""}</small></div>
+                    <span className={`dc-int__est ${m.activo ? "is-ok" : ""}`}><i />{m.activo ? "Activo" : "Inactivo"}</span>
+                  </div>
+                  <div className="dc-cfg__dnums">
+                    <div><Percent size={12} strokeWidth={2.2} /><span>Comisión</span><b>{m.porcentajeComision != null ? `${m.porcentajeComision}%` : "—"}</b></div>
+                    <div><Target size={12} strokeWidth={2.2} /><span>Meta</span><b>{m.metaMensual != null ? `S/ ${Number(m.metaMensual).toLocaleString("es-PE")}` : "—"}</b></div>
+                    <button type="button" onClick={() => setEdit({ tipo: "doctor", item: { ...m } })}><Pencil size={13} strokeWidth={2} /> Editar</button>
+                  </div>
+                </article>
+              ); })}
+            </div>
+          )}
+        </section>
       )}
 
       {tab === "sedes" && (
-        <div style={{ ...card, overflow: "hidden" }}>
-          <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Sedes</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Locales de atención de la clínica.</div></div>
-            <Btn small onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={15} strokeWidth={1.75} /> Nueva sede</Btn>
-          </div>
-          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr><th style={th}>Sede</th><th style={th}>Dirección</th><th style={th}>Teléfono</th><th style={{ ...th, textAlign: "right" }}></th></tr></thead>
-            <tbody>{sedes.map((s) => (
-              <tr key={s.id}><td style={{ ...td, fontWeight: 500 }}>{s.nombre}</td><td style={td}>{s.direccion || "—"}</td><td style={td}>{s.telefono || "—"}</td><td style={{ ...td, textAlign: "right" }}>{rowBtns("sede", s)}</td></tr>
-            ))}{sedes.length === 0 && <tr><td style={td} colSpan={4}>Sin sedes aún.</td></tr>}</tbody>
-          </table></div>
-        </div>
+        <section className="dc-cfg__panel">
+          {cab("Sedes", "Locales de atención de la clínica.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
+          {sedes.length === 0 ? <p className="dc-cfg__nada">Sin sedes aún.</p> : (
+            <div className="dc-cfg__docs">
+              {sedes.map((sd, k) => { const col = ["#0E9199", "#D97706", "#6D4FD1", "#2F6FDE"][k % 4]; return (
+                <article key={sd.id} className="dc-cfg__sede" style={{ "--c": col }}>
+                  <span className="dc-cfg__sico is-grande"><Building2 size={18} strokeWidth={2} /></span>
+                  <div><b>{sd.nombre}</b><small><MapPin size={11} strokeWidth={2.2} /> {sd.direccion || "Sin dirección"}</small><small><Phone size={11} strokeWidth={2.2} /> {sd.telefono || "Sin teléfono"}</small></div>
+                  <button type="button" className="dc-row-action" aria-label={`Editar ${sd.nombre}`} title="Editar" onClick={() => setEdit({ tipo: "sede", item: { ...sd } })}><Pencil size={14} strokeWidth={2} /></button>
+                </article>
+              ); })}
+            </div>
+          )}
+        </section>
       )}
 
       {tab === "horarios" && (() => {
@@ -714,6 +732,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         );
       })()}
 
+      </div>
       {edit && (() => { const it = edit.item; const set = (k, v) => setEdit((e) => ({ ...e, item: { ...e.item, [k]: v } })); const T = { sede: "Sede", servicio: "Servicio", doctor: "Doctor", promo: "Promoción" }[edit.tipo];
         return (
           <Modal icon={<Settings size={20} strokeWidth={1.75} />} titulo={`${it.id ? "Editar" : "Nuevo"} ${T.toLowerCase()}`} onClose={() => setEdit(null)} maxW={460}

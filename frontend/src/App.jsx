@@ -5257,24 +5257,24 @@ function MiProduccion({ usuario, citas }) {
 /* ---- Integraciones (recomendaciones reales del mercado peruano) ---- */
 function Integraciones({ notify }) {
   const cats = [
-    { cat: "Facturación electrónica (SUNAT)", items: [
+    { cat: "Facturación electrónica (SUNAT)", ic: Receipt, c: "#D97706", items: [
       // NEW-51: Caja confirma que aún no hay OSE — no mentir «Conectado».
       { n: "NubeFacT", d: "Emisión de boletas/facturas XML UBL 2.1 vía OSE. Certificado ISO 27001. Aún no conectado en esta clínica: las boletas se registran en el sistema sin envío a SUNAT.", estado: "pendiente", rec: true },
       { n: "Doctocliq Facturación", d: "Facturación SUNAT integrada para Perú, México y Ecuador.", estado: "disponible" },
     ] },
-    { cat: "Pagos en línea y POS", items: [
+    { cat: "Pagos en línea y POS", ic: CreditCard, c: "#2F6FDE", items: [
       { n: "Culqi", d: "Tarjeta + Yape + Plin. 3.44% + IGV, sin mensualidad, liquidez el mismo día con BCP. Ideal para clínicas.", estado: "conectado", rec: true },
       { n: "Izipay", d: "POS físico + web, abono inmediato. Bueno si la clínica ya cobra presencial.", estado: "disponible" },
       { n: "Niubiz", d: "Acepta Amex/Diners y cuotas. Conviene a alto volumen con tarifa negociada.", estado: "disponible" },
     ] },
-    { cat: "Mensajería y captación", items: [
+    { cat: "Mensajería e IA", ic: MessageSquare, c: "#16A36A", items: [
       { n: "WhatsApp Cloud API (Meta)", d: "Canal oficial para el agente IA. Más económico a escala que intermediarios.", estado: "conectado", rec: true },
       // Aquí figuraba otro proveedor del que la aplicación no depende. El motor real es
       // OpenAI (application.yml: openai.base-url), y solo con OPENAI_API_KEY cargada:
       // sin ella el asistente cae al motor de reglas.
       { n: "API de OpenAI", d: "Motor del agente conversacional con function calling para consultar precios, ver disponibilidad y agendar. Sin clave, el asistente responde con el motor de reglas.", estado: "conectado", rec: true },
     ] },
-    { cat: "Captación de pacientes", items: [
+    { cat: "Captación de pacientes", ic: Users, c: "#6D4FD1", items: [
       { n: "Doctoralia", d: "Directorio público con gran tráfico orgánico; sincroniza agenda para captar pacientes nuevos.", estado: "disponible" },
     ] },
   ];
@@ -5282,40 +5282,54 @@ function Integraciones({ notify }) {
   const conectadas = its.filter((i) => i.estado === "conectado").length;
   const pendientesInt = its.filter((i) => i.estado === "pendiente").length;
   const [detInt, setDetInt] = useState(null);
+  const [catSel, setCatSel] = useState("todas");
+  const EST_INT = { conectado: ["Conectado", "is-ok"], pendiente: ["Pendiente", "is-warn"], disponible: ["Disponible", ""] };
   return (
-    <div>
-      <Card style={{ padding: 18, marginBottom: 16, background: "linear-gradient(90deg,var(--dc-bg),#fff)", border: "1px solid var(--dc-info-soft)" }}><div style={{ display: "flex", gap: 12, alignItems: "center" }}><Plug size={22} strokeWidth={1.75} color={NAVY} /><div style={{ fontSize: 14, color: "var(--dc-info-ink)" }}>Estas son integraciones <strong>reales del mercado peruano</strong> que tu plataforma puede conectar. Las marcadas como recomendadas son las de mejor encaje para clínicas dentales.</div></div></Card>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Conectadas" value={conectadas} color="var(--dc-ok-700)" icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub="activas ahora" />
-        <KpiCard label="Pendientes" value={pendientesInt} color="var(--dc-warn-600)" icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub="sin OSE / por activar" />
-        <KpiCard label="Disponibles" value={its.length - conectadas - pendientesInt} color={NAVY} icon={<Plug size={18} strokeWidth={1.75} />} sub="listas para conectar" />
-        <KpiCard label="Recomendadas" value={its.filter((i) => i.rec).length} color="var(--dc-warn-600)" icon={<Star size={18} strokeWidth={1.75} />} sub="mejor encaje dental" />
-      </div>
-      {cats.map((c) => (
-        <div key={c.cat} style={{ marginBottom: 22 }}>
-          <h3 style={{ color: NAVY, fontSize: 14, fontWeight: 600, margin: "0 0 12px", fontFamily: DISPLAY_FONT }}>{c.cat}</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
-            {c.items.map((it) => (
-              <Card key={it.n} onClick={() => setDetInt({ ...it, cat: c.cat })} style={{ padding: 18, cursor: "pointer", transition: "border-color .15s" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{it.n}</span>{it.rec && <span style={{ fontSize: 12, fontWeight: 500, background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", padding: "2px 7px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 3 }}><Star size={9} strokeWidth={1.75} /> RECOMENDADO</span>}</div>
-                </div>
-                <p style={{ fontSize: 13, color: "var(--dc-ink-400)", margin: "0 0 14px", lineHeight: 1.5 }}>{it.d}</p>
-                {it.estado === "conectado"
-                  ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={15} strokeWidth={1.75} /> Conectado</span>
-                  : it.estado === "pendiente"
-                    ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 5 }}>Pendiente de conectar</span>
-                  : <Btn small kind="ghost" onClick={(e) => { e.stopPropagation(); setDetInt({ ...it, cat: c.cat }); }}><Plug size={14} strokeWidth={1.75} /> Conectar</Btn>}
-              </Card>
-            ))}
-          </div>
+    <div style={{ display: "grid", gap: 14 }}>
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{conectadas}</b><span>{conectadas === 1 ? "integración activa" : "integraciones activas"}</span></div>
+          <p>Proveedores reales del mercado peruano para tu clínica</p>
         </div>
-      ))}
+        <div className="dc-esp-hero__cifras">
+          <div><b>{pendientesInt}</b><span>Por activar</span></div>
+          <div><b>{its.length - conectadas - pendientesInt}</b><span>Disponibles</span></div>
+          <div><b>{its.filter((i) => i.rec).length}</b><span>Recomendadas</span></div>
+        </div>
+        <span />
+      </section>
+      <div className="dc-us__roles" role="tablist" aria-label="Categoría">
+        <button type="button" role="tab" aria-selected={catSel === "todas"} className={catSel === "todas" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setCatSel("todas")}><Plug size={13} strokeWidth={2} /> Todas <i>{its.length}</i></button>
+        {cats.map((c) => { const CI = c.ic; return <button key={c.cat} type="button" role="tab" aria-selected={catSel === c.cat} className={catSel === c.cat ? "is-on" : ""} style={{ "--c": c.c }} onClick={() => setCatSel(c.cat)}><CI size={13} strokeWidth={2} /> {c.cat} <i>{c.items.length}</i></button>; })}
+      </div>
+      {cats.filter((c) => catSel === "todas" || catSel === c.cat).map((c) => { const CI = c.ic; return (
+        <section key={c.cat} className="dc-int__cat" style={{ "--c": c.c }}>
+          <div className="dc-int__cab"><span><CI size={15} strokeWidth={2} /></span><h3>{c.cat}</h3><small>{c.items.filter((x) => x.estado === "conectado").length} de {c.items.length} conectadas</small></div>
+          <div className="dc-int__grid">
+            {c.items.map((it) => { const [el, ec] = EST_INT[it.estado] || EST_INT.disponible; const col = colorDe(it.n); return (
+              <article key={it.n} className={`dc-int__card is-${it.estado}`} onClick={() => setDetInt({ ...it, cat: c.cat })} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setDetInt({ ...it, cat: c.cat }); }}>
+                <div className="dc-int__top">
+                  <span className="dc-int__logo" style={{ background: `linear-gradient(135deg, ${col}, ${tint(col, 0.75)})` }}>{it.n.replace(/[^A-Za-z ]/g, "").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+                  <div><b>{it.n}</b>{it.rec && <small className="dc-int__rec"><Star size={10} strokeWidth={2.4} /> Recomendado</small>}</div>
+                  <span className={`dc-int__est ${ec}`}><i />{el}</span>
+                </div>
+                <p>{it.d}</p>
+                <div className="dc-int__pie">
+                  {it.estado === "conectado"
+                    ? <span className="dc-int__ok"><CheckCircle2 size={14} strokeWidth={2} /> Funcionando</span>
+                    : <button type="button" className={it.estado === "pendiente" ? "is-warn" : ""} onClick={(e) => { e.stopPropagation(); setDetInt({ ...it, cat: c.cat }); }}><Plug size={13} strokeWidth={2} /> {it.estado === "pendiente" ? "Terminar conexión" : "Conectar"}</button>}
+                  <em>Ver detalle <ChevronRight size={13} strokeWidth={2.2} /></em>
+                </div>
+              </article>
+            ); })}
+          </div>
+        </section>
+      ); })}
       {its.length === 0 && <Card style={{ padding: 0 }}><Vacio icon={<Plug size={22} strokeWidth={1.75} />} titulo="Sin integraciones" sub="No hay conectores disponibles por ahora." /></Card>}
       {detInt && <Modal icon={<Plug size={20} strokeWidth={1.75} />} tone={detInt.estado === "conectado" ? "var(--dc-ok-700)" : NAVY} titulo={detInt.n} sub={detInt.cat} onClose={() => setDetInt(null)} maxW={480}
         footer={detInt.estado === "conectado" ? <Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          {detInt.rec && <span style={{ fontSize: 12, fontWeight: 500, background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", padding: "3px 9px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 4 }}><Star size={10} strokeWidth={1.75} /> RECOMENDADO</span>}
+          {detInt.rec && <span style={{ fontSize: 12, fontWeight: 500, background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", padding: "3px 9px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 4 }}><Star size={10} strokeWidth={1.75} /> Recomendado</span>}
           {detInt.estado === "conectado" ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={14} strokeWidth={1.75} /> Conectado</span> : <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={13} strokeWidth={1.75} /> Disponible</span>}
         </div>
         <div style={{ fontSize: 14, color: "var(--dc-ink-700)", lineHeight: 1.6, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "13px 15px" }}>{detInt.d}</div>
@@ -5486,7 +5500,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         {form && permOpen && (
           <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo={`Permisos de ${form.nombre || "usuario"}`} sub="Ajusta qué puede hacer esta persona en cada módulo. Sobrescribe los permisos de su rol." onClose={() => setPermOpen(false)} maxW={860}
             footer={<><Btn small kind="ghost" onClick={() => { setForm({ ...form, permisos: undefined }); setPermOpen(false); }}><Repeat size={14} strokeWidth={1.75} /> Restaurar rol</Btn><Btn small onClick={() => setPermOpen(false)}><Check size={15} strokeWidth={1.75} /> Listo</Btn></>}>
-            <MatrizPermisos perms={form.permisos || {}} onToggle={(mod, acc) => setForm((f) => ({ ...f, permisos: togglePermAccion(f.permisos || (rolePerms[f.rol] || ROL_PERMS[f.rol] || {}), mod, acc) }))} />
+            <PermisosGrupos perms={form.permisos || {}} onToggle={(mod, acc) => setForm((f) => ({ ...f, permisos: togglePermAccion(f.permisos || (rolePerms[f.rol] || ROL_PERMS[f.rol] || {}), mod, acc) }))} />
           </Modal>
         )}
 
@@ -5549,6 +5563,63 @@ function MatrizPermisos({ perms, onToggle, lockVer, solo }) {
   );
 }
 
+/* Permisos agrupados por área: interruptor "Ver" y acciones como etiquetas. */
+const GRUPOS_PERM = [
+  { id: "gestion", label: "Gestión y reportes", icon: BarChart3, c: "#6D4FD1", mods: ["gerencial", "reportes", "comisiones", "metas", "miproduccion"] },
+  { id: "atencion", label: "Atención y agenda", icon: CalendarCheck, c: "#0E9199", mods: ["dashboard", "whatsapp", "agenda", "disponibilidad", "espera", "tickets", "recall", "formularios", "resenas"] },
+  { id: "clinico", label: "Clínico", icon: Stethoscope, c: "#2F6FDE", mods: ["pacientes", "odontograma", "tratamientos", "recetas", "consentimientos", "perio", "radiografias", "laboratorio"] },
+  { id: "caja", label: "Caja y recursos", icon: Wallet, c: "#D97706", mods: ["facturacion", "seguros", "servicios", "inventario"] },
+  { id: "admin", label: "Administración", icon: Settings, c: "#E0694F", mods: ["plan", "integraciones", "config", "usuarios", "permisos", "auditoria"] },
+];
+function PermisosGrupos({ perms, onToggle, lockVer, onGrupo }) {
+  const [q, setQ] = useState("");
+  const [abiertos, setAbiertos] = useState(() => new Set(GRUPOS_PERM.map((g) => g.id)));
+  const otros = MODULOS.filter((m) => !GRUPOS_PERM.some((g) => g.mods.includes(m.id))).map((m) => m.id);
+  const grupos = otros.length ? [...GRUPOS_PERM, { id: "otros", label: "Otros", icon: Layers, c: "#28527A", mods: otros }] : GRUPOS_PERM;
+  const extra = ACCIONES.filter((a) => a.id !== "ver");
+  const txt = q.trim().toLowerCase();
+  return (
+    <div className="dc-pg2">
+      <label className="dc-cob__buscar dc-pg2__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar módulo" aria-label="Buscar módulo" /></label>
+      {grupos.map((g) => {
+        const mods = g.mods.map((id) => MODULOS.find((m) => m.id === id)).filter(Boolean).filter((m) => !txt || m.label.toLowerCase().includes(txt));
+        if (!mods.length) return null;
+        const vis = mods.filter((m) => (perms[m.id] || []).includes("ver")).length;
+        const abierto = abiertos.has(g.id) || !!txt;
+        const GI = g.icon;
+        return (
+          <section key={g.id} className="dc-pg2__grupo" style={{ "--c": g.c }}>
+            <header>
+              <button type="button" className="dc-pg2__plegar" aria-expanded={abierto} onClick={() => setAbiertos((s0) => { const n = new Set(s0); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })}>
+                <span className="dc-pg2__gico"><GI size={16} strokeWidth={2} /></span>
+                <b>{g.label}</b>
+                <small>{vis} de {mods.length} visibles</small>
+                <ChevronDown size={15} strokeWidth={2.2} className={abierto ? "is-abierto" : ""} />
+              </button>
+              {onGrupo && <div className="dc-pg2__gacc"><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "todo")}>Dar todo</button><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "ver")}>Solo ver</button><button type="button" onClick={() => onGrupo(mods.map((m) => m.id), "nada")}>Quitar</button></div>}
+            </header>
+            {abierto && (
+              <div className="dc-pg2__filas">
+                {mods.map((m) => { const acts = perms[m.id] || []; const ver = acts.includes("ver"); const locked = lockVer && lockVer(m.id); return (
+                  <div key={m.id} className={`dc-pg2__fila${ver ? " is-ver" : ""}`}>
+                    <button type="button" role="switch" aria-checked={ver} aria-label={`${ver ? "Ocultar" : "Mostrar"} ${m.label}`} className={`dc-mini-btn dc-pg2__sw${ver ? " is-on" : ""}${locked ? " is-lock" : ""}`} onClick={() => { if (!locked) onToggle(m.id, "ver"); }} title={locked ? "Obligatorio para este rol" : ver ? "Visible: toca para ocultar" : "Oculto: toca para mostrar"}><i>{locked && <Lock size={9} strokeWidth={2.6} />}</i></button>
+                    <div className="dc-pg2__mod"><b>{m.label}</b><small>{ver ? `${acts.length - 1} de ${extra.length} acciones` : "Oculto para este rol"}</small></div>
+                    <div className="dc-pg2__acts">
+                      {extra.map((a) => { const on = acts.includes(a.id); return (
+                        <button key={a.id} type="button" className={`dc-mini-btn dc-pg2__chip${on ? " is-on" : ""}`} aria-pressed={on} aria-label={`${on ? "Quitar" : "Dar"} ${a.label} en ${m.label}`} onClick={() => onToggle(m.id, a.id)}>{a.label}</button>
+                      ); })}
+                    </div>
+                  </div>
+                ); })}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
   const [rolSel, setRolSel] = useState("admin");
   const [desdeServidor, setDesdeServidor] = useState(false);
@@ -5573,6 +5644,11 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
     setRolePerms((p) => ({ ...p, [rolSel]: togglePermAccion(p[rolSel] || ROL_PERMS[rolSel] || {}, mod, acc) }));
   };
   const restaurar = () => { setRolePerms((p) => ({ ...p, [rolSel]: JSON.parse(JSON.stringify(ROL_PERMS[rolSel] || {})) })); notify(`Permisos de ${ROLES[rolSel].label} restaurados por defecto.`); };
+  const onGrupo = (mods, modo) => setRolePerms((p) => {
+    const cur = { ...(p[rolSel] || ROL_PERMS[rolSel] || {}) };
+    mods.forEach((m) => { cur[m] = modo === "todo" ? [...ACCION_IDS] : modo === "ver" || lockVer(m) ? ["ver"] : []; });
+    return { ...p, [rolSel]: cur };
+  });
   const guardar = () => {
     if (!auth.token) { notify("Permisos guardados en este navegador."); return; }
     setGuardando(true);
@@ -5620,8 +5696,7 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
             <div><b>{R.label}</b><p>{R.desc}</p></div>
             <div className="dc-perm__nums"><div><b>{nMods}</b><small>Visibles</small></div><div><b>{nAcc}</b><small>Permisos</small></div></div>
           </header>
-          <div className="dc-perm__ley"><span><i className="is-ver" /> Ver (muestra el módulo)</span><span><i className="is-on" /> Acción permitida</span><span><i className="is-lock" /> Obligatorio</span><span><i /> Sin permiso</span></div>
-          <MatrizPermisos perms={perms} onToggle={onToggle} lockVer={lockVer} />
+          <PermisosGrupos perms={perms} onToggle={onToggle} lockVer={lockVer} onGrupo={onGrupo} />
         </section>
       </div>
     </div>
@@ -5775,6 +5850,58 @@ function Plataforma({ notify }) {
 }
 
 /* ---- Auditoría y accesos (módulo del perfil TI) ---- */
+/* Registro de auditoría como línea de tiempo agrupada por día. */
+function AuditoriaVista({ rows, hoyN, usuarios, alertas, sub, onDet, niv }) {
+  const [filtro, setFiltro] = useState("todos");
+  const [q, setQ] = useState("");
+  const tipoDe = (a) => { const t = String(a.accion || "").toLowerCase(); return a.nivel === "warn" ? "alerta" : t.includes("sesión") || t.includes("sesion") ? "sesion" : t.includes("historia") || t.includes("odontograma") || t.includes("paciente") ? "clinico" : "cambio"; };
+  const TIPOS = { sesion: [LogOut, "#2F6FDE", "Sesiones"], clinico: [Stethoscope, "#0E9199", "Clínico"], cambio: [Settings, "#6D4FD1", "Cambios"], alerta: [AlertTriangle, "#E0694F", "Alertas"] };
+  const txt = q.trim().toLowerCase();
+  const lista = rows.filter((a) => (filtro === "todos" || tipoDe(a) === filtro) && (!txt || `${a.usuario} ${a.accion} ${a.detalle} ${a.ip}`.toLowerCase().includes(txt)));
+  const grupos = [];
+  lista.forEach((a) => { const f = String(a.fecha || "—"); const k = f.lastIndexOf(" "); const dia = k > 0 ? f.slice(0, k).replace(/,$/, "") : f; const hora = k > 0 ? f.slice(k + 1) : ""; const g = grupos.find((x) => x.dia === dia); const it = { ...a, _hora: hora }; if (g) g.items.push(it); else grupos.push({ dia, items: [it] }); });
+  return (
+    <>
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{rows.length}</b><span>eventos registrados</span></div>
+          <p>{sub}</p>
+        </div>
+        <div className="dc-esp-hero__cifras">
+          <div><b>{hoyN}</b><span>Hoy</span></div>
+          <div><b>{usuarios}</b><span>Usuarios con actividad</span></div>
+          <div><b>{alertas}</b><span>Alertas</span></div>
+        </div>
+        <span />
+      </section>
+      <div className="dc-us__barra">
+        <label className="dc-cob__buscar dc-us__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar usuario, acción o IP" aria-label="Buscar en auditoría" /></label>
+        <div className="dc-us__roles" role="tablist" aria-label="Tipo de evento">
+          <button type="button" role="tab" aria-selected={filtro === "todos"} className={filtro === "todos" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setFiltro("todos")}>Todos <i>{rows.length}</i></button>
+          {Object.entries(TIPOS).map(([k, [TI, c, l]]) => { const n = rows.filter((a) => tipoDe(a) === k).length; return n ? <button key={k} type="button" role="tab" aria-selected={filtro === k} className={filtro === k ? "is-on" : ""} style={{ "--c": c }} onClick={() => setFiltro(k)}><TI size={13} strokeWidth={2} /> {l} <i>{n}</i></button> : null; })}
+        </div>
+      </div>
+      {grupos.length === 0 ? <Card><Vacio icon={<ShieldCheck size={22} strokeWidth={1.75} />} titulo="Sin eventos" sub="No hay registros que coincidan." /></Card> : grupos.map((g) => (
+        <section key={g.dia} className="dc-aud__dia">
+          <div className="dc-aud__dtit"><b>{g.dia}</b><span>{g.items.length} {g.items.length === 1 ? "evento" : "eventos"}</span></div>
+          <div className="dc-aud__lista">
+            {g.items.map((a) => { const [TI, c] = TIPOS[tipoDe(a)]; const R = ROLES[a.rol]; return (
+              <button key={a.id} type="button" className={`dc-aud__ev${a.nivel === "warn" ? " is-warn" : ""}`} style={{ "--c": c }} onClick={() => onDet(a)}>
+                <span className="dc-aud__hora">{a._hora}</span>
+                <span className="dc-aud__ico"><TI size={15} strokeWidth={2} /></span>
+                <div className="dc-aud__txt"><b>{a.accion}</b><span>{a.detalle}</span></div>
+                <div className="dc-aud__quien"><b>{a.usuario}</b><span style={{ color: R?.color }}>{R?.label || a.rol}</span></div>
+                <code>{a.ip}</code>
+                {a.nivel === "warn" ? <span className="dc-int__est is-warn"><i />Alerta</span> : <span className="dc-int__est is-ok"><i />{niv.ok.l}</span>}
+              </button>
+            ); })}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
 function Auditoria() {
   // NEW-50/57/58: datos reales de GET /auditoria. KPI Hoy por fecha Lima YYYY-MM-DD. Sin filas inventadas.
   const conectado = !!auth.token;
@@ -5828,15 +5955,8 @@ function Auditoria() {
       { key: "nivel", label: "Estado", w: "minmax(100px,0.7fr)", a: "center", get: (a) => niv[a.nivel].l, cell: (a) => { const N = niv[a.nivel]; return <span style={{ fontSize: 12, fontWeight: 500, color: N.fg, background: N.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}>{a.nivel === "warn" ? <AlertTriangle size={11} strokeWidth={1.75} /> : <CheckCircle2 size={11} strokeWidth={1.75} />} {N.l}</span>; } },
     ];
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16, overflowX: "auto", maxWidth: "100%", width: "100%" }}>
-        <ModHead icon={<ShieldCheck size={20} strokeWidth={1.75} />} color={DS.c.primary} titulo="Auditoría y accesos" sub="Modo demostración (sin sesión)." />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-          <KpiCard label="Eventos registrados" value={AUDITORIA.length} color={NAVY} icon={<ShieldCheck size={18} strokeWidth={1.75} />} sub="en el periodo" />
-          <KpiCard label="Alertas" value={alertas} color={alertas ? "var(--dc-red)" : "var(--dc-ok-700)"} icon={<AlertTriangle size={18} strokeWidth={1.75} />} sub="intentos / bajas" />
-          <KpiCard label="Usuarios" value={usuarios} color={TEAL} icon={<Users size={18} strokeWidth={1.75} />} sub="con actividad" />
-          <KpiCard label="Hoy" value={hoyN} color={DS.c.primary} icon={<Calendar size={18} strokeWidth={1.75} />} sub="eventos del día" />
-        </div>
-        <DataTable titulo="Registro de accesos" sub="eventos" minWidth={900} rows={AUDITORIA.map((a, i) => ({ ...a, id: i, orden: AUDITORIA.length - i }))} onRowClick={(a) => setDet(a)} defaultSort={{ key: "fecha", dir: "desc" }} cols={colsDemo} empty={<Vacio icon={<ShieldCheck size={22} strokeWidth={1.75} />} titulo="Sin eventos" sub="No hay registros de auditoría en el periodo." />} />
+      <div style={{ display: "grid", gap: 14 }}>
+        <AuditoriaVista rows={AUDITORIA.map((a, i) => ({ ...a, id: i }))} hoyN={hoyN} usuarios={usuarios} alertas={alertas} sub="Datos de ejemplo, sin sesión" onDet={setDet} niv={niv} />
         {det && (() => { const R = ROLES[det.rol]; const N = niv[det.nivel]; return (
           <Modal icon={<ShieldCheck size={20} strokeWidth={1.75} />} tone={det.nivel === "warn" ? "var(--dc-warn-600)" : DS.c.primary} titulo={det.accion} sub={`${det.fecha} – ${det.usuario}`} onClose={() => setDet(null)} maxW={480} footer={<Btn small kind="ghost" onClick={() => setDet(null)}>Cerrar</Btn>}>
             <div style={{ display: "grid", gap: 10 }}>
@@ -5868,15 +5988,9 @@ function Auditoria() {
     { key: "nivel", label: "Estado", w: "minmax(100px,0.7fr)", a: "center", get: (a) => niv[a.nivel].l, cell: (a) => { const N = niv[a.nivel]; return <span style={{ fontSize: 12, fontWeight: 500, color: N.fg, background: N.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={11} strokeWidth={1.75} /> {N.l}</span>; } },
   ];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16, overflowX: "auto", maxWidth: "100%", width: "100%" }}>
-      <ModHead icon={<ShieldCheck size={20} strokeWidth={1.75} />} color={DS.c.primary} titulo="Auditoría y accesos" sub="Inicios de sesión y aperturas de historia clínica (Ley 29733)." />
-      {err && <Card style={{ padding: 14, color: "var(--dc-danger-700)", fontSize: 13 }}>{err}</Card>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-        <KpiCard label="Eventos registrados" value={rows.length} color={NAVY} icon={<ShieldCheck size={18} strokeWidth={1.75} />} sub="últimos 500" />
-        <KpiCard label="Usuarios" value={usuarios} color={TEAL} icon={<Users size={18} strokeWidth={1.75} />} sub="con actividad" />
-        <KpiCard label="Hoy" value={hoyN} color={DS.c.primary} icon={<Calendar size={18} strokeWidth={1.75} />} sub="eventos del día" />
-      </div>
-      <DataTable titulo="Registro de accesos" sub="eventos" minWidth={900} rows={rows} onRowClick={(a) => setDet(a)} defaultSort={{ key: "fecha", dir: "desc" }} cols={cols} empty={<Vacio icon={<ShieldCheck size={22} strokeWidth={1.75} />} titulo="Sin eventos" sub="Aún no hay inicios de sesión ni aperturas de HC registradas." />} />
+    <div style={{ display: "grid", gap: 14 }}>
+      {err && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span>{err}</span></div>}
+      <AuditoriaVista rows={rows} hoyN={hoyN} usuarios={usuarios} alertas={rows.filter((r) => r.nivel === "warn").length} sub="Inicios de sesión y aperturas de historia clínica (Ley 29733)" onDet={setDet} niv={niv} />
       {det && (() => { const R = ROLES[det.rol]; const N = niv[det.nivel]; return (
         <Modal icon={<ShieldCheck size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={det.accion} sub={`${det.fecha} – ${det.usuario}`} onClose={() => setDet(null)} maxW={480} footer={<Btn small kind="ghost" onClick={() => setDet(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gap: 10 }}>
@@ -6957,70 +7071,55 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
         </div>
       )}
 
-      <div className="dc-plan__grid">
-        <section className="dc-plan__panel">
-          <div className="dc-plan__tit"><h3>Tu cuenta hoy</h3><span>Se factura por sede y por odontólogo; el equipo de apoyo y los pacientes son ilimitados</span></div>
-          <div className="dc-plan__cuenta">
-            {cuenta.map((x, k) => (
-              <div key={x.l} style={{ "--c": ["#0E9199", "#6D4FD1", "#2F6FDE", "#16A36A"][k] }}>
-                <span className="dc-plan__cico">{x.ic}</span>
-                <div><small>{x.l}</small><b>{x.v}</b><span>{x.sub}</span></div>
-              </div>
-            ))}
+      <section className="dc-plan__fila">
+        {uso.map((x, k) => { const pct = Math.round((x.u / x.lim) * 100); const col = pct >= 80 ? "#D97706" : ["#0E9199", "#16A36A", "#6D4FD1"][k % 3]; return (
+          <div key={x.l} className="dc-plan__med" style={{ "--c": col }}>
+            <div><b>{x.l}</b><span>{x.u.toLocaleString("es-PE")}<small>/{x.lim.toLocaleString("es-PE")}</small></span></div>
+            <span className="dc-plan__barra"><i style={{ width: `${pct}%` }} /></span>
           </div>
-        </section>
-        <section className="dc-plan__panel">
-          <div className="dc-plan__tit"><h3>Consumo del mes</h3><span>Bolsas incluidas en tu plan</span></div>
-          {uso.length === 0 ? <p className="dc-seg__nada">El consumo real todavía no se mide desde el servidor.</p> : (
-            <div className="dc-plan__uso">
-              {uso.map((x, k) => { const pct = Math.round((x.u / x.lim) * 100); const col = pct >= 80 ? "#D97706" : ["#0E9199", "#16A36A", "#6D4FD1"][k % 3]; return (
-                <div key={x.l} style={{ "--c": col }}>
-                  <span className="dc-plan__anillo" style={{ "--p": pct }}><b>{pct}%</b></span>
-                  <div><b>{x.l}</b><span>{x.u.toLocaleString("es-PE")} de {x.lim.toLocaleString("es-PE")}</span></div>
-                </div>
-              ); })}
-              <p>Al superar las bolsas, el consumo extra se factura al cierre del mes.</p>
-            </div>
-          )}
-        </section>
-      </div>
+        ); })}
+        <div className="dc-plan__nota">
+          <Info size={14} strokeWidth={2} />
+          <span>Se factura por sede y por odontólogo. {sedesExtra > 0 && actual.sedeExtra ? `Tienes ${sedesExtra} sede adicional (S/ ${actual.sedeExtra}/mes). ` : ""}{odExtra > 0 ? `${odExtra} odontólogo adicional (S/ ${actual.odontologoExtra} c/u). ` : ""}Equipo de apoyo y pacientes ilimitados.</span>
+        </div>
+      </section>
 
       <section>
-        <div className="dc-plan__tit"><h3>Elige tu plan</h3><span>Cada plan incluye todo lo del anterior; el menú se actualiza al instante</span></div>
+        <div className="dc-plan__tit"><h3>Planes</h3><span>Cada plan incluye todo lo del anterior</span></div>
         <div className="dc-plan__planes">
           {PLANES.map((p, k) => { const esActual = p.id === actual.id; const sube = p.precio > actual.precio; return (
             <article key={p.id} className={`dc-plan__card${esActual ? " is-actual" : ""}`} style={{ "--c": TONO_PLAN[k % TONO_PLAN.length] }}>
-              <header>
-                <div><b>{p.nombre}</b>{esActual ? <span className="dc-plan__cinta">Tu plan</span> : p.destacado ? <span className="dc-plan__cinta is-dest">Más elegido</span> : null}</div>
+              <div className="dc-plan__c1">
+                <div><b>{p.nombre}</b><small>{p.tagline} – {totalMods(p.id)} módulos</small></div>
                 <div className="dc-plan__precio"><b>S/ {p.precio}</b><span>/mes</span></div>
-                <small>{p.tagline}</small>
-              </header>
-              <div className="dc-plan__mods"><Zap size={12} strokeWidth={2.2} /> {totalMods(p.id)} módulos</div>
-              <ul>{p.incluye.slice(0, 5).map((f, i) => <li key={i}><Check size={13} strokeWidth={2.6} /> {f}</li>)}</ul>
+              </div>
+              <ul>{p.incluye.slice(0, 3).map((f, i) => <li key={i}><Check size={13} strokeWidth={2.6} /> {f}</li>)}</ul>
               {esActual
-                ? <button type="button" className="dc-plan__cta is-actual" disabled><CheckCircle2 size={14} strokeWidth={2.2} /> Plan actual</button>
-                : <button type="button" className={`dc-plan__cta${sube ? " is-sube" : ""}`} onClick={() => setConfirmP(p)}>{sube ? "Subir a este plan" : "Cambiar a este plan"}</button>}
+                ? <span className="dc-plan__cta is-actual"><CheckCircle2 size={14} strokeWidth={2.2} /> Tu plan actual</span>
+                : <button type="button" className={`dc-plan__cta${sube ? " is-sube" : ""}`} onClick={() => setConfirmP(p)}>{sube ? "Mejorar a " : "Cambiar a "}{p.nombre}</button>}
             </article>
           ); })}
         </div>
       </section>
 
-      <section className="dc-plan__panel">
-        <div className="dc-plan__tit"><h3>Historial de facturación</h3><span>{facturas.length} {facturas.length === 1 ? "pago" : "pagos"}</span></div>
-        {facturas.length === 0 ? <p className="dc-seg__nada">{conectado ? "El historial de cobros de tu membresía todavía no está conectado." : "Aún no hay cobros de tu membresía."}</p> : (
+      {facturas.length > 0 ? (
+        <details className="dc-plan__hist">
+          <summary>
+            <span className="dc-plan__fico"><Receipt size={15} strokeWidth={2} /></span>
+            <div><b>Última mensualidad pagada</b><span>{fechaLegible(facturas[0].fecha)} – S/ {actual.precio}</span></div>
+            <em>Ver historial ({facturas.length}) <ChevronDown size={14} strokeWidth={2.2} /></em>
+          </summary>
           <div className="dc-plan__facts">
             {facturas.map((f, i) => (
               <div key={i}>
-                <span className="dc-plan__fico"><Receipt size={15} strokeWidth={2} /></span>
-                <div><b>Plan {actual.nombre}, mensualidad</b><span>{fechaLegible(f.fecha)}</span></div>
-                <span className="dc-pill is-ok">Pagado</span>
+                <div><b>Plan {actual.nombre}</b><span>{fechaLegible(f.fecha)}</span></div>
                 <em>S/ {actual.precio}</em>
                 <button type="button" onClick={() => notify("Descargando comprobante...")}><Download size={13} strokeWidth={2.2} /> Comprobante</button>
               </div>
             ))}
           </div>
-        )}
-      </section>
+        </details>
+      ) : <p className="dc-seg__nada">{conectado ? "El historial de cobros de tu membresía todavía no está conectado." : "Aún no hay cobros de tu membresía."}</p>}
       {confirmP && (() => { const sube = confirmP.precio > actual.precio; const gana = PLAN_MODULOS[confirmP.id].filter((m) => !PLAN_MODULOS[actual.id].includes(m)); const pierde = PLAN_MODULOS[actual.id].filter((m) => !PLAN_MODULOS[confirmP.id].includes(m)); return (
         <Modal icon={<CreditCard size={20} strokeWidth={1.75} />} tone={sube ? "var(--dc-ok)" : NAVY} titulo={`Cambiar a plan ${confirmP.nombre}`} sub={`S/ ${confirmP.precio}/mes – ${confirmP.tagline}`} onClose={() => setConfirmP(null)}
           footer={<><Btn small kind="ghost" onClick={() => setConfirmP(null)}>Cancelar</Btn><Btn small kind={sube ? "navy" : "red"} onClick={() => { cambiarPlan(confirmP); setConfirmP(null); }}><Check size={15} strokeWidth={1.75} /> Confirmar cambio</Btn></>}>
