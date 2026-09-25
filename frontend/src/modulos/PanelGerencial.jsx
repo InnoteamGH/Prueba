@@ -782,7 +782,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     api.gerencialIndicadores().then(setInd).catch(() => setInd({ errorDeCarga: true }));
     api.gerencialReportes().then(setRep).catch(() => setRep({ errorDeCarga: true }));
     api.pagos.listar().then((r) => setPagos(r || [])).catch(() => setPagos([]));
-    api.citas.listar(fecha).then((r) => setCitasHoy(r || [])).catch(() => setCitasHoy(citasProp || []));
+    api.citas.listar(fecha).then((r) => setCitasHoy(r || [])).catch(() => setCitasHoy([]));
     api.actividad(fecha).then((r) => setActividad(r || [])).catch(() => setActividad([]));
     const d = new Date();
     const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;

@@ -1,21 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
-  Baby, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard,
-  FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck,
-  Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp,
-  TrendingDown, LogOut, Eye, EyeOff, Shield, Briefcase, UserCog, Plug, Star, AlertTriangle,
-  BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings,
-  Phone, Server, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe,
-  Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera,
-  Upload, Crown, Navigation, ChevronDown, ChevronUp, ArrowLeft, Filter, Download, ExternalLink,
-  Copy, RefreshCw, MoreHorizontal, Layers, Grid3X3, List, SlidersHorizontal, CircleDot, Hash,
-  Link2, Unlink, QrCode, Wifi, WifiOff, Database, HardDrive, Cpu, MemoryStick, Timer, Hourglass,
-  CalendarClock, CalendarPlus, CalendarX2, UserMinus, UserX, Ban, CircleAlert, CircleCheck,
-  CircleX, Info, HelpCircle, MessageCircle, MessagesSquare, Mic, MicOff, Volume2, VolumeX, Image,
-  Images, FileImage, FilePlus, FileMinus, FileCheck, FileX, Folder, FolderOpen, FolderPlus,
-  Archive, Inbox, SendHorizonal, Reply, Forward, Bookmark, Flag, Pin, PinOff, ThumbsUp, ThumbsDown,
-  Heart, HeartOff, Share2, Printer, Syringe, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown,
-  Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag
+  Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag,
 } from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
@@ -57,7 +42,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {EnCabecera, MenuAcciones, DIAS_SEM, EDAD_PEDIATRICA, EDAD_TRANSICION, EmblemaNino, HORAS_SEL, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, etapaFicha, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, acentoFicha, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, WARM, addDays, calcEdad, colorDe, cortaSede, espsDe, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, minutosViaje, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
+import {EnCabecera, MenuAcciones, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -354,40 +339,13 @@ function AreaChart({ data, color = DS.c.primary, labels, formato }) {
     </div>
   );
 }
-function Donut({ segments, label = "citas/mes", center }) {
-  const total = segments.reduce((a, s) => a + s.v, 0);
-  let acc = 0; const R = 52, C = 2 * Math.PI * R;
-  const centro = center != null ? center : total;
-  return (
-    <svg viewBox="0 0 140 140" style={{ width: 140, height: 140 }}>
-      {segments.map((s, i) => { const frac = s.v / total; const dash = frac * C; const off = acc * C; acc += frac;
-        return <circle key={i} cx="70" cy="70" r={R} fill="none" stroke={s.c} strokeWidth="18" strokeDasharray={`${dash} ${C - dash}`} strokeDashoffset={-off} transform="rotate(-90 70 70)" />; })}
-      <text x="70" y="66" textAnchor="middle" fontSize={String(centro).length > 5 ? "16" : "22"} fontWeight="800" fill={NAVY}>{centro}</text>
-      <text x="70" y="84" textAnchor="middle" fontSize="10" fill="var(--dc-ink-500)">{label}</text>
-    </svg>
-  );
-}
 // Placeholder de un dato que aún no está. Si la petición falló no dice "Cargando…":
 // ese dato ya no va a llegar y quien mira se queda esperando.
 /**
  * Para un widget cuyo dato todavía NO tiene backend. Con sesión abierta enseñar el
  * ejemplo sería enseñar cifras falsas como propias de la clínica: se dice qué falta.
  */
-function SinConectar({ que }) {
-  return (
-    <div style={{ height: "100%", display: "grid", placeItems: "center", textAlign: "center", padding: "0 18px" }}>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-400)", marginBottom: 4 }}>Endpoint en desarrollo</div>
-        <div style={{ fontSize: 12, color: "var(--dc-ink-400)", lineHeight: 1.5 }}>{que}</div>
-      </div>
-    </div>
-  );
-}
 
-function SinDato({ dato, texto = "Cargando…" }) {
-  const fallo = dato && dato.errorDeCarga;
-  return <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", fontSize: 13, textAlign: "center", padding: "0 14px" }}>{fallo ? "No se pudo cargar del servidor." : texto}</div>;
-}
 
 function Gerencial({ citas, sede }) {
   return <PanelGerencial citas={citas} sede={sede} />;
@@ -406,16 +364,12 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const conectado = !!auth.token;
   const mapCD = (c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || null, especialidad: c.especialidad || null, esp: c.especialidadId, sede: c.sedeId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), motivo: c.motivo, estado: c.estado, llegada: !!c.llegada, valor: c.valor });
   const [remC, setRemC] = useState(null);
-  // Cierre de caja real del día, para que el widget "Caja del día" deje de ser cuatro
-  // cifras fijas que contradecían al KPI "Ingresos del día" de esta misma pantalla.
-  const [cierreCaja, setCierreCaja] = useState(null);
   const [cajaDeuda, setCajaDeuda] = useState(null);
   // NEW-29/30: cobros reales (misma base que Caja), filtrados por sede activa.
   const [pagosHist, setPagosHist] = useState(null);
   const [usrTiDash, setUsrTiDash] = useState(null);
   useEffect(() => {
     if (conectado && esAdmin) {
-      api.pagos.cierre().then(setCierreCaja).catch(() => {});
       api.caja().then(setCajaDeuda).catch(() => setCajaDeuda({ porCobrar: [] }));
     }
     if (conectado && (esAdmin || esAdmSede || esRec || esGer)) {
@@ -441,13 +395,6 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
       clearInterval(id);
     };
   }, []);
-  // Produccion real del medico en sesion: el widget "Mi meta del mes" mostraba
-  // 9200 fijos contra una meta de 12000 escrita a mano, asi que ni la produccion
-  // ni la meta eran suyas. Es el mismo endpoint que usa la pantalla Mi produccion.
-  const [miProd, setMiProd] = useState(null);
-  useEffect(() => {
-    if (conectado && esMed) api.miProduccion().then(setMiProd).catch(() => setMiProd({ errorDeCarga: true }));
-  }, []); // eslint-disable-line
   const [pendEvo, setPendEvo] = useState(null);   // {pendientes, soloMias, items}
   // Sin argumentos el backend devuelve SOLO las de hoy, así que "Citas – últimos 7 días"
   // salía con seis días en cero y recepción nunca veía la tarea de confirmar las de
@@ -617,16 +564,6 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const libres = porHoraQuedan.filter((x) => x.n === 0).length;    // franjas sin cita que aún quedan
   const cuposLibres = Math.max(0, porHoraQuedan.length * capHora - ch.filter((c) => parseInt(c.hora, 10) >= horaAhora).length);
   const colHora = (x) => x.n === 0 ? "var(--dc-line)" : x.pct >= 100 ? "var(--dc-red)" : x.pct >= 60 ? "var(--dc-warn-600)" : DS.c.primary;
-  // Gerencia mira el negocio entero: conversion de presupuestos, deuda y cartera.
-  // Administrador de sede mira su operacion: ocupacion y ausentismo de SU sede
-  // (el backend ya recorta /gerencial/reportes a las sedes del usuario).
-  const [indGer, setIndGer] = useState(null);
-  const [repSede, setRepSede] = useState(null);
-  useEffect(() => {
-    if (!conectado) return;
-    if (esGer) api.gerencialIndicadores().then(setIndGer).catch(() => {});
-    if (esAdmSede) api.gerencialReportes().then(setRepSede).catch(() => {});
-  }, [conectado]); // eslint-disable-line
   const num = (v) => Number(v || 0).toLocaleString();
   const bloque = (valor, color, pie) => (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
@@ -778,297 +715,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
 
 
 /* ---- Agenda con acciones de flujo ---- */
-/* Resumen de estados del odontograma para la ficha. */
-const DIENTE_INFO = {
-  caries: { l: "Caries", c: "var(--dc-red)" }, obturado: { l: "Obturado", c: DS.c.primary }, corona: { l: "Corona", c: "var(--dc-warn-700)" }, sellante: { l: "Sellante", c: "var(--dc-ok-700)" },
-  ausente: { l: "Ausente", c: "var(--dc-ink-500)" }, endodoncia: { l: "Endodoncia", c: "var(--dc-purple)" }, implante: { l: "Implante", c: "var(--dc-blue)" }, extraer: { l: "Por extraer", c: "var(--dc-red)" }, fractura: { l: "Fractura", c: "var(--dc-warn-600)" } };
 const ATENCION = ["caries", "extraer", "fractura"];
-
-/* Ficha del paciente con DATOS REALES del backend (endpoint ficha360). */
-function FichaReal({ data, onClose, notify = () => {} }) {
-  const p = data?.paciente || {};
-  const r = data?.resumen || {};
-  const money = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const edad = calcEdad(p.fechaNacimiento);
-  const arr = (x) => Array.isArray(x) ? x : [];
-  const secTit = { fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, margin: "0 0 8px", display: "flex", alignItems: "center", gap: 7 };
-  const box = { border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 14px", background: "#fff" };
-  const kpi = (l, v, c) => <div style={{ ...box, flex: "1 1 130px" }}><div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".04em" }}>{l}</div><div style={{ fontSize: 18, fontWeight: 600, color: c || NAVY, fontFamily: DISPLAY_FONT, marginTop: 3 }}>{v}</div></div>;
-  const Sec = ({ icon, titulo, children, vacio }) => (
-    <div style={{ marginTop: 16 }}>
-      <div style={secTit}>{icon} {titulo}</div>
-      {children ?? <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{vacio}</div>}
-    </div>
-  );
-  const filaL = { display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--dc-bg-alt)", fontSize: 13 };
-  const citas = arr(data?.citas), trat = arr(data?.tratamientos), pagos = arr(data?.pagos), odo = arr(data?.odontograma),
-        rec = arr(data?.recetas), lab = arr(data?.laboratorio), hist = arr(data?.historia), resenas = arr(data?.resenas);
-  const EST_TRAT = { pendiente: "var(--dc-ink-200)", en_progreso: "var(--dc-warn)", completada: "var(--dc-ok-700)" };
-  const [tab, setTab] = useState("resumen");
-  const TABS = [{id:"resumen",label:"Resumen"},{id:"clinico",label:"Historia clínica"},{id:"pagos",label:"Finanzas"}];
-  return (
-    <Modal icon={<User size={20} strokeWidth={1.75} />} titulo={p.nombre || "Ficha del paciente"}
-      sub={[p.dni ? `DNI ${p.dni}` : null, p.telefono, (p.fechaNacimiento && edad != null) ? `${edad} años` : null, p.distrito, p.aseguradora && p.aseguradora !== "Ninguno" ? p.aseguradora : null].filter(Boolean).join(" – ")}
-      onClose={onClose} maxW={720}>
-      {/* Bug D19 re-test: Alergias siempre visibles en header */}
-      {(arr(p.alergias).length > 0 || arr(p.antecedentes).length > 0) && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, padding: "0 0 12px", borderBottom: "1px solid var(--dc-line)" }}>
-          {arr(p.alergias).map((a) => <span key={"al" + a} style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-fee2)", padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}>⚠ Alergia: {a}</span>)}
-          {arr(p.antecedentes).map((a) => <span key={"an" + a} style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}>{a}</span>)}
-        </div>
-      )}
-      {/* Bug D20 re-test: Botones de acción rápida en header */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <Btn small onClick={() => notify("Función 'Agendar cita' próximamente")}><Calendar size={14} strokeWidth={1.75} /> Agendar cita</Btn>
-        <Btn small onClick={() => notify("Función 'Registrar cobro' próximamente")}><CreditCard size={14} strokeWidth={1.75} /> Registrar cobro</Btn>
-      </div>
-      {/* KPIs */}
-      {/* Bug D21 re-test: Navegación responsive en móvil */}
-      <div style={{ display: "flex", gap: 24, margin: "0 -24px 16px", padding: "0 24px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-bg)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "14px 0", border: "none", background: "none", borderBottom: `2px solid ${tab === t.id ? DS.c.primary : "transparent"}`, color: tab === t.id ? NAVY : "var(--dc-ink-500)", fontWeight: tab === t.id ? 800 : 600, fontSize: 13, cursor: "pointer", transition: "background-color 150ms ease, color 150ms ease", whiteSpace: "nowrap", flexShrink: 0 }}>{t.label}</button>
-        ))}
-      </div>
-      
-      {tab === "resumen" && (
-        <>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {kpi("Saldo", money(r.saldo), (Number(r.saldo) || 0) > 0.5 ? "var(--dc-warn-600)" : "var(--dc-ok-700)")}
-            {kpi("Invertido", money(r.invertido))}
-            {/* Bug #16 re-test: Usar trat.length directamente, no confiar en r.tratamientos que puede ser 0 */}
-            {kpi("Tratamientos", trat.length)}
-            {kpi("Piezas por atender", r.piezasPorAtender ?? "—", "var(--dc-danger)")}
-          </div>
-          {p.comentario && <div style={{ ...box, marginTop: 12, fontSize: 13, color: "var(--dc-ink-700)", background: "var(--dc-bg-soft2)" }}>{p.comentario}</div>}
-          
-          <Sec icon={<Calendar size={15} strokeWidth={1.75} color={DS.c.primary} />} titulo={`Histórico de citas (${citas.length})`} vacio="Sin citas registradas.">
-            {citas.length > 0 && <div style={box}>
-              <div style={{ ...filaL, fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".04em", borderBottom: "1px solid var(--dc-line)" }}>
-                <span style={{ width: 140 }}>Fecha / hora</span><span style={{ flex: 1 }}>Especialidad – Médico</span><span style={{ width: 72, textAlign: "center" }}>Sillón</span><span style={{ width: 100, textAlign: "right" }}>Estado</span>
-              </div>
-              {citas.slice(0, 20).map((c, i) => (
-              <div key={i} style={filaL}>
-                <span style={{ color: NAVY, fontWeight: 500, width: 140 }}>{c.fecha || "—"}{c.hora ? " – " + c.hora : ""}</span>
-                <span style={{ color: "var(--dc-ink-400)", flex: 1 }}>{c.especialidad} – {c.medico}</span>
-                <span style={{ width: 72, textAlign: "center", fontWeight: 500, color: c.sillon ? NAVY : "var(--dc-ink-400)" }}>{c.sillon ? `S${c.sillon}` : "—"}</span>
-                <span style={{ width: 100, textAlign: "right", fontWeight: 500, color: "var(--dc-ink-700)" }}>{(ESTADO_BADGE[c.estado] || {}).l || c.estado}</span>
-              </div>
-            ))}
-            </div>}
-          </Sec>
-        </>
-      )}
-
-      {tab === "clinico" && (
-        <>
-          <Sec icon={<Smile size={15} strokeWidth={1.75} color={DS.c.primary} />} titulo={`Odontograma (${odo.length})`} vacio="Sin hallazgos.">
-            {odo.length > 0 && (
-              <div style={{ display: "grid", gap: 12 }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", padding: "12px 8px", background: "var(--dc-bg-soft2)", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-line)" }}>
-                  {odo.map((o, i) => {
-                    const info = DIENTE_INFO[o.estado] || { l: o.estado || "Marcada", c: "var(--dc-danger-700)" };
-                    return (
-                      <div key={i} title={o.nota || info.l} style={{ width: 44, textAlign: "center" }}>
-                        <div style={{ width: 36, height: 42, margin: "0 auto 4px", borderRadius: "6px 6px 10px 10px", border: `2px solid ${info.c}`, background: tint(info.c, 0.133), display: "grid", placeItems: "center", fontSize: 12, fontWeight: 500, color: info.c }}>{o.pieza}</div>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: info.c, lineHeight: 1.2 }}>{info.l}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>Numeración FDI – R.M. 559-2022-MINSA. Abre la ficha completa en Pacientes para editar el odontograma gráfico.</div>
-              </div>
-            )}
-          </Sec>
-            
-            <Sec icon={<FlaskConical size={15} strokeWidth={1.75} color={DS.c.primary} />} titulo={`Laboratorio (${lab.length})`} vacio="Sin envíos.">
-              {/* Bug D24 re-test: Verificado que muestra trabajo, proveedor (lab) y estado */}
-              {lab.length > 0 && <div style={box}>{lab.map((l, i) => (
-                <div key={i} style={filaL}><span style={{ color: NAVY, fontWeight: 500 }}>{l.trabajo}</span><span style={{ color: "var(--dc-ink-400)" }}>{l.lab}</span><span style={{ fontWeight: 500, color: "var(--dc-warn-600)" }}>{l.estado}</span></div>
-              ))}</div>}
-            </Sec>
-
-          <Sec icon={<ClipboardList size={15} strokeWidth={1.75} color={DS.c.primary} />} titulo={`Plan de tratamiento (${trat.length})`} vacio="Sin plan de tratamiento.">
-            {trat.length > 0 && <div style={box}>{trat.map((t, i) => (
-              <div key={i} style={filaL}><span style={{ color: NAVY, fontWeight: 500 }}>{t.nombre}{t.pieza ? ` – pieza ${t.pieza}` : ""}</span><span style={{ color: EST_TRAT[t.estado] || "var(--dc-ink-400)", fontWeight: 500 }}>{t.estado}</span><span style={{ fontWeight: 500 }}>{money(t.costo)}</span></div>
-            ))}</div>}
-          </Sec>
-          
-          <Sec icon={<FileText size={15} strokeWidth={1.75} color={DS.c.primary} />} titulo={`Recetas (${rec.length})`} vacio="Sin recetas.">
-            {rec.length > 0 && <div style={box}>{rec.slice(0, 8).map((x, i) => (
-              <div key={i} style={filaL}><span style={{ color: NAVY, fontWeight: 500 }}>{x.fecha || "—"}</span><span style={{ color: "var(--dc-ink-400)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.indicaciones || "—"}</span><span style={{ color: "var(--dc-ink-400)" }}>{x.medico}</span></div>
-            ))}</div>}
-          </Sec>
-        </>
-      )}
-
-      {tab === "pagos" && (
-        <Sec icon={<CreditCard size={15} strokeWidth={1.75} color={DS.c.primary} />} titulo={`Historial de Pagos (${pagos.length})`} vacio="Sin pagos registrados.">
-          {pagos.length > 0 && <div style={box}>{pagos.map((pg, i) => (
-            <div key={i} style={filaL}><span style={{ color: NAVY, fontWeight: 500 }}>{pg.fecha || "—"}</span><span style={{ color: "var(--dc-ink-400)", flex: 1, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pg.concepto || "—"}</span><span style={{ fontWeight: 500, color: "var(--dc-ok-700)" }}>{money(pg.monto)}</span></div>
-          ))}</div>}
-        </Sec>
-      )}
-    </Modal>
-  );
-}
-
-/* Ficha del paciente (modal reutilizable): odontograma, plan, pagos e historia. */
-function FichaPaciente({ nombre, onClose, fichas, cita }) {
-  const p = PACIENTES_INIT.find((x) => x.nombre === nombre);
-  const ficha = p && ((fichas && fichas[p.id]) || FICHA_CLINICA[p.id]);
-  const trat = (ficha && ficha.tratamiento) || [];
-  const total = trat.reduce((s, f) => s + f.costo, 0);
-  const pagado = trat.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0);
-  const saldo = total - pagado;
-  const pend = trat.filter((f) => f.estado === "pendiente").length;
-  const piezas = Object.entries((ficha && ficha.odontograma) || {}).map(([n, d]) => {
-    const partes = [];
-    if (d.whole) partes.push({ parte: "Toda la pieza", estado: d.whole });
-    if (d.caras) Object.entries(d.caras).forEach(([k, e]) => partes.push({ parte: caraOdontoLabel(n, k), estado: e }));
-    return { n, partes, nota: (ficha && ficha.notas && ficha.notas[n]) || "" };
-  }).filter((x) => x.partes.length);
-  const piezasAtencion = piezas.filter((x) => x.partes.some((pt) => ATENCION.includes(pt.estado))).length;
-  const ini = (s) => (s || "?").split(" ").map((w) => w[0]).join("").slice(0, 2);
-  const TEAL = DS.c.primary;
-  const sub = { fontSize: 13, fontWeight: 500, color: NAVY, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 };
-  const secc = { background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "16px 18px", boxShadow: "0 1px 2px rgba(16,24,40,.03)" };
-
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "grid", placeItems: "center", zIndex: 200, padding: 20 }}>
-      <div className="dc-modal dc-ficha-modal" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", width: "min(860px,96vw)", maxHeight: "calc(92vh / var(--dc-z, 1))", borderRadius: "var(--dc-r-lg)", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 44px 110px -34px rgba(15,27,56,.62)", animation: "dcModal .28s cubic-bezier(.2,.7,.2,1)" }}>
-        <div className="dc-modal__head" style={{ position: "relative", padding: "22px 26px", color: "#fff", flexShrink: 0 }}>
-          <button aria-label="Cerrar" className="dc-modal__x" onClick={onClose} style={{ position: "absolute", top: 18, right: 18, background: "rgba(255,255,255,.15)", border: "none", borderRadius: "var(--dc-r-sm)", width: 30, height: 30, cursor: "pointer", color: "#fff", display: "grid", placeItems: "center" }}><X size={16} strokeWidth={1.75} /></button>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 50, height: 50, borderRadius: "var(--dc-r-lg)", background: "rgba(255,255,255,.18)", display: "grid", placeItems: "center", fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 16 }}>{ini(nombre)}</div>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 600, fontFamily: DISPLAY_FONT }}>{nombre}</div>
-              <div className="dc-ficha-chips">{p ? <><span>DNI {p.dni}</span><span><MapPin size={12} strokeWidth={2} /> {etiquetaSedes(p.sedes ?? p.sede)}</span>{p.ultima && <span><Clock size={12} strokeWidth={2} /> Última visita {fechaLegible(p.ultima)}</span>}</> : <span>Paciente</span>}</div>
-            </div>
-          </div>
-          {/* La ficha puede existir sin estas listas -updFicha la crea vacia y le anade solo
-              lo que se guarde-, asi que .length a secas reventaba la pantalla. */}
-          {ficha && ((ficha.alergias || []).length > 0 || (ficha.antecedentes || []).length > 0) && (
-            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-              {ficha.alergias.map((a) => <span key={a} style={{ background: "rgba(248,113,113,.22)", color: "var(--dc-fee)", fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}>⚠ {a}</span>)}
-              {ficha.antecedentes.map((a) => <span key={a} style={{ background: "rgba(255,255,255,.14)", color: "var(--dc-bg)", fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}>{a}</span>)}
-            </div>
-          )}
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        {cita && (
-          <div style={{ padding: "16px 26px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)" }}>
-            <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-500)", marginBottom: 10 }}>Cita seleccionada</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 26px" }}>
-              {[["Hora", cita.hora], ["Odontólogo", (MEDICOS.find((m) => m.id === cita.medicoId) || {}).nombre || "—"], ["Sede", nombreSede(cita.sede)], ["Motivo", cita.motivo]].map(([k, v]) => (
-                <div key={k} style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", textTransform: "uppercase", letterSpacing: .4, marginBottom: 2 }}>{k}</div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!ficha ? (
-          <Vacio icon={<FileText size={24} strokeWidth={1.75} />} titulo="Sin historia clínica registrada" sub="Este paciente aún no tiene fichas. Se crearán en su primera atención." />
-        ) : (
-          <div style={{ padding: 20, display: "grid", gap: 14, background: "var(--dc-bg)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10 }}>
-              {[["Saldo", `S/ ${saldo.toFixed(0)}`, saldo > 0 ? RED : "var(--dc-ok-700)", <DollarSign size={16} strokeWidth={1.75} />], ["Invertido", `S/ ${(ficha.pagos || []).reduce((s, x) => s + x.monto, 0)}`, "var(--dc-ok-700)", <Wallet size={16} strokeWidth={1.75} />], ["Piezas por atender", piezasAtencion, TEAL, <Smile size={16} strokeWidth={1.75} />], ["Tratamientos", pend, DS.c.primary, <ClipboardList size={16} strokeWidth={1.75} />]].map(([l, v, c, ic]) => (
-                <div key={l} style={{ background: tint(c, 0.051), border: "1px solid " + tint(c, 0.133), borderRadius: "var(--dc-r-lg)", padding: "13px 15px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}><span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</span><span style={{ color: c }}>{ic}</span></div><div style={{ fontSize: 21, fontWeight: 600, color: c, fontFamily: DISPLAY_FONT }}>{v}</div></div>
-              ))}
-            </div>
-
-            <div style={secc}>
-              <h4 style={sub}><Smile size={14} strokeWidth={1.75} color={TEAL} /> Odontograma — hallazgos por pieza</h4>
-              {piezas.length === 0 ? <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Sin hallazgos registrados. Boca sana.</div> : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 10 }}>
-                  {piezas.map((x) => { const att = x.partes.some((pt) => ATENCION.includes(pt.estado)); return (
-                    <div key={x.n} style={{ border: `1px solid ${att ? "var(--dc-danger-mid)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: 12, background: att ? "var(--dc-white)" : "var(--dc-bg)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
-                        <span style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: NAVY, color: "#fff", display: "grid", placeItems: "center", fontWeight: 600, fontSize: 13, fontFamily: DISPLAY_FONT }}>{x.n}</span>
-                        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)" }}>Pieza {x.n}</span>
-                      </div>
-                      <div style={{ display: "grid", gap: 5 }}>
-                        {x.partes.map((pt, i) => { const info = DIENTE_INFO[pt.estado] || { l: pt.estado, c: "var(--dc-ink-400)" }; return (
-                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
-                            <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-sm)", background: info.c, flexShrink: 0 }} />
-                            <span style={{ color: "var(--dc-ink-700)", flex: 1 }}>{pt.parte}</span>
-                            <span style={{ background: tint(info.c, 0.094), color: info.c, fontWeight: 500, fontSize: 12, padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{info.l}</span>
-                          </div>
-                        ); })}
-                      </div>
-                      {x.nota && <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 8, fontStyle: "italic", display: "flex", gap: 5 }}><FileText size={12} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> {x.nota}</div>}
-                    </div>
-                  ); })}
-                </div>
-              )}
-            </div>
-
-            <div style={secc}>
-              <h4 style={sub}><ClipboardList size={14} strokeWidth={1.75} color={DS.c.primary} /> Plan de tratamiento</h4>
-              {trat.length === 0 ? <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Sin plan activo.</div> : trat.map((f, i) => (
-                <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
-                  <span style={{ width: 24, height: 24, borderRadius: "var(--dc-r-full)", background: f.estado === "atendida" ? TEAL : "#fff", color: f.estado === "atendida" ? "#fff" : "var(--dc-ink-500)", border: f.estado === "atendida" ? "none" : "2px solid var(--dc-bg)", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{f.estado === "atendida" ? <Check size={13} strokeWidth={1.75} /> : i + 1}</span>
-                  <span style={{ flex: 1, fontWeight: 500, color: NAVY, fontSize: 13 }}>{f.nombre}</span>
-                  <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>S/ {f.costo.toFixed(0)}</span>
-                  <Badge estado={f.estado} />
-                </div>
-              ))}
-            </div>
-
-            {(ficha.pagos || []).length > 0 && (
-              <div style={secc}>
-                <h4 style={sub}><CreditCard size={14} strokeWidth={1.75} color="var(--dc-ok-700)" /> Pagos</h4>
-                {ficha.pagos.map((pg, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: i ? "1px solid var(--dc-bg)" : "none", fontSize: 13 }}>
-                    <CheckCircle2 size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /><span style={{ flex: 1, color: "var(--dc-ink-700)" }}>{pg.fecha} – {pg.concepto} <span style={{ color: "var(--dc-ink-500)" }}>({pg.metodo})</span></span><span style={{ fontWeight: 500, color: NAVY }}>S/ {pg.monto}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {(ficha.recetas || []).length > 0 && (
-              <div style={secc}>
-                <h4 style={sub}><FileText size={14} strokeWidth={1.75} color={DS.c.primary} /> Recetas</h4>
-                {ficha.recetas.map((r, i) => (
-                  <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderTop: i ? "1px solid var(--dc-bg)" : "none", fontSize: 13 }}>
-                    <span style={{ color: DS.c.primary, fontWeight: 500 }}>℞</span><span style={{ flex: 1, color: "var(--dc-ink-700)" }}>{r.texto}</span><span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{r.fecha}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {(ficha.lab || []).length > 0 && (
-              <div style={secc}>
-                <h4 style={sub}><FlaskConical size={14} strokeWidth={1.75} color={DS.c.primary} /> Trabajos de laboratorio</h4>
-                {ficha.lab.map((l, i) => { const I = LAB_INFO[l.estado] || { l: l.estado, bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: i ? "1px solid var(--dc-bg)" : "none", fontSize: 13 }}>
-                    <FlaskConical size={15} strokeWidth={1.75} color={DS.c.primary} /><span style={{ flex: 1, color: "var(--dc-ink-700)" }}>{l.trabajo} <span style={{ color: "var(--dc-ink-500)" }}>– {l.lab}</span></span><span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "2px 9px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>
-                  </div>
-                ); })}
-              </div>
-            )}
-
-            {(ficha.historia || []).length > 0 && (
-              <div style={secc}>
-                <h4 style={sub}><Activity size={14} strokeWidth={1.75} color={TEAL} /> Historia de visitas</h4>
-                {ficha.historia.map((h, i) => (
-                  <div key={i} style={{ display: "flex", gap: 12, paddingBottom: i < ficha.historia.length - 1 ? 14 : 0 }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}><div style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: TEAL, marginTop: 5 }} />{i < ficha.historia.length - 1 && <div style={{ width: 2, flex: 1, background: "var(--dc-line)", marginTop: 3 }} />}</div>
-                    <div><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{h.titulo}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", margin: "1px 0 3px" }}>{h.fecha}</div><div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{h.detalle}</div></div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ---- Primitivos modernos (reutilizables) ---- */
 // Número que cuenta hacia arriba al montar (micro-animación).
@@ -1082,17 +729,6 @@ function useCountUp(target, ms = 650) {
   return v;
 }
 // Anillo de progreso claro y animado (sobre fondo blanco).
-const RingLight = ({ pct, size = 48, color = DS.c.primary, track = "var(--dc-line)", sw = 6 }) => {
-  const r = (size - sw) / 2, C = 2 * Math.PI * r;
-  const [on, setOn] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setOn(true), 90); return () => clearTimeout(t); }, []);
-  return (
-    <svg width={size} height={size} style={{ flexShrink: 0 }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={sw} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeDasharray={`${(on ? pct : 0) / 100 * C} ${C}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ transition: "stroke-dasharray .9s cubic-bezier(.2,.7,.2,1)" }} />
-    </svg>
-  );
-};
 
 // Anillos de actividad concéntricos (estilo Apple Health).
 
@@ -1449,35 +1085,6 @@ function SalaTV({ onClose, citasDemo = [] }) {
 }
 
 /* Registro de evolución clínica ligado a la cita (cierra el trabajo del doctor y habilita su producción). */
-function EvolucionModal({ cita, onClose, onGuardada, notify }) {
-  const conectado = !!auth.token;
-  const [f, setF] = useState({ diagnostico: "", detalle: "", receta: "" });
-  const [guardando, setGuardando] = useState(false);
-  const inp = { width: "100%", padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" };
-  const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
-  const guardar = () => {
-    if (!f.diagnostico.trim() && !f.detalle.trim()) { notify("Escribe al menos el diagnóstico o la evolución."); return; }
-    if (conectado) {
-      setGuardando(true);
-      api.historia.crear({ pacienteId: cita.pacienteId, citaId: cita.id, medicoId: cita.medicoId, titulo: "Evolución", diagnostico: f.diagnostico, detalle: f.detalle, receta: f.receta || null })
-        .then(() => onGuardada())
-        .catch(() => { setGuardando(false); notify("No se pudo guardar la evolución."); });
-      return;
-    }
-    onGuardada();
-  };
-  return (
-    <Modal icon={<Stethoscope size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Evolución de la atención" sub={`${cita.paciente || "Paciente"}${cita.fecha ? " – " + cita.fecha : ""}`} onClose={onClose} maxW={560}
-      footer={<><Btn small kind="ghost" onClick={onClose}>Cancelar</Btn><Btn small onClick={guardar} disabled={guardando}><Check size={15} strokeWidth={1.75} /> Guardar evolución</Btn></>}>
-      <div style={{ display: "grid", gap: 14 }}>
-        <div><label style={lbl}>Diagnóstico</label><input className="dc-premium-inp" value={f.diagnostico} onChange={(e) => setF({ ...f, diagnostico: e.target.value })} placeholder="Ej. Caries oclusal pieza 36" style={inp} /></div>
-        <div><label style={lbl}>Evolución / procedimiento realizado</label><textarea className="dc-premium-inp" value={f.detalle} onChange={(e) => setF({ ...f, detalle: e.target.value })} rows={4} placeholder="Describe lo realizado en la atención…" style={inp} /></div>
-        <div><label style={lbl}>Indicaciones / receta (opcional)</label><textarea className="dc-premium-inp" value={f.receta} onChange={(e) => setF({ ...f, receta: e.target.value })} rows={2} placeholder="Ej. Ibuprofeno 400mg c/8h por 3 días…" style={inp} /></div>
-        <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>Al guardar, esta atención cuenta en tu producción.</div>
-      </div>
-    </Modal>
-  );
-}
 
 /* Cancelar cita con motivo (trazabilidad + reprogramación). */
 function CancelarCitaModal({ cita, onClose, onConfirm }) {
@@ -1518,7 +1125,6 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const [espKey, setEspKey] = useState(0);              // fuerza recarga de la lista de espera tras asignar
   const [reprog, setReprog] = useState(null);           // reprogramar una cita sin arrastrar: { id, paciente, fecha, hora }
   const [dlOpen, setDlOpen] = useState(false);          // menú de descarga (Excel / PDF)
-  const [evoCita, setEvoCita] = useState(null);         // cita para registrar evolución clínica
   const [cancelCita, setCancelCita] = useState(null);   // cita a cancelar (con motivo)
   const cancelarConMotivo = (c, motivo) => {
     if (conectado) { api.citas.cambiarEstado(c.id, "cancelada", motivo).then(() => { notify(`Cita de ${c.paciente} cancelada.`); recargar(); recargarAll(); }).catch(() => notify("Error al cancelar.")); }
@@ -1564,12 +1170,16 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     onIntentDone();
   }, [crearIntent]); // eslint-disable-line react-hooks/exhaustive-deps
   const citas = conectado ? (remoto || []) : citasProp;
-  const [ficha, setFicha] = useState(null);
   const [fichaCita, setFichaCita] = useState(null);
-  const [fmId, setFmId] = useState(null);               // ficha médica conectada (no texto demo)
-  const abrirFichaCita = (c) => {
-    if (conectado && c?.pacienteId) { setFmId(c.pacienteId); setFichaCita(c); return; }
-    setFicha(c?.paciente); setFichaCita(c);
+  const [fmId, setFmId] = useState(null);               // ficha médica del paciente de la cita
+  const [fmTabCita, setFmTabCita] = useState(null);
+  // La evolución se escribe en la historia clínica (con CIE-10, signos, alergias a la
+  // vista y firma), no en un formulario aparte que se saltaba todo eso.
+  const abrirFichaCita = (c, tab = null) => {
+    setFmTabCita(tab);
+    const pid = c?.pacienteId ?? (conectado ? null : (pacientes.find((x) => x.nombre === c?.paciente) || PACIENTES_INIT.find((x) => x.nombre === c?.paciente) || {}).id);
+    if (pid != null) { setFmId(pid); setFichaCita(c); return; }
+    notify("Esta cita no tiene un paciente registrado todavía.");
   };
   const [agendar, setAgendar] = useState(false);
   const puedeAgendar = conectado && (rol === "recepcion" || rol === "admin" || rol === "gerencia");
@@ -1662,8 +1272,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         const abierta = c.estado !== "cancelada" && c.estado !== "atendida" && c.estado !== "no_show";
         const principal =
           rol === "medico" && c.estado === "confirmada" && c.llegada ? <ActionBtn onClick={() => { set(c.id, "en_atencion"); onAtender && onAtender(c); }} color={DS.c.primary}>Iniciar</ActionBtn>
-          : rol === "medico" && c.estado === "en_atencion" ? <ActionBtn onClick={() => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); setEvoCita(c); }} color="var(--dc-ok-700)">Finalizar</ActionBtn>
-          : rol === "medico" && c.estado === "atendida" ? <ActionBtn subtle onClick={() => setEvoCita(c)} color={DS.c.primary}>Evolución</ActionBtn>
+          : rol === "medico" && c.estado === "en_atencion" ? <ActionBtn onClick={() => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); abrirFichaCita(c, "historia"); }} color="var(--dc-ok-700)">Finalizar</ActionBtn>
+          : rol === "medico" && c.estado === "atendida" ? <ActionBtn subtle onClick={() => abrirFichaCita(c, "historia")} color={DS.c.primary}>Evolución</ActionBtn>
           : rol !== "medico" && c.estado === "confirmada" && c.llegada ? <ActionBtn onClick={() => set(c.id, "en_atencion", `Llamando a ${c.paciente} a consultorio…`)} color="var(--dc-warn-600)">Llamar</ActionBtn>
           : rol !== "medico" && conectado && c.pacienteId && saldos[c.pacienteId] > 0 ? <ActionBtn onClick={() => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede })} color={DS.c.primary}>Cobrar S/ {saldos[c.pacienteId].toFixed(0)}</ActionBtn>
           : puedeOperarAgenda && abierta ? <ActionBtn subtle onClick={() => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora })} color={DS.c.primary}>Reprogramar</ActionBtn>
@@ -1836,19 +1446,19 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
         cols={COLS_AGENDA} />
-      </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={abrirFichaCita} onReagendar={reagendarCita} horario={horarioClinica.horario} feriados={horarioClinica.feriados} bloqueos={bloqueos} onNuevo={puedeAgendar ? (patch) => setAgendar(patch) : undefined} />}
+      </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={reagendarCita} horario={horarioClinica.horario} feriados={horarioClinica.feriados} bloqueos={bloqueos} onNuevo={puedeAgendar ? (patch) => setAgendar(patch) : undefined} />}
       {fmId && (
         <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
           <FichaMedica pacienteId={fmId} onClose={() => { setFmId(null); setFichaCita(null); }} notify={notify} can={can} rol={rol}
+            pacienteDemo={conectado ? null : (pacientes.find((x) => String(x.id) === String(fmId)) || null)}
+            initialTab={fmTabCita}
             sedeId={sedeApiUuid(sedeActiva != null && sedeActiva !== "all" ? sedeActiva : 1)}
             onAgendar={(pac) => { setFmId(null); setFichaCita(null); setAgendar({ pacienteId: pac.id || fmId, motivo: "Consulta" }); }}
             onCobrar={(pac) => { const pid = pac.id || fmId; setFmId(null); setFichaCita(null); setPago({ pid, nombre: pac.nombre || "Paciente", monto: saldos[pid] || 0, sedeId: null }); }} />
         </React.Suspense>
       )}
-      {ficha && !fmId && <FichaPaciente nombre={ficha} onClose={() => { setFicha(null); setFichaCita(null); }} fichas={fichas} cita={fichaCita} />}
       {tv && <SalaTV onClose={() => setTv(false)} citasDemo={citasProp} />}
       {pago && <ModalCobro monto={pago.monto} pacienteId={pago.pid} sedeId={pago.sedeId} paciente={pago.nombre} concepto="Cobro en Agenda" onClose={() => setPago(null)} onAprobado={(res) => { setPago(null); notify(`Cobrado S/ ${(res?.montoCobrado ?? pago.monto).toFixed(2)} de ${pago.nombre}. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Comprobante de demostración (sin envío a SUNAT)."}`); recargar(); recargarSaldos(); }} />}
-      {evoCita && <EvolucionModal cita={evoCita} notify={notify} onClose={() => setEvoCita(null)} onGuardada={() => { setEvoCita(null); notify("Evolución registrada. La producción de esta atención ya cuenta."); }} />}
       {cancelCita && <CancelarCitaModal cita={cancelCita} onClose={() => setCancelCita(null)} onConfirm={(motivo) => cancelarConMotivo(cancelCita, motivo)} />}
       {bloqForm && (() => {
         const selSty = { width: "100%", padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, fontWeight: 500, cursor: "pointer", boxSizing: "border-box" };
@@ -1924,184 +1534,6 @@ const ASEGS = ["Ninguno", "Pacífico EPS", "Rímac Seguros", "Mapfre", "La Posit
    despues (avisar a la madre, exigir firma del tutor legal…) en vez de ser
    texto libre con veinte formas de escribir "mamá". */
 const PARENTESCOS = ["Madre", "Padre", "Abuelo/a", "Tutor legal", "Hermano/a mayor", "Tío/a", "Otro"];
-/* ---- Historia clínica / anamnesis (adulto y pediátrica) ---- */
-const HC_ADULTO = [
-  { t: "Motivo de consulta", f: [{ k: "motivo", type: "area", ph: "¿Por qué acude el paciente?" }] },
-  { t: "Antecedentes médicos", f: [{ k: "antecedentes", type: "checks", opts: ["Diabetes", "Hipertensión", "Cardiopatía", "Asma", "Hepatitis", "Anticoagulantes", "Epilepsia", "Embarazo", "Ninguno"] }] },
-  { t: "Alergias", f: [{ k: "alergias", type: "checks", opts: ["Penicilina", "Anestesia local", "Látex", "AINEs", "Ninguna"] }, { k: "alergiasOtras", type: "text", ph: "Otras alergias / detalle" }] },
-  { t: "Medicación actual", f: [{ k: "medicacion", type: "area", ph: "Medicamentos que toma habitualmente" }] },
-  { t: "Antecedentes odontológicos", f: [{ k: "odonto", type: "checks", opts: ["Sangrado de encías", "Bruxismo", "Sensibilidad", "Extracciones previas", "Ortodoncia previa"] }, { k: "ultimaVisita", type: "text", ph: "Última visita al dentista" }] },
-  // Ver HABITOS_DE_ADULTO: se ocultan por debajo de la edad de transicion.
-  { t: "Hábitos", f: [{ k: "habitos", type: "checks", opts: ["Tabaco", "Alcohol", "Rechina los dientes"] }, { k: "cepillado", type: "select", opts: ["1 vez/día", "2 veces/día", "3+ veces/día"], ph: "Frecuencia de cepillado" }] },
-];
-/* Preguntas que no se le hacen a un nino. Se filtran aunque alguien cambie la
-   pestana a "Adulto" en la ficha de un menor: preguntarle a uno de 7 anios si fuma
-   no tiene sentido y ensucia su historia. Desde los 13 (EDAD_TRANSICION) si salen,
-   porque es la edad en la que empiezan a tener sentido. */
-const HABITOS_DE_ADULTO = ["Tabaco", "Alcohol"];
-const HC_PEDIATRICO = [
-  { t: "Motivo de consulta", f: [{ k: "motivo", type: "area", ph: "Motivo de la visita" }] },
-  { t: "Antecedentes perinatales", f: [{ k: "perinatal", type: "checks", opts: ["Parto normal", "Cesárea", "Embarazo sin complicaciones", "Prematuro"] }, { k: "pesoNacer", type: "text", ph: "Peso al nacer" }] },
-  { t: "Alimentación", f: [{ k: "alimentacion", type: "checks", opts: ["Lactancia materna", "Biberón", "Alimentación mixta"] }, { k: "destete", type: "text", ph: "Edad de destete" }] },
-  { t: "Hábitos de succión / orales", f: [{ k: "succion", type: "checks", opts: ["Succión digital (dedo)", "Chupón", "Onicofagia (uñas)", "Respirador bucal", "Ninguno"] }] },
-  { t: "Desarrollo dental", f: [{ k: "erupcion", type: "text", ph: "Erupción del primer diente" }, { k: "primeraVisita", type: "text", ph: "Primera visita dental" }] },
-  { t: "Antecedentes médicos", f: [{ k: "antecedentes", type: "checks", opts: ["Asma", "Cardiopatía", "Convulsiones", "Vacunas completas", "Ninguno"] }] },
-  // Las mismas claves que en la historia de adulto (alergias, alergiasOtras, medicacion):
-  // así lo que se anote aquí acaba donde ya lo lee el resto del sistema -el aviso de
-  // alergias de la ficha y la receta-. Antes solo había una casilla "Alergias" dentro de
-  // antecedentes: un sí/no sin decir a qué, y en un niño la dosis va por peso y edad.
-  { t: "Alergias", f: [{ k: "alergias", type: "checks", opts: ["Penicilina", "Anestesia local", "Látex", "AINEs", "Ninguna"] }, { k: "alergiasOtras", type: "text", ph: "Otras alergias / detalle" }] },
-  { t: "Medicación actual", f: [{ k: "medicacion", type: "area", ph: "Medicamentos que toma habitualmente (jarabes, inhaladores…)" }] },
-  // Dos cosas que solo existen en odontopediatria y que un odontopediatra espera
-  // encontrar en la ficha:
-  //  - La escala de Frankl clasifica como se porto el nino en el sillon. Sirve para
-  //    decidir si la proxima cita necesita mas tiempo, acompanamiento o sedacion.
-  //  - El riesgo de caries marca cada cuanto hay que citarlo a control y si toca
-  //    fluor o sellantes, que es de lo que mas se hace a esta edad.
-  { t: "Conducta en el sillón (escala de Frankl)", f: [{ k: "frankl", type: "select", ph: "¿Cómo se portó?",
-    opts: ["1 – Claramente negativo (rechaza, llora, no colabora)",
-           "2 – Negativo (reticente, poco colaborador)",
-           "3 – Positivo (acepta, algo cauteloso)",
-           "4 – Claramente positivo (colabora, disfruta)"] }] },
-  { t: "Riesgo de caries y prevención", f: [
-    { k: "riesgoCaries", type: "select", ph: "Nivel de riesgo", opts: ["Bajo", "Moderado", "Alto"] },
-    { k: "prevencion", type: "checks", opts: ["Aplicación de flúor", "Sellantes", "Instrucción de higiene", "Control de dieta azucarada"] },
-    { k: "cepilladoSupervisado", type: "text", ph: "¿Quién le cepilla o supervisa?" }] },
-];
-function HistoriaClinica({ paciente, ficha, onClose, onSave, notify = () => {}, onEditarPaciente }) {
-  const edad = calcEdad(paciente?.nacimiento);
-  const prev = ficha?.historiaClinica || {};
-  // El umbral vive en comun.jsx: aqui cortaba en 14 y en FichaMedica en 15, asi que
-  // un chico de 14 salia pediatrico en una pantalla y adulto en la otra.
-  const pedPorEdad = esPediatrico(paciente?.nacimiento);
-  // Tres etapas (comun.jsx): en la de transicion la ficha arranca ya en adulto,
-  // porque es la que va a usar a partir de ahora, pero se avisa del cambio.
-  const etapa = etapaFicha(paciente?.nacimiento);
-  // Celeste nino, rosa nina, turquesa si no consta (comun.jsx: colorPediatrico).
-  const CP = colorPediatrico(paciente?.genero);
-  const PED = CP.c, PED_SUAVE = CP.suave, PED_LINEA = CP.linea;
-  const faltanAnios = aniosParaAdulto(paciente?.nacimiento);
-  const [tipo, setTipo] = useState(prev.tipo || (etapa === "pediatrico" ? "pediatrico" : "adulto"));
-  const esPed = tipo === "pediatrico";
-  const [hc, setHc] = useState(prev);
-  const secc = tipo === "pediatrico" ? HC_PEDIATRICO : HC_ADULTO;
-  const setF = (k, v) => setHc((s) => ({ ...s, [k]: v }));
-  const toggleChk = (k, opt) => setHc((s) => { const a = s[k] || []; return { ...s, [k]: a.includes(opt) ? a.filter((x) => x !== opt) : [...a, opt] }; });
-  const guardar = () => { onSave({ ...hc, tipo, actualizado: fmt(hoy) }); notify(`Historia clínica de ${paciente?.nombre || "paciente"} guardada.`); onClose(); };
-  const inp = { width: "100%", padding: "10px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
-  const acc = acentoFicha(esPed);
-
-  // Sin fecha de nacimiento no se sabe qué historia toca. Antes se suponía "adulto" y
-  // se abría el formulario de adulto con sus pestañas: a un niño se le acababa
-  // preguntando por tabaco, alcohol y embarazo. Ahora se pide la fecha primero.
-  if (edad == null) return (
-    <Modal icon={<FileText size={20} strokeWidth={1.75} />} titulo="Historia clínica" sub={paciente?.nombre || ""} onClose={onClose} maxW={520}
-      footer={<><Btn small kind="ghost" onClick={onClose}>Cerrar</Btn>{onEditarPaciente && <Btn small onClick={onEditarPaciente}><Users size={15} strokeWidth={1.75} /> Completar la fecha</Btn>}</>}>
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-md)", padding: "14px 16px" }}>
-        <AlertTriangle size={20} strokeWidth={1.75} color="var(--dc-warn-600)" style={{ flexShrink: 0, marginTop: 1 }} />
-        <div style={{ fontSize: 13, color: "var(--dc-warn-ink)", lineHeight: 1.55 }}>
-          <b>Falta la fecha de nacimiento de {paciente?.nombre || "este paciente"}.</b><br />
-          La historia clínica no es la misma para un niño que para un adulto: cambian los
-          antecedentes que se preguntan, los hábitos y hasta las dosis. Complétala en la
-          ficha del paciente y vuelve a abrir la historia.
-        </div>
-      </div>
-    </Modal>
-  );
-
-  return (
-    <Modal icon={<FileText size={20} strokeWidth={1.75} />} tone={acc} titulo="Historia clínica" sub={`${paciente?.nombre || ""}${edad != null ? ` – ${edad} años` : ""}`} onClose={onClose} maxW={680}
-      footer={<><Btn small kind="ghost" onClick={onClose}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> Guardar historia</Btn></>}>
-      {/* A un nino de 7 anios no se le enseña la pestaña de adulto: no es un modo que
-          le corresponda, y tenerla ahi solo invita a rellenar la ficha equivocada. Las
-          dos pestañas salen unicamente en la etapa de transicion (13-14), que es cuando
-          de verdad conviven, y en un adulto que tenga historia pediatrica que consultar.
-          En un nino se muestra una etiqueta fija que dice lo que es. */}
-      {etapa === "pediatrico" ? (
-        // La insignia dice el cuestionario ABIERTO, no la edad: si una historia se guardó
-        // como de adulto, se veía "Ficha pediátrica" encima del formulario de adulto y no
-        // había manera de volver, porque el conmutador solo sale desde los 13.
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: esPed ? PED_SUAVE : "var(--dc-warn-soft)", border: `1px solid ${esPed ? PED_LINEA : "var(--dc-amber-soft)"}`,
-                        borderRadius: "var(--dc-r-md)", padding: "7px 14px", color: esPed ? PED : "var(--dc-warn-600)", fontWeight: 500, fontSize: 13 }}>
-            <EmblemaNino size={17} /> {esPed ? "Ficha pediátrica" : "Cuestionario de adulto"}
-          </div>
-          {!esPed && (
-            <div style={{ fontSize: 13, color: "var(--dc-warn-600)", marginTop: 7, lineHeight: 1.5 }}>
-              Este paciente tiene {edad} años y su historia se guardó con el cuestionario de adulto.{" "}
-              <button onClick={() => setTipo("pediatrico")} style={{ background: "none", border: "none", padding: 0, color: PED, fontWeight: 500, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Volver a la ficha pediátrica</button>
-              {" "}(lo ya escrito no se pierde).
-            </div>
-          )}
-        </div>
-      ) : (
-      <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3, marginBottom: 16 }}>
-        {[["adulto", "Adulto", User], ["pediatrico", "Pediátrico", null]].map(([k, l, Ic]) => {
-          const on = tipo === k;
-          const col = acentoFicha(k === "pediatrico");
-          return (
-            <button key={k} onClick={() => setTipo(k)} aria-pressed={on}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer",
-                       fontWeight: 500, fontSize: 13, background: on ? "#fff" : "transparent", color: on ? col : "var(--dc-ink-400)",
-                       boxShadow: on ? "0 1px 2px rgba(16,24,40,.12)" : "none", transition: "color .15s, background .15s" }}>
-              {Ic ? <Ic size={15} strokeWidth={1.9} /> : <EmblemaNino size={16} />} {l}
-            </button>);
-        })}
-      </div>
-      )}
-      {etapa === "transicion" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, borderRadius: "var(--dc-r-md)", padding: "10px 13px", marginBottom: 14 }}>
-          <span style={{ color: PED, flexShrink: 0, display: "grid", placeItems: "center" }}><EmblemaNino size={22} /></span>
-          <div style={{ fontSize: 13, color: "var(--dc-ink-500)", lineHeight: 1.5 }}>
-            Con {edad} años está pasando de ficha pediátrica a la de adulto: en {faltanAnios} año{faltanAnios === 1 ? "" : "s"} será solo de adulto.
-            Puedes seguir usando las dos — lo que ya se registró de niño <b>no se pierde</b>.
-          </div>
-        </div>
-      )}
-      {edad != null && etapa !== "transicion" && (esPed !== pedPorEdad) && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", borderRadius: "var(--dc-r-md)", padding: "8px 12px", marginBottom: 14 }}>El paciente tiene {edad} años — normalmente sería {pedPorEdad ? "pediátrico" : "adulto"}.</div>}
-      {/* Apoderado: se lee de la ficha del paciente, no se vuelve a pedir aqui.
-          Si falta, se dice donde completarlo en vez de callarlo. */}
-      {esPed && (paciente?.apoderadoNombre
-        ? <div style={{ display: "flex", alignItems: "center", gap: 10, background: PED_SUAVE, border: `1px solid ${PED_LINEA}`, borderRadius: "var(--dc-r-md)", padding: "10px 13px", marginBottom: 14 }}>
-            <Baby size={17} strokeWidth={1.75} color={PED} style={{ flexShrink: 0 }} />
-            <div style={{ fontSize: 13, color: "var(--dc-warn-700)", lineHeight: 1.5 }}>
-              Responsable: <b>{paciente.apoderadoNombre}</b>
-              {paciente.apoderadoParentesco ? ` – ${paciente.apoderadoParentesco}` : ""}
-              {paciente.apoderadoTelefono ? ` – ${paciente.apoderadoTelefono}` : ""}
-            </div>
-          </div>
-        : <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--dc-warn-soft)", borderRadius: "var(--dc-r-md)", padding: "10px 13px", marginBottom: 14 }}>
-            <Baby size={17} strokeWidth={1.75} color="var(--dc-warn-600)" style={{ flexShrink: 0 }} />
-            <div style={{ fontSize: 13, color: "var(--dc-warn-ink)", lineHeight: 1.5 }}>
-              Este menor no tiene apoderado registrado. Añádelo desde <b>Pacientes → editar</b>: sin él nadie puede firmar sus consentimientos.
-            </div>
-          </div>)}
-      <div style={{ display: "grid", gap: 18 }}>
-        {secc.map((s) => (
-          <div key={s.t}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: acc, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 10 }}>{s.t}</div>
-            <div style={{ display: "grid", gap: 10 }}>
-              {s.f.map((fld) => {
-                if (fld.type === "checks") return (
-                  <div key={fld.k} style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                    {fld.opts.filter((opt) => !(etapa === "pediatrico" && HABITOS_DE_ADULTO.includes(opt)))
-                      .map((opt) => { const on = (hc[fld.k] || []).includes(opt); return (
-                      <button key={opt} onClick={() => toggleChk(fld.k, opt)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${acc}` : "1.5px solid var(--dc-line)", background: on ? tint(acc, 0.078) : "#fff", color: on ? acc : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{on ? <Check size={13} strokeWidth={1.75} /> : <Plus size={13} strokeWidth={1.75} />} {opt}</button>
-                    ); })}
-                  </div>
-                );
-                if (fld.type === "area") return <textarea className="dc-premium-inp" key={fld.k} value={hc[fld.k] || ""} onChange={(e) => setF(fld.k, e.target.value)} placeholder={fld.ph} rows={2} style={{ ...inp, resize: "vertical" }} />;
-                if (fld.type === "select") return <Select key={fld.k} value={hc[fld.k] || ""} onChange={(v) => setF(fld.k, v)} placeholder={fld.ph} options={[{ value: "", label: fld.ph }, ...fld.opts.map((o) => ({ value: o, label: o }))]} />;
-                return <input className="dc-premium-inp" key={fld.k} value={hc[fld.k] || ""} onChange={(e) => setF(fld.k, e.target.value)} placeholder={fld.ph} style={inp} />;
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Modal>
-  );
-}
-
 const TAG_COLOR = { VIP: "var(--dc-warn-700)", Impuntual: "var(--dc-danger)", Ortodoncia: "var(--dc-purple)", Deudor: "var(--dc-warn-600)", Nuevo: DS.c.primary, Recurrente: "var(--dc-ok-700)" };
 const TAGS_DISP = ["VIP", "Impuntual", "Ortodoncia", "Deudor", "Nuevo", "Recurrente"];
 
@@ -2120,7 +1552,6 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // Dar de alta un paciente y lanzar campañas es trabajo de recepción y administración.
   // Gerencia entra aquí a consultar la cartera, no a escribir en ella.
   const puedeGestionar = can ? can("pacientes", "crear") : true;
-  const [histPac, setHistPac] = useState(null); // paciente para historia clínica
   // Modo conectado (JWT presente): los datos vienen del backend real; si no, demo.
   const conectado = !!auth.token;
   const sedeInt = (uuid) => (uuid && String(uuid).endsWith("a2")) ? 2 : 1;
@@ -2206,14 +1637,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     return fut[0] || null;
   };
   const relFecha = (iso, futuro) => { const d = Math.round((new Date(iso + "T00:00:00") - new Date(hoyISO + "T00:00:00")) / 86400000); const n = Math.abs(d); const txt = n === 0 ? "Hoy" : n < 30 ? `${n} día${n > 1 ? "s" : ""}` : n < 365 ? `${Math.round(n / 30)} mes${Math.round(n / 30) > 1 ? "es" : ""}` : `${Math.round(n / 365)} año${Math.round(n / 365) > 1 ? "s" : ""}`; return futuro ? (n === 0 ? "Hoy" : `En ${txt}`) : (n === 0 ? "Hoy" : `Hace ${txt}`); };
-  const [ficha, setFicha] = useState(null);
-  const [ficha360, setFicha360] = useState(null);   // ficha real (backend) en modo conectado
   const [fmId, setFmId] = useState(() => {
     const { pacienteId } = parseHash(typeof window !== "undefined" ? window.location.hash : "");
     return pacienteId || null;
   });
   const [fmTab, setFmTab] = useState(null);
-  const [cargandoFicha, setCargandoFicha] = useState(false);
   useEffect(() => {
     const { pacienteId } = parseHash(window.location.hash);
     if (pacienteId) setFmId(pacienteId);
@@ -2233,25 +1661,13 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     }
   }, [fmId]); // eslint-disable-line
   const cerrarFm = () => { setFmId(null); setFmTab(null); irHash("pacientes"); };
-  /**
-   * Historia clinica. Conectado abre la Ficha medica, que es la que guarda de verdad
-   * (paciente.fichaClinica en el servidor). El modal ligero guardaba en localStorage
-   * y avisaba "guardada": la anamnesis se perdia al recargar, no la veia nadie mas
-   * del equipo, y encima arrancaba con los datos de ejemplo de otro paciente.
-   * En demostracion se conserva el modal, que es donde tiene sentido.
-   */
-  const abrirHistoria = (p) => {
-    if (conectado && p?.id) { setFmTab(null); setFmId(p.id); return; }
-    setHistPac(p);
-  };
-  const verFicha = (p) => {
-    if (conectado && p?.id) { setFmTab(null); setFmId(p.id); return; }
-    setFicha(p.nombre);
-  };
-  const abrirOdontograma = (p) => {
-    if (conectado && p?.id) { setFmTab("odontograma"); setFmId(p.id); return; }
-    notify("Abre un paciente con sesión conectada para ver el odontograma.");
-  };
+  // Una sola historia clínica: la Ficha médica, que es la que guarda en el servidor
+  // (paciente.fichaClinica, /historia, /auditoria). La demostración abre la misma
+  // pantalla con datos de ejemplo, así lo que se revisa es lo que se usará.
+  const abrirFicha = (p, tab = null) => { if (p?.id != null) { setFmTab(tab); setFmId(p.id); } };
+  const abrirHistoria = (p) => abrirFicha(p, "historia");
+  const verFicha = (p) => abrirFicha(p);
+  const abrirOdontograma = (p) => abrirFicha(p, "odontograma");
   const [form, setForm] = useState(null); // datos + segmentación de marketing
   const [camp, setCamp] = useState(null); // compositor de campaña de marketing
   const nuevo = () => { setFormErr({}); setForm({ nombre: "", dni: "", telefono: "", email: "", nacimiento: "", genero: "", distrito: "", canal: "Recomendación", aseguradora: "Ninguno", marketing: false, sedes: [1], tags: [], comentario: "", tarea: "", apoderadoNombre: "", apoderadoParentesco: "", apoderadoDni: "", apoderadoTelefono: "" }); };
@@ -2475,18 +1891,16 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
       </section>
       <DataTable titulo="Directorio de pacientes" maxHeight={560} sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
-      {ficha && <FichaPaciente nombre={ficha} onClose={() => setFicha(null)} fichas={fichas} />}
-      {ficha360 && <FichaReal data={ficha360} onClose={() => setFicha360(null)} notify={notify} />}
       {fmId && (
         <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
           <FichaMedica pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
+            pacienteDemo={conectado ? null : pacientes.find((x) => String(x.id) === String(fmId))}
             sedeId={sedeApiUuid(sedeIds?.[0] ?? 1)}
             initialTab={fmTab}
             onAgendar={(pac) => { cerrarFm(); onAgendarPaciente?.(pac); }}
             onCobrar={(pac) => { cerrarFm(); onCobrarPaciente?.(pac); }} />
         </React.Suspense>
       )}
-      {histPac && <HistoriaClinica paciente={histPac} ficha={fichas[histPac.id]} notify={notify} onClose={() => setHistPac(null)} onEditarPaciente={() => { const p = histPac; setHistPac(null); editar(p); }} onSave={(hc) => updFicha(histPac.id, (cur) => ({ ...cur, historiaClinica: hc }))} />}
       {camp && (() => {
         const canales = [["whatsapp", "WhatsApp", <MessageSquare size={15} strokeWidth={1.75} />], ["email", "Email", <Mail size={15} strokeWidth={1.75} />], ["ambos", "Ambos", <Send size={15} strokeWidth={1.75} />]];
         const preview = (camp.msg || "").replace(/\{nombre\}/g, lista.find((p) => p.marketing)?.nombre?.split(" ")[0] || "Ana");
@@ -2638,12 +2052,6 @@ const ESTADOS_DIENTE = {
   sano: { l: "Sano", color: "#fff", borde: "var(--dc-ink-400)", porCara: false },
   ...ESTADOS_ODO,
 };
-const CARAS = (pieza) => [
-  { k: "top", l: "Vestibular" },
-  { k: "bottom", l: ES_SUPERIOR(pieza) ? "Palatino" : "Lingual" },
-  { k: "left", l: "Mesial" }, { k: "right", l: "Distal" },
-  { k: "center", l: (Number(String(pieza).slice(-1)) >= 1 && Number(String(pieza).slice(-1)) <= 3) ? "Incisal" : "Oclusal" },
-];
 const DIENTES_ADULTO = {
   sup: [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28],
   inf: [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38] };
@@ -5098,6 +4506,10 @@ function MiProduccion({ usuario, citas }) {
   // Si el usuario conectado NO es odontólogo (un administrador, recepción), este módulo
   // no aplica: se dice claramente en vez de caer a los números de demostración, que era
   // justo el problema — un admin viendo "su" producción inventada.
+  // Mientras llega la respuesta no se pintan las cifras de ejemplo de la demostración.
+  if (conectado && real == null) {
+    return <Vacio icon={<Clock size={26} strokeWidth={1.75} />} titulo="Cargando tu producción…" sub="Trayendo tus atenciones y comisiones del mes." />;
+  }
   if (conectado && real && real.fallo) {
     return (
       <Vacio icon={<AlertTriangle size={26} strokeWidth={1.75} />}
@@ -5393,7 +4805,9 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     if (conectado) { api.usuarios.desactivar(u.id).then(() => { notify(`${u.nombre} desactivado.`); recargar(); }).catch(() => notify("No se pudo desactivar al usuario.")); return; }
     setStaff((s) => s.filter((x) => x.id !== u.id)); notify(`${u.nombre} dado de baja.`);
   };
-  const resetPass = (u) => notify(`Se envió un enlace para restablecer la contraseña de ${u.nombre} a ${u.email || u.user}. (Help Desk TI)`);
+  const resetPass = (u) => notify(auth.token
+    ? `El restablecimiento de clave de ${u.nombre} todavía no está disponible desde aquí. Pídelo a soporte.`
+    : `Se envió un enlace para restablecer la contraseña de ${u.nombre} a ${u.email || u.user}. (Demostración)`);
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -5507,35 +4921,6 @@ const togglePermAccion = (perms, mod, acc) => {
 };
 
 /* Matriz reutilizable Módulo × Acción. `perms` = {modId:[acciones]}. */
-function MatrizPermisos({ perms, onToggle, lockVer, solo }) {
-  const lista = solo ? MODULOS.filter((m) => solo.includes(m.id)) : MODULOS;
-  return (
-    <div className="dc-mp">
-      <table>
-        <thead>
-          <tr>
-            <th>Módulo</th>
-            {ACCIONES.map((a) => <th key={a.id}>{a.label}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {lista.map((m) => { const acts = perms[m.id] || []; const visible = acts.includes("ver"); return (
-            <tr key={m.id} className={visible ? "" : "is-oculto"}>
-              <td><span className="dc-mp__mod"><i className={visible ? "is-on" : ""} />{m.label}</span><small>{visible ? `${acts.length}/${ACCIONES.length}` : "Oculto"}</small></td>
-              {ACCIONES.map((a) => { const on = acts.includes(a.id); const locked = a.id === "ver" && lockVer && lockVer(m.id); const lbl = locked ? "Obligatorio (no editable)" : on ? `Quitar ${a.label}` : `Dar ${a.label}`; return (
-                <td key={a.id}>
-                  <button type="button" className={`dc-mini-btn dc-mp__t${on ? " is-on" : ""}${a.id === "ver" ? " is-ver" : ""}${locked ? " is-lock" : ""}`} aria-label={lbl} title={lbl} aria-pressed={on} onClick={() => { if (!locked) onToggle(m.id, a.id); }}>
-                    {on ? (locked ? <Lock size={11} strokeWidth={2.4} /> : <Check size={12} strokeWidth={3} />) : null}
-                  </button>
-                </td>
-              ); })}
-            </tr>
-          ); })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 /* Permisos agrupados por área: interruptor "Ver" y acciones como etiquetas. */
 const GRUPOS_PERM = [
@@ -8140,7 +7525,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Sede concreta donde se registran las cosas nuevas (nunca "all").
   const sedeActiva = sede === "all" ? (sedeDetectada ?? misSedes[0] ?? 1) : sede;
 
-  const onAgendarIA = () => { setCitas((cs) => [...cs, { id: Date.now(), paciente: "Nuevo (vía IA)", dni: "00000000", medicoId: 1, esp: 1, sede: sedeActiva, fecha: fmt(hoy), hora: "16:30", motivo: "Agendado por agente IA", estado: "confirmada", llegada: false }]); notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}.`); };
+  const onAgendarIA = () => { if (auth.token) { notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}. Aparecerá en la Agenda.`); return; } setCitas((cs) => [...cs, { id: Date.now(), paciente: "Nuevo (vía IA)", dni: "00000000", medicoId: 1, esp: 1, sede: sedeActiva, fecha: fmt(hoy), hora: "16:30", motivo: "Agendado por agente IA", estado: "confirmada", llegada: false }]); notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}.`); };
 
   // P1-1: iniciar atención → abre el espacio clínico del paciente de esa cita.
   const atenderCita = (cita) => {
@@ -8457,7 +7842,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
             <h1 className="dc-top__titulo">{NAV.find((n) => n.id === vista)?.label}</h1>
           </div>
         </header>
-        <div data-dc-scroll className="dc-contenido" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}><div className={`dc-pagina${vista === "whatsapp" ? " dc-pagina--chat" : ""}`}><div id="dc-top-slot" className="dc-vista-acc" /><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 14 }}>Cargando módulo…</div>}>{render()}</React.Suspense></div></div>
+        <div data-dc-scroll className="dc-contenido" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}><div className={`dc-pagina${vista === "whatsapp" ? " dc-pagina--chat" : ""}`}><div id="dc-top-slot" className="dc-vista-acc" /><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 14 }}>Cargando módulo…</div>}><React.Fragment key={retryTick}>{render()}</React.Fragment></React.Suspense></div></div>
       </main>
 
       {showPasos && (() => {

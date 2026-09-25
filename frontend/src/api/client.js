@@ -458,7 +458,13 @@ export const api = {
     probar: (clave, telefono) => request("POST", `/automatizaciones/${clave}/probar`, { telefono }),
     probarHsm: (clave, telefono) => request("POST", `/automatizaciones/${clave}/probar-hsm`, { telefono }),
   },
-  auditoria: () => request("GET", "/auditoria"),
+  // Sin parámetros: registro de toda la clínica. Con { pacienteId }: solo los accesos
+  // y cambios de esa historia clínica (el servidor puede ignorar el filtro; la ficha
+  // vuelve a filtrar por su lado).
+  auditoria: (q = {}) => {
+    const qs = new URLSearchParams(Object.entries(q).filter(([, v]) => v != null && v !== "")).toString();
+    return request("GET", `/auditoria${qs ? `?${qs}` : ""}`);
+  },
   // ── Grupo B (módulos operativos/clínicos) ──
   inventario: {
     listar: () => request("GET", "/inventario"),

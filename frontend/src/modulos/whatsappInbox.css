@@ -5,14 +5,6 @@
   box-sizing: border-box;
 }
 
-.dc-inbox-header-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-  max-width: 100%;
-}
-
 .dc-inbox-chat-head {
   display: flex;
   align-items: center;
@@ -86,11 +78,6 @@
 }
 
 /* ---- Estado del canal (en la cabecera de la app) ---- */
-.wa-estado { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: space-between; min-width: 0; }
-.wa-estado__datos { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--dc-ink-500); white-space: nowrap; }
-.wa-estado__datos b { color: var(--dc-ink-900); font-weight: 600; }
-.wa-estado__sep { width: 1px; height: 16px; background: var(--dc-line); }
-.wa-estado .dc-inbox-header-actions { flex-wrap: nowrap; }
 
 /* ---- Lista de chats ---- */
 .dc-inbox-list { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--dc-line); background: var(--dc-surface); }
@@ -110,11 +97,12 @@
 .dc-inbox-chat-head { flex-shrink: 0; padding: 8px 14px !important; background: #F7F8F8; border-bottom: 1px solid var(--dc-line); flex-wrap: nowrap !important; }
 .dc-inbox-chat-head-name > div:last-child > div:first-child { font-size: 15px !important; font-weight: 600 !important; color: var(--dc-ink-900) !important; }
 .dc-inbox-chat-head-actions { flex-wrap: nowrap !important; align-items: center; }
-.wa-volver, .wa-info, .wa-info-cerrar { all: unset; box-sizing: border-box; cursor: pointer; width: 34px; height: 34px; min-width: 34px; border-radius: 999px; display: grid; place-items: center; color: var(--dc-ink-500); }
-.wa-volver:hover, .wa-info:hover, .wa-info-cerrar:hover { background: rgba(14,42,51,.07); color: var(--dc-ink-900); }
+.wa-volver,
+.wa-info { all: unset; box-sizing: border-box; cursor: pointer; width: 34px; height: 34px; min-width: 34px; border-radius: 999px; display: grid; place-items: center; color: var(--dc-ink-500); }
+.wa-volver:hover,
+.wa-info:hover { background: rgba(14,42,51,.07); color: var(--dc-ink-900); }
 .wa-info[aria-expanded="true"] { color: var(--dc-brand-600); }
 .wa-volver { display: none !important; margin-right: 2px; }
-.wa-info-cerrar { position: absolute; top: 10px; right: 10px; display: none !important; }
 
 /* Fondo con un patrón muy tenue, como el papel tapiz de WhatsApp. */
 .wa-hilo {
@@ -186,7 +174,7 @@
   .dc-inbox.wa { position: relative; }
   .wa-vacio { grid-column: 2 / 3; }
 }
-@media (max-width: 1180px) { .wa-estado__datos { display: none; } }
+
 /* Pantallas grandes: panel fijo que se puede ocultar con (i) o con la ✕. */
 @media (min-width: 1501px) {
   .dc-inbox.wa.sin-info { grid-template-columns: 290px minmax(0, 1fr); }
@@ -208,7 +196,7 @@
   .wa-hilo { padding: 10px 12px 14px; }
   .dc-inbox-chat-head-actions .dc-btn { padding: 4px 10px !important; }
   .wa-vacio { display: none; }
-  .wa-estado .dc-inbox-header-actions { display: none; }
+  
 }
 
 /* Hora del último mensaje y contador de no leídos, como en WhatsApp. */

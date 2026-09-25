@@ -63,7 +63,6 @@
   --dc-sh-2:0 10px 30px -12px rgba(14,42,51,.18);
   --dc-sh-3:0 20px 45px -28px rgba(15,27,56,.40);
 
-
   /* ---- Alias de marca / estados usados en app (Sprint 5) ---- */
   --dc-navy:#0F4050;
   --dc-red:#C8312B;
@@ -102,7 +101,6 @@
   --dc-fee2:#FEE4E2;
   --dc-line-alt:#C6D8DB;
   --dc-line-alt2:#C6D8DB;
-
 
   /* ---- Auto Sprint 5 (hex residuales → tokens) ---- */
 
@@ -190,7 +188,8 @@ button, input, select, textarea { font-family: inherit; word-spacing: inherit; }
   font-size: 12px !important;
   font-weight: 600 !important;
 }
-.dc-kpi__value, .dc-franja__cifra b, .dc-hoy__cifras b, .dc-cita__hora,
+.dc-kpi__value,
+.dc-cita__hora,
 [style*="tabular-nums"] { font-variant-numeric: tabular-nums lining-nums; }
 .dc-btn, input.dc-premium-inp, select, textarea,
 .dc-campo__input, [role="button"] {
@@ -324,17 +323,7 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc
     margin-right: 12px;
     flex-shrink: 0;
   }
-  .dc-action-bar-mobile {
-    position: sticky;
-    bottom: 0;
-    z-index: 40;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    background: rgba(255,255,255,.92);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid var(--dc-line);
-    display: flex;
-    gap: 8px;
-  }
+  
 }
 @media (max-width: 479px) {
   .dc-kpi__value { font-size: 20px !important; }

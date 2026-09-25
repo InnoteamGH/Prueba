@@ -1,7 +1,7 @@
 /* Módulo WhatsApp + IA (inbox, agente, configuración del asistente).
    Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Settings, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, X, Zap } from "lucide-react";
+import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
 import {MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
 import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";

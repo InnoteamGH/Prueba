@@ -1,6 +1,6 @@
 /* Módulo Recall. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect } from "react";
-import { AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, ChevronRight, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap } from "lucide-react";
+import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
 import {EnCabecera, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint} from "../comun";
 

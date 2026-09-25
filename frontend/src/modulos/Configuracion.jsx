@@ -1,6 +1,6 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect } from "react";
-import { AlertCircle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone } from "lucide-react";
+import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone} from "lucide-react";
 import api, { auth } from "../api/client";
 import {Btn, Card, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales} from "../comun";
 

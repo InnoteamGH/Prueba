@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {AvatarPaciente, PACIENTES_INIT, FICHA_CLINICA, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, calcEdad, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {AvatarPaciente, PACIENTES_INIT, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -22,6 +22,7 @@ import {
   X, User, Phone, Stethoscope, Smile, ClipboardList, CreditCard,
   FileText, Plus, Check, Mail, MessageSquare, Camera, AlertTriangle, Tag, Braces, Image, Pill, Printer, Trash2, Baby, Eraser,
   CalendarDays, Activity, Clock, Paperclip, LayoutGrid, ChevronDown, Pencil, Search, Shield, FlaskConical, Calendar,
+  History, Lock, Eye, FilePlus, ShieldCheck, FilePen, PenLine, Download,
 } from "lucide-react";
 
 /* ── Paleta dental: mismos tokens DS del producto (D17) ── */
@@ -894,6 +895,78 @@ const VITALES_PED = [["peso", "Peso", "kg"], ["talla", "Talla", "cm"]];
 const TIPOS_ARCHIVO = ["Radiografía panorámica", "Radiografía periapical", "Radiografía bitewing", "Tomografía", "Foto intraoral", "Foto extraoral", "Documento", "Otro"];
 const ESTADO_CITA = { pendiente: "Pendiente", confirmada: "Confirmada", en_atencion: "En atención", atendida: "Atendida", cancelada: "Cancelada", no_show: "No asistió", cerrada_sistema: "Cerrada por sistema" };
 // Plantillas rápidas para no escribir de cero (el doctor solo ajusta el detalle).
+/* ── Registro de actividad de la historia clínica ──
+   Quién abrió o cambió el expediente y cuándo (NTS 139-MINSA y Ley 29733). La fuente
+   es GET /auditoria?pacienteId=…; si el servidor aún no filtra por paciente, se
+   reconstruye con los registros clínicos que ya traen autor y fecha. */
+const REG_TIPOS = {
+  acceso: { l: "Acceso", Ic: Eye, c: "#2563EB" },
+  crear: { l: "Registro", Ic: FilePlus, c: "#0E9199" },
+  editar: { l: "Modificación", Ic: FilePen, c: "#D97706" },
+  adenda: { l: "Adenda", Ic: PenLine, c: "#7C3AED" },
+  firma: { l: "Firma", Ic: ShieldCheck, c: "#16A36A" },
+  imprimir: { l: "Impresión", Ic: Printer, c: "#475569" },
+  eliminar: { l: "Eliminación", Ic: Trash2, c: "#DC2626" },
+};
+const tipoRegistro = (accion) => {
+  const a = String(accion || "").toUpperCase();
+  if (/ACCESO|VER|LECTURA|CONSULTA/.test(a)) return "acceso";
+  if (/ADENDA/.test(a)) return "adenda";
+  if (/FIRM/.test(a)) return "firma";
+  if (/IMPRI|EXPORT|DESCARG/.test(a)) return "imprimir";
+  if (/ELIMIN|BORR|DELETE|ANUL/.test(a)) return "eliminar";
+  if (/CREA|REGISTR|POST|NUEV|ALTA|SUB/.test(a)) return "crear";
+  return "editar";
+};
+const ACCION_LEGIBLE = { HC_ACCESO: "Abrió la historia clínica", HC_ACTUALIZAR: "Modificó la historia clínica", HC_IMPRIMIR: "Imprimió la historia clínica" };
+/** Filas del servidor → formato del registro. Solo las que son de este paciente. */
+function registroDesdeServidor(list, pac) {
+  const id = String(pac?.id ?? ""), dni = String(pac?.dni || "");
+  return (Array.isArray(list) ? list : []).filter((a) => {
+    const ref = [a.pacienteId, a.entidadId, a.recursoId].map((x) => (x == null ? "" : String(x)));
+    if (id && ref.includes(id)) return true;
+    const det = String(a.detalle || "");
+    return (id && det.includes(id)) || (dni && det.includes(dni));
+  }).map((a, i) => ({
+    id: a.id || `srv-${i}`,
+    ts: a.creadoEn || a.fecha || "",
+    usuario: a.usuario || "—",
+    rol: a.rol || "",
+    tipo: tipoRegistro(a.accion),
+    accion: ACCION_LEGIBLE[a.accion] || a.accion || "Actividad",
+    detalle: a.detalle && a.detalle !== "—" ? a.detalle : "",
+    origen: [a.ip && a.ip !== "—" ? a.ip : "", a.dispositivo || ""].filter(Boolean).join(" · "),
+  }));
+}
+/** Reconstruye el registro con lo que ya trae autor y fecha (evoluciones, recetas, archivos, consentimientos). */
+function registroDesdeFicha(d, rx, consent) {
+  const out = [];
+  const arrX = (v) => (Array.isArray(v) ? v : []);
+  arrX(d?.historia).filter((h) => !h.local).forEach((h, i) => {
+    const vacia = !String(h.diagnostico || "").trim() && !String(h.detalle || "").trim();
+    const adenda = h.titulo === "Adenda";
+    out.push({ id: `h-${h.id || i}`, ts: h.creadoEn || (h.fecha ? `${h.fecha}T${h.hora || "12:00"}:00` : ""), usuario: h.medico || h.creadoPor || "—", rol: "Odontólogo",
+      tipo: adenda ? "adenda" : "crear", accion: adenda ? "Agregó una adenda" : vacia ? "Se abrió la evolución de la cita" : "Registró una evolución",
+      detalle: [h.diagnostico, h.detalle].filter(Boolean).join(" — ").slice(0, 160) });
+  });
+  arrX(d?.recetas).forEach((r, i) => out.push({ id: `r-${r.id || i}`, ts: r.creadoEn || (r.fecha ? `${r.fecha}T12:00:00` : ""), usuario: r.medico || "—", rol: "Odontólogo", tipo: "crear", accion: "Emitió una receta", detalle: r.indicaciones || r.texto || "" }));
+  arrX(rx).filter((x) => !x.local).forEach((x, i) => out.push({ id: `x-${x.id || i}`, ts: x.creadoEn || (x.fecha ? `${x.fecha}T12:00:00` : ""), usuario: x.subidoPor || "—", rol: "", tipo: "crear", accion: `Anexó ${String(x.tipo || "un archivo").toLowerCase()}`, detalle: x.nota || "" }));
+  arrX(consent).filter((c) => c.firmado && !c.local).forEach((c, i) => out.push({ id: `c-${c.id || i}`, ts: c.fechaFirma || c.creadoEn || "", usuario: c.firmanteNombre || "Paciente", rol: "Firmante", tipo: "firma", accion: "Firmó un consentimiento", detalle: c.tipo || c.titulo || "" }));
+  return out.filter((e) => e.ts);
+}
+/** Accesos de ejemplo para la demostración (lo que el servidor devolverá con sesión). */
+function registroDemo(pac) {
+  const base = new Date(); base.setMinutes(0, 0, 0);
+  const hace = (dias, h, m) => { const x = new Date(base); x.setDate(x.getDate() - dias); x.setHours(h, m); return x.toISOString(); };
+  const nom = pac?.nombre || "el paciente";
+  return [
+    { id: "dm1", ts: hace(0, 9, 12), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "Consulta del día", origen: "Sede Miraflores · Chrome en Windows" },
+    { id: "dm2", ts: hace(0, 8, 47), usuario: "Lucía Paz", rol: "Recepción", tipo: "acceso", accion: "Abrió la historia clínica", detalle: `Confirmó la cita de ${nom}`, origen: "Sede Miraflores · Chrome en Windows" },
+    { id: "dm3", ts: hace(3, 17, 5), usuario: "Roberto Díaz", rol: "Administrador", tipo: "imprimir", accion: "Imprimió la historia clínica", detalle: "Copia solicitada por el paciente", origen: "Sede San Isidro · Edge en Windows" },
+    { id: "dm4", ts: hace(12, 11, 30), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "editar", accion: "Modificó la anamnesis", detalle: "Antecedentes: agregó «Bruxismo»", origen: "Sede Miraflores · Safari en iPad" },
+    { id: "dm5", ts: hace(12, 11, 2), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "", origen: "Sede Miraflores · Safari en iPad" },
+  ];
+}
 const PLANTILLAS_EVO = [
   { l: "Profilaxis", diag: "Profilaxis dental", det: "Destartraje supragingival y profilaxis con pasta profiláctica. Se refuerzan indicaciones de higiene oral y técnica de cepillado." },
   { l: "Exodoncia", diag: "Exodoncia simple", det: "Bajo anestesia local, se realiza exodoncia de la pieza ___. Hemostasia lograda. Se indican cuidados post-operatorios." },
@@ -918,7 +991,7 @@ const ALERGIA_FAMILIA = [
 ];
 const MIN_ALERGIA_MATCH = 4;
 
-export default function FichaMedica({ pacienteId, onClose, notify = () => { }, can, onAgendar, onCobrar, rol: rolProp, sedeId = null, initialTab = null }) {
+export default function FichaMedica({ pacienteId, onClose, notify = () => { }, can, onAgendar, onCobrar, rol: rolProp, sedeId = null, initialTab = null, pacienteDemo = null }) {
   const conectado = !!auth.token;
   const rol = rolProp || auth.sesion?.rol || "";
   // Evitar click-through: al cerrar, el mismo click puede caer en el sidebar del shell
@@ -946,6 +1019,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const puedeLab = tabMod("laboratorio");
   const puedeConsent = tabMod("consentimientos");
   const puedeOrto = tabMod("odontograma") || tabMod("tratamientos");
+  // El registro de accesos lo ven quien escribe en la historia y quien audita.
+  const puedeRegistro = !conectado || !can || can("auditoria", "ver") || puedeEscribirClinico;
   const [d, setD] = useState(null);   // payload de ficha360
   const [tab, setTab] = useState(initialTab || "resumen");
   useEffect(() => {
@@ -984,6 +1059,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const [upNota, setUpNota] = useState("");
   const [labOrdenes, setLabOrdenes] = useState([]);
   const [consentimientos, setConsentimientos] = useState([]);
+  const [regSrv, setRegSrv] = useState(null);          // filas de auditoría del servidor (null = sin cargar)
+  const [regLocal, setRegLocal] = useState([]);        // lo hecho en esta sesión (demo)
+  const [regFiltro, setRegFiltro] = useState("todo");
+  const [regQ, setRegQ] = useState("");
   const [fil, setFil] = useState(null); // form de filiación (editable)
   const [fc, setFc] = useState(null);   // ficha clínica estructurada (anamnesis/examen)
   const [tagIn, setTagIn] = useState("");
@@ -996,14 +1075,26 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     // Modo demostración: arma la ficha con los datos de ejemplo del paciente, para
     // que la pantalla se pueda revisar sin backend.
     if (!conectado && pacienteId != null) {
-      const pac = PACIENTES_INIT.find((x) => String(x.id) === String(pacienteId));
+      const pac = pacienteDemo || PACIENTES_INIT.find((x) => String(x.id) === String(pacienteId));
       const fc = FICHA_CLINICA[pacienteId] || {};
       if (pac) {
         const trat = (fc.tratamiento || []).map((t) => ({ ...t, estado: t.estado === "atendida" ? "completada" : t.estado }));
         const total = trat.reduce((a, t) => a + (Number(t.costo) || 0), 0);
         const pagado = (fc.pagos || []).reduce((a, g) => a + (Number(g.monto) || 0), 0);
-        setD({ paciente: { ...pac, alergias: fc.alergias || [], antecedentes: fc.antecedentes || [] }, resumen: { saldo: total - pagado, total, pagado, planTotal: total, invertido: pagado }, tratamientos: trat, pagos: fc.pagos || [], recetas: fc.recetas || [], historia: fc.historia || [], citas: [] });
-        setFil((f) => ({ ...f, nombre: pac.nombre || "", dni: pac.dni || "", telefono: pac.telefono || "", email: pac.email || "" }));
+        const medNom = (id) => (MEDICOS.find((m) => m.id === id) || {}).nombre || "";
+        const historia = (fc.historia || []).map((h, i) => ({ id: `demo-h${i}`, medico: medNom(1), diagnostico: h.diagnostico || h.titulo, ...h }));
+        const recetas = (fc.recetas || []).map((r2, i) => ({ id: `demo-r${i}`, medico: medNom(1), indicaciones: r2.indicaciones || r2.texto, ...r2 }));
+        const citas = CITAS_INIT.filter((c) => c.paciente === pac.nombre).map((c) => ({ ...c, medico: medNom(c.medicoId) }));
+        const paciente = { ...pac, fechaNacimiento: pac.fechaNacimiento || pac.nacimiento || "", alergias: fc.alergias || [], antecedentes: fc.antecedentes || [] };
+        setD({ paciente, resumen: { saldo: total - pagado, total, pagado, planTotal: total, invertido: pagado }, tratamientos: trat, pagos: fc.pagos || [], recetas, historia, citas });
+        setFil({ nombre: pac.nombre || "", dni: pac.dni || "", telefono: pac.telefono || "", email: pac.email || "", fechaNacimiento: paciente.fechaNacimiento, genero: pac.genero || "", distrito: pac.distrito || "", aseguradora: pac.aseguradora && pac.aseguradora !== "Ninguno" ? pac.aseguradora : "",
+          apoderadoNombre: pac.apoderadoNombre || "", apoderadoParentesco: pac.apoderadoParentesco || "", apoderadoDni: pac.apoderadoDni || "", apoderadoTelefono: pac.apoderadoTelefono || "" });
+        setFc((cur) => cur || { motivoConsulta: fc.historia?.[0]?.titulo ? `Control posterior a ${String(fc.historia[0].titulo).toLowerCase()}` : "", filiacion: { direccion: pac.distrito ? `Av. Principal 123, ${pac.distrito}` : "", ocupacion: "", estadoCivil: "", grupoSanguineo: "", contactoEmergencia: "", telefonoEmergencia: "" } });
+        setMedicos(MEDICOS.map((m) => ({ id: String(m.id), nombre: m.nombre })));
+        setConsentimientos((cur) => cur.length ? cur : [
+          { id: "demo-c1", tipo: "Consentimiento general de atención", firmado: true, fechaFirma: pac.ultima || "", firmanteNombre: pac.apoderadoNombre || pac.nombre },
+          ...(trat.some((t) => t.estado !== "completada") ? [{ id: "demo-c2", tipo: `Consentimiento para ${String(trat.find((t) => t.estado !== "completada").nombre).toLowerCase()}`, firmado: false }] : []),
+        ]);
       }
       setCargandoFicha(false);
       return;
@@ -1013,7 +1104,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     setErrorFicha(null);
     api.pacientes.ficha360(pacienteId).then((r) => {
       setD(r);
-      setFil({ nombre: r?.paciente?.nombre || "", dni: r?.paciente?.dni || "", telefono: r?.paciente?.telefono || "", email: r?.paciente?.email || "", fechaNacimiento: r?.paciente?.fechaNacimiento || "", genero: r?.paciente?.genero || "", distrito: r?.paciente?.distrito || "", aseguradora: r?.paciente?.aseguradora || "" });
+      const rp = r?.paciente || {};
+      setFil({ nombre: rp.nombre || "", dni: rp.dni || "", telefono: rp.telefono || "", email: rp.email || "", fechaNacimiento: rp.fechaNacimiento || "", genero: rp.genero || "", distrito: rp.distrito || "", aseguradora: rp.aseguradora || "",
+        apoderadoNombre: rp.apoderadoNombre || "", apoderadoParentesco: rp.apoderadoParentesco || "", apoderadoDni: rp.apoderadoDni || "", apoderadoTelefono: rp.apoderadoTelefono || "" });
       setFc(parseJson(r?.paciente?.fichaClinica, {}) || {});
       setCargandoFicha(false);
     }).catch((err) => {
@@ -1036,6 +1129,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])).catch(() => setConsentimientos([]));
     }
   }, [pacienteId]); // eslint-disable-line
+
+  const cargarRegistro = () => {
+    if (!conectado || !pacienteId) return;
+    api.auditoria({ pacienteId }).then((list) => setRegSrv(list || [])).catch(() => setRegSrv([]));
+  };
+  useEffect(() => { if (tab === "registro" && regSrv == null) cargarRegistro(); }, [tab]); // eslint-disable-line
+  // Lo hecho en esta sesión queda en el registro al instante (en demostración es la única fuente).
+  const anotar = (tipo, accion, detalle = "") => setRegLocal((cur) => [{ id: `loc-${Date.now()}-${cur.length}`, ts: new Date().toISOString(), usuario: auth.sesion?.nombre || "Tú", rol: auth.sesion?.rol || "", tipo, accion, detalle, origen: "Esta sesión" }, ...cur]);
 
   const p = d?.paciente || {};
   const r = d?.resumen || {};
@@ -1109,17 +1210,32 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       genero,
       distrito: (fil.distrito || "").trim() || null,
       aseguradora: (fil.aseguradora || "").trim() || null,
+      apoderadoNombre: (fil.apoderadoNombre || "").trim() || null,
+      apoderadoParentesco: (fil.apoderadoParentesco || "").trim() || null,
+      apoderadoDni: (fil.apoderadoDni || "").trim() || null,
+      apoderadoTelefono: (fil.apoderadoTelefono || "").trim() || null,
     };
-    api.pacientes.actualizar(pacienteId, payload).then(() => { notify("Filiación guardada."); cargar(); }).catch(() => notify("No se pudo guardar."));
+    // Dirección, ocupación, contacto de emergencia…: viajan dentro de la ficha clínica,
+    // que el servidor ya guarda como JSON, así no hace falta tocar el esquema del paciente.
+    const nextFc = { ...(fc || {}), filiacion: { ...((fc || {}).filiacion || {}) } };
+    anotar("editar", "Modificó la filiación", "Datos personales y de contacto");
+    if (!conectado) { setD((cur) => ({ ...cur, paciente: { ...cur.paciente, ...payload } })); setFc(nextFc); notify("Filiación guardada."); return; }
+    api.pacientes.actualizar(pacienteId, { ...payload, fichaClinica: JSON.stringify(nextFc) }).then(() => { notify("Filiación guardada."); cargar(); }).catch(() => notify("No se pudo guardar."));
   };
-  const savePac = (patch) => api.pacientes.actualizar(pacienteId, patch).then(cargar).catch(() => notify("No se pudo guardar."));
+  const savePac = (patch) => {
+    if (!conectado) { setD((cur) => ({ ...cur, paciente: { ...cur.paciente, ...patch } })); return Promise.resolve(); }
+    return api.pacientes.actualizar(pacienteId, patch).then(cargar).catch(() => notify("No se pudo guardar."));
+  };
   const addTag = () => { const t = tagIn.trim(); if (!t) return; const cur = arr(p.tags); if (!cur.includes(t)) savePac({ tags: [...cur, t] }); setTagIn(""); };
   const delTag = (t) => savePac({ tags: arr(p.tags).filter((x) => x !== t) });
-  const addAlergia = () => { const a = alergIn.trim(); if (!a) return; const cur = arr(p.alergias); if (!cur.includes(a)) savePac({ alergias: [...cur, a] }); setAlergIn(""); };
-  const delAlergia = (a) => savePac({ alergias: arr(p.alergias).filter((x) => x !== a) });
+  const addAlergia = () => { const a = alergIn.trim(); if (!a) return; const cur = arr(p.alergias); if (!cur.includes(a)) { savePac({ alergias: [...cur, a] }); anotar("editar", "Registró una alergia", a); } setAlergIn(""); };
+  const delAlergia = (a) => { savePac({ alergias: arr(p.alergias).filter((x) => x !== a) }); anotar("eliminar", "Quitó una alergia", a); };
   const toggleAntecedente = (c) => {
     if (!puedeEscribirClinico) return;
-    const cur = arr(p.antecedentes); const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]; api.pacientes.actualizar(pacienteId, { antecedentes: next }).then(cargar).catch(() => notify("No se pudo actualizar."));
+    const cur = arr(p.antecedentes); const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c];
+    anotar("editar", "Modificó los antecedentes", `${cur.includes(c) ? "Quitó" : "Agregó"} «${c}»`);
+    if (!conectado) { setD((x) => ({ ...x, paciente: { ...x.paciente, antecedentes: next } })); return; }
+    api.pacientes.actualizar(pacienteId, { antecedentes: next }).then(cargar).catch(() => notify("No se pudo actualizar."));
   };
 
   // ── Ficha clínica estructurada (anamnesis + examen) ──
@@ -1143,10 +1259,18 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     if (!evo.diagnostico.trim() && !evo.detalle.trim()) { notify("Escribe el diagnóstico o la evolución."); return; }
     if (medicos.length && !evoMedico) { notify("Indica el doctor que atendió."); return; }
     const sv = vitalesActivos.map(([k, l]) => (vit[k] ? `${l} ${vit[k]}` : "")).filter(Boolean).join(" – ");
+    if (!conectado) {
+      const med = medicos.find((m) => String(m.id) === String(evoMedico));
+      const ahora = new Date();
+      setD((cur) => ({ ...cur, historia: [{ id: `demo-h${Date.now()}`, fecha: hoy, hora: ahora.toTimeString().slice(0, 5), creadoEn: ahora.toISOString(), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || "", medico: med?.nombre || "", local: true }, ...arr(cur.historia)] }));
+      anotar("crear", "Registró una evolución", evo.diagnostico || evo.detalle);
+      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify("Evolución registrada y firmada.");
+      return;
+    }
     try {
       await api.historia.crear({ pacienteId, titulo: "Evolución", ...parseDiagnostico(evo.diagnostico), detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || null });
       if (evoFile) { try { const url = await leerArchivo(evoFile); await crearArchivo(url, "Foto intraoral", "Anexo de evolución" + (evo.diagnostico ? " – " + evo.diagnostico : "")); } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); } }
-      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify("Evolución registrada."); cargar(); recargarRx();
+      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify("Evolución registrada y firmada."); cargar(); recargarRx();
     } catch { notify("No se pudo guardar la evolución."); }
   };
   const completarDraft = (id) => {
@@ -1160,20 +1284,30 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     id: h.id,
     diagnostico: h.diagnostico || "",
     detalle: h.detalle || "",
-    medicoId: h.medicoId || "",
+    medicoId: String(h.medicoId || (medicos.find((m) => m.nombre === h.medico) || {}).id || ""),
     titulo: h.titulo || "",
     fecha: h.fecha || "",
-    // Si ya tenía contenido clínico, editar crea adenda (append-only MVP).
-    locked: !!(String(h.diagnostico || "").trim() || String(h.detalle || "").trim()) && h.titulo !== "Adenda",
+    // Una nota con contenido clínico queda cerrada: corregirla crea una adenda
+    // (también sobre otra adenda). La historia solo crece; nunca se reescribe.
+    locked: !!(String(h.diagnostico || "").trim() || String(h.detalle || "").trim()),
   });
   const guardarEdit = () => {
     const v = editEvo; if (!v) return;
     if (!(v.diagnostico || "").trim() && !(v.detalle || "").trim()) { notify("Escribe el diagnóstico o la evolución."); return; }
+    if (v.locked && !conectado) {
+      const med = medicos.find((m) => String(m.id) === String(v.medicoId));
+      const ahora = new Date();
+      setD((cur) => ({ ...cur, historia: [{ id: `demo-a${Date.now()}`, fecha: hoy, hora: ahora.toTimeString().slice(0, 5), creadoEn: ahora.toISOString(), titulo: "Adenda", adendaDe: v.id, adendaFecha: v.fecha, diagnostico: v.diagnostico, detalle: v.detalle, medicoId: v.medicoId || "", medico: med?.nombre || "", local: true }, ...arr(cur.historia)] }));
+      anotar("adenda", "Agregó una adenda", `A la evolución del ${fmtFecha(v.fecha)}`);
+      notify("Adenda registrada (la nota original no se modificó)."); setEditEvo(null);
+      return;
+    }
     if (v.locked) {
       const ref = v.fecha ? `del ${v.fecha}` : (v.id ? `#${String(v.id).slice(0, 8)}` : "");
       api.historia.crear({
         pacienteId,
         titulo: "Adenda",
+        adendaDe: v.id || null,
         ...parseDiagnostico(v.diagnostico || ""),
         detalle: `Adenda a evolución ${ref}. ${(v.detalle || "").trim()}`.trim(),
         medicoId: v.medicoId || null,
@@ -1224,10 +1358,19 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     const file = e.target.files && e.target.files[0];
     if (!file) { return; }
     if (!file.type.startsWith("image/")) { notify("Sube una imagen (radiografía o foto)."); e.target.value = ""; return; }
+    if (!conectado) {
+      leerArchivo(file).then((url) => { setRx((cur) => [{ id: `demo-x${Date.now()}`, tipo: upTipo, fecha: hoy, url, nota: upNota, local: true }, ...cur]); anotar("crear", `Anexó ${upTipo.toLowerCase()}`, upNota); setUpNota(""); notify("Archivo anexado al expediente."); });
+      e.target.value = ""; return;
+    }
     leerArchivo(file).then((url) => crearArchivo(url, upTipo, upNota).then(() => { notify("Archivo anexado al expediente."); setUpNota(""); recargarRx(); }).catch(() => notify("No se pudo subir el archivo.")));
     e.target.value = "";
   };
-  const borrarArchivo = (id) => { api.radiografias.borrar(id).then(() => { notify("Archivo eliminado."); recargarRx(); }).catch(() => notify("No se pudo eliminar.")); };
+  const borrarArchivo = (x) => {
+    if (!confirm(`¿Quitar «${x.tipo || "este archivo"}» del expediente? Quedará constancia en el registro de actividad.`)) return;
+    anotar("eliminar", "Quitó un archivo", x.tipo || "");
+    if (!conectado) { setRx((cur) => cur.filter((y) => y.id !== x.id)); notify("Archivo eliminado."); return; }
+    const id = x.id;
+    api.radiografias.borrar(id).then(() => { notify("Archivo eliminado."); recargarRx(); }).catch(() => notify("No se pudo eliminar.")); };
 
   // ── Imprimir historia clínica completa ──
   const imprimirHC = () => {
@@ -1279,13 +1422,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     ["historia", "Historia clínica", ClipboardList],
     ["odontograma", "Odontograma", Smile],
     ["perio", "Periodontograma", Activity],
-    ["receta", "Receta médica", Pill],
+    ["receta", "Receta", Pill],
     ["ortodoncia", "Ortodoncia", Braces],
-    ["cuenta", "Estado de cuenta", CreditCard],
+    ["cuenta", "Cuenta", CreditCard],
     ["laboratorio", "Laboratorio", FlaskConical],
     ["consentimientos", "Consentimientos", Shield],
     ["archivos", "Archivos", Image],
     ["filiacion", "Filiación", User],
+    ["registro", "Registro", History],
   ].filter(([k]) => (k !== "receta" || puedeRecetar)
                  && (k !== "perio" || puedePerio)
                  && (k !== "archivos" || puedeArchivos)
@@ -1293,6 +1437,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                  && (k !== "ortodoncia" || puedeOrto)
                  && (k !== "laboratorio" || puedeLab)
                  && (k !== "consentimientos" || puedeConsent)
+                 && (k !== "registro" || puedeRegistro)
                  // El periodontograma mide bolsa y recesion, y eso no se hace en
                  // denticion temporal: no se le ofrece a un menor de 13. Si por un
                  // caso concreto hicieran falta, basta con que el paciente pase a la
@@ -1359,7 +1504,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <textarea style={{ ...inpMini, resize: "vertical" }} rows={2} placeholder="Evolución / procedimiento" value={editEvo.detalle} onChange={(ev) => setEditEvo({ ...editEvo, detalle: ev.target.value })} />
             {editEvo.locked && (
               <div style={{ fontSize: 12, color: "var(--dc-warn-ink)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-sm)", padding: "8px 10px" }}>
-                Esta evolución ya está cerrada. Al guardar se crea una <b>Adenda</b> (la nota original no se modifica).
+                Esta evolución está firmada. Lo que escribas se guarda como <b>adenda</b> con tu nombre y la hora; la nota original no cambia.
               </div>
             )}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -1373,7 +1518,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     let titulo = "", sub = "", right = "";
     let editable = false;
     if (e.k === "cita") { const c = e.c; titulo = (c.especialidad && c.especialidad !== "—" ? c.especialidad : "Cita") + (c.estado && c.estado !== "—" ? " – " + (ESTADO_CITA[c.estado] || c.estado) : ""); sub = [c.motivo, c.medico && c.medico !== "—" ? rotuloMedico(c.medico) : "", c.hora].filter(Boolean).join(" – "); }
-    else if (e.k === "evolucion") { const h = e.h; const vacia = !(h.diagnostico && String(h.diagnostico).trim()) && !(h.detalle && String(h.detalle).trim()); titulo = vacia ? "Evolución (pendiente de llenar)" : (h.diagnostico || h.titulo || "Evolución"); sub = [h.detalle, h.signosVitales ? "Signos: " + h.signosVitales : "", h.medico && h.medico !== "—" ? rotuloMedico(h.medico) : ""].filter(Boolean).join(" – "); editable = conectado && !!h.id && !vacia; }
+    else if (e.k === "evolucion") { const h = e.h; const vacia = !(h.diagnostico && String(h.diagnostico).trim()) && !(h.detalle && String(h.detalle).trim()); titulo = vacia ? "Evolución (pendiente de llenar)" : (h.diagnostico || h.titulo || "Evolución"); sub = [h.detalle, h.signosVitales ? "Signos: " + h.signosVitales : ""].filter(Boolean).join(" – "); editable = puedeEscribirClinico && !!h.id && !vacia; }
     else if (e.k === "pago") { const g = e.g; titulo = g.concepto || "Pago"; right = money(g.monto); }
     else if (e.k === "receta") { const r2 = e.r; const its = arr(parseJson(r2.items, [])); titulo = "Receta" + (its.length ? ": " + its.map((x) => x.medicamento).filter(Boolean).join(", ") : ""); sub = r2.indicaciones || (r2.medico && r2.medico !== "—" ? rotuloMedico(r2.medico) : ""); }
     else if (e.k === "archivo") { const x = e.x; titulo = x.tipo || "Archivo"; sub = x.nota || ""; }
@@ -1384,9 +1529,16 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
             <span style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{titulo}</span>
             {right ? <span style={{ fontSize: 13, fontWeight: 500, color: GREEN }}>{right}</span>
-              : editable ? <button type="button" className="fm-edit dc-icon-btn" aria-label="Editar evolución" onClick={() => abrirEdit(e.h)} title="Editar evolución" style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 2, display: "inline-flex", flexShrink: 0 }}><Pencil size={14} strokeWidth={1.9} /></button> : null}
+              : editable ? <button type="button" className="fm-edit dc-icon-btn" aria-label="Agregar adenda" onClick={() => abrirEdit(e.h)} title="Agregar adenda (la nota original no cambia)" style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 2, display: "inline-flex", flexShrink: 0 }}><Pencil size={14} strokeWidth={1.9} /></button> : null}
           </div>
+          {e.k === "evolucion" && e.h.titulo === "Adenda" && <span className="fm-adenda"><PenLine size={11} strokeWidth={2.2} /> Adenda{e.h.adendaFecha ? ` a la nota del ${fmtFecha(e.h.adendaFecha)}` : ""}</span>}
           {sub && <div style={{ fontSize: 12, color: TEXT, marginTop: 2 }}>{sub}</div>}
+          {e.k === "evolucion" && (String(e.h.diagnostico || "").trim() || String(e.h.detalle || "").trim()) && (
+            <div className="fm-firma" title="Nota cerrada: para corregirla se agrega una adenda">
+              <Lock size={11} strokeWidth={2.2} />
+              <span>Firmada por <b>{e.h.medico && e.h.medico !== "—" ? rotuloMedico(e.h.medico) || e.h.medico : "profesional sin registrar"}</b>{e.h.cop ? ` · COP ${e.h.cop}` : ""} · {fmtFecha(e.h.fecha)}{e.h.hora ? `, ${String(e.h.hora).slice(0, 5)}` : ""}</span>
+            </div>
+          )}
           {e.k === "archivo" && e.x.url && <img src={e.x.url} alt="" style={{ marginTop: 6, width: 90, height: 66, objectFit: "cover", borderRadius: "var(--dc-r-sm)", border: `1px solid ${LINE}` }} />}
         </div>
       </div>
@@ -1484,7 +1636,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {onAgendar && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
             {onCobrar && debe && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
-            {conectado && puedeEscribirClinico && <button onClick={imprimirHC} style={btn("ghost")}><Printer size={15} strokeWidth={1.75} /> Imprimir HC</button>}
+            {puedeEscribirClinico && <button onClick={() => { anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }} style={btn("ghost")}><Printer size={15} strokeWidth={1.75} /> Imprimir HC</button>}
             <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>
           </div>
         </div>
@@ -1565,7 +1717,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {tab === "resumen" && (
               <>
                 {/* La alergia ya se ve en la cabecera y en la tarjeta de alergias. */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+                <div className="fm-kpis4" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
                   {[
                     ["Última visita", ultimaVisita ? fmtFecha(ultimaVisita.fecha) : "—", ultimaVisita && ultimaVisita.especialidad !== "—" ? ultimaVisita.especialidad : "", CalendarDays, NAVY],
                     ["Próxima cita", proximaCita ? fmtFecha(proximaCita.fecha) : "Sin programar", proximaCita ? (proximaCita.hora || "") : "", Clock, TEAL],
@@ -1633,6 +1785,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                             <div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.tipo || c.titulo || "Consentimiento"}</div>
                             <div style={{ fontSize: 12, color: MUTED }}>{(c.fechaFirma || c.creadoEn || "").slice(0, 10) || "—"} – {c.firmado ? "Firmado" : "Pendiente"}</div>
                           </div>
+                          {!c.firmado && !conectado && (
+                            <button onClick={() => { setConsentimientos((cur) => cur.map((y) => y.id === c.id ? { ...y, firmado: true, fechaFirma: hoy, firmanteNombre: p.apoderadoNombre || p.nombre, local: true } : y)); anotar("firma", "Firmó un consentimiento", c.tipo || ""); notify("Consentimiento firmado."); }}
+                              style={{ ...btn("ghost"), fontSize: 13 }}>Firmar</button>
+                          )}
                           {!c.firmado && conectado && (
                             <button onClick={() => api.consentimientos.firmar(c.id, `firma://${c.id}`, { firmanteNombre: p.nombre, firmanteDni: p.dni }).then(() => { notify("Consentimiento firmado."); api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])); }).catch(() => notify("No se pudo firmar."))}
                               style={{ ...btn("ghost"), fontSize: 13 }}>Firmar</button>
@@ -1643,25 +1799,68 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </div>
             )}
 
-            {tab === "filiacion" && fil && (
-              <div style={card}>
-                <div style={secTitle}>Datos personales</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div><label style={lbl}>Nombre completo</label><input style={inp} value={fil.nombre} onChange={(e) => setFil({ ...fil, nombre: e.target.value })} /></div>
-                  <div><label style={lbl}>DNI</label><input style={inp} value={fil.dni} onChange={(e) => setFil({ ...fil, dni: e.target.value.replace(/\D/g, "").slice(0, 8) })} /></div>
-                  <div><label style={lbl}>Teléfono</label><input style={inp} value={fil.telefono} onChange={(e) => setFil({ ...fil, telefono: e.target.value })} /></div>
-                  <div><label style={lbl}>Correo</label><input style={inp} value={fil.email} onChange={(e) => setFil({ ...fil, email: e.target.value })} /></div>
-                  <div><label style={lbl}>Fecha de nacimiento</label><input type="date" max={hoy} style={inp} value={fil.fechaNacimiento || ""} onChange={(e) => setFil({ ...fil, fechaNacimiento: e.target.value })} /></div>
-                  <div><label style={lbl}>Género</label>
-                    <Select value={fil.genero} onChange={(v) => setFil({ ...fil, genero: v })} placeholder="—"
-                      options={[{ value: "", label: "—" }, ...["Femenino", "Masculino", "Prefiere no decir"].map((g) => ({ value: g, label: g }))]} />
+            {tab === "filiacion" && fil && (() => {
+              const FL = F.filiacion || {};
+              const setFL = (k, v) => setFc((cur) => ({ ...(cur || {}), filiacion: { ...((cur || {}).filiacion || {}), [k]: v } }));
+              const campo = (label, val, on, extra = {}) => <div className="fm-fil__c"><label style={lbl}>{label}</label><input style={inp} value={val || ""} onChange={(e) => on(e.target.value)} {...extra} /></div>;
+              const nroHC = p.numeroHistoria || p.nroHistoria || p.dni || "—";
+              const verApoderado = esPed || enTransicion || fil.apoderadoNombre;
+              return (
+                <div className="fm-fil">
+                  <div className="fm-fil__hc">
+                    <span className="fm-fil__ico"><FileText size={18} strokeWidth={1.9} /></span>
+                    <div><small>N.º de historia clínica</small><b>{nroHC}</b>{!(p.numeroHistoria || p.nroHistoria) && p.dni && <em>Se usa el DNI como número de historia</em>}</div>
+                    {(p.creadoEn || p.fechaRegistro) && <div><small>Apertura de la historia</small><b>{fmtFecha(String(p.creadoEn || p.fechaRegistro).slice(0, 10))}</b></div>}
+                    <div><small>Edad</small><b>{edad != null ? `${edad} años` : "Sin fecha de nacimiento"}</b></div>
                   </div>
-                  <div><label style={lbl}>Distrito</label><input style={inp} value={fil.distrito} onChange={(e) => setFil({ ...fil, distrito: e.target.value })} /></div>
-                  <div><label style={lbl}>Aseguradora / EPS</label><input style={inp} value={fil.aseguradora} onChange={(e) => setFil({ ...fil, aseguradora: e.target.value })} placeholder="Ninguno" /></div>
+                  <section style={card}>
+                    <div className="fm-fil__t"><User size={15} strokeWidth={1.9} /> Identificación</div>
+                    <div className="fm-fil__g">
+                      {campo("Nombre completo", fil.nombre, (v) => setFil({ ...fil, nombre: v }))}
+                      {campo("DNI", fil.dni, (v) => setFil({ ...fil, dni: v.replace(/\D/g, "").slice(0, 8) }), { inputMode: "numeric" })}
+                      <div className="fm-fil__c"><label style={lbl}>Fecha de nacimiento</label><input type="date" max={hoy} style={inp} value={fil.fechaNacimiento || ""} onChange={(e) => setFil({ ...fil, fechaNacimiento: e.target.value })} /></div>
+                      <div className="fm-fil__c"><label style={lbl}>Sexo</label>
+                        <Select value={fil.genero} onChange={(v) => setFil({ ...fil, genero: v })} placeholder="—"
+                          options={[{ value: "", label: "—" }, ...["Femenino", "Masculino", "Prefiere no decir"].map((g) => ({ value: g, label: g }))]} />
+                      </div>
+                      <div className="fm-fil__c"><label style={lbl}>Estado civil</label>
+                        <Select value={FL.estadoCivil || ""} onChange={(v) => setFL("estadoCivil", v)} placeholder="—"
+                          options={[{ value: "", label: "—" }, ...["Soltero(a)", "Casado(a)", "Conviviente", "Divorciado(a)", "Viudo(a)"].map((g) => ({ value: g, label: g }))]} />
+                      </div>
+                      {campo("Ocupación", FL.ocupacion, (v) => setFL("ocupacion", v))}
+                      <div className="fm-fil__c"><label style={lbl}>Grupo sanguíneo</label>
+                        <Select value={FL.grupoSanguineo || ""} onChange={(v) => setFL("grupoSanguineo", v)} placeholder="No consta"
+                          options={[{ value: "", label: "No consta" }, ...["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"].map((g) => ({ value: g, label: g }))]} />
+                      </div>
+                      {campo("Aseguradora / EPS", fil.aseguradora, (v) => setFil({ ...fil, aseguradora: v }), { placeholder: "Ninguna" })}
+                    </div>
+                  </section>
+                  <section style={card}>
+                    <div className="fm-fil__t"><Phone size={15} strokeWidth={1.9} /> Contacto</div>
+                    <div className="fm-fil__g">
+                      {campo("Teléfono", fil.telefono, (v) => setFil({ ...fil, telefono: v }), { inputMode: "tel" })}
+                      {campo("Correo", fil.email, (v) => setFil({ ...fil, email: v }), { type: "email" })}
+                      <div className="fm-fil__c is-ancho"><label style={lbl}>Dirección</label><input style={inp} value={FL.direccion || ""} onChange={(e) => setFL("direccion", e.target.value)} placeholder="Calle, número, referencia" /></div>
+                      {campo("Distrito", fil.distrito, (v) => setFil({ ...fil, distrito: v }))}
+                      {campo("Contacto de emergencia", FL.contactoEmergencia, (v) => setFL("contactoEmergencia", v), { placeholder: "Nombre y parentesco" })}
+                      {campo("Teléfono de emergencia", FL.telefonoEmergencia, (v) => setFL("telefonoEmergencia", v), { inputMode: "tel" })}
+                    </div>
+                  </section>
+                  {verApoderado && (
+                    <section style={{ ...card, borderColor: "var(--dc-amber-soft)" }}>
+                      <div className="fm-fil__t"><Shield size={15} strokeWidth={1.9} /> Apoderado <span className="fm-fil__nota">Firma consentimientos y recibe la receta del menor</span></div>
+                      <div className="fm-fil__g">
+                        {campo("Nombre del apoderado", fil.apoderadoNombre, (v) => setFil({ ...fil, apoderadoNombre: v }))}
+                        {campo("Parentesco", fil.apoderadoParentesco, (v) => setFil({ ...fil, apoderadoParentesco: v }), { placeholder: "Madre, padre, tutor…" })}
+                        {campo("DNI del apoderado", fil.apoderadoDni, (v) => setFil({ ...fil, apoderadoDni: v.replace(/\D/g, "").slice(0, 8) }), { inputMode: "numeric" })}
+                        {campo("Teléfono del apoderado", fil.apoderadoTelefono, (v) => setFil({ ...fil, apoderadoTelefono: v }), { inputMode: "tel" })}
+                      </div>
+                    </section>
+                  )}
+                  <div className="fm-fil__bar"><span>Los cambios quedan en el registro de actividad con tu nombre y la hora.</span><button onClick={guardarFiliacion} style={btn()}><Check size={15} strokeWidth={1.75} /> Guardar filiación</button></div>
                 </div>
-                <div style={{ marginTop: 16, textAlign: "right" }}><button onClick={guardarFiliacion} style={btn()}><Check size={15} strokeWidth={1.75} /> Guardar filiación</button></div>
-              </div>
-            )}
+              );
+            })()}
 
             {tab === "historia" && (
               <div className="fm-clinico">
@@ -1891,6 +2090,80 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </div>
             )}
 
+            {tab === "registro" && (() => {
+              const fuenteSrv = conectado && Array.isArray(regSrv) ? registroDesdeServidor(regSrv, p) : [];
+              const usaSrv = fuenteSrv.length > 0;
+              const base = !conectado ? registroDemo(p) : usaSrv ? fuenteSrv : [];
+              const todos = [...regLocal, ...base, ...(usaSrv ? [] : registroDesdeFicha(d, rx, consentimientos))]
+                .sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+              const q = regQ.trim().toLowerCase();
+              const lista = todos.filter((e) => (regFiltro === "todo" || (regFiltro === "cambios" ? e.tipo !== "acceso" : e.tipo === regFiltro)) && (!q || [e.usuario, e.accion, e.detalle, e.rol].join(" ").toLowerCase().includes(q)));
+              const accesos = todos.filter((e) => e.tipo === "acceso");
+              const personas = new Set(todos.map((e) => e.usuario).filter((u) => u && u !== "—")).size;
+              const fh = (ts) => { const x = new Date(ts); return isNaN(x) ? { dia: String(ts).slice(0, 10), hora: "" } : { dia: x.toISOString().slice(0, 10), hora: x.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) }; };
+              const ultimo = accesos[0] ? fh(accesos[0].ts) : null;
+              const grupos = [];
+              lista.forEach((e) => { const { dia } = fh(e.ts); const g = grupos.find((x) => x.dia === dia); if (g) g.items.push(e); else grupos.push({ dia, items: [e] }); });
+              const exportar = () => {
+                const filas = [["Fecha", "Hora", "Usuario", "Rol", "Acción", "Detalle", "Origen"], ...lista.map((e) => { const t = fh(e.ts); return [t.dia, t.hora, e.usuario, e.rol, e.accion, e.detalle, e.origen || ""]; })];
+                const csv = filas.map((f) => f.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+                a.download = `registro-hc-${(p.dni || p.id || "paciente")}.csv`; a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+                anotar("imprimir", "Exportó el registro de actividad");
+              };
+              const FILT = [["todo", "Todo", todos.length], ["acceso", "Accesos", accesos.length], ["cambios", "Cambios", todos.length - accesos.length]];
+              return (
+                <div className="fm-reg">
+                  <div className="fm-reg__head">
+                    <span className="fm-reg__ico"><History size={20} strokeWidth={1.9} /></span>
+                    <div>
+                      <h3>Registro de actividad</h3>
+                      <p>Quién abrió o cambió esta historia clínica y cuándo. Nadie puede editar ni borrar estas entradas.</p>
+                    </div>
+                    <button type="button" className="fm-reg__exp" onClick={exportar} disabled={!lista.length}><Download size={14} strokeWidth={2} /> Exportar</button>
+                  </div>
+                  <div className="fm-reg__kpis">
+                    <div style={{ "--k": "#2563EB" }}><span>Accesos</span><b>{accesos.length}</b></div>
+                    <div style={{ "--k": "#D97706" }}><span>Cambios y registros</span><b>{todos.length - accesos.length}</b></div>
+                    <div style={{ "--k": "#0E9199" }}><span>Personas distintas</span><b>{personas}</b></div>
+                    <div style={{ "--k": "#7C3AED" }}><span>Último acceso</span><b className="is-txt">{ultimo ? `${fmtFecha(ultimo.dia)}${ultimo.hora ? `, ${ultimo.hora}` : ""}` : "—"}</b></div>
+                  </div>
+                  <div className="fm-reg__bar">
+                    <div className="fm-reg__chips">
+                      {FILT.map(([k, l, n]) => <button key={k} type="button" className={regFiltro === k ? "is-on" : ""} onClick={() => setRegFiltro(k)}>{l} <i>{n}</i></button>)}
+                    </div>
+                    <label className="fm-reg__q"><Search size={14} strokeWidth={2} /><input value={regQ} onChange={(e) => setRegQ(e.target.value)} placeholder="Buscar persona o acción" /></label>
+                  </div>
+                  {conectado && regSrv == null && <div className="fm-reg__nota">Cargando el registro…</div>}
+                  {conectado && regSrv != null && !usaSrv && (
+                    <div className="fm-reg__nota"><AlertTriangle size={14} strokeWidth={2} /> El servidor todavía no envía los accesos de este paciente. Se muestra lo que queda firmado en la historia (evoluciones, recetas, archivos y consentimientos).</div>
+                  )}
+                  {!lista.length ? <div style={{ ...card, fontSize: 13, color: MUTED }}>{q || regFiltro !== "todo" ? "Nada coincide con el filtro." : "Aún no hay actividad registrada para este paciente."}</div> : (
+                    <div style={{ ...card, padding: "6px 0" }}>
+                      {grupos.map((g) => (
+                        <div key={g.dia} className="fm-reg__dia">
+                          <div className="fm-reg__fecha">{fmtFecha(g.dia)}</div>
+                          {g.items.map((e) => { const T = REG_TIPOS[e.tipo] || REG_TIPOS.editar; const Ic = T.Ic; return (
+                            <div key={e.id} className="fm-reg__fila" style={{ "--t": T.c }}>
+                              <span className="fm-reg__hora">{fh(e.ts).hora}</span>
+                              <span className="fm-reg__tile"><Ic size={15} strokeWidth={2} /></span>
+                              <div className="fm-reg__txt">
+                                <div><b>{e.usuario}</b>{e.rol ? <em>{e.rol}</em> : null}<span className="fm-reg__pill">{T.l}</span></div>
+                                <p>{e.accion}{e.detalle ? <> — <span>{e.detalle}</span></> : null}</p>
+                                {e.origen && <small>{e.origen}</small>}
+                              </div>
+                            </div>
+                          ); })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {tab === "odontograma" && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} sedeId={sedeId} /></div>}
 
             {tab === "perio" && puedePerio && <div style={card}><Periodontograma pacienteId={pacienteId} notify={notify} /></div>}
@@ -1981,7 +2254,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12 }}>
                   {rx.map((x) => (
                     <div key={x.id} style={{ border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-md)", overflow: "hidden", background: "var(--dc-ink-alt)", position: "relative" }}>
-                      <button onClick={() => borrarArchivo(x.id)} title="Eliminar del expediente" aria-label="Eliminar del expediente" style={{ position: "absolute", top: 6, right: 6, zIndex: 2, width: 24, height: 24, borderRadius: "var(--dc-r-full)", border: "none", background: "rgba(0,0,0,.55)", color: "var(--dc-white)", cursor: "pointer", display: "grid", placeItems: "center" }}><Trash2 size={13} strokeWidth={2} /></button>
+                      <button onClick={() => borrarArchivo(x)} title="Eliminar del expediente" aria-label="Eliminar del expediente" style={{ position: "absolute", top: 6, right: 6, zIndex: 2, width: 24, height: 24, borderRadius: "var(--dc-r-full)", border: "none", background: "rgba(0,0,0,.55)", color: "var(--dc-white)", cursor: "pointer", display: "grid", placeItems: "center" }}><Trash2 size={13} strokeWidth={2} /></button>
                       <a href={x.url || undefined} target="_blank" rel="noreferrer" style={{ display: "block", height: 104 }}>{x.url ? <img src={x.url} alt={x.tipo} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ height: "100%", display: "grid", placeItems: "center" }}><Image size={26} color="rgba(255,255,255,.5)" /></div>}</a>
                       <div style={{ padding: "7px 10px", background: "var(--dc-white)" }}>
                         <div style={{ fontSize: 12, fontWeight: 500, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.tipo || "Estudio"}</div>
