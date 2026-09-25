@@ -1,8 +1,8 @@
 /* Pantalla #/metas — meta mensual por médico (DC-41 / DC-09). */
 import React, { useEffect, useState } from "react";
-import { Check, Target, TrendingUp, Trophy, Users } from "lucide-react";
+import { Check, LayoutGrid, Target, TrendingUp, Trophy, Users } from "lucide-react";
 import api, { auth } from "../api/client";
-import { Card, ListaFiltrable, ESPECIALIDADES, MEDICOS, Vacio, colorDe, iniciales, tint } from "../comun";
+import {Card, ListaFiltrable, ESPECIALIDADES, MEDICOS, Vacio, colorDe, iniciales, tint, PersonaCelda} from "../comun";
 
 export default function Metas({ notify = () => {}, can }) {
   const conectado = !!auth.token;
@@ -87,7 +87,13 @@ export default function Metas({ notify = () => {}, can }) {
         <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>
       )}
       {meds.length > 0 && (
-        <ListaFiltrable rows={meds} sub="odontólogos" cols={[
+        <ListaFiltrable rows={meds} sub="odontólogos" vistaClave="metas" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
+          { key: "n", label: "Odontólogo", w: "minmax(190px,1.3fr)", cell: (m) => <PersonaCelda nombre={m.nombre} sub={m.especialidad || "Sin especialidad"} /> },
+          { key: "prod", label: "Producción", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.prodMes != null ? soles(Number(m.prodMes)) : "—"}</span> },
+          { key: "meta", label: "Meta", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.metaMensual ? soles(Number(m.metaMensual)) : "—"}</span> },
+          { key: "av", label: "Avance", w: "minmax(160px,1fr)", cell: (m) => { const mt = Number(m.metaMensual) || 0; const pct = m.prodMes != null && mt ? Math.round((Number(m.prodMes) / mt) * 100) : null; return pct == null ? <span className="dc-tp__sub">Sin dato</span> : <span className="dc-tp__prog"><i><em style={{ width: `${Math.min(pct, 100)}%` }} /></i><small>{pct}%</small></span>; } },
+          { key: "com", label: "Comisión", w: "100px", a: "right", cell: (m) => <span className="dc-tp__sub">{m.porcentajeComision != null ? `${m.porcentajeComision}%` : "—"}</span> },
+        ] }} cols={[
           { key: "nombre", label: "Odontólogo", get: (m) => m.nombre || "" },
           { key: "esp", label: "Especialidad", get: (m) => m.especialidad || "" },
           { key: "prod", label: "Producción", get: (m) => (m.prodMes != null ? String(m.prodMes) : ""), sortVal: (m) => Number(m.prodMes) || 0 },

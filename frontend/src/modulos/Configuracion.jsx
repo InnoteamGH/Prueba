@@ -1,8 +1,8 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect } from "react";
-import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone} from "lucide-react";
+import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid} from "lucide-react";
 import api, { auth } from "../api/client";
-import {Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales} from "../comun";
+import {Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda} from "../comun";
 
 const BANCOS_PE = [
   { id: "bcp", nombre: "BCP — Banco de Crédito", cuenta: [14] },
@@ -599,7 +599,11 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         <section className="dc-cfg__panel">
           {cab("Servicios y precios", "El agente de WhatsApp y los presupuestos usan estos precios.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "servicio", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo servicio</button>)}
           {esps.length === 0 ? <p className="dc-cfg__nada">Sin servicios aún.</p> : (
-            <ListaFiltrable rows={esps} sub="servicios" defaultSort={{ key: "nombre", dir: "asc" }} cols={[
+            <ListaFiltrable rows={esps} sub="servicios" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_servicios" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 520, onRowClick: (e) => setEdit({ tipo: "servicio", item: { ...e } }), cols: [
+              { key: "n", label: "Servicio", w: "minmax(200px,1.6fr)", cell: (e) => <span className="dc-tp__strong">{e.nombre}</span> },
+              { key: "d", label: "Duración", w: "120px", a: "center", cell: (e) => { const dur = e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin; return <span className="dc-tp__sub">{dur ? `${dur} min` : "—"}</span>; } },
+              { key: "p", label: "Precio", w: "120px", a: "right", cell: (e) => <span className="dc-tp__num">S/ {Number(e.precioBase) || 0}</span> },
+            ] }} cols={[
               { key: "nombre", label: "Servicio", get: (e) => e.nombre || "" },
               { key: "dur", label: "Duración", get: (e) => String(e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin || ""), sortVal: (e) => Number(e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin) || 0 },
               { key: "precio", label: "Precio", get: (e) => String(Number(e.precioBase) || 0), sortVal: (e) => Number(e.precioBase) || 0 },
@@ -623,7 +627,13 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         <section className="dc-cfg__panel">
           {cab("Doctores", "Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "doctor", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo doctor</button>)}
           {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : (
-            <ListaFiltrable rows={meds} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} cols={[
+            <ListaFiltrable rows={meds} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_doctores" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
+              { key: "n", label: "Doctor", w: "minmax(200px,1.4fr)", cell: (m) => <PersonaCelda nombre={m.nombre} sub={m.cop || ""} /> },
+              { key: "e", label: "Especialidad", w: "minmax(150px,1fr)", get: (m) => espNombre(m.especialidadId) || "—" },
+              { key: "c", label: "Comisión", w: "100px", a: "center", cell: (m) => <span className="dc-tp__sub">{m.porcentajeComision != null ? `${m.porcentajeComision}%` : "—"}</span> },
+              { key: "mt", label: "Meta", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.metaMensual != null ? `S/ ${Number(m.metaMensual).toLocaleString("es-PE")}` : "—"}</span> },
+              { key: "s", label: "Estado", w: "110px", a: "right", cell: (m) => <span className={`dc-pill ${m.activo ? "is-ok" : ""}`}>{m.activo ? "Activo" : "Inactivo"}</span> },
+            ] }} cols={[
               { key: "nombre", label: "Doctor", get: (m) => m.nombre || "" },
               { key: "esp", label: "Especialidad", get: (m) => espNombre(m.especialidadId) || "" },
               { key: "estado", label: "Estado", get: (m) => (m.activo ? "Activo" : "Inactivo") },

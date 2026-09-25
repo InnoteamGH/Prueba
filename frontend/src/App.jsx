@@ -40,7 +40,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint} from "./comun";
+import {EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -2998,7 +2998,19 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
         {fases.length === 0 && !nueva && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Sin tratamiento" sub="Agrega la primera fase, o créalas desde el odontograma." />}
         {fases.length > 0 && (
           <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="fases" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
-            vistas={[{ id: "tabla", label: "Tabla", icon: Table2 }, { id: "recorrido", label: "Recorrido", icon: Route }, { id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} cols={[
+            vistas={[{ id: "recorrido", label: "Recorrido", icon: Route }, { id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]}
+            tabla={{ primero: true, minWidth: 700, onRowClick: (f) => setDetF(f), cols: [
+              { key: "n", label: "#", w: "48px", a: "center", cell: (f) => <span className={`dc-tr__nodo${f.estado === "atendida" ? " is-okn" : ""}`}>{f.estado === "atendida" ? <Check size={14} strokeWidth={3} /> : f._n}</span> },
+              { key: "proc", label: "Procedimiento", w: "minmax(200px,1.6fr)", cell: (f) => <span className="dc-tr__proc"><b>{nombreFaseLimpio(f)}</b>{f.origen === "odontograma" && <span className="dc-tr__orig"><Smile size={11} strokeWidth={2} /> del odontograma</span>}</span> },
+              { key: "pieza", label: "Pieza", w: "80px", a: "center", cell: (f) => <span className="dc-tp__sub">{piezaDeFase(f)}</span> },
+              { key: "cara", label: "Cara", w: "80px", a: "center", cell: (f) => <span className="dc-tp__sub">{caraDeFase(f)}</span> },
+              { key: "costo", label: "Costo", w: "110px", a: "right", cell: (f) => <span className="dc-tp__num">S/ {f.costo.toFixed(2)}</span> },
+              { key: "estado", label: "Estado", w: "170px", a: "right", cell: (f) => f.estado === "atendida" ? <Badge estado={f.estado} /> : (
+                <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
+                  {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
+                  <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button></> : <Badge estado={f.estado} />}
+                </div>) },
+            ] }} cols={[
               { key: "proc", label: "Procedimiento", get: (f) => nombreFaseLimpio(f) },
               { key: "pieza", label: "Pieza", get: (f) => String(piezaDeFase(f) ?? "") },
               { key: "costo", label: "Costo", get: (f) => f.costo.toFixed(2), sortVal: (f) => f.costo },
@@ -3042,21 +3054,7 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
                   ))}
                 </div>
               );
-              return (
-                <div className="dc-tr__tabla">
-                  <div className="dc-tr__th"><span>#</span><span>Procedimiento</span><span>Pieza</span><span>Cara</span><span>Costo</span><span>Estado</span></div>
-                  {lst.map((f) => (
-                    <div key={f.id} className={`dc-tr__tr${hecho(f) ? " is-ok" : ""}`} onClick={() => setDetF(f)}>
-                      <span className="dc-tr__nodo">{hecho(f) ? <Check size={14} strokeWidth={3} /> : f._n}</span>
-                      <span className="dc-tr__proc"><b>{nombreFaseLimpio(f)}</b>{origen(f)}</span>
-                      <span>{piezaDeFase(f)}</span>
-                      <span>{caraDeFase(f)}</span>
-                      <span className="dc-tr__costo">S/ {f.costo.toFixed(2)}</span>
-                      <span>{acciones(f)}</span>
-                    </div>
-                  ))}
-                </div>
-              );
+              return null;
             }}</ListaFiltrable>
         )}
       </Card>
@@ -3971,7 +3969,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <div><h3>Saldos por cobrar</h3><span>{porCobrar.length} {porCobrar.length === 1 ? "paciente" : "pacientes"} con plan en curso</span></div>
           </div>
           {conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : !porCobrar.length ? <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todo cobrado" sub="No hay saldos pendientes en esta sede." /> : (
-            <ListaFiltrable rows={porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} cols={[
+            <ListaFiltrable rows={porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} vistaClave="cobros" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
+              { key: "p", label: "Paciente", w: "minmax(200px,1.4fr)", cell: (x) => <PersonaCelda nombre={x.p.nombre} sub={x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} /> },
+              { key: "fases", label: "Fases pend.", w: "110px", a: "center", cell: (x) => <span className="dc-tp__sub">{x.pend}</span> },
+              { key: "cob", label: "Cobrado", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
+              { key: "saldo", label: "Saldo", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num is-mal">S/ {x.saldo.toFixed(2)}</span> },
+              { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!cajaAbierta} title={cajaAbierta ? "Registrar cobro" : "Abre la caja para cobrar"} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
+            ] }} cols={[
               { key: "paciente", label: "Paciente", get: (x) => x.p.nombre || "" },
               { key: "sede", label: "Sede", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") },
               { key: "fases", label: "Fases pendientes", get: (x) => String(x.pend), sortVal: (x) => x.pend },
@@ -4233,7 +4237,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </Card>
           )}
           {(histCaja || []).length === 0 ? <Card><Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (
-          <ListaFiltrable rows={histCaja} sub="jornadas" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+          <ListaFiltrable rows={histCaja} sub="jornadas" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 820, cols: [
+            { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__strong">{fechaLegible(r.fecha)}</span> },
+            { key: "sede", label: "Sede", w: "minmax(140px,1fr)", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—" },
+            { key: "quien", label: "Responsable", w: "minmax(160px,1.2fr)", get: (r) => `${r.abiertaPorNombre || "—"}${!r.abierta && r.cerradaPorNombre && r.cerradaPorNombre !== r.abiertaPorNombre ? ` / ${r.cerradaPorNombre}` : ""}` },
+            { key: "fondo", label: "Fondo", w: "100px", a: "right", cell: (r) => <span className="dc-tp__num">S/ {Number(r.fondo || 0).toFixed(2)}</span> },
+            { key: "esp", label: "Esperado", w: "110px", a: "right", cell: (r) => <span className="dc-tp__num">{r.efectivoEsperado != null ? `S/ ${Number(r.efectivoEsperado).toFixed(2)}` : "—"}</span> },
+            { key: "con", label: "Contado", w: "110px", a: "right", cell: (r) => <span className="dc-tp__num">{r.efectivoContado != null ? `S/ ${Number(r.efectivoContado).toFixed(2)}` : "—"}</span> },
+            { key: "est", label: "Resultado", w: "140px", a: "right", cell: (r) => { const d = r.diferencia != null ? Number(r.diferencia) : null; const est = r.abierta ? "abierta" : d == null ? "cerrada" : Math.abs(d) < 0.01 ? "cuadra" : d < 0 ? "falta" : "sobra"; return <span className={`dc-pill ${est === "cuadra" || est === "cerrada" ? "is-ok" : est === "abierta" ? "is-info" : est === "falta" ? "is-mal" : "is-aviso"}`}>{est === "abierta" ? "Abierta" : est === "cuadra" ? "Cuadra" : est === "cerrada" ? "Cerrada" : `${est === "falta" ? "Faltan" : "Sobran"} S/ ${Math.abs(d).toFixed(2)}`}</span>; } },
+          ] }} cols={[
             { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
             { key: "sede", label: "Sede", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "" },
             { key: "quien", label: "Responsable", get: (r) => [r.abiertaPorNombre, r.cerradaPorNombre].filter(Boolean).join(" ") },
@@ -4374,7 +4386,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <span><b>Pasarela sin conectar.</b> Cuando se conecte (Niubiz, Culqi o similar), el paciente pagará desde su celular y el cobro entrará a Caja.</span>
           </div>
           {links.length === 0 ? <Card><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." /></Card> : (
-          <ListaFiltrable rows={links} sub="links" cols={[
+          <ListaFiltrable rows={links} sub="links" vistaClave="caja_links" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
+            { key: "p", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (l) => <PersonaCelda nombre={l.paciente} /> },
+            { key: "c", label: "Concepto", w: "minmax(160px,1.3fr)", get: (l) => l.concepto || "Pago de tratamiento" },
+            { key: "e", label: "Estado", w: "120px", a: "center", cell: (l) => l.estado === "pagado" ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Pagado</span> : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Pendiente</span> },
+            { key: "m", label: "Monto", w: "110px", a: "right", cell: (l) => <span className="dc-tp__num">S/ {Number(l.monto).toFixed(2)}</span> },
+          ] }} cols={[
             { key: "paciente", label: "Paciente", get: (l) => l.paciente || "" },
             { key: "concepto", label: "Concepto", get: (l) => l.concepto || "Pago de tratamiento" },
             { key: "estado", label: "Estado", get: (l) => (l.estado === "pagado" ? "Pagado" : "Pendiente") },
@@ -5555,7 +5572,14 @@ function Recetas({ pacientes: pacProp, notify, updFicha }) {
         {recetas.length === 0 && !form && <Card style={{ padding: 0 }}><Vacio icon={<FileText size={22} strokeWidth={1.75} />} titulo="Sin recetas" sub="Emite la primera receta; queda firmada en la historia del paciente." /></Card>}
         {recetas.length > 0 && (
           <ListaFiltrable rows={recetas} sub="recetas" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="recetas"
-            vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "paciente", label: "Por paciente", icon: Users }]} cols={[
+            vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "paciente", label: "Por paciente", icon: Users }]}
+            tabla={{ minWidth: 760, cols: [
+              { key: "paciente", label: "Paciente", w: "minmax(180px,1.1fr)", cell: (r) => { const col = colorDe(r.paciente); return <span className="dc-tp__quien"><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente)}</span><b>{r.paciente}</b></span>; } },
+              { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__sub">{fechaLegible(r.fecha)}</span> },
+              { key: "med", label: "Medicamentos", w: "minmax(220px,1.8fr)", cell: (r) => <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div> },
+              { key: "indic", label: "Indicaciones", w: "minmax(160px,1.2fr)", get: (r) => r.indic || "—" },
+              { key: "estado", label: "Estado", w: "110px", a: "right", cell: () => <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span> },
+            ] }} cols={[
             { key: "paciente", label: "Paciente", get: (r) => r.paciente || "" },
             { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
             { key: "med", label: "Medicamento", get: (r) => (r.items || []).map((it) => it.med).join(" ") },
@@ -5788,7 +5812,14 @@ function Consentimientos({ pacientes: pacProp, notify }) {
           <Card className="dc-env">
             <div className="dc-env__cab"><h3>Consentimientos</h3></div>
             <ListaFiltrable rows={docs} sub="documentos" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="consentimientos"
-              vistas={[{ id: "tabla", label: "Tabla", icon: Table2 }, { id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }, { id: "estado", label: "Por estado", icon: Columns3 }]} cols={[
+              vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }, { id: "estado", label: "Por estado", icon: Columns3 }]}
+              tabla={{ primero: true, minWidth: 720, cols: [
+                { key: "paciente", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (d) => <span className="dc-tp__quien">{av(d.paciente)}<b>{d.paciente}</b></span> },
+                { key: "tipo", label: "Documento", w: "minmax(200px,1.5fr)", cell: (d) => <span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span> },
+                { key: "fecha", label: "Fecha", w: "140px", a: "center", cell: (d) => <span className="dc-tp__sub">{fechaLegible(d.fecha)}</span> },
+                { key: "estado", label: "Estado", w: "130px", a: "center", cell: pill },
+                { key: "acc", label: "", w: "110px", a: "right", cell: accion },
+              ] }} cols={[
                 { key: "paciente", label: "Paciente", get: (d) => d.paciente || "" },
                 { key: "tipo", label: "Documento", get: (d) => d.tipo || "" },
                 { key: "fecha", label: "Fecha", get: (d) => d.fecha || "" },
@@ -5805,20 +5836,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
                     ))}
                   </div>
                 );
-                return (
-                  <div className="dc-cns__tabla">
-                    <div className="dc-cns__th"><span>Paciente</span><span>Documento</span><span>Fecha</span><span>Estado</span><span>Acción</span></div>
-                    {lst.map((d) => (
-                      <div key={d.id} className="dc-cns__tr">
-                        <span className="dc-cns__pac">{av(d.paciente)}<b>{d.paciente}</b></span>
-                        <span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span>
-                        <span className="dc-cns__fecha">{fechaLegible(d.fecha)}</span>
-                        <span>{pill(d)}</span>
-                        <span>{accion(d)}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
+                return <div className="dc-cns__grid">{lst.map(tarjeta)}</div>;
               }}</ListaFiltrable>
           </Card>
         );
@@ -6227,7 +6245,13 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         <Card className="dc-env">
           <div className="dc-env__cab"><h3>Órdenes de compra</h3></div>
           {filas.length === 0 && <Vacio icon={<Send size={22} strokeWidth={1.75} />} titulo="Sin órdenes" sub="Todavía no has registrado ninguna orden de compra." />}
-          {filas.length > 0 && <ListaFiltrable rows={filas} sub="órdenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+          {filas.length > 0 && <ListaFiltrable rows={filas} sub="órdenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="compras" vistas={[{ id: "lista", label: "Lista", icon: List }]} tabla={{ minWidth: 720, cols: [
+            { key: "prov", label: "Proveedor", w: "minmax(160px,1fr)", cell: (c) => <span className="dc-tp__strong">{c.proveedor}</span> },
+            { key: "items", label: "Productos", w: "minmax(200px,1.6fr)", get: (c) => c.items || "—" },
+            { key: "fecha", label: "Fecha", w: "120px", cell: (c) => <span className="dc-tp__sub">{c.fecha ? fechaLegible(c.fecha) : "—"}</span> },
+            { key: "estado", label: "Estado", w: "120px", a: "center", cell: (c) => <span className="dc-pill" style={{ "--c": OC_COL[c.estado] || "#8A9CA1" }}><i /> {(EST_OC[c.estado] || EST_OC.borrador).l}</span> },
+            { key: "total", label: "Total", w: "110px", a: "right", cell: (c) => <span className="dc-tp__num">S/ {Number(c.total).toFixed(2)}</span> },
+          ] }} cols={[
             { key: "proveedor", label: "Proveedor", get: (c) => c.proveedor || "" },
             { key: "items", label: "Productos", get: (c) => c.items || "" },
             { key: "fecha", label: "Fecha", get: (c) => c.fecha || "" },
@@ -6910,7 +6934,12 @@ function Resenas({ notify, citas = [], can }) {
         {(() => { const lista = [...reviews].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).filter((r) => filtroRes === "todas" ? true : filtroRes === "pendientes" ? !r.resp : !!r.resp); return lista.length === 0
           ? <Vacio icon={<Star size={22} strokeWidth={1.75} />} titulo={reviews.length ? "Nada con este filtro" : "Sin reseñas"} sub={reviews.length ? "Prueba con otro filtro." : "Solicita reseñas a tus pacientes recientes para construir tu reputación."} />
           : (
-          <ListaFiltrable rows={lista} sub="reseñas" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+          <ListaFiltrable rows={lista} sub="reseñas" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="resenas" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, onRowClick: (r) => setSel(r), cols: [
+            { key: "n", label: "Paciente", w: "minmax(170px,1fr)", cell: (r) => <PersonaCelda nombre={r.nombre} sub={fechaLegible(r.fecha)} /> },
+            { key: "s", label: "Calificación", w: "120px", cell: (r) => <span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span> },
+            { key: "t", label: "Comentario", w: "minmax(240px,2.2fr)", get: (r) => r.texto || "" },
+            { key: "e", label: "Estado", w: "140px", a: "right", cell: (r) => r.resp ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-pill is-aviso">Por responder</span> },
+          ] }} cols={[
             { key: "nombre", label: "Paciente", get: (r) => r.nombre || "" },
             { key: "estrellas", label: "Estrellas", get: (r) => String(r.estrellas), sortVal: (r) => Number(r.estrellas) || 0 },
             { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
@@ -7054,7 +7083,13 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
           </div>
         )}
       </section>
-      <ListaFiltrable rows={liqView} sub="liquidaciones" cols={[
+      <ListaFiltrable rows={liqView} sub="liquidaciones" vistaClave="seguros" vistas={[{ id: "tablero", label: "Tablero", icon: Columns3 }]} tabla={{ minWidth: 820, onRowClick: (x) => setDetalleLiq(x), cols: [
+        { key: "p", label: "Paciente", w: "minmax(170px,1.1fr)", cell: (x) => <PersonaCelda nombre={x.paciente} sub={x.aseg} /> },
+        { key: "cob", label: "Seguro", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-ok">S/ {Number(x.cob).toLocaleString("es-PE")}</span> },
+        { key: "cop", label: "Copago", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</span> },
+        { key: "tot", label: "Total", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {Number(x.total).toLocaleString("es-PE")}</span> },
+        { key: "est", label: "Estado", w: "150px", a: "center", cell: (x) => { const c = COLS_LIQ.find(([k]) => k === x.estado); return <span className="dc-pill" style={{ "--c": c ? c[3] : "#8A9CA1" }}><i /> {c ? c[1] : x.estado}</span>; } },
+      ] }} cols={[
         { key: "paciente", label: "Paciente", get: (x) => x.paciente || "" },
         { key: "aseg", label: "Aseguradora", get: (x) => x.aseg || "" },
         { key: "cob", label: "Cubre seguro", get: (x) => Number(x.cob || 0).toFixed(2), sortVal: (x) => Number(x.cob) || 0 },
@@ -7284,7 +7319,15 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
             <Vacio icon={soloFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={soloFotos ? "Sin fotos" : "Sin estudios"} sub={soloFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía o foto de este paciente."} />
           ) : (
             <ListaFiltrable rows={base} sub="imágenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="radiografias"
-              vistas={[{ id: "galeria", label: "Galería", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "linea", label: "Línea de tiempo", icon: History }]} cols={[
+              vistas={[{ id: "galeria", label: "Galería", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "linea", label: "Línea de tiempo", icon: History }]}
+              tabla={{ minWidth: 720, onRowClick: (s) => setVisor(s), cols: [
+                { key: "img", label: "", w: "60px", cell: (s) => { const I = s.tipo === "foto" ? Camera : Scan; return <span className={`dc-tp__thumb${s.tipo === "foto" ? " is-foto" : ""}`}>{s.url ? <img src={s.url} alt="" /> : <I size={18} strokeWidth={1.6} />}</span>; } },
+                { key: "tipo", label: "Estudio", w: "minmax(160px,1fr)", cell: (s) => <span className="dc-tp__strong">{RX_TIPOS[s.tipo] || s.tipo}</span> },
+                { key: "fecha", label: "Fecha", w: "140px", cell: (s) => <span className="dc-tp__sub">{fechaLegible(s.fecha)}</span> },
+                { key: "sede", label: "Sede", w: "150px", cell: (s) => <span className="dc-tp__sub">{s.sede ? nombreSede(s.sede) : "—"}</span> },
+                { key: "nota", label: "Nota", w: "minmax(160px,1.4fr)", get: (s) => s.nota || "—" },
+                { key: "acc", label: "", w: "90px", a: "right", cell: (s) => <div className="dc-rxv__acc" onClick={(e) => e.stopPropagation()}><button type="button" onClick={() => setVisor(s)} title="Abrir visor" aria-label="Abrir visor"><Eye size={15} strokeWidth={1.9} /></button>{puedeBorrarRx && <button type="button" className="is-del" onClick={() => setBorrarRx(s)} title="Eliminar estudio" aria-label="Eliminar estudio"><Trash2 size={15} strokeWidth={1.9} /></button>}</div> },
+              ] }} cols={[
               { key: "tipo", label: "Tipo", get: (s) => RX_TIPOS[s.tipo] || s.tipo || "" },
               { key: "fecha", label: "Fecha", get: (s) => s.fecha || "" },
               { key: "sede", label: "Sede", get: (s) => nombreSede(s.sede) || "" },

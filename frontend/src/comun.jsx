@@ -11,7 +11,7 @@
    ============================================================================ */
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import {AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal} from "lucide-react";
+import {AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2} from "lucide-react";
 
 export const NAVY = "var(--dc-navy)", RED = "var(--dc-red)", BG = "var(--dc-bg)", INK = "var(--dc-ink-alt)", TEAL = "var(--dc-teal)", WARM = "var(--dc-warn-700)";
 
@@ -1319,7 +1319,7 @@ export function useVista(clave, opciones) {
   let valor = opciones.some((o) => o.id === v) ? v : opciones[0]?.id;
   // En celular una tabla ancha obliga a desplazarse de lado: si hay tarjetas, se usan.
   const movil = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
-  if (movil && valor === "tabla" && opciones.some((o) => o.id === "tarjetas")) valor = "tarjetas";
+  if (movil && valor === "tabla") { const alt = opciones.find((o) => o.id !== "tabla"); if (alt) valor = alt.id; }
   return [valor, setV];
 }
 
@@ -1327,16 +1327,63 @@ export function useVista(clave, opciones) {
    ya filtrada y ordenada a children(lista, vista). Con `vistas` y `vistaClave` suma el
    selector de forma de ver. Es componente (no hook suelto) para poder usarse dentro de
    ramas condicionales sin romper el orden de los hooks. */
-export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", children }) {
+/* Celda de persona para tablas: iniciales en su color, nombre y dato secundario. */
+export function PersonaCelda({ nombre, sub, size = 34 }) {
+  const col = colorDe(nombre || "");
+  return (
+    <span className="dc-tp__quien">
+      <span className="dc-rec__av" style={{ width: size, height: size, fontSize: size > 36 ? 13 : 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(nombre || "")}</span>
+      <span style={{ minWidth: 0 }}><b>{nombre || "—"}</b>{sub ? <small>{sub}</small> : null}</span>
+    </span>
+  );
+}
+
+/* Tabla con el mismo diseño que DataTable (mismas clases: en celular pasa sola a
+   tarjetas con la etiqueta de cada dato), pensada para la vista "Tabla" de las listas.
+   cols: [{ key, label, w, a:"left"|"center"|"right", get, cell }] */
+export function TablaPremium({ cols, rows, onRowClick, minWidth = 640 }) {
+  const COL = cols.map((c) => c.w || "minmax(0,1fr)").join(" ");
+  const al = (c) => (c.a === "right" ? "end" : c.a === "center" ? "center" : "start");
+  return (
+    <div className="dc-table-wrap dc-tp">
+      <div style={{ overflowX: "auto" }}>
+        <div style={{ minWidth, width: "100%" }}>
+          <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 14, padding: "0 18px", alignItems: "center", minHeight: 46 }}>
+            {cols.map((c) => <span key={c.key} className="dc-tp__th" style={{ justifySelf: al(c), textAlign: c.a || "left" }}>{c.label}</span>)}
+          </div>
+          {rows.map((r, i) => (
+            <div key={r.id ?? i} className="dc-table-row dc-tp__row" onClick={onRowClick ? () => onRowClick(r) : undefined}
+              style={{ display: "grid", gridTemplateColumns: COL, gap: 14, alignItems: "center", padding: "12px 18px", cursor: onRowClick ? "pointer" : "default" }}>
+              {cols.map((c) => (
+                <div key={c.key} data-label={c.label || ""} style={{ minWidth: 0, justifySelf: al(c), textAlign: c.a || "left" }}>
+                  {c.cell ? c.cell(r) : <span className="dc-tp__txt">{c.get ? c.get(r) : ""}</span>}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", tabla = null, children }) {
   const { lista, st } = useFiltroTabla(rows, cols, defaultSort);
-  const [vista, setVista] = useVista(vistaClave || "x", vistas || []);
+  // Con `tabla` la lista ofrece también la vista Tabla, con el diseño común del portal.
+  const opciones = tabla
+    ? (() => { const base = (vistas || [{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]).filter((v) => v.id !== "tabla"); const t = { id: "tabla", label: "Tabla", icon: Table2 }; return tabla.primero ? [t, ...base] : [...base, t]; })()
+    : vistas;
+  const [vista, setVista] = useVista(vistaClave || "x", opciones || []);
+  vistas = opciones;
   return (
     <div className={`dc-lf ${className}`}>
       <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub}
         extra={<>{extra}{vistas && <SelectorVista opciones={vistas} valor={vista} onChange={setVista} />}</>} />
       {lista.length === 0 && (rows || []).length > 0
         ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." />
-        : children(lista, vista)}
+        : (tabla && vista === "tabla")
+          ? <TablaPremium cols={tabla.cols} rows={lista} onRowClick={tabla.onRowClick} minWidth={tabla.minWidth} />
+          : children(lista, vista)}
     </div>
   );
 }

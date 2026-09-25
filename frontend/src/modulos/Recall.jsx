@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
-import {EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint} from "../comun";
+import {EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint, PersonaCelda} from "../comun";
 
 function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
@@ -309,7 +309,11 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
           {puedeEnviar && cola.some((c) => c.estado === "por_contactar") && <Btn small onClick={enviarTodos}><Send size={14} strokeWidth={1.75} /> Enviar a todos</Btn>}
         </div>
         {cola.length > 0 && (
-          <ListaFiltrable rows={cola} sub="pacientes" className="dc-lf--dentro dc-rec__lf" cols={[
+          <ListaFiltrable rows={cola} sub="pacientes" className="dc-lf--dentro dc-rec__lf" vistaClave="recall_cola" vistas={[{ id: "lista", label: "Lista", icon: CalendarCheck }]} tabla={{ minWidth: 600, cols: [
+            { key: "n", label: "Paciente", w: "minmax(200px,1.4fr)", cell: (p) => <PersonaCelda nombre={p.nombre} /> },
+            { key: "u", label: "Última visita", w: "150px", cell: (p) => <span className="dc-tp__sub">{p.ultima ? fechaLegible(String(p.ultima).slice(0, 10)) : "—"}</span> },
+            { key: "e", label: "", w: "140px", a: "right", cell: (p) => p.estado === "enviado" ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Enviado</span> : <button type="button" className="dc-rec__recordar" onClick={() => enviar(p.id)}><Send size={14} strokeWidth={1.75} /> Recordar</button> },
+          ] }} cols={[
             { key: "nombre", label: "Paciente", get: (p) => p.nombre || "" },
             { key: "ultima", label: "Última visita", get: (p) => String(p.ultima || "").slice(0, 10) },
             { key: "estado", label: "Estado", get: (p) => (p.estado === "enviado" ? "Enviado" : "Por contactar") },
