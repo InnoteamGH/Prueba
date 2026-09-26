@@ -1,0 +1,243 @@
+/* WhatsApp inbox — responsive reflow (WA-08) */
+.dc-inbox {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.dc-inbox-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.dc-inbox-chat-head-name {
+  min-width: 0;
+  flex: 1 1 120px;
+}
+
+.dc-inbox-chat-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.dc-inbox-ejemplo {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dc-warn-600, #b45309);
+  background: var(--dc-warn-soft, #fef3c7);
+  border: 1px solid var(--dc-line, #e5e7eb);
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.dc-inbox-conexion {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--dc-r-lg, 12px);
+  font-size: 13px;
+  color: var(--dc-slate, #475569);
+}
+
+.dc-inbox-conexion code {
+  font-size: 12px;
+  word-break: break-all;
+  background: var(--dc-bg-soft, #f8fafc);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* ======================================================================
+   BANDEJA TIPO WHATSAPP
+   Lista | conversación | contacto. Altura = pantalla menos la cabecera de la
+   app, sin scroll de página. En móvil se ve una cosa a la vez.
+   ====================================================================== */
+.dc-inbox.wa {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr) 280px;
+  height: calc(calc(100dvh / var(--dc-z, 1)) - 56px - 32px);
+  min-height: 460px;
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--dc-line);
+  background: var(--dc-surface);
+  box-shadow: var(--dc-sh-1);
+}
+
+/* ---- Estado del canal (en la cabecera de la app) ---- */
+
+/* ---- Lista de chats ---- */
+.dc-inbox-list { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--dc-line); background: var(--dc-surface); }
+.dc-inbox-list > div:first-child { padding: 12px 12px !important; }
+.dc-inbox-list input { font-size: 13.5px !important; border-radius: 999px !important; border: 1px solid transparent !important; background: var(--dc-bg-alt) !important; padding: 9px 12px 9px 34px !important; }
+.dc-inbox-list input:focus { background: #fff !important; border-color: var(--dc-brand-100) !important; }
+.wa-item { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: center; width: 100%; padding: 9px 12px; border-bottom: 1px solid var(--dc-line); transition: background .12s; }
+.wa-item:hover { background: var(--dc-bg-soft2); }
+.wa-item.is-on { background: var(--dc-brand-050); box-shadow: inset 3px 0 0 var(--dc-primary-alt); }
+.wa-item:focus-visible { box-shadow: var(--dc-focus); }
+.wa-item__nom { font-size: 14.5px; font-weight: 600; color: var(--dc-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-av { width: 42px; height: 42px; border-radius: 999px; flex-shrink: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--dc-brand-600); background: linear-gradient(135deg, #E3F6F6, #C9ECEC); }
+.wa-av--sm { width: 38px; height: 38px; font-size: 13px; }
+
+/* ---- Conversación ---- */
+.dc-inbox-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; background: #EFEAE2; }
+.dc-inbox-chat-head { flex-shrink: 0; padding: 8px 14px !important; background: #F7F8F8; border-bottom: 1px solid var(--dc-line); flex-wrap: nowrap !important; }
+.dc-inbox-chat-head-name > div:last-child > div:first-child { font-size: 15px !important; font-weight: 600 !important; color: var(--dc-ink-900) !important; }
+.dc-inbox-chat-head-actions { flex-wrap: nowrap !important; align-items: center; }
+.wa-volver,
+.wa-info { all: unset; box-sizing: border-box; cursor: pointer; width: 34px; height: 34px; min-width: 34px; border-radius: 999px; display: grid; place-items: center; color: var(--dc-ink-500); }
+.wa-volver:hover,
+.wa-info:hover { background: rgba(14,42,51,.07); color: var(--dc-ink-900); }
+.wa-info[aria-expanded="true"] { color: var(--dc-brand-600); }
+.wa-volver { display: none !important; margin-right: 2px; }
+
+/* Fondo con un patrón muy tenue, como el papel tapiz de WhatsApp. */
+.wa-hilo {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 14px 4% 18px;
+  background-color: #EFEAE2;
+  background-image: radial-gradient(rgba(14,42,51,.045) 1px, transparent 1.2px);
+  background-size: 18px 18px;
+  scrollbar-width: thin; scrollbar-color: rgba(14,42,51,.2) transparent;
+}
+.wa-fecha { display: flex; justify-content: center; margin: 12px 0 8px; position: sticky; top: 4px; z-index: 2; }
+.wa-fecha span { background: #fff; color: var(--dc-ink-500); font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.1); text-transform: capitalize; }
+.wa-sis { display: flex; justify-content: center; margin: 8px 0; }
+.wa-sis span { background: #FFF5C4; color: #6B5A12; font-size: 12.5px; padding: 6px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.08); text-align: center; max-width: 80%; }
+
+.wa-fila { display: flex; margin-top: 2px; }
+.wa-fila--primero { margin-top: 10px; }
+.wa-fila--out { justify-content: flex-end; }
+.wa-b {
+  position: relative; max-width: min(72%, 560px);
+  padding: 6px 9px 8px 10px; border-radius: 8px;
+  font-size: 14.2px; line-height: 1.42; color: #111B21;
+  background: #fff; box-shadow: 0 1px .5px rgba(11,20,26,.13);
+  word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap;
+}
+.wa-b--out { background: #D9FDD3; }
+.wa-b--ia { background: #E4F4F3; }
+/* colita */
+.wa-b--cola.wa-b--in { border-top-left-radius: 0; }
+.wa-b--cola.wa-b--out { border-top-right-radius: 0; }
+.wa-b--cola::before { content: ""; position: absolute; top: 0; width: 8px; height: 13px; }
+.wa-b--cola.wa-b--in::before { left: -8px; background: #fff; clip-path: polygon(100% 0, 0 0, 100% 100%); }
+.wa-b--cola.wa-b--out::before { right: -8px; background: #D9FDD3; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.wa-b--cola.wa-b--ia::before { background: #E4F4F3; }
+.wa-b__autor { display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--dc-brand-600); margin-bottom: 2px; }
+.wa-b__autor--rec { color: #1F8A4C; }
+/* La hora deja su hueco al final del texto, como en WhatsApp. */
+.wa-b__txt::after { content: ""; display: inline-block; width: 78px; }
+.wa-b__meta { position: absolute; right: 8px; bottom: 4px; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #667781; font-variant-numeric: tabular-nums; }
+.wa-b__tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.wa-b__tools span { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; color: var(--dc-brand-600); background: rgba(14,140,149,.1); padding: 2px 7px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+
+.wa-bajar { position: absolute; right: 18px; bottom: 96px; width: 38px; height: 38px; border-radius: 999px; border: 0; background: #fff; color: var(--dc-ink-500); box-shadow: 0 2px 6px rgba(11,20,26,.2); display: grid; place-items: center; cursor: pointer; z-index: 3; }
+
+/* ---- Pie: compositor y sugerencias ---- */
+.wa-pie { flex-shrink: 0; background: #F0F2F5; padding: 8px 14px 10px; display: grid; gap: 8px; border-top: 1px solid var(--dc-line); }
+.wa-pie--nota { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dc-ok-700); }
+.wa-pie__ayuda { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dc-ink-500); }
+.wa-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.wa-chips::-webkit-scrollbar { display: none; }
+.wa-chips__et { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--dc-ink-400); white-space: nowrap; }
+.wa-chip { all: unset; box-sizing: border-box; cursor: pointer; white-space: nowrap; font-size: 13px; font-weight: 500; color: var(--dc-ink-700); background: #fff; border: 1px solid var(--dc-line); border-radius: 999px; padding: 6px 12px; }
+.wa-chip:hover { border-color: var(--dc-brand-100); color: var(--dc-brand-600); background: var(--dc-brand-050); }
+.wa-chip:focus-visible { box-shadow: var(--dc-focus); }
+.wa-compositor { display: flex; align-items: center; gap: 8px; }
+.wa-input { flex: 1; min-width: 0; min-height: 42px !important; border: 0; outline: 0; border-radius: 10px; background: #fff; padding: 10px 14px; font: inherit; font-size: 14.5px; color: var(--dc-ink-900); }
+.wa-input::placeholder { color: #8696A0; }
+.wa-enviar { width: 42px; height: 42px; min-width: 42px; border-radius: 999px; border: 0; display: grid; place-items: center; cursor: pointer; color: #fff; background: var(--dc-primary-alt); }
+.wa-enviar:disabled { background: #C5CFD3; cursor: default; }
+
+/* ---- Panel del contacto ---- */
+.dc-inbox-side { position: relative; display: flex; flex-direction: column; overflow-y: auto; min-width: 0; border-left: 1px solid var(--dc-line); background: var(--dc-surface); }
+.wa-vacio { grid-column: 2 / 4; display: grid; place-items: center; background: #F7F8F8; color: var(--dc-ink-500); font-size: 14px; padding: 24px; text-align: center; }
+
+/* Pantallas medianas: el panel del contacto se abre encima con el botón (i). */
+@media (max-width: 1500px) {
+  .dc-inbox.wa { grid-template-columns: 280px minmax(0, 1fr); }
+  .dc-inbox.wa > .dc-inbox-side { position: absolute; right: 0; top: 0; bottom: 0; width: 290px; z-index: 5; box-shadow: -12px 0 30px -12px rgba(14,42,51,.3); transform: translateX(105%); transition: transform .2s ease; }
+  .dc-inbox.wa.is-info > .dc-inbox-side { transform: none; }
+  .dc-inbox.wa { position: relative; }
+  .wa-vacio { grid-column: 2 / 3; }
+}
+
+/* Pantallas grandes: panel fijo que se puede ocultar con (i) o con la ✕. */
+@media (min-width: 1501px) {
+  .dc-inbox.wa.sin-info { grid-template-columns: 290px minmax(0, 1fr); }
+  .dc-inbox.wa.sin-info > .dc-inbox-side { display: none; }
+  .dc-inbox.wa.sin-info .wa-vacio { grid-column: 2 / 3; }
+}
+/* Móvil: lista o conversación, una a la vez. */
+@media (max-width: 767px) {
+  .dc-inbox.wa { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); height: calc(calc(100dvh / var(--dc-z, 1)) - 128px); border-radius: 12px; }
+  .dc-inbox.wa > .dc-inbox-list, .dc-inbox.wa.is-hilo > .dc-inbox-thread { height: 100%; }
+  .dc-inbox-chat-head { padding: 6px 8px !important; gap: 4px !important; }
+  .dc-inbox-chat-head-actions { gap: 2px !important; }
+  .dc-inbox.wa > .dc-inbox-thread { display: none; }
+  .dc-inbox.wa.is-hilo > .dc-inbox-list { display: none; }
+  .dc-inbox.wa.is-hilo > .dc-inbox-thread { display: flex; }
+  .dc-inbox.wa > .dc-inbox-side { width: 100%; }
+  .wa-volver { display: grid !important; }
+  .wa-b { max-width: 85%; }
+  .wa-hilo { padding: 10px 12px 14px; }
+  .dc-inbox-chat-head-actions .dc-btn { padding: 4px 10px !important; }
+  .wa-vacio { display: none; }
+  
+}
+
+/* Hora del último mensaje y contador de no leídos, como en WhatsApp. */
+.wa-item__hora { font-size: 12px; color: #667781; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wa-item__hora.is-nuevo { color: #1FA855; font-weight: 600; }
+.wa-item__nuevos { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #25D366; color: #fff; font-size: 11.5px; font-weight: 700; display: grid; place-items: center; }
+.wa-item__cuerpo { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.wa-item__fila { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.wa-item__fila .wa-item__nom { flex: 1; min-width: 0; }
+.wa-item__prev { flex: 1; min-width: 0; font-size: 13px; color: #667781; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-item__prev.is-nuevo { color: var(--dc-ink-900); font-weight: 500; }
+.wa-item__modo { flex-shrink: 0; font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--dc-ok-100); color: var(--dc-ok-700); }
+.wa-item__modo.is-rec { background: var(--dc-warn-100); color: var(--dc-warn-700); }
+.wa-item__hora { flex-shrink: 0; margin-left: auto; }
+/* Filtros de la lista en una sola fila. */
+.dc-inbox-list > div:first-child > div:last-child { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; gap: 4px !important; }
+.dc-inbox-list > div:first-child > div:last-child::-webkit-scrollbar { display: none; }
+.dc-inbox-list > div:first-child > div:last-child > button { padding: 4px 8px !important; font-size: 11.5px !important; white-space: nowrap; flex-shrink: 0; }
+
+/* Sin barra superior: la bandeja ocupa toda la altura. */
+@media (min-width: 768px) { .dc-inbox.wa { height: calc(calc(100dvh / var(--dc-z, 1)) - 36px); } }
+.wa-lista__tit { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wa-lista__tit > span:first-child { font-family: var(--dc-font-title); font-size: 15px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; }
+.wa-canal { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: #E3F7EC; color: #15803D; }
+.wa-canal i { width: 6px; height: 6px; border-radius: 999px; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); }
+.wa-canal.is-ambar { background: #FEF4DC; color: #946009; }
+.wa-canal.is-rojo { background: #FDECEA; color: #B23A2B; }
+.wa-canal.is-gris { background: var(--dc-bg); color: var(--dc-ink-500); }
+.wa-lista__acc { display: flex; align-items: center; gap: 4px; }
+.wa-lista__btn { all: unset; box-sizing: border-box; cursor: pointer; width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: var(--dc-primary-alt); }
+.wa-lista__btn:hover { background: var(--dc-bg); }
+.wa-lista__btn:focus-visible { box-shadow: var(--dc-focus); }
+.wa-filtro__n { font-size: 11px; font-weight: 700; opacity: .75; font-variant-numeric: tabular-nums; }
+.wa-avisos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.wa-aviso { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+.wa-aviso.is-aviso { background: #FEF4DC; color: #946009; }
+.wa-aviso.is-ok { background: #E3F7EC; color: #15803D; }
+.wa-aviso.is-error { background: #FDECEA; color: #B23A2B; }
+.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { gap: 4px !important; flex-wrap: nowrap !important; }
+.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 8px !important; font-size: 11.5px !important; gap: 4px !important; white-space: nowrap; }
+.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; } .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 7px !important; flex-shrink: 0; }
+/* Avatares con el color de cada contacto (como en la agenda y pacientes). */
+.wa-av { --av: #0E8C95; color: var(--av); background: linear-gradient(135deg, color-mix(in srgb, var(--av) 22%, #fff), color-mix(in srgb, var(--av) 8%, #fff)); font-family: var(--dc-font-title); font-weight: 750; }
+.wa-av--xl { width: 84px; height: 84px; font-size: 28px; margin: 0 auto 14px; box-shadow: 0 0 0 5px #fff, 0 14px 30px -14px color-mix(in srgb, var(--av) 60%, transparent); }

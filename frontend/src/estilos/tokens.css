@@ -1,0 +1,346 @@
+:root{
+  /* ---- Marca (SIN CAMBIOS, ya cumplen AA) ---- */
+  --dc-brand-900:#0B2F3A;
+  --dc-brand-700:#0F4050;   /* azul Dento Check   – 13.13:1 sobre blanco */
+  --dc-brand-600:#0A6C76;   /* teal de acción     –  8.59:1 sobre blanco */
+  --dc-brand-500:#0C7C86;
+  --dc-brand-100:#CFEDEE;
+  --dc-brand-050:#EAF7F7;
+
+  /* ---- Escala de grises (CORREGIDA para AA) ---- */
+  --dc-ink:#0E2A33;
+  --dc-ink-900:#0E2A33;   /* títulos          – 17.75:1 */
+  --dc-ink-700:#33505A;   /* cuerpo           – 10.46:1 */
+  --dc-ink-500:#587079;   /* secundario       –  5.98:1  ← reemplaza #707B8C */
+  --dc-ink-400:#6B8088;   /* meta, timestamps –  4.97:1  ← reemplaza #98A2B3 */
+  --dc-ink-200:#BFD0D4;   /* SOLO bordes e iconos decorativos. NUNCA texto. */
+  --dc-line:#DFEBEC;      /* bordes */
+  --dc-surface:#FFFFFF;   /* tarjetas */
+  --dc-bg:#F1F7F7;        /* fondo de app: neutro plano, sin degradados */
+
+  /* ---- Semánticos (CORREGIDOS) ---- */
+  --dc-ok-700:#15803D;      /* texto y botón verde –  5.02:1 sobre blanco */
+  --dc-ok-100:#E7F7EE;
+  --dc-warn-700:#92400E;    /* texto ámbar         –  7.09:1 */
+  --dc-warn-600:#B45309;    /* botón ámbar         –  5.02:1 */
+  --dc-warn-100:#FEF3C7;
+  --dc-danger-700:#B42318;  /* rojo                –  6.57:1 */
+  --dc-danger-100:#FEF2F2;
+  --dc-info-700:#1D4ED8;
+  --dc-info-100:#DBEAFE;
+
+  /* ---- Tipografía: 8 pasos, ninguno fraccionario ---- */
+  --dc-fs-xs:12px;    --dc-lh-xs:16px;   /* etiquetas de tabla, chips */
+  --dc-fs-sm:13px;    --dc-lh-sm:18px;   /* meta, ayudas */
+  --dc-fs-md:14px;    --dc-lh-md:21px;   /* CUERPO POR DEFECTO */
+  --dc-fs-lg:16px;    --dc-lh-lg:23px;   /* subtítulos */
+  --dc-fs-xl:18px;    --dc-lh-xl:26px;   /* títulos de tarjeta */
+  --dc-fs-2xl:21px;   --dc-lh-2xl:28px;  /* títulos de pantalla */
+  --dc-fs-3xl:27px;   --dc-lh-3xl:34px;  /* cifras grandes */
+  --dc-fs-4xl:44px;   --dc-lh-4xl:52px;  /* cifra protagonista (una por pantalla) */
+
+  /* UX-11: densidad de ficha clínica (override por data-densidad en .fm) */
+  --dc-ficha-fs:14px;     /* recepción / admin */
+  --dc-ficha-row:56px;
+
+  --dc-fw-normal:400;   /* CUERPO. Hoy se usa 1 vez; debe ser el más frecuente. */
+  --dc-fw-medium:500;
+  --dc-fw-semibold:600; /* énfasis */
+  --dc-fw-bold:700;     /* títulos. NO usar 800. */
+
+  /* ---- Espaciado: base 4 ---- */
+  --dc-sp-1:4px;  --dc-sp-2:8px;   --dc-sp-3:12px; --dc-sp-4:16px;
+  --dc-sp-5:20px; --dc-sp-6:24px;  --dc-sp-8:32px; --dc-sp-10:40px;
+
+  /* ---- Radios: 4 valores ---- */
+  --dc-r-sm:6px;    /* chips, badges */
+  --dc-r-md:10px;   /* botones, campos */
+  --dc-r-lg:16px;   /* tarjetas */
+  --dc-r-full:999px;
+
+  /* ---- Elevación: 3 niveles ---- */
+  --dc-sh-1:0 1px 2px rgba(14,42,51,.04), 0 4px 14px -6px rgba(14,42,51,.08);
+  --dc-sh-2:0 10px 30px -12px rgba(14,42,51,.18);
+  --dc-sh-3:0 20px 45px -28px rgba(15,27,56,.40);
+
+  /* ---- Alias de marca / estados usados en app (Sprint 5) ---- */
+  --dc-navy:#0F4050;
+  --dc-red:#C8312B;
+  --dc-teal:#0C7C86;
+  --dc-ok:#16A34A;
+  --dc-ok-soft:#E7F7EE;
+  --dc-warn:#F59E0B;
+  --dc-warn-soft:#FEF3C7;
+  --dc-warn-ink:#92400E;
+  --dc-danger:#DC2626;
+  --dc-danger-soft:#FEF2F2;
+  --dc-danger-mid:#FECACA;
+  --dc-info-soft:#DBEAFE;
+  --dc-info-ink:#1E40AF;
+  --dc-info-700b:#1D4ED8;
+  --dc-accent-cyan:#14A3A8;
+  --dc-accent-soft:#E3F5F5;
+  --dc-purple:#7C3AED;
+  --dc-amber-soft:#FDE68A;
+  --dc-amber-ink:#D97706;
+  --dc-green-soft:#A7F3D0;
+  --dc-sky:#BAE6FD;
+  --dc-ink-alt:#0E2A33;
+  --dc-slate:#64748B;
+  --dc-bg-alt:#E9F2F3;
+  --dc-bg-soft:#F5FAFA;
+  --dc-bg-soft2:#F2F9F9;
+  --dc-white:#FFFFFF;
+  --dc-red-deep:#B91C1C;
+  --dc-red-alt:#C22F27;
+  --dc-brand-mid:#1C5A68;
+  --dc-brand-soft:#B9C3DE;
+  --dc-blue:#1B5FBF;
+  --dc-primary-alt:#0E8C95;
+  --dc-fee:#FEE2E2;
+  --dc-fee2:#FEE4E2;
+  --dc-line-alt:#C6D8DB;
+  --dc-line-alt2:#C6D8DB;
+
+  /* ---- Auto Sprint 5 (hex residuales → tokens) ---- */
+
+  /* ---- Foco ---- */
+  --dc-focus:0 0 0 3px rgba(14,140,149,.30);
+
+  /* ---- Objetivo táctil ----
+     44 px solo con puntero táctil (WCAG 2.5.5). Con ratón, 44 px por botón de icono
+     inflaba las filas de las tablas, desbordaba la columna de acciones y convertía
+     las "×" en círculos enormes; 36 px sigue muy por encima del mínimo AA (24 px). */
+  --dc-tap-min:36px;
+
+  /* UX-17: --dc-x-* eliminados; usar solo tokens semánticos de este archivo. */
+}
+/* ---- Identidad Dento Check ----
+   Petróleo para la estructura, turquesa para la acción, coral como acento
+   cálido (sonrisa) y oro para el plan. */
+:root {
+  --dc-petroleo:#0B3440;
+  --dc-petroleo-2:#0F4553;
+  --dc-coral:#F07C6C;
+  --dc-coral-100:#FDEBE8;
+  --dc-oro:#C8963E;
+  --dc-oro-100:#FBF1DE;
+  --dc-violeta:#7C5CD6;
+  --dc-violeta-100:#EFEAFC;
+  --dc-grad-marca: linear-gradient(135deg, #14A3A8 0%, #0E8C95 45%, #0A6C76 100%);
+  --dc-font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dc-font-title: 'Manrope Variable', 'Manrope', 'Inter Variable', system-ui, sans-serif;
+}
+@media (pointer: coarse) {
+  :root { --dc-tap-min:44px; }
+}
+
+/* SPEC §5 / UX-16 — foco de teclado global (WCAG 2.4.7).
+   !important: gana a boxShadow inline en Btn (~41 botones) que dejaba computed none. */
+*:focus-visible{
+  outline:none !important;
+  box-shadow: var(--dc-focus) !important;
+  border-radius: inherit;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+.dc-btn:focus-visible{
+  box-shadow: var(--dc-focus) !important;
+}
+
+/* ---- UX-01 contraste: texto nunca usa tinta fallida ---- */
+:root {
+  --dc-ink-fail-707b8c: var(--dc-ink-500);
+  --dc-ink-fail-98a2b3: var(--dc-ink-400);
+}
+
+/* ---- UX-04 / UX-06 / UX-08 tipografía y táctil globales ---- */
+body {
+  font-family: var(--dc-font);
+  /* Inter para leer (tablas, formularios, chat) y Manrope para títulos y cifras.
+     cv05: "l" con cola, para no confundirla con el 1 en DNI y teléfonos;
+     cv08: "I" con remates, distinta de la "l". */
+  font-feature-settings: "cv05", "cv08", "calt";
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: var(--dc-fs-md);
+  line-height: var(--dc-lh-md);
+  font-weight: var(--dc-fw-normal);
+  color: var(--dc-ink-700);
+}
+h1, h2, h3, h4, .dc-title {
+  font-weight: var(--dc-fw-bold);
+  color: var(--dc-ink-900);
+  letter-spacing: -.015em;
+  text-wrap: balance;
+}
+button, input, select, textarea { font-family: inherit; word-spacing: inherit; }
+
+/* ---- Reglas de mayúsculas y números ----
+   Todo el texto va en tipo oración, también las etiquetas pequeñas: se
+   distinguen por peso y color, no por MAYÚSCULAS espaciadas. Las cifras usan
+   dígitos tabulares. */
+[style*="text-transform: uppercase"] {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+.dc-kpi__value,
+.dc-cita__hora,
+[style*="tabular-nums"] { font-variant-numeric: tabular-nums lining-nums; }
+.dc-btn, input.dc-premium-inp, select, textarea,
+.dc-campo__input, [role="button"] {
+  min-height: var(--dc-tap-min);
+  box-sizing: border-box;
+}
+/* Icon-only / close: ampliar hit area sin agrandar el glifo */
+.dc-icon-btn,
+button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc-row-action):not(.dc-mini-btn):not(.dc-info):not([class*="dc-sb__"]):not([class*="dc-top__"]):not([class*="wa-"]):not(.dc-rec__switch):not([class*="dc-gal__"]):not([class*="pgc-"]) {
+  min-width: var(--dc-tap-min) !important;
+  min-height: var(--dc-tap-min) !important;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+/* UX-12 */
+.dc-money, [data-money], td.num, .dc-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* NAV-07: filas de tabla sin desborde ~10px */
+.dc-table-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+.dc-table-row {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+.dc-table-row > div {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* NAV-07: Pacientes — evitar scrollWidth > clientWidth en KPIs/filas */
+.dc-pacientes-root {
+  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
+}
+.dc-pacientes-root,
+.dc-pacientes-root * {
+  box-sizing: border-box;
+}
+.dc-pacientes-root .dc-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.dc-pacientes-root .dc-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+.dc-pacientes-root .dc-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--dc-line-alt2, #cbd5e1);
+  border-radius: 999px;
+}
+.dc-pacientes-root .dc-table-wrap > div[style] {
+  /* el scroller interno es el único con overflow-x intencional */
+  max-width: 100%;
+}
+.dc-pacientes-root .dc-table-row > div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dc-pacientes-root .dc-title,
+.dc-pacientes-root h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ---- UX-03 breakpoints ---- */
+@media (max-width: 1023px) {
+  .dc-split { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 767px) {
+  input, select, textarea, .dc-premium-inp {
+    font-size: 16px !important; /* iOS zoom + UX-08 */
+  }
+  /* Tablas → tarjetas (UX-18: sin > al scroller; min-width en nieto + overflow anulado) */
+  .dc-table-wrap { overflow: visible !important; }
+  .dc-table-wrap div[style*="overflow"] {
+    overflow-x: visible !important;
+  }
+  .dc-table-wrap div[style*="minWidth"],
+  .dc-table-wrap div[style*="min-width"] {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .dc-table-head {
+    display: none !important;
+  }
+  .dc-table-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 14px 16px !important;
+    border: 1px solid var(--dc-line) !important;
+    border-radius: 14px !important;
+    margin: 0 12px 10px !important;
+    background: var(--dc-surface) !important;
+    grid-template-columns: none !important;
+    box-sizing: border-box !important;
+    width: calc(100% - 24px) !important;
+    max-width: calc(100% - 24px) !important;
+  }
+  .dc-table-row > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    text-align: left !important;
+    padding: 0 !important;
+  }
+  .dc-table-row > .dc-col-sticky {
+    position: static !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  .dc-table-row > div::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dc-ink-500);
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  
+}
+@media (max-width: 479px) {
+  .dc-kpi__value { font-size: 20px !important; }
+}
+
+/* UX-14: toast mínimo 4s — clase aplicada desde notify host */
+.dc-toast { animation: dcToastIn .2s ease-out; }
+@keyframes dcToastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* "capitalize" ponía mayúscula en cada palabra ("Septiembre De 2026"):
+   en español solo va la primera letra. */
+div[style*="text-transform: capitalize"] { text-transform: none !important; }
+div[style*="text-transform: capitalize"]::first-letter { text-transform: uppercase; }
+/* Superficies premium: esquinas algo más amplias y sombra en capas (suave de cerca,
+   difusa de lejos) en lugar de una sombra dura. */
+:root {
+  --dc-r-lg: 18px;
+  --dc-sh-1: 0 1px 2px rgba(14,42,51,.04), 0 14px 34px -26px rgba(14,42,51,.38);
+  --dc-sh-2: 0 2px 4px rgba(14,42,51,.05), 0 22px 44px -26px rgba(14,42,51,.45);
+}
