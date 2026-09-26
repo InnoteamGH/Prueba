@@ -1,336 +1,482 @@
-/* Periodontograma clínico: gráfica anatómica por arcada con margen gingival y fondo de
-   bolsa, captura rápida por teclado, mapa de riesgo, indicadores y orientación AAP/EFP
-   2017. Lo usan la pantalla Clínico › Periodontograma y la ficha del paciente.
-   El contrato con el backend está documentado en util/periodontal.js. */
+/* Periodontograma clínico. Gráfica por arcada y cara (margen gingival, fondo de bolsa y
+   encía), registro rápido por teclado o teclado en pantalla con recorrido clínico,
+   orientación AAP/EFP 2017 y sitios críticos. Lo usan Clínico › Periodontograma y la
+   ficha del paciente. Contrato con el backend: util/periodontal.js
+   (GET /periodontograma?pacienteId=… y PUT /periodontograma, una fila por pieza). */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Droplet, FileText, Keyboard, Printer, Sparkles, X, Zap } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Keyboard, Redo2, Undo2 } from "lucide-react";
 import api, { auth } from "../api/client";
-import { SUP, INF, SITIOS, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, colorPs, demoPerio } from "../util/periodontal";
+import { SUP, INF, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, demoPerio } from "../util/periodontal";
+import "./periodontograma.css";
 
-const COLW = 58;          // ancho de cada pieza en la gráfica
-const MM = 4.6;           // píxeles por milímetro
-const H = 150;            // alto de la gráfica de una cara
-const CARA_NOMBRE = { v: "Vestibular", l: "Palatino", li: "Lingual" };
+const COL = 54, H = 150, CEJ = 86, SC = 5;
+const GEO = { 1: [32, 23, 42, 66], 2: [28, 22, 38, 62], 3: [32, 27, 44, 80], 4: [34, 31, 36, 68], 5: [33, 32, 34, 68], 6: [46, 48, 34, 62], 7: [44, 46, 33, 58], 8: [40, 42, 31, 52] };
+const NOMB = { 1: "Incisivo central", 2: "Incisivo lateral", 3: "Canino", 4: "Primer premolar", 5: "Segundo premolar", 6: "Primer molar", 7: "Segundo molar", 8: "Tercer molar" };
+const LADO = { 1: "superior derecho", 2: "superior izquierdo", 3: "inferior izquierdo", 4: "inferior derecho" };
+const ROM = ["0", "I", "II", "III"];
 
-/* Silueta de la pieza. dir = -1 raíz hacia arriba (superior), +1 hacia abajo (inferior). */
-function silueta(n, cx, cej, dir) {
-  const t = tipoDiente(n);
-  const cw = { molar: 44, premolar: 34, canino: 30, incisivo: 27 }[t];
-  const ch = { molar: 30, premolar: 32, canino: 38, incisivo: 36 }[t];
-  const rh = { molar: 62, premolar: 66, canino: 84, incisivo: 70 }[t];
-  const x1 = cx - cw / 2, x2 = cx + cw / 2, oy = cej - dir * ch, my = cej - dir * ch * 0.55;
-  const corona = `M ${x1} ${cej} C ${x1 - 3} ${my}, ${x1 + 3} ${oy}, ${cx} ${oy} C ${x2 - 3} ${oy}, ${x2 + 3} ${my}, ${x2} ${cej} Z`;
-  const raiz = (rx, rw, largo) => `M ${rx - rw / 2} ${cej} C ${rx - rw / 2} ${cej + dir * largo * 0.62}, ${rx - 2} ${cej + dir * largo}, ${rx} ${cej + dir * largo} C ${rx + 2} ${cej + dir * largo}, ${rx + rw / 2} ${cej + dir * largo * 0.62}, ${rx + rw / 2} ${cej} Z`;
-  const raices = t === "molar" ? [raiz(cx - cw * 0.24, 15, rh), raiz(cx + cw * 0.24, 15, rh * 0.94)] : t === "premolar" && n % 10 === 4 && esSuperior(n) ? [raiz(cx - 6, 11, rh), raiz(cx + 6, 11, rh * 0.95)] : [raiz(cx, cw * 0.56, rh)];
-  return { corona, raices, oy };
+const nombre = (n) => `${NOMB[n % 10]} ${LADO[Math.floor(n / 10)]}`;
+const caraNom = (n, i) => (i < 3 ? "Vestibular" : esSuperior(n) ? "Palatino" : "Lingual");
+const letra = (i) => ["M", "C", "D"][i % 3];
+const sitioCorto = (n, i) => `${caraNom(n, i)[0]}${letra(i)}`;
+const sev = (v) => (v == null ? "vacio" : v >= 6 ? "alto" : v >= 4 ? "mod" : "ok");
+const copia = (p) => ({ ...p, pd: [...p.pd], mg: [...p.mg], bop: [...p.bop], placa: [...p.placa], sup: [...p.sup] });
+const completar = (m) => { const out = {}; [...SUP, ...INF].forEach((n) => { out[n] = m[n] || piezaVacia(); }); return out; };
+
+/* Recorrido clínico: superior V 18→28, palatino 28→18, inferior L 48→38, V 38→48. */
+function recorrido(d) {
+  const out = [];
+  const add = (arco, cara, rev) => (rev ? [...arco].reverse() : arco).forEach((n) => {
+    if (d[n]?.ausente) return;
+    const o = ordenVisual(n, cara);
+    (rev ? [...o].reverse() : o).forEach((i) => out.push({ n, i }));
+  });
+  add(SUP, "v", false); add(SUP, "l", true); add(INF, "l", false); add(INF, "v", true);
+  return out;
 }
 
-function Grafica({ piezas, dientes, cara, dir, sel, onSel }) {
-  const W = piezas.length * COLW;
-  const cej = dir < 0 ? 92 : 58;
-  const y = (mm) => cej + dir * mm * MM;
-  // Tramos continuos de piezas presentes: las líneas se cortan en las ausencias.
-  const tramos = []; let cur = [];
-  piezas.forEach((n, i) => {
-    const p = dientes[n];
-    if (!p || p.ausente) { if (cur.length) tramos.push(cur); cur = []; return; }
-    ordenVisual(n, cara === "v" ? "v" : "l").forEach((si, k) => {
-      const pd = p.pd[si]; const mg = p.mg[si] ?? 0;
-      cur.push({ x: i * COLW + COLW * (0.2 + k * 0.3), pd, mg, bop: p.bop[si], sup: p.sup[si] });
+/* Examen anterior de la demostración (en la API todavía no hay historial de sondajes). */
+function demoPrevio(actual) {
+  let s = 97; const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const m = {};
+  Object.keys(actual).forEach((k) => {
+    const p = copia(actual[k]);
+    if (!p.ausente) for (let i = 0; i < 6; i++) if (p.pd[i] != null) {
+      p.pd[i] = Math.min(10, p.pd[i] + (p.pd[i] >= 4 ? (r() > 0.35 ? 1 : 0) : (r() > 0.8 ? 1 : 0)));
+      p.bop[i] = p.bop[i] || r() > 0.72;
+    }
+    m[k] = p;
+  });
+  return m;
+}
+
+/* ---------- Dibujo (SVG en texto: solo números y rutas propias) ---------- */
+function geo(n) { const g = GEO[n % 10], s = esSuperior(n); return { w: s ? g[0] : g[1], ch: g[2], rl: g[3], raices: esMolar(n) ? (s ? 3 : 2) : (n % 10 === 4 && s ? 2 : 1), tipo: tipoDiente(n) }; }
+const sitioX = (n, k, cx) => cx + (k - 1) * geo(n).w * 0.32;
+function corona(cx, g) {
+  const w = g.w, wn = w * 0.72, t = CEJ, b = CEJ + g.ch;
+  let p = `M${cx - wn / 2},${t} C${cx - w / 2 - 1},${t + g.ch * 0.22} ${cx - w / 2},${t + g.ch * 0.72} ${cx - w * 0.38},${b}`;
+  if (g.tipo === "canino") p += ` L${cx},${b + 7} L${cx + w * 0.38},${b}`;
+  else if (g.tipo === "incisivo") p += ` Q${cx},${b + 3} ${cx + w * 0.38},${b}`;
+  else { const k = g.tipo === "molar" ? 3 : 2, x0 = cx - w * 0.38, st = (w * 0.76) / k; for (let j = 0; j < k; j++) { const a = x0 + st * j; p += ` Q${a + st / 2},${b + 6} ${a + st},${b}`; } }
+  return p + ` C${cx + w / 2},${t + g.ch * 0.72} ${cx + w / 2 + 1},${t + g.ch * 0.22} ${cx + wn / 2},${t} Z`;
+}
+function raiz(cx, g) {
+  const wn = g.w * 0.72, rl = g.rl, t = CEJ;
+  if (g.raices === 1) return `M${cx - wn / 2},${t} C${cx - wn / 2},${t - rl * 0.55} ${cx - wn * 0.28},${t - rl} ${cx},${t - rl} C${cx + wn * 0.28},${t - rl} ${cx + wn / 2},${t - rl * 0.55} ${cx + wn / 2},${t} Z`;
+  const f = t - (g.tipo === "molar" ? 18 : rl * 0.5), o = wn / 2;
+  return `M${cx - o},${t} C${cx - o - 3},${t - rl * 0.5} ${cx - o + 1},${t - rl * 0.92} ${cx - o * 0.55},${t - rl} C${cx - o * 0.2},${t - rl * 0.95} ${cx - 4},${t - rl * 0.45} ${cx},${f} C${cx + 4},${t - rl * 0.45} ${cx + o * 0.2},${t - rl * 0.95} ${cx + o * 0.55},${t - rl} C${cx + o - 1},${t - rl * 0.92} ${cx + o + 3},${t - rl * 0.5} ${cx + o},${t} Z`;
+}
+function dienteSvg(p, n, cx, cara) {
+  const g = geo(n);
+  if (p.ausente) return `<g opacity=".45"><path d="${raiz(cx, g)}" fill="none" stroke="var(--pg-t300)" stroke-dasharray="3 3"/><path d="${corona(cx, g)}" fill="none" stroke="var(--pg-t300)" stroke-dasharray="3 3"/><path d="M${cx - 10},${CEJ + 8} l20,20 M${cx + 10},${CEJ + 8} l-20,20" stroke="var(--pg-t400)" stroke-width="1.6" stroke-linecap="round"/></g>`;
+  let s = "";
+  if (p.implante) {
+    const w = g.w * 0.42;
+    s += `<rect x="${cx - w / 2}" y="${CEJ - g.rl * 0.85}" width="${w}" height="${g.rl * 0.85}" rx="${w / 2}" fill="url(#pgImp)" stroke="var(--pg-borde)"/>`;
+    for (let y = CEJ - g.rl * 0.8; y < CEJ - 4; y += 7) s += `<path d="M${cx - w / 2},${y} L${cx + w / 2},${y + 3}" stroke="var(--pg-borde)" stroke-width="1" opacity=".8"/>`;
+  } else {
+    if (g.raices === 3 && cara === "v") s += `<path d="${raiz(cx, { ...g, raices: 1, w: g.w * 0.7, rl: g.rl + 6 })}" fill="url(#pgRaiz)" opacity=".55" stroke="var(--pg-borde)" stroke-width=".8"/>`;
+    s += `<path d="${raiz(cx, g)}" fill="url(#pgRaiz)" stroke="var(--pg-borde)" stroke-width="1"/>`;
+  }
+  return s + `<path d="${corona(cx, g)}" fill="url(#pgCor)" stroke="var(--pg-borde)" stroke-width="1.1"/>`;
+}
+function puntos(arco, cara, fuente) {
+  const segs = []; let cur = null;
+  arco.forEach((n, idx) => {
+    const p = fuente[n];
+    if (!p || p.ausente) { cur = null; return; }
+    if (!cur) { cur = []; segs.push(cur); }
+    const cx = idx * COL + COL / 2;
+    ordenVisual(n, cara).forEach((i, k) => { const ym = CEJ - (p.mg[i] ?? 0) * SC; cur.push({ n, i, x: sitioX(n, k, cx), ym, yp: ym - (p.pd[i] ?? 0) * SC, pd: p.pd[i] }); });
+  });
+  return segs;
+}
+function svgCara(arco, cara, abajo, dientes, previo, sel) {
+  const W = arco.length * COL; let g = "";
+  for (let mm = 1; mm <= 16; mm++) { const y = CEJ - mm * SC; g += `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="${mm % 3 === 0 ? "var(--pg-grid-2)" : "var(--pg-grid)"}"/>`; }
+  const si = arco.indexOf(sel.n);
+  if (si >= 0) g += `<rect x="${si * COL}" y="0" width="${COL}" height="${H}" fill="var(--pg-col-sel)"/>`;
+  arco.forEach((n, idx) => { g += dienteSvg(dientes[n], n, idx * COL + COL / 2, cara); });
+  const segs = puntos(arco, cara, dientes);
+  segs.forEach((sg) => {
+    const a = sg[0], z = sg[sg.length - 1];
+    g += `<path d="M${a.x - 12},${a.ym} ${sg.map((p) => `L${p.x},${p.ym}`).join(" ")} L${z.x + 12},${z.ym} L${z.x + 12},${z.ym - 26} ${[...sg].reverse().map((p) => `L${p.x},${p.ym - 26}`).join(" ")} L${a.x - 12},${a.ym - 26} Z" fill="var(--pg-encia)"/>`;
+    g += `<polygon points="${sg.map((p) => `${p.x},${p.ym}`).join(" ")} ${[...sg].reverse().map((p) => `${p.x},${p.yp}`).join(" ")}" fill="var(--pg-bolsa)"/>`;
+  });
+  if (previo) puntos(arco, cara, previo).forEach((sg) => { g += `<polyline points="${sg.map((p) => `${p.x},${p.yp}`).join(" ")}" fill="none" stroke="var(--pg-t400)" stroke-width="1.6" stroke-dasharray="4 3"/>`; });
+  segs.forEach((sg) => {
+    const a = sg[0], z = sg[sg.length - 1];
+    g += `<polyline points="${a.x - 12},${a.ym} ${sg.map((p) => `${p.x},${p.ym}`).join(" ")} ${z.x + 12},${z.ym}" fill="none" stroke="var(--pg-azul)" stroke-width="2" stroke-linejoin="round"/>`;
+    g += `<polyline points="${sg.map((p) => `${p.x},${p.yp}`).join(" ")}" fill="none" stroke="var(--pg-rojo)" stroke-width="2.2" stroke-linejoin="round"/>`;
+    sg.forEach((p) => {
+      const pz = dientes[p.n];
+      if (p.pd >= 4) g += `<circle cx="${p.x}" cy="${p.yp}" r="2.6" fill="var(--pg-rojo)"/>`;
+      if (pz.bop[p.i]) g += `<path d="M${p.x},${p.yp - 11} c-2.6,3.6 -3.6,5.2 -3.6,6.6 a3.6,3.6 0 0 0 7.2,0 c0,-1.4 -1,-3 -3.6,-6.6 Z" transform="rotate(180 ${p.x} ${p.yp - 7})" fill="var(--pg-rojo)"/>`;
+      if (pz.sup[p.i]) g += `<circle cx="${p.x}" cy="${p.yp - 16}" r="3" fill="none" stroke="var(--pg-ambar)" stroke-width="1.8"/>`;
     });
   });
-  if (cur.length) tramos.push(cur);
-  return (
-    <svg className="pg-svg" viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Gráfica ${CARA_NOMBRE[cara] || cara}`}>
-      {[2, 4, 6, 8, 10].map((mm) => <line key={mm} x1="0" x2={W} y1={y(mm)} y2={y(mm)} className={`pg-svg__ref${mm === 4 || mm === 6 ? " is-marca" : ""}`} />)}
-      {piezas.map((n, i) => {
-        const p = dientes[n] || piezaVacia(); const cx = i * COLW + COLW / 2; const s = silueta(n, cx, cej, dir);
-        return (
-          <g key={n} className={`pg-diente${p.ausente ? " is-ausente" : ""}${p.implante ? " is-implante" : ""}${sel === n ? " is-sel" : ""}`} onClick={() => onSel(n)}>
-            <rect x={i * COLW + 1} y="0" width={COLW - 2} height={H} rx="10" className="pg-diente__hit" />
-            {p.implante
-              ? <path d={`M ${cx - 6} ${cej} L ${cx - 4} ${cej + dir * 60} L ${cx} ${cej + dir * 66} L ${cx + 4} ${cej + dir * 60} L ${cx + 6} ${cej} Z`} className="pg-implante" />
-              : s.raices.map((d, k) => <path key={k} d={d} className="pg-raiz" />)}
-            <path d={s.corona} className="pg-corona" />
-            {p.implante && [12, 24, 36, 48].map((o) => <line key={o} x1={cx - 6} x2={cx + 6} y1={cej + dir * o} y2={cej + dir * (o + 3)} className="pg-rosca" />)}
-            {p.ausente && <path d={`M ${cx - 9} ${cej - 9} L ${cx + 9} ${cej + 9} M ${cx + 9} ${cej - 9} L ${cx - 9} ${cej + 9}`} className="pg-ausente-x" />}
-          </g>
-        );
-      })}
-      <line x1="0" x2={W} y1={cej} y2={cej} className="pg-svg__lac" />
-      {tramos.map((t, k) => {
-        const mgPts = t.map((s) => `${s.x},${y(s.mg)}`).join(" ");
-        const pdPts = t.map((s) => `${s.x},${y(s.mg + (s.pd ?? 0))}`).join(" ");
-        const area = `${mgPts} ${[...t].reverse().map((s) => `${s.x},${y(s.mg + (s.pd ?? 0))}`).join(" ")}`;
-        return (
-          <g key={k} pointerEvents="none">
-            <polygon points={area} className="pg-bolsa" />
-            <polyline points={mgPts} className="pg-margen" />
-            <polyline points={pdPts} className="pg-fondo" />
-            {t.map((s, j) => s.pd != null && s.pd >= 4 && <circle key={j} cx={s.x} cy={y(s.mg + s.pd)} r={s.pd >= 6 ? 4.2 : 3.4} className={`pg-punto is-${colorPs(s.pd)}`} />)}
-            {t.map((s, j) => s.bop && <circle key={`b${j}`} cx={s.x} cy={y(s.mg) - dir * 5} r="2.6" className="pg-sangra" />)}
-            {t.map((s, j) => s.sup && <circle key={`s${j}`} cx={s.x} cy={y(s.mg) - dir * 11} r="2.4" className="pg-supura" />)}
-          </g>
-        );
-      })}
-    </svg>
-  );
+  if (cara === "v") arco.forEach((n, idx) => {
+    const p = dientes[n];
+    if (!esMolar(n) || !(p.furca > 0) || p.ausente) return;
+    const cx = idx * COL + COL / 2, y = CEJ - 16;
+    g += `<path d="M${cx},${y - 7} L${cx + 6},${y + 4} L${cx - 6},${y + 4} Z" fill="${p.furca >= 2 ? "var(--pg-ambar)" : "none"}" stroke="var(--pg-ambar)" stroke-width="1.6"/>`;
+  });
+  const sp = segs.flat().find((p) => p.n === sel.n && p.i === sel.i);
+  if (sp) g += `<line x1="${sp.x}" x2="${sp.x}" y1="${Math.min(sp.yp, sp.ym) - 8}" y2="${CEJ + 4}" stroke="var(--pg-marca)" stroke-width="1.4" stroke-dasharray="2 2"/><circle cx="${sp.x}" cy="${sp.yp}" r="5" fill="none" stroke="var(--pg-marca)" stroke-width="2"/>`;
+  let t = "";
+  [3, 6, 9, 12, 15].forEach((mm) => { const y = CEJ - mm * SC; t += `<text x="3" y="${(abajo ? H - y : y) + 3}" class="pgc-eje">${mm}</text>`; });
+  t += `<line x1="${W / 2}" x2="${W / 2}" y1="0" y2="${H}" stroke="var(--pg-linea-2)"/>`;
+  const defs = `<defs><linearGradient id="pgCor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--pg-esm-2)"/><stop offset="1" style="stop-color:var(--pg-esm-1)"/></linearGradient><linearGradient id="pgRaiz" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:var(--pg-den-1)"/><stop offset="1" style="stop-color:var(--pg-den-2)"/></linearGradient><linearGradient id="pgImp" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8FA3BC"/><stop offset=".5" stop-color="#DCE5F1"/><stop offset="1" stop-color="#7C8FA8"/></linearGradient></defs>`;
+  return `${defs}<g${abajo ? ` transform="translate(0 ${H}) scale(1 -1)"` : ""}>${g}</g>${t}`;
 }
 
 export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = "", notify = () => {}, soloLectura = false }) {
   const conectado = !!auth.token;
-  const [dientes, setDientes] = useState({});
-  const [cargando, setCargando] = useState(true);
+  const [dientes, setDientes] = useState(null);
+  const [previo, setPrevio] = useState(null);
   const [error, setError] = useState(false);
-  const [sel, setSel] = useState(16);
-  const [arcada, setArcada] = useState("ambas");
-  const [rapida, setRapida] = useState(true);
-  const [estadoGuardado, setEstadoGuardado] = useState(null); // { tipo: "ok"|"guardando"|"error", hora }
-  const [informe, setInforme] = useState(false);
+  const [sel, setSel] = useState({ n: 16, i: 2 });
+  const [arcada, setArcada] = useState("sup");
+  const [campo, setCampo] = useState("pd");
+  const [neg, setNeg] = useState(false);
+  const [comparar, setComparar] = useState(false);
+  const [guardado, setGuardado] = useState(null); // { tipo: "ok" | "guardando" | "error", hora }
+  const [hist, setHist] = useState({ u: [], r: [] });
+  const ultimo = useRef(null);
   const timers = useRef({});
-  const inputs = useRef([]);
+  const activo = useRef(false);
+  const raizRef = useRef(null);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
-    setCargando(true); setError(false);
-    const completar = (m) => { const out = {}; [...SUP, ...INF].forEach((n) => { out[n] = m[n] || piezaVacia(); }); return out; };
-    if (!conectado) { setDientes(completar(demoPerio(pacienteId))); setCargando(false); return; }
-    if (!pacienteId) { setDientes(completar({})); setCargando(false); return; }
+    setDientes(null); setError(false); setHist({ u: [], r: [] });
+    if (!conectado) { const d = completar(demoPerio(pacienteId)); setDientes(d); setPrevio(demoPrevio(d)); return; }
+    setPrevio(null);
+    if (!pacienteId) { setDientes(completar({})); return; }
     api.perio.porPaciente(pacienteId)
       .then((rows) => setDientes(completar(desdeApi(rows))))
-      .catch(() => { setDientes(completar({})); setError(true); })
-      .finally(() => setCargando(false));
+      .catch(() => { setDientes(completar({})); setError(true); });
   }, [pacienteId, conectado]);
 
-  // Guardado pieza por pieza, con una pausa corta para no enviar cada tecla.
+  // Guardado pieza por pieza con una pausa corta, para no enviar cada tecla.
   const persistir = (n, p) => {
     if (!conectado || !pacienteId) return;
     clearTimeout(timers.current[n]);
-    setEstadoGuardado({ tipo: "guardando" });
+    setGuardado({ tipo: "guardando" });
     timers.current[n] = setTimeout(() => {
       api.perio.guardar(aApi(pacienteId, n, p))
-        .then(() => setEstadoGuardado({ tipo: "ok", hora: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) }))
-        .catch(() => { setEstadoGuardado({ tipo: "error" }); notify(`No se pudo guardar la pieza ${n}.`); });
-    }, 650);
+        .then(() => setGuardado({ tipo: "ok", hora: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) }))
+        .catch(() => { setGuardado({ tipo: "error" }); notify(`No se pudo guardar la pieza ${n}.`); });
+    }, 600);
   };
-  const cambiar = (n, fn) => {
-    if (soloLectura) return;
-    const b = dientes[n] || piezaVacia();
-    const p = { ...b, pd: [...b.pd], mg: [...b.mg], bop: [...b.bop], placa: [...b.placa], sup: [...b.sup] };
-    fn(p);
-    setDientes((d) => ({ ...d, [n]: p }));
+  const modificar = (n, fn, conHist = true) => {
+    if (soloLectura || !dientes) return;
+    const p = copia(dientes[n]); fn(p);
+    if (conHist) setHist((h) => ({ u: [...h.u.slice(-59), dientes], r: [] }));
+    setDientes({ ...dientes, [n]: p });
     persistir(n, p);
   };
-  const setSitio = (n, campo, i, v) => cambiar(n, (p) => { p[campo][i] = v; });
-  const togSitio = (n, campo, i) => cambiar(n, (p) => { p[campo][i] = !p[campo][i]; });
+  const restaurar = (destino) => {
+    Object.keys(destino).forEach((k) => { if (JSON.stringify(destino[k]) !== JSON.stringify(dientes[k])) persistir(+k, destino[k]); });
+    setDientes(destino);
+  };
+  const deshacer = () => { if (!hist.u.length) return; const d = hist.u[hist.u.length - 1]; setHist({ u: hist.u.slice(0, -1), r: [...hist.r, dientes] }); restaurar(d); };
+  const rehacer = () => { if (!hist.r.length) return; const d = hist.r[hist.r.length - 1]; setHist({ u: [...hist.u, dientes], r: hist.r.slice(0, -1) }); restaurar(d); };
 
-  const m = useMemo(() => metricas(dientes), [dientes]);
-  const dx = useMemo(() => clasificacion(m), [m]);
-  const orden = [...SUP, ...INF];
-  const mover = (d) => { const i = orden.indexOf(sel); let j = i; do { j = (j + d + orden.length) % orden.length; } while (dientes[orden[j]]?.ausente && j !== i); setSel(orden[j]); };
-
-  // Captura rápida: al escribir la profundidad salta al sitio siguiente. "1" espera el
-  // segundo dígito (10, 11, 12…). B, P y S marcan sangrado, placa y supuración.
-  let seq = 0;
-  const celdaPs = (n, si, campo) => {
-    const p = dientes[n]; const idx = seq++; const v = p[campo][si];
-    const sev = campo === "pd" ? colorPs(v) : null;
-    return (
-      <input key={`${campo}${si}`} ref={(el) => { inputs.current[idx] = el; }} className={`pg-in${sev ? ` is-${sev}` : ""}${campo === "mg" ? " is-mg" : ""}`}
-        inputMode="numeric" value={v ?? ""} disabled={soloLectura || p.ausente} aria-label={`${campo === "pd" ? "Profundidad" : "Margen gingival"} ${n} ${SITIOS[si]}`}
-        title={`${campo === "pd" ? "Profundidad de sondaje" : "Margen gingival (recesión +)"} – pieza ${n}, ${SITIOS[si].toLowerCase()}`}
-        onFocus={(e) => { setSel(n); e.target.select(); }}
-        onKeyDown={(e) => {
-          const k = e.key.toLowerCase();
-          if (campo === "pd" && ["b", "p", "s"].includes(k)) { e.preventDefault(); togSitio(n, k === "b" ? "bop" : k === "p" ? "placa" : "sup", si); }
-          if (e.key === "ArrowRight" || (e.key === "Enter" && !e.shiftKey)) { e.preventDefault(); inputs.current[idx + 1]?.focus(); }
-          if (e.key === "ArrowLeft" || (e.key === "Enter" && e.shiftKey)) { e.preventDefault(); inputs.current[idx - 1]?.focus(); }
-        }}
-        onChange={(e) => {
-          const raw = e.target.value.replace(campo === "mg" ? /[^\d-]/g : /\D/g, "").slice(0, 3);
-          const val = raw === "" || raw === "-" ? null : Math.max(campo === "mg" ? -9 : 0, Math.min(15, parseInt(raw, 10)));
-          setSitio(n, campo, si, val);
-          if (rapida && raw !== "" && raw !== "1" && raw !== "-") setTimeout(() => inputs.current[idx + 1]?.focus(), 0);
-        }} />
-    );
+  const ir = (s) => { setSel(s); setArcada(esSuperior(s.n) ? "sup" : "inf"); };
+  const siguiente = (desde, paso) => {
+    const r = recorrido(dientes), k = r.findIndex((x) => x.n === desde.n && x.i === desde.i);
+    return r[Math.max(0, Math.min(r.length - 1, (k < 0 ? 0 : k) + paso))] || desde;
+  };
+  const escribirEn = (s, v) => {
+    if (dientes[s.n].ausente) return;
+    modificar(s.n, (p) => { if (campo === "pd") p.pd[s.i] = Math.max(0, Math.min(15, v)); else p.mg[s.i] = neg ? -Math.abs(v) : Math.min(12, v); });
+    setNeg(false);
+    ultimo.current = { ...s, t: Date.now(), d: v, campo };
+    ir(siguiente(s, 1));
+  };
+  // "1" y luego 0–5 en menos de 0,8 s se toma como 10–15 en el mismo sitio.
+  const digito = (d) => {
+    const u = ultimo.current;
+    if (u && u.d === 1 && campo === "pd" && u.campo === "pd" && Date.now() - u.t < 800 && d <= 5) { ultimo.current = null; escribirEn({ n: u.n, i: u.i }, 10 + d); return; }
+    escribirEn(sel, d);
+  };
+  const bandera = (k, s = ultimo.current || sel) => { if (!dientes[s.n].ausente) modificar(s.n, (p) => { p[k][s.i] = !p[k][s.i]; }); };
+  const borrar = () => modificar(sel.n, (p) => { p[campo][sel.i] = null; });
+  const elegir = (s, c) => { ultimo.current = null; ir(s); if (c) setCampo(c); };
+  const elegirDiente = (n) => elegir({ n, i: sel.n === n ? sel.i : ordenVisual(n, "v")[0] });
+  const moverVisual = (paso) => {
+    const arco = arcada === "sup" ? SUP : INF, cara = sel.i < 3 ? "v" : "l", l = [];
+    arco.forEach((n) => ordenVisual(n, cara).forEach((i) => l.push({ n, i })));
+    const k = l.findIndex((x) => x.n === sel.n && x.i === sel.i);
+    const nx = l[Math.max(0, Math.min(l.length - 1, k + paso))]; if (nx) elegir(nx);
   };
 
-  const cara = (piezas, c, dir, arriba) => {
-    const cl = c === "v" ? "v" : "l";
-    const filas = (
-      <div className="pg-filas">
-        {c === "v" && (
-          <div className="pg-fila pg-fila--num"><span className="pg-lbl" />{piezas.map((n) => <button key={n} type="button" className={`dc-mini-btn pg-num${sel === n ? " is-sel" : ""}${dientes[n]?.ausente ? " is-aus" : ""}`} onClick={() => setSel(n)}>{n}</button>)}</div>
-        )}
-        {c === "v" && (
-          <div className="pg-fila"><span className="pg-lbl">Movilidad</span>{piezas.map((n) => { const p = dientes[n]; return (
-            <button key={n} type="button" className={`dc-mini-btn pg-chip${p.movilidad ? " is-on" : ""}`} disabled={soloLectura || p.ausente} title="Movilidad (Miller 0–3): toca para cambiar"
-              onClick={() => cambiar(n, (q) => { q.movilidad = ((q.movilidad || 0) + 1) % 4 || null; })}>{p.ausente ? "" : p.movilidad || "·"}</button>); })}</div>
-        )}
-        {c === "v" && (
-          <div className="pg-fila"><span className="pg-lbl">Furca</span>{piezas.map((n) => { const p = dientes[n]; return esMolar(n) && !p.ausente ? (
-            <button key={n} type="button" className={`dc-mini-btn pg-furca g${p.furca || 0}`} disabled={soloLectura} title="Furca (Hamp 0–3): toca para cambiar"
-              onClick={() => cambiar(n, (q) => { q.furca = ((q.furca || 0) + 1) % 4 || null; })}>{p.furca ? ["", "I", "II", "III"][p.furca] : "·"}</button>) : <span key={n} className="pg-vacio" />; })}</div>
-        )}
-        <div className="pg-fila"><span className="pg-lbl">Sangrado · placa</span>{piezas.map((n) => { const p = dientes[n]; return (
-          <span key={n} className="pg-tres">{p.ausente ? null : ordenVisual(n, cl).map((si) => (
-            <span key={si} className="pg-marcas">
-              <button type="button" className={`dc-mini-btn pg-bop${p.bop[si] ? " is-on" : ""}`} disabled={soloLectura} onClick={() => togSitio(n, "bop", si)} aria-label={`Sangrado ${n} ${SITIOS[si]}`} title="Sangrado al sondaje (B)" />
-              <button type="button" className={`dc-mini-btn pg-placa${p.placa[si] ? " is-on" : ""}`} disabled={soloLectura} onClick={() => togSitio(n, "placa", si)} aria-label={`Placa ${n} ${SITIOS[si]}`} title="Placa (P)" />
-            </span>))}</span>); })}</div>
-        <div className="pg-fila"><span className="pg-lbl">Margen gingival</span>{piezas.map((n) => <span key={n} className="pg-tres">{dientes[n].ausente ? null : ordenVisual(n, cl).map((si) => celdaPs(n, si, "mg"))}</span>)}</div>
-        <div className="pg-fila"><span className="pg-lbl">Profundidad</span>{piezas.map((n) => <span key={n} className="pg-tres">{dientes[n].ausente ? null : ordenVisual(n, cl).map((si) => celdaPs(n, si, "pd"))}</span>)}</div>
-        <div className="pg-fila pg-fila--nic"><span className="pg-lbl">Nivel de inserción</span>{piezas.map((n) => { const p = dientes[n]; return (
-          <span key={n} className="pg-tres">{p.ausente ? null : ordenVisual(n, cl).map((si) => { const c2 = nic(p.pd[si], p.mg[si]); return <span key={si} className={`pg-nic${c2 != null && c2 >= 5 ? " is-alto" : c2 != null && c2 >= 3 ? " is-medio" : ""}`}>{c2 ?? ""}</span>; })}</span>); })}</div>
+  // El teclado solo actúa si el último clic fue dentro del periodontograma.
+  useEffect(() => {
+    const down = (e) => { activo.current = !!raizRef.current?.contains(e.target); };
+    document.addEventListener("pointerdown", down);
+    return () => document.removeEventListener("pointerdown", down);
+  }, []);
+  useEffect(() => {
+    if (soloLectura || !dientes) return undefined;
+    const h = (e) => {
+      const tg = e.target;
+      if (!activo.current || (tg && (tg.tagName === "TEXTAREA" || tg.tagName === "INPUT" || tg.tagName === "SELECT" || tg.isContentEditable))) return;
+      const k = e.key, low = k.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && low === "z") { e.preventDefault(); if (e.shiftKey) rehacer(); else deshacer(); return; }
+      if ((e.ctrlKey || e.metaKey) && low === "y") { e.preventDefault(); rehacer(); return; }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/^[0-9]$/.test(k)) { e.preventDefault(); digito(+k); return; }
+      if (low === "b") return bandera("bop");
+      if (low === "p") return bandera("placa");
+      if (low === "s") return bandera("sup");
+      if (k === "Tab") { e.preventDefault(); setCampo(campo === "pd" ? "mg" : "pd"); setNeg(false); return; }
+      if (k === "-" && campo === "mg") { setNeg(!neg); return; }
+      if (k === "Backspace" || k === "Delete") { e.preventDefault(); borrar(); return; }
+      if (k === "ArrowRight") { e.preventDefault(); moverVisual(1); return; }
+      if (k === "ArrowLeft") { e.preventDefault(); moverVisual(-1); return; }
+      if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); const o = ordenVisual(sel.n, sel.i < 3 ? "v" : "l"), otra = ordenVisual(sel.n, sel.i < 3 ? "l" : "v"); elegir({ n: sel.n, i: otra[o.indexOf(sel.i)] }); return; }
+      if ((k === "Enter" || k === " ") && !(tg && tg.tagName === "BUTTON")) { e.preventDefault(); ultimo.current = null; ir(siguiente(sel, 1)); }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  });
+
+  // Mantener visible el sitio activo cuando la gráfica tiene scroll horizontal.
+  useEffect(() => {
+    const sc = scrollRef.current, a = sc?.querySelector(".pgc-s.is-act");
+    if (!sc || !a) return;
+    const r = a.getBoundingClientRect(), rs = sc.getBoundingClientRect();
+    if (r.left < rs.left + 100 || r.right > rs.right - 10) sc.scrollLeft += r.left - rs.left - rs.width / 2;
+  }, [sel, campo]);
+
+  const m = useMemo(() => (dientes ? metricas(dientes) : null), [dientes]);
+  const mp = useMemo(() => (previo ? metricas(previo) : null), [previo]);
+  const dx = useMemo(() => (m ? clasificacion(m) : null), [m]);
+  const criticos = useMemo(() => {
+    if (!dientes) return [];
+    const l = [];
+    [...SUP, ...INF].forEach((n) => { const p = dientes[n]; if (p.ausente) return; for (let i = 0; i < 6; i++) { const v = p.pd[i]; if (v != null && v >= 5) l.push({ n, i, v, b: p.bop[i], s: p.sup[i] }); } });
+    return l.sort((a, b) => b.v - a.v || b.b - a.b);
+  }, [dientes]);
+
+  if (!dientes) return <div className="pgc-cargando">Cargando periodontograma…</div>;
+
+  const cmp = comparar && previo;
+  const arco = arcada === "sup" ? SUP : INF;
+  const interna = arcada === "sup" ? "Palatino" : "Lingual";
+  const p = dientes[sel.n];
+  const tot = m.presentes * 6;
+  let hechos = 0; [...SUP, ...INF].forEach((n) => { if (!dientes[n].ausente) hechos += dientes[n].pd.filter((v) => v != null).length; });
+  const dxTono = dx.estado === "periodontitis" ? "r" : dx.estado === "gingivitis" ? "a" : dx.estado === "salud" ? "o" : "n";
+  const delta = (a, b, dec = 0) => {
+    if (!cmp) return null;
+    const d = +(a - b).toFixed(dec);
+    return <span className={`pgc-delta is-${!d ? "igual" : d < 0 ? "mejor" : "peor"}`}>{!d ? "=" : `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(dec)}`}</span>;
+  };
+  const KPI = [
+    ["Sangrado", m.bopPct, "%", delta(m.bopPct, mp?.bopPct), m.bopPct >= 10 ? "r" : ""],
+    ["Placa", m.placaPct, "%", delta(m.placaPct, mp?.placaPct), m.placaPct >= 20 ? "a" : ""],
+    ["PS media", m.pdMedia.toFixed(1), "mm", delta(m.pdMedia, mp?.pdMedia, 1), ""],
+    ["NIC medio", m.calMedia.toFixed(1), "mm", delta(m.calMedia, mp?.calMedia, 1), ""],
+    ["Sitios ≥4", m.s4, "", delta(m.s4, mp?.s4), m.s4 ? "a" : ""],
+    ["Sitios ≥6", m.s6, "", delta(m.s6, mp?.s6), m.s6 ? "r" : ""],
+  ];
+
+  const colCls = (n) => `pgc-col${sel.n === n ? " is-sel" : ""}${dientes[n].ausente ? " is-aus" : ""}`;
+  const filaNum = (cara, c, rot) => (
+    <div className={`pgc-fila is-${c}`}>
+      <div className="pgc-rot">{rot}</div>
+      {arco.map((n) => { const pz = dientes[n]; return (
+        <div key={n} className={colCls(n)}>
+          {ordenVisual(n, cara).map((i) => {
+            if (pz.ausente) return <span key={i} className="pgc-s is-ro is-vacio">·</span>;
+            if (c === "nic") { const v = nic(pz.pd[i], pz.mg[i]); return <span key={i} className="pgc-s is-ro">{v ?? "·"}</span>; }
+            const v = pz[c][i], act = sel.n === n && sel.i === i && campo === c;
+            const pv = cmp && c === "pd" && v != null ? previo[n]?.pd[i] : null;
+            return (
+              <button key={i} type="button"
+                className={`pgc-s${c === "pd" ? ` is-${sev(v)}` : v == null ? " is-vacio" : ""}${act ? " is-act" : ""}`}
+                onClick={() => elegir({ n, i }, c)} aria-label={`${n} ${sitioCorto(n, i)} ${c === "pd" ? "profundidad" : "margen"} ${v ?? "sin dato"}`}>
+                {v ?? "·"}
+                {pv != null && pv !== v && <sup className={v > pv ? "is-up" : "is-dn"}>{v > pv ? "+" : "−"}{Math.abs(v - pv)}</sup>}
+              </button>
+            );
+          })}
+        </div>
+      ); })}
+    </div>
+  );
+  const filaDots = (cara, k, rot) => (
+    <div className={`pgc-fila is-${k}`}>
+      <div className="pgc-rot">{rot}</div>
+      {arco.map((n) => { const pz = dientes[n]; return (
+        <div key={n} className={colCls(n)}>
+          {ordenVisual(n, cara).map((i) => pz.ausente ? <span key={i} className="pgc-dot" /> : (
+            <button key={i} type="button" className={`pgc-dot is-${k}${pz[k][i] ? " is-on" : ""}${k === "bop" && pz.sup[i] ? " is-sup" : ""}`} disabled={soloLectura}
+              onClick={() => { elegir({ n, i }); bandera(k, { n, i }); }} aria-pressed={pz[k][i]} aria-label={`${rot} ${n} ${sitioCorto(n, i)}`}><i /></button>
+          ))}
+        </div>
+      ); })}
+    </div>
+  );
+  const filaCiclo = (k, rot) => (
+    <div className="pgc-fila is-ciclo">
+      <div className="pgc-rot">{rot}</div>
+      {arco.map((n) => { const pz = dientes[n];
+        if (pz.ausente || (k === "furca" && !esMolar(n))) return <div key={n} className={colCls(n)} />;
+        const v = pz[k] || 0;
+        return <div key={n} className={colCls(n)}><button type="button" className={`pgc-cyc is-v${v}`} disabled={soloLectura} onClick={() => modificar(n, (q) => { q[k] = ((q[k] || 0) + 1) % 4; })} aria-label={`${rot} ${n}: ${v}`}>{k === "furca" ? (v ? ROM[v] : "–") : v}</button></div>;
+      })}
+    </div>
+  );
+  const svg = (cara, abajo) => (
+    <div className="pgc-svgw" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const n = arco[Math.floor((e.clientX - r.left) / COL)]; if (n) elegirDiente(n); }}>
+      <svg viewBox={`0 0 ${arco.length * COL} ${H}`} width={arco.length * COL} height={H} role="img" aria-label={`Sondaje ${cara === "v" ? "vestibular" : interna.toLowerCase()}`}
+        dangerouslySetInnerHTML={{ __html: svgCara(arco, cara, abajo, dientes, cmp ? previo : null, sel) }} />
+    </div>
+  );
+  const bloque = (cara) => (
+    <div className="pgc-cara">
+      <h4>{cara === "v" ? "Vestibular" : esSuperior(sel.n) ? "Palatino" : "Lingual"}</h4>
+      <div className="pgc-sitios">
+        {ordenVisual(sel.n, cara).map((i) => { const v = p.pd[i]; return (
+          <div key={i} className={`pgc-st${sel.i === i ? " is-act" : ""}`}>
+            <button type="button" className="pgc-st__main" onClick={() => elegir({ n: sel.n, i })}>
+              <small>{letra(i)}</small>
+              <span className={`pgc-st__v is-${sev(v)}`}>{p.ausente ? "—" : v ?? "·"}</span>
+              <span className="pgc-st__sub">MG {p.mg[i] ?? "·"} · NIC {nic(v, p.mg[i]) ?? "·"}</span>
+            </button>
+            <div className="pgc-fl">
+              {[["bop", "B", "Sangrado"], ["placa", "P", "Placa"], ["sup", "S", "Supuración"]].map(([k, l, t]) => (
+                <button key={k} type="button" className={`is-${k}${p[k][i] ? " is-on" : ""}`} title={t} aria-pressed={p[k][i]} disabled={soloLectura || p.ausente} onClick={() => bandera(k, { n: sel.n, i })}>{l}</button>
+              ))}
+            </div>
+          </div>
+        ); })}
       </div>
-    );
-    const graf = <div className="pg-fila pg-fila--graf"><span className="pg-lbl pg-lbl--cara">{c === "v" ? "Vestibular" : dir < 0 ? "Palatino" : "Lingual"}</span><Grafica piezas={piezas} dientes={dientes} cara={c} dir={dir} sel={sel} onSel={setSel} /></div>;
-    return <div className={`pg-cara${arriba ? " is-arriba" : ""}`}>{arriba ? <>{filas}{graf}</> : <>{graf}{filas}</>}</div>;
-  };
-
-  const p = dientes[sel] || piezaVacia();
-  const nivel = (n) => { const x = dientes[n]; if (!x || x.ausente) return "aus"; const mx = Math.max(-1, ...x.pd.filter((v) => v != null)); return mx < 0 ? "vacio" : mx >= 6 ? "grave" : mx >= 4 ? "moderado" : "sano"; };
-  const dxColor = { sin_datos: "#64748B", salud: "#16A36A", gingivitis: "#D97706", periodontitis: "#DC2626" }[dx.estado];
-
-  const imprimir = () => {
-    const w = window.open("", "_blank"); if (!w) { notify("Permite ventanas emergentes para imprimir."); return; }
-    const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    const fila = (lista) => lista.map((n) => { const t = dientes[n]; return `<tr><td><b>${n}</b></td><td>${t.ausente ? "Ausente" : t.pd.map((v) => v ?? "–").join(" ")}</td><td>${t.ausente ? "" : t.mg.map((v) => v ?? "–").join(" ")}</td><td>${t.ausente ? "" : t.pd.map((v, i) => nic(v, t.mg[i]) ?? "–").join(" ")}</td><td>${t.ausente ? "" : t.bop.filter(Boolean).length}</td><td>${t.movilidad || ""}</td><td>${esMolar(n) && t.furca ? t.furca : ""}</td></tr>`; }).join("");
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Periodontograma ${esc(pacienteNombre)}</title><style>body{font-family:Inter,Arial,sans-serif;color:#0f2a33;padding:28px}h1{font-size:20px;margin:0}small{color:#64748b}.k{display:flex;gap:10px;margin:16px 0}.k div{border:1px solid #dbe7e7;border-radius:10px;padding:8px 12px}.k b{display:block;font-size:18px}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}td,th{border-bottom:1px solid #e5eded;padding:5px 6px;text-align:left}th{background:#f3f8f8}</style></head><body><h1>Periodontograma</h1><small>${esc(pacienteNombre)} · ${new Date().toLocaleDateString("es-PE")}</small><div class="k"><div>Sangrado<b>${m.bopPct}%</b></div><div>Placa<b>${m.placaPct}%</b></div><div>PS media<b>${m.pdMedia} mm</b></div><div>NIC medio<b>${m.calMedia} mm</b></div><div>Sitios ≥4 mm<b>${m.s4}</b></div><div>Sitios ≥6 mm<b>${m.s6}</b></div></div><p><b>${esc(dx.titulo)}</b> (orientativo AAP/EFP 2017). ${esc(dx.detalle)}</p><table><tr><th>Pieza</th><th>PS (VM VC VD PM PC PD)</th><th>Margen</th><th>NIC</th><th>Sangrado</th><th>Movilidad</th><th>Furca</th></tr>${fila(SUP)}${fila(INF)}</table></body></html>`);
-    w.document.close(); w.focus(); w.print();
-  };
-
-  if (cargando) return <div className="pg-cargando"><Activity size={18} /> Cargando el periodontograma…</div>;
+    </div>
+  );
+  const seg = (k, dis) => (
+    <div className="pgc-mini">
+      {[0, 1, 2, 3].map((v) => <button key={v} type="button" className={(p[k] || 0) === v ? "is-on" : ""} disabled={dis || soloLectura} onClick={() => modificar(sel.n, (q) => { q[k] = v; })}>{k === "furca" ? ROM[v] : v}</button>)}
+    </div>
+  );
 
   return (
-    <div className="pg">
-      {error && <div className="pg-aviso"><AlertTriangle size={15} /> No se pudo leer el sondaje guardado. Lo que registres ahora se guardará igual.</div>}
+    <div className="pgc" ref={raizRef}>
+      {error && <div className="pgc-aviso"><AlertTriangle size={15} strokeWidth={2} /> No se pudo cargar el sondaje guardado. Lo que registres se guardará igual.</div>}
 
-      <section className="pg-resumen">
-        <div className="pg-dx" style={{ "--c": dxColor }}>
-          <span className="pg-dx__ico">{dx.estado === "salud" ? <CheckCircle2 size={20} /> : dx.estado === "sin_datos" ? <Activity size={20} /> : <AlertTriangle size={20} />}</span>
-          <div><small>Orientación diagnóstica · AAP/EFP 2017</small><b>{dx.titulo}</b><p>{dx.detalle}</p></div>
+      <section className="pgc-panel pgc-resumen" aria-label="Resumen del examen">
+        <div className={`pgc-dx is-${dxTono}`} title={`${dx.detalle} Orientativo: no reemplaza el juicio clínico ni la radiografía.`}>
+          <span className="pgc-dx__led" /><b>{dx.titulo}</b>
         </div>
-        <div className="pg-kpis">
-          {[["Sangrado", `${m.bopPct}%`, m.bopPct >= 30 ? "mal" : m.bopPct >= 10 ? "warn" : "ok", "de los sitios"],
-            ["Placa", `${m.placaPct}%`, m.placaPct >= 30 ? "mal" : m.placaPct >= 15 ? "warn" : "ok", "O'Leary"],
-            ["PS media", `${m.pdMedia}`, m.pdMedia >= 4 ? "mal" : m.pdMedia >= 3 ? "warn" : "ok", "mm"],
-            ["NIC medio", `${m.calMedia}`, m.calMedia >= 4 ? "mal" : m.calMedia >= 2.5 ? "warn" : "ok", "mm"],
-            ["Bolsas ≥4", m.s4, m.s4 ? "warn" : "ok", `${m.s6} de ≥6 mm`],
-            ["Piezas", m.presentes, "neutro", `${m.movil} con movilidad`]].map(([l, v, t, sub]) => (
-            <div key={l} className={`pg-kpi is-${t}`}><span>{l}</span><b>{v}</b><small>{sub}</small></div>
-          ))}
+        <div className="pgc-kpis">
+          {KPI.map(([l, v, u, d, c]) => <div key={l} className="pgc-kpi"><small>{l}</small><b className={c ? `is-${c}` : ""}>{v}{u && <u>{u}</u>}{d}</b></div>)}
         </div>
+        <div className="pgc-prog" title="Sitios sondados"><span>{hechos}/{tot}</span><i style={{ "--p": `${tot ? (hechos / tot) * 100 : 0}%` }} /></div>
+        <span className={`pgc-estado is-${soloLectura ? "ro" : guardado?.tipo || "ok"}`}>
+          {soloLectura ? "Solo lectura" : !conectado ? "Demostración" : guardado?.tipo === "guardando" ? "Guardando…" : guardado?.tipo === "error" ? "Sin guardar" : guardado?.hora ? `Guardado ${guardado.hora}` : "Al día"}
+        </span>
+        {!soloLectura && <>
+          <button type="button" className="pgc-ib" onClick={deshacer} disabled={!hist.u.length} aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><Undo2 size={15} strokeWidth={2} /></button>
+          <button type="button" className="pgc-ib" onClick={rehacer} disabled={!hist.r.length} aria-label="Rehacer" title="Rehacer (Ctrl+Y)"><Redo2 size={15} strokeWidth={2} /></button>
+        </>}
       </section>
 
-      <section className="pg-duo">
-        <div className="pg-mapa">
-          <header><b>Mapa de riesgo</b><span>Peor bolsa de cada pieza. Toca una para editarla.</span></header>
-          {[SUP, INF].map((fila, k) => (
-            <div key={k} className="pg-mapa__fila">
-              {fila.map((n, i) => (
-                <button key={n} type="button" className={`dc-mini-btn pg-mapa__d is-${nivel(n)}${sel === n ? " is-sel" : ""}${i === 8 ? " is-medio" : ""}`} onClick={() => setSel(n)} title={`Pieza ${n}`}>
-                  {n}{dientes[n]?.bop.some(Boolean) && !dientes[n]?.ausente && <i />}
+      <div className="pgc-trabajo">
+        <section className="pgc-panel pgc-carta-card">
+          <div className="pgc-carta-cab">
+            <div className="pgc-seg" role="radiogroup" aria-label="Arcada">
+              {[["sup", "Superior"], ["inf", "Inferior"]].map(([k, l]) => (
+                <button key={k} type="button" role="radio" aria-checked={arcada === k} className={arcada === k ? "is-on" : ""}
+                  onClick={() => { setArcada(k); const a = k === "sup" ? SUP : INF; if (!a.includes(sel.n)) { const f = a.find((x) => !dientes[x].ausente) || a[0]; setSel({ n: f, i: ordenVisual(f, "v")[0] }); } }}>{l}</button>
+              ))}
+            </div>
+            {previo && <button type="button" className={`pgc-tg${comparar ? " is-on" : ""}`} aria-pressed={comparar} onClick={() => setComparar(!comparar)}>Comparar con anterior</button>}
+            <div className="pgc-leyenda">
+              <span><i className="is-mg" />Margen</span><span><i className="is-bolsa" />Bolsa</span><span><i className="is-enc" />Encía</span>{cmp && <span><i className="is-prev" />Anterior</span>}
+            </div>
+          </div>
+          <div className="pgc-scroll" ref={scrollRef}>
+            <div className="pgc-carta">
+              {filaCiclo("movilidad", "Movilidad")}
+              {filaCiclo("furca", "Furca")}
+              {filaDots("v", "placa", "Placa")}
+              {filaDots("v", "bop", "Sangrado")}
+              {filaNum("v", "nic", "NIC")}
+              {filaNum("v", "mg", "Margen")}
+              {filaNum("v", "pd", "Prof.")}
+              <div className="pgc-fila is-svg"><div className="pgc-rot is-cara">Vestibular</div>{svg("v", false)}</div>
+              <div className="pgc-fila is-num">
+                <div className="pgc-rot">Pieza</div>
+                {arco.map((n) => <div key={n} className="pgc-col"><button type="button" className={`pgc-num${sel.n === n ? " is-sel" : ""}${dientes[n].ausente ? " is-aus" : ""}`} onClick={() => elegirDiente(n)}>{n}{dientes[n].implante && <span>IMP</span>}</button></div>)}
+              </div>
+              <div className="pgc-fila is-svg"><div className="pgc-rot is-cara">{interna}</div>{svg("l", true)}</div>
+              {filaNum("l", "pd", "Prof.")}
+              {filaNum("l", "mg", "Margen")}
+              {filaNum("l", "nic", "NIC")}
+              {filaDots("l", "bop", "Sangrado")}
+              {filaDots("l", "placa", "Placa")}
+            </div>
+          </div>
+          {criticos.length > 0 && (
+            <div className="pgc-crit">
+              <b>Sitios ≥ 5 mm</b>
+              {criticos.slice(0, 12).map((x) => (
+                <button key={`${x.n}-${x.i}`} type="button" className={x.v >= 6 ? "is-alto" : ""} onClick={() => elegir({ n: x.n, i: x.i }, "pd")}>
+                  {x.n} {sitioCorto(x.n, x.i)} <strong>{x.v}</strong>{x.b && <i className="is-b" />}{x.s && <i className="is-s" />}
                 </button>
               ))}
+              {criticos.length > 12 && <span>+{criticos.length - 12}</span>}
             </div>
-          ))}
-          {(() => { const crit = []; [...SUP, ...INF].forEach((n) => { const t = dientes[n]; if (!t || t.ausente) return; t.pd.forEach((v, i) => { if (v != null && v >= 5) crit.push({ n, i, v, b: t.bop[i] }); }); }); crit.sort((a2, b2) => b2.v - a2.v); return crit.length ? (
-            <div className="pg-crit">
-              <b>Sitios críticos <i>{crit.length}</i></b>
-              <div>{crit.slice(0, 8).map((c) => <button key={`${c.n}-${c.i}`} type="button" className={`dc-mini-btn is-${colorPs(c.v)}`} onClick={() => setSel(c.n)} title={SITIOS[c.i]}><strong>{c.n}</strong> {SITIOS[c.i].replace("Palatino/lingual", "P/L").replace("Vestibular", "V")} · {c.v} mm{c.b ? " · sangra" : ""}</button>)}</div>
-            </div>) : <p className="pg-crit__ok"><CheckCircle2 size={14} /> Sin bolsas de 5 mm o más.</p>; })()}
-          <div className="pg-leyenda"><span className="is-sano">≤3 mm</span><span className="is-moderado">4–5 mm</span><span className="is-grave">≥6 mm</span><span className="is-aus">Ausente</span><span className="is-bop">Sangrado</span></div>
-        </div>
+          )}
+        </section>
 
-        <div className="pg-insp">
-          <header>
-            <button type="button" className="pg-nav" onClick={() => mover(-1)} aria-label="Pieza anterior"><ChevronLeft size={16} /></button>
-            <div className="pg-insp__tit"><small>{tipoDiente(sel)} · {esSuperior(sel) ? "superior" : "inferior"}</small><b>Pieza {sel}</b></div>
-            <button type="button" className="pg-nav" onClick={() => mover(1)} aria-label="Pieza siguiente"><ChevronRight size={16} /></button>
-            <div className="pg-insp__tog">
-              <button type="button" className={p.ausente ? "is-on" : ""} disabled={soloLectura} onClick={() => cambiar(sel, (q) => { q.ausente = !q.ausente; })}>Ausente</button>
-              <button type="button" className={p.implante ? "is-on" : ""} disabled={soloLectura} onClick={() => cambiar(sel, (q) => { q.implante = !q.implante; })}>Implante</button>
+        <aside className="pgc-panel pgc-insp" aria-label={`Pieza ${sel.n}${pacienteNombre ? ` de ${pacienteNombre}` : ""}`}>
+          <div className="pgc-insp__cab">
+            <div className="pgc-insp__n">{sel.n}</div>
+            <div><b>{nombre(sel.n)}</b><small>{caraNom(sel.n, sel.i)} {letra(sel.i)}</small></div>
+            <div className="pgc-insp__nav">
+              <button type="button" className="pgc-ib" aria-label="Sitio anterior" onClick={() => elegir(siguiente(sel, -1))}><ChevronLeft size={16} strokeWidth={2.2} /></button>
+              <button type="button" className="pgc-ib" aria-label="Sitio siguiente" onClick={() => elegir(siguiente(sel, 1))}><ChevronRight size={16} strokeWidth={2.2} /></button>
             </div>
-          </header>
-          {p.ausente ? <p className="pg-insp__nada">Pieza marcada como ausente: no cuenta en los indicadores.</p> : (<>
-            <div className="pg-sitios">
-              {[["v", "Vestibular"], ["l", esSuperior(sel) ? "Palatino" : "Lingual"]].map(([c, t]) => (
-                <div key={c} className="pg-sitios__cara">
-                  <span className="pg-sitios__t">{t}</span>
-                  {ordenVisual(sel, c).map((si) => { const c2 = nic(p.pd[si], p.mg[si]); return (
-                    <div key={si} className="pg-sitio">
-                      <small>{SITIOS[si].split(" ").pop()}</small>
-                      <b className={`is-${colorPs(p.pd[si]) || "vacio"}`}>{p.pd[si] ?? "–"}<em>mm</em></b>
-                      <span>Margen {p.mg[si] ?? "–"} · NIC {c2 ?? "–"}</span>
-                      <div className="pg-sitio__tog">
-                        <button type="button" className={`dc-mini-btn is-b${p.bop[si] ? " is-on" : ""}`} disabled={soloLectura} onClick={() => togSitio(sel, "bop", si)} title="Sangrado"><Droplet size={12} /></button>
-                        <button type="button" className={`dc-mini-btn is-p${p.placa[si] ? " is-on" : ""}`} disabled={soloLectura} onClick={() => togSitio(sel, "placa", si)} title="Placa">P</button>
-                        <button type="button" className={`dc-mini-btn is-s${p.sup[si] ? " is-on" : ""}`} disabled={soloLectura} onClick={() => togSitio(sel, "sup", si)} title="Supuración">S</button>
-                      </div>
-                    </div>); })}
-                </div>
-              ))}
-            </div>
-            <div className="pg-insp__pie">
-              <div className="pg-seg"><span>Movilidad</span>{[0, 1, 2, 3].map((x) => <button key={x} type="button" disabled={soloLectura} className={(p.movilidad || 0) === x ? "is-on" : ""} onClick={() => cambiar(sel, (q) => { q.movilidad = x || null; })}>{x}</button>)}</div>
-              {esMolar(sel) && <div className="pg-seg"><span>Furca</span>{[0, 1, 2, 3].map((x) => <button key={x} type="button" disabled={soloLectura} className={(p.furca || 0) === x ? "is-on" : ""} onClick={() => cambiar(sel, (q) => { q.furca = x || null; })}>{x ? ["", "I", "II", "III"][x] : "0"}</button>)}</div>}
-              <input className="pg-nota" value={p.nota} disabled={soloLectura} placeholder="Nota de la pieza (opcional)" onChange={(e) => { const v = e.target.value; cambiar(sel, (q) => { q.nota = v; }); }} />
-            </div>
-          </>)}
-        </div>
-      </section>
-
-      <section className="pg-carta">
-        <header className="pg-barra">
-          <div className="pg-seg pg-seg--arc">{[["ambas", "Ambas arcadas"], ["sup", "Superior"], ["inf", "Inferior"]].map(([k, l]) => <button key={k} type="button" className={arcada === k ? "is-on" : ""} onClick={() => setArcada(k)}>{l}</button>)}</div>
-          <button type="button" className={`pg-rapida${rapida ? " is-on" : ""}`} onClick={() => setRapida((x) => !x)} title="Al escribir una profundidad pasa solo al sitio siguiente"><Zap size={14} /> Captura rápida</button>
-          <span className="pg-atajos"><Keyboard size={14} /> Escribe la profundidad · <kbd>B</kbd> sangrado · <kbd>P</kbd> placa · <kbd>S</kbd> supuración · <kbd>Enter</kbd> siguiente</span>
-          <span className={`pg-estado is-${estadoGuardado?.tipo || (conectado ? "idle" : "demo")}`}>
-            {!conectado ? "Demostración: los cambios no se guardan" : estadoGuardado?.tipo === "guardando" ? "Guardando…" : estadoGuardado?.tipo === "error" ? "Error al guardar" : estadoGuardado?.tipo === "ok" ? `Guardado ${estadoGuardado.hora}` : "Se guarda solo al escribir"}
-          </span>
-          <button type="button" className="pg-btn" onClick={() => setInforme(true)}><FileText size={14} /> Informe</button>
-          <button type="button" className="pg-btn" onClick={imprimir}><Printer size={14} /> Imprimir</button>
-        </header>
-        <div className="pg-scroll">
-          <div className="pg-lienzo">
-            {arcada !== "inf" && (
-              <div className="pg-arcada"><span className="pg-arcada__t">Arcada superior</span>
-                {cara(SUP, "v", -1, true)}
-                {cara(SUP, "l", -1, false)}
-              </div>
-            )}
-            {arcada !== "sup" && (
-              <div className="pg-arcada"><span className="pg-arcada__t">Arcada inferior</span>
-                {cara(INF, "l", 1, true)}
-                {cara(INF, "v", 1, false)}
-              </div>
-            )}
           </div>
-        </div>
-        <footer className="pg-ley2">
-          <span><i className="l-margen" /> Margen gingival</span><span><i className="l-fondo" /> Fondo de bolsa</span><span><i className="l-lac" /> Límite amelocementario</span>
-          <span><i className="l-sangra" /> Sangrado</span><span><i className="l-supura" /> Supuración</span><span className="pg-ley2__nota">Margen positivo = recesión · NIC = profundidad + margen</span>
-        </footer>
-      </section>
-
-      {informe && (
-        <div className="pg-velo" onMouseDown={() => setInforme(false)}>
-          <div className="pg-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <header style={{ "--c": dxColor }}><span><Sparkles size={18} /></span><div><b>Informe periodontal</b><small>{pacienteNombre || "Paciente"} · {new Date().toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" })}</small></div><button type="button" onClick={() => setInforme(false)} aria-label="Cerrar"><X size={18} /></button></header>
-            <div className="pg-modal__cuerpo">
-              <div className="pg-dx" style={{ "--c": dxColor }}><div><small>Orientación AAP/EFP 2017</small><b>{dx.titulo}</b><p>{dx.detalle}</p></div></div>
-              <ul className="pg-reco">
-                {(dx.estado === "periodontitis" ? [`Raspado y alisado radicular en ${m.piezasConBolsa} ${m.piezasConBolsa === 1 ? "pieza" : "piezas"} con bolsas ≥4 mm`, "Reevaluación periodontal a las 6–8 semanas", m.placaPct >= 20 ? `Control de placa: hoy ${m.placaPct}%, meta menor al 20%` : "Mantener el control de placa actual", m.furcas ? `Seguimiento de ${m.furcas} ${m.furcas === 1 ? "furca comprometida" : "furcas comprometidas"}` : "Radiografías para confirmar el estadio y definir el grado"]
-                  : dx.estado === "gingivitis" ? ["Profilaxis y destartraje", "Instrucción de higiene y técnica de cepillado", "Control en 3 meses"]
-                  : dx.estado === "salud" ? ["Mantenimiento periodontal cada 6 meses", "Refuerzo de higiene interproximal"]
-                  : ["Registra el sondaje de las seis caras de cada pieza"]).map((r) => <li key={r}><CheckCircle2 size={15} /> {r}</li>)}
-              </ul>
-              <p className="pg-modal__nota">Orientativo: la clasificación final la define el profesional con radiografías, antecedentes y factores de riesgo.</p>
-            </div>
-            <footer><button type="button" className="pg-btn" onClick={imprimir}><Printer size={14} /> Imprimir</button><button type="button" className="pg-btn is-pri" onClick={() => setInforme(false)}>Listo</button></footer>
+          <div className="pgc-insp__tgl">
+            <button type="button" className={`pgc-tg${p.ausente ? " is-on" : ""}`} aria-pressed={p.ausente} disabled={soloLectura} onClick={() => modificar(sel.n, (q) => { q.ausente = !q.ausente; })}>Ausente</button>
+            <button type="button" className={`pgc-tg${p.implante ? " is-on" : ""}`} aria-pressed={p.implante} disabled={soloLectura} onClick={() => modificar(sel.n, (q) => { q.implante = !q.implante; })}>Implante</button>
           </div>
-        </div>
-      )}
+          <div className="pgc-insp__caras">{bloque("v")}{bloque("l")}</div>
+          <div className="pgc-par">
+            <div><span className="pgc-lbl">Movilidad</span>{seg("movilidad", p.ausente)}</div>
+            <div><span className="pgc-lbl">Furca</span>{seg("furca", !esMolar(sel.n) || p.ausente)}</div>
+          </div>
+          {!soloLectura && (
+            <div className="pgc-teclado">
+              <div className="pgc-seg is-sm" role="radiogroup" aria-label="Dato a registrar">
+                {[["pd", "Profundidad"], ["mg", "Margen"]].map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={campo === k} className={campo === k ? "is-on" : ""} onClick={() => { setCampo(k); setNeg(false); }}>{l}</button>)}
+              </div>
+              <div className="pgc-teclas">
+                {Array.from({ length: 13 }, (_, v) => <button key={v} type="button" className={`pgc-tk${campo === "pd" && v >= 6 ? " is-k6" : campo === "pd" && v >= 4 ? " is-k4" : ""}`} onClick={() => { ultimo.current = null; escribirEn(sel, v); }}>{v}</button>)}
+                <button type="button" className={`pgc-tk is-fn${neg ? " is-on" : ""}`} disabled={campo === "pd"} onClick={() => setNeg(!neg)} title="Margen coronal al límite amelocementario">−</button>
+                <button type="button" className="pgc-tk is-fn" onClick={borrar}>Borrar</button>
+                <button type="button" className="pgc-tk is-fn is-b" onClick={() => bandera("bop")}>Sangra</button>
+                <button type="button" className="pgc-tk is-fn is-p" onClick={() => bandera("placa")}>Placa</button>
+                <button type="button" className="pgc-tk is-fn is-s" onClick={() => bandera("sup")}>Supura</button>
+                <button type="button" className="pgc-tk is-sig" onClick={() => { ultimo.current = null; ir(siguiente(sel, 1)); }}>Siguiente</button>
+              </div>
+              <details className="pgc-atajos">
+                <summary><Keyboard size={13} strokeWidth={2} /> Atajos</summary>
+                <kbd>0</kbd>–<kbd>9</kbd> registra y avanza · <kbd>1</kbd><kbd>0</kbd> = 10 · <kbd>B</kbd> sangra · <kbd>P</kbd> placa · <kbd>S</kbd> supura · <kbd>Tab</kbd> profundidad/margen · <kbd>−</kbd> margen negativo · <kbd>←</kbd><kbd>→</kbd> sitio · <kbd>↑</kbd><kbd>↓</kbd> cara · <kbd>Ctrl</kbd><kbd>Z</kbd> deshacer
+              </details>
+            </div>
+          )}
+          <textarea className="pgc-nota" aria-label={`Nota de la pieza ${sel.n}`} placeholder="Nota de la pieza" value={p.nota || ""} disabled={soloLectura}
+            onChange={(e) => { const v = e.target.value; modificar(sel.n, (q) => { q.nota = v; }, false); }} />
+        </aside>
+      </div>
     </div>
   );
 }
