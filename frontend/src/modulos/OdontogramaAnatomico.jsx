@@ -4,6 +4,21 @@ import { snapshotAGuardados } from "../util/odontogramaBridge.js";
 import { apiRowsAHtmlDatos } from "../util/odontogramaHydrate.js";
 import { pedirAnexoAlIframe } from "../util/odontogramaAnexo.js";
 import { useDatosImpresion } from "../util/membrete";
+import { MEDICOS } from "../comun";
+
+/* Profesional que firma los documentos del odontograma: el odontólogo que tiene la
+   sesión abierta; si imprime otra persona (recepción), el médico tratante del
+   paciente. El COP sale del registro del médico. Quien imprime queda en la traza. */
+function profesionalDoc(medicoTratante) {
+  let u = null;
+  try { u = JSON.parse(localStorage.getItem("dc_usuario") || "null"); } catch { u = null; }
+  const u2 = u || auth.sesion || {};
+  const esMedico = /medico|odont/i.test(String(u2.rol || ""));
+  const nombre = (esMedico ? u2.nombre : "") || medicoTratante || "";
+  const m = MEDICOS.find((x) => (u2.medicoId != null && x.id === u2.medicoId) || (nombre && x.nombre === nombre));
+  const cop = String((esMedico && u2.cop) || (m && m.cop) || "").replace(/^\s*COP\s*/i, "");
+  return { nombre: nombre || (m && m.nombre) || "", cop, impreso: u2.nombre || "" };
+}
 
 export { snapshotAGuardados };
 
@@ -85,6 +100,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   pacienteEdad = "",
   pacienteHc = "",
   pacienteSede = "",
+  medicoTratante = "",
   capa = "inicial",
   denticion = "adulto",
   /** null = autoaltura al contenido de la maqueta (referencia completa). */
@@ -191,6 +207,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         sede: pacienteSede || "",
       },
     });
+    postToIframe({ type: "dento-odontograma-profesional", profesional: profesionalDoc(medicoTratante) });
     // Membrete de los documentos del odontograma (resumen y plan de inversión): los
     // mismos datos de empresa y de la sede activa que el resto del sistema.
     postToIframe({
@@ -202,7 +219,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         horario: datosDoc.sede.horario, correo: datosDoc.sede.correo, serie: datosDoc.sede.serieDocumento,
       },
     });
-  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc]);
+  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante]);
 
   const persistir = useCallback(async (payload) => {
     if (!editable || !pacienteId || !payload?.datos || !auth.token) return;

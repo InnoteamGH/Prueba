@@ -121,7 +121,9 @@ export function curvaCajaAcumulada(pagos, fechaYmd) {
 }
 
 export function inicialesDe(nombre) {
-  const partes = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+  // Sin el tratamiento: «Dra. Carla Mendoza» → CM, no DM.
+  const partes = String(nombre || "").trim().split(/\s+/).filter(Boolean)
+    .filter((w, i, a) => !(a.length > 1 && i === 0 && /^(dra?|lic|sr|sra|mg|mgtr)\.?$/i.test(w)));
   if (!partes.length) return "?";
   if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
   return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();

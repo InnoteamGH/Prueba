@@ -173,7 +173,10 @@ async function request(method, path, body, extraHeaders) {
   const promise = run();
   if (method === "GET") {
     inflightGet.set(dedupeKey, promise);
-    promise.finally(() => inflightGet.delete(dedupeKey));
+    // then(ok, err) en lugar de finally: finally devuelve otra promesa que repite el
+    // rechazo y, como nadie la escucha, cada GET fallido salía como error no controlado.
+    const limpiar = () => inflightGet.delete(dedupeKey);
+    promise.then(limpiar, limpiar);
   }
   return promise;
 }

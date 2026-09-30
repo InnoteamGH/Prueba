@@ -2687,8 +2687,9 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               pacienteNombre={(pacientes.find((x) => x.id === pacienteId) || {}).nombre || ""}
               pacienteDni={(pacientes.find((x) => x.id === pacienteId) || {}).dni || ""}
               pacienteEdad={edadPac != null ? edadPac : ""}
-              pacienteHc=""
+              pacienteHc={(() => { const px = pacientes.find((x) => x.id === pacienteId) || {}; return px.numeroHistoria || px.nroHistoria || px.dni || ""; })()}
               pacienteSede={sedeLabelOdo}
+              medicoTratante={(() => { const px = pacientes.find((x) => x.id === pacienteId) || {}; return px.medico || (MEDICOS.find((m) => m.id === px.medicoId) || {}).nombre || ""; })()}
               capa={fase}
               denticion={denticionApi(denticion)}
               zoom={zoom}
@@ -6195,7 +6196,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         <span />
         {puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={nuevo}><Plus size={14} strokeWidth={2} /> Nuevo servicio</button>}
       </section>
-      {cats.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {cats.length > 0 && <div className="dc-chips-fila" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {[["all", "Todas"], ...cats.map((c) => [c, c])].map(([k, l]) => { const on = cat === k; const col = k === "all" ? NAVY : (SERV_CAT_COL[k] || "var(--dc-ink-400)"); return (
           <button key={k} type="button" className={`dc-cat${on ? " is-on" : ""}`} style={{ "--c": col }} onClick={() => setCat(k)}>{k !== "all" && <i />}{l}<span>{k === "all" ? items.length : items.filter((x) => (x.especialidad || x.cat) === k).length}</span></button>
         ); })}
@@ -6724,7 +6725,7 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
           {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", trabajo: "", lab: "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
         </section>
       ); })()}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div className="dc-chips-fila" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {[["todos", "Todos", "#0E9199"], ["enviado", "Enviado", "#2563EB"], ["en_proceso", "En proceso", "#D97706"], ["recibido", "Recibido", "#6D4FD1"], ["entregado", "Entregado", "#16A36A"], ["atrasados", "Atrasados", "#D0563F"]].map(([k, l, c]) => {
           const n = k === "todos" ? casos.length : k === "atrasados" ? casos.filter((x) => x.estado !== "entregado" && faltanDias(x) < 0).length : casos.filter((x) => x.estado === k).length;
           return <button key={k} type="button" className={`dc-cat${filtroLab === k ? " is-on" : ""}`} style={{ "--c": c }} onClick={() => setFiltroLab(k)}>{k !== "todos" && <i />}{l}<span>{n}</span></button>;

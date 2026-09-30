@@ -378,12 +378,12 @@ export const ESPECIALIDADES = [
  * `citasDemo` es el número de atenciones que corresponde a esa producción.
  */
 export const MEDICOS = [
-  { id: 1, nombre: "Dra. Carla Mendoza", esp: 1, esps: [1, 4], sede: 1, sedes: [1, 2], foto: "CM", color: NAVY, meta: 12000, prodDemo: 9200, citasDemo: 58 },
-  { id: 2, nombre: "Dr. Luis Paredes", esp: 2, esps: [2], sede: 1, sedes: [1], foto: "LP", color: "var(--dc-brand-mid)", meta: 10000, prodDemo: 7800, citasDemo: 49 },
-  { id: 3, nombre: "Dra. Ana Quispe", esp: 3, esps: [3], sede: 2, sedes: [2], foto: "AQ", color: DS.c.primary, meta: 8500, prodDemo: 6400, citasDemo: 41 },
-  { id: 4, nombre: "Dra. Sofía Torres", esp: 5, esps: [5], sede: 2, sedes: [2], foto: "ST", color: DS.c.accent, meta: 7000, prodDemo: 5100, citasDemo: 33 },
-  { id: 5, nombre: "Dr. Jorge Ramos", esp: 4, esps: [4], sede: 1, sedes: [1, 2], foto: "JR", color: "var(--dc-info-ink)", meta: 6000, prodDemo: 4200, citasDemo: 28 },
-  { id: 6, nombre: "Dr. Miguel Flores", esp: 1, esps: [1], sede: 2, sedes: [2], foto: "MF", color: "var(--dc-brand-600)", meta: 5000, prodDemo: 3500, citasDemo: 22 },
+  { id: 1, nombre: "Dra. Carla Mendoza", cop: "24493", esp: 1, esps: [1, 4], sede: 1, sedes: [1, 2], foto: "CM", color: NAVY, meta: 12000, prodDemo: 9200, citasDemo: 58 },
+  { id: 2, nombre: "Dr. Luis Paredes", cop: "18762", esp: 2, esps: [2], sede: 1, sedes: [1], foto: "LP", color: "var(--dc-brand-mid)", meta: 10000, prodDemo: 7800, citasDemo: 49 },
+  { id: 3, nombre: "Dra. Ana Quispe", cop: "31045", esp: 3, esps: [3], sede: 2, sedes: [2], foto: "AQ", color: DS.c.primary, meta: 8500, prodDemo: 6400, citasDemo: 41 },
+  { id: 4, nombre: "Dra. Sofía Torres", cop: "27318", esp: 5, esps: [5], sede: 2, sedes: [2], foto: "ST", color: DS.c.accent, meta: 7000, prodDemo: 5100, citasDemo: 33 },
+  { id: 5, nombre: "Dr. Jorge Ramos", cop: "15984", esp: 4, esps: [4], sede: 1, sedes: [1, 2], foto: "JR", color: "var(--dc-info-ink)", meta: 6000, prodDemo: 4200, citasDemo: 28 },
+  { id: 6, nombre: "Dr. Miguel Flores", cop: "33620", esp: 1, esps: [1], sede: 2, sedes: [2], foto: "MF", color: "var(--dc-brand-600)", meta: 5000, prodDemo: 3500, citasDemo: 22 },
 ];
 export const espsDe = (m) => m ? (m.esps || [m.esp]) : [];
 

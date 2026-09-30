@@ -3817,3 +3817,71 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-emp__logoacc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 220px; }
 .dc-emp__logoacc small { flex-basis: 100%; font-size: 12px; color: var(--dc-ink-500); }
 @media (max-width: 560px) { .dc-emp__logoprev { width: 100%; } }
+
+/* ── Celular: franjas superiores compactas ──
+   En 390 px ocupaban entre 180 y 370 px (casi media pantalla). Se quita el texto
+   descriptivo, las cifras van en una sola fila deslizable y la acción principal sube
+   a la esquina, para que el contenido empiece en el primer tercio de la pantalla. */
+@media (max-width: 600px) {
+  .dc-hero, .dc-ag-hero, .dc-esp-hero, .dc-sat-hero {
+    padding: 12px 14px !important; gap: 8px 10px !important; border-radius: 16px !important;
+    margin-bottom: 10px !important; min-height: 0 !important;
+  }
+  /* Título y acción principal en la primera línea; lo demás debajo, a lo ancho */
+  .dc-esp-hero > * { order: 5; flex: 1 1 100% !important; }
+  .dc-esp-hero > .dc-esp-hero__txt { order: 0; flex: 1 1 0 !important; }
+  .dc-esp-hero > .dc-esp-hero__agregar, .dc-esp-hero > .dc-esp-hero__btn, .dc-esp-hero > .dc-hero-acc { order: 1; flex: 0 0 auto !important; width: auto !important; }
+  .dc-esp-hero > .dc-esp-hero__prox { order: 2; }
+  .dc-esp-hero > .dc-esp-hero__cifras { order: 3; }
+  .dc-esp-hero > .dc-lab-flujo { order: 4; flex-wrap: nowrap !important; }
+  .dc-lab-flujo li { margin-right: 0 !important; }
+  .dc-lab-flujo__fl { display: none; }
+  /* Agenda: la descarga pasa a la esquina de la franja */
+  .dc-ag-hero { display: flex !important; flex-direction: column; align-items: stretch !important; position: relative; }
+  .dc-ag-hero__dia { padding-right: 44px; }
+  .dc-ag-hero__prox { order: 1; }
+  .dc-ag-hero__cifras { order: 2; justify-content: flex-start !important; }
+  .dc-ag-hero__estados { order: 3; }
+  .dc-ag-hero__acc { position: absolute !important; top: 10px; right: 10px; margin: 0 !important; z-index: 2; }
+  .dc-ag-hero__acc .dc-icon-btn { width: 32px !important; height: 32px !important; background: rgba(255,255,255,.16) !important; border-color: rgba(255,255,255,.28) !important; color: #fff !important; }
+  .dc-ag-hero__acc:empty { display: none; }
+  .dc-esp-hero__agregar { height: 32px !important; padding: 0 12px !important; font-size: 12.5px !important; }
+  .dc-hero-acc { display: flex; gap: 6px; flex-wrap: nowrap; }
+  .dc-hero__txt p, .dc-ag-hero__dia p, .dc-esp-hero__txt p, .dc-hero__fecha,
+  .dc-ag-hero__eyebrow, .dc-ag-hero__leyenda, .dc-res-hero__dist { display: none !important; }
+  .dc-esp-hero__num b { font-size: 22px !important; }
+  .dc-esp-hero__num span { font-size: 12.5px !important; }
+  .dc-hero__txt h2, .dc-ag-hero__dia h2 { font-size: 17px !important; }
+  /* Cifras: una fila, deslizable si no entran */
+  .dc-hero__cifras, .dc-ag-hero__cifras, .dc-esp-hero__cifras {
+    display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none;
+    gap: 0 !important; margin: 0 -14px !important; padding: 0 14px !important; grid-column: 1 / -1 !important;
+  }
+  .dc-hero__cifras::-webkit-scrollbar, .dc-ag-hero__cifras::-webkit-scrollbar, .dc-esp-hero__cifras::-webkit-scrollbar { display: none; }
+  .dc-hero__cifras > div, .dc-ag-hero__cifras > div, .dc-esp-hero__cifras > div { flex: none; padding: 0 12px !important; }
+  .dc-hero__cifras > div:first-child, .dc-ag-hero__cifras > div:first-child, .dc-esp-hero__cifras > div:first-child { padding-left: 0 !important; border-left: 0 !important; }
+  .dc-hero__cifras b, .dc-ag-hero__cifras b, .dc-esp-hero__cifras b { font-size: 17px !important; }
+  .dc-hero__cifras span, .dc-ag-hero__cifras span, .dc-esp-hero__cifras span { font-size: 10.5px !important; }
+  /* Recuadros "próxima / a reactivar": una línea */
+  .dc-esp-hero__prox, .dc-ag-hero__prox { padding: 6px 8px !important; border-radius: 12px !important; max-width: none !important; }
+  .dc-ag-hero__prox-fila { gap: 10px !important; }
+  .dc-esp-hero__prox .dc-pac-hero__ico { display: none; }
+  /* Laboratorio: flujo en una fila */
+  .dc-lab-flujo { display: flex !important; overflow-x: auto; scrollbar-width: none; gap: 6px !important; }
+  .dc-lab-flujo li { flex: none; min-width: 92px; padding: 6px 10px !important; }
+  .dc-hero__btn { height: 32px !important; padding: 0 12px !important; }
+  .dc-esp-hero__btn { height: 32px !important; padding: 0 12px !important; font-size: 12.5px !important; }
+  /* Paciente activo (odontograma, periodontograma…): avatar chico y datos en línea */
+  .dc-pbar { padding: 12px 14px !important; margin-bottom: 10px !important; }
+  .dc-pbar > div { gap: 10px !important; align-items: flex-start !important; }
+  .dc-pbar > div > :first-child { zoom: .66; }
+  .dc-pbar > div > div:nth-child(2) { min-width: 0 !important; flex: 1 1 0 !important; }
+  .dc-pbar > div > div:nth-child(2) > div:first-child:not([style*="flex"]) { display: none; }
+  .dc-pbar > div > div:nth-child(2) > div[style*="flex"] { gap: 6px !important; }
+  .dc-pbar > div > div:nth-child(2) > div[style*="flex"] > :first-child { flex: 1 1 100%; width: 100% !important; max-width: none !important; }
+  .dc-pbar .dc-chip { height: 22px !important; padding: 2px 8px !important; font-size: 11px !important; }
+  /* Filtros en una fila deslizable en lugar de tres renglones */
+  .dc-chips-fila { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
+  .dc-chips-fila::-webkit-scrollbar { display: none; }
+  .dc-chips-fila > * { flex: none; }
+}

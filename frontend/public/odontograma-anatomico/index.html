@@ -2468,7 +2468,7 @@ function fechaCorta(d){const z=x=>(x<10?'0':'')+x;
 /* Número del documento: serie de la sede que emite + año + H.C. Se recalcula cuando el
    sistema envía el paciente y la sede (applyPaciente / applyClinica). */
 let NUM_DOC='';
-function calcNumDoc(){ NUM_DOC=(CLINICA.serie?CLINICA.serie+'-':'')+'PI-'+new Date().getFullYear()+'-'+PACIENTE.hc+'-01'; }
+function calcNumDoc(){ NUM_DOC=(CLINICA.serie?CLINICA.serie+'-':'')+'PI-'+new Date().getFullYear()+'-'+(PACIENTE.hc||'SN')+'-01'; TOMA.id='ODO-'+(PACIENTE.hc||'SN')+'-0007'; }
 calcNumDoc();
 const imp=v=>v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
 
@@ -2492,7 +2492,7 @@ function fichaPaciente(){
   return '<div class="ficha"><div>'+
     '<p><b>Paciente :</b> '+esc(PACIENTE.nombre)+'</p>'+
     '<p><b>DNI :</b> '+esc(PACIENTE.dni)+'</p>'+
-    '<p><b>Historia clínica :</b> '+esc(PACIENTE.hc)+'</p></div><div>'+
+    '<p><b>Historia clínica :</b> '+esc(PACIENTE.hc||'—')+'</p></div><div>'+
     '<p><b>Profesional :</b> '+esc(PROF.nombre)+'</p>'+
     '<p><b>'+(MOSTRAR_RNE&&PROF.rne?'COP – RNE :</b> '+esc(PROF.cop)+' – '+esc(PROF.rne)
                                     :'COP :</b> '+esc(PROF.cop))+'</p>'+
@@ -3023,6 +3023,18 @@ construir(); panel();
       if(typeof calcNumDoc==='function') calcNumDoc();
     }catch(e){}
   }
+  /* Profesional que firma: lo envía el sistema (sesión del odontólogo o médico
+     tratante). Sin dato se deja en blanco en lugar de un nombre de ejemplo. */
+  function applyProfesional(p){
+    try{
+      if(!p||typeof p!=='object') return;
+      PROF.nombre=p.nombre?String(p.nombre):'—';
+      PROF.cop=p.cop?String(p.cop):'—';
+      PROF.rne='';
+      TRAZA.solicitado=PROF.nombre;
+      if(p.impreso){ TRAZA.impreso=String(p.impreso); TRAZA.creado=String(p.impreso); }
+    }catch(e){}
+  }
   function applyPaciente(p){
     try{
       if(!p||typeof p!=='object') return;
@@ -3030,7 +3042,7 @@ construir(); panel();
         if(p.nombre) PACIENTE.nombre=String(p.nombre);
         if(p.edad!=null) PACIENTE.edad=String(p.edad);
         if(p.dni) PACIENTE.dni=String(p.dni);
-        if(p.hc) PACIENTE.hc=String(p.hc);
+        if('hc' in p) PACIENTE.hc=p.hc?String(p.hc):'';
         if(p.sede) PACIENTE.sede=String(p.sede);
         if(typeof calcNumDoc==='function') calcNumDoc();
       }
@@ -3208,10 +3220,11 @@ construir(); panel();
     if(d.type==='dento-odontograma-export-png') exportPng(d.id);
     if(d.type==='dento-odontograma-zoom') applyZoom(d.zoom);
     if(d.type==='dento-odontograma-paciente') applyPaciente(d.paciente);
+    if(d.type==='dento-odontograma-profesional') applyProfesional(d.profesional);
     if(d.type==='dento-odontograma-clinica') applyClinica(d.clinica);
     if(d.type==='dento-odontograma-documento' && typeof abrirDocumento==='function'){ try{ window.scrollTo(0,0); abrirDocumento(d.que||'plan'); }catch(e){} }
   });
-  window.__dentoBridge={snapshot:snapshot,notify:notify,hydrate:hydrate,exportPng:exportPng,applyZoom:applyZoom,applyPaciente:applyPaciente,applyClinica:applyClinica};
+  window.__dentoBridge={snapshot:snapshot,notify:notify,hydrate:hydrate,exportPng:exportPng,applyZoom:applyZoom,applyPaciente:applyPaciente,applyClinica:applyClinica,applyProfesional:applyProfesional};
   setTimeout(notify, 400);
   try{
     var params=new URLSearchParams(location.search);

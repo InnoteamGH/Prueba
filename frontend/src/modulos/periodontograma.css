@@ -187,9 +187,9 @@ button.pgc-dot:hover { background: var(--pg-panel-2); }
 
 /* Documentos: proforma e informe */
 .pgc-docs { display: flex; gap: 8px; flex-wrap: wrap; }
-.pgc-docbtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 999px; border: 0; cursor: pointer;
+.pgc .pgc-docbtn, .pgc-docbtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 999px; border: 0; cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: linear-gradient(118deg, #0B6C78, #14A3A8); box-shadow: 0 8px 16px -10px rgba(11,108,120,.9); white-space: nowrap; }
-.pgc-docbtn.is-sec { color: #0A6C76; background: #E6F5F5; box-shadow: inset 0 0 0 1px #BFE3E4; }
+.pgc .pgc-docbtn.is-sec, .pgc-docbtn.is-sec { color: #0A6C76; background: #E6F5F5; box-shadow: inset 0 0 0 1px #BFE3E4; }
 .pgc-docbtn:disabled { opacity: .45; cursor: not-allowed; }
 .pgc-pf-fondo { position: fixed; inset: 0; z-index: 90; background: rgba(12, 24, 36, .45); display: grid; place-items: center; padding: 16px; }
 .pgc-pf { width: min(760px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: var(--pg-panel, #fff); border-radius: 18px;

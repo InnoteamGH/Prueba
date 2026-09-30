@@ -282,7 +282,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
     if (!conectado) {
       setSedes(SEDES.map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "" }; }));
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, precioBase: e.precio })));
-      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: null, activo: true, porcentajeComision: 30, metaMensual: m.meta })));
+      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: true, porcentajeComision: 30, metaMensual: m.meta })));
       setGoLive({
         listoParaOperar: true, total: 4, completados: 4, obligatoriosPendientes: 0,
         items: [

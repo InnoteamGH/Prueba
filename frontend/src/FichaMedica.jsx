@@ -218,7 +218,7 @@ function Diente({ n, data, pincel, onFace, onWhole, editable }) {
   );
 }
 
-function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgosSeed, soloLectura = false, pacienteNombre, pacienteDni = "", sedeId = null }) {
+function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgosSeed, soloLectura = false, pacienteNombre, pacienteDni = "", pacienteHc = "", sedeId = null }) {
   const conectado = !!auth.token;
   const editable = conectado && !soloLectura;
   const [fase, setFase] = useState("inicial");
@@ -387,7 +387,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
           pacienteNombre={pacienteNombre || ""}
           pacienteDni={pacienteDni || ""}
           pacienteEdad={edadDe(fechaNacimiento) != null ? edadDe(fechaNacimiento) : ""}
-          pacienteHc=""
+          pacienteHc={pacienteHc || pacienteDni || ""}
           pacienteSede=""
           capa={fase}
           denticion={denticionApi(denticion)}
@@ -2082,7 +2082,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               );
             })()}
 
-            {tab === "odontograma" && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} sedeId={sedeId} /></div>}
+            {tab === "odontograma" && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} pacienteHc={p.numeroHistoria || p.nroHistoria || ""} sedeId={sedeId} /></div>}
 
             {tab === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura={!puedeEscribirClinico} />}
 

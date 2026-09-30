@@ -288,28 +288,37 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc
   .dc-table-head {
     display: none !important;
   }
+  /* Fila → tarjeta compacta: la persona arriba a todo el ancho, el resto de datos en
+     dos columnas con la etiqueta pequeña encima, y las acciones en una sola línea. */
   .dc-table-row {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 8px !important;
-    padding: 14px 16px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start !important;
+    gap: 8px 12px !important;
+    padding: 11px 13px !important;
     border: 1px solid var(--dc-line) !important;
     border-radius: 14px !important;
-    margin: 0 12px 10px !important;
+    margin: 0 10px 8px !important;
     background: var(--dc-surface) !important;
-    grid-template-columns: none !important;
     box-sizing: border-box !important;
-    width: calc(100% - 24px) !important;
-    max-width: calc(100% - 24px) !important;
+    width: calc(100% - 20px) !important;
+    max-width: calc(100% - 20px) !important;
+    min-height: 0 !important;
   }
   .dc-table-row > div {
     display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    justify-self: stretch !important;
     text-align: left !important;
     padding: 0 !important;
+    min-width: 0 !important;
+    gap: 1px !important;
+    font-size: 13px;
+    line-height: 1.35;
   }
+  .dc-table-row > div > * { margin: 0 !important; padding-left: 0 !important; }
   .dc-table-row > .dc-col-sticky {
     position: static !important;
     box-shadow: none !important;
@@ -317,13 +326,31 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc
   }
   .dc-table-row > div::before {
     content: attr(data-label);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--dc-ink-500);
-    margin-right: 12px;
-    flex-shrink: 0;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--dc-ink-400);
+    line-height: 1.2;
   }
-  
+  .dc-table-row > div[data-label=""]::before { display: none; }
+  /* La persona (avatar + nombre) encabeza la tarjeta, sin etiqueta. */
+  .dc-table-row > div:has(.dc-tp__quien),
+  .dc-table-row > div[data-label="Paciente"], .dc-table-row > div[data-label="Nombre"],
+  .dc-table-row > div[data-label="Usuario"], .dc-table-row > div[data-label="Producto"],
+  .dc-table-row > div[data-label="Servicio"], .dc-table-row > div[data-label="Persona"] { grid-column: 1 / -1; order: -1; }
+  .dc-table-row > div:has(.dc-tp__quien)::before,
+  .dc-table-row > div[data-label="Paciente"]::before, .dc-table-row > div[data-label="Nombre"]::before,
+  .dc-table-row > div[data-label="Usuario"]::before, .dc-table-row > div[data-label="Producto"]::before,
+  .dc-table-row > div[data-label="Servicio"]::before, .dc-table-row > div[data-label="Persona"]::before { display: none; }
+  .dc-table-row > div > * { max-width: 100%; }
+  /* Acciones: una fila al pie, alineada a la derecha y sin etiqueta. */
+  .dc-table-row > div[data-label="Acciones"], .dc-table-row > div[data-label="Acción"] {
+    grid-column: 1 / -1; order: 99; flex-direction: row !important; justify-content: flex-end !important; align-items: center !important;
+    flex-wrap: wrap; gap: 6px !important; border-top: 1px dashed var(--dc-line); padding-top: 6px !important;
+  }
+  .dc-table-row > div[data-label="Acciones"]::before, .dc-table-row > div[data-label="Acción"]::before { display: none; }
+  .dc-table-row > div[data-label="Acciones"]:not(:has(button, a)), .dc-table-row > div[data-label="Acción"]:not(:has(button, a)) { display: none !important; }
 }
 @media (max-width: 479px) {
   .dc-kpi__value { font-size: 20px !important; }

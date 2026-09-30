@@ -3,8 +3,43 @@
  * Rutas: #/reportes – #/comisiones – #/metas
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import api from "../api/client";
-import { EnCabecera, ListaFiltrable } from "../comun";
+import api, { auth } from "../api/client";
+import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS } from "../comun";
+
+/* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
+   mismas cifras que usan Metas y el Resumen del mes), para que el módulo no salga en cero. */
+function datosDemo() {
+  const porMedico = MEDICOS.map((m) => {
+    const produccion = m.prodDemo || 0;
+    const porcentaje = 40;
+    return {
+      medicoId: m.id, nombre: m.nombre, atendidas: m.citasDemo || 0, produccion, porcentaje,
+      comision: Math.round(produccion * porcentaje / 100),
+      especialidad: (ESPECIALIDADES.find((e) => e.id === m.esp) || {}).nombre || "Odontólogo",
+      ticketCita: m.citasDemo ? produccion / m.citasDemo : 0,
+    };
+  });
+  const totalProduccion = porMedico.reduce((a, m) => a + m.produccion, 0);
+  const totalComision = porMedico.reduce((a, m) => a + m.comision, 0);
+  const totalCitas = porMedico.reduce((a, m) => a + m.atendidas, 0);
+  const fr = [0.14, 0.15, 0.16, 0.17, 0.18, 0.2];
+  const ahora = new Date();
+  const cobrosPorMes = fr.map((f, i) => {
+    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (fr.length - 1 - i), 1);
+    return {
+      mes: d.toLocaleDateString("es-PE", { month: "short" }).replace(".", ""),
+      mesLargo: d.toLocaleDateString("es-PE", { month: "long", year: "numeric" }),
+      cobrado: Math.round(totalProduccion * f * 1.02),
+    };
+  });
+  const totalCobrado = cobrosPorMes.reduce((a, m) => a + m.cobrado, 0);
+  const totalPagado = Math.round(totalComision * 0.6);
+  return {
+    porMedico, totalProduccion, totalComision, totalCitas, totalCobrado, totalPagado, cobrosPorMes,
+    odontologos: porMedico.length, odontologosConProduccion: porMedico.filter((m) => m.produccion > 0).length,
+    pendienteLiquidar: totalComision - totalPagado, mesesConCobro: cobrosPorMes.length, sinDato: false,
+  };
+}
 import { filtraMicro, inicialesDe, layoutProgreso } from "./panelGerencialUtil";
 import {
   UMBRAL_AUSENTISMO,
@@ -739,6 +774,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
 
   const cargar = useCallback(() => {
     setErr(null);
+    if (!auth.token) { setData(datosDemo()); return; }
     api.comisiones()
       .then((r) => setData(r))
       .catch((e) => setErr(e?.message || "No se pudo cargar comisiones"));
