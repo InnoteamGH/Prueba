@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import confDefault from "../util/planInversionConf.js";
 import { urlLogo, useDatosImpresion } from "../util/membrete";
+import { Select } from "../comun";
 import {
   SUELTOS_PARTIDA,
   resolverLineas,
@@ -225,23 +226,13 @@ export default function PlanInversionDocumento({
         <div className="plan-inv-no-print" style={{ margin: "12px 16px", padding: 12, background: "#F4F1EA", borderRadius: 8, fontFamily: "system-ui,sans-serif", fontSize: 13 }}>
           <div style={{ fontWeight: 500, marginBottom: 8 }}>Añadir servicio suelto</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <select value={codAdd} onChange={(e) => setCodAdd(Number(e.target.value))} style={inp}>
-              {SUELTOS_PARTIDA.map((s) => (
-                <option key={s.cod} value={s.cod}>
-                  {s.cod} – {s.nom}
-                  {s.amb === "pieza" ? " – sobre la pieza elegida" : ""}
-                  {s.amb === "maxilar" && !s.fijo ? " – por maxilar" : ""}
-                  {s.fijo === "ambos" ? " – ambos maxilares" : ""}
-                </option>
-              ))}
-            </select>
+            <Select width={360} ariaLabel="Servicio suelto" value={codAdd} onChange={(v) => setCodAdd(Number(v))}
+              options={SUELTOS_PARTIDA.map((x) => ({ value: x.cod, label: `${x.cod} – ${x.nom}`, sub: x.amb === "pieza" ? "Sobre la pieza elegida" : x.fijo === "ambos" ? "Ambos maxilares" : x.amb === "maxilar" && !x.fijo ? "Por maxilar" : undefined }))} />
             {servicioAdd?.amb === "pieza" && (
               <input placeholder="Pieza (ej. 16)" value={piezaAdd} onChange={(e) => setPiezaAdd(e.target.value)} style={{ ...inp, width: 100 }} />
             )}
             {necesitaSelectorMaxilar(servicioAdd) && (
-              <select value={maxAdd} onChange={(e) => setMaxAdd(e.target.value)} style={inp}>
-                {opcionesMaxilar().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <Select width={200} ariaLabel="Maxilar" value={maxAdd} onChange={(v) => setMaxAdd(v)} options={opcionesMaxilar()} />
             )}
             <button type="button" onClick={addSuelto} style={btnPrimary}>Añadir</button>
           </div>

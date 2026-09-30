@@ -4659,7 +4659,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                               <div key={e.id} className="dc-egcat__item">
                                 <div><b>{e.concepto}</b><span>{fechaLegible(e.fecha)} – {e.metodo}</span></div>
                                 <strong>{e.moneda === "USD" ? "US$" : "S/"} {Number(e.monto).toFixed(2)}</strong>
-                                {puedeEgresos ? <select aria-label={`Categoría de ${e.concepto}`} value={EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros"} onChange={(ev) => reclasificarEgreso(e, ev.target.value)}>{EGRESO_CATS.map((c) => <option key={c} value={c}>{c}</option>)}</select> : <span className="dc-pill">{e.categoria}</span>}
+                                {puedeEgresos ? <Select small width={170} ariaLabel={`Categoría de ${e.concepto}`} value={EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros"} onChange={(v) => reclasificarEgreso(e, v)} options={EGRESO_CATS} /> : <span className="dc-pill">{e.categoria}</span>}
                               </div>
                             ))}
                           </div>
@@ -8802,9 +8802,7 @@ function DatosFacturacion({ onClose, notify = () => {}, readOnly = false }) {
             <div key={d.id || i} style={{ display: "grid", gridTemplateColumns: readOnly ? "1fr 1.2fr 1fr" : "1fr 1.2fr 1fr auto", gap: 8, alignItems: "end" }}>
               <label>
                 <span style={lblF}>Tipo</span>
-                <select disabled={readOnly} value={d.tipo} onChange={(e) => setDestino(i, "tipo", e.target.value)} style={{ width: "100%", minHeight: 44, padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: readOnly ? "var(--dc-bg)" : "#fff", fontSize: 14 }}>
-                  {DESTINOS_TIPOS.map(([k, lbl]) => <option key={k} value={k}>{lbl}</option>)}
-                </select>
+                <Select disabled={readOnly} ariaLabel="Tipo de medio" value={d.tipo} onChange={(v) => setDestino(i, "tipo", v)} options={DESTINOS_TIPOS.map(([k, lbl]) => ({ value: k, label: lbl }))} />
               </label>
               <Field label="Etiqueta" value={d.label} onChange={(v) => setDestino(i, "label", v)} placeholder="Ej. Yape recepción" />
               <Field label="Detalle" value={d.detalle} onChange={(v) => setDestino(i, "detalle", v)} placeholder="N° / CCI (opcional)" />

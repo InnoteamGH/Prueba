@@ -1317,10 +1317,8 @@ export function FiltroCabecera({ st, total, filtradas, sub = "registros", classN
       {verOrden && (
         <div className="dc-fcab__orden">
           <span>Ordenar</span>
-          <select value={sortCol || ""} onChange={(e) => { setSortCol(e.target.value || null); }} aria-label="Ordenar por">
-            <option value="">Sin orden</option>
-            {ordenables.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-          </select>
+          <Select small width={170} ariaLabel="Ordenar por" value={sortCol || ""} onChange={(v) => setSortCol(v || null)}
+            options={[{ value: "", label: "Sin orden" }, ...ordenables.map((c) => ({ value: c.key, label: c.label }))]} />
           {sortCol && <button type="button" className="dc-fcab__dir" onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")} aria-label={sortDir === "asc" ? "Ascendente" : "Descendente"} title={sortDir === "asc" ? "Ascendente" : "Descendente"}>
             {sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2.2} /> : <ChevronDown size={14} strokeWidth={2.2} />}</button>}
         </div>
@@ -1820,7 +1818,7 @@ export function Select({
 
   const alto = small ? "8px 30px 8px 11px" : "10px 34px 10px 13px";
   return (
-    <div ref={cajaRef} style={{ position: "relative", width: width || "100%", display: "inline-block", zIndex: abierto ? 200 : undefined }}>
+    <div ref={cajaRef} className={`dc-sel${abierto ? " is-open" : ""}${small ? " is-sm" : ""}`} style={{ position: "relative", width: width || "100%", display: "inline-block", zIndex: abierto ? 200 : undefined }}>
       <button
         type="button" disabled={disabled} onClick={() => (abierto ? setAbierto(false) : abrir())} onKeyDown={teclado}
         aria-haspopup="listbox" aria-expanded={abierto} aria-label={ariaLabel}
@@ -1845,7 +1843,7 @@ export function Select({
       </button>
 
       {abierto && (
-        <div role="listbox" ref={listaRef} onKeyDown={teclado} tabIndex={-1}
+        <div role="listbox" ref={listaRef} onKeyDown={teclado} tabIndex={-1} className={`dc-sel__panel${haciaArriba ? " is-arriba" : ""}`}
           style={{
             position: "absolute", zIndex: 200, left: 0, right: 0,
             [haciaArriba ? "bottom" : "top"]: "calc(100% + 6px)",
@@ -1855,7 +1853,7 @@ export function Select({
           }}>
           {buscador && (
             <div style={{ position: "sticky", top: -5, background: "var(--dc-white)", padding: "1px 1px 6px", zIndex: 1 }}>
-              <input ref={buscaRef} value={filtro} onChange={(e) => { setFiltro(e.target.value); setMarcado(0); }}
+              <input ref={buscaRef} className="dc-sel__buscar" value={filtro} onChange={(e) => { setFiltro(e.target.value); setMarcado(0); }}
                 onKeyDown={(e) => {
                   // Las flechas y Enter siguen manejando la lista aunque el foco
                   // este en la caja: escribir y elegir sin soltar el teclado.
@@ -1875,14 +1873,14 @@ export function Select({
             const sel = String(o.value) === String(value);
             const activo = i === marcado;
             return (
-              <div key={`${o.value}-${i}`} role="option" aria-selected={sel}
+              <div key={`${o.value}-${i}`} role="option" aria-selected={sel} className={`dc-sel__opt${sel ? " is-sel" : ""}${activo && !o.disabled ? " is-act" : ""}${o.disabled ? " is-off" : ""}`}
                 onMouseEnter={() => setMarcado(i)}
                 onPointerDown={(e) => { if (o.disabled) return; e.preventDefault(); elegir(o); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 9, padding: "9px 11px",
                   borderRadius: DS.r.item - 4, cursor: o.disabled ? "not-allowed" : "pointer",
                   touchAction: "manipulation",
-                  background: sel ? DS.c.primarySoft : activo && !o.disabled ? "var(--dc-white)" : "transparent",
+                  background: sel ? DS.c.primarySoft : activo && !o.disabled ? "#F0F8F8" : "transparent",
                   color: o.disabled ? DS.c.faint : sel ? DS.c.primary : DS.c.text,
                   fontSize: 13, fontWeight: sel ? 700 : 600,
                   opacity: o.disabled ? 0.6 : 1,
@@ -1892,7 +1890,7 @@ export function Select({
                   <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
                   {o.sub && <span style={{ display: "block", fontSize: 12, fontWeight: 500, color: DS.c.faint }}>{o.sub}</span>}
                 </span>
-                {sel && <Check size={14} strokeWidth={2.5} style={{ flexShrink: 0 }} />}
+                {sel && <span className="dc-sel__chk"><Check size={12} strokeWidth={3} /></span>}
               </div>
             );
           })}

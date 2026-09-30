@@ -2,7 +2,7 @@ import { abrirDocumento } from "./util/membrete";
 import React, { useState, useEffect, useRef } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {AvatarPaciente, DataTable, PACIENTES_INIT, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {AvatarPaciente, Modal, DataTable, PACIENTES_INIT, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -24,7 +24,7 @@ import {
   X, User, Phone, Stethoscope, Smile, ClipboardList, CreditCard,
   FileText, Plus, Check, Mail, MessageSquare, Camera, AlertTriangle, Tag, Braces, Image, Pill, Printer, Trash2, Baby, Eraser,
   CalendarDays, Activity, Clock, Paperclip, LayoutGrid, ChevronDown, Pencil, Search, Shield, FlaskConical, Calendar,
-  History, Lock, Eye, FilePlus, ShieldCheck, FilePen, PenLine, Download,
+  History, Lock, Eye, CheckCircle2, FilePlus, ShieldCheck, FilePen, PenLine, Download,
 } from "lucide-react";
 
 /* ── Paleta dental: mismos tokens DS del producto (D17) ── */
@@ -973,6 +973,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const [busqueda, setBusqueda] = useState("");       // buscador por palabra en la línea de tiempo
   const [rango, setRango] = useState("todo");         // rango de fechas de la línea de tiempo
   const [editEvo, setEditEvo] = useState(null);       // evolución en edición { id, diagnostico, detalle, medicoId }
+  const [atVer, setAtVer] = useState(null);           // fecha de la atención abierta en «Detalle de la atención»
   const [upTipo, setUpTipo] = useState(TIPOS_ARCHIVO[0]);
   const [upNota, setUpNota] = useState("");
   const [labOrdenes, setLabOrdenes] = useState([]);
@@ -1462,14 +1463,113 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       </div>
     );
   };
+  // ── Atenciones: todo lo que se hizo en una misma fecha, en un solo lugar ──
+  // La línea de tiempo mostraba que «existió» una cita o una evolución, pero no qué se
+  // hizo. Cada fecha se abre ahora como una atención con su detalle completo.
+  const fechaDe = (x) => String(x || "").slice(0, 10);
+  const atencionDe = (fecha) => {
+    const del = linea.filter((e) => e.fecha === fecha);
+    return {
+      fecha,
+      citas: del.filter((e) => e.k === "cita").map((e) => e.c),
+      evos: del.filter((e) => e.k === "evolucion").map((e) => e.h),
+      recetas: del.filter((e) => e.k === "receta").map((e) => e.r),
+      pagos: del.filter((e) => e.k === "pago").map((e) => e.g),
+      archivos: del.filter((e) => e.k === "archivo").map((e) => e.x),
+      procs: arr(d?.tratamientos).filter((t) => [t.fecha, t.completadaEn, t.terminadaEn, t.atendidaEn].some((f) => fechaDe(f) === fecha)),
+    };
+  };
+  const itemsReceta = (r2) => { const its = arr(parseJson(r2.items, [])).filter((x) => x && x.medicamento); return its.length ? its : (r2.texto ? [{ medicamento: r2.texto }] : []); };
+  const lineaMed = (x) => [x.medicamento, x.presentacion, x.dosis, x.frecuencia, x.duracion].filter((v) => v && String(v).trim()).join(" · ");
+  const medicosDe = (a) => [...new Set([...a.evos.map((h) => h.medico), ...a.citas.map((c) => c.medico), ...a.recetas.map((r2) => r2.medico)].filter((n) => n && n !== "—"))];
+  const resumenAtencion = (a) => {
+    const ev = a.evos.find((h) => String(h.diagnostico || h.titulo || "").trim());
+    const cita = a.citas[0];
+    return (ev && (ev.diagnostico || ev.titulo)) || (cita && (cita.motivo || cita.especialidad)) || (a.pagos[0] && a.pagos[0].concepto) || (a.recetas.length ? "Receta" : "") || "Atención";
+  };
+  const imprimirAtencion = (a) => {
+    const e = (t) => String(t ?? "").replace(/[&<>"]/g, (x) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[x]));
+    const meds = medicosDe(a).map(rotuloMedico).join(", ");
+    const html = `<p><b>Paciente:</b> ${e(p.nombre)} &nbsp; <b>DNI:</b> ${e(p.dni || "—")} &nbsp; <b>Fecha:</b> ${e(fmtFecha(a.fecha))}${meds ? ` &nbsp; <b>Profesional:</b> ${e(meds)}` : ""}</p>`
+      + (a.citas.length ? `<h2>Cita</h2><table><tbody>${a.citas.map((c) => `<tr><td>${e(c.hora || "")}</td><td>${e(c.especialidad || "Cita")}${c.motivo ? " — " + e(c.motivo) : ""}</td><td>${e(ESTADO_CITA[c.estado] || c.estado || "")}</td></tr>`).join("")}</tbody></table>` : "")
+      + (a.evos.length ? `<h2>Evolución clínica</h2>${a.evos.map((h) => `<p><b>${e(h.diagnostico || h.titulo || "Evolución")}</b>${h.titulo === "Adenda" ? " (adenda)" : ""}</p><p>${e(h.detalle || "")}</p>${h.signosVitales ? `<p><b>Signos vitales:</b> ${e(h.signosVitales)}</p>` : ""}`).join("")}` : "")
+      + (a.procs.length ? `<h2>Procedimientos</h2><table><tbody>${a.procs.map((t) => `<tr><td>${e(t.nombre)}</td><td>${e(t.estado || "")}</td></tr>`).join("")}</tbody></table>` : "")
+      + (a.recetas.length ? `<h2>Receta</h2>${a.recetas.map((r2) => `<ul>${itemsReceta(r2).map((x) => `<li>${e(lineaMed(x))}</li>`).join("")}</ul>${r2.indicaciones && r2.indicaciones !== r2.texto ? `<p>${e(r2.indicaciones)}</p>` : ""}`).join("")}` : "")
+      + (a.pagos.length ? `<h2>Pagos</h2><table><tbody>${a.pagos.map((g) => `<tr><td>${e(g.concepto || "Pago")}</td><td>${e(g.metodo || "")}</td><td style="text-align:right">${e(money(g.monto))}</td></tr>`).join("")}</tbody></table>` : "");
+    imprimir(`Atención del ${fmtFecha(a.fecha)}`, html, notify);
+  };
+  const modalAtencion = () => {
+    if (!atVer) return null;
+    const a = atencionDe(atVer);
+    const meds = medicosDe(a);
+    const totalPagos = a.pagos.reduce((s2, g) => s2 + (Number(g.monto) || 0), 0);
+    const vacio = !a.citas.length && !a.evos.length && !a.recetas.length && !a.pagos.length && !a.archivos.length && !a.procs.length;
+    const Sec = ({ ic: I, t, n, children }) => (
+      <section className="fm-at__sec"><h4><span><I size={14} strokeWidth={2} /></span>{t}{n != null ? <em>{n}</em> : null}</h4>{children}</section>
+    );
+    return (
+      <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} titulo={`Atención del ${fmtFecha(a.fecha)}`} sub={[p.nombre, meds.map(rotuloMedico).join(", ")].filter(Boolean).join(" – ")} onClose={() => setAtVer(null)}
+        footer={<><button type="button" className="dc-btn dc-btn--secundario" onClick={() => setAtVer(null)}>Cerrar</button><button type="button" className="dc-btn fm-at__imp" onClick={() => imprimirAtencion(a)}><Printer size={14} strokeWidth={2} /> Imprimir atención</button></>}>
+        <div className="fm-at">
+          <div className="fm-at__res">
+            <div><small>Motivo / diagnóstico</small><b>{resumenAtencion(a)}</b></div>
+            <div><small>Profesional</small><b>{meds.length ? meds.map(rotuloMedico).join(", ") : "—"}</b></div>
+            <div><small>Pagado ese día</small><b>{totalPagos ? money(totalPagos) : "—"}</b></div>
+          </div>
+          {vacio && <p className="fm-at__nada">No hay registros para esta fecha.</p>}
+          {a.citas.some((c) => /atend|complet/i.test(String(c.estado))) && !a.evos.length && (
+            <div className="fm-at__aviso">
+              <AlertTriangle size={16} strokeWidth={2} />
+              <span><b>Atención sin evolución.</b> La cita figura como atendida pero no se registró qué se hizo.</span>
+              {puedeEscribirClinico && <button type="button" onClick={() => { setAtVer(null); setTab("historia"); }}>Registrar evolución</button>}
+            </div>
+          )}
+          {a.citas.length > 0 && <Sec ic={CalendarDays} t="Cita" n={a.citas.length}>
+            {a.citas.map((c, i) => <div key={i} className="fm-at__fila"><b>{c.hora || "—"}</b><span>{[c.especialidad && c.especialidad !== "—" ? c.especialidad : "Cita", c.motivo].filter(Boolean).join(" — ")}<small>{[c.medico && c.medico !== "—" ? rotuloMedico(c.medico) : "", c.sedeNombre || ""].filter(Boolean).join(" · ")}</small></span><i className="fm-at__pill">{ESTADO_CITA[c.estado] || c.estado || "—"}</i></div>)}
+          </Sec>}
+          {a.evos.length > 0 && <Sec ic={ClipboardList} t="Evolución clínica" n={a.evos.length}>
+            {a.evos.map((h, i) => { const lleno = String(h.diagnostico || "").trim() || String(h.detalle || "").trim(); return (
+              <div key={i} className="fm-at__evo">
+                <div className="fm-at__evocab"><b>{h.diagnostico || h.titulo || "Evolución"}</b>{h.titulo === "Adenda" ? <i className="fm-at__pill is-adenda">Adenda</i> : lleno ? <i className="fm-at__pill is-ok">Firmada</i> : <i className="fm-at__pill is-pend">Pendiente de llenar</i>}</div>
+                {h.titulo && h.diagnostico && h.titulo !== h.diagnostico && h.titulo !== "Adenda" && <small className="fm-at__sub">{h.titulo}</small>}
+                <p>{h.detalle || "Sin detalle del procedimiento."}</p>
+                {h.signosVitales && <div className="fm-at__vit"><Activity size={13} strokeWidth={2} /> {h.signosVitales}</div>}
+                <small className="fm-at__firma">{rotuloMedico(h.medico) || "Profesional no indicado"}{h.hora ? ` · ${h.hora}` : ""}</small>
+              </div>
+            ); })}
+          </Sec>}
+          {a.procs.length > 0 && <Sec ic={CheckCircle2} t="Procedimientos del plan" n={a.procs.length}>
+            {a.procs.map((t, i) => <div key={i} className="fm-at__fila"><span>{t.nombre}</span><i className="fm-at__pill is-ok">{t.estado === "terminada" ? "Terminado" : "Realizado"}</i><b>{money(t.costo)}</b></div>)}
+          </Sec>}
+          {a.recetas.length > 0 && <Sec ic={Pill} t="Receta" n={a.recetas.length}>
+            {a.recetas.map((r2, i) => <div key={i} className="fm-at__rx">
+              <ul>{itemsReceta(r2).map((x, j) => <li key={j}><Pill size={12} strokeWidth={2} /> {lineaMed(x)}</li>)}</ul>
+              {r2.indicaciones && r2.indicaciones !== r2.texto && <p>{r2.indicaciones}</p>}
+            </div>)}
+          </Sec>}
+          {a.pagos.length > 0 && <Sec ic={CreditCard} t="Pagos" n={a.pagos.length}>
+            {a.pagos.map((g, i) => <div key={i} className="fm-at__fila"><span>{g.concepto || "Pago"}<small>{g.metodo || ""}</small></span><b className="is-ok">{money(g.monto)}</b></div>)}
+          </Sec>}
+          {a.archivos.length > 0 && <Sec ic={Image} t="Archivos" n={a.archivos.length}>
+            <div className="fm-at__files">{a.archivos.map((x, i) => <a key={i} href={x.url || undefined} target="_blank" rel="noreferrer" className="fm-at__file">{x.url ? <img src={x.url} alt={x.tipo || "Archivo"} /> : <Image size={20} strokeWidth={1.6} />}<span>{x.tipo || "Archivo"}{x.nota ? <small>{x.nota}</small> : null}</span></a>)}</div>
+          </Sec>}
+        </div>
+      </Modal>
+    );
+  };
   const timelineUI = (evs, vacio) => {
     if (!evs.length) return <div style={{ fontSize: 13, color: MUTED }}>{vacio}</div>;
     const grupos = [];
     evs.forEach((e) => { const g = grupos.find((x) => x.fecha === e.fecha); if (g) g.items.push(e); else grupos.push({ fecha: e.fecha, items: [e] }); });
     return <div style={{ display: "grid", gap: 18 }}>{grupos.map((g) => (
-      <div key={g.fecha}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: TEAL, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 10 }}><CalendarDays size={13} strokeWidth={2} /> {fmtFecha(g.fecha)}</div>
-        <div style={{ display: "grid", gap: 12, borderLeft: `2px solid ${LINE}`, paddingLeft: 14, marginLeft: 6 }}>{g.items.map((e, i) => evItem(e, i))}</div>
+      <div key={g.fecha} className="fm-tl__grupo">
+        <div className="fm-tl__cab">
+          <span className="fm-tl__fecha"><CalendarDays size={13} strokeWidth={2} /> {fmtFecha(g.fecha)}</span>
+          <button type="button" className="fm-tl__ver" onClick={() => setAtVer(g.fecha)}><Eye size={13} strokeWidth={2} /> Ver atención</button>
+        </div>
+        <div className="fm-tl__items" style={{ display: "grid", gap: 12, borderLeft: `2px solid ${LINE}`, paddingLeft: 14, marginLeft: 6 }}>{g.items.map((e, i) => (
+          <div key={e.k + i} className="fm-tl__item" title="Ver el detalle de esta atención" onClick={(ev) => { if (ev.target.closest("button, a, input, textarea, [role=listbox]")) return; setAtVer(g.fecha); }}>{evItem(e, i)}</div>
+        ))}</div>
       </div>
     ))}</div>;
   };
@@ -1486,6 +1586,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       {cerrando && (
         <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 61, cursor: "default" }} />
       )}
+      {modalAtencion()}
       <div className="fm" data-densidad={densFicha} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 1200, background: BG, borderRadius: "var(--dc-r-lg)", boxShadow: "0 40px 90px -25px rgba(11,18,32,.55)", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 560, opacity: cerrando ? 0.96 : 1 }}>
         <style>{`
           .fm[data-densidad="clinica"] { --dc-ficha-fs: 17px; --dc-ficha-row: 64px; }
