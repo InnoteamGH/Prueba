@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api, { auth } from "../api/client";
-import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS } from "../comun";
+import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden } from "../comun";
 
 /* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
    mismas cifras que usan Metas y el Resumen del mes), para que el módulo no salga en cero. */
@@ -685,15 +685,15 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
             { key: "perdidas", label: "Se pierden", get: (r) => String(r.perdidas ?? ""), sortVal: (r) => Number(r.perdidas) || 0 },
             { key: "tasa", label: "%", get: (r) => (r.tasa == null ? "" : String(r.tasa)), sortVal: (r) => (r.tasa == null ? -1 : Number(r.tasa)) },
             { key: "coste", label: "Coste", get: (r) => (r.coste != null ? String(r.coste) : ""), sortVal: (r) => Number(r.coste) || 0 },
-          ]}>{(lstA) => (
+          ]} modoTabla>{(lstA, _v, stA) => (
           <div className="dc-tabla-doc dc-tabla-doc--aus" role="table" aria-label="Ausentismo por odontólogo">
             <div className="fila cab" role="row">
-              <span>Odontólogo</span>
-              <span className="der">Agenda</span>
+              <ThOrden st={stA} k="nombre">Odontólogo</ThOrden>
+              <ThOrden st={stA} k="agenda" a="right" className="der">Agenda</ThOrden>
               <span>Escala 0 – {ESCALA_AUSENTISMO_MAX}% – raya {UMBRAL_AUSENTISMO}%</span>
-              <span className="der">Se pierden</span>
-              <span className="der">%</span>
-              <span className="der">Coste</span>
+              <ThOrden st={stA} k="perdidas" a="right" className="der">Se pierden</ThOrden>
+              <ThOrden st={stA} k="tasa" a="right" className="der">%</ThOrden>
+              <ThOrden st={stA} k="coste" a="right" className="der">Coste</ThOrden>
             </div>
             {lstA.map((r) => (
               <div
@@ -961,11 +961,11 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
                 { key: "citas", label: "Citas", get: (m) => String(m.atendidas || 0), sortVal: (m) => Number(m.atendidas) || 0 },
                 { key: "prod", label: "Producción", get: (m) => String(m.produccion || 0), sortVal: (m) => Number(m.produccion) || 0 },
                 { key: "com", label: "Comisión", get: (m) => String(m.comision || 0), sortVal: (m) => Number(m.comision) || 0 },
-              ]}>{(lstP) => (
+              ]} modoTabla>{(lstP, _v, stP) => (
               <div className="dc-tabla-doc" role="table" aria-label="Producción y comisión por odontólogo">
                 <div className="fila cab" role="row">
-                  <span>Odontólogo</span><span className="der">Citas</span><span>Parte del total</span>
-                  <span className="der">Producción</span><span className="der">%</span><span className="der">Comisión</span>
+                  <ThOrden st={stP} k="nombre">Odontólogo</ThOrden><ThOrden st={stP} k="citas" a="right" className="der">Citas</ThOrden><span>Parte del total</span>
+                  <ThOrden st={stP} k="prod" a="right" className="der">Producción</ThOrden><span className="der">%</span><ThOrden st={stP} k="com" a="right" className="der">Comisión</ThOrden>
                 </div>
                 {lstP.map((m) => { const i = porMedico.indexOf(m);
                   const lay = layoutProgreso(m.produccion, totalProd);

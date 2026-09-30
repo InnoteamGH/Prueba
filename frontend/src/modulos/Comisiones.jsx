@@ -183,7 +183,7 @@ function Comisiones({ citas, can }) {
         </Modal>
       )}
       {detalle && (() => { const m = detalle; const esp = ESPECIALIDADES.find((e) => e.id === m.esp); const subEsp = m.espNombre || (esp ? esp.nombre : "Odontólogo"); return (
-        <Modal icon={<span style={{ fontWeight: 500 }}>{m.foto}</span>} tone={m.color} titulo={m.nombre} sub={subEsp} onClose={() => setDetalle(null)} maxW={500} footer={<Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
+        <Modal icon={<span style={{ fontWeight: 500 }}>{m.foto}</span>} titulo={m.nombre} sub={subEsp} onClose={() => setDetalle(null)} maxW={500} footer={<Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
             {[["Atenciones", m.n, NAVY], ["Producción", `S/ ${m.prod.toLocaleString()}`, DS.c.primary], [m.pctCom != null ? `Comisión (${m.pctCom}%)` : "Comisión", `S/ ${m.com.toLocaleString()}`, RED]].map(([l, v, col]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "12px 14px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 600, color: col, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{v}</div></div>)}
           </div>

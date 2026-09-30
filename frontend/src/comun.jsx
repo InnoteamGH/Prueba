@@ -1169,6 +1169,15 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
 // Modal centrado reutilizable (header con degradado + cuerpo con scroll).
 // size: confirm|corto|largo → 420|560|720 (SPEC §15.7). maxW sigue disponible.
 const MODAL_SIZE = { confirm: 420, corto: 560, largo: 720 };
+/* Todos los modales llevan la cabecera de la marca; el `tone` sólo distingue los que
+   avisan de algo (peligro, advertencia, éxito) en el ícono y en una línea de color. */
+function tonoModal(t) {
+  const x = String(t || "").toLowerCase();
+  if (t === RED || /red|danger|coral|#d0563f|#b42318|#e5484d/.test(x)) return "peligro";
+  if (/warn|amber|#d97706/.test(x)) return "aviso";
+  if (/ok|success|#16a36a/.test(x)) return "ok";
+  return "marca";
+}
 export const Modal = ({ icon, titulo, sub, onClose, children, footer, maxW, size, tone = NAVY }) => {
   const widthPx = maxW ?? MODAL_SIZE[size] ?? MODAL_SIZE.largo;
   const panelRef = useRef(null);
@@ -1193,7 +1202,7 @@ export const Modal = ({ icon, titulo, sub, onClose, children, footer, maxW, size
   }, [onClose]);
   return (
   <div className="dc-modal-backdrop" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15, 35, 42, 0.35)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", display: "grid", placeItems: "center", zIndex: 200, padding: 20, animation: "dcBackdropFade 0.2s ease-out forwards" }}>
-    <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dc-modal-title" tabIndex={-1} className="dc-modal" onClick={(e) => e.stopPropagation()} style={{ background: "var(--dc-white)", width: `min(${widthPx}px,96vw)`, maxHeight: "min(680px, 88vh)", borderRadius: "var(--dc-r-lg)", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(15, 35, 42, 0.4), 0 0 0 1px rgba(15, 35, 42, 0.05)", animation: "dcModalSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards", transform: "translateZ(0)", outline: "none" }}>
+    <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dc-modal-title" tabIndex={-1} className="dc-modal" data-tono={tonoModal(tone)} onClick={(e) => e.stopPropagation()} style={{ background: "var(--dc-white)", width: `min(${widthPx}px,96vw)`, maxHeight: "min(680px, 88vh)", borderRadius: "var(--dc-r-lg)", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(15, 35, 42, 0.4), 0 0 0 1px rgba(15, 35, 42, 0.05)", animation: "dcModalSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards", transform: "translateZ(0)", outline: "none" }}>
       <div className="dc-modal__head" style={{ "--tono": tone === NAVY ? "#0E9199" : tone, padding: "20px 24px", background: `linear-gradient(135deg, ${DS.c.primary}, ${DS.c.primaryDark})`, color: "var(--dc-white)", flexShrink: 0, display: "flex", alignItems: "center", gap: 14 }}>
         {icon && <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "rgba(255,255,255,.15)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</div>}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1226,10 +1235,14 @@ export function useFiltroTabla(rows, cols, defaultSort) {
   const [sortDir, setSortDir] = useState(defaultSort?.dir ?? "asc");
   const [colFilters, setColFilters] = useState({});
   const [activeCol, setActiveCol] = useState(null);
+  // Búsqueda única sobre todas las columnas (listas); las tablas siguen con filtro por columna.
+  const [q, setQ] = useState("");
   const toggleSort = (key) => { setActiveCol(null); if (sortCol !== key) { setSortCol(key); setSortDir("asc"); } else if (sortDir === "asc") setSortDir("desc"); else setSortCol(null); };
-  const anyF = Object.values(colFilters).some((v) => v && v.trim());
+  const anyF = Object.values(colFilters).some((v) => v && v.trim()) || !!q.trim();
   const lista = useMemo(() => {
-    const base = (rows || []).filter((r) => cols.every((c) => { if (c.noFilter || !c.get) return true; const f = (colFilters[c.key] || "").trim().toLowerCase(); return !f || String(c.get(r) ?? "").toLowerCase().includes(f); }));
+    const qq = q.trim().toLowerCase();
+    const base = (rows || []).filter((r) => cols.every((c) => { if (c.noFilter || !c.get) return true; const f = (colFilters[c.key] || "").trim().toLowerCase(); return !f || String(c.get(r) ?? "").toLowerCase().includes(f); })
+      && (!qq || cols.some((c) => !c.noFilter && c.get && String(c.get(r) ?? "").toLowerCase().includes(qq))));
     const sc = cols.find((c) => c.key === sortCol && (c.sortVal || c.get));
     if (!sc) return base;
     const val = sc.sortVal || sc.get;
@@ -1238,38 +1251,55 @@ export function useFiltroTabla(rows, cols, defaultSort) {
       const r = typeof x === "number" && typeof y === "number" ? x - y : String(x ?? "").localeCompare(String(y ?? ""), "es", { numeric: true, sensitivity: "base" });
       return sortDir === "asc" ? r : -r;
     });
-  }, [rows, cols, colFilters, sortCol, sortDir]);
-  const limpiar = () => { setColFilters({}); setActiveCol(null); };
-  return { lista, anyF, limpiar, st: { cols, sortCol, sortDir, colFilters, setColFilters, activeCol, setActiveCol, toggleSort } };
+  }, [rows, cols, colFilters, sortCol, sortDir, q]);
+  const limpiar = () => { setColFilters({}); setActiveCol(null); setQ(""); };
+  return { lista, anyF, limpiar, st: { cols, sortCol, sortDir, setSortCol, setSortDir, colFilters, setColFilters, activeCol, setActiveCol, toggleSort, q, setQ } };
 }
-/* Cabecera de filtros para listas en tarjetas: cada columna es una pastilla que se
-   convierte en buscador al tocarla y lleva su botón de orden, igual que en las tablas. */
-export function FiltroCabecera({ st, total, filtradas, sub = "registros", className = "", extra = null }) {
-  const { cols, sortCol, sortDir, colFilters, setColFilters, activeCol, setActiveCol, toggleSort } = st;
-  const anyF = Object.values(colFilters).some((v) => v && v.trim());
+/* Encabezado de columna que ordena: se usa en las tablas propias de cada módulo para
+   que el orden viva en la tabla, no en una barra aparte. */
+export function ThOrden({ st, k, children, className = "", a = "left" }) {
+  if (!st || !st.cols.some((c) => c.key === k && !c.noSort)) return <span className={className}>{children}</span>;
+  const on = st.sortCol === k;
+  return (
+    <button type="button" className={`dc-th-ord${on ? " is-on" : ""} ${className}`} style={{ justifyContent: a === "right" ? "flex-end" : a === "center" ? "center" : "flex-start" }}
+      onClick={() => st.toggleSort(k)} aria-sort={on ? (st.sortDir === "asc" ? "ascending" : "descending") : "none"} title="Ordenar">
+      <span>{children}</span>
+      {on ? (st.sortDir === "asc" ? <ChevronUp size={13} strokeWidth={2.2} /> : <ChevronDown size={13} strokeWidth={2.2} />) : <ArrowUpDown size={11} strokeWidth={1.9} className="dc-th-ord__ic" />}
+    </button>
+  );
+}
+/* Barra de las listas: cuántos hay, un buscador y «Ordenar por». Reemplaza la fila de
+   pastillas por columna, que repetía la tabla y no se entendía. En modo tabla el orden
+   lo hacen los encabezados y aquí queda sólo el buscador. */
+export function FiltroCabecera({ st, total, filtradas, sub = "registros", className = "", extra = null, modoTabla = false }) {
+  const { cols, sortCol, sortDir, setSortCol, setSortDir, q, setQ } = st;
+  const ordenables = cols.filter((c) => !c.noSort && (c.sortVal || c.get));
+  const buscable = total > 6 && cols.some((c) => !c.noFilter && c.get);
+  const verOrden = !modoTabla && ordenables.length > 0;
+  if (!buscable && !verOrden && !extra) return null;
   return (
     <div className={`dc-fcab ${className}`}>
-      <span className="dc-fcab__cant">{filtradas} {sub}{anyF ? ` de ${total}` : ""}</span>
-      <div className="dc-fcab__cols">
-        {cols.filter((c) => !(c.noFilter && c.noSort)).map((c) => {
-          const isSort = sortCol === c.key; const isFilt = !!(colFilters[c.key] && colFilters[c.key].trim()); const open = activeCol === c.key || isFilt;
-          return (
-            <div key={c.key} className={`dc-fcab__col${isFilt || isSort ? " is-on" : ""}`}>
-              {open && !c.noFilter ? (
-                <input aria-label={`Filtrar ${c.label}`} autoFocus={activeCol === c.key} value={colFilters[c.key] || ""} placeholder={c.label}
-                  onChange={(e) => setColFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                  onBlur={() => { if (!(colFilters[c.key] || "").trim()) setActiveCol(null); }}
-                  onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[c.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} />
-              ) : (
-                <button type="button" className="dc-fcab__lbl" onClick={() => !c.noFilter && setActiveCol(c.key)} title={c.noFilter ? c.label : "Clic para filtrar"}>{c.label}</button>
-              )}
-              {!c.noSort && <button type="button" className="dc-fcab__ord" aria-label={`Ordenar ${c.label}`} title="Ordenar" onClick={() => toggleSort(c.key)}>{isSort ? (sortDir === "asc" ? <ChevronUp size={13} strokeWidth={2.2} /> : <ChevronDown size={13} strokeWidth={2.2} />) : <ArrowUpDown size={11} strokeWidth={1.9} />}</button>}
-            </div>
-          );
-        })}
-        {anyF && <button type="button" className="dc-fcab__limpiar" onClick={() => { setColFilters({}); setActiveCol(null); }}>Limpiar</button>}
-      </div>
-      {extra}
+      <span className="dc-fcab__cant"><b>{filtradas}</b> {sub}{q.trim() ? ` de ${total}` : ""}</span>
+      {buscable && (
+        <label className="dc-fcab__buscar">
+          <Search size={14} strokeWidth={2} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${sub}…`} aria-label={`Buscar en ${sub}`}
+            onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} />
+          {q && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setQ("")}><X size={13} strokeWidth={2.2} /></button>}
+        </label>
+      )}
+      {verOrden && (
+        <div className="dc-fcab__orden">
+          <span>Ordenar</span>
+          <select value={sortCol || ""} onChange={(e) => { setSortCol(e.target.value || null); }} aria-label="Ordenar por">
+            <option value="">Sin orden</option>
+            {ordenables.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+          {sortCol && <button type="button" className="dc-fcab__dir" onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")} aria-label={sortDir === "asc" ? "Ascendente" : "Descendente"} title={sortDir === "asc" ? "Ascendente" : "Descendente"}>
+            {sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2.2} /> : <ChevronDown size={14} strokeWidth={2.2} />}</button>}
+        </div>
+      )}
+      {extra && <div className="dc-fcab__extra">{extra}</div>}
     </div>
   );
 }
@@ -1316,7 +1346,7 @@ export function PersonaCelda({ nombre, sub, size = 34 }) {
 /* Tabla con el mismo diseño que DataTable (mismas clases: en celular pasa sola a
    tarjetas con la etiqueta de cada dato), pensada para la vista "Tabla" de las listas.
    cols: [{ key, label, w, a:"left"|"center"|"right", get, cell }] */
-export function TablaPremium({ cols, rows, onRowClick, minWidth = 640 }) {
+export function TablaPremium({ cols, rows, onRowClick, minWidth = 640, st = null }) {
   const COL = cols.map((c) => c.w || "minmax(0,1fr)").join(" ");
   const al = (c) => (c.a === "right" ? "end" : c.a === "center" ? "center" : "start");
   return (
@@ -1324,7 +1354,7 @@ export function TablaPremium({ cols, rows, onRowClick, minWidth = 640 }) {
       <div style={{ overflowX: "auto" }}>
         <div style={{ minWidth, width: "100%" }}>
           <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 14, padding: "0 18px", alignItems: "center", minHeight: 46 }}>
-            {cols.map((c) => <span key={c.key} className="dc-tp__th" style={{ justifySelf: al(c), textAlign: c.a || "left" }}>{c.label}</span>)}
+            {cols.map((c) => <span key={c.key} className="dc-tp__th" style={{ justifySelf: al(c), textAlign: c.a || "left" }}>{st ? <ThOrden st={st} k={c.orden || (st.cols.some((x) => x.key === c.key) ? c.key : (st.cols.find((x) => x.label === c.label) || {}).key)} a={c.a}>{c.label}</ThOrden> : c.label}</span>)}
           </div>
           {rows.map((r, i) => (
             <div key={r.id ?? i} className="dc-table-row dc-tp__row" onClick={onRowClick ? () => onRowClick(r) : undefined}
@@ -1342,7 +1372,7 @@ export function TablaPremium({ cols, rows, onRowClick, minWidth = 640 }) {
   );
 }
 
-export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", tabla = null, children }) {
+export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", tabla = null, modoTabla = false, children }) {
   const { lista, st } = useFiltroTabla(rows, cols, defaultSort);
   // Con `tabla` la lista ofrece también la vista Tabla, con el diseño común del portal.
   const opciones = tabla
@@ -1350,15 +1380,16 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
     : vistas;
   const [vista, setVista] = useVista(vistaClave || "x", opciones || []);
   vistas = opciones;
+  const enTabla = modoTabla || (tabla && vista === "tabla");
   return (
     <div className={`dc-lf ${className}`}>
-      <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub}
-        extra={<>{extra}{vistas && <SelectorVista opciones={vistas} valor={vista} onChange={setVista} />}</>} />
+      <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub} modoTabla={enTabla}
+        extra={(extra || vistas) ? <>{extra}{vistas && <SelectorVista opciones={vistas} valor={vista} onChange={setVista} />}</> : null} />
       {lista.length === 0 && (rows || []).length > 0
-        ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." />
+        ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con la búsqueda." />
         : (tabla && vista === "tabla")
-          ? <TablaPremium cols={tabla.cols} rows={lista} onRowClick={tabla.onRowClick} minWidth={tabla.minWidth} />
-          : children(lista, vista)}
+          ? <TablaPremium cols={tabla.cols} rows={lista} onRowClick={tabla.onRowClick} minWidth={tabla.minWidth} st={st} />
+          : children(lista, vista, st)}
     </div>
   );
 }
@@ -1407,7 +1438,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
           {lista.length === 0 ? (rows.length > 0 ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." /> : (empty || <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin registros" sub="Aún no hay datos para mostrar." />)) : mostradas.map((r, i) => { return (
             <div key={r.id ?? i} className={`dc-table-row${rowClassName ? " " + (rowClassName(r) || "") : ""}`} onClick={onRowClick ? () => onRowClick(r) : undefined} style={{ display: "grid", gridTemplateColumns: COL, gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--dc-line)", cursor: onRowClick ? "pointer" : "default", background: "transparent", transition: "background .15s", position: "relative", zIndex: 1, boxSizing: "border-box", width: "100%", maxWidth: "100%", minWidth: 0 }} onMouseEnter={(ev) => { ev.currentTarget.style.background = "var(--dc-bg-soft2)"; }} onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; }}>
               {cols.map((col) => (
-                <div key={col.key} data-label={col.label || ""} className={col.sticky ? "dc-col-sticky" : undefined} style={{ minWidth: 0, ...(col.sticky ? stickyCell : {}), ...(col.a === "left" ? { paddingLeft: 12 }
+                <div key={col.key} data-label={col.label || ""} data-vacio={col.vacio && col.vacio(r) ? "" : undefined} className={col.sticky ? "dc-col-sticky" : undefined} style={{ minWidth: 0, ...(col.sticky ? stickyCell : {}), ...(col.a === "left" ? { paddingLeft: 12 }
                   : col.a === "right" ? { display: "flex", justifyContent: "flex-end", textAlign: "right", paddingRight: 12, fontVariantNumeric: "tabular-nums" }
                   : { display: "flex", justifyContent: "center", textAlign: "center" }) }}>{col.cell ? col.cell(r) : <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: "100%" }}>{col.get ? col.get(r) : ""}</span>}</div>
               ))}

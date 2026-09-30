@@ -344,6 +344,8 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc
   .dc-table-row > div[data-label="Usuario"]::before, .dc-table-row > div[data-label="Producto"]::before,
   .dc-table-row > div[data-label="Servicio"]::before, .dc-table-row > div[data-label="Persona"]::before { display: none; }
   .dc-table-row > div > * { max-width: 100%; }
+  /* Datos vacíos («—») no ocupan espacio en la tarjeta */
+  .dc-table-row > div[data-vacio] { display: none !important; }
   /* Acciones: una fila al pie, alineada a la derecha y sin etiqueta. */
   .dc-table-row > div[data-label="Acciones"], .dc-table-row > div[data-label="Acción"] {
     grid-column: 1 / -1; order: 99; flex-direction: row !important; justify-content: flex-end !important; align-items: center !important;

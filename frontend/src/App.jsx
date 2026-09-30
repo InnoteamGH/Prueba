@@ -1483,7 +1483,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           api.bloqueos.crear(payload).then(() => { notify("Horario bloqueado."); setBloqForm(null); recargarBloqueos(); }).catch(() => notify("No se pudo crear el bloqueo."));
         };
         return (
-        <Modal icon={<Lock size={20} strokeWidth={1.75} />} tone={RED} titulo="Bloquear horario" sub="Almuerzo, ausencia o mantenimiento — no se podrá agendar en ese rango" onClose={() => setBloqForm(null)} maxW={480}
+        <Modal icon={<Lock size={20} strokeWidth={1.75} />} titulo="Bloquear horario" sub="Almuerzo, ausencia o mantenimiento — no se podrá agendar en ese rango" onClose={() => setBloqForm(null)} maxW={480}
           footer={<><Btn small kind="ghost" onClick={() => setBloqForm(null)}>Cancelar</Btn><Btn small kind="red" onClick={guardarBloq}><Lock size={15} strokeWidth={1.75} /> Bloquear</Btn></>}>
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
@@ -1847,11 +1847,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     { key: "ultima", label: "Última cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => ultimaDe(p) || "", cell: (p) => { const u = ultimaDe(p); if (!u) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Sin visitas</span>; const m = mesesSinVenir(p); const c = m >= 6 ? "var(--dc-warn-600)" : m >= 3 ? "var(--dc-ink-400)" : "var(--dc-ok-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 size={13} strokeWidth={1.75} color={c} style={{ flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: c, fontWeight: 500 }}>{relFecha(u, false)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(u)}</div></div></div>; } },
     { key: "proxima", label: "Próxima cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => proxima(p)?.fecha || "zzz", cell: (p) => { const px = proxima(p); if (!px) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar size={12} strokeWidth={1.75} /> Sin agendar</span>; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: DS.c.primary, flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: DS.c.primary, fontWeight: 500 }}>{relFecha(px.fecha, true)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(px.fecha)} – {(px.hora || "").slice(0, 5)}</div></div></div>; } },
     // "Tarea" no existe en el backend: con sesión salía "—" en todas las filas.
-    ...(conectado ? [] : [{ key: "tarea", label: "Tarea", w: "minmax(130px,0.9fr)", a: "left", get: (p) => p.tarea || "zzz", cell: (p) => { const t = p.tarea; if (!t) return <span style={{ fontSize: 12, color: "var(--dc-line-alt)" }}>—</span>; return <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><BellRing size={12} strokeWidth={1.75} /> {t}</span>; } }]),
+    ...(conectado ? [] : [{ key: "tarea", label: "Tarea", w: "minmax(130px,0.9fr)", a: "left", vacio: (p) => !p.tarea, get: (p) => p.tarea || "zzz", cell: (p) => { const t = p.tarea; if (!t) return <span style={{ fontSize: 12, color: "var(--dc-line-alt)" }}>—</span>; return <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><BellRing size={12} strokeWidth={1.75} /> {t}</span>; } }]),
     // Con sesión, el saldo real del paciente (plan menos pagos); en la demostración, el
     // presupuesto de ejemplo que lleva cada ficha.
     // Con sesión: columna de deuda (saldo pendiente). Verde solo si está al día.
-    { key: "presupuesto", label: conectado ? "Saldo pendiente" : "Presupuesto", w: "minmax(120px,1fr)", a: "left", get: (p) => { const q = conectado ? (saldos ? saldos[p.id] : null) : p.presupuesto; return q ? Math.max(0, q.total - q.pagado) : -1; }, cell: (p) => { const pr = conectado ? (saldos ? saldos[p.id] : null) : p.presupuesto; if (!pr || !pr.total) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>; const total = Math.max(0, Number(pr.total) || 0); const pagado = Math.min(Math.max(0, Number(pr.pagado) || 0), total); const saldo = Math.max(0, total - pagado); const full = saldo <= 0.5; const pctDeuda = total > 0 ? Math.min(100, Math.round((saldo / total) * 100)) : 0; return (
+    { key: "presupuesto", label: conectado ? "Saldo pendiente" : "Presupuesto", w: "minmax(120px,1fr)", a: "left", vacio: (p) => { const q = conectado ? (saldos ? saldos[p.id] : null) : p.presupuesto; return !q || !q.total; }, get: (p) => { const q = conectado ? (saldos ? saldos[p.id] : null) : p.presupuesto; return q ? Math.max(0, q.total - q.pagado) : -1; }, cell: (p) => { const pr = conectado ? (saldos ? saldos[p.id] : null) : p.presupuesto; if (!pr || !pr.total) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>; const total = Math.max(0, Number(pr.total) || 0); const pagado = Math.min(Math.max(0, Number(pr.pagado) || 0), total); const saldo = Math.max(0, total - pagado); const full = saldo <= 0.5; const pctDeuda = total > 0 ? Math.min(100, Math.round((saldo / total) * 100)) : 0; return (
       <div style={{ minWidth: 0, width: "100%", overflow: "hidden" }}>
         {full ? (
           <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)" }}>Al día</div>
@@ -1916,7 +1916,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         const canales = [["whatsapp", "WhatsApp", <MessageSquare size={15} strokeWidth={1.75} />], ["email", "Email", <Mail size={15} strokeWidth={1.75} />], ["ambos", "Ambos", <Send size={15} strokeWidth={1.75} />]];
         const preview = (camp.msg || "").replace(/\{nombre\}/g, lista.find((p) => p.marketing)?.nombre?.split(" ")[0] || "Ana");
         return (
-          <Modal icon={<Megaphone size={20} strokeWidth={1.75} />} tone={camp.color} titulo="Nueva campaña de marketing" sub={`Segmento: ${camp.label} – ${camp.n} destinatario(s)`} onClose={() => setCamp(null)} maxW={600}
+          <Modal icon={<Megaphone size={20} strokeWidth={1.75} />} titulo="Nueva campaña de marketing" sub={`Segmento: ${camp.label} – ${camp.n} destinatario(s)`} onClose={() => setCamp(null)} maxW={600}
             footer={<><Btn small kind="ghost" onClick={() => setCamp(null)}>Cancelar</Btn><Btn small onClick={enviarCamp}><Send size={15} strokeWidth={1.75} /> Enviar a {camp.n}</Btn></>}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, background: tint(camp.color, 0.071), border: `1px solid ${tint(camp.color, 0.2)}`, borderRadius: "var(--dc-r-lg)", padding: "12px 14px", marginBottom: 18 }}>
               <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: tint(camp.color, 0.133), color: camp.color, display: "grid", placeItems: "center", flexShrink: 0 }}>{camp.icon}</div>
@@ -3252,7 +3252,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
         const selSty = { width: "100%", padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, fontWeight: 500, cursor: "pointer", boxSizing: "border-box" };
         const lblSty = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
         return (
-        <Modal icon={<Bell size={20} strokeWidth={1.75} />} tone="var(--dc-warn-600)" titulo="Agregar a lista de espera" sub="Paciente que quiere cita pero no hay cupo disponible" onClose={() => setNuevoEsp(null)} maxW={560}
+        <Modal icon={<Bell size={20} strokeWidth={1.75} />} titulo="Agregar a lista de espera" sub="Paciente que quiere cita pero no hay cupo disponible" onClose={() => setNuevoEsp(null)} maxW={560}
           footer={<><Btn small kind="ghost" onClick={() => setNuevoEsp(null)}>Cancelar</Btn><Btn small onClick={guardarEsp}><Check size={15} strokeWidth={1.75} /> Agregar a espera</Btn></>}>
           {/* Selector de paciente registrado (o registrar nuevo) */}
           <div style={{ marginBottom: 16 }}>
@@ -4635,7 +4635,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {egForm && (() => {
         const mets = [["efectivo", "Efectivo", DollarSign], ["tarjeta", "Tarjeta", CreditCard], ["transferencia", "Transferencia", Wallet], ["yape", "Yape", Zap]];
         return (
-        <Modal icon={<Wallet size={20} strokeWidth={1.75} />} tone={RED} titulo="Registrar egreso" sub="Gasto de la clínica que sale de caja" onClose={() => setEgForm(null)} maxW={520}
+        <Modal icon={<Wallet size={20} strokeWidth={1.75} />} titulo="Registrar egreso" sub="Gasto de la clínica que sale de caja" onClose={() => setEgForm(null)} maxW={520}
           footer={<><Btn small kind="ghost" onClick={() => setEgForm(null)}>Cancelar</Btn><Btn small kind="red" onClick={guardarEgreso}><Check size={15} strokeWidth={1.75} /> Registrar egreso</Btn></>}>
           <Field label="Concepto" value={egForm.concepto} onChange={(v) => setEgForm({ ...egForm, concepto: v })} placeholder="Ej. Compra de guantes y mascarillas" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
@@ -4931,7 +4931,7 @@ function MiProduccion({ usuario, citas }) {
         </Card>
       </div>
       {detK && (() => { const Ic = detK.icon; return (
-        <Modal icon={<Ic size={20} strokeWidth={1.75} />} tone={detK.color} titulo={detK.l} sub="Cómo se calcula" onClose={() => setDetK(null)} maxW={440} footer={<Btn small kind="ghost" onClick={() => setDetK(null)}>Cerrar</Btn>}>
+        <Modal icon={<Ic size={20} strokeWidth={1.75} />} titulo={detK.l} sub="Cómo se calcula" onClose={() => setDetK(null)} maxW={440} footer={<Btn small kind="ghost" onClick={() => setDetK(null)}>Cerrar</Btn>}>
           <div style={{ fontSize: 27, fontWeight: 600, color: detK.color, fontFamily: DISPLAY_FONT, marginBottom: 10 }}>{detK.v}</div>
           <div style={{ fontSize: 14, color: "var(--dc-ink-700)", lineHeight: 1.6, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "13px 15px" }}>{detK.desc}</div>
         </Modal>
@@ -5135,7 +5135,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
 
         {/* Formulario alta/edición */}
         {form && (
-          <Modal icon={form.id ? <Pencil size={20} strokeWidth={1.75} /> : <UserPlus size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar usuario" : "Nuevo usuario"} sub={form.id ? "Actualiza sus datos, rol y sedes" : "Crea la cuenta y asigna su rol y sedes"} tone={ROLES[form.rol].color} onClose={() => setForm(null)} maxW={620}
+          <Modal icon={form.id ? <Pencil size={20} strokeWidth={1.75} /> : <UserPlus size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar usuario" : "Nuevo usuario"} sub={form.id ? "Actualiza sus datos, rol y sedes" : "Crea la cuenta y asigna su rol y sedes"} onClose={() => setForm(null)} maxW={620}
             footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}><Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn><Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
               <Field label="Nombre completo" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Ana Torres" />
@@ -7053,7 +7053,7 @@ function Resenas({ notify, citas = [], can }) {
         ); })()}
       </Card>
       {sel && (() => { const r = reviews.find((x) => x.id === sel.id) || sel; const col = colorDe(r.nombre); return (
-        <Modal icon={<Star size={20} strokeWidth={1.75} />} tone="var(--dc-warn-600)" titulo={r.nombre} sub={`${fechaLegible(r.fecha)} – reseña pública`} onClose={() => setSel(null)} maxW={520}
+        <Modal icon={<Star size={20} strokeWidth={1.75} />} titulo={r.nombre} sub={`${fechaLegible(r.fecha)} – reseña pública`} onClose={() => setSel(null)} maxW={520}
           footer={r.resp ? <Btn small kind="ghost" onClick={() => setSel(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setSel(null)}>Cancelar</Btn><Btn small onClick={() => { responder(r.id); setSel(null); }}><Send size={15} strokeWidth={1.75} /> Publicar respuesta</Btn></>}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>{r.nombre[0]}</div>

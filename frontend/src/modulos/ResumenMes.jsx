@@ -94,13 +94,13 @@ export default function ResumenMes({ kd }) {
           <b>{soles(d.salidas)}</b>
           <em>{d.salidasUsd ? `+ US$ ${d.salidasUsd.toFixed(2)} en dólares · ` : ""}{d.salidasCat[0] ? `Mayor gasto: ${d.salidasCat[0][0]}` : "Sin egresos registrados"}</em>
         </article>
-        <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#16A36A" : "#DC2626" }}>
+        <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#0B6C78" : "#D0563F" }}>
           <span className="dc-rm__ico"><Wallet size={18} strokeWidth={2.2} /></span>
           <small>Resultado del mes</small>
           <b>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</b>
           <em>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</em>
         </article>
-        <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#6D4FD1" }}>
+        <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#C98A12" }}>
           <span className="dc-rm__ico"><Target size={18} strokeWidth={2.2} /></span>
           <small>Meta mensual</small>
           <b>{d.meta ? soles(d.meta) : "Sin meta"}</b>

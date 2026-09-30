@@ -121,7 +121,7 @@
 .dc-pc .dc-tabla-doc .qui em {
   font-style: normal; font-size: var(--dc-fs-xs); color: var(--dc-ink-500); display: block;
 }
-.dc-pc .dc-tabla-doc .ini {
+.dc-pc .dc-tabla-doc .ini { font-style: normal;
   width: 30px; height: 30px; border-radius: var(--dc-r-md); display: grid; place-items: center;
   font-size: var(--dc-fs-xs); font-weight: var(--dc-fw-bold); flex: none;
 }

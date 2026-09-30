@@ -338,7 +338,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
       </Card>
       </>)}
       {cfg && (() => { const Ic = cfg.icon; return (
-        <Modal icon={<Ic size={20} strokeWidth={1.75} />} tone={cfg.color} titulo={cfg.l} sub={`Automatización – se envía ${cfg.timing.toLowerCase()}`} onClose={() => setCfg(null)} maxW={520}
+        <Modal icon={<Ic size={20} strokeWidth={1.75} />} titulo={cfg.l} sub={`Automatización – se envía ${cfg.timing.toLowerCase()}`} onClose={() => setCfg(null)} maxW={520}
           footer={<><Btn small kind="ghost" onClick={() => setCfg(null)}>Cancelar</Btn><Btn small onClick={guardarCfg}><Check size={15} strokeWidth={1.75} /> Guardar mensaje</Btn></>}>
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Cuándo se envía</div><div style={{ fontSize: 14, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.timing}</div></div>
