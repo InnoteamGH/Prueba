@@ -4149,3 +4149,25 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
   .dc-cjx .dc-caja-sub, .dc-cjx .dc-caja-hero { padding: 8px 12px !important; }
   .dc-cjx .dc-caja-sub .dc-esp-hero__cifras, .dc-cjx .dc-caja-hero .dc-esp-hero__cifras, .dc-cjx .dc-caja-sub .dc-esp-hero__txt p, .dc-cjx .dc-caja-hero .dc-esp-hero__txt p { display: none !important; }
 }
+
+/* Caja: cierre, relevo de turno, anulación y filtro por medio */
+.dc-cjx .dc-esp-hero__cifras[hidden] { display: none !important; }
+.dc-cjx .dc-caja-sub--titulo .dc-esp-hero__num b { font-size: 16px !important; }
+.dc-turno__saliente { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 12px 14px; border-radius: 12px; background: #F2F8F8; box-shadow: inset 0 0 0 1px #DCEBEC; font-size: 13px; }
+.dc-turno__saliente span { color: var(--dc-ink-500); }
+.dc-turno__saliente b { color: var(--dc-ink-900); text-align: right; font-variant-numeric: tabular-nums; }
+.dc-turno__dif { padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+.dc-turno__dif.is-ok { background: #E7F7EF; color: #0F7A4B; }
+.dc-turno__dif.is-sobra { background: #FEF3E2; color: #9A5B06; }
+.dc-turno__dif.is-falta { background: #FDEDEA; color: #B8452F; }
+.dc-anul__motivos { display: flex; flex-wrap: wrap; gap: 6px; }
+.dc-anul__motivos button { all: unset; cursor: pointer; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--dc-ink-700); background: #F4F7F8; box-shadow: inset 0 0 0 1px var(--dc-line); }
+.dc-anul__motivos button:hover { background: #FDEDEA; color: #B8452F; }
+.dc-anul__motivos button.is-on { background: #FDEDEA; color: #B8452F; box-shadow: inset 0 0 0 1.5px #E0694F; }
+.dc-cz__medios { display: flex; gap: 6px; padding: 0 14px 10px; overflow-x: auto; scrollbar-width: none; }
+.dc-cz__medios::-webkit-scrollbar { display: none; }
+.dc-cz__medios button { all: unset; cursor: pointer; flex: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--dc-ink-700); background: #F4F7F8; box-shadow: inset 0 0 0 1px var(--dc-line); }
+.dc-cz__medios button svg { color: var(--m, #0E9199); }
+.dc-cz__medios button i { font-style: normal; font-size: 11px; color: var(--dc-ink-400); }
+.dc-cz__medios button.is-on { background: #0B6C78; color: #fff; box-shadow: none; }
+.dc-cz__medios button.is-on svg, .dc-cz__medios button.is-on i { color: rgba(255,255,255,.85); }

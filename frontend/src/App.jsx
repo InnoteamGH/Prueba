@@ -3487,6 +3487,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [cierreBusy, setCierreBusy] = useState(false);
   const [cajaMovs, setCajaMovs] = useState([]);
   const [movForm, setMovForm] = useState(null); // { tipo, monto, nota }
+  const [turnoForm, setTurnoForm] = useState(null); // { cajero, contado, nota }
+  const [anulForm, setAnulForm] = useState(null);   // { pagoId, paciente, monto, motivo }
+  const [medioFil, setMedioFil] = useState("todos"); // filtro de «Movimientos del día» en el cierre
+  // «Yape (Niubiz)», «POS», «tarjeta»… → una sola clave por medio para agrupar y filtrar.
+  const medioKey = (x) => { const t = String(x || "otro").toLowerCase(); return ["efectivo", "yape", "plin", "tarjeta", "transferencia", "seguro"].find((k) => t.startsWith(k)) || (t.startsWith("pos") ? "tarjeta" : t); };
   const [histCaja, setHistCaja] = useState(() => conectado ? [] : [
     // Demostración: la jornada de hoy, si ya se cerró, sigue en el historial al recargar.
     ...(() => { try { const r = JSON.parse(localStorage.getItem(cajaStorageKey()) || "null"); return r && r.abierta === false && r.cerradaEn ? [{ id: "hoy", fecha: fmt(hoy), sedeNombre: nombreSede(sedeActiva), abierta: false, abiertaEn: r.abiertaEn, cerradaEn: r.cerradaEn, abiertaPorNombre: r.abiertaPorNombre, cerradaPorNombre: r.cerradaPorNombre, fondo: r.fondo, efectivoEsperado: r.efectivoEsperado, efectivoContado: r.efectivoContado, diferencia: r.diferencia }] : []; } catch { return []; } })(),
@@ -3607,32 +3612,37 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const registrarCambioTurno = () => {
     if (!puedeAbrirCaja) { notify("Tu rol no puede registrar cambio de turno."); return; }
     if (!apertura?.id || !apertura.abierta) { notify("Abre la caja primero."); return; }
-    const cajero = window.prompt("Nombre del cajero entrante:");
-    if (cajero == null) return;
-    if (!(cajero || "").trim()) { notify("Indica el nombre del cajero entrante."); return; }
-    const contadoRaw = window.prompt("Efectivo contado parcial (S/):", "0");
-    if (contadoRaw == null) return;
-    const contado = Number(contadoRaw);
-    if (Number.isNaN(contado) || contado < 0) { notify("Monto contado inválido."); return; }
-    const nota = `CAMBIO_TURNO|contado=${contado}|cajero=${cajero.trim()}`;
+    setTurnoForm({ cajero: "", contado: "", nota: "" });
+  };
+  const guardarCambioTurno = (esperado) => {
+    const cajero = (turnoForm?.cajero || "").trim();
+    if (!cajero) { notify("Indica el nombre del cajero entrante."); return; }
+    const contado = Number(turnoForm.contado);
+    if (turnoForm.contado === "" || Number.isNaN(contado) || contado < 0) { notify("Indica el efectivo contado en la gaveta."); return; }
+    const dif = esperado == null ? null : Math.round((contado - esperado) * 100) / 100;
+    const nota = `CAMBIO_TURNO|contado=${contado}|cajero=${cajero}${esperado != null ? `|esperado=${esperado}|diferencia=${dif}` : ""}${(turnoForm.nota || "").trim() ? `|nota=${turnoForm.nota.trim()}` : ""}`;
+    const msg = `Cambio de turno registrado – entra ${cajero} – contado S/ ${contado.toFixed(2)}${dif ? ` (${dif > 0 ? "sobran" : "faltan"} S/ ${Math.abs(dif).toFixed(2)})` : ""}.`;
     if (conectado) {
       api.cajaMovimientos.crear({ aperturaId: apertura.id, tipo: "turno", monto: 0, nota })
-        .then(() => { notify(`Cambio de turno registrado – ${cajero.trim()} – contado S/ ${contado.toFixed(2)}.`); recargarCajaMovs(); })
+        .then(() => { notify(msg); setTurnoForm(null); recargarCajaMovs(); })
         .catch((e) => notify(e?.message || "No se pudo registrar el cambio de turno."));
       return;
     }
     setCajaMovs((ms) => [...ms, { id: Date.now(), tipo: "turno", monto: 0, nota, creadoEn: new Date().toISOString() }]);
-    notify(`Cambio de turno registrado – ${cajero.trim()}.`);
+    setTurnoForm(null);
+    notify(msg);
   };
-  const anularPagoHoy = (pagoId) => {
+  const anularPagoHoy = (pagoId, mov = null) => {
     if (!puedeAbrirCaja) { notify("Tu rol no puede anular cobros."); return; }
     if (!pagoId) return;
-    const motivo = window.prompt("Motivo de la anulación / devolución:");
-    if (motivo == null) return;
-    if (!(motivo || "").trim()) { notify("El motivo es obligatorio."); return; }
+    setAnulForm({ pagoId, paciente: mov?.paciente || "", monto: Number(mov?.monto) || 0, metodo: mov?.metodo || "", motivo: "" });
+  };
+  const confirmarAnulacion = () => {
+    const motivo = (anulForm?.motivo || "").trim();
+    if (!motivo) { notify("El motivo es obligatorio."); return; }
     if (!conectado) { notify("Conéctate para anular un cobro real."); return; }
-    api.pagos.anular(pagoId, { motivo: motivo.trim() })
-      .then(() => { notify("Pago anulado."); recargarCaja(); recargarCierre(); recargarHist(); })
+    api.pagos.anular(anulForm.pagoId, { motivo })
+      .then(() => { notify("Pago anulado."); setAnulForm(null); recargarCaja(); recargarCierre(); recargarHist(); })
       .catch((e) => notify(e?.message || "No se pudo anular el pago."));
   };
   const cerrarApertura = (esperadoEfectivo, usdCierre = null) => {
@@ -3916,6 +3926,32 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   return (
     <div className="dc-cjx" style={{ display: "grid", gap: 14 }}>
       {cabeceraCaja}
+      {turnoForm && (() => {
+        const cont = turnoForm.contado === "" ? null : Number(turnoForm.contado);
+        const dif = cont == null || Number.isNaN(cont) || gavetaHoy == null ? null : Math.round((cont - gavetaHoy) * 100) / 100;
+        return (
+          <Modal icon={<Repeat size={20} strokeWidth={1.75} />} titulo="Cambio de turno" sub={`Relevo de caja – ${sedeNombre()}`} size="corto" onClose={() => setTurnoForm(null)}
+            footer={<><Btn small kind="ghost" onClick={() => setTurnoForm(null)}>Cancelar</Btn><Btn small onClick={() => guardarCambioTurno(gavetaHoy)}><Check size={14} strokeWidth={2} /> Registrar relevo</Btn></>}>
+            <div style={{ display: "grid", gap: 14 }}>
+              <div className="dc-turno__saliente"><span>Entrega</span><b>{apertura?.abiertaPorNombre || nombreUsuarioCaja()}</b><span>Efectivo esperado en gaveta</span><b>{gavetaHoy == null ? "—" : sol(gavetaHoy)}</b></div>
+              <Field label="Cajero entrante" value={turnoForm.cajero} onChange={(v) => setTurnoForm({ ...turnoForm, cajero: v })} placeholder="Nombre de quien recibe la caja" icon={<User size={15} strokeWidth={1.75} />} />
+              <Field label="Efectivo contado (S/)" type="number" value={turnoForm.contado} onChange={(v) => setTurnoForm({ ...turnoForm, contado: v })} placeholder={gavetaHoy != null ? gavetaHoy.toFixed(2) : "0.00"} icon={<Banknote size={15} strokeWidth={1.75} />} hint="Cuenten juntos la gaveta antes del relevo." />
+              {dif != null && <div className={`dc-turno__dif ${Math.abs(dif) < 0.01 ? "is-ok" : dif > 0 ? "is-sobra" : "is-falta"}`}>{Math.abs(dif) < 0.01 ? "Cuadra exacto con lo esperado." : dif > 0 ? `Sobran ${sol(dif)} respecto de lo esperado.` : `Faltan ${sol(-dif)} respecto de lo esperado.`}</div>}
+              <Field label="Observación (opcional)" value={turnoForm.nota} onChange={(v) => setTurnoForm({ ...turnoForm, nota: v })} placeholder="Ej. se entrega con S/ 50 en monedas" />
+            </div>
+          </Modal>
+        );
+      })()}
+      {anulForm && (
+        <Modal icon={<X size={20} strokeWidth={1.9} />} tone={RED} titulo="Anular cobro" sub={`${anulForm.paciente || "Paciente"} – ${sol(anulForm.monto)}${anulForm.metodo ? ` – ${METODO_LBL[String(anulForm.metodo).toLowerCase()] || anulForm.metodo}` : ""}`} size="corto" onClose={() => setAnulForm(null)}
+          footer={<><Btn small kind="ghost" onClick={() => setAnulForm(null)}>Volver</Btn><Btn small kind="red" onClick={confirmarAnulacion}>Anular cobro</Btn></>}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.5 }}>El cobro sale del arqueo del día y queda registrado en Auditoría con el motivo. Si ya se entregó boleta, emite la nota de crédito que corresponda.</p>
+            <div className="dc-anul__motivos">{["Error en el monto", "Medio de pago equivocado", "Cobro duplicado", "Devolución al paciente"].map((m) => <button key={m} type="button" className={anulForm.motivo === m ? "is-on" : ""} onClick={() => setAnulForm({ ...anulForm, motivo: m })}>{m}</button>)}</div>
+            <Field label="Motivo (obligatorio)" value={anulForm.motivo} onChange={(v) => setAnulForm({ ...anulForm, motivo: v })} placeholder="Describe por qué se anula" />
+          </div>
+        </Modal>
+      )}
       {tab === "cobros" && <section className="dc-esp-hero dc-caja-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>S/ {montoPorCobrar.toLocaleString("es-PE")}</b><span>por cobrar</span></div>
@@ -4217,7 +4253,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {tab === "cierre" && (() => {
         const c = cierre || (conectado ? { total: 0, cantidad: 0, porMetodo: {}, movimientos: [] } : (() => {
           const pm = {};
-          boletasHoyActivas.forEach((b) => { const m = String(b.metodo || "efectivo").toLowerCase() === "pos" ? "tarjeta" : String(b.metodo || "efectivo").toLowerCase(); const k = m === "efectivo" && b.moneda === "USD" ? "efectivo_usd" : m; pm[k] = (pm[k] || 0) + b.monto; });
+          boletasHoyActivas.forEach((b) => { const m = medioKey(b.metodo || "efectivo"); const k = m === "efectivo" && b.moneda === "USD" ? "efectivo_usd" : m; pm[k] = (pm[k] || 0) + b.monto; });
           return { total: boletasHoyActivas.reduce((a, b) => a + b.monto, 0), cantidad: boletasHoyActivas.length, porMetodo: pm, movimientos: boletasHoyActivas.map((b, i) => ({ id: null, hora: b.hora || "", paciente: b.paciente, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), monto: b.monto, _k: i })) };
         })());
         const metodos = Object.entries(c.porMetodo || {}).filter(([, v]) => Number(v) > 0);
@@ -4250,16 +4286,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const semaforo = diffNum == null ? null : Math.abs(diffNum) < 0.01 ? "cuadra" : diffNum > 0 ? "sobra" : "falta";
         return (
           <div style={{ display: "grid", gap: 16 }}>
-            <section className="dc-esp-hero dc-caja-sub">
+            <section className="dc-esp-hero dc-caja-sub dc-caja-sub--titulo">
               <div className="dc-esp-hero__txt">
-                <div className="dc-esp-hero__num"><b>{esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo)}</b><span>efectivo esperado</span></div>
-                <p>{cajaAbierta ? `Arqueo de hoy – ${sedeNombre()}${apertura?.abiertaPorNombre ? `, abierta por ${apertura.abiertaPorNombre}` : ""}` : `Caja cerrada – ${sedeNombre()} – ${fechaLegible(fmt(hoy))}`}</p>
+                <div className="dc-esp-hero__num"><b>Arqueo del día</b></div>
+                <p>{cajaAbierta ? "Cuenta la gaveta y compárala con el efectivo esperado" : "Se habilita con la caja abierta"}</p>
               </div>
-              <div className="dc-esp-hero__cifras">
-                <div><b>{nfmt(c.total)}</b><span>Cobrado hoy</span></div>
-                <div><b>{nfmt(netoHoyCierre)}</b><span>Neto estimado</span></div>
-                <div><b>{c.cantidad}</b><span>Cobros</span></div>
-              </div>
+              <div className="dc-esp-hero__cifras" hidden></div>
               <span />
               <div className="dc-hero-acc">
                 <button type="button" className="dc-esp-hero__agregar" onClick={recargarCierre}><Repeat size={14} strokeWidth={1.9} /> Actualizar</button>
@@ -4405,7 +4437,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 </Card>
                 <Card className="dc-cz__movs">
                   <div className="dc-cz__movcab"><h4>Movimientos del día</h4><span>{(c.movimientos || []).length}</span></div>
-                  {(c.movimientos || []).length === 0 ? <p className="dc-cz__nada">Los cobros del día aparecerán aquí.</p> : <ListaFiltrable rows={c.movimientos} sub="cobros" className="dc-cz__lf" cols={[
+                  {(c.movimientos || []).length > 0 && (() => { const cnt = {}; (c.movimientos || []).forEach((m) => { const k = medioKey(m.metodo); cnt[k] = (cnt[k] || 0) + 1; }); const ks = Object.keys(cnt); return ks.length > 1 ? (
+                    <div className="dc-cz__medios" role="tablist" aria-label="Filtrar por medio de pago">
+                      <button type="button" role="tab" aria-selected={medioFil === "todos"} className={medioFil === "todos" ? "is-on" : ""} onClick={() => setMedioFil("todos")}>Todos <i>{(c.movimientos || []).length}</i></button>
+                      {ks.map((k) => { const [Ico, col] = medioUi(k); return <button key={k} type="button" role="tab" aria-selected={medioFil === k} className={medioFil === k ? "is-on" : ""} style={{ "--m": col }} onClick={() => setMedioFil(k)}><Ico size={12} strokeWidth={2.2} /> {METODO_LBL[k] || k} <i>{cnt[k]}</i></button>; })}
+                    </div>
+                  ) : null; })()}
+                  {(c.movimientos || []).length === 0 ? <p className="dc-cz__nada">Los cobros del día aparecerán aquí.</p> : <ListaFiltrable rows={(c.movimientos || []).filter((m) => medioFil === "todos" || medioKey(m.metodo) === medioFil)} sub="cobros" className="dc-cz__lf" cols={[
                     { key: "paciente", label: "Paciente", get: (m) => m.paciente || "" },
                     { key: "hora", label: "Hora", get: (m) => m.hora || "" },
                     { key: "metodo", label: "Medio", get: (m) => m.metodo || "" },
@@ -4417,7 +4455,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                       <em>{nfmt(m.monto)}</em>
                       {m.id && <div className="dc-cz__macc">
                         <button type="button" className="dc-mini-btn" title="Enviar boleta por WhatsApp" aria-label="Enviar boleta por WhatsApp" onClick={() => api.pagos.enviarWa(m.id).then((r) => notify(r?.ok ? `Boleta enviada a ${m.paciente} por WhatsApp.` : "No se pudo enviar (¿el paciente tiene teléfono?).")).catch(() => notify("No se pudo enviar la boleta."))}><MessageSquare size={13} strokeWidth={2} /></button>
-                        {puedeAbrirCaja && <button type="button" className="dc-mini-btn is-mal" title="Anular cobro" aria-label="Anular cobro" onClick={() => anularPagoHoy(m.id)}><X size={13} strokeWidth={2.2} /></button>}
+                        {puedeAbrirCaja && <button type="button" className="dc-mini-btn is-mal" title="Anular cobro" aria-label="Anular cobro" onClick={() => anularPagoHoy(m.id, m)}><X size={13} strokeWidth={2.2} /></button>}
                       </div>}
                     </div>
                   ); })}</ListaFiltrable>}
