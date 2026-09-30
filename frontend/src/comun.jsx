@@ -1258,14 +1258,40 @@ export function useFiltroTabla(rows, cols, defaultSort) {
 /* Encabezado de columna que ordena: se usa en las tablas propias de cada módulo para
    que el orden viva en la tabla, no en una barra aparte. */
 export function ThOrden({ st, k, children, className = "", a = "left" }) {
-  if (!st || !st.cols.some((c) => c.key === k && !c.noSort)) return <span className={className}>{children}</span>;
+  const col = st && st.cols.find((c) => c.key === k);
+  if (!col) return <span className={className}>{children}</span>;
+  const puedeOrdenar = !col.noSort && !!(col.sortVal || col.get);
+  const puedeFiltrar = !col.noFilter && !!col.get;
   const on = st.sortCol === k;
+  const valor = (st.colFilters && st.colFilters[k]) || "";
+  const filtrando = !!valor.trim();
+  const abierto = puedeFiltrar && (st.activeCol === k || filtrando);
+  const label = typeof children === "string" ? children : col.label;
+  const cerrar = () => { if (!valor.trim()) st.setActiveCol(null); };
   return (
-    <button type="button" className={`dc-th-ord${on ? " is-on" : ""} ${className}`} style={{ justifyContent: a === "right" ? "flex-end" : a === "center" ? "center" : "flex-start" }}
-      onClick={() => st.toggleSort(k)} aria-sort={on ? (st.sortDir === "asc" ? "ascending" : "descending") : "none"} title="Ordenar">
-      <span>{children}</span>
-      {on ? (st.sortDir === "asc" ? <ChevronUp size={13} strokeWidth={2.2} /> : <ChevronDown size={13} strokeWidth={2.2} />) : <span className="dc-col-sort" aria-hidden="true"><ArrowUpDown size={11} strokeWidth={1.9} className="dc-th-ord__ic" /></span>}
-    </button>
+    <span className={`dc-th${on ? " is-sort" : ""}${filtrando ? " is-filt" : ""} ${className}`} style={{ justifyContent: a === "right" ? "flex-end" : a === "center" ? "center" : "flex-start" }}>
+      {abierto ? (
+        <span className="dc-th__in">
+          <Search size={12} strokeWidth={2.2} />
+          <input autoFocus={st.activeCol === k} value={valor} placeholder={label} aria-label={`Filtrar ${label}`}
+            onChange={(e) => st.setColFilters((f) => ({ ...f, [k]: e.target.value }))}
+            onBlur={cerrar}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { st.setColFilters((f) => { const n = { ...f }; delete n[k]; return n; }); st.setActiveCol(null); e.currentTarget.blur(); }
+              if (e.key === "Enter") { st.setActiveCol(null); e.currentTarget.blur(); }
+            }} />
+          {filtrando && <button type="button" className="dc-th__x" aria-label={`Quitar filtro de ${label}`} onMouseDown={(e) => e.preventDefault()} onClick={() => { st.setColFilters((f) => { const n = { ...f }; delete n[k]; return n; }); st.setActiveCol(null); }}><X size={11} strokeWidth={2.4} /></button>}
+        </span>
+      ) : (
+        <button type="button" className="dc-th__lbl" disabled={!puedeFiltrar} title={puedeFiltrar ? `Escribe para filtrar por ${String(label).toLowerCase()}` : undefined} onClick={() => puedeFiltrar && st.setActiveCol(k)}>{children}</button>
+      )}
+      {puedeOrdenar && (
+        <button type="button" className="dc-col-sort" aria-label={`Ordenar por ${label}`} title="Ordenar"
+          aria-sort={on ? (st.sortDir === "asc" ? "ascending" : "descending") : "none"} onClick={() => st.toggleSort(k)}>
+          {on ? (st.sortDir === "asc" ? <ChevronUp size={13} strokeWidth={2.4} /> : <ChevronDown size={13} strokeWidth={2.4} />) : <ArrowUpDown size={11} strokeWidth={2} />}
+        </button>
+      )}
+    </span>
   );
 }
 /* Barra de las listas: cuántos hay, un buscador y «Ordenar por». Reemplaza la fila de
@@ -1274,8 +1300,8 @@ export function ThOrden({ st, k, children, className = "", a = "left" }) {
 export function FiltroCabecera({ st, total, filtradas, sub = "registros", className = "", extra = null, modoTabla = false }) {
   const { cols, sortCol, sortDir, setSortCol, setSortDir, q, setQ } = st;
   const ordenables = cols.filter((c) => !c.noSort && (c.sortVal || c.get));
-  const buscable = total > 6 && cols.some((c) => !c.noFilter && c.get);
-  const verOrden = !modoTabla && ordenables.length > 0;
+  const buscable = !modoTabla && total > 6 && cols.some((c) => !c.noFilter && c.get);
+  const verOrden = !modoTabla && ordenables.length > 0 && total > 3;
   if (!buscable && !verOrden && !extra) return null;
   return (
     <div className={`dc-fcab ${className}`}>
@@ -1395,10 +1421,10 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
 }
 
 export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true }) {
-  const { lista, anyF, st } = useFiltroTabla(rows, cols, defaultSort);
+  const { lista, anyF, limpiar, st } = useFiltroTabla(rows, cols, defaultSort);
   const { sortCol, sortDir, colFilters, q, setQ } = st;
   // Mismo patrón que las listas: un buscador para toda la tabla y el orden en el encabezado.
-  const conBuscar = buscar && (rows || []).length > 6 && cols.some((c) => !c.noFilter && c.get);
+  const conBuscar = false; // las tablas filtran escribiendo en el nombre de cada columna
   const cajaBuscar = conBuscar ? (
     <label className="dc-fcab__buscar dc-dt__buscar">
       <Search size={14} strokeWidth={2} />
@@ -1420,7 +1446,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
     : { overflowX: "auto" };
   return (
     <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
-      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span></div><div className="dc-dt__acc">{cajaBuscar}{accion}</div></div>}
+      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span>{anyF && <button type="button" className="dc-dt__limpiar" onClick={limpiar}>Limpiar filtros</button>}</div><div className="dc-dt__acc">{cajaBuscar}{accion}</div></div>}
       {!titulo && cajaBuscar && <div className="dc-dt__barra"><span className="dc-fcab__cant"><b>{lista.length}</b> {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}</span>{cajaBuscar}</div>}
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;

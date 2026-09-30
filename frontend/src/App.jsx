@@ -3428,6 +3428,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const mesActual = fmt(hoy).slice(0, 7);
   const histFiltrado = hist.filter(pagoEnSedeActiva).filter((p) => (p.fecha || "").slice(0, 7) === mesActual);
   const cajaStorageKey = () => `dc_caja_apertura_${fmt(hoy)}_${sedeActiva || "all"}`;
+  const nombreUsuarioCaja = () => { try { return (JSON.parse(localStorage.getItem("dc_usuario") || "null") || {}).nombre || "Recepción"; } catch { return "Recepción"; } };
   const [apertura, setApertura] = useState(null);
   const [jornadaAbiertaPrevia, setJornadaAbiertaPrevia] = useState(null);
   const [cierreAdmin, setCierreAdmin] = useState(null); // { id, fecha, sedeId, fondo }
@@ -3487,6 +3488,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [cajaMovs, setCajaMovs] = useState([]);
   const [movForm, setMovForm] = useState(null); // { tipo, monto, nota }
   const [histCaja, setHistCaja] = useState(() => conectado ? [] : [
+    // Demostración: la jornada de hoy, si ya se cerró, sigue en el historial al recargar.
+    ...(() => { try { const r = JSON.parse(localStorage.getItem(cajaStorageKey()) || "null"); return r && r.abierta === false && r.cerradaEn ? [{ id: "hoy", fecha: fmt(hoy), sedeNombre: nombreSede(sedeActiva), abierta: false, abiertaEn: r.abiertaEn, cerradaEn: r.cerradaEn, abiertaPorNombre: r.abiertaPorNombre, cerradaPorNombre: r.cerradaPorNombre, fondo: r.fondo, efectivoEsperado: r.efectivoEsperado, efectivoContado: r.efectivoContado, diferencia: r.diferencia }] : []; } catch { return []; } })(),
     { id: "dj1", fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 5).toISOString(), cerradaPorNombre: "Carla Mendoza", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 40).toISOString(), fondo: 100, efectivoEsperado: 860, efectivoContado: 860, diferencia: 0, abierta: false },
     { id: "dj2", fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede Surco", abiertaPorNombre: "Luis Paredes", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 30).toISOString(), cerradaPorNombre: "Luis Paredes", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 10).toISOString(), fondo: 100, efectivoEsperado: 540, efectivoContado: 530, diferencia: -10, abierta: false },
     { id: "dj3", fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 8, 0).toISOString(), cerradaPorNombre: "Roberto Díaz", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 20, 5).toISOString(), fondo: 150, efectivoEsperado: 1220, efectivoContado: 1225, diferencia: 5, abierta: false },
@@ -3544,7 +3547,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     if (!conectado) {
       if (MODO_DEMO) {
         const fondoDemo = Number(aperturaForm.fondo) || 0;
-        setApertura({ id: "demo", abierta: true, fondo: fondoDemo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: "Recepción", destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) });
+        const ap = { id: "demo", abierta: true, fondo: fondoDemo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: nombreUsuarioCaja(), destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) };
+        setApertura(ap);
+        try { localStorage.setItem(cajaStorageKey(), JSON.stringify(ap)); } catch { /* sin almacenamiento */ }
         notify(`Caja abierta (demo) con fondo S/ ${fondoDemo.toFixed(2)}.`);
         setTab("cobros");
         return;
@@ -3637,6 +3642,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     if (Number.isNaN(contado)) { notify("Efectivo contado inválido."); return; }
     const esperado = Number(esperadoEfectivo);
     const diff = Math.round((contado - esperado) * 100) / 100;
+    const cerradaHoy = () => ({ ...(apertura || {}), abierta: false, cerradaEn: new Date().toISOString(), cerradaPorNombre: nombreUsuarioCaja(), efectivoContado: contado, efectivoEsperado: esperado, diferencia: diff, justificacion: (cierreForm.justificacion || "").trim() });
     if (Math.abs(diff) > 0.009 && !(cierreForm.justificacion || "").trim()) {
       notify("La justificación es obligatoria cuando hay descuadre.");
       return;
@@ -3652,15 +3658,20 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     setCierreBusy(true);
     if (conectado && apertura?.id) {
       api.cajaApertura.cerrar(apertura.id, body)
-        .then(() => { setApertura(null); setCierreForm({ contado: "", justificacion: "", observaciones: "" }); notify("Caja cerrada. " + resumen); setTab("historial"); })
+        .then(() => { setApertura(cerradaHoy()); setCierreForm({ contado: "", justificacion: "", observaciones: "" }); notify("Caja cerrada. " + resumen); setTab("historial"); recargarHistCaja(); })
         .catch((e) => notify(e?.message || "No se pudo cerrar la caja."))
         .finally(() => setCierreBusy(false));
       return;
     }
-    localStorage.removeItem(cajaStorageKey());
-    setApertura(null);
+    // Demostración: la jornada queda registrada como cerrada (con su cuadre) y pasa al historial.
+    const cerrada = cerradaHoy();
+    try { localStorage.setItem(cajaStorageKey(), JSON.stringify(cerrada)); } catch { /* sin almacenamiento */ }
+    setApertura(cerrada);
+    setHistCaja((h) => [{ id: "hoy-" + Date.now(), fecha: fmt(hoy), sedeNombre: sedeNombre(), abierta: false, abiertaEn: cerrada.abiertaEn, cerradaEn: cerrada.cerradaEn, abiertaPorNombre: cerrada.abiertaPorNombre, cerradaPorNombre: cerrada.cerradaPorNombre, fondo: cerrada.fondo, efectivoEsperado: esperado, efectivoContado: contado, diferencia: diff }, ...(h || [])]);
+    setCierreForm({ contado: "", justificacion: "", observaciones: "" });
     setCierreBusy(false);
     notify("Caja cerrada. " + resumen);
+    setTab("historial");
   };
   const guardarMovCaja = () => {
     if (!movForm || !(Number(movForm.monto) > 0)) { notify("Indica el monto del movimiento."); return; }
@@ -3840,8 +3851,71 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   };
   const TABS = [["apertura", "Apertura", KeyRound], ["cobros", "Cobros", CreditCard], ["cierre", "Cierre del día", DollarSign], ["historial", "Historial", Clock], ...(puedeVerMovimientos ? [["movimientos", "Ingresos y egresos", Wallet]] : []), ["links", "Links de pago", Zap]];
   const METODO_LBL = { efectivo: "Efectivo", tarjeta: "Tarjeta", yape: "Yape", plin: "Plin", transferencia: "Transferencia", seguro: "Seguro", efectivo_usd: "Efectivo en dólares" };
+  // ── Cabecera única de Caja ──
+  // Un solo lugar con el estado de la caja, las cifras del día y el proceso en pasos:
+  // Apertura → Cobros → Ingresos y egresos → Cierre. Antes cada pestaña tenía su propia
+  // franja con cifras distintas y se navegaba sólo desde el menú lateral.
+  const horaDe = (iso) => { if (!iso) return ""; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }); };
+  const cerradaHoyReg = !cajaAbierta && apertura && apertura.abierta === false && apertura.cerradaEn ? apertura : null;
+  const cobradoUsdHoy = boletasHoyActivas.filter((b) => b.moneda === "USD").reduce((a, b) => a + (Number(b.montoOriginal) || 0), 0);
+  const efCobradoHoy = boletasHoyActivas.filter((b) => String(b.metodo || "efectivo").toLowerCase() === "efectivo" && b.moneda !== "USD").reduce((a, b) => a + b.monto, 0);
+  const efEgresosHoy = egresosHoy.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda !== "USD").reduce((a, e) => a + e.monto, 0);
+  const gavetaHoy = cajaAbierta ? Math.round(((Number(apertura?.fondo) || 0) + efCobradoHoy - efEgresosHoy + netoMovsCaja) * 100) / 100 : null;
+  const sol = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const difTxt = (d) => (d == null ? "" : Math.abs(d) < 0.01 ? "Cuadró exacto" : d > 0 ? `Sobraron ${sol(d)}` : `Faltaron ${sol(-d)}`);
+  const linksPend = links.filter((l) => l.estado === "pendiente").length;
+  const pasos = [
+    { id: "apertura", n: 1, l: "Apertura", ic: KeyRound, ok: cajaAbierta || !!cerradaHoyReg, sub: cajaAbierta ? `Abierta ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? `Abrió ${horaDe(cerradaHoyReg.abiertaEn)}` : "Fondo y medios" },
+    { id: "cobros", n: 2, l: "Cobros", ic: CreditCard, ok: false, sub: `${boletasHoyActivas.length} ${boletasHoyActivas.length === 1 ? "cobro" : "cobros"} · ${sol(montoHoy)}`, badge: terminadosPorPac.size || null },
+    ...(puedeVerMovimientos ? [{ id: "movimientos", n: 3, l: "Ingresos y egresos", ic: Wallet, ok: false, sub: `${egresosHoy.length} ${egresosHoy.length === 1 ? "egreso" : "egresos"} · ${sol(totEgresosHoy)}` }] : []),
+    { id: "cierre", n: puedeVerMovimientos ? 4 : 3, l: "Cierre y arqueo", ic: Calculator, ok: !!cerradaHoyReg, sub: cerradaHoyReg ? difTxt(cerradaHoyReg.diferencia) : cajaAbierta ? "Al final del día" : "Con la caja abierta" },
+  ];
+  // En celular la fila de pasos se desliza: el paso activo queda siempre a la vista.
+  useEffect(() => {
+    const el = document.querySelector(".dc-cjh__paso.is-on, .dc-cjh__extra.is-on");
+    const fila = el && el.parentElement;
+    if (fila && fila.scrollWidth > fila.clientWidth) fila.scrollTo({ left: el.offsetLeft - (fila.clientWidth - el.offsetWidth) / 2, behavior: "smooth" });
+  }, [tab]);
+  const cabeceraCaja = (
+    <section className={`dc-cjh${cajaAbierta ? " is-abierta" : cerradaHoyReg ? " is-cerrada" : " is-pendiente"}`} aria-label="Caja del día">
+      <div className="dc-cjh__top">
+        <div className="dc-cjh__estado">
+          <span className="dc-cjh__chip"><i />{cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>
+          <h2>{sedeNombre()}</h2>
+          <p>{fechaLegible(fmt(hoy))}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}${apertura?.abiertaPorNombre ? ` · ${apertura.abiertaPorNombre}` : ""}` : cerradaHoyReg ? ` · cerró ${horaDe(cerradaHoyReg.cerradaEn)} · ${difTxt(cerradaHoyReg.diferencia)}` : " · ábrela para empezar a cobrar"}</p>
+        </div>
+        <dl className="dc-cjh__cifras">
+          <div><dt>Cobrado hoy</dt><dd>{sol(montoHoy)}{cobradoUsdHoy ? <small> + US$ {cobradoUsdHoy.toFixed(2)}</small> : null}</dd></div>
+          <div><dt>Egresos hoy</dt><dd>{sol(totEgresosHoy)}{totEgresosHoyUsd ? <small> + US$ {totEgresosHoyUsd.toFixed(2)}</small> : null}</dd></div>
+          <div><dt>Efectivo en gaveta</dt><dd>{gavetaHoy == null ? (cerradaHoyReg?.efectivoContado != null ? sol(cerradaHoyReg.efectivoContado) : "—") : sol(gavetaHoy)}</dd></div>
+          <div><dt>Por cobrar</dt><dd>{sol(montoPorCobrar)}</dd></div>
+        </dl>
+        <div className="dc-cjh__acc">
+          {!cajaAbierta && !cerradaHoyReg && puedeAbrirCaja && tab !== "apertura" && <button type="button" className="dc-cjh__btn is-pri" onClick={() => setTab("apertura")}><KeyRound size={15} strokeWidth={2} /> Abrir caja</button>}
+          {cajaAbierta && tab !== "cobros" && <button type="button" className="dc-cjh__btn is-pri" onClick={() => setTab("cobros")}><CreditCard size={15} strokeWidth={2} /> Cobrar</button>}
+          {cajaAbierta && tab !== "cierre" && <button type="button" className="dc-cjh__btn" onClick={() => setTab("cierre")}><Lock size={14} strokeWidth={2} /> Cerrar caja</button>}
+          {cerradaHoyReg && tab !== "historial" && <button type="button" className="dc-cjh__btn" onClick={() => setTab("historial")}><History size={14} strokeWidth={2} /> Ver historial</button>}
+        </div>
+      </div>
+      <nav className="dc-cjh__pasos" aria-label="Proceso de caja">
+        {pasos.map((p, i) => { const Ic = p.ic; const on = tab === p.id; return (
+          <React.Fragment key={p.id}>
+            {i > 0 && <ChevronRight size={14} strokeWidth={2} className="dc-cjh__sep" aria-hidden="true" />}
+            <button type="button" className={`dc-cjh__paso${on ? " is-on" : ""}${p.ok ? " is-ok" : ""}`} aria-current={on ? "step" : undefined} onClick={() => setTab(p.id)}>
+              <span className="dc-cjh__n">{p.ok ? <Check size={13} strokeWidth={3} /> : p.n}</span>
+              <span className="dc-cjh__pt"><b><Ic size={13} strokeWidth={2} /> {p.l}{p.badge ? <em>{p.badge} {p.badge === 1 ? "listo" : "listos"}</em> : null}</b><small>{p.sub}</small></span>
+            </button>
+          </React.Fragment>
+        ); })}
+        <span className="dc-cjh__div" aria-hidden="true" />
+        <button type="button" className={`dc-cjh__extra${tab === "historial" ? " is-on" : ""}`} onClick={() => setTab("historial")}><History size={14} strokeWidth={2} /> Historial</button>
+        <button type="button" className={`dc-cjh__extra${tab === "links" ? " is-on" : ""}`} onClick={() => setTab("links")}><Link2 size={14} strokeWidth={2} /> Links de pago{linksPend ? <em>{linksPend}</em> : null}</button>
+      </nav>
+    </section>
+  );
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="dc-cjx" style={{ display: "grid", gap: 14 }}>
+      {cabeceraCaja}
       {tab === "cobros" && <section className="dc-esp-hero dc-caja-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>S/ {montoPorCobrar.toLocaleString("es-PE")}</b><span>por cobrar</span></div>
@@ -4084,12 +4158,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           )}
         </Card>
         <aside className="dc-cob__lado">
-          <div className={`dc-cob__estado${cajaAbierta ? " is-abierta" : ""}`}>
+          <div className={`dc-cob__estado${cajaAbierta ? " is-abierta" : ""}`} hidden={!jornadaAbiertaPrevia?.id}>
             <span className="dc-cob__estado-ico"><KeyRound size={18} strokeWidth={1.9} /></span>
             <div><small>{!cajaAbierta && jornadaAbiertaPrevia?.id ? `Jornada del ${jornadaAbiertaPrevia.fecha} sin cerrar` : "Caja del día"}</small><b>{cajaAbierta ? "Abierta" : "Cerrada"}</b></div>
             {!cajaAbierta && <button type="button" onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>{jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}</button>}
           </div>
-          <div className="dc-cob__hoy">
+          <div className="dc-cob__hoy" hidden={!boletasHoyActivas.some((b) => b.moneda === "USD")}>
             <div><small>Cobrado hoy</small><b>S/ {montoHoy.toLocaleString("es-PE")}</b></div>
             <div><small>Boletas hoy</small><b className="is-neutro">{boletasHoyActivas.length}</b></div>            {boletasHoyActivas.some((b) => b.moneda === "USD") && <div className="dc-cob__usd"><small>Recibido en dólares</small><b>US$ {boletasHoyActivas.filter((b) => b.moneda === "USD").reduce((a, b) => a + (Number(b.montoOriginal) || 0), 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Ya sumado en soles al tipo de cambio del cobro</span></div>}
           </div>
@@ -8958,7 +9032,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   const wrap = (children, pad = 22) => (
     <div style={{ position: "fixed", inset: 0, background: "rgba(8,36,44,.42)", backdropFilter: "blur(10px)", zIndex: 200, display: "grid", placeItems: "center", padding: 16 }} onClick={onClose}>
       <div className="dc-cobro" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 460, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
-        <div className="dc-cobro__head" style={{ background: "radial-gradient(55% 150% at 100% 0%, rgba(125,240,215,.4) 0%, transparent 60%), linear-gradient(118deg, #0C5A3E 0%, #15803D 45%, #22A565 100%)", padding: "18px 22px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="dc-cobro__head" style={{ background: "radial-gradient(55% 150% at 100% 0%, rgba(125,240,215,.3) 0%, transparent 60%), linear-gradient(118deg, #0C4553 0%, #0B6C78 45%, #0E9199 82%, #22AFAA 100%)", padding: "18px 22px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 12.5, opacity: .85, fontWeight: 600 }}>{auth.token ? "Cobro con comprobante" : "Cobro de demostración"}</div>
             <div style={{ fontSize: 21, fontWeight: 600, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{sym} {aUi(netPen).toFixed(2)}</div>

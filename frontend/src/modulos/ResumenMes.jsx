@@ -25,7 +25,7 @@ const DEMO_TOP = [
 ];
 const DEMO_SALIDAS = [["Alquiler", 2800], ["Laboratorio", 2140], ["Insumos", 1930], ["Planilla", 4200], ["Servicios (luz/agua)", 385], ["Marketing", 450], ["Otros", 575]];
 
-export default function ResumenMes({ kd }) {
+export default function ResumenMes({ kd, acciones = null }) {
   const conectado = !!auth.token;
   const hoy = new Date();
   const desde = ymd(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
@@ -79,6 +79,7 @@ export default function ResumenMes({ kd }) {
       <header className="dc-rm__tit">
         <h2>Resumen de {MESES[hoy.getMonth()]}</h2>
         <span>Del 1 al {hoy.getDate()} · día {hoy.getDate()} de {diasMes}</span>
+        {acciones && <div className="dc-rm__acc dc-pg dc-pg--top">{acciones}</div>}
       </header>
 
       <div className="dc-rm__kpis">

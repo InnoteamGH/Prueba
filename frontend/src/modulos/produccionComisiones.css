@@ -94,7 +94,7 @@
 .dc-pc .dc-tabla-doc { display: flex; flex-direction: column; }
 .dc-pc .dc-tabla-doc .fila {
   display: grid;
-  grid-template-columns: minmax(160px, 1.6fr) 56px minmax(80px, 1fr) 92px 56px 92px;
+  grid-template-columns: minmax(160px, 1.6fr) 84px minmax(80px, 1fr) 118px 56px 108px;
   gap: var(--dc-sp-3); align-items: center; padding: 10px 8px;
   border-bottom: 1px solid var(--dc-line); cursor: pointer; font-size: var(--dc-fs-sm);
   min-height: var(--dc-tap-min);
@@ -233,7 +233,7 @@
 }
 
 .dc-pc .dc-tabla-doc--aus .fila {
-  grid-template-columns: minmax(160px, 1.5fr) 56px minmax(100px, 1fr) 72px 56px 88px;
+  grid-template-columns: minmax(160px, 1.5fr) 88px minmax(100px, 1fr) 112px 60px 92px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -14,7 +14,7 @@ import {
   metaEstado,
   moneyFmt,
 } from "./panelGerencialUtil";
-import { pluralEs, EnCabecera, ThOrden, useFiltroTabla } from "../comun";
+import { pluralEs, ThOrden, useFiltroTabla } from "../comun";
 import "./panelGerencial.css";
 import ResumenMes from "./ResumenMes";
 
@@ -945,10 +945,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
   return (
     <div className="dc-pg">
 
-      {/* Estado y ayuda del panel viven en la cabecera de la app: sin fila extra. */}
-      <EnCabecera>
-        {/* .dc-pg envuelve el portal para que los estilos del panel (chip, botones) sigan aplicando. */}
-        <div className="dc-pg dc-pg--top"><div className="dc-head-acc" title={subHead}>
+      {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
+      <ResumenMes kd={kd} acciones={<div className="dc-head-acc" title={subHead}>
           <span className="dc-chip dc-chip--vivo"><span className="punto" aria-hidden="true" />En vivo</span>
           <span className="dc-reloj">{reloj}</span>
           <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={recargar}>Hoy</button>
@@ -971,10 +969,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           })}>
             <span aria-hidden="true">ℹ</span> Qué mide cada gráfico
           </button>
-        </div></div>
-      </EnCabecera>
-
-      <ResumenMes kd={kd} />
+        </div>} />
 
       <section className="dc-kpis" aria-label="Indicadores">
 
