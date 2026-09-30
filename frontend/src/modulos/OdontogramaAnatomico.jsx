@@ -3,6 +3,7 @@ import api, { auth } from "../api/client";
 import { snapshotAGuardados } from "../util/odontogramaBridge.js";
 import { apiRowsAHtmlDatos } from "../util/odontogramaHydrate.js";
 import { pedirAnexoAlIframe } from "../util/odontogramaAnexo.js";
+import { useDatosImpresion } from "../util/membrete";
 
 export { snapshotAGuardados };
 
@@ -175,6 +176,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     }
   }, [pacienteId, capa, postToIframe, measureIframe, demoEstados]);
 
+  const datosDoc = useDatosImpresion();
   const syncChrome = useCallback(() => {
     postToIframe({ type: "dento-odontograma-zoom", zoom });
     postToIframe({
@@ -187,7 +189,18 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         sede: pacienteSede || "",
       },
     });
-  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId]);
+    // Membrete de los documentos del odontograma (resumen y plan de inversión): los
+    // mismos datos de empresa y de la sede activa que el resto del sistema.
+    postToIframe({
+      type: "dento-odontograma-clinica",
+      clinica: {
+        nombre: datosDoc.empresa.nombre, razon: datosDoc.empresa.razonSocial, ruc: datosDoc.empresa.ruc,
+        web: datosDoc.empresa.web, logo: datosDoc.empresa.logo, bajada: datosDoc.empresa.bajada,
+        sede: datosDoc.sede.nombre, dir: datosDoc.sede.direccion, tel: datosDoc.sede.telefonos,
+        horario: datosDoc.sede.horario, correo: datosDoc.sede.correo, serie: datosDoc.sede.serieDocumento,
+      },
+    });
+  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc]);
 
   const persistir = useCallback(async (payload) => {
     if (!editable || !pacienteId || !payload?.datos || !auth.token) return;

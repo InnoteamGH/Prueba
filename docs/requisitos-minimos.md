@@ -105,6 +105,23 @@ Algunos pacientes pagan en dólares. El sistema registra la moneda original sin 
 - **Nuevo** `PUT /egresos/:id` con cuerpo parcial `{ categoria?, concepto?, monto?, moneda? }` para reclasificar.
 - Categorías: Insumos, Laboratorio, Alquiler, Servicios (luz/agua), Planilla, Marketing, Equipos, Otros.
 
+### Membrete de documentos: `/clinica` y `/clinica/impresion`
+
+Todo lo que se imprime o se descarga en PDF lleva el mismo membrete: proforma (plan de inversión), resumen del odontograma, receta, historia clínica, consentimientos, boleta, arqueo de caja, y los PDF de Agenda y listados.
+
+- **De la empresa, iguales en todas las sedes:** nombre comercial, razón social, RUC, web y logo. Se editan en Configuración → Datos de la clínica.
+- **De la sede que emite, que es la sede activa de la sesión:** nombre de la sede, dirección, teléfonos, horario, correo y serie de documentos. Se editan en Configuración → Sedes.
+
+Campos que tiene que manejar el backend:
+
+- `GET /clinica` y `PUT /clinica`: **nuevo** `logo`. El frontend envía una imagen PNG en data URL (alto máx. 240 px); el backend puede guardarla tal cual o subirla a almacenamiento y devolver la URL.
+- `POST /sedes` y `PUT /sedes/:id`: **nuevos** `horarioDocumento` (texto, p. ej. «Lun a vie 9:00–19:00 – sáb 9:00–14:00»), `correo` y `serieDocumento` (máx. 4 caracteres, p. ej. `SI`). `direccion` y `telefono` ya existían.
+- `GET /clinica/impresion?sedeId=`: ya lo usa el plan de inversión. Debe devolver:
+  - `empresa`: `{ nombreComercial, razonSocial, ruc, web, logo }`.
+  - `sedes[0]`: la sede pedida, con `{ nombre, direccion, telefonos, horario, correo, serieDocumento }`.
+
+Si el endpoint falla, el frontend arma el membrete con `GET /clinica` y la lista de sedes.
+
 ---
 
 ## 5. Lista de cambios de backend
@@ -116,3 +133,6 @@ Algunos pacientes pagan en dólares. El sistema registra la moneda original sin 
 5. `GET /pagos/cierre`: opcional, `usd.efectivo`.
 6. `POST /egresos` y `GET /egresos`: campo `moneda`. Nuevo `PUT /egresos/:id`.
 7. `PATCH /tratamientos/fases/:id`: aceptar el estado `"terminada"` y `terminadaEn`. Una fase terminada sigue contando como saldo hasta que se cobra.
+8. `GET /clinica` y `PUT /clinica`: campo `logo`.
+9. `POST /sedes` y `PUT /sedes/:id`: campos `horarioDocumento`, `correo` y `serieDocumento`.
+10. `GET /clinica/impresion?sedeId=`: devolver la empresa con `logo` y la sede pedida con dirección, teléfonos, horario, correo y serie, para el membrete de todos los documentos.

@@ -32,6 +32,7 @@ import {
 import { metaEstado, colorEstado, labelEstado, inicialCara } from "./util/odontogramaEstado";
 import { formatearFDI } from "./util/formatearFDI";
 import PlanInversionDocumento from "./modulos/PlanInversionDocumento";
+import { abrirDocumento, datosDemo, fijarDatosImpresion, normalizarImpresion, resolverVars, useDatosImpresion } from "./util/membrete";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 
 /* ============================================================================
@@ -4183,7 +4184,30 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <span />
               <div className="dc-hero-acc">
                 <button type="button" className="dc-esp-hero__agregar" onClick={recargarCierre}><Repeat size={14} strokeWidth={1.9} /> Actualizar</button>
-                <button type="button" className="dc-esp-hero__agregar" onClick={() => window.print()}><FileText size={14} strokeWidth={1.9} /> Imprimir</button>
+                <button type="button" className="dc-esp-hero__agregar" onClick={() => {
+                  // Arqueo imprimible con el membrete de la sede (no la pantalla completa).
+                  const e = (t) => String(t ?? "").replace(/[&<>"]/g, (x) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[x]));
+                  const fila = (a, b, fuerte) => `<tr${fuerte ? ' class="fz"' : ""}><td>${e(a)}</td><td class="num">${e(b)}</td></tr>`;
+                  const usd = (n) => "US$ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  const metodos = Object.entries(c.porMetodo || {}).filter(([, v]) => Number(v)).map(([k, v]) => fila(k === "efectivo_usd" ? "Efectivo en dólares" : k.charAt(0).toUpperCase() + k.slice(1), nfmt(v))).join("");
+                  const ok = abrirDocumento({
+                    titulo: "Arqueo de caja",
+                    sub: `${fechaLegible(fmt(hoy))}${apertura?.abiertaPorNombre ? ` · Abierta por ${apertura.abiertaPorNombre}` : ""}`,
+                    css: ".num{text-align:right;white-space:nowrap}.fz td{font-weight:700;background:#F4F1EA!important}h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 4px}.firmas{display:flex;justify-content:space-between;gap:40px;margin-top:60px}.firmas div{flex:1;border-top:1px solid #1B1614;padding-top:6px;text-align:center;font-size:11px}",
+                    cuerpo: `<h2>Efectivo en soles</h2><table class="doc-tabla"><thead><tr><th>Concepto</th><th class="num">Monto</th></tr></thead><tbody>`
+                      + fila("Fondo inicial", cajaAbierta ? nfmt(fondoIni) : "—") + fila("Cobros en efectivo", "+ " + nfmt(cobradoEfectivo))
+                      + fila("Egresos en efectivo", "− " + nfmt(egresosEfectivo)) + fila("Retiros e ingresos", (netoMovsCaja < 0 ? "− " : "+ ") + nfmt(Math.abs(netoMovsCaja)))
+                      + fila("Efectivo esperado", esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo), true)
+                      + fila("Efectivo contado", contadoNum == null ? "—" : nfmt(contadoNum)) + fila("Diferencia", diffNum == null ? "—" : nfmt(diffNum), true)
+                      + `</tbody></table>`
+                      + (usdActivo ? `<h2>Efectivo en dólares</h2><table class="doc-tabla"><thead><tr><th>Concepto</th><th class="num">Monto</th></tr></thead><tbody>`
+                        + fila("Fondo inicial", usd(fondoUsd)) + fila("Cobros en efectivo", "+ " + usd(cobradoEfectivoUsd)) + fila("Egresos en efectivo", "− " + usd(egresosEfectivoUsd))
+                        + fila("Esperado", usd(esperadoUsd), true) + fila("Contado", contadoUsdNum == null ? "—" : usd(contadoUsdNum)) + fila("Diferencia", diffUsd == null ? "—" : usd(diffUsd), true) + `</tbody></table>` : "")
+                      + `<h2>Cobros del día por medio de pago</h2><table class="doc-tabla"><thead><tr><th>Medio</th><th class="num">Monto</th></tr></thead><tbody>${metodos || fila("Sin cobros", "—")}${fila(`Total (${c.cantidad} cobros)`, nfmt(c.total), true)}</tbody></table>`
+                      + `<div class="firmas"><div>Entregó</div><div>Recibió / supervisó</div></div>`,
+                  });
+                  if (!ok) notify("Permite las ventanas emergentes para imprimir.");
+                }}><FileText size={14} strokeWidth={1.9} /> Imprimir</button>
               </div>
             </section>
             <div className="dc-cz">
@@ -5964,10 +5988,19 @@ function Consentimientos({ pacientes: pacProp, notify }) {
       )}
       {(() => {
         const verPdf = (d) => {
-              const w = window.open("", "_blank"); if (!w) { notify("Permite ventanas emergentes para descargar el PDF."); return; }
-              const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-              w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.tipo)} - ${esc(d.paciente)}</title><style>*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--dc-brand-900);padding:40px;max-width:720px;margin:0 auto}h1{font-size:20px;color:var(--dc-teal);margin:0 0 4px}.meta{color:var(--dc-slate);font-size:13px;margin-bottom:24px}.box{border:1px solid var(--dc-line);border-radius:12px;padding:20px;font-size:13.5px;line-height:1.7}.firma{margin-top:28px;border-top:1px solid var(--dc-line);padding-top:14px}img{max-width:280px;border:1px solid var(--dc-line);border-radius:8px}@media print{@page{margin:16mm}}</style></head><body><h1>${esc(d.tipo)}</h1><div class="meta">Paciente: <b>${esc(d.paciente)}</b> &middot; Fecha: ${esc(d.fecha)} &middot; Estado: ${esc(d.estado)}</div><div class="box">${d.contenido ? esc(d.contenido) : "El paciente firmó y aceptó este consentimiento informado de forma electrónica."}</div>${d.firmaUrl ? `<div class="firma"><div style="font-size:12px;color:var(--dc-slate);margin-bottom:6px">${d.firmanteNombre ? "Firma del apoderado:" : "Firma del paciente:"}</div><img src="${d.firmaUrl}"/>${d.firmanteNombre ? `<div style="font-size:12.5px;color:var(--dc-brand-900);margin-top:8px">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteRelacion ? ` (${esc(d.firmanteRelacion.toLowerCase())})` : ""}${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}, en representación del paciente por ser menor de edad.</div>` : ""}</div>` : ""}<div class="firma" style="color:var(--dc-ink-400);font-size:11px;border:none">Generado por Dento Check</div><script>window.onload=function(){setTimeout(function(){window.print();},250);};<\/script></body></html>`);
-              w.document.close();
+              const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+              const firma = d.firmaUrl ? `<div class="cs-firma"><div class="cs-l">${d.firmanteNombre ? "Firma del apoderado" : "Firma del paciente"}</div><img src="${esc(d.firmaUrl)}" alt="Firma">${d.firmanteNombre ? `<div class="cs-rep">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteRelacion ? ` (${esc(d.firmanteRelacion.toLowerCase())})` : ""}${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}, en representación del paciente por ser menor de edad.</div>` : ""}</div>` : "";
+              const ok = abrirDocumento({
+                titulo: d.tipo, tituloVentana: `${d.tipo} - ${d.paciente}`,
+                sub: `Consentimiento informado · ${d.estado}`,
+                css: `.cs-meta{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:11.5px;margin:6px 0 14px}
+                  .cs-box{border:1px solid #D9D3CA;border-radius:6px;padding:14px 16px;font-size:12.5px;line-height:1.7;white-space:pre-wrap}
+                  .cs-firma{margin-top:26px;border-top:1px solid #D9D3CA;padding-top:12px}.cs-l{font-size:10.5px;color:#7d746a;margin-bottom:6px}
+                  .cs-firma img{max-width:260px;border:1px solid #D9D3CA;border-radius:6px}.cs-rep{font-size:11.5px;margin-top:8px}`,
+                cuerpo: `<div class="cs-meta"><span><b>Paciente:</b> ${esc(d.paciente)}</span><span><b>Fecha:</b> ${esc(d.fecha)}</span><span><b>Estado:</b> ${esc(d.estado)}</span></div>`
+                  + `<div class="cs-box">${d.contenido ? esc(d.contenido) : "El paciente firmó y aceptó este consentimiento informado de forma electrónica."}</div>${firma}`,
+              });
+              if (!ok) notify("Permite ventanas emergentes para descargar el PDF.");
             };
         const firmado = (d) => d.estado === "firmado";
         const accion = (d) => !firmado(d)
@@ -7940,6 +7973,23 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   };
   // Sede concreta donde se registran las cosas nuevas (nunca "all").
   const sedeActiva = sede === "all" ? (sedeDetectada ?? misSedes[0] ?? 1) : sede;
+  // Membrete de los documentos: la empresa es una sola; dirección, teléfonos y horario
+  // son los de la sede desde donde se emite (la activa). Ver util/membrete.js.
+  useEffect(() => {
+    if (!auth.token) { fijarDatosImpresion(datosDemo(sedeActiva)); return; }
+    let vivo = true;
+    const uuid = sedeApiUuid(sedeActiva);
+    const deSedes = () => {
+      const sd = sedesOrg.find((x) => String(x.id) === String(uuid) || String(x.id) === String(sedeActiva)) || {};
+      return { sedes: [{ nombre: sd.nombre, direccion: sd.direccion, telefonos: sd.telefono, horario: sd.horario, correo: sd.email }] };
+    };
+    Promise.allSettled([api.clinica.impresion(uuid), api.clinica.get()]).then(([imp, cli]) => {
+      if (!vivo) return;
+      const base = imp.status === "fulfilled" && imp.value ? imp.value : deSedes();
+      fijarDatosImpresion(normalizarImpresion(base, sedeActiva, cli.status === "fulfilled" ? cli.value : {}));
+    });
+    return () => { vivo = false; };
+  }, [sedeActiva, sedesOrg]); // eslint-disable-line
 
   const onAgendarIA = () => { if (auth.token) { notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}. Aparecerá en la Agenda.`); return; } setCitas((cs) => [...cs, { id: Date.now(), paciente: "Nuevo (vía IA)", dni: "00000000", medicoId: 1, esp: 1, sede: sedeActiva, fecha: fmt(hoy), hora: "16:30", motivo: "Agendado por agente IA", estado: "confirmada", llegada: false }]); notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}.`); };
 
@@ -8461,7 +8511,17 @@ function numeroALetras(num) {
 }
 function BoletaView({ boleta, onClose }) {
   const ref = useRef(null);
-  const EMISOR = getEmisor();
+  // Emisor fiscal (razón social y RUC) y datos del establecimiento que emite: la sede
+  // activa. Mismos datos que el membrete del resto de documentos (util/membrete.js).
+  const DI = useDatosImpresion();
+  const EMI = getEmisor();
+  const EMISOR = {
+    ...EMI,
+    nombre: EMI.nombre && EMI.nombre !== "CLÍNICA" ? EMI.nombre : (DI.empresa.razonSocial || DI.empresa.nombre || "CLÍNICA"),
+    ruc: EMI.ruc || DI.empresa.ruc,
+    dir: DI.sede.direccion || EMI.dir,
+    tel: DI.sede.telefonos || EMI.tel,
+  };
   const serie = boleta.serie || EMISOR.serie || "B001";
   const total = Number(boleta.total) || 0;
   const opGravada = Math.round((total / 1.18) * 100) / 100;
@@ -8471,7 +8531,7 @@ function BoletaView({ boleta, onClose }) {
   const imprimir = () => {
     const w = window.open("", "_blank", "width=460,height=680");
     if (!w) return;
-    w.document.write(`<html><head><title>Boleta ${serie}-${boleta.numero}</title><meta charset="utf-8"></head><body style="margin:0;font-family:Arial,Helvetica,sans-serif">${ref.current.innerHTML}</body></html>`);
+    w.document.write(`<html><head><title>Boleta ${serie}-${boleta.numero}</title><meta charset="utf-8"><style>body{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body style="margin:0;font-family:Arial,Helvetica,sans-serif">${resolverVars(ref.current.innerHTML)}</body></html>`);
     w.document.close(); w.focus(); setTimeout(() => { w.print(); }, 250);
   };
   const cell = { padding: "6px 8px", fontSize: 12, color: "var(--dc-ink-900)", borderBottom: "1px solid var(--dc-line)" };
@@ -8481,7 +8541,9 @@ function BoletaView({ boleta, onClose }) {
       <div ref={ref}>
         <div style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 18, background: "#fff", color: "var(--dc-ink-900)", fontFamily: "Arial, Helvetica, sans-serif" }}>
           <div style={{ textAlign: "center", borderBottom: "2px solid var(--dc-ink-900)", paddingBottom: 10, marginBottom: 10 }}>
+            {DI.empresa.logo && <img src={DI.empresa.logo} alt={DI.empresa.nombre} style={{ height: 40, maxWidth: 200, objectFit: "contain", display: "block", margin: "0 auto 6px" }} />}
             <div style={{ fontSize: 14, fontWeight: 500 }}>{EMISOR.nombre}</div>
+            {DI.sede.nombre && <div style={{ fontSize: 11.5, color: "var(--dc-ink-700)", marginTop: 2 }}>Establecimiento: {DI.sede.nombre}</div>}
             <div style={{ fontSize: 12, color: "var(--dc-ink-700)", marginTop: 2 }}>{EMISOR.dir}</div>
             <div style={{ fontSize: 12, color: "var(--dc-ink-700)" }}>Teléfono: {EMISOR.tel}</div>
             <div style={{ fontSize: 12, fontWeight: 500, marginTop: 3 }}>RUC: {EMISOR.ruc}</div>

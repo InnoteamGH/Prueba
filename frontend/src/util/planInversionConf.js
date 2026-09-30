@@ -3,7 +3,7 @@ export default {
     "razonSocial": "ODONTOSONRISA MEDICAL",
     "nombreComercial": "Odonto Sonrisa",
     "ruc": "20612478636",
-    "logo": "logo-marca.png",
+    "logo": "marca/logo-clinica.png",
     "colorPrimario": "#1B1614",
     "web": "odontosonrisa.pe",
     "colorAcento": "#B7AEA2",

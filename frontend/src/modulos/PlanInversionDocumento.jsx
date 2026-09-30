@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import confDefault from "../util/planInversionConf.js";
+import { urlLogo, useDatosImpresion } from "../util/membrete";
 import {
   SUELTOS_PARTIDA,
   resolverLineas,
@@ -55,7 +56,16 @@ export default function PlanInversionDocumento({
   onClose,
 }) {
   const [confApi, setConfApi] = useState(null);
-  const conf = confProp || confApi || confDefault;
+  // Sin respuesta de /clinica/impresion se usan los datos del sistema de la sede activa
+  // (util/membrete.js), no una clínica fija.
+  const DI = useDatosImpresion();
+  const confSistema = useMemo(() => ({
+    ...confDefault,
+    empresa: { ...confDefault.empresa, nombreComercial: DI.empresa.nombre, nombreParaDocumento: DI.empresa.nombre,
+      razonSocial: DI.empresa.razonSocial, ruc: DI.empresa.ruc, web: DI.empresa.web, logo: DI.empresa.logo },
+    sedes: [{ ...(confDefault.sedes?.[0] || {}), ...DI.sede, serieDocumento: DI.sede.serieDocumento || confDefault.sedes?.[0]?.serieDocumento }],
+  }), [DI]);
+  const conf = confProp || confApi || confSistema;
   const sedeOrigen = conf.sedes?.[0]?.origenSedeDocumento || (sedeId ? "toma_o_activa" : "fallback");
   const sede = (conf.sedes && conf.sedes[0]) || {};
   const doc = conf.documento || {};
@@ -260,6 +270,7 @@ export default function PlanInversionDocumento({
                 <>
                   <header style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 16, fontFamily: "Georgia, serif" }}>
                     <div>
+                      {(empresa.logo || DI.empresa.logo) && <img src={urlLogo(empresa.logo || DI.empresa.logo)} alt={empresa.nombreComercial || ""} style={{ height: 46, maxWidth: 220, objectFit: "contain", display: "block", marginBottom: 6 }} />}
                       <div style={{ fontSize: 22, fontWeight: 600 }}>{empresa.nombreParaDocumento || empresa.nombreComercial || "Clínica"}</div>
                       <div className="plan-inv-muted">RUC {empresa.ruc}</div>
                       {empresa.web && <div className="plan-inv-muted">{empresa.web}</div>}
@@ -270,6 +281,7 @@ export default function PlanInversionDocumento({
                       <div className="plan-inv-muted">{sede.nombre}</div>
                       <div className="plan-inv-muted">{sede.direccion}</div>
                       <div className="plan-inv-muted">{sede.telefonos}</div>
+                      {sede.horario ? <div className="plan-inv-muted">{sede.horario}</div> : null}
                       {correo ? <div className="plan-inv-muted">{correo}</div> : null}
                     </div>
                   </header>

@@ -1,3 +1,4 @@
+import { abrirDocumento } from "./util/membrete";
 import React, { useState, useEffect, useRef } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
@@ -102,33 +103,21 @@ const parseDiagnostico = (txt) => {
   return { diagnostico: s };
 };
 
-/* Abre una ventana imprimible con contenido HTML (recetas, historia clínica). */
+/* Abre una ventana imprimible con contenido HTML (recetas, historia clínica), con el
+   membrete de la clínica y los datos de la sede desde donde se emite (util/membrete.js). */
+const CSS_FICHA_DOC = `
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#1B1614;border-bottom:1.5px solid #D9D3CA;padding-bottom:5px;margin:20px 0 9px}
+  .muted{color:#7d746a} .row{display:flex;gap:24px;flex-wrap:wrap;margin:3px 0}
+  .row b{color:#1B1614} table{width:100%;border-collapse:collapse;margin-top:6px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #D9D3CA;font-size:11.5px;vertical-align:top}
+  th{background:#F4F1EA;color:#1B1614;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+  .box{border:1px solid #D9D3CA;border-radius:6px;padding:9px 11px;margin:6px 0;white-space:pre-wrap}
+  .rx-item{border-bottom:1px dashed #D9D3CA;padding:8px 0} .rx-item b{font-size:13.5px}
+  .firma{margin-top:52px;text-align:center;width:280px;margin-left:auto} .firma div{border-top:1px solid #1B1614;padding-top:6px}
+  .pill{display:inline-block;background:#F4F1EA;border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0;font-size:11.5px}`;
 function imprimir(titulo, inner, notify) {
-  const w = window.open("", "_blank", "width=820,height=940");
-  if (!w) { notify && notify("Permite las ventanas emergentes para imprimir."); return; }
-  w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>
-    <style>
-      *{box-sizing:border-box} body{font-family:'Segoe UI',Arial,sans-serif;color:var(--dc-navy);margin:0;padding:34px 40px;font-size:13px;line-height:1.5}
-      h1{font-size:20px;margin:0} h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--dc-primary-alt);border-bottom:1.5px solid var(--dc-line);padding-bottom:5px;margin:22px 0 10px}
-      .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid var(--dc-primary-alt);padding-bottom:14px}
-      .muted{color:var(--dc-ink-400)} .row{display:flex;gap:24px;flex-wrap:wrap;margin:3px 0}
-      .row b{color:var(--dc-ink-alt)} table{width:100%;border-collapse:collapse;margin-top:6px} th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--dc-line);font-size:12.5px;vertical-align:top}
-      th{background:var(--dc-bg-alt);color:var(--dc-navy);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
-      .box{border:1px solid var(--dc-line);border-radius:8px;padding:10px 12px;margin:6px 0;white-space:pre-wrap}
-      .rx-item{border-bottom:1px dashed var(--dc-ink-200);padding:8px 0} .rx-item b{font-size:14px}
-      .firma{margin-top:52px;text-align:center;width:280px;float:right} .firma div{border-top:1px solid var(--dc-navy);padding-top:6px}
-      .pill{display:inline-block;background:var(--dc-bg-alt);border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0;font-size:12px}
-      @media print{body{padding:16px 20px}}
-    </style></head><body>${inner}</body></html>`);
-  w.document.close(); w.focus(); setTimeout(() => { try { w.print(); } catch { } }, 350);
-}
-function cabeceraHTML(clinica, titulo) {
-  const c = clinica || {};
-  return `<div class="hdr"><div><h1>${esc(c.nombre || "Clínica Dental")}</h1>
-    <div class="muted">${esc([c.razonSocial, c.ruc ? "RUC " + c.ruc : "", c.direccion].filter(Boolean).join(" – "))}</div>
-    <div class="muted">${esc([c.telefono, c.email].filter(Boolean).join(" – "))}</div></div>
-    <div style="text-align:right"><div style="font-weight:800;font-size:15px;color:var(--dc-primary-alt)">${esc(titulo)}</div>
-    <div class="muted">${new Date().toLocaleDateString("es-PE")}</div></div></div>`;
+  const ok = abrirDocumento({ titulo, cuerpo: inner, css: CSS_FICHA_DOC });
+  if (!ok) notify && notify("Permite las ventanas emergentes para imprimir.");
 }
 
 /* ── Odontograma ── */
@@ -663,7 +652,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
     const its = arr(parseJson(r.items, []));
     const filas = its.map((x) => `<div class="rx-item"><b>${esc(x.medicamento)}</b>${x.presentacion ? " — " + esc(x.presentacion) : ""}<div class="muted">${esc([x.dosis && ("Dosis: " + x.dosis), x.frecuencia && ("Frecuencia: " + x.frecuencia), x.duracion && ("Duración: " + x.duracion)].filter(Boolean).join("  –  "))}</div></div>`).join("");
     const edad = edadDe(paciente?.fechaNacimiento);
-    imprimir("Receta médica", `${cabeceraHTML(clinica, "Receta médica")}
+    imprimir("Receta médica", `
       <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha || "")}</div></div>
       <h2>Rp/</h2>${filas || '<div class="muted">—</div>'}
       ${r.indicaciones ? `<h2>Indicaciones</h2><div class="box">${esc(r.indicaciones)}</div>` : ""}
@@ -1309,7 +1298,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       const filas = piezas.filter((o) => (o.fase || "inicial") === k).map(filaOdo).join("");
       return filas ? `<h2>Odontograma – ${esc(titulo)}</h2><table><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Nota</th></tr></thead><tbody>${filas}</tbody></table>` : "";
     }).join("");
-    imprimir("Historia clínica", `${cabeceraHTML(clinica, "Historia clínica")}
+    imprimir("Historia clínica", `
       <h2>Filiación</h2>
       <div class="row"><div><b>Paciente:</b> ${esc(p.nombre || "")}</div>${p.dni ? `<div><b>DNI:</b> ${esc(p.dni)}</div>` : ""}${p.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}${p.genero ? `<div><b>Género:</b> ${esc(p.genero)}</div>` : ""}</div>
       <div class="row">${p.fechaNacimiento ? `<div><b>Fecha de nacimiento:</b> ${esc(fmtFecha(p.fechaNacimiento))}</div>` : ""}${p.telefono ? `<div><b>Teléfono:</b> ${esc(p.telefono)}</div>` : ""}${p.distrito ? `<div><b>Distrito:</b> ${esc(p.distrito)}</div>` : ""}${p.aseguradora ? `<div><b>Seguro:</b> ${esc(p.aseguradora)}</div>` : ""}</div>

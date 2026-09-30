@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid} from "lucide-react";
 import api, { auth } from "../api/client";
+import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
 import {Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda} from "../comun";
 
 const BANCOS_PE = [
@@ -197,7 +198,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   const [clinica, setClinica] = useState(() => {
     let local = {};
     try { local = JSON.parse(localStorage.getItem("dc_data_v1_clinica_horario") || "null") || {}; } catch { /* nada guardado */ }
-    return { nombre: "", razonSocial: "", ruc: "", direccion: "", telefono: "", email: "", web: "", cuentas: [], billeteras: [],
+    // Sin sesión se parte de la clínica de demostración (y de lo editado en este navegador),
+    // que es la misma que sale en el membrete de los documentos.
+    const e = auth.token ? {} : empresaDemo();
+    return { nombre: e.nombre || "", razonSocial: e.razonSocial || "", ruc: e.ruc || "", direccion: "", telefono: "", email: "", web: e.web || "", logo: e.logo || "", cuentas: [], billeteras: [],
              horario: local.horario || {}, feriados: local.feriados || [], tipoCambio: 3.75 };
   });
   const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", color: NAVY, boxSizing: "border-box", background: "var(--dc-white)" };
@@ -210,10 +214,15 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   // configurable de verdad y no todas las clínicas se vean igual.
   const leerHorarioLocal = () => { try { return JSON.parse(localStorage.getItem("dc_data_v1_clinica_horario") || "null") || {}; } catch { return {}; } };
   const guardarHorarioLocal = (c) => { try { localStorage.setItem("dc_data_v1_clinica_horario", JSON.stringify({ horario: c.horario || {}, feriados: c.feriados || [] })); } catch { /* almacenamiento lleno o bloqueado */ } };
-  const cargarClinica = () => { if (conectado) api.clinica.get().then((r) => setClinica({ nombre: r?.nombre || "", razonSocial: r?.razonSocial || "", ruc: r?.ruc || "", direccion: r?.direccion || "", telefono: r?.telefono || "", email: r?.email || "", web: r?.web || "", cuentas: Array.isArray(r?.cuentas) ? r.cuentas : [], billeteras: Array.isArray(r?.billeteras) ? r.billeteras : [], horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [], tipoCambio: Number(r?.tipoCambio) > 0 ? Number(r.tipoCambio) : 3.75 })).catch(() => {}); };
+  const cargarClinica = () => { if (conectado) api.clinica.get().then((r) => setClinica({ nombre: r?.nombre || "", razonSocial: r?.razonSocial || "", ruc: r?.ruc || "", direccion: r?.direccion || "", telefono: r?.telefono || "", email: r?.email || "", web: r?.web || "", logo: r?.logo || r?.logoUrl || "", cuentas: Array.isArray(r?.cuentas) ? r.cuentas : [], billeteras: Array.isArray(r?.billeteras) ? r.billeteras : [], horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [], tipoCambio: Number(r?.tipoCambio) > 0 ? Number(r.tipoCambio) : 3.75 })).catch(() => {}); };
   const guardarClinica = () => {
     guardarHorarioLocal(clinica);          // el dashboard y la disponibilidad leen de aquí
-    if (!conectado) { notify("Horario guardado en este navegador. Con sesión se guarda en la clínica."); return Promise.resolve(); }
+    if (!conectado) {
+      guardarDemo({ empresa: { nombre: clinica.nombre, razonSocial: clinica.razonSocial, ruc: clinica.ruc, web: clinica.web, logo: clinica.logo || "" } });
+      refrescarDatosDemo();
+      notify("Guardado en este navegador. Con sesión se guarda en la clínica.");
+      return Promise.resolve();
+    }
     return api.clinica.actualizar(clinica).then(() => { notify("Datos de la clínica guardados."); cargarGoLive(); }).catch(() => notify("No se pudieron guardar."));
   };
   const [rucBusy, setRucBusy] = useState(false);
@@ -271,7 +280,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   const delBilletera = (i) => setClinica((c) => ({ ...c, billeteras: c.billeteras.filter((_, j) => j !== i) }));
   const cargar = () => {
     if (!conectado) {
-      setSedes(SEDES.map((s) => ({ id: s.id, nombre: s.nombre, direccion: s.dir, telefono: "" })));
+      setSedes(SEDES.map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "" }; }));
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, precioBase: e.precio })));
       setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: null, activo: true, porcentajeComision: 30, metaMensual: m.meta })));
       setGoLive({
@@ -308,11 +317,16 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       return;
     }
     if (edit.tipo === "sede" && !auth.token) {
-      setSedes((ss) => (it.id ? ss.map((x) => (x.id === it.id ? { ...x, ...it } : x)) : [...ss, { ...it, id: Date.now() }]));
+      const id = it.id || Date.now();
+      setSedes((ss) => (it.id ? ss.map((x) => (x.id === it.id ? { ...x, ...it } : x)) : [...ss, { ...it, id }]));
+      guardarDemo({ sedes: { [id]: { nombre: it.nombre, direccion: it.direccion || "", telefonos: it.telefono || "", horario: it.horarioDocumento || "", correo: it.correo || "", serieDocumento: it.serieDocumento || "" } } });
+      refrescarDatosDemo();
       notify("Sede guardada (demo)."); setEdit(null); return;
     }
     if (edit.tipo === "sede") {
-      const payload = { nombre: it.nombre, direccion: it.direccion, telefono: it.telefono, activa: it.activa !== false };
+      // Dirección, teléfonos, horario, correo y serie salen en el membrete de los
+      // documentos emitidos desde esta sede.
+      const payload = { nombre: it.nombre, direccion: it.direccion, telefono: it.telefono, horarioDocumento: it.horarioDocumento || null, correo: it.correo || null, serieDocumento: it.serieDocumento || null, activa: it.activa !== false };
       (it.id ? api.sedes.actualizar(it.id, payload) : api.sedes.crear(payload)).then(() => done("Sede guardada.")).catch(err);
     } else if (edit.tipo === "servicio") {
       const precio = Number(it.precioBase);
@@ -419,7 +433,9 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         <div className="dc-emp">
           {fiscalReadOnly && conectado && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>RUC, razón social y datos fiscales son de solo lectura para tu rol.</span></div>}
           <section className="dc-emp__id">
-            <span className="dc-emp__logo">{(clinica.nombre || "Clínica").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+            {clinica.logo
+              ? <span className="dc-emp__logo is-img"><img src={clinica.logo} alt={clinica.nombre || "Logo"} /></span>
+              : <span className="dc-emp__logo">{(clinica.nombre || "Clínica").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>}
             <div>
               <small>Tu clínica</small>
               <b>{clinica.nombre || "Nombre comercial"}</b>
@@ -444,6 +460,25 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
               {campo("Web", <input value={clinica.web} onChange={(e) => set("web", e.target.value)} placeholder="www.clinica.pe" />, 1)}
               {campo("Tipo de cambio (S/ por 1 US$)", <input type="number" step="0.01" min="0.01" value={clinica.tipoCambio ?? 3.75} onChange={(e) => set("tipoCambio", Number(e.target.value) || 3.75)} />, 1)}
               <p className="dc-emp__nota is-3">Se usa en Caja para cobros en dólares.</p>
+            </div>
+          </section>
+
+          <section className="dc-cfg__panel">
+            {cab("Logo para documentos", "Sale en el membrete de proformas, recetas, historia clínica, consentimientos, boletas y reportes.")}
+            <div className="dc-emp__logocfg">
+              <div className="dc-emp__logoprev">{clinica.logo ? <img src={clinica.logo} alt="Logo actual" /> : <span>Sin logo: se imprime el nombre comercial</span>}</div>
+              <div className="dc-emp__logoacc">
+                <label className="dc-cfg__nuevo">
+                  <Plus size={14} strokeWidth={2.2} /> {clinica.logo ? "Cambiar logo" : "Subir logo"}
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden onChange={(e) => {
+                    const f = e.target.files && e.target.files[0]; e.target.value = "";
+                    logoDesdeArchivo(f).then((url) => { set("logo", url); notify("Logo listo. Pulsa «Guardar datos» para aplicarlo a los documentos."); })
+                      .catch(() => notify("Sube una imagen PNG, JPG, SVG o WEBP."));
+                  }} />
+                </label>
+                {clinica.logo && <button type="button" className="dc-cfg__nuevo is-sec" onClick={() => set("logo", "")}><Trash2 size={14} strokeWidth={2.2} /> Quitar</button>}
+                <small>PNG con fondo transparente, horizontal. Se ajusta solo al alto del membrete.</small>
+              </div>
             </div>
           </section>
 
@@ -511,7 +546,7 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
               </div>
             )}
           </section>
-          <div className="dc-emp__guardar"><span>Los cambios se aplican en boletas, Caja y el asistente de WhatsApp.</span><button type="button" className="dc-cfg__nuevo" onClick={guardarClinica}><Check size={15} strokeWidth={2.2} /> Guardar datos</button></div>
+          <div className="dc-emp__guardar"><span>Los cambios se aplican en boletas, proformas, informes, Caja y el asistente de WhatsApp.</span><button type="button" className="dc-cfg__nuevo" onClick={guardarClinica}><Check size={15} strokeWidth={2.2} /> Guardar datos</button></div>
         </div>
         );
       })()}
@@ -764,6 +799,10 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
               {edit.tipo === "sede" && <>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Dirección<input className="dc-premium-inp" value={it.direccion || ""} onChange={(e) => set("direccion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Av. Conquistadores 145, San Isidro" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Teléfono<input className="dc-premium-inp" value={it.telefono || ""} onChange={(e) => set("telefono", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="01 234 5678" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Horario para documentos<input className="dc-premium-inp" value={it.horarioDocumento || ""} onChange={(e) => set("horarioDocumento", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Lun a vie 9:00–19:00 – sáb 9:00–14:00" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Correo de la sede<input className="dc-premium-inp" type="email" value={it.correo || ""} onChange={(e) => set("correo", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="sede@clinica.pe" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Serie de documentos<input className="dc-premium-inp" value={it.serieDocumento || ""} onChange={(e) => set("serieDocumento", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))} style={{ ...inp, marginTop: 5 }} placeholder="SI" /></label>
+                <p style={{ margin: 0, fontSize: 12, color: "var(--dc-ink-500)" }}>Dirección, teléfono, horario y correo salen en el membrete de los documentos que se emiten desde esta sede. La serie encabeza su numeración.</p>
                 {it.direccion && <a className="dc-emp__mapa" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(it.direccion)}`} target="_blank" rel="noreferrer"><MapPin size={14} strokeWidth={2} /> Ver en Google Maps</a>}
               </>}
             </div>

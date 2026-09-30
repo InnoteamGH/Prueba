@@ -9,6 +9,7 @@
    siguen siendo la fuente única de verdad; solo cambiaron de archivo. No
    renombres claves, solo valores (misma regla que antes).
    ============================================================================ */
+import { abrirDocumento } from "./util/membrete";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2} from "lucide-react";
@@ -425,43 +426,16 @@ export async function exportarExcel({ nombreArchivo, hoja = "Datos", titulo, col
   XLSX.writeFile(wb, nombreArchivo.endsWith(".xlsx") ? nombreArchivo : nombreArchivo + ".xlsx");
 }
 export const escHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-/* PDF bien formateado vía ventana de impresión (Guardar como PDF). Sin dependencias extra. */
+/* PDF bien formateado vía ventana de impresión (Guardar como PDF). Sin dependencias extra.
+   Sale con el membrete de la clínica y los datos de la sede activa (util/membrete.js). */
 export function exportarPDF({ titulo, subtitulo, columnas, filas }) {
-  const w = window.open("", "_blank");
-  if (!w) return false;
   const th = columnas.map((c) => `<th>${escHtml(c.label)}</th>`).join("");
   const trs = filas.map((r) => `<tr>${columnas.map((c) => `<td>${escHtml(r[c.key] ?? "")}</td>`).join("")}</tr>`).join("");
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(titulo)}</title><style>
-    *{box-sizing:border-box} body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--dc-brand-900);padding:26px;margin:0}
-    h1{font-size:19px;margin:0 0 2px;color:var(--dc-teal)} .sub{color:var(--dc-slate);font-size:12px;margin-bottom:16px}
-    table{width:100%;border-collapse:collapse;font-size:11.5px} thead{display:table-header-group}
-    th{background:var(--dc-teal);color:var(--dc-white);text-align:left;padding:8px 10px;font-weight:600;white-space:nowrap}
-    td{padding:7px 10px;border-bottom:1px solid var(--dc-line)} tr:nth-child(even) td{background:var(--dc-white)}
-    .foot{margin-top:14px;color:var(--dc-ink-400);font-size:10.5px}
-    @media print{@page{margin:12mm}}
-  
-        .dc-login-btn { transition: all 0.2s cubic-bezier(0.2,0.8,0.2,1); }
-        .dc-login-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 28px -10px var(--dc-accent-cyan) !important; filter: brightness(1.1); }
-        .dc-login-btn:active:not(:disabled) { transform: translateY(0); }
-        .dc-outline-btn { transition: all 0.2s; }
-        .dc-outline-btn:hover { background: var(--dc-bg-soft2) !important; border-color: var(--dc-line) !important; transform: translateY(-1px); }
-        .dc-input-container:focus-within svg { color: var(--dc-accent-cyan) !important; }
-        .dc-login-right { box-shadow: -20px 0 60px rgba(11, 83, 102, 0.05); position: relative; z-index: 5; }
-
-      
-        .dc-kpicard { position: relative; overflow: hidden; transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); border: 1px solid rgba(255,255,255,0.4); }
-        .dc-kpicard:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -10px rgba(11,83,102,.12) !important; border-color: rgba(14,116,144,.15); }
-        .dc-kpicard::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent); transform: skewX(-20deg); transition: none; pointer-events: none; zIndex: 10; }
-        .dc-kpicard:hover::after { left: 200%; transition: all 0.6s ease-in-out; }
-
-      </style></head><body>
-    <h1>${escHtml(titulo)}</h1><div class="sub">${escHtml(subtitulo || "")}</div>
-    <table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>
-    <div class="foot">Generado por Dento Check</div>
-    <script>window.onload=function(){setTimeout(function(){window.print();},250);};<\/script>
-  </body></html>`);
-  w.document.close();
-  return true;
+  return abrirDocumento({
+    titulo, sub: subtitulo || "", horizontal: columnas.length > 6,
+    cuerpo: `<table class="doc-tabla"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`
+      + (filas.length ? "" : `<p class="doc-nota">Sin registros para este filtro.</p>`),
+  });
 }
 export const fechaLegible = (s) => new Date(s + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" });
 export const calcEdad = (s) => { if (!s) return null; const b = new Date(s + "T00:00:00"); if (isNaN(b)) return null; let e = hoy.getFullYear() - b.getFullYear(); const m = hoy.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && hoy.getDate() < b.getDate())) e--; return e >= 0 && e < 120 ? e : null; };
