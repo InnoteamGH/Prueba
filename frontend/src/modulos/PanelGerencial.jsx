@@ -14,7 +14,7 @@ import {
   metaEstado,
   moneyFmt,
 } from "./panelGerencialUtil";
-import { pluralEs, EnCabecera } from "../comun";
+import { pluralEs, EnCabecera, ThOrden, useFiltroTabla } from "../comun";
 import "./panelGerencial.css";
 import ResumenMes from "./ResumenMes";
 
@@ -881,7 +881,16 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
   const conSaldo = pacs.filter((p) => Number(p.saldo) > 0);
   const saldoMayor = conSaldo.reduce((m, p) => Math.max(m, Number(p.saldo) || 0), 0);
 
-  const ranking = kd?.ranking || [];
+  const rankingBase = kd?.ranking || [];
+  // Equipo: orden en el encabezado, igual que el resto de tablas del sistema.
+  const colsEquipo = useMemo(() => [
+    { key: "nombre", label: "Odontólogo", get: (r) => r.nombre || r.medico || "" },
+    { key: "estado", label: "Estado", get: (r) => (Number(r.produccion) > 0 ? "Facturó" : "Sin actividad") },
+    { key: "citas", label: "Citas", get: (r) => String(r.citas ?? r.atendidas ?? 0), sortVal: (r) => Number(r.citas ?? r.atendidas ?? 0) || 0 },
+    { key: "prod", label: "Producción", get: (r) => String(r.produccion || 0), sortVal: (r) => Number(r.produccion) || 0 },
+    { key: "meta", label: "Meta del mes", get: (r) => String(r.meta || 0), sortVal: (r) => Number(r.meta) || 0 },
+  ], []);
+  const { lista: ranking, st: stEq } = useFiltroTabla(rankingBase, colsEquipo, null);
 
   const enSillon = citasHoy.filter((c) => c.estado === "en_atencion").length;
   const cobradas = citasHoy.filter((c) => c.estado === "atendida").length;
@@ -1556,8 +1565,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
         <h2 style={{ fontSize: "var(--dc-fs-lg)", lineHeight: "var(--dc-lh-lg)", margin: "0 0 var(--dc-sp-3)" }}>Equipo</h2>
         <div className="dc-table-wrap">
           <div className="dc-table-head" role="row">
-            <span>Odontólogo</span><span>Estado</span><span className="num">Citas</span>
-            <span className="num">Producción</span><span className="der">Meta del mes</span>
+            <ThOrden st={stEq} k="nombre">Odontólogo</ThOrden><ThOrden st={stEq} k="estado">Estado</ThOrden><ThOrden st={stEq} k="citas" a="right" className="num">Citas</ThOrden>
+            <ThOrden st={stEq} k="prod" a="right" className="num">Producción</ThOrden><ThOrden st={stEq} k="meta" a="right" className="der">Meta del mes</ThOrden>
           </div>
           {!ranking.length && (
             <div className="dc-table-row"><div className="persona"><span className="persona__t"><span className="nom">Sin odontólogos en el ranking</span></span></div></div>

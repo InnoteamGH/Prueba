@@ -5190,7 +5190,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           </Modal>
         )}
 
-        <DataTable titulo="Directorio de usuarios" sub="usuarios" minWidth={880} maxHeight={560} rows={lista} defaultSort={{ key: "usuario", dir: "asc" }} empty={<Vacio icon={<UserCog size={22} strokeWidth={1.75} />} titulo="Sin usuarios" sub="No hay usuarios que coincidan." />} cols={[
+        <DataTable buscar={false} titulo="Directorio de usuarios" sub="usuarios" minWidth={880} maxHeight={560} rows={lista} defaultSort={{ key: "usuario", dir: "asc" }} empty={<Vacio icon={<UserCog size={22} strokeWidth={1.75} />} titulo="Sin usuarios" sub="No hay usuarios que coincidan." />} cols={[
           { key: "usuario", label: "Usuario", w: "minmax(220px,1.8fr)", a: "left", get: (u) => u.nombre + " " + u.user + " " + u.email, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(R.color, 0.22)}, ${tint(R.color, 0.08)})`, color: R.color, flexShrink: 0 }}>{iniciales(u.nombre.replace(/^Dra?\.\s*/, ""))}</span><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{u.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{u.user} – {u.email}</div></div></div>; } },
           { key: "rol", label: "Rol", w: "minmax(140px,1fr)", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
           { key: "sede", label: "Sede", w: "minmax(120px,1fr)", a: "center", get: (u) => etiquetaSedes(u.sedes), cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span> },
@@ -5387,13 +5387,11 @@ const ESTADO_CLINICA = {
   suspendida:  { l: "Suspendida", bg: "var(--dc-fee)", fg: "var(--dc-danger-700)" } };
 function Plataforma({ notify }) {
   const [clinicas, setClinicas] = useState(CLINICAS_INIT);
-  const [q, setQ] = useState("");
   const [detC, setDetC] = useState(null);
   const activas = clinicas.filter((c) => c.estado === "activa").length;
   const trial = clinicas.filter((c) => c.estado === "trial").length;
   const mrr = clinicas.reduce((s, c) => s + c.mrr, 0);
   const usuarios = clinicas.reduce((s, c) => s + c.usuarios, 0);
-  const lista = clinicas.filter((c) => q.trim() === "" || (c.nombre + " " + c.ruc).toLowerCase().includes(q.toLowerCase()));
   const toggle = (c) => {
     const nuevo = c.estado === "suspendida" ? "activa" : "suspendida";
     setClinicas((cs) => cs.map((x) => x.id === c.id ? { ...x, estado: nuevo, mrr: nuevo === "suspendida" ? 0 : (x.plan === "grande" ? 499 : x.plan === "mediana" ? 299 : 0) } : x));
@@ -5469,48 +5467,28 @@ function Plataforma({ notify }) {
         ))}
       </div>
 
-      <Card style={{ overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 500 }}>Clínicas en la plataforma</h3>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>Cada clínica es un tenant aislado. Aquí solo se ve el estado de la cuenta, nunca su historia clínica.</div>
-          </div>
-          <div style={{ position: "relative", minWidth: 220 }}>
-            <span style={{ position: "absolute", left: 12, top: 10, color: "var(--dc-ink-500)" }}><Search size={16} strokeWidth={1.75} /></span>
-            <input className="dc-premium-inp" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar clínica o RUC"
-              style={{ width: "100%", padding: "9px 12px 9px 38px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", boxSizing: "border-box", color: NAVY }} />
-          </div>
-        </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
-            <thead><tr style={{ background: "var(--dc-bg)", textAlign: "left" }}>{["Clínica", "Plan", "Sedes", "Usuarios", "Pacientes", "MRR", "Estado", ""].map((h) => <th key={h} style={{ padding: "11px 16px", fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
-            <tbody>
-              {lista.map((c) => { const E = ESTADO_CLINICA[c.estado]; return (
-                <tr key={c.id} style={{ borderTop: "1px solid var(--dc-line)" }}>
-                  <td style={{ padding: "12px 16px" }}>
-                    <button onClick={() => setDetC(c)} title="Ver detalle" style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: DS.c.primary, color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={17} strokeWidth={1.75} /></div>
-                      <div><div style={{ fontWeight: 500, color: NAVY }}>{c.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>RUC {c.ruc}</div></div>
-                    </button>
-                  </td>
-                  <td style={{ padding: "12px 16px", color: "var(--dc-ink-700)" }}>{PLAN_LABEL[c.plan]}</td>
-                  <td style={{ padding: "12px 16px", color: "var(--dc-ink-700)" }}>{c.sedes}</td>
-                  <td style={{ padding: "12px 16px", color: "var(--dc-ink-700)" }}>{c.usuarios}</td>
-                  <td style={{ padding: "12px 16px", color: "var(--dc-ink-700)" }}>{c.pacientes}</td>
-                  <td style={{ padding: "12px 16px", fontWeight: 500, color: NAVY }}>S/ {c.mrr}</td>
-                  <td style={{ padding: "12px 16px" }}><span style={{ fontSize: 12, fontWeight: 500, color: E.fg, background: E.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{E.l}</span></td>
-                  <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                    <button aria-label="Activar o desactivar" onClick={() => toggle(c)} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: c.estado === "suspendida" ? "var(--dc-ok-700)" : "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      <Power size={14} strokeWidth={1.75} /> {c.estado === "suspendida" ? "Reactivar" : "Suspender"}
-                    </button>
-                  </td>
-                </tr>
-              ); })}
-              {lista.length === 0 && <tr><td colSpan={8} style={{ padding: 28, textAlign: "center", color: "var(--dc-ink-500)" }}>No hay clínicas que coincidan.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      {/* Mismo patrón de tabla que el resto del sistema: buscador en la barra y orden en el encabezado. */}
+      <DataTable titulo="Clínicas en la plataforma" sub="clínicas" minWidth={820} rows={clinicas} defaultSort={{ key: "nombre", dir: "asc" }}
+        empty={<Vacio icon={<Building2 size={22} strokeWidth={1.75} />} titulo="Sin clínicas" sub="Aún no hay clínicas registradas." />}
+        cols={[
+          { key: "nombre", label: "Clínica", w: "minmax(220px,2fr)", a: "left", get: (c) => `${c.nombre} ${c.ruc}`, sortVal: (c) => c.nombre, cell: (c) => (
+            <button type="button" onClick={() => setDetC(c)} title="Ver detalle" className="dc-tp__quien" style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
+              <span className="dc-rec__av" style={{ width: 34, height: 34, background: tint(DS.c.primary, 0.14), color: DS.c.primary }}><Building2 size={16} strokeWidth={1.9} /></span>
+              <span style={{ minWidth: 0 }}><b>{c.nombre}</b><small>RUC {c.ruc}</small></span>
+            </button>
+          ) },
+          { key: "plan", label: "Plan", w: "minmax(100px,1fr)", a: "center", get: (c) => PLAN_LABEL[c.plan] || "" },
+          { key: "sedes", label: "Sedes", w: "80px", a: "right", get: (c) => String(c.sedes), sortVal: (c) => Number(c.sedes) || 0 },
+          { key: "usuarios", label: "Usuarios", w: "90px", a: "right", get: (c) => String(c.usuarios), sortVal: (c) => Number(c.usuarios) || 0 },
+          { key: "pacientes", label: "Pacientes", w: "100px", a: "right", get: (c) => String(c.pacientes), sortVal: (c) => Number(c.pacientes) || 0 },
+          { key: "mrr", label: "MRR", w: "100px", a: "right", get: (c) => String(c.mrr), sortVal: (c) => Number(c.mrr) || 0, cell: (c) => <span className="dc-tp__num">S/ {c.mrr}</span> },
+          { key: "estado", label: "Estado", w: "120px", a: "center", get: (c) => (ESTADO_CLINICA[c.estado] || {}).l || "", cell: (c) => { const E = ESTADO_CLINICA[c.estado]; return <span style={{ fontSize: 12, fontWeight: 600, color: E.fg, background: E.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{E.l}</span>; } },
+          { key: "acc", label: "Acciones", w: "130px", a: "right", noSort: true, noFilter: true, cell: (c) => (
+            <button type="button" aria-label="Activar o desactivar" onClick={() => toggle(c)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, color: c.estado === "suspendida" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>
+              <Power size={14} strokeWidth={1.75} /> {c.estado === "suspendida" ? "Reactivar" : "Suspender"}
+            </button>
+          ) },
+        ]} />
       {detC && (() => { const E = ESTADO_CLINICA[detC.estado]; return (
         <Modal icon={<Building2 size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detC.nombre} sub={`RUC ${detC.ruc} – Plan ${PLAN_LABEL[detC.plan]}`} onClose={() => setDetC(null)} maxW={500}
           footer={<><Btn small kind="ghost" onClick={() => setDetC(null)}>Cerrar</Btn><Btn small kind={detC.estado === "suspendida" ? "primary" : "red"} onClick={() => { toggle(detC); setDetC(null); }}><Power size={15} strokeWidth={1.75} /> {detC.estado === "suspendida" ? "Reactivar" : "Suspender"}</Btn></>}>
@@ -10078,25 +10056,16 @@ function AwgSuscripciones({ notify }) {
         <KpiCard label="Suspendidas" value={susp} color="var(--dc-danger-700)" icon={<Power size={18} strokeWidth={1.75} />} sub="sin servicio" />
       </div>
       <ModHead icon={<CreditCard size={20} strokeWidth={1.75} />} titulo="Suscripciones y licencias" sub="Plan contratado, estado de la cuenta y facturación recurrente de cada clínica." />
-      <Card style={{ overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 820 }}>
-            <thead><tr style={{ background: "var(--dc-bg)", textAlign: "left" }}>{["Clínica", "Plan", "Estado", "MRR", "Última actividad", ""].map((h) => <th key={h} style={{ padding: "11px 16px", fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
-            <tbody>
-              {cl.map((c) => { const E = ESTADO_CLINICA[c.estado]; return (
-                <tr key={c.id} style={{ borderTop: "1px solid var(--dc-line)" }}>
-                  <td style={{ padding: "12px 16px" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "var(--dc-r-sm)", background: "var(--dc-purple)", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div><div style={{ fontWeight: 500, color: NAVY }}>{c.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>RUC {c.ruc}</div></div></div></td>
-                  <td style={{ padding: "12px 16px" }}><Select small width={150} ariaLabel="Plan" value={c.plan} onChange={(v) => cambiarPlan(c.id, v)} options={["pequena", "mediana", "grande"].map((p) => ({ value: p, label: PLAN_LABEL[p] }))} /></td>
-                  <td style={{ padding: "12px 16px" }}><Select small width={140} ariaLabel="Estado de la clínica" value={c.estado} onChange={(v) => cambiarEstado(c.id, v)} options={["activa", "trial", "suspendida"].map((s) => ({ value: s, label: ESTADO_CLINICA[s].l }))} /></td>
-                  <td style={{ padding: "12px 16px", fontWeight: 500, color: NAVY }}>S/ {c.mrr}</td>
-                  <td style={{ padding: "12px 16px", color: "var(--dc-ink-500)" }}>{c.ultimo}</td>
-                  <td style={{ padding: "12px 16px", textAlign: "right" }}><button onClick={() => notify(`Factura de ${c.nombre} generada.`)} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: DS.c.primary, display: "inline-flex", alignItems: "center", gap: 6 }}><FileText size={14} strokeWidth={1.75} /> Facturar</button></td>
-                </tr>
-              ); })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <DataTable titulo="Suscripciones" sub="clínicas" minWidth={860} rows={cl} defaultSort={{ key: "nombre", dir: "asc" }} cols={[
+        { key: "nombre", label: "Clínica", w: "minmax(220px,2fr)", a: "left", get: (c) => `${c.nombre} ${c.ruc}`, sortVal: (c) => c.nombre, cell: (c) => (
+          <span className="dc-tp__quien"><span className="dc-rec__av" style={{ width: 34, height: 34, background: tint(DS.c.primary, 0.14), color: DS.c.primary }}><Building2 size={16} strokeWidth={1.9} /></span><span style={{ minWidth: 0 }}><b>{c.nombre}</b><small>RUC {c.ruc}</small></span></span>
+        ) },
+        { key: "plan", label: "Plan", w: "170px", a: "center", get: (c) => PLAN_LABEL[c.plan] || "", cell: (c) => <Select small width={150} ariaLabel="Plan" value={c.plan} onChange={(v) => cambiarPlan(c.id, v)} options={["pequena", "mediana", "grande"].map((pl) => ({ value: pl, label: PLAN_LABEL[pl] }))} /> },
+        { key: "estado", label: "Estado", w: "160px", a: "center", get: (c) => (ESTADO_CLINICA[c.estado] || {}).l || "", cell: (c) => <Select small width={140} ariaLabel="Estado de la clínica" value={c.estado} onChange={(v) => cambiarEstado(c.id, v)} options={["activa", "trial", "suspendida"].map((e) => ({ value: e, label: ESTADO_CLINICA[e].l }))} /> },
+        { key: "mrr", label: "MRR", w: "100px", a: "right", get: (c) => String(c.mrr), sortVal: (c) => Number(c.mrr) || 0, cell: (c) => <span className="dc-tp__num">S/ {c.mrr}</span> },
+        { key: "ultimo", label: "Última actividad", w: "minmax(120px,1fr)", a: "left", get: (c) => c.ultimo || "" },
+        { key: "acc", label: "Acciones", w: "120px", a: "right", noSort: true, noFilter: true, cell: (c) => <button type="button" onClick={() => notify(`Factura de ${c.nombre} generada.`)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6 }}><FileText size={14} strokeWidth={1.75} /> Facturar</button> },
+      ]} />
     </div>
   );
 }
@@ -10110,9 +10079,7 @@ const AWG_USUARIOS = [
   { id: 6, nombre: "Carlos Prado", tenant: "Dental Plaza Norte", rol: "ti", email: "ti@plazanorte.pe", estado: "bloqueado", ultimo: "Hace 12 días" },
 ];
 function AwgUsuariosGlobales({ notify }) {
-  const [q, setQ] = useState("");
   const [users, setUsers] = useState(AWG_USUARIOS);
-  const lista = users.filter((u) => q.trim() === "" || (u.nombre + " " + u.tenant + " " + u.email).toLowerCase().includes(q.toLowerCase()));
   const toggle = (u) => { setUsers((us) => us.map((x) => x.id === u.id ? { ...x, estado: x.estado === "activo" ? "bloqueado" : "activo" } : x)); notify(`${u.nombre} ${u.estado === "activo" ? "bloqueado" : "desbloqueado"} (soporte AWG).`); };
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -10123,29 +10090,14 @@ function AwgUsuariosGlobales({ notify }) {
         <KpiCard label="Tenants" value={new Set(users.map((u) => u.tenant)).size} color="var(--dc-purple)" icon={<Building2 size={18} strokeWidth={1.75} />} />
       </div>
       <ModHead icon={<Users size={20} strokeWidth={1.75} />} titulo="Usuarios de todos los tenants" sub="Soporte transversal: AWG puede bloquear/desbloquear cuentas de cualquier clínica." />
-      <div style={{ position: "relative", maxWidth: 360 }}>
-        <span style={{ position: "absolute", left: 12, top: 11, color: "var(--dc-ink-500)" }}><Search size={16} strokeWidth={1.75} /></span>
-        <input className="dc-premium-inp" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar usuario, tenant o correo" style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", boxSizing: "border-box", color: NAVY }} />
-      </div>
-      <Card style={{ overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 780 }}>
-            <thead><tr style={{ background: "var(--dc-bg)", textAlign: "left" }}>{["Usuario", "Tenant", "Rol", "Estado", "Último acceso", ""].map((h) => <th key={h} style={{ padding: "11px 16px", fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
-            <tbody>
-              {lista.map((u) => { const R = ROLES[u.rol]; return (
-                <tr key={u.id} style={{ borderTop: "1px solid var(--dc-line)" }}>
-                  <td style={{ padding: "12px 16px" }}><div style={{ fontWeight: 500, color: NAVY }}>{u.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{u.email}</div></td>
-                  <td style={{ padding: "12px 16px", color: "var(--dc-ink-700)" }}>{u.tenant}</td>
-                  <td style={{ padding: "12px 16px" }}><span style={{ fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{R.label}</span></td>
-                  <td style={{ padding: "12px 16px" }}>{u.estado === "activo" ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Activo</span> : <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Bloqueado</span>}</td>
-                  <td style={{ padding: "12px 16px", color: "var(--dc-ink-500)" }}>{u.ultimo}</td>
-                  <td style={{ padding: "12px 16px", textAlign: "right" }}><button aria-label="Activar o desactivar" onClick={() => toggle(u)} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: u.estado === "activo" ? "var(--dc-warn-600)" : "var(--dc-ok-700)", display: "inline-flex", alignItems: "center", gap: 6 }}><Power size={14} strokeWidth={1.75} /> {u.estado === "activo" ? "Bloquear" : "Desbloquear"}</button></td>
-                </tr>
-              ); })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <DataTable titulo="Usuarios" sub="usuarios" minWidth={820} rows={users} defaultSort={{ key: "nombre", dir: "asc" }} cols={[
+        { key: "nombre", label: "Usuario", w: "minmax(220px,2fr)", a: "left", get: (u) => `${u.nombre} ${u.email}`, sortVal: (u) => u.nombre, cell: (u) => <PersonaCelda nombre={u.nombre} sub={u.email} /> },
+        { key: "tenant", label: "Tenant", w: "minmax(140px,1fr)", a: "left", get: (u) => u.tenant || "" },
+        { key: "rol", label: "Rol", w: "190px", a: "center", get: (u) => (ROLES[u.rol] || {}).label || "", cell: (u) => { const R = ROLES[u.rol]; return <span style={{ whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 600, color: R.color, background: tint(R.color, 0.078), padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{R.label}</span>; } },
+        { key: "estado", label: "Estado", w: "120px", a: "center", get: (u) => (u.estado === "activo" ? "Activo" : "Bloqueado"), cell: (u) => (u.estado === "activo" ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Activo</span> : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Bloqueado</span>) },
+        { key: "ultimo", label: "Último acceso", w: "minmax(120px,1fr)", a: "left", get: (u) => u.ultimo || "" },
+        { key: "acc", label: "Acciones", w: "140px", a: "right", noSort: true, noFilter: true, cell: (u) => <button type="button" aria-label="Activar o desactivar" onClick={() => toggle(u)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, color: u.estado === "activo" ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}><Power size={14} strokeWidth={1.75} /> {u.estado === "activo" ? "Bloquear" : "Desbloquear"}</button> },
+      ]} />
     </div>
   );
 }

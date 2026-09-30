@@ -1264,7 +1264,7 @@ export function ThOrden({ st, k, children, className = "", a = "left" }) {
     <button type="button" className={`dc-th-ord${on ? " is-on" : ""} ${className}`} style={{ justifyContent: a === "right" ? "flex-end" : a === "center" ? "center" : "flex-start" }}
       onClick={() => st.toggleSort(k)} aria-sort={on ? (st.sortDir === "asc" ? "ascending" : "descending") : "none"} title="Ordenar">
       <span>{children}</span>
-      {on ? (st.sortDir === "asc" ? <ChevronUp size={13} strokeWidth={2.2} /> : <ChevronDown size={13} strokeWidth={2.2} />) : <ArrowUpDown size={11} strokeWidth={1.9} className="dc-th-ord__ic" />}
+      {on ? (st.sortDir === "asc" ? <ChevronUp size={13} strokeWidth={2.2} /> : <ChevronDown size={13} strokeWidth={2.2} />) : <span className="dc-col-sort" aria-hidden="true"><ArrowUpDown size={11} strokeWidth={1.9} className="dc-th-ord__ic" /></span>}
     </button>
   );
 }
@@ -1394,10 +1394,20 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
   );
 }
 
-export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName }) {
-  const { lista, anyF, st: { sortCol, sortDir, colFilters, setColFilters, activeCol, setActiveCol, toggleSort } } = useFiltroTabla(rows, cols, defaultSort);
+export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true }) {
+  const { lista, anyF, st } = useFiltroTabla(rows, cols, defaultSort);
+  const { sortCol, sortDir, colFilters, q, setQ } = st;
+  // Mismo patrón que las listas: un buscador para toda la tabla y el orden en el encabezado.
+  const conBuscar = buscar && (rows || []).length > 6 && cols.some((c) => !c.noFilter && c.get);
+  const cajaBuscar = conBuscar ? (
+    <label className="dc-fcab__buscar dc-dt__buscar">
+      <Search size={14} strokeWidth={2} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${sub || "la tabla"}…`} aria-label={`Buscar en ${sub || "la tabla"}`} onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} />
+      {q && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setQ("")}><X size={13} strokeWidth={2.2} /></button>}
+    </label>
+  ) : null;
   const [visible, setVisible] = useState(pageSize);
-  useEffect(() => { setVisible(pageSize); }, [rows, pageSize, colFilters, sortCol, sortDir]);
+  useEffect(() => { setVisible(pageSize); }, [rows, pageSize, colFilters, sortCol, sortDir, q]);
   const COL = cols.map((c) => c.w).join(" ");
   const mostradas = lista.slice(0, visible);
   const hayMas = lista.length > visible;
@@ -1410,7 +1420,8 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
     : { overflowX: "auto" };
   return (
     <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
-      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? " – filtrado" : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span></div>{accion && <div>{accion}</div>}</div>}
+      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span></div><div className="dc-dt__acc">{cajaBuscar}{accion}</div></div>}
+      {!titulo && cajaBuscar && <div className="dc-dt__barra"><span className="dc-fcab__cant"><b>{lista.length}</b> {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}</span>{cajaBuscar}</div>}
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;
             width: max-content solo cuando minWidth > 0 explícito exige scroll horizontal. */}
@@ -1420,22 +1431,15 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
         <div style={minWidth > 0 ? { minWidth, width: "100%" } : { width: "100%", minWidth: 0, maxWidth: "100%" }}>
           <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 12, padding: "4px 16px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-bg-soft)", ...(maxHeight ? { position: "sticky", top: 0, zIndex: 3 } : {}) }}>
             {cols.map((col) => {
-              if (col.noFilter && col.noSort) return <span key={col.key} style={{ fontSize: 12, fontWeight: 500, letterSpacing: .02, color: "var(--dc-ink-500)", textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", alignSelf: "center", paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", ...(col.sticky ? { ...stickyHead, display: "flex", justifyContent: "center" } : {}) }}>{col.label}</span>;
-              const isSort = sortCol === col.key; const isFilt = !!(colFilters[col.key] && colFilters[col.key].trim()); const open = activeCol === col.key || isFilt;
               const just = col.a === "left" ? "flex-start" : col.a === "right" ? "flex-end" : "center";
               return (
-                <div key={col.key} style={{ display: "flex", alignItems: "center", justifyContent: just, gap: 4, minWidth: 0, paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, ...(col.sticky ? stickyHead : {}) }}>
-                  {open ? (
-                    <input className="dc-th dc-premium-inp" aria-label={`Filtrar ${col.label}`} autoFocus={activeCol === col.key} value={colFilters[col.key] || ""} onChange={(e) => setColFilters((f) => ({ ...f, [col.key]: e.target.value }))} onBlur={() => { if (!(colFilters[col.key] || "").trim()) setActiveCol(null); }} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") { if (e.key === "Escape") setColFilters((f) => { const n = { ...f }; delete n[col.key]; return n; }); setActiveCol(null); e.currentTarget.blur(); } }} placeholder={col.label} style={{ flex: 1, width: "100%", minWidth: 0, minHeight: 30, textAlign: col.a === "left" ? "left" : "center", fontSize: 12, fontWeight: 500, color: NAVY, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 8px", outline: "none", boxSizing: "border-box" }} />
-                  ) : (
-                    <button type="button" onClick={() => !col.noFilter && setActiveCol(col.key)} title={col.noFilter ? col.label : "Clic para filtrar"} style={{ minWidth: 0, textAlign: col.a === "left" ? "left" : col.a === "right" ? "right" : "center", fontSize: 12, fontWeight: 500, letterSpacing: .02, color: isFilt || isSort ? "var(--dc-ink-900)" : "var(--dc-ink-500)", background: "transparent", border: "none", cursor: col.noFilter ? "default" : "text", padding: "6px 0", borderRadius: "var(--dc-r-sm)", whiteSpace: "normal", lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{col.label}</button>
-                  )}
-                  {!col.noSort && <button type="button" className="dc-col-sort" aria-label={`Ordenar ${col.label}`} onClick={() => toggleSort(col.key)} title="Ordenar" style={{ flexShrink: 0, width: 22, height: 22, display: "grid", placeItems: "center", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", background: isSort ? tint(DS.c.primary, 0.12) : "transparent", color: isSort ? DS.c.primary : "var(--dc-ink-400)", transition: "background .12s, color .12s", padding: 0 }}>{isSort ? (sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />) : <ArrowUpDown size={12} strokeWidth={1.75} />}</button>}
+                <div key={col.key} className="dc-dt__th" style={{ display: "flex", alignItems: "center", justifyContent: just, minWidth: 0, minHeight: 34, paddingLeft: col.a === "left" ? 12 : 0, paddingRight: col.a === "right" ? 12 : 0, ...(col.sticky ? stickyHead : {}) }}>
+                  {col.noSort ? <span className="dc-dt__lbl">{col.label}</span> : <ThOrden st={st} k={col.key} a={col.a || "center"}>{col.label}</ThOrden>}
                 </div>
               );
             })}
           </div>
-          {lista.length === 0 ? (rows.length > 0 ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con el filtro." /> : (empty || <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin registros" sub="Aún no hay datos para mostrar." />)) : mostradas.map((r, i) => { return (
+          {lista.length === 0 ? (rows.length > 0 ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con la búsqueda." /> : (empty || <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin registros" sub="Aún no hay datos para mostrar." />)) : mostradas.map((r, i) => { return (
             <div key={r.id ?? i} className={`dc-table-row${rowClassName ? " " + (rowClassName(r) || "") : ""}`} onClick={onRowClick ? () => onRowClick(r) : undefined} style={{ display: "grid", gridTemplateColumns: COL, gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--dc-line)", cursor: onRowClick ? "pointer" : "default", background: "transparent", transition: "background .15s", position: "relative", zIndex: 1, boxSizing: "border-box", width: "100%", maxWidth: "100%", minWidth: 0 }} onMouseEnter={(ev) => { ev.currentTarget.style.background = "var(--dc-bg-soft2)"; }} onMouseLeave={(ev) => { ev.currentTarget.style.background = "transparent"; }}>
               {cols.map((col) => (
                 <div key={col.key} data-label={col.label || ""} data-vacio={col.vacio && col.vacio(r) ? "" : undefined} className={col.sticky ? "dc-col-sticky" : undefined} style={{ minWidth: 0, ...(col.sticky ? stickyCell : {}), ...(col.a === "left" ? { paddingLeft: 12 }
