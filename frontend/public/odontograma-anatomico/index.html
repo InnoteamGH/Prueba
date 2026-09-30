@@ -3209,6 +3209,7 @@ construir(); panel();
     if(d.type==='dento-odontograma-zoom') applyZoom(d.zoom);
     if(d.type==='dento-odontograma-paciente') applyPaciente(d.paciente);
     if(d.type==='dento-odontograma-clinica') applyClinica(d.clinica);
+    if(d.type==='dento-odontograma-documento' && typeof abrirDocumento==='function'){ try{ window.scrollTo(0,0); abrirDocumento(d.que||'plan'); }catch(e){} }
   });
   window.__dentoBridge={snapshot:snapshot,notify:notify,hydrate:hydrate,exportPng:exportPng,applyZoom:applyZoom,applyPaciente:applyPaciente,applyClinica:applyClinica};
   setTimeout(notify, 400);

@@ -2635,8 +2635,12 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                 </div>
               )}
               {pacienteId && <Btn small kind="ghost" onClick={() => { setFmTab("historia"); setFmOpen(true); }}><FileText size={14} strokeWidth={1.75} /> Ficha del paciente</Btn>}
-              {/* En la vista anatómica el plan de inversión ya está dentro del odontograma. */}
-              {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Plan de inversión imprimible"><Printer size={14} strokeWidth={1.75} /> Plan de inversión</Btn>}
+              {/* Documentos a la vista: en la anatómica los emite el propio odontograma (mismo membrete). */}
+              {vistaOdo === "anatomico" && pacienteId && <>
+                <Btn small onClick={() => { anatomicoRef.current?.abrirDocumento?.("plan"); }} title="Plan de inversión (proforma) para imprimir o guardar en PDF"><FileText size={14} strokeWidth={1.75} /> Proforma</Btn>
+                <Btn small kind="ghost" onClick={() => { anatomicoRef.current?.abrirDocumento?.("resumen"); }} title="Resumen clínico del odontograma"><Printer size={14} strokeWidth={1.75} /> Resumen</Btn>
+              </>}
+              {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Plan de inversión imprimible"><Printer size={14} strokeWidth={1.75} /> Proforma</Btn>}
               <label className="dc-odo-bar__zoom" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 999, padding: "4px 12px", marginLeft: "auto" }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Zoom</span>
                 <input type="range" min="50" max="130" value={zoom} onChange={(e) => setZoom(Number(e.target.value))}
@@ -6940,7 +6944,7 @@ function Periodontograma({ pacientes: pacProp, notify, can }) {
     <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
       <PacienteBar pacientes={pacientes} pacienteId={pid} setPacienteId={setPid} modulo="Periodontograma" />
       {!pid ? <Card><Vacio icon={<HeartPulse size={24} strokeWidth={1.75} />} titulo="Elige un paciente" sub="Selecciónalo arriba para ver o registrar su sondaje periodontal." /></Card>
-        : <PeriodontogramaClinico key={pid} pacienteId={pid} pacienteNombre={paciente?.nombre || ""} notify={notify} soloLectura={soloLectura} />}
+        : <PeriodontogramaClinico key={pid} pacienteId={pid} pacienteNombre={paciente?.nombre || ""} paciente={paciente} notify={notify} soloLectura={soloLectura} />}
     </div>
   );
 }
@@ -7745,8 +7749,20 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   useEffect(() => { const f = () => setAnchoVp(window.innerWidth); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
   const colapAuto = anchoVp >= 768 && anchoVp < 1200;
   const [expandTab, setExpandTab] = useState(false);
-  const colap = colapAuto ? !expandTab : colapPref;
-  const setColap = (f) => (colapAuto ? setExpandTab((e) => !e) : setColapPref(f));
+  // Odontograma y periodontograma (módulo o pestaña de la ficha) necesitan todo el ancho:
+  // al abrirlos el menú pasa a riel de íconos. Se puede expandir a mano y vuelve a
+  // contraerse la próxima vez que se entra a una de esas vistas.
+  const [fichaAmplia, setFichaAmplia] = useState(false);
+  useEffect(() => {
+    const f = (e) => setFichaAmplia(!!(e && e.detail));
+    window.addEventListener("dc-vista-amplia", f);
+    return () => window.removeEventListener("dc-vista-amplia", f);
+  }, []);
+  const vistaAmplia = anchoVp >= 768 && (vista === "odontograma" || vista === "perio" || fichaAmplia);
+  const [expandAmplia, setExpandAmplia] = useState(false);
+  useEffect(() => { setExpandAmplia(false); }, [vistaAmplia, vista]);
+  const colap = vistaAmplia ? !expandAmplia : (colapAuto ? !expandTab : colapPref);
+  const setColap = (f) => (vistaAmplia ? setExpandAmplia((e) => !e) : colapAuto ? setExpandTab((e) => !e) : setColapPref(f));
   const [subAbierto, setSubAbierto] = useState({}); // submenús del sidebar abiertos (por etiqueta del padre)
   // Menú por rol: grupos plegables (se recuerda lo que cada quien abre o cierra),
   // favoritos fijados arriba y buscador con Ctrl + K.

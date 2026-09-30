@@ -149,7 +149,9 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     return pedirAnexoAlIframe(win);
   }, []);
 
-  useImperativeHandle(ref, () => ({ capturarAnexo }), [capturarAnexo]);
+  // Abre el documento del odontograma (plan de inversión o resumen) desde la barra del sistema.
+  const abrirDocumento = useCallback((que) => { postToIframe({ type: "dento-odontograma-documento", que }); }, [postToIframe]);
+  useImperativeHandle(ref, () => ({ capturarAnexo, abrirDocumento }), [capturarAnexo, abrirDocumento]);
 
   const hidratarDesdeApi = useCallback(async () => {
     if (!pacienteId) return;

@@ -4,9 +4,10 @@
    ficha del paciente. Contrato con el backend: util/periodontal.js
    (GET /periodontograma?pacienteId=… y PUT /periodontograma, una fila por pieza). */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Keyboard, Redo2, Undo2 } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Keyboard, Printer, Redo2, Undo2, X } from "lucide-react";
 import api, { auth } from "../api/client";
 import { SUP, INF, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, demoPerio } from "../util/periodontal";
+import { FASES_PERIO, abrirInformePerio, abrirProformaPerio, guardarPrecio, sugerirPlan, totalesPlan } from "../util/perioPlan";
 import "./periodontograma.css";
 
 const COL = 54, H = 150, CEJ = 86, SC = 5;
@@ -131,7 +132,16 @@ function svgCara(arco, cara, abajo, dientes, previo, sel) {
   return `${defs}<g${abajo ? ` transform="translate(0 ${H}) scale(1 -1)"` : ""}>${g}</g>${t}`;
 }
 
-export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = "", notify = () => {}, soloLectura = false }) {
+/* Profesional que emite: el usuario conectado si es odontólogo. */
+function profesionalActual() {
+  try {
+    const u = JSON.parse(localStorage.getItem("dc_usuario") || "null");
+    const r = String(u?.rol || auth.sesion?.rol || "");
+    return /medico|odont/i.test(r) ? (u?.nombre || auth.sesion?.nombre || "") : "";
+  } catch { return ""; }
+}
+
+export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = "", paciente = null, notify = () => {}, soloLectura = false }) {
   const conectado = !!auth.token;
   const [dientes, setDientes] = useState(null);
   const [previo, setPrevio] = useState(null);
@@ -148,6 +158,8 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   const activo = useRef(false);
   const raizRef = useRef(null);
   const scrollRef = useRef(null);
+  // Proforma: plan sugerido por el sondaje, editable antes de emitirla.
+  const [pf, setPf] = useState(null); // { plan, desc }
 
   useEffect(() => {
     setDientes(null); setError(false); setHist({ u: [], r: [] });
@@ -223,7 +235,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
     if (soloLectura || !dientes) return undefined;
     const h = (e) => {
       const tg = e.target;
-      if (!activo.current || (tg && (tg.tagName === "TEXTAREA" || tg.tagName === "INPUT" || tg.tagName === "SELECT" || tg.isContentEditable))) return;
+      if (pf || !activo.current || (tg && (tg.tagName === "TEXTAREA" || tg.tagName === "INPUT" || tg.tagName === "SELECT" || tg.isContentEditable))) return;
       const k = e.key, low = k.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && low === "z") { e.preventDefault(); if (e.shiftKey) rehacer(); else deshacer(); return; }
       if ((e.ctrlKey || e.metaKey) && low === "y") { e.preventDefault(); rehacer(); return; }
@@ -271,6 +283,15 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   const tot = m.presentes * 6;
   let hechos = 0; [...SUP, ...INF].forEach((n) => { if (!dientes[n].ausente) hechos += dientes[n].pd.filter((v) => v != null).length; });
   const dxTono = dx.estado === "periodontitis" ? "r" : dx.estado === "gingivitis" ? "a" : dx.estado === "salud" ? "o" : "n";
+  const datosPac = { nombre: paciente?.nombre || pacienteNombre, dni: paciente?.dni || "", hc: paciente?.hc || paciente?.numeroHc || paciente?.nroHc || "" };
+  const abrirProforma = () => setPf({ plan: sugerirPlan(dientes, dx), desc: 0 });
+  const emitir = (ok) => { if (!ok) notify("Permite las ventanas emergentes para ver el documento."); };
+  const informe = () => emitir(abrirInformePerio({
+    dientes, m, dx, paciente: datosPac, profesional: profesionalActual(),
+    criticos: criticos.map((x) => ({ ...x, sitio: sitioCorto(x.n, x.i) })),
+    plan: pf ? pf.plan : sugerirPlan(dientes, dx),
+  }));
+  const setItem = (id, k, v) => setPf((c) => ({ ...c, plan: c.plan.map((x) => (x.id === id ? { ...x, [k]: v } : x)) }));
   const delta = (a, b, dec = 0) => {
     if (!cmp) return null;
     const d = +(a - b).toFixed(dec);
@@ -380,6 +401,10 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
         <span className={`pgc-estado is-${soloLectura ? "ro" : guardado?.tipo || "ok"}`}>
           {soloLectura ? "Solo lectura" : !conectado ? "Demostración" : guardado?.tipo === "guardando" ? "Guardando…" : guardado?.tipo === "error" ? "Sin guardar" : guardado?.hora ? `Guardado ${guardado.hora}` : "Al día"}
         </span>
+        <div className="pgc-docs">
+          <button type="button" className="pgc-docbtn" onClick={abrirProforma} disabled={!m.sitios} title={m.sitios ? "Tratamiento sugerido con precios, para imprimir o enviar" : "Registra el sondaje primero"}><FileText size={15} strokeWidth={2} /> Proforma</button>
+          <button type="button" className="pgc-docbtn is-sec" onClick={informe} disabled={!m.sitios} title="Informe periodontal en PDF"><Printer size={15} strokeWidth={2} /> Informe</button>
+        </div>
         {!soloLectura && <>
           <button type="button" className="pgc-ib" onClick={deshacer} disabled={!hist.u.length} aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><Undo2 size={15} strokeWidth={2} /></button>
           <button type="button" className="pgc-ib" onClick={rehacer} disabled={!hist.r.length} aria-label="Rehacer" title="Rehacer (Ctrl+Y)"><Redo2 size={15} strokeWidth={2} /></button>
@@ -477,6 +502,47 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
             onChange={(e) => { const v = e.target.value; modificar(sel.n, (q) => { q.nota = v; }, false); }} />
         </aside>
       </div>
+      {pf && (() => {
+        const t = totalesPlan(pf.plan, pf.desc);
+        const sol = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return (
+          <div className="pgc-pf-fondo" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) setPf(null); }}>
+            <div className="pgc-pf" role="dialog" aria-modal="true" aria-label="Proforma periodontal">
+              <header className="pgc-pf__cab">
+                <div><b>Proforma periodontal</b><small>{datosPac.nombre || "Paciente"} · {dx.titulo}</small></div>
+                <button type="button" className="pgc-ib" onClick={() => setPf(null)} aria-label="Cerrar"><X size={16} strokeWidth={2} /></button>
+              </header>
+              <p className="pgc-pf__ayuda">Tratamiento sugerido por el sondaje. Marca lo que incluyes y ajusta cantidades o precios; los precios que cambies se recuerdan.</p>
+              <div className="pgc-pf__lista">
+                {[1, 2, 3, 4].map((f) => {
+                  const its = pf.plan.filter((x) => x.fase === f);
+                  if (!its.length) return null;
+                  return (
+                    <div key={f} className="pgc-pf__fase">
+                      <h4>{FASES_PERIO[f]}</h4>
+                      {its.map((x) => (
+                        <div key={x.id} className={`pgc-pf__it${x.incluir ? "" : " is-off"}`}>
+                          <label className="pgc-pf__chk"><input type="checkbox" checked={x.incluir} onChange={(e) => setItem(x.id, "incluir", e.target.checked)} />
+                            <span><b>{x.nombre}</b>{x.det && <small>{x.det}</small>}{x.cond && <small className="is-cond">{x.cond}</small>}</span></label>
+                          <label className="pgc-pf__num"><span>Cant.</span><input type="number" min="1" max="32" value={x.cant} onChange={(e) => setItem(x.id, "cant", Math.max(1, Number(e.target.value) || 1))} /></label>
+                          <label className="pgc-pf__num is-precio"><span>Precio S/</span><input type="number" min="0" step="10" value={x.precio} onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setItem(x.id, "precio", v); guardarPrecio(x.cod, v); }} /></label>
+                          <em>{sol(x.cant * x.precio)}</em>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+              <footer className="pgc-pf__pie">
+                <label className="pgc-pf__num"><span>Descuento %</span><input type="number" min="0" max="100" value={pf.desc} onChange={(e) => setPf((c) => ({ ...c, desc: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }))} /></label>
+                <div className="pgc-pf__tot"><small>{t.n} partidas{t.desc ? ` · descuento ${sol(t.desc)}` : ""}</small><b>{sol(t.total)}</b></div>
+                <button type="button" className="pgc-docbtn is-sec" onClick={informe}><Printer size={15} strokeWidth={2} /> Informe</button>
+                <button type="button" className="pgc-docbtn" disabled={!t.n} onClick={() => emitir(abrirProformaPerio({ plan: pf.plan, descPct: pf.desc, paciente: datosPac, profesional: profesionalActual(), dx }))}><FileText size={15} strokeWidth={2} /> Imprimir o guardar PDF</button>
+              </footer>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

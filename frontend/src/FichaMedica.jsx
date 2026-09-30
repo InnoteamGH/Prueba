@@ -934,6 +934,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const puedeRegistro = !conectado || !can || can("auditoria", "ver") || puedeEscribirClinico;
   const [d, setD] = useState(null);   // payload de ficha360
   const [tab, setTab] = useState(initialTab || "resumen");
+  // Odontograma y periodontograma usan todo el ancho: se pide al menú lateral que se
+  // contraiga mientras esa pestaña está abierta (lo escucha MainApp).
+  useEffect(() => {
+    const amplia = tab === "odontograma" || tab === "perio";
+    window.dispatchEvent(new CustomEvent("dc-vista-amplia", { detail: amplia }));
+  }, [tab]);
+  useEffect(() => () => window.dispatchEvent(new CustomEvent("dc-vista-amplia", { detail: false })), []);
   useEffect(() => {
     if (initialTab) setTab(initialTab);
   }, [initialTab, pacienteId]);
@@ -2077,7 +2084,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
 
             {tab === "odontograma" && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} sedeId={sedeId} /></div>}
 
-            {tab === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} notify={notify} soloLectura={!puedeEscribirClinico} />}
+            {tab === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura={!puedeEscribirClinico} />}
 
             {tab === "receta" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
 

@@ -122,6 +122,11 @@ Campos que tiene que manejar el backend:
 
 Si el endpoint falla, el frontend arma el membrete con `GET /clinica` y la lista de sedes.
 
+### Periodontograma: proforma e informe
+
+- La proforma sugiere el tratamiento según el sondaje: higiene, raspado por cuadrante, reevaluación, cirugía condicional, furcas, ferulización y mantenimiento. El doctor la ajusta antes de emitirla.
+- Por ahora los precios que edita el doctor se recuerdan en el navegador (`dc_perio_precios`). **Pendiente de backend:** que salgan del catálogo de servicios de la clínica con estos códigos: `IHO`, `PRO`, `RAR`, `REE`, `CIR`, `FUR`, `FER` y `MAN`.
+
 ---
 
 ## 5. Lista de cambios de backend
@@ -136,3 +141,4 @@ Si el endpoint falla, el frontend arma el membrete con `GET /clinica` y la lista
 8. `GET /clinica` y `PUT /clinica`: campo `logo`.
 9. `POST /sedes` y `PUT /sedes/:id`: campos `horarioDocumento`, `correo` y `serieDocumento`.
 10. `GET /clinica/impresion?sedeId=`: devolver la empresa con `logo` y la sede pedida con dirección, teléfonos, horario, correo y serie, para el membrete de todos los documentos.
+11. Catálogo de servicios: precios de los tratamientos periodontales (`IHO`, `PRO`, `RAR`, `REE`, `CIR`, `FUR`, `FER`, `MAN`) para la proforma del periodontograma.
