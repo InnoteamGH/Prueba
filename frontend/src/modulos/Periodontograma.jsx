@@ -421,18 +421,20 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
         <div className="pgc-kpis">
           {KPI.map(([l, v, u, d, c]) => <div key={l} className="pgc-kpi"><small>{l}</small><b className={c ? `is-${c}` : ""}>{v}{u && <u>{u}</u>}{d}</b></div>)}
         </div>
-        <div className="pgc-prog" title="Sitios sondados"><span>Sitios registrados {hechos}/{tot}</span><i style={{ "--p": `${tot ? (hechos / tot) * 100 : 0}%` }} /></div>
-        <span className={`pgc-estado is-${soloLectura ? "ro" : guardado?.tipo || "ok"}`}>
-          {soloLectura ? "Solo lectura" : !conectado ? "Demostración" : guardado?.tipo === "guardando" ? "Guardando…" : guardado?.tipo === "error" ? "Sin guardar" : guardado?.hora ? `Guardado ${guardado.hora}` : "Al día"}
-        </span>
-        <div className="pgc-docs">
-          <button type="button" className="pgc-docbtn" onClick={abrirProforma} disabled={!m.sitios} title={m.sitios ? "Tratamiento sugerido por el sondaje, para pasarlo al presupuesto del paciente" : "Registra el sondaje primero"}><FileText size={15} strokeWidth={2} /> Tratamiento sugerido</button>
-          <button type="button" className="pgc-docbtn is-sec" onClick={informe} disabled={!m.sitios} title="Informe periodontal en PDF"><Printer size={15} strokeWidth={2} /> Informe</button>
+        <div className="pgc-prog" title="Sitios sondados"><small>Sitios registrados</small><span>{hechos}/{tot}<i style={{ "--p": `${tot ? (hechos / tot) * 100 : 0}%` }} /></span></div>
+        <div className="pgc-acc">
+          <span className={`pgc-estado is-${soloLectura ? "ro" : guardado?.tipo || "ok"}`}>
+            {soloLectura ? "Solo lectura" : !conectado ? "Demostración" : guardado?.tipo === "guardando" ? "Guardando…" : guardado?.tipo === "error" ? "Sin guardar" : guardado?.hora ? `Guardado ${guardado.hora}` : "Al día"}
+          </span>
+          <div className="pgc-docs">
+            <button type="button" className="pgc-docbtn" onClick={abrirProforma} disabled={!m.sitios} title={m.sitios ? "Tratamiento sugerido por el sondaje, para pasarlo al presupuesto del paciente" : "Registra el sondaje primero"}><FileText size={15} strokeWidth={2} /> Tratamiento sugerido</button>
+            <button type="button" className="pgc-docbtn is-sec" onClick={informe} disabled={!m.sitios} title="Informe periodontal en PDF"><Printer size={15} strokeWidth={2} /> Informe</button>
+          </div>
+          {!soloLectura && <>
+            <button type="button" className="pgc-ib" onClick={deshacer} disabled={!hist.u.length} aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><Undo2 size={15} strokeWidth={2} /></button>
+            <button type="button" className="pgc-ib" onClick={rehacer} disabled={!hist.r.length} aria-label="Rehacer" title="Rehacer (Ctrl+Y)"><Redo2 size={15} strokeWidth={2} /></button>
+          </>}
         </div>
-        {!soloLectura && <>
-          <button type="button" className="pgc-ib" onClick={deshacer} disabled={!hist.u.length} aria-label="Deshacer" title="Deshacer (Ctrl+Z)"><Undo2 size={15} strokeWidth={2} /></button>
-          <button type="button" className="pgc-ib" onClick={rehacer} disabled={!hist.r.length} aria-label="Rehacer" title="Rehacer (Ctrl+Y)"><Redo2 size={15} strokeWidth={2} /></button>
-        </>}
       </section>
 
       <div className="pgc-trabajo">
