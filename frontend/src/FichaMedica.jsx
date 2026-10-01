@@ -965,10 +965,20 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const setTab = (t) => {
     const [a, b] = normTabFicha(t);
     setTabState(a);
-    if (a === "odontograma") setSubOdo(b || "odo");
+    // Volver a pedir «odontograma» estando ya en esa pestaña no cambia la sub-vista abierta.
+    if (a === "odontograma") setSubOdo((cur) => b || (tab === "odontograma" ? cur : "odo"));
     if (a === "archivos") setSubArch(b || null);
     if (onTabChange) onTabChange(a);
   };
+  // Si la ruta cambia la pestaña pedida (p. ej. Periodontograma desde el menú), se aplica
+  // también con la ficha ya montada.
+  useEffect(() => {
+    if (!initialTab) return;
+    const [a, b] = normTabFicha(initialTab);
+    setTabState(a);
+    if (a === "odontograma") setSubOdo((cur) => (b || (cur === "perio" || cur === "orto" ? cur : "odo")));
+    if (a === "archivos") setSubArch(b || null);
+  }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
   // Odontograma y periodontograma usan todo el ancho: se pide al menú lateral que se
   // contraiga mientras esa pestaña está abierta (lo escucha MainApp).
   useEffect(() => {

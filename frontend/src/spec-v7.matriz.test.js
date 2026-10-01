@@ -29,9 +29,10 @@ describe("A26 — menú sin duplicados", () => {
     // ausentismo y ocupación son pestañas) y los módulos clínicos viven en la ficha.
     assert.equal((block.match(/label: "Reportes"/g) || []).length, 1, "una sola entrada de Reportes");
     assert.match(block, /id: "dashboard"/);
-    assert.match(block, /id: "pacientes", label: "Pacientes", icon: Users, match: \[[^\]]*"odontograma"[^\]]*"perio"[^\]]*"tratamientos"/);
-    assert.doesNotMatch(block, /\{ id: "odontograma", label:/);
-    assert.match(block, /"recetas"[^\]]*"radiografias"[^\]]*"consentimientos"/);
+    // Odontograma y Periodontograma tienen acceso directo en el menú (eligen paciente y abren su ficha).
+    assert.match(block, /\{ id: "odontograma", label: "Odontograma", icon:/);
+    assert.match(block, /\{ id: "perio", label: "Periodontograma", icon:/);
+    assert.match(block, /id: "pacientes", label: "Pacientes", icon: Users, match: \[[^\]]*"tratamientos"[^\]]*"recetas"[^\]]*"radiografias"[^\]]*"consentimientos"/);
   });
 });
 

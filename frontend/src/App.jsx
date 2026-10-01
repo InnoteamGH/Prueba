@@ -7970,6 +7970,38 @@ function RedirFicha({ vista, pacienteActivo, setVista, notify }) {
   return null;
 }
 
+/* Odontograma y Periodontograma desde el menú: se elige el paciente y se abre su ficha
+   en esa vista (el estado clínico sigue siendo uno solo, el de la ficha). */
+function ElegirPacienteClinico({ vista, pacientes = [], pacienteActivo, onElegir }) {
+  const [q, setQ] = useState("");
+  const esPerio = vista === "perio";
+  const titulo = esPerio ? "Periodontograma" : "Odontograma";
+  const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const lista = pacientes.filter((p) => !q.trim() || norm(p.nombre).includes(norm(q)) || String(p.dni || "").includes(q.trim()));
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <section className="dc-esp-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{titulo}</b></div>
+          <p>Elige el paciente para abrir su {titulo.toLowerCase()}.</p>
+        </div>
+        {pacienteActivo?.id && <button type="button" className="dc-esp-hero__btn" onClick={() => onElegir(pacienteActivo.id)}>Continuar con {pacienteActivo.nombre}</button>}
+      </section>
+      <Card className="dc-elegir">
+        <input className="dc-premium-inp dc-elegir__buscar" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre o DNI…" aria-label="Buscar paciente" />
+        <div className="dc-elegir__lista">
+          {lista.length === 0 ? <p className="dc-elegir__vacio">Ningún paciente coincide con la búsqueda.</p> : lista.slice(0, 60).map((p) => (
+            <button key={p.id} type="button" className="dc-elegir__fila" onClick={() => onElegir(p.id)}>
+              <PersonaCelda nombre={p.nombre} sub={p.dni ? `DNI ${p.dni}` : undefined} />
+              <span className="dc-elegir__ir">Abrir {titulo.toLowerCase()} <ChevronRight size={14} strokeWidth={2} /></span>
+            </button>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 /* NAV-08: un módulo que el plan no incluye muestra su aviso, sin redirigir en silencio. */
 function PlanBloqueado({ modulo, onVerPlanes }) {
   const nombre = (MODULOS.find((m) => m.id === modDeVista(modulo)) || {}).label || "Este módulo";
@@ -8492,7 +8524,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       ...(rol === "medico" ? [{ id: "disponibilidad", label: "Mi disponibilidad", icon: Clock }] : []),
     ] },
     { grupo: "Pacientes", items: [
-      { id: "pacientes", label: "Pacientes", icon: Users, match: ["odontograma", "perio", "tratamientos", "recetas", "radiografias", "fotos", "consentimientos", "formularios"] },
+      { id: "pacientes", label: "Pacientes", icon: Users, match: ["tratamientos", "recetas", "radiografias", "fotos", "consentimientos", "formularios"] },
+      // Accesos directos pedidos por la clínica: eligen el paciente y abren su ficha en esa vista.
+      { id: "odontograma", label: "Odontograma", icon: Smile },
+      { id: "perio", label: "Periodontograma", icon: Activity },
     ] },
     { grupo: "Comunicación", items: [
       { id: "whatsapp", label: "WhatsApp + IA", icon: MessageSquare, tag: "IA" },
@@ -8585,7 +8620,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "disponibilidad": return <Disponibilidad notify={notify} usuario={usuario} citas={citas} setCitas={setCitas} horarioClinica={horarioClinica} />;
       // Rutas clínicas antiguas (NAV-02): llevan a la pestaña de la ficha del paciente en
       // atención o, si no hay uno, al directorio con el aviso «Elige un paciente».
-      case "odontograma": case "perio": case "tratamientos": case "recetas": case "radiografias": case "fotos": case "consentimientos": case "formularios":
+      case "odontograma": case "perio":
+        return <ElegirPacienteClinico key={vista} vista={vista} pacientes={pf} pacienteActivo={pacienteActivo} onElegir={(id) => setVista("pacientes", { pacienteId: id, tab: vista === "perio" ? "perio" : "odontograma" })} />;
+      case "tratamientos": case "recetas": case "radiografias": case "fotos": case "consentimientos": case "formularios":
         return <RedirFicha vista={vista} pacienteActivo={pacienteActivo} setVista={setVista} notify={notify} />;
       case "pacientes": return <PacientesView consumirInsumos={consumirInsumos} sedeActiva={sedeActiva} misSedes={misSedes} onIr={setVista} pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
         onAgendarPaciente={(pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta" }); setVista("agenda"); }}
