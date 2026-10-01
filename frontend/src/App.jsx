@@ -16,7 +16,7 @@ const Metas = React.lazy(() => import("./modulos/Metas"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
-import FacturacionSunat from "./modulos/FacturacionSunat";
+import FacturacionSunat, { ConexionSunat } from "./modulos/FacturacionSunat";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
@@ -3975,7 +3975,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       return;
     }
     const numero = numeroRaw != null ? fmtComprobante(numeroRaw) : peekBoletaLocal(em.serie);
-    setBoletaVer({ serie, numero, cliente: b.paciente, dni: b.dni || "", direccion: b.direccion || "", fecha: b.fecha || fmt(hoy), total: Number(b.monto) || 0, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), items: b.items && b.items.length ? b.items : undefined });
+    setBoletaVer({ serie, numero, cliente: b.paciente, dni: b.dni || "", direccion: b.direccion || "", fecha: b.fecha || fmt(hoy), total: Number(b.monto) || 0, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), items: b.items && b.items.length ? b.items : undefined, tipo: b.tipo || "Boleta", docTipo: b.docTipo || "DNI", docNum: b.docNum || b.dni || "", moneda: b.moneda || "PEN", ref: b.refComprobante || undefined });
   };
   const metodoLabel = { tarjeta: "Tarjeta (Niubiz)", yape: "Yape (Niubiz)", efectivo: "Efectivo", transferencia: "Transferencia" };
   // El ModalCobro ya registró el pago (backend). Aquí solo marcamos las fases como
@@ -5230,11 +5230,6 @@ function MiProduccion({ usuario, citas }) {
 /* ---- Integraciones (recomendaciones reales del mercado peruano) ---- */
 function Integraciones({ notify }) {
   const cats = [
-    { cat: "Facturación electrónica (SUNAT)", ic: Receipt, c: "#D97706", items: [
-      // NEW-51: Caja confirma que aún no hay OSE — no mentir «Conectado».
-      { n: "NubeFacT", d: "Emisión de boletas/facturas XML UBL 2.1 vía OSE. Certificado ISO 27001. Aún no conectado en esta clínica: las boletas se registran en el sistema sin envío a SUNAT.", estado: "pendiente", rec: true },
-      { n: "Doctocliq Facturación", d: "Facturación SUNAT integrada para Perú, México y Ecuador.", estado: "disponible" },
-    ] },
     { cat: "Pagos en línea y POS", ic: CreditCard, c: "#2F6FDE", items: [
       { n: "Culqi", d: "Tarjeta + Yape + Plin. 3.44% + IGV, sin mensualidad, liquidez el mismo día con BCP. Ideal para clínicas.", estado: "conectado", rec: true },
       { n: "Izipay", d: "POS físico + web, abono inmediato. Bueno si la clínica ya cobra presencial.", estado: "disponible" },
@@ -5271,6 +5266,8 @@ function Integraciones({ notify }) {
         </div>
         <span />
       </section>
+      {/* La conexión con SUNAT es tarea de TI: proveedor, credenciales, IGV y series. */}
+      <ConexionSunat notify={notify} />
       <div className="dc-us__roles" role="tablist" aria-label="Categoría">
         <button type="button" role="tab" aria-selected={catSel === "todas"} className={catSel === "todas" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setCatSel("todas")}><Plug size={13} strokeWidth={2} /> Todas <i>{its.length}</i></button>
         {cats.map((c) => { const CI = c.ic; return <button key={c.cat} type="button" role="tab" aria-selected={catSel === c.cat} className={catSel === c.cat ? "is-on" : ""} style={{ "--c": c.c }} onClick={() => setCatSel(c.cat)}><CI size={13} strokeWidth={2} /> {c.cat} <i>{c.items.length}</i></button>; })}
@@ -8925,6 +8922,12 @@ function BoletaView({ boleta, onClose }) {
     tel: DI.sede.telefonos || EMI.tel,
   };
   const serie = boleta.serie || EMISOR.serie || "B001";
+  // Boleta, factura o nota de crédito; en soles o en dólares.
+  const tipoDoc = boleta.tipo || "Boleta";
+  const TIT = { Boleta: "Boleta de venta electrónica", Factura: "Factura electrónica", "Nota de crédito": "Nota de crédito electrónica" }[tipoDoc] || "Boleta de venta electrónica";
+  const mon = boleta.moneda === "USD" ? "US$" : "S/";
+  const docLbl = boleta.docTipo || (tipoDoc === "Factura" ? "RUC" : "DNI");
+  const docNum = boleta.docNum || boleta.dni || "";
   const total = Number(boleta.total) || 0;
   const opGravada = Math.round((total / 1.18) * 100) / 100;
   const igv = Math.round((total - opGravada) * 100) / 100;
@@ -8933,12 +8936,12 @@ function BoletaView({ boleta, onClose }) {
   const imprimir = () => {
     const w = window.open("", "_blank", "width=460,height=680");
     if (!w) return;
-    w.document.write(`<html><head><title>Boleta ${serie}-${boleta.numero}</title><meta charset="utf-8"><style>body{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body style="margin:0;font-family:Arial,Helvetica,sans-serif">${resolverVars(ref.current.innerHTML)}</body></html>`);
+    w.document.write(`<html><head><title>${TIT} ${serie}-${boleta.numero}</title><meta charset="utf-8"><style>body{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body style="margin:0;font-family:Arial,Helvetica,sans-serif">${resolverVars(ref.current.innerHTML)}</body></html>`);
     w.document.close(); w.focus(); setTimeout(() => { w.print(); }, 250);
   };
   const cell = { padding: "6px 8px", fontSize: 12, color: "var(--dc-ink-900)", borderBottom: "1px solid var(--dc-line)" };
   return (
-    <Modal icon={<FileText size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Boleta de venta electrónica" sub={`${serie}-${boleta.numero}`} onClose={onClose} maxW={480}
+    <Modal icon={<FileText size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={TIT} sub={`${serie}-${boleta.numero}`} onClose={onClose} maxW={480}
       footer={<><Btn small kind="ghost" onClick={onClose}>Cerrar</Btn><Btn small onClick={imprimir}><Upload size={15} strokeWidth={1.75} /> Imprimir / PDF</Btn></>}>
       <div ref={ref}>
         <div style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 18, background: "#fff", color: "var(--dc-ink-900)", fontFamily: "Arial, Helvetica, sans-serif" }}>
@@ -8950,14 +8953,15 @@ function BoletaView({ boleta, onClose }) {
             <div style={{ fontSize: 12, color: "var(--dc-ink-700)" }}>Teléfono: {EMISOR.tel}</div>
             <div style={{ fontSize: 12, fontWeight: 500, marginTop: 3 }}>RUC: {EMISOR.ruc}</div>
             <div style={{ marginTop: 8, border: "1px solid var(--dc-ink-900)", borderRadius: "var(--dc-r-sm)", padding: "6px 8px", display: "inline-block" }}>
-              <div style={{ fontSize: 12, fontWeight: 500 }}>BOLETA DE VENTA ELECTRÓNICA</div>
+              <div style={{ fontSize: 12, fontWeight: 500 }}>{TIT.toUpperCase()}</div>
               <div style={{ fontSize: 13, fontWeight: 500, letterSpacing: ".5px" }}>{serie}-{boleta.numero}</div>
             </div>
           </div>
           <div style={{ fontSize: 12, lineHeight: 1.7 }}>
             <div><strong>Señor(es):</strong> {boleta.cliente}</div>
             <div><strong>Dirección:</strong> {boleta.direccion || "—"}</div>
-            <div><strong>DNI:</strong> {boleta.dni || "—"}</div>
+            <div><strong>{docLbl}:</strong> {docNum || "—"}</div>
+            <div><strong>Moneda:</strong> {boleta.moneda === "USD" ? "Dólares americanos" : "Soles"}</div>
             <div><strong>F. Emisión:</strong> {boleta.fecha}</div>
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10 }}>
@@ -8980,18 +8984,18 @@ function BoletaView({ boleta, onClose }) {
           </table>
           <div style={{ marginTop: 10, fontSize: 12, marginLeft: "auto", width: "62%" }}>
             {[["OP. GRAVADA", opGravada], ["TOTAL IGV", igv]].map(([l, v]) => (
-              <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span style={{ color: "var(--dc-ink-700)" }}>{l}</span><strong>S/ {v.toFixed(2)}</strong></div>
+              <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span style={{ color: "var(--dc-ink-700)" }}>{l}</span><strong>{mon} {v.toFixed(2)}</strong></div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid var(--dc-ink-900)", marginTop: 3, fontWeight: 500, fontSize: 13 }}><span>IMPORTE TOTAL VENTA</span><span>S/ {total.toFixed(2)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid var(--dc-ink-900)", marginTop: 3, fontWeight: 500, fontSize: 13 }}><span>IMPORTE TOTAL VENTA</span><span>{mon} {total.toFixed(2)}</span></div>
             {!auth.token && <div className="dc-bol-demo">Documento de demostración: no se envió a SUNAT y no tiene valor tributario.</div>}
           </div>
           <div style={{ fontSize: 12, marginTop: 10, borderTop: "1px dashed var(--dc-line)", paddingTop: 8, lineHeight: 1.7 }}>
-            <div><strong>CONDICIÓN DE PAGO:</strong> AL CONTADO S/ {total.toFixed(2)}</div>
-            <div><strong>SON:</strong> {numeroALetras(total)}</div>
+            <div><strong>CONDICIÓN DE PAGO:</strong> AL CONTADO {mon} {total.toFixed(2)}</div>
+            <div><strong>SON:</strong> {boleta.moneda === "USD" ? String(numeroALetras(total)).replace(/SOLES?/g, "DÓLARES AMERICANOS") : numeroALetras(total)}</div>
             <div style={{ marginTop: 4 }}>Observación: {boleta.ref ? `${metLbl} – Op. ${boleta.ref}` : metLbl}</div>
             <div>Usuario: {boleta.usuario || "sistema"}</div>
           </div>
-          <div style={{ textAlign: "center", fontSize: 12, color: "var(--dc-ink-400)", marginTop: 12 }}>Representación impresa de la Boleta de Venta Electrónica</div>
+          <div style={{ textAlign: "center", fontSize: 12, color: "var(--dc-ink-400)", marginTop: 12 }}>Representación impresa de la {TIT}</div>
         </div>
       </div>
     </Modal>

@@ -1589,7 +1589,9 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
   );
 }
 
-export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true, exportar = true, exportTitulo = "" }) {
+export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true, exportar = true, exportTitulo = "" }) {
+  // Columnas con `soloExport` no se pintan: van solo en el Excel/PDF (p. ej. base e IGV).
+  const cols = colsTodas.filter((c) => !c.soloExport);
   const { lista, anyF, limpiar, st } = useFiltroTabla(rows, cols, defaultSort);
   const { sortCol, sortDir, colFilters, q, setQ } = st;
   // Mismo patrón que las listas: un buscador para toda la tabla y el orden en el encabezado.
@@ -1615,7 +1617,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
     : { overflowX: "auto" };
   return (
     <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
-      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span>{anyF && <button type="button" className="dc-dt__limpiar" onClick={limpiar}>Limpiar filtros</button>}</div><div className="dc-dt__acc">{cajaBuscar}{accion}{exportar && lista.length > 0 && <BotonExportar titulo={exportTitulo || titulo} cols={cols} filas={lista} sub={etiquetaCant(lista.length, sub)} />}</div></div>}
+      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span>{anyF && <button type="button" className="dc-dt__limpiar" onClick={limpiar}>Limpiar filtros</button>}</div><div className="dc-dt__acc">{cajaBuscar}{accion}{exportar && lista.length > 0 && <BotonExportar titulo={exportTitulo || titulo} cols={colsTodas} filas={lista} sub={etiquetaCant(lista.length, sub)} />}</div></div>}
       {!titulo && cajaBuscar && <div className="dc-dt__barra"><span className="dc-fcab__cant"><b>{lista.length}</b> {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}</span>{cajaBuscar}</div>}
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;
