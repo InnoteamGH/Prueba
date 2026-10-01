@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
-import {Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
+import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
@@ -13,9 +13,13 @@ const Recall = React.lazy(() => import("./modulos/Recall"));
 const WhatsAppInbox = React.lazy(() => import("./modulos/WhatsAppInbox"));
 const PanelGerencial = React.lazy(() => import("./modulos/PanelGerencial"));
 const Metas = React.lazy(() => import("./modulos/Metas"));
+const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
+import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId } from "./compartido/catalogo";
+import * as M from "./compartido/metricas";
+import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat } from "./modulos/FacturacionSunat";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
@@ -46,7 +50,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {DatosDemoCtx, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {DatosDemoCtx, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -366,6 +370,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const esRec = rol === "recepcion", esAdmin = rol === "admin", esTI = rol === "ti";
   const esGer = rol === "gerencia", esAdmSede = rol === "admin_sede";
   const conectado = !!auth.token;
+  const dbDash = useContext(DatosDemoCtx);
   const mapCD = (c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || null, especialidad: c.especialidad || null, esp: c.especialidadId, sede: c.sedeId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), motivo: c.motivo, estado: c.estado, llegada: !!c.llegada, valor: c.valor });
   const [remC, setRemC] = useState(null);
   const [cajaDeuda, setCajaDeuda] = useState(null);
@@ -461,7 +466,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const ch = chAll;
   const citasHoyKpi = ch.filter(esCitaActivaHoy);
   const [det, setDet] = useState(null); // KPI abierto en modal de detalle
-  const rowsCitas = (arr) => [...arr].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ izq: `${c.hora} – ${c.paciente}`, der: (ESTADO_BADGE[c.estado] || {}).l || c.estado }));
+  const rowsCitas = (arr) => [...arr].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ izq: `${c.hora} – ${c.paciente}`, der: (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado }));
   // Con sesión manda el valor que envía el backend (precio base de la especialidad).
   // Antes se buscaba en ESPECIALIDADES, la constante de demostración con ids 1..5,
   // mientras c.esp es un UUID: no casaba nunca y todas las citas valían 100 soles.
@@ -500,8 +505,10 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const cobradoMesCaja = pagosSede.filter((p) => (p.fecha || "").toString().slice(0, 7) === mesIso)
     .reduce((s, p) => s + (Number(p.monto) || 0), 0);
   // Médico: producción de atenciones. Resto conectado: cobrado en caja (alineado con Caja).
-  const ingresos = esMed || !conectado
-    ? produccionDia
+  // M-05: «Cobrado hoy» es lo mismo que la cabecera de Caja (pagos de hoy), no la
+  // producción de las citas atendidas. El médico ve su producción.
+  const ingresos = esMed ? produccionDia : !conectado
+    ? M.cobradoEnFecha(dbDash?.fichas || {}, { fecha: hoyIso, sede: sedeActiva }).total
     : (pagosHistFalló ? null : (pagosHist == null ? null : cobradoHoyCaja));
   const cobrosHoyRows = !esMed && conectado && pagosHistOk
     ? pagosSede.filter((p) => (p.fecha || "").toString().slice(0, 10) === hoyIso)
@@ -608,11 +615,18 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const mananaSinConf = citasMed.filter((c) => c.fecha === manana && c.estado === "pendiente");
   const sinConfHoy = ch.filter((c) => c.estado === "pendiente");
   const mesesDesde = (iso) => { if (!iso) return 0; const d = new Date(iso + "T00:00:00"); return (hoy.getFullYear() - d.getFullYear()) * 12 + (hoy.getMonth() - d.getMonth()); };
-  const porReactivar = pacientes.filter((p) => p.ultima && mesesDesde(p.ultima) >= 6);
-  const DEUDORES_DEMO = [["Elena Vargas", 1240, 45], ["Marco Salas", 860, 31], ["Julia Ríos", 640, 62], ["Andrés Paz", 420, 18], ["Nora Campos", 300, 8]];
+  // INI-01..05: cada tarea es una consulta viva sobre la misma fuente que su módulo
+  // (compartido/metricas.js). Nada de cifras escritas a mano.
+  const porReactivar = conectado ? pacientes.filter((p) => p.ultima && mesesDesde(p.ultima) >= 6) : M.porReactivar(pacientes, citas);
+  const carteraDemo = conectado ? null : M.cartera(dbDash?.fichas || {}, pacientes, { sede: sedeActiva });
   const deudores = conectado
     ? ((cajaDeuda && cajaDeuda.porCobrar) || []).filter((r) => Number(r.saldo) > 0).map((r) => ({ n: r.paciente || "—", v: Number(r.saldo) || 0 }))
-    : DEUDORES_DEMO.filter(([, , d]) => d > 30).map(([n, v]) => ({ n, v }));
+    : carteraDemo.conVencido.map((f) => ({ n: f.p.nombre, v: f.vencido }));
+  const liqs = conectado ? [] : (dbDash?.liquidaciones || []);
+  const liqObs = liqs.filter((l) => l.estado === "observado"), liqBorr = liqs.filter((l) => l.estado === "borrador");
+  const labAtr = conectado ? [] : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso));
+  const docsPend = conectado ? [] : (dbDash?.documentos || []).filter((d) => d.estado === "pendiente" || d.estado === "enviado");
+  const nomPac = (id) => (pacientesAll.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
   const verCaja = esAdmin || esGer || esAdmSede;
   const nombres = (arr, k = "paciente") => arr.slice(0, 3).map((x) => x[k]).join(", ") + (arr.length > 3 ? ` y ${arr.length - 3} más` : "");
   const tareas = [
@@ -622,9 +636,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
     !esTI && sinConfHoy.length > 0 && { id: "confHoy", tono: "aviso", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `${pluralEs(sinConfHoy.length, "cita de hoy sin confirmar", "citas de hoy sin confirmar")}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))), accion: "Ir a la agenda", ir: () => onIr("agenda") },
     !esTI && !esMed && mananaSinConf.length > 0 && { id: "confMan", tono: "info", icon: <Send size={18} strokeWidth={1.75} />, titulo: `${pluralEs(mananaSinConf.length, "cita de mañana por confirmar", "citas de mañana por confirmar")}`, detalle: "Envía el recordatorio por WhatsApp para que confirmen hoy.", accion: "Enviar confirmaciones", ir: enviarConfMañana },
     verCaja && deudores.length > 0 && { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") },
-    esAdmin && !conectado && { id: "sunat", tono: "peligro", icon: <FileText size={18} strokeWidth={1.75} />, titulo: "2 comprobantes observados por SUNAT", detalle: "Y 9 pendientes de envío. Corrígelos para no perder el plazo de emisión.", accion: "Revisar", ir: () => onIr("facturacion") },
-    esAdmin && !conectado && { id: "seguros", tono: "info", icon: <Umbrella size={18} strokeWidth={1.75} />, titulo: "1 liquidación de seguro observada", detalle: "La Positiva – S/ 1,900. Mapfre tiene S/ 3,100 por enviar.", accion: "Ver seguros", ir: () => onIr("seguros") },
-    esMed && !conectado && { id: "controles", tono: "info", icon: <BellRing size={18} strokeWidth={1.75} />, titulo: "2 controles vencen esta semana", detalle: "María Fernanda López (ortodoncia) y Carlos Quispe (post-endodoncia).", accion: "Ver pacientes", ir: () => onIr("pacientes") },
+    (esAdmin || esAdmSede) && liqObs.length > 0 && { id: "seguros", tono: "aviso", icon: <Umbrella size={18} strokeWidth={1.75} />, titulo: `${pluralEs(liqObs.length, "liquidación de seguro observada", "liquidaciones de seguro observadas")}`, detalle: `${liqObs.map((l) => `${l.aseg} (${nomPac(l.pid)})`).join(", ")}${liqBorr.length ? ` · ${pluralEs(liqBorr.length, "borrador", "borradores")} por enviar` : ""}.`, accion: "Ver seguros", ir: () => onIr("seguros") },
+    !esTI && !esRec && labAtr.length > 0 && { id: "lab", tono: "aviso", icon: <FlaskConical size={18} strokeWidth={1.75} />, titulo: `${pluralEs(labAtr.length, "caso de laboratorio atrasado", "casos de laboratorio atrasados")}`, detalle: labAtr.map((c) => `${c.trabajo} – ${c.paciente || nomPac(c.pacienteId)}`).slice(0, 3).join(", "), accion: "Ver laboratorio", ir: () => onIr("laboratorio") },
+    !esTI && !esGer && docsPend.length > 0 && { id: "docs", tono: "info", icon: <FileCheck size={18} strokeWidth={1.75} />, titulo: `${pluralEs(docsPend.length, "documento sin firmar", "documentos sin firmar")}`, detalle: `${[...new Set(docsPend.map((d) => nomPac(d.pacienteId)))].slice(0, 3).join(", ")}. Envía el enlace o fírmalo en consultorio.`, accion: "Ver pacientes", ir: () => onIr("pacientes") },
     !esTI && !esMed && porReactivar.length > 0 && { id: "reactivar", tono: "info", icon: <Repeat size={18} strokeWidth={1.75} />, titulo: `${pluralEs(porReactivar.length, "paciente para reactivar", "pacientes para reactivar")}`, detalle: `Más de 6 meses sin venir: ${nombres(porReactivar, "nombre")}.`, accion: "Enviar recordatorio", ir: () => onIr("recall") },
   ].filter(Boolean);
   const ordenTono = { peligro: 0, aviso: 1, info: 2 };
@@ -675,7 +689,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
               ["Confirmadas", ["confirmada"], "#0E8C95"],
               ["Por confirmar", ["pendiente"], "#9AAAB0"],
               ["No vinieron", ["no_show", "cancelada"], "#E06A58"],
-            ].map(([l, est, c]) => ({ l, c, n: ch.filter((x) => est.includes(x.estado)).length })).filter((g) => g.n > 0);
+            ].map(([l, est, c]) => ({ l, c, n: ch.filter((x) => est.includes(estadoCita(x))).length })).filter((g) => g.n > 0);
             const tot = grupos.reduce((a, g) => a + g.n, 0) || 1;
             return (
               <Card className="dc-hoy__estado">
@@ -695,12 +709,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
             <Card className="dc-hoy__proximas">
               <div className="dc-hoy__cab"><h3>{esMed ? "Tus próximos pacientes" : "Próximas citas"}</h3><button type="button" className="dc-hoy__link" onClick={() => onIr("agenda")}>Ver todas</button></div>
               {proximas.length === 0 ? <div className="dc-hoy__vacio dc-hoy__vacio--mini"><span>No hay citas para hoy.</span></div> : proximas.map((c) => {
-                const e = ESTADO_BADGE[c.estado] || ESTADO_BADGE.pendiente;
                 return (
                   <div key={c.id} className="dc-cita">
                     <span className="dc-cita__hora">{c.hora}</span>
                     <div className="dc-cita__txt"><b>{c.paciente}</b><span>{c.motivo || "Consulta"}</span></div>
-                    <span className="dc-cita__estado" style={{ background: e.bg, color: e.fg }}>{e.l}</span>
+                    <EstadoPill entidad="cita" estado={estadoCita(c)} />
                   </div>
                 );
               })}
@@ -739,7 +752,7 @@ function useCountUp(target, ms = 650) {
 /* ---- Vista Calendario semanal de la Agenda ---- */
 // Paleta estable de colores por doctor (estilo Doctocliq: cada agenda su color).
 const DOC_PAL = [DS.c.primary, "var(--dc-purple)", "var(--dc-red)", "var(--dc-warn-700)", "var(--dc-primary-alt)", "var(--dc-ok-700)", "var(--dc-warn-700)", "var(--dc-danger)", "var(--dc-purple)", "var(--dc-primary-alt)"];
-const EST_LABEL = { pendiente: "Pendiente", confirmada: "Confirmada", en_atencion: "En atención", atendida: "Atendida", cancelada: "Cancelada", no_show: "No asistió", reprogramada: "Reprogramada", cerrada_sistema: "Cerrada por sistema" };
+const EST_LABEL = Object.fromEntries(Object.keys(ESTADO_BADGE).map((k) => [k, ESTADO_BADGE[k].l]));
 
 const SILLONES_CAL = [1, 2, 3, 4];
 /** Sillón real de la cita; null / "sin" si no hay número válido (DC-31: sin hash). */
@@ -902,7 +915,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   ];
   const descargarRango = (tipo) => {
     setDlOpen(false);
-    const filas = rangoCitas.map((c) => ({ fecha: c.fecha, hora: c.hora, paciente: c.paciente, medico: c.medico || "—", estado: EST_LABEL[c.estado] || c.estado }));
+    const filas = rangoCitas.map((c) => ({ fecha: c.fecha, hora: c.hora, paciente: c.paciente, medico: c.medico || "—", estado: EST_LABEL[estadoCita(c)] || c.estado }));
     if (!filas.length) return;
     if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${modo}_${iso(hoyD)}.xlsx`, hoja: "Agenda", titulo: `Agenda — ${titulo}`, columnas: COLS_CAL, filas });
     else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: `${filas.length} cita(s)`, columnas: COLS_CAL, filas });
@@ -912,7 +925,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     // El alto refleja la duración en Día/Sillón (30 min ≈ 26px): más largo = bloque más alto.
     const alto = (modo === "dia" || modo === "sillon") ? Math.max(26, Math.round((Number(c.duracionMin) || 30) / 30 * 26)) : undefined; return (
     <div draggable={arrastrable} onDragStart={(e) => { setDrag(c); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setDrag(null); setOver(null); }}
-      onClick={() => onCita && onCita(c)} title={`${c.hora}–${finCita(c)} (${Number(c.duracionMin) || 30} min) – ${c.paciente} – ${c.medico || ""} – ${EST_LABEL[c.estado] || ""}${arrastrable ? " – arrastra para mover" : ""}`}
+      onClick={() => onCita && onCita(c)} title={`${c.hora}–${finCita(c)} (${Number(c.duracionMin) || 30} min) – ${c.paciente} – ${c.medico || ""} – ${EST_LABEL[estadoCita(c)] || ""}${arrastrable ? " – arrastra para mover" : ""}`}
       style={{ textAlign: "left", border: `1px solid ${tint(col, 0.251)}`, borderLeft: `4px solid ${col}`, background: `linear-gradient(135deg, ${tint(col, 0.082)}, ${tint(col, 0.02)})`, backdropFilter: "blur(8px)", borderRadius: "var(--dc-r-md)", padding: "5px 8px", cursor: arrastrable ? "grab" : "pointer", minWidth: 0, opacity: cancel ? 0.55 : 1, minHeight: alto, boxShadow: `0 4px 12px ${tint(col, 0.082)}, inset 0 2px 4px rgba(255,255,255,0.6)`, transition: "all .15s" }}
       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 6px 16px ${tint(col, 0.145)}, inset 0 2px 4px rgba(255,255,255,0.8)`; if (arrastrable) e.currentTarget.style.transform = "translateY(-1px) scale(1.01)"; }} onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 4px 12px ${tint(col, 0.082)}, inset 0 2px 4px rgba(255,255,255,0.6)`; if (arrastrable) e.currentTarget.style.transform = "none"; }}>
       <div style={{ fontSize: 12, fontWeight: 500, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: cancel ? "line-through" : "none", display: "flex", alignItems: "center", gap: 3 }}>{c.confirmadoWa && <CheckCheck size={11} strokeWidth={1.75} color="var(--dc-ok-700)" style={{ flexShrink: 0 }} />}{c.agendadoPorIa && !c.confirmadoWa && <MessageSquare size={10} strokeWidth={1.75} color="var(--dc-ok-700)" style={{ flexShrink: 0 }} />}<span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, minWidth: 0 }}>{horaLbl} {c.paciente}</span>{modo !== "sillon" && sillonDe(c) != null && <span className="dc-cal__stag" title={`Sillón ${sillonDe(c)}`}>S{sillonDe(c)}</span>}</div>
@@ -1017,7 +1030,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           </div>
         </div>
       ) : modo === "tabla" ? (() => {
-        const ESTC = { pendiente: "#8FA3A7", confirmada: "#0E9199", en_atencion: "#D97706", atendida: "#16A36A", cancelada: "#D2463A", no_show: "#E0694F", reprogramada: "#6D4FD1", cerrada_sistema: "#7C9499" };
+        const ESTC = Object.fromEntries(Object.keys(ESTADO_BADGE).map((k) => [k, ESTADO_BADGE[k].fg]));
         const rows = semana.flatMap((d) => citasDe(iso(d)).map((c) => ({ ...c, _d: d }))).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
         const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
         const FCOLS = [
@@ -1026,7 +1039,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           { key: "paciente", label: "Paciente", get: (c) => c.paciente || "" },
           { key: "motivo", label: "Motivo", get: (c) => c.motivo || "" },
           { key: "medico", label: "Doctor", get: (c) => c.medico || "" },
-          { key: "estado", label: "Estado", get: (c) => EST_LABEL[c.estado] || c.estado || "" },
+          { key: "estado", label: "Estado", get: (c) => EST_LABEL[estadoCita(c)] || c.estado || "" },
         ];
         return (
         <ListaFiltrable rows={rows} cols={FCOLS} sub="citas" className="dc-agt__lf">{(lista) => { const dias = [];
@@ -1034,7 +1047,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
         return (
         <div className="dc-agt">
           {dias.length === 0 && <p className="dc-agt__nada">Sin citas en esta semana.</p>}
-          {dias.map((g) => { const esHoy = g.k === hoyISO; const cnt = {}; g.items.forEach((c) => { cnt[c.estado] = (cnt[c.estado] || 0) + 1; }); return (
+          {dias.map((g) => { const esHoy = g.k === hoyISO; const cnt = {}; g.items.forEach((c) => { const e = estadoCita(c); cnt[e] = (cnt[e] || 0) + 1; }); return (
             <section key={g.k} className={`dc-agt__dia${esHoy ? " is-hoy" : ""}`}>
               <header>
                 <span className="dc-agt__fecha"><b>{g.d.getDate()}</b><small>{NOM[(g.d.getDay() + 6) % 7]}</small></span>
@@ -1042,13 +1055,13 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                 <div className="dc-agt__cnt">{Object.entries(cnt).map(([e, n]) => <span key={e} style={{ "--e": ESTC[e] || "#8FA3A7" }}><i />{n} {(EST_LABEL[e] || e).toLowerCase()}</span>)}</div>
               </header>
               <div className="dc-agt__filas">
-                {g.items.map((c) => { const col = colorDe(c); const ec = ESTC[c.estado] || "#8FA3A7"; const cancel = c.estado === "cancelada"; return (
+                {g.items.map((c) => { const col = colorDe(c); const ec = ESTC[estadoCita(c)] || "#8FA3A7"; const cancel = c.estado === "cancelada"; return (
                   <button type="button" key={c.id} className={`dc-agt__fila${cancel ? " is-cancel" : ""}`} style={{ "--e": ec, "--d": col }} onClick={() => onCita && onCita(c)}>
                     <span className="dc-agt__hora">{c.hora}</span>
                     <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 11.5, background: `linear-gradient(135deg, ${tint(ec, 0.22)}, ${tint(ec, 0.08)})`, color: ec }}>{iniciales(c.paciente)}</span>
                     <span className="dc-agt__pac"><b>{c.paciente}</b>{c.motivo && <small>{c.motivo}</small>}</span>
                     <span className="dc-agt__doc"><i />{c.medico || "—"}</span>
-                    <span className="dc-agt__est">{EST_LABEL[c.estado] || c.estado}</span>
+                    <span className="dc-agt__est">{EST_LABEL[estadoCita(c)] || c.estado}</span>
                   </button>
                 ); })}
               </div>
@@ -1439,8 +1452,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           {hasDet && <Info size={13} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} />}
         </div>); } },
     // La llegada se muestra en el mismo estado («En sala») en vez de una columna aparte.
-    { key: "estado", label: "Estado", get: (c) => (c.llegada && (c.estado === "confirmada" || c.estado === "pendiente") ? "En sala" : (EST[c.estado] || EST.pendiente).l), w: "124px", a: "center",
-      cell: (c) => { const enSala = c.llegada && (c.estado === "confirmada" || c.estado === "pendiente"); const e = EST[c.estado] || EST.pendiente; return <div style={{ display: "flex", justifyContent: "center" }}>{enSala ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> En sala</span> : <span className="dc-pill" style={{ "--c": e.c }}><i /> {e.l}</span>}</div>; } },
+    { key: "estado", label: "Estado", get: (c) => estadoInfo("cita", estadoCita(c)).label, w: "124px", a: "center",
+      cell: (c) => <div style={{ display: "flex", justifyContent: "center" }}><EstadoPill entidad="cita" estado={estadoCita(c)} /></div> },
     // Ancho fijo: cada fila es su propia rejilla, así que un ancho "según contenido"
     // descuadraba la columna de una fila a otra.
     // Una acción principal visible según el estado de la cita; el resto en el menú ⋯.
@@ -1500,7 +1513,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const filasExport = () => [...todasHoy].sort((a, b) => (a.hora || "").localeCompare(b.hora || "")).map((c) => ({
     hora: c.hora, paciente: c.paciente, dni: c.dni, medico: c.medico || nom(c.medicoId),
     sede: c.sedeNombre || nombreSede(c.sede), motivo: c.motivo,
-    estado: (EST[c.estado] || EST.pendiente).l, llegada: c.llegada ? "Presente" : "Por llegar" }));
+    estado: estadoInfo("cita", estadoCita(c)).label, llegada: c.llegada ? "Presente" : "Por llegar" }));
   const descargar = (tipo) => {
     setDlOpen(false);
     const filas = filasExport();
@@ -1637,16 +1650,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf} reglas={reglasAg} validar={validarMovida} sedeInicial={sedeActiva}
         onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
         onQuitarAsignacion={puedeAgendar ? (id) => { if (conectado) { api.sillones.quitarAsignacion(id).then(() => notify("Turno quitado.")).catch(() => notify("No se pudo quitar.")); return; } demoDb?.setAsignaciones((xs) => (xs || []).filter((x) => x.id !== id)); notify("Turno quitado."); } : null} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
-      {fmId && (
-        <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
-          <FichaMedica pacienteId={fmId} onClose={() => { setFmId(null); setFichaCita(null); }} notify={notify} can={can} rol={rol}
-            pacienteDemo={conectado ? null : (pacientes.find((x) => String(x.id) === String(fmId)) || null)}
-            initialTab={fmTabCita}
-            sedeId={sedeApiUuid(sedeActiva != null && sedeActiva !== "all" ? sedeActiva : 1)}
-            onAgendar={(pac) => { setFmId(null); setFichaCita(null); setAgendar({ pacienteId: pac.id || fmId, motivo: "Consulta" }); }}
-            onCobrar={(pac) => { const pid = pac.id || fmId; setFmId(null); setFichaCita(null); setPago({ pid, nombre: pac.nombre || "Paciente", monto: saldos[pid] || 0, sedeId: null }); }} />
-        </React.Suspense>
-      )}
+
       {tv && <SalaTV onClose={() => setTv(false)} citasDemo={citasProp} />}
       {pago && <ModalCobro monto={pago.monto} pacienteId={pago.pid} sedeId={pago.sedeId} paciente={pago.nombre} concepto="Cobro en Agenda" onClose={() => setPago(null)} onAprobado={(res) => { setPago(null); notify(`Cobrado S/ ${(res?.montoCobrado ?? pago.monto).toFixed(2)} de ${pago.nombre}. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Comprobante de demostración (sin envío a SUNAT)."}`); recargar(); recargarSaldos(); }} />}
       {cancelCita && <CancelarCitaModal cita={cancelCita} onClose={() => setCancelCita(null)} onConfirm={(motivo) => cancelarConMotivo(cancelCita, motivo)} />}
@@ -1747,7 +1751,7 @@ function fmtTelDir(tel) {
   return "—";
 }
 
-function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, notify = () => {}, crearIntent = false, onIntentDone = () => {}, can, rol, sedeIds = [1, 2], onAgendarPaciente, onCobrarPaciente }) {
+function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, notify = () => {}, crearIntent = false, onIntentDone = () => {}, can, rol, sedeIds = [1, 2], onAgendarPaciente, onCobrarPaciente, consumirInsumos = () => {}, sedeActiva = 1, misSedes = SEDE_IDS, onIr = () => {}, avisoElegir = null }) {
   // Dar de alta un paciente y lanzar campañas es trabajo de recepción y administración.
   // Gerencia entra aquí a consultar la cartera, no a escribir en ella.
   const puedeGestionar = can ? can("pacientes", "crear") : true;
@@ -1794,8 +1798,10 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // En conectado, la última visita y la próxima cita vienen ya resueltas del backend
   // (GET /pacientes/resumen-citas). Antes se pedía `citas.listar("all")`, que traía TODO
   // el histórico de citas de la clínica al navegador para derivar solo esos dos datos.
-  // En demo se siguen calculando en memoria sobre CITAS_INIT.
-  const [citasSrc, setCitasSrc] = useState(conectado ? [] : CITAS_INIT);
+  // En demo se calculan sobre las citas vivas de la Agenda (contexto), no sobre la semilla.
+  const dbPac = useContext(DatosDemoCtx);
+  const [citasSrcRem, setCitasSrc] = useState([]);
+  const citasSrc = conectado ? citasSrcRem : (dbPac?.citas || CITAS_INIT);
   const [resumenCitas, setResumenCitas] = useState(null);   // { pacienteId: {ultimaVisita, proximaFecha, proximaHora} }
   useEffect(() => {
     recargar();
@@ -1824,7 +1830,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     });
     return m;
   }, [conectado, resumenCitas, citasSrc]);
-  const ultimaDe = (p) => p.ultima || ultimaVisita[p.id] || null;
+  // M-10: la misma «última visita» que la ficha y el Panel (última cita Atendida).
+  const ultimaDe = (p) => conectado ? (p.ultima || ultimaVisita[p.id] || null) : M.ultimaVisita(p, citasSrc);
   // Próxima cita del paciente (futura, más cercana, ni cancelada ni atendida).
   const proxima = (p) => {
     if (conectado) {
@@ -1840,13 +1847,14 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     const { pacienteId } = parseHash(typeof window !== "undefined" ? window.location.hash : "");
     return pacienteId || null;
   });
-  const [fmTab, setFmTab] = useState(null);
+  const [fmTab, setFmTab] = useState(() => parseHash(typeof window !== "undefined" ? window.location.hash : "").tab || null);
   useEffect(() => {
     const { pacienteId } = parseHash(window.location.hash);
     if (pacienteId) setFmId(pacienteId);
     const onHash = () => {
-      const { pacienteId: pid } = parseHash(window.location.hash);
+      const { pacienteId: pid, tab: t } = parseHash(window.location.hash);
       setFmId(pid || null);
+      if (pid) setFmTab(t || null);
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -1854,7 +1862,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   useEffect(() => {
     const { pacienteId } = parseHash(window.location.hash);
     if (fmId) {
-      if (pacienteId !== String(fmId)) irHash("pacientes", { pacienteId: fmId });
+      if (pacienteId !== String(fmId)) irHash("pacientes", { pacienteId: fmId, tab: fmTab || undefined });
     } else if (pacienteId) {
       // No borrar el deep-link en el primer render antes de hidratar fmId
     }
@@ -1974,7 +1982,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   };
   // Antes: 7 recorridos completos de la lista de pacientes en CADA render (5 filter + reduce + sort).
   // Ahora: una sola pasada, y solo cuando cambian los pacientes o sus últimas visitas.
-  const { activos, reactivar, nuevos, cumpleMes, optIn, canalTop } = useMemo(() => {
+  const { activos, reactivar: reactivarLoc, nuevos: nuevosLoc, cumpleMes, optIn, canalTop } = useMemo(() => {
     let activos = 0, reactivar = 0, nuevos = 0, cumpleMes = 0, optIn = 0;
     const canalCount = {};
     const mesHoy = hoy.getMonth();
@@ -1995,6 +2003,10 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     return { activos, reactivar, nuevos, cumpleMes, optIn,
              canalTop: Object.entries(canalCount).sort((a, b) => b[1] - a[1]).slice(0, 8) };
   }, [lista, ultimaVisita]); // eslint-disable-line
+  // M-08 / M-09: mismas definiciones que Recordatorios y Panel gerencial.
+  const reactivarLista = conectado ? null : M.porReactivar(lista, citasSrc);
+  const reactivar = conectado ? reactivarLoc : reactivarLista.length;
+  const nuevos = conectado ? nuevosLoc : M.nuevos30(lista, citasSrc).length;
   const canalMax = Math.max(1, ...canalTop.map((c) => c[1]));
   const canalCol = { "Recomendación": "#16A36A", "Instagram": "#E0487A", "Facebook": "#2F6FDE", "Google": "#F2A93B", "TikTok": "#1F3A40", "Volante": "#D97706", "Pasó por el local": "#0E9199", "Convenio empresa": "#6D4FD1", "Sin registrar": "#B7C8CB" };
   const segmentos = [
@@ -2007,7 +2019,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   ];
   const segmentoPac = (k) => lista.filter((p) => p.telefono && String(p.telefono).trim() && (
     k === "cumple" ? (p.nacimiento && new Date(p.nacimiento + "T00:00:00").getMonth() === hoy.getMonth())
-    : k === "react" ? (dias(p) > 180 && diasDesdeAlta(p) > 30)
+    : k === "react" ? (reactivarLista ? reactivarLista.some((r) => r.id === p.id) : (dias(p) > 180 && diasDesdeAlta(p) > 30))
     : k === "opt" ? (p.marketing || (!conectado && (Number(p.id) || 0) % 3 !== 0)) : false));
   const enviarCamp = async () => {
     const canalTxt = camp.canal === "ambos" ? "WhatsApp y email" : camp.canal === "email" ? "email" : "WhatsApp";
@@ -2070,6 +2082,30 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       </div>
     ) },
   ];
+  // Ficha a página completa (FIC-01): #/pacientes/:id/:pestaña. Odontograma, Plan y
+  // cuenta y Archivos son los mismos componentes que antes eran módulos sueltos, con el
+  // paciente fijo: un solo estado por paciente (ODO-01, FIC-03, FIC-05).
+  const slotsFicha = {
+    odontograma: (pid) => <Odontograma key={`odo-${pid}`} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeActiva={sedeActiva} />,
+    plan: (pid) => <Tratamientos key={`plan-${pid}`} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
+    archivos: (pid, sub) => <ArchivosPaciente key={`arch-${pid}`} pid={pid} sub={sub} pacientes={pacientes} notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} onIrLaboratorio={() => onIr("laboratorio")} />,
+  };
+  if (fmId) {
+    return (
+      <div className="dc-ficha-pagina">
+        <button type="button" className="dc-volver" onClick={cerrarFm}><ChevronRight size={15} strokeWidth={2} style={{ transform: "rotate(180deg)" }} /> Pacientes</button>
+        <React.Suspense fallback={<Card style={{ padding: 24 }}>Cargando ficha…</Card>}>
+          <FichaMedica pagina slots={slotsFicha} pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
+            pacienteDemo={conectado ? null : pacientes.find((x) => String(x.id) === String(fmId))}
+            sedeId={sedeApiUuid(sedeIds?.[0] ?? 1)}
+            initialTab={fmTab}
+            onTabChange={(t) => { setFmTab(t); irHash("pacientes", { pacienteId: fmId, tab: t }); }}
+            onAgendar={(pac) => onAgendarPaciente?.(pac)}
+            onCobrar={(pac) => onCobrarPaciente?.(pac)} />
+        </React.Suspense>
+      </div>
+    );
+  }
   return (
     <div className="dc-pacientes-root" style={{ display: "grid", gap: 16, minWidth: 0, width: "100%", overflowX: "hidden" }}>
       <section className="dc-esp-hero dc-pac-hero">
@@ -2470,8 +2506,8 @@ function DienteSVG({ n, data, onCara, onWhole }) {
 }
 
 /* Procedimiento y precio sugeridos por hallazgo, para pasar del odontograma al plan. */
-const SUGERENCIA_PLAN = { caries: { p: "Obturación", c: 120 }, fractura: { p: "Reconstrucción", c: 180 }, extraer: { p: "Extracción", c: 200 }, ausente: { p: "Implante / prótesis", c: 900 }, corona: { p: "Corona", c: 450 }, endodoncia: { p: "Endodoncia", c: 350 } };
-function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, sedeActiva = 1, can, rol }) {
+function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, sedeActiva = 1, can, rol, pacienteFijo = null }) {
+  const demoDbOdo = useContext(DatosDemoCtx);
   const conectado = !!auth.token;
   const [pacRemoto, setPacRemoto] = useState(null);
   // Hace falta el nacimiento: sin el no se puede saber que denticion le toca.
@@ -2489,7 +2525,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     sedeNombre: p.sedeNombre || null,
   })))).catch(() => {}); }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
-  const [pacienteId, setPacienteId] = useState(pacienteActivo || (auth.token ? null : pacProp[0]?.id) || null);
+  const [pacienteId, setPacienteId] = useState(pacienteFijo || pacienteActivo || (auth.token ? null : pacProp[0]?.id) || null);
   const [fmTab, setFmTab] = useState(null); // overlay ficha sin salir del módulo Odontograma
   const [fmOpen, setFmOpen] = useState(false);
   const [fmShield, setFmShield] = useState(false); // absorbe click-through al cerrar overlay
@@ -2715,15 +2751,36 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     return tieneEstados && !esPiezaSana(n);
   });
   // P0-2: del hallazgo al plan de tratamiento (misma ficha).
-  const yaEnPlan = (nombre) => (fichas[pacienteId]?.tratamiento || []).some((f) => f.nombre === nombre);
+  // ODO-02 / ODO-03: del hallazgo al presupuesto único, solo con servicios del catálogo.
+  const catalogoOdo = (demoDbOdo?.catalogo || CATALOGO_SEED);
+  const yaItem = (servId, pieza) => (fichas[pacienteId]?.tratamiento || []).some((f) => f.estado !== "anulado" && String(f.servicioId) === String(servId) && String(f.pieza) === String(pieza));
+  const agregarItems = (lineas) => {
+    const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l, i) => ({ id: Date.now() + i, servicioId: l.serv.id, pieza: Number(l.pieza), cara: l.cara || undefined, nombre: nombreItem(l.serv, l.pieza, l.cara), costo: l.serv.precio, estado: "pendiente", origen: "odontograma" }));
+    if (!nuevos.length) { notify && notify("Los hallazgos por hacer ya están en el presupuesto."); return; }
+    updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: [...(cur.tratamiento || []), ...nuevos] }));
+    notify && notify(`${nuevos.length === 1 ? "Se agregó 1 ítem" : `Se agregaron ${nuevos.length} ítems`} al presupuesto (Plan y cuenta).`);
+  };
   const agregarAlPlan = (n) => {
     const d = estados[n]; const ests = d.whole ? [d.whole] : Object.values(d.caras || {});
-    const sug = ests.map((e) => SUGERENCIA_PLAN[e]).find(Boolean);
-    if (!sug) { notify && notify("Esta pieza no requiere un procedimiento."); return; }
-    const nombre = `${sug.p} – pieza ${n}`;
-    if (yaEnPlan(nombre)) { notify && notify("Ya está en el plan de tratamiento."); return; }
-    updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: [...(cur.tratamiento || []), { id: Date.now(), nombre, costo: sug.c, estado: "pendiente", origen: "odontograma" }] }));
-    notify && notify(`Agregado al plan: ${nombre} (S/ ${sug.c}).`);
+    const serv = ests.map((e) => servicioPorHallazgo(catalogoOdo, e)).find(Boolean);
+    if (!serv) { notify && notify("Este hallazgo no tiene un servicio en el catálogo."); return; }
+    const caras = d.whole ? "" : Object.entries(d.caras || {}).filter(([, e]) => servicioPorHallazgo(catalogoOdo, e)?.id === serv.id).map(([k]) => CARA_LETRA[k] || "").join("");
+    agregarItems([{ serv, pieza: n, cara: caras }]);
+  };
+  // Vista anatómica: los hallazgos en rojo (por hacer) del dibujo guardado.
+  const HALLAZGO_IFRAME = { coronaT: "corona", extraccion: "extraer", rr: "extraer", fractR: "extraer", absceso: "endodoncia", periapic: "endodoncia" };
+  const pasarHallazgos = () => {
+    const datos = (fichas[pacienteId]?.odoHtml || {})[fase] || {};
+    const lineas = [];
+    for (const [pz, row] of Object.entries(datos)) {
+      const porServ = {};
+      const add = (h, cara) => { const serv = servicioPorHallazgo(catalogoOdo, HALLAZGO_IFRAME[h] || h); if (!serv) return; porServ[serv.id] = porServ[serv.id] || { serv, caras: "" }; if (cara) porServ[serv.id].caras += cara; };
+      for (const [cara, m] of Object.entries(row?.caras || {})) if (m?.c === "r") add(m.h, cara);
+      for (const m of row?.pieza || []) if (m?.c === "r") add(m.h, "");
+      Object.values(porServ).forEach((x) => lineas.push({ serv: x.serv, pieza: pz, cara: x.caras }));
+    }
+    if (!lineas.length) { notify && notify("No hay hallazgos por hacer (en rojo) con servicio en el catálogo."); return; }
+    agregarItems(lineas);
   };
 
   const totalPiezas = [...filas.sup, ...filas.inf].reduce((n, f) => n + f.length, 0);
@@ -2756,7 +2813,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: vistaOdo === "anatomico" ? 8 : 16 }}>
-      {vistaOdo !== "anatomico" && (
+      {vistaOdo !== "anatomico" && !pacienteFijo && (
         <PacienteBar pacientes={pacientes} pacienteId={pacienteId} setPacienteId={setPacienteId} modulo="Odontograma" sedeLabel={sedeLabelOdo || null} />
       )}
 
@@ -2798,10 +2855,10 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               </>
             )}
             <div className={vistaOdo === "anatomico" ? "dc-odo-bar" : undefined} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
-              {vistaOdo === "anatomico" && paciente && paciente.nombre && (
+              {vistaOdo === "anatomico" && !pacienteFijo && paciente && paciente.nombre && (
                 <span className="dc-odo-bar__av" style={{ "--av": colorDe(paciente.nombre) }}>{iniciales(paciente.nombre)}</span>
               )}
-              {vistaOdo === "anatomico" && (
+              {vistaOdo === "anatomico" && !pacienteFijo && (
                 <Select
                   width={240}
                   ariaLabel="Paciente"
@@ -2824,13 +2881,13 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                   ))}
                 </div>
               )}
-              {pacienteId && <Btn small kind="ghost" onClick={() => { setFmTab("historia"); setFmOpen(true); }}><FileText size={14} strokeWidth={1.75} /> Ficha del paciente</Btn>}
+              {pacienteId && !pacienteFijo && <Btn small kind="ghost" onClick={() => { setFmTab("historia"); setFmOpen(true); }}><FileText size={14} strokeWidth={1.75} /> Ficha del paciente</Btn>}
               {/* Documentos a la vista: en la anatómica los emite el propio odontograma (mismo membrete). */}
               {vistaOdo === "anatomico" && pacienteId && <>
-                <Btn small onClick={() => { anatomicoRef.current?.abrirDocumento?.("plan"); }} title="Plan de inversión (proforma) para imprimir o guardar en PDF"><FileText size={14} strokeWidth={1.75} /> Proforma</Btn>
-                <Btn small kind="ghost" onClick={() => { anatomicoRef.current?.abrirDocumento?.("resumen"); }} title="Resumen clínico del odontograma"><Printer size={14} strokeWidth={1.75} /> Resumen</Btn>
+                <Btn small onClick={() => { anatomicoRef.current?.abrirDocumento?.("plan"); }} title="Presupuesto del paciente para imprimir o guardar en PDF"><FileText size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>
+                <Btn small kind="ghost" onClick={() => { anatomicoRef.current?.abrirDocumento?.("resumen"); }} title="Resumen clínico del odontograma"><Printer size={14} strokeWidth={1.75} /> Resumen de hallazgos</Btn>
               </>}
-              {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Plan de inversión imprimible"><Printer size={14} strokeWidth={1.75} /> Proforma</Btn>}
+              {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Presupuesto del paciente para imprimir"><Printer size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
               <label className="dc-odo-bar__zoom" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 999, padding: "4px 12px", marginLeft: "auto" }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Zoom</span>
                 <input type="range" min="50" max="130" value={zoom} onChange={(e) => setZoom(Number(e.target.value))}
@@ -2874,6 +2931,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               ref={anatomicoRef}
               pacienteId={pacienteId}
               demoEstados={conectado ? null : estados}
+              demoDatos={conectado ? null : ((fichas[pacienteId]?.odoHtml || {})[fase] || null)}
+              onDemoCambio={conectado ? null : (datos, f) => updFicha(pacienteId, (cur) => ({ ...cur, odoHtml: { ...(cur.odoHtml || {}), [f || fase]: datos } }))}
               pacienteNombre={(pacientes.find((x) => x.id === pacienteId) || {}).nombre || ""}
               pacienteDni={(pacientes.find((x) => x.id === pacienteId) || {}).dni || ""}
               pacienteEdad={edadPac != null ? edadPac : ""}
@@ -2897,6 +2956,32 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               }}
             />
           </div>
+          {pacienteId && (() => {
+            const items = (fichas[pacienteId]?.tratamiento || []).filter((f) => f.estado !== "anulado");
+            const total = items.reduce((a, f) => a + (Number(f.costo) || 0), 0);
+            return (
+              <section className="dc-odo-ppto" aria-label="Presupuesto del paciente">
+                <header className="dc-odo-ppto__h">
+                  <div>
+                    <h3>Presupuesto del paciente</h3>
+                    <p>Un solo presupuesto: lo que marques <b>por hacer</b> (en rojo) pasa aquí con el precio del catálogo de servicios.</p>
+                  </div>
+                  {vistaOdo === "anatomico" && !conectado && <button className="dc-btn dc-btn--primary" onClick={pasarHallazgos}>Pasar hallazgos por hacer al presupuesto</button>}
+                </header>
+                {items.length === 0 ? <p className="dc-odo-ppto__vacio">Aún no hay procedimientos en el presupuesto.</p> : (
+                  <table className="dc-odo-ppto__t">
+                    <thead><tr><th>Procedimiento</th><th>Estado</th><th className="num">Precio</th></tr></thead>
+                    <tbody>
+                      {items.map((f) => (
+                        <tr key={f.id}><td>{f.nombre}</td><td><EstadoPill entidad="procedimiento" estado={f.estado} /></td><td className="num">S/ {(Number(f.costo) || 0).toLocaleString("es-PE")}</td></tr>
+                      ))}
+                    </tbody>
+                    <tfoot><tr><td colSpan={2}>Total del plan</td><td className="num">S/ {total.toLocaleString("es-PE")}</td></tr></tfoot>
+                  </table>
+                )}
+              </section>
+            );
+          })()}
           {vistaOdo === "clasico" && (<>
           {/* El indice de caries cambia de nombre segun la denticion: en dientes de
               leche se escribe en minusculas (ceo-d) y en permanentes en mayusculas
@@ -3095,7 +3180,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
 }
 
 /* ---- Tratamientos (plan de tratamiento = fuente de los cargos) ---- */
-function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can }) {
+function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can }) {
   // Cobrar una fase es caja, no plan de tratamiento. Gerencia consulta el plan; el
   // cobro lo hace quien tiene caja (recepción, administración).
   const puedeCobrar = can ? can("facturacion", "crear") : true;
@@ -3105,7 +3190,7 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
   const [sedes, setSedes] = useState([]);
   useEffect(() => { if (conectado) { api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); api.sedes.listar().then((s) => setSedes(s || [])).catch(() => {}); } }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
-  const [pacienteId, setPacienteId] = useState(pacienteActivo || (auth.token ? null : pacProp[0]?.id) || null);
+  const [pacienteId, setPacienteId] = useState(pacienteFijo || pacienteActivo || (auth.token ? null : pacProp[0]?.id) || null);
   useEffect(() => { if (pacienteActivo) setPacienteId(pacienteActivo); }, [pacienteActivo]);
   useEffect(() => {
     if (!conectado || !pacRemoto) return;
@@ -3119,33 +3204,39 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
   const recargarTrat = () => { if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); }).catch(() => {}); };
   useEffect(() => { if (pacienteId) recargarTrat(); else setFasesRem([]); }, [pacienteId, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => p.id === pacienteId) || { id: pacienteId, nombre: "Selecciona un paciente" };
-  const fases = conectado ? fasesRem : (fichas[pacienteId]?.tratamiento || []);
+  const fases = (conectado ? fasesRem : (fichas[pacienteId]?.tratamiento || [])).filter((f) => f.estado !== "anulado");
   const piezaDeFase = (f) => {
     if (f.piezaNumero != null && f.piezaNumero !== "") return String(f.piezaNumero);
+    if (f.pieza != null && f.pieza !== "") return String(f.pieza);
     const m = String(f.nombre || "").match(/pieza\s*(\d+)/i);
     return m ? m[1] : "—";
   };
   const caraDeFase = (f) => (f.cara && String(f.cara).trim()) || "—";
-  const nombreFaseLimpio = (f) => String(f.nombre || "").replace(/\s*[-–]?\s*pieza\s*\d+/i, "").trim() || f.nombre;
+  const nombreFaseLimpio = (f) => String(f.nombre || "").replace(/\s*[-–·]?\s*pieza\s*\d+(\s*\([A-Za-z]+\))?/i, "").trim() || f.nombre;
   const total = fases.reduce((s, f) => s + f.costo, 0), pagado = fases.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0), saldo = total - pagado;
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
   const sedePago = () => (sedes[0]?.id) || null;
   const setTrat = (fn) => updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: fn(cur.tratamiento || []) }));
   const addPago = (concepto, monto) => updFicha(pacienteId, (cur) => ({ ...cur, pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto, monto, metodo: "Caja" }] }));
   const agregarFase = () => {
-    if (!nueva.nombre.trim()) { notify("Indica el nombre de la fase."); return; }
+    if (!nueva.nombre.trim()) { notify("Indica el procedimiento."); return; }
     if (conectado) {
       const payload = { nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0 };
       if (nueva.servicioId) payload.servicioId = nueva.servicioId;
       if (nueva.pieza) payload.piezaNumero = Number(nueva.pieza);
       if (nueva.cara && String(nueva.cara).trim()) payload.cara = String(nueva.cara).trim();
-      const doAdd = (pid) => api.tratamientos.agregarFase(pid, payload).then(() => { notify("Fase agregada al plan."); setNueva(null); recargarTrat(); }).catch(() => notify("Error al agregar la fase."));
+      const doAdd = (pid) => api.tratamientos.agregarFase(pid, payload).then(() => { notify("Procedimiento agregado al presupuesto."); setNueva(null); recargarTrat(); }).catch(() => notify("No se pudo agregar el procedimiento."));
       if (planId) doAdd(planId); else api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento" }).then((p) => { setPlanId(p.id); doAdd(p.id); }).catch(() => notify("Error al crear el plan."));
       return;
     }
-    setTrat((t) => [...t, { id: Date.now(), nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0, estado: "pendiente", servicioId: nueva.servicioId || null, piezaNumero: nueva.pieza ? Number(nueva.pieza) : null, cara: nueva.cara || null }]); notify("Fase agregada al plan."); setNueva(null);
+    setTrat((t) => [...t, { id: Date.now(), nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0, estado: "pendiente", servicioId: nueva.servicioId || null, piezaNumero: nueva.pieza ? Number(nueva.pieza) : null, cara: nueva.cara || null }]); notify("Procedimiento agregado al presupuesto."); setNueva(null);
   };
-  const quitarFase = (f) => { if (conectado) { api.tratamientos.borrarFase(f.id).then(() => { notify("Fase eliminada del plan."); recargarTrat(); }).catch(() => notify("Error al eliminar la fase.")); return; } setTrat((t) => t.filter((x) => x.id !== f.id)); notify("Fase eliminada del plan."); };
+  const quitarFase = (f) => {
+    // TRA-04: un procedimiento no se borra, se anula (queda en el historial del plan).
+    if (!confirm(`¿Anular «${f.nombre}»? Sale del presupuesto y del saldo; queda registrado como anulado.`)) return;
+    if (conectado) { api.tratamientos.actualizarFase(f.id, { estado: "anulado" }).then(() => { notify("Procedimiento anulado."); recargarTrat(); }).catch(() => api.tratamientos.borrarFase(f.id).then(() => { notify("Procedimiento anulado."); recargarTrat(); }).catch(() => notify("No se pudo anular el procedimiento."))); return; }
+    setTrat((tt) => tt.map((x) => (x.id === f.id ? { ...x, estado: "anulado", anuladoEn: new Date().toISOString() } : x))); notify("Procedimiento anulado. Ya no suma al saldo.");
+  };
   const esInvasivo = (nom) => /endodoncia|cirug|implante|extracci|bracket|ortodoncia/i.test(nom || "");
   // El doctor marca la fase como terminada: el cobro queda generado solo en Caja
   // (bloque «Tratamientos terminados por cobrar»), sin que recepción lo digite.
@@ -3154,7 +3245,7 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
     if (conectado) {
       api.tratamientos.actualizarFase(f.id, { estado: "terminada", terminadaEn: cuando })
         .then(() => { notify(`${f.nombre} terminado. El cobro de S/ ${f.costo.toFixed(2)} ya está en Caja.`); recargarTrat(); })
-        .catch((err) => notify((err && err.message) || "No se pudo marcar la fase como terminada."));
+        .catch((err) => notify((err && err.message) || "No se pudo marcar el procedimiento como terminado."));
       return;
     }
     setTrat((t) => t.map((x) => (x.id === f.id ? { ...x, estado: "terminada", terminadaEn: cuando } : x)));
@@ -3166,7 +3257,7 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
       api.tratamientos.actualizarFase(f.id, { estado: "atendida" })
         .then(() => api.pagos.registrar({ pacienteId, sedeId: sedePago(), faseId: f.id, concepto: f.nombre, monto: f.costo, metodo: "efectivo" }))
         .then(() => { notify(`Cobrado: ${f.nombre} — S/ ${f.costo.toFixed(2)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); })
-        .catch((err) => notify((err && err.message) || "Error al cobrar la fase. Verifica el consentimiento firmado."));
+        .catch((err) => notify((err && err.message) || "No se pudo cobrar el procedimiento. Verifica el consentimiento firmado."));
       return;
     }
     if (esInvasivo(f.nombre)) {
@@ -3179,19 +3270,21 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
   const avance = fases.length ? Math.round((atendidas / fases.length) * 100) : 0;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
-      <PacienteBar pacientes={pacientes} pacienteId={pacienteId} setPacienteId={setPacienteId} modulo="Plan de tratamiento" extra={fases.length > 0 && (
-        <div className="dc-trat-met">
-          <div className="dc-trat-met__anillo" style={{ "--p": avance }}><b>{avance}%</b><span>avance</span></div>
+      {!pacienteFijo && <PacienteBar pacientes={pacientes} pacienteId={pacienteId} setPacienteId={setPacienteId} modulo="Plan y cuenta" />}
+      {/* Una sola franja de cifras del plan (TRA-01) con rótulos claros (TRA-03). */}
+      {fases.length > 0 && (
+        <div className="dc-trat-met dc-trat-met--franja">
           <div className="dc-trat-met__cifras">
-            <div><b>S/ {total.toLocaleString("es-PE")}</b><span>Total del plan</span></div>
-            <div><b>S/ {pagado.toLocaleString("es-PE")}</b><span>Cobrado</span></div>
-            <div className={saldo > 0 ? "is-saldo" : ""}><b>S/ {saldo.toLocaleString("es-PE")}</b><span>{saldo > 0 ? "Por cobrar" : "Al día"}</span></div>
+            <div><b>S/ {total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Total del plan</span></div>
+            <div><b>S/ {pagado.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Pagado {total ? Math.round((pagado / total) * 100) : 0}%</span></div>
+            <div className={saldo > 0 ? "is-saldo" : ""}><b>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>{saldo > 0 ? "Saldo del plan" : "Al día"}</span></div>
+            <div><b>{atendidas + fases.filter((f) => f.estado === "terminada").length}/{fases.length}</b><span>Avance clínico</span></div>
           </div>
         </div>
-      )} />
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }} className="dc-trat">
+      )}
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14.5, fontWeight: 700 }}>Fases del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} atendidas</span></h3><Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Fase</Btn></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14.5, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -3204,13 +3297,13 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Pieza<br /><input className="dc-premium-inp" value={nueva.pieza || ""} onChange={(e) => setNueva({ ...nueva, pieza: e.target.value.replace(/\D/g, "").slice(0, 2) })} placeholder="16" style={{ ...inp, marginTop: 4 }} /></label>
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Cara<br /><input className="dc-premium-inp" value={nueva.cara || ""} onChange={(e) => setNueva({ ...nueva, cara: e.target.value })} placeholder="O" style={{ ...inp, marginTop: 4 }} /></label>
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Costo (S/)<br /><input className="dc-premium-inp" type="number" value={nueva.costo} onChange={(e) => setNueva({ ...nueva, costo: e.target.value })} placeholder="120" style={{ ...inp, marginTop: 4 }} /></label>
-              <div style={{ display: "flex", gap: 6 }}><Btn small onClick={agregarFase} aria-label="Agregar fase" title="Agregar fase"><Check size={15} strokeWidth={1.75} /></Btn><Btn small kind="ghost" onClick={() => setNueva(null)} aria-label="Cancelar" title="Cancelar"><X size={15} strokeWidth={1.75} /></Btn></div>
+              <div style={{ display: "flex", gap: 6 }}><Btn small onClick={agregarFase} aria-label="Agregar procedimiento" title="Agregar procedimiento"><Check size={15} strokeWidth={1.75} /></Btn><Btn small kind="ghost" onClick={() => setNueva(null)} aria-label="Cancelar" title="Cancelar"><X size={15} strokeWidth={1.75} /></Btn></div>
             </div>
           </div>
         )}
-        {fases.length === 0 && !nueva && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Sin tratamiento" sub="Agrega la primera fase, o créalas desde el odontograma." />}
+        {fases.length === 0 && !nueva && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub="Agrega el primer procedimiento o pásalos desde el odontograma." />}
         {fases.length > 0 && (
-          <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="fases" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
+          <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="procedimientos" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
             vistas={[{ id: "recorrido", label: "Recorrido", icon: Route }, { id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]}
             tabla={{ primero: true, minWidth: 720, onRowClick: (f) => setDetF(f), cols: [
               { key: "n", label: "#", w: "48px", a: "center", cell: (f) => <span className={`dc-tr__nodo${f.estado === "atendida" ? " is-okn" : ""}`}>{f.estado === "atendida" ? <Check size={14} strokeWidth={3} /> : f._n}</span> },
@@ -3218,27 +3311,27 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
               { key: "pieza", label: "Pieza", w: "64px", a: "center", cell: (f) => <span className="dc-tp__sub">{piezaDeFase(f)}</span> },
               { key: "cara", label: "Cara", w: "60px", a: "center", cell: (f) => <span className="dc-tp__sub">{caraDeFase(f)}</span> },
               { key: "costo", label: "Costo", w: "96px", a: "right", cell: (f) => <span className="dc-tp__num">S/ {f.costo.toFixed(2)}</span> },
-              { key: "estado", label: "Estado", w: "minmax(240px,1.4fr)", a: "right", cell: (f) => f.estado === "atendida" ? <Badge estado={f.estado} /> : (
+              { key: "estado", label: "Estado", w: "minmax(240px,1.4fr)", a: "right", cell: (f) => f.estado === "atendida" ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : (
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
                   {f.estado !== "terminada" && puedeTerminar && <button type="button" className="dc-accion dc-accion--fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={13} strokeWidth={2} style={{ marginRight: 4 }} />Terminar</button>}
-                  {f.estado === "terminada" && <Badge estado="terminada" />}
+                  {f.estado === "terminada" && <EstadoPill entidad="procedimiento" estado="terminada" />}
                   {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
-                  {f.estado !== "terminada" && <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button>}</> : (f.estado !== "terminada" && !puedeTerminar) ? <Badge estado={f.estado} /> : null}
+                  {f.estado !== "terminada" && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[{ label: "Anular procedimiento", peligro: true, onClick: () => quitarFase(f) }]} />}</> : (f.estado !== "terminada" && !puedeTerminar) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : null}
                 </div>) },
             ] }} cols={[
               { key: "proc", label: "Procedimiento", get: (f) => nombreFaseLimpio(f) },
               { key: "pieza", label: "Pieza", get: (f) => String(piezaDeFase(f) ?? "") },
               { key: "costo", label: "Costo", get: (f) => f.costo.toFixed(2), sortVal: (f) => f.costo },
-              { key: "estado", label: "Estado", get: (f) => (f.estado === "atendida" ? "Atendida" : f.estado === "terminada" ? "Terminada, por cobrar" : "Pendiente") },
+              { key: "estado", label: "Estado", get: (f) => estadoInfo("procedimiento", f.estado).label },
             ]}>{(lst, vista) => {
               const hecho = (f) => f.estado === "atendida";
               const siguiente = fases.find((f) => !hecho(f));
-              const acciones = (f) => hecho(f) ? <Badge estado={f.estado} /> : (
+              const acciones = (f) => hecho(f) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : (
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
                   {f.estado !== "terminada" && puedeTerminar && <button type="button" className="dc-accion dc-accion--fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={13} strokeWidth={2} style={{ marginRight: 4 }} />Terminar</button>}
-                  {f.estado === "terminada" && <Badge estado="terminada" />}
+                  {f.estado === "terminada" && <EstadoPill entidad="procedimiento" estado="terminada" />}
                   {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
-                  {f.estado !== "terminada" && <button type="button" className="dc-tr__quitar" aria-label="Quitar fase" title="Quitar" onClick={() => quitarFase(f)}><X size={15} strokeWidth={1.9} /></button>}</> : (f.estado !== "terminada" && !puedeTerminar) ? <Badge estado={f.estado} /> : null}
+                  {f.estado !== "terminada" && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[{ label: "Anular procedimiento", peligro: true, onClick: () => quitarFase(f) }]} />}</> : (f.estado !== "terminada" && !puedeTerminar) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : null}
                 </div>
               );
               const origen = (f) => f.origen === "odontograma" && <span className="dc-tr__orig"><Smile size={11} strokeWidth={2} /> del odontograma</span>;
@@ -3276,25 +3369,18 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
         )}
       </Card>
       {detF && (() => { const f = fases.find((x) => x.id === detF.id) || detF; return (
-        <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} tone={NAVY} titulo={f.nombre} sub={`Fase del plan – ${paciente.nombre}`} onClose={() => setDetF(null)} maxW={460}
-          footer={(f.estado === "atendida" || !puedeCobrar) ? <Btn small kind="ghost" onClick={() => setDetF(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => { quitarFase(f); setDetF(null); }}><Trash2 size={15} strokeWidth={1.75} /> Quitar</Btn><Btn small onClick={() => { cobrarFase(f); setDetF(null); }}><DollarSign size={15} strokeWidth={1.75} /> Cobrar S/ {f.costo.toFixed(0)}</Btn></>}>
+        <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} tone={NAVY} titulo={f.nombre} sub={`Procedimiento del plan – ${paciente.nombre}`} onClose={() => setDetF(null)} maxW={460}
+          footer={(f.estado === "atendida" || !puedeCobrar) ? <Btn small kind="ghost" onClick={() => setDetF(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => { quitarFase(f); setDetF(null); }}><Trash2 size={15} strokeWidth={1.75} /> Anular</Btn><Btn small onClick={() => { cobrarFase(f); setDetF(null); }}><DollarSign size={15} strokeWidth={1.75} /> Cobrar S/ {f.costo.toFixed(0)}</Btn></>}>
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Procedimiento</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500, textAlign: "right" }}>{nombreFaseLimpio(f)}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Pieza</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{piezaDeFase(f)}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Cara</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{caraDeFase(f)}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Costo</span><span style={{ fontSize: 14, color: NAVY, fontWeight: 600, fontFamily: DISPLAY_FONT }}>S/ {f.costo.toFixed(2)}</span></div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Estado</span><Badge estado={f.estado} /></div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Estado</span><EstadoPill entidad="procedimiento" estado={f.estado} /></div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Origen</span><span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{f.origen === "odontograma" ? "Derivado del odontograma" : "Agregado manualmente"}</span></div>
           </div>
         </Modal>
       ); })()}
-      <Card className="dc-trat-fin" style={{ padding: 22, height: "fit-content" }}>
-        <h3 style={{ margin: "0 0 12px", color: NAVY, fontSize: 14.5, fontWeight: 700 }}>Resumen financiero</h3>
-        <div className="dc-trat-fin__barra" role="img" aria-label={`Cobrado ${total ? Math.round((pagado / total) * 100) : 0}% del plan`}><i style={{ width: `${total ? Math.min(100, (pagado / total) * 100) : 0}%` }} /></div>
-        <div className="dc-trat-fin__ley"><span><i className="is-ok" />Cobrado {total ? Math.round((pagado / total) * 100) : 0}%</span><span><i />Pendiente {total ? 100 - Math.round((pagado / total) * 100) : 0}%</span></div>
-        {[["Total del plan", total, "var(--dc-ink-700)"], ["Cobrado", pagado, "var(--dc-ok-700)"], ["Saldo", saldo, RED]].map(([l, v, c]) => <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-line)" }}><span style={{ color: "var(--dc-ink-400)", fontSize: 14 }}>{l}</span><span style={{ fontWeight: 500, color: c, fontSize: 14 }}>S/ {v.toFixed(2)}</span></div>)}
-        {saldo > 0 && <div style={{ marginTop: 14, background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: 14 }}><div style={{ fontSize: 13, fontWeight: 500, color: NAVY, marginBottom: 8 }}>Pago en cuotas</div><div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginBottom: 10 }}>Saldo S/ {saldo.toFixed(2)} en 3 cuotas de S/ {(saldo / 3).toFixed(2)}</div>{puedeCobrar && <Btn small full onClick={cobrarSaldo}><CreditCard size={15} strokeWidth={1.75} /> Registrar pago del saldo</Btn>}</div>}
-      </Card>
     </div>
     </div>
   );
@@ -3516,18 +3602,6 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 
 /* ---- Caja / Facturación (fuente única: el plan de tratamiento de cada ficha) ---- */
 const EGRESO_CATS = ["Insumos", "Laboratorio", "Alquiler", "Servicios (luz/agua)", "Planilla", "Marketing", "Equipos", "Otros"];
-const EGRESOS_DEMO = [
-  { id: 1, fecha: fmt(hoy), concepto: "Movilidad y mensajería", categoria: "Otros", monto: 35, metodo: "efectivo" },
-  { id: 2, fecha: fmt(hoy), concepto: "Resinas y adhesivos", categoria: "Insumos", monto: 320, metodo: "transferencia" },
-  { id: 3, fecha: fmt(hoy), concepto: "Trabajo de laboratorio — corona zirconio", categoria: "Laboratorio", monto: 180, metodo: "transferencia" },
-  { id: 4, fecha: fmt(hoy), concepto: "Repuesto de micromotor (proveedor en dólares)", categoria: "Equipos", monto: 40, metodo: "efectivo", moneda: "USD" },
-  { id: 5, fecha: addDays(-1), concepto: "Campaña Instagram Ads", categoria: "Marketing", monto: 150, metodo: "tarjeta" },
-  { id: 6, fecha: addDays(-3), concepto: "Guantes, mascarillas y eyectores", categoria: "Insumos", monto: 410, metodo: "transferencia" },
-  { id: 7, fecha: addDays(-5), concepto: "Luz y agua del local", categoria: "Servicios (luz/agua)", monto: 385, metodo: "transferencia" },
-  { id: 8, fecha: addDays(-6), concepto: "Alquiler del consultorio", categoria: "Alquiler", monto: 2800, metodo: "transferencia" },
-  { id: 9, fecha: addDays(-8), concepto: "Prótesis parcial — laboratorio", categoria: "Laboratorio", monto: 520, metodo: "transferencia" },
-  { id: 10, fecha: addDays(-9), concepto: "Compra varios", categoria: "Otros", monto: 260, metodo: "efectivo" },
-];
 const LINKS_DEMO = [
   { id: 1, paciente: "Rosa Linares", concepto: "Abono ortodoncia", monto: 250, estado: "pagado", fecha: addDays(-1) },
   { id: 2, paciente: "Pedro Gómez", concepto: "Saldo endodoncia", monto: 400, estado: "pendiente", fecha: fmt(hoy) },
@@ -3542,7 +3616,7 @@ const medioUi = (t) => MEDIO_UI[String(t || "").toLowerCase()] || [Wallet, "#0E9
 const DENOMS_USD = [100, 50, 20, 10, 5, 1];
 const DENOMS = [[200, "b"], [100, "b"], [50, "b"], [20, "b"], [10, "b"], [5, "m"], [2, "m"], [1, "m"], [0.5, "m"], [0.2, "m"], [0.1, "m"]];
 
-function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null }) {
+function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null, abrirEgreso = false, onEgresoAbierto = () => {} }) {
   // Autorización granular: si llega `can` se usa la matriz; si no, se cae al rol.
   const puedeEgresos = can ? can("facturacion", "aprobar") : rol !== "recepcion" && rol !== "gerencia";
   // Bug #26 re-test: Gerencia debe VER la pestaña Ingresos/egresos (solo lectura), aunque no pueda crear egresos
@@ -3555,6 +3629,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     ? "Comprobante registrado (todavía no se envía a SUNAT)."
     : "Comprobante de demostración (sin envío a SUNAT).";
   const [pago, setPago] = useState(null); // { pid, nombre, monto }
+  const [filtroCob, setFiltroCob] = useState("listos");
+  // Menú «Crear › Registrar egreso»: abre el formulario de egreso al llegar.
+  useEffect(() => { if (abrirEgreso) { setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" }); onEgresoAbierto(); } }, [abrirEgreso]); // eslint-disable-line react-hooks/exhaustive-deps
   const [caja, setCaja] = useState({ porCobrar: [], boletasHoy: [], montoPorCobrar: 0, montoHoy: 0 });
   const [cajaError, setCajaError] = useState(false);
   const [histError, setHistError] = useState(false);
@@ -3563,9 +3640,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [verHist, setVerHist] = useState(false);
   const [pacsHoy, setPacsHoy] = useState(new Set());   // pacientes con cita hoy (para "por cobrar de hoy")
   // Las pestañas son submódulos del menú lateral (Caja → Cobros, Apertura…): la vista manda.
-  const [tabLocal, setTabLocal] = useState("cobros");  // cobros | apertura | cierre | historial | movimientos | links
-  const tab = tabProp || tabLocal;
-  const setTab = (t) => (onTab ? onTab(t) : setTabLocal(t));
+  const [tabLocal, setTabLocal] = useState("hoy");  // cobros | apertura | cierre | historial | movimientos | links
+  // Pestañas de Caja (NAV-03): hoy (apertura + cobros), movimientos, cierre, historial,
+  // sunat, links. Las rutas antiguas «cobros» y «apertura» caen en «hoy».
+  const tabRaw = tabProp || tabLocal;
+  const tab = ["cobros", "apertura", "caja", "facturacion"].includes(tabRaw) ? "hoy" : tabRaw;
+  const setTab = (t) => { const d = (t === "cobros" || t === "apertura") ? "hoy" : t; return onTab ? onTab(d) : setTabLocal(d); };
   // CAJA-01: sede explícita para abrir/cerrar (nunca "all" → primera sede a escondidas).
   const [cajaSedePick, setCajaSedePick] = useState(null); // uuid o null
   const sedeRequierePick = sedeFiltro === "all";
@@ -3746,7 +3826,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         setApertura(ap);
         try { localStorage.setItem(cajaStorageKey(), JSON.stringify(ap)); } catch { /* sin almacenamiento */ }
         notify(`Caja abierta (demo) con fondo S/ ${fondoDemo.toFixed(2)}.`);
-        setTab("cobros");
+        setTab("hoy");
         return;
       }
       notify("Conéctate al servidor para abrir caja; las jornadas colgadas se validan ahí.");
@@ -3761,7 +3841,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const fondo = Number(aperturaForm.fondo) || 0;
     const destinosActivos = JSON.stringify(destinosCatalogo.filter((d) => destinosSel.has(d.id)));
     api.cajaApertura.abrir({ sedeId: sid, fondo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || null, fecha: ymdLima(new Date()) || fmt(hoy), destinosActivos })
-      .then((r) => { setApertura(mapAperturaApi({ ...r, abierta: true })); setJornadaAbiertaPrevia(null); notify(`Caja abierta en ${sedeNombre()} con fondo S/ ${fondo.toFixed(2)}.`); setTab("cobros"); })
+      .then((r) => { setApertura(mapAperturaApi({ ...r, abierta: true })); setJornadaAbiertaPrevia(null); notify(`Caja abierta en ${sedeNombre()} con fondo S/ ${fondo.toFixed(2)}.`); setTab("hoy"); })
       .catch((e) => {
         notify(e?.message || "No se pudo abrir la caja en el servidor.");
         if (e?.status === 409) { recargarApertura(); setTab("historial"); }
@@ -3886,19 +3966,31 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     setMovForm(null);
   };
   const cajaAbierta = !!apertura?.abierta;
+  // Cobrar a un paciente: si tiene trabajo terminado sin pagar, se cobra eso con sus ítems;
+  // si no, se registra un abono a cuenta del plan.
+  const cobrarCuenta = (x) => {
+    const items = (x.terminadosItems || []);
+    if (x.porCobrar > 0 && items.length) {
+      if (!cajaAbierta) { intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.porCobrar }); return; }
+      setPago({ pid: x.p.id, nombre: x.p.nombre, monto: x.porCobrar, faseIds: items.map((f) => f.id), items: items.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) });
+      return;
+    }
+    intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo });
+  };
   const intentarCobrar = (payload) => {
     if (!cajaAbierta) {
       notify(jornadaAbiertaPrevia?.id
         ? "Cierra la jornada anterior en Historial antes de cobrar."
         : "Abre la caja del día antes de cobrar.");
-      setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura");
+      setTab(jornadaAbiertaPrevia?.id ? "historial" : "hoy");
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { /* sin scroll */ }
       return;
     }
     setPago(payload);
   };
   const [cierre, setCierre] = useState(null);
   const recargarCierre = () => { if (conectado) api.pagos.cierre().then(setCierre).catch(() => {}); };
-  const [egresosDemo, setEgresosDemo] = usePersist("egresos_demo_v2", EGRESOS_DEMO);
+  const { egresos: egresosDemo, setEgresos: setEgresosDemo } = useContext(DatosDemoCtx);
   const [egresosApi, setEgresosApi] = useState([]);
   const egresos = conectado ? egresosApi : egresosDemo;
   const setEgresos = conectado ? setEgresosApi : setEgresosDemo;
@@ -3947,12 +4039,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     onCobroDesdeFichaDone();
   }, [cobroDesdeFicha, conectado, caja.porCobrar?.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (conectado && tab === "cierre") recargarCierre(); }, [tab]); // eslint-disable-line
-  const saldoDe = (pid) => { const t = fichas[pid]?.tratamiento || []; const total = t.reduce((s, f) => s + f.costo, 0); const pagado = t.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0); return { total, pagado, saldo: total - pagado, pend: t.filter((f) => f.estado !== "atendida").length }; };
+  // Cuenta única del paciente (M-06/M-07): la misma que leen Pendientes, Panel y la ficha.
+  const saldoDe = (pid) => { const c = M.cuentaPaciente(fichas[pid]); const t = (fichas[pid]?.tratamiento || []).filter((f) => f.estado !== "anulado"); return { total: c.total, pagado: c.pagado, saldo: c.saldoPlan, porCobrar: c.porCobrar, vencido: c.vencido, terminadosItems: c.terminados, pend: t.filter((f) => f.estado !== "atendida").length }; };
   // Ítems del plan pendientes (para itemizar la boleta): precio con IGV, importe base.
   const itemsDe = (pid) => (fichas[pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 }));
   const porCobrar = conectado
     ? (caja.porCobrar || []).map((r) => ({ p: { id: r.pacienteId, nombre: r.paciente, dni: "", sedes: "", sedeNombre: r.sede || "" }, total: Number(r.total) || 0, pagado: Number(r.pagado) || 0, saldo: Number(r.saldo) || 0, pend: r.pend || 0 }))
-    : pacientes.map((p) => ({ p, ...saldoDe(p.id) })).filter((x) => x.saldo > 0).sort((a, b) => b.saldo - a.saldo);
+    : pacientes.map((p) => ({ p, ...saldoDe(p.id) })).filter((x) => x.saldo > 0 || x.porCobrar > 0).sort((a, b) => (b.porCobrar - a.porCobrar) || (b.saldo - a.saldo));
   const porCobrarHoy = conectado ? porCobrar.filter((x) => pacsHoy.has(x.p.id)) : [];
   // Tratamientos que el doctor marcó como terminados: el cobro se genera solo.
   // Conectado: caja.terminados = [{ pacienteId, paciente, faseId, nombre, costo, medico, terminadaEn }].
@@ -3964,7 +4057,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     ? (caja.boletasHoy || []).map((b) => ({ id: b.id, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null }))
     : pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).filter((pg) => pg.fecha === fmt(hoy)).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", direccion: p.direccion || p.distrito || "", anulado: false })));
   const boletasHoyActivas = boletasHoy.filter((b) => !b.anulado);
-  const montoPorCobrar = conectado ? (Number(caja.montoPorCobrar) || 0) : porCobrar.reduce((s, x) => s + x.saldo, 0);
+  // «Por cobrar» = trabajo terminado aún sin pagar (M-06), igual en Caja, Panel y Pendientes.
+  const montoPorCobrar = conectado ? (Number(caja.montoPorCobrar) || 0) : porCobrar.reduce((s, x) => s + (x.porCobrar || 0), 0);
   const montoHoy = conectado ? (Number(caja.montoHoy) || 0) : boletasHoyActivas.reduce((s, b) => s + b.monto, 0);
   const fiscalReadOnly = rol === "admin_sede" || (can && !can("config", "editar"));
   const abrirBoleta = (b) => {
@@ -4076,41 +4170,39 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const fila = el && el.parentElement;
     if (fila && fila.scrollWidth > fila.clientWidth) fila.scrollTo({ left: el.offsetLeft - (fila.clientWidth - el.offsetWidth) / 2, behavior: "smooth" });
   }, [tab]);
+  // Franja de Caja (CAJ-01): una línea con estado, cobrado hoy, por cobrar y neto del día,
+  // y debajo las pestañas, que son la única navegación de Caja (NAV-03).
+  const tabsCaja = [
+    { id: "hoy", l: "Hoy", ic: CreditCard },
+    puedeVerMovimientos && { id: "movimientos", l: "Ingresos y egresos", ic: ArrowUpDown },
+    { id: "cierre", l: "Cierre", ic: Lock },
+    { id: "historial", l: "Historial", ic: History },
+    { id: "sunat", l: "Comprobantes SUNAT", ic: Receipt },
+    { id: "links", l: "Links de pago", ic: Link2, badge: linksPend || 0 },
+  ].filter(Boolean);
   const cabeceraCaja = (
-    <section className={`dc-cjh${cajaAbierta ? " is-abierta" : cerradaHoyReg ? " is-cerrada" : " is-pendiente"}`} aria-label="Caja del día">
-      <div className="dc-cjh__top">
-        <div className="dc-cjh__estado">
-          <span className="dc-cjh__chip"><i />{cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>
-          <h2>{!cajaAbierta && !cerradaHoyReg && sedeRequierePick && !sedeUuid() ? "Caja del día" : sedeNombre()}</h2>
-          <p>{fechaLegible(fmt(hoy))}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}${apertura?.abiertaPorNombre ? ` · ${apertura.abiertaPorNombre}` : ""}` : cerradaHoyReg ? ` · cerró ${horaDe(cerradaHoyReg.cerradaEn)} · ${difTxt(cerradaHoyReg.diferencia)}` : " · ábrela para empezar a cobrar"}</p>
-        </div>
-        <dl className="dc-cjh__cifras">
-          <div><dt>Cobrado hoy</dt><dd>{sol(montoHoy)}{cobradoUsdHoy ? <small> + US$ {cobradoUsdHoy.toFixed(2)}</small> : null}</dd></div>
-          <div><dt>Egresos hoy</dt><dd>{sol(totEgresosHoy)}{totEgresosHoyUsd ? <small> + US$ {totEgresosHoyUsd.toFixed(2)}</small> : null}</dd></div>
-          <div><dt>Efectivo en gaveta</dt><dd>{gavetaHoy == null ? (cerradaHoyReg?.efectivoContado != null ? sol(cerradaHoyReg.efectivoContado) : "—") : sol(gavetaHoy)}</dd></div>
-          <div><dt>Por cobrar</dt><dd>{sol(montoPorCobrar)}</dd></div>
-        </dl>
-        <div className="dc-cjh__acc">
-          {!cajaAbierta && !cerradaHoyReg && puedeAbrirCaja && tab !== "apertura" && <button type="button" className="dc-cjh__btn is-pri" onClick={() => setTab("apertura")}><KeyRound size={15} strokeWidth={2} /> Abrir caja</button>}
-          {cajaAbierta && tab !== "cobros" && <button type="button" className="dc-cjh__btn is-pri" onClick={() => setTab("cobros")}><CreditCard size={15} strokeWidth={2} /> Cobrar</button>}
-          {cajaAbierta && tab !== "cierre" && <button type="button" className="dc-cjh__btn" onClick={() => setTab("cierre")}><Lock size={14} strokeWidth={2} /> Cerrar caja</button>}
-          {cerradaHoyReg && tab !== "historial" && <button type="button" className="dc-cjh__btn" onClick={() => setTab("historial")}><History size={14} strokeWidth={2} /> Ver historial</button>}
+    <section className={`dc-cj4${cajaAbierta ? " is-abierta" : cerradaHoyReg ? " is-cerrada" : " is-pendiente"}`} aria-label="Caja del día">
+      <div className="dc-cj4__franja">
+        <span className="dc-cj4__estado"><i />{cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>
+        <span className="dc-cj4__sede">{sedeNombre()}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? ` · ${difTxt(cerradaHoyReg.diferencia)}` : ""}</span>
+        <span className="dc-cj4__cifra">Cobrado hoy <b>{sol(montoHoy)}</b>{cobradoUsdHoy ? <small> + US$ {cobradoUsdHoy.toFixed(2)}</small> : null}</span>
+        <span className="dc-cj4__cifra">Por cobrar <b className="is-aviso">{sol(montoPorCobrar)}</b></span>
+        <span className="dc-cj4__cifra" title="Cobrado hoy menos egresos de hoy">Neto del día <b className={netoHoy < 0 ? "is-neg" : ""}>{netoHoy < 0 ? "− " : ""}{sol(Math.abs(netoHoy))}</b></span>
+        <div className="dc-cj4__acc">
+          {!cajaAbierta && !cerradaHoyReg && puedeAbrirCaja && tab !== "hoy" && <button type="button" className="dc-cj4__btn is-pri" onClick={() => setTab("hoy")}><KeyRound size={14} strokeWidth={2} /> Abrir caja</button>}
+          {cajaAbierta && puedeAbrirCaja && tab !== "cierre" && <button type="button" className="dc-cj4__btn" onClick={() => setTab("cierre")}><Lock size={14} strokeWidth={2} /> Cerrar caja</button>}
+          {cajaAbierta && puedeAbrirCaja && <MenuAcciones etiqueta="Más acciones de caja" opciones={[
+            { label: "Retiro o ingreso de efectivo", onClick: () => { setTab("hoy"); setMovForm({ tipo: "retiro", monto: "", nota: "" }); } },
+            { label: "Cambio de turno", onClick: registrarCambioTurno },
+          ]} />}
         </div>
       </div>
-      <nav className="dc-cjh__pasos" aria-label="Proceso de caja">
-        {pasos.map((p, i) => { const Ic = p.ic; const on = tab === p.id; return (
-          <React.Fragment key={p.id}>
-            {i > 0 && <ChevronRight size={14} strokeWidth={2} className="dc-cjh__sep" aria-hidden="true" />}
-            <button type="button" className={`dc-cjh__paso${on ? " is-on" : ""}${p.ok ? " is-ok" : ""}`} aria-current={on ? "step" : undefined} onClick={() => setTab(p.id)}>
-              <span className="dc-cjh__n">{p.ok ? <Check size={13} strokeWidth={3} /> : p.n}</span>
-              <span className="dc-cjh__pt"><b><Ic size={13} strokeWidth={2} /> {p.l}{p.badge ? <em>{p.badge} {p.badge === 1 ? "listo" : "listos"}</em> : null}</b><small>{p.sub}</small></span>
-            </button>
-          </React.Fragment>
+      <nav className="dc-cj4__tabs" role="tablist" aria-label="Secciones de caja">
+        {tabsCaja.map((t) => { const Ic = t.ic; const on = tab === t.id; return (
+          <button key={t.id} type="button" role="tab" aria-selected={on} className={on ? "is-on" : ""} onClick={() => setTab(t.id)}>
+            <Ic size={14} strokeWidth={2} /> {t.l}{t.badge ? <em>{t.badge}</em> : null}
+          </button>
         ); })}
-        <span className="dc-cjh__div" aria-hidden="true" />
-        <button type="button" className={`dc-cjh__extra${tab === "sunat" ? " is-on" : ""}`} onClick={() => setTab("sunat")} title="Facturación electrónica (SUNAT)"><Receipt size={14} strokeWidth={2} /> <span className="dc-cjh__xt">Facturación</span></button>
-        <button type="button" className={`dc-cjh__extra${tab === "historial" ? " is-on" : ""}`} onClick={() => setTab("historial")} title="Historial de cajas"><History size={14} strokeWidth={2} /> <span className="dc-cjh__xt">Historial</span></button>
-        <button type="button" className={`dc-cjh__extra${tab === "links" ? " is-on" : ""}`} onClick={() => setTab("links")} title="Links de pago"><Link2 size={14} strokeWidth={2} /> <span className="dc-cjh__xt">Links de pago</span>{linksPend ? <em>{linksPend}</em> : null}</button>
       </nav>
     </section>
   );
@@ -4147,120 +4239,45 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         sedes={(misSedes || [1, 2]).map((n) => ({ id: n, nombre: nombreSede(n) }))}
         pagos={pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", sede: pg.sede ?? (Array.isArray(p.sedes) ? p.sedes[0] : p.sede) ?? 1 })))} />}
 
-      {tab === "apertura" && (
-        <div className="dc-ap" style={{ display: "grid", gap: 16 }}>
-          <section className="dc-esp-hero dc-caja-sub">
-            <div className="dc-esp-hero__txt">
-              <div className="dc-esp-hero__num"><b>{cajaAbierta ? "Abierta" : "Cerrada"}</b><span>caja del día</span></div>
-              <p>{fechaLegible(fmt(hoy))} – {sedeNombre()}</p>
+      {tab === "hoy" && !cajaAbierta && (() => {
+        // Apertura en un solo bloque (CAJ-02): sede (solo si hace falta elegirla), fondo en
+        // soles y dólares, nota y «Abrir caja». Los medios de pago se configuran aparte.
+        const sedesOpc = sedes.length
+          ? sedes.filter((x) => sedesUsuarioUuid().includes(x.id))
+          : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) })).filter((x) => x.id);
+        const bloqueado = (sedeRequierePick && !cajaSedePick) || !!jornadaAbiertaPrevia?.id;
+        return (
+        <div className="dc-ap" style={{ display: "grid", gap: 12 }}>
+          {jornadaAbiertaPrevia?.id && (
+            <div className="fm-aviso-edad is-mal">
+              <AlertTriangle size={15} strokeWidth={2} />
+              <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}. Ciérrala antes de abrir otra caja en esta sede.</span>
+              <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" }); }}>Cerrarla</button>
             </div>
-            <div className="dc-esp-hero__cifras">
-              <div><b>S/ {Number(cajaAbierta ? apertura?.fondo || 0 : aperturaForm.fondo || 0).toLocaleString("es-PE")}</b><span>Fondo inicial</span></div>
-              <div><b>{destinosSel.size}</b><span>Medios activos</span></div>
-              <div><b>{porCobrar.length}</b><span>Planes por cobrar</span></div>
-            </div>
-            <span />
-            {cajaAbierta && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => setTab("cobros")}><CreditCard size={14} strokeWidth={1.9} /> Ir a cobros</button></div>}
-          </section>
-          {(() => {
-            const sedesOpc = sedes.length
-              ? sedes.filter((x) => sedesUsuarioUuid().includes(x.id))
-              : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) })).filter((x) => x.id);
-            const sedeTxt = cajaAbierta ? sedeNombre() : ((sedes.length ? sedes : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) }))).find((x) => x.id === cajaSedePick)?.nombre || (sedeRequierePick ? "Sin elegir" : sedeNombre()));
-            const fondoVal = Number(cajaAbierta ? apertura?.fondo || 0 : aperturaForm.fondo || 0);
-            const bloqueado = (sedeRequierePick && !cajaSedePick) || !!jornadaAbiertaPrevia?.id;
-            const destActivos = cajaAbierta && apertura?.destinosActivos
-              ? (() => { try { const arr = typeof apertura.destinosActivos === "string" ? JSON.parse(apertura.destinosActivos) : apertura.destinosActivos; return arr || []; } catch { return []; } })()
-              : destinosCatalogo.filter((d) => destinosSel.has(d.id));
-            let n = 0;
-            const Paso = ({ icon: Ico, tono, titulo, sub, children }) => { n += 1; return (
-              <section className="dc-ap2__paso" style={{ "--t": tono }}>
-                <header><span className="dc-ap2__ico"><Ico size={20} strokeWidth={1.9} /><i>{n}</i></span><div><h3>{titulo}</h3><span>{sub}</span></div></header>
-                <div className="dc-ap2__cuerpo">{children}</div>
-              </section>
-            ); };
-            return (
-            <div className="dc-ap2">
-              <div className="dc-ap2__main">
-                {cajaAbierta ? (
-                  <section className="dc-ap2__abierta">
-                    <div className="dc-ap2__ok">
-                      <span><CheckCircle2 size={26} strokeWidth={2} /></span>
-                      <div><small>Caja abierta en {sedeNombre()}</small><b>Lista para cobrar</b><p>Desde {apertura.abiertaEn ? new Date(apertura.abiertaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "—"}{apertura.abiertaPorNombre ? `, por ${apertura.abiertaPorNombre}` : ""}{apertura.nota ? ` – ${apertura.nota}` : ""}</p></div>
-                    </div>
-                    <div className="dc-ap2__atajos">
-                      <button type="button" style={{ "--t": "#D97706" }} onClick={() => setMovForm({ tipo: "retiro", monto: "", nota: "" })}><span><ArrowUpDown size={19} strokeWidth={1.9} /></span><b>Retiro o ingreso</b><small>Mover efectivo</small></button>
-                      {puedeAbrirCaja && <button type="button" style={{ "--t": "#28527A" }} onClick={registrarCambioTurno}><span><Repeat size={19} strokeWidth={1.9} /></span><b>Cambio de turno</b><small>Registrar relevo</small></button>}
-                    </div>
-                  </section>
-                ) : (
-                  <>
-                    {jornadaAbiertaPrevia?.id && (
-                      <div className="fm-aviso-edad is-mal">
-                        <AlertTriangle size={15} strokeWidth={2} />
-                        <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}{(histCaja || []).filter((h) => h?.abierta && h.id !== jornadaAbiertaPrevia.id).length ? " y otras más" : ""}. Ciérrala antes de abrir otra caja en esta sede.</span>
-                        <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: String(Number(jornadaAbiertaPrevia.fondo) || 0), justificacion: "" }); }}>Cerrar jornada</button>
-                      </div>
-                    )}
-                    {sedeRequierePick && Paso({ icon: Building2, tono: "#0E9199", titulo: "¿En qué sede abres?", sub: "Cada sede lleva su propia caja", children: (
-                      <div className="dc-ap2__sedes" role="radiogroup" aria-label="Sede para abrir caja">
-                        {sedesOpc.map((x) => (
-                          <button key={x.id} type="button" role="radio" aria-checked={cajaSedePick === x.id} className={cajaSedePick === x.id ? "is-on" : ""} onClick={() => setCajaSedePick(x.id)}>
-                            <span><MapPin size={16} strokeWidth={2} /></span><b>{x.nombre}</b>{cajaSedePick === x.id && <Check size={15} strokeWidth={3} />}
-                          </button>
-                        ))}
-                      </div>
-                    ) })}
-                    {Paso({ icon: Coins, tono: "#D97706", titulo: "Fondo inicial", sub: "El sencillo con el que empieza la gaveta", children: (
-                      <>
-                        <div className="dc-ap2__fondo">
-                          <label className="dc-ap2__monto"><span>S/</span><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></label>
-                          <div className="dc-ap2__rapidos">{[50, 100, 150, 200, 300].map((v) => <button key={v} type="button" className={Number(aperturaForm.fondo) === v ? "is-on" : ""} onClick={() => setAperturaForm({ ...aperturaForm, fondo: String(v) })}>S/ {v}</button>)}</div>
-                        </div>
-                        <div className="dc-ap2__fondo dc-ap2__fondo--usd">
-                          <label className="dc-ap2__monto"><span>US$</span><input inputMode="decimal" aria-label="Fondo inicial en dólares (US$)" value={aperturaForm.fondoUsd} onChange={(e) => setAperturaForm({ ...aperturaForm, fondoUsd: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></label>
-                          <p className="dc-ap2__usdnota">Si la gaveta también guarda dólares, anótalos aquí. Se cuentan aparte al cerrar.</p>
-                        </div>
-                        <label className="dc-ap2__nota"><Pencil size={14} strokeWidth={2} /><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Nota o turno (opcional), ej. turno mañana" /></label>
-                      </>
-                    ) })}
-                    {Paso({ icon: Wallet, tono: "#6D4FD1", titulo: "Medios de pago de hoy", sub: `${destinosSel.size} de ${destinosCatalogo.length} activos`, children: (
-                      <div className="dc-ap2__medios">
-                        {destinosCatalogo.map((d) => { const on = destinosSel.has(d.id); const [Ico, col] = medioUi(d.tipo || d.id); return (
-                          <button key={d.id} type="button" role="checkbox" aria-checked={on} className={on ? "is-on" : ""} style={{ "--m": col }} onClick={() => setDestinosSel((prev) => { const nx = new Set(prev); if (nx.has(d.id)) nx.delete(d.id); else nx.add(d.id); return nx; })}>
-                            <span className="dc-ap2__mico"><Ico size={18} strokeWidth={1.9} /></span>
-                            <b>{d.label}</b>
-                            <i>{on && <Check size={11} strokeWidth={3.2} />}</i>
-                          </button>
-                        ); })}
-                      </div>
-                    ) })}
-                  </>
+          )}
+          {puedeAbrirCaja ? (
+            <section className="dc-ap3" aria-label="Abrir caja">
+              <div className="dc-ap3__tit"><span><KeyRound size={18} strokeWidth={2} /></span><div><b>Abrir caja</b><small>{fechaLegible(fmt(hoy))} · necesitas abrirla para cobrar</small></div></div>
+              <div className="dc-ap3__campos">
+                {sedeRequierePick && (
+                  <label className="dc-ap3__campo"><span>Sede</span>
+                    <Select small width={180} ariaLabel="Sede para abrir caja" value={cajaSedePick || ""} placeholder="Elegir sede" onChange={(v) => setCajaSedePick(v)} options={sedesOpc.map((x) => ({ value: x.id, label: x.nombre }))} />
+                  </label>
                 )}
+                <label className="dc-ap3__campo"><span>Fondo inicial</span><span className="dc-ap3__monto"><i>S/</i><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
+                <label className="dc-ap3__campo"><span>Fondo en dólares</span><span className="dc-ap3__monto"><i>US$</i><input inputMode="decimal" aria-label="Fondo inicial en dólares (US$)" value={aperturaForm.fondoUsd} onChange={(e) => setAperturaForm({ ...aperturaForm, fondoUsd: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
+                <label className="dc-ap3__campo is-nota"><span>Nota (opcional)</span><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Ej. turno mañana" /></label>
+                <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado} title={sedeRequierePick && !cajaSedePick ? "Elige la sede" : undefined}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>
               </div>
-              <aside className="dc-ap2__ticket">
-                <div className="dc-ap2__tcab">
-                  <span><KeyRound size={18} strokeWidth={2} /></span>
-                  <div><small>{fechaLegible(fmt(hoy))}</small><b>Apertura de caja</b></div>
-                </div>
-                <ul>
-                  <li><span>Sede</span><b className={sedeTxt === "Sin elegir" ? "is-falta" : ""}>{sedeTxt}</b></li>
-                  <li><span>Responsable</span><b>{cajaAbierta ? (apertura?.abiertaPorNombre || "—") : "Tú"}</b></li>
-                  <li><span>Medios activos</span><b>{destActivos.length}</b></li>
-                </ul>
-                <div className="dc-ap2__tmedios">{destActivos.map((d) => { const [Ico, col] = medioUi(d.tipo || d.id); return <span key={d.id || d.label} style={{ "--m": col }}><Ico size={12} strokeWidth={2.2} /> {d.label || d.tipo}</span>; })}</div>
-                <div className="dc-ap2__tcorte" />
-                <div className="dc-ap2__ttotal"><span>Fondo inicial</span><b>S/ {fondoVal.toFixed(2)}</b></div>
-                {cajaAbierta ? null : (
-                  <>
-                    <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>
-                    <p>{sedeRequierePick && !cajaSedePick ? "Elige la sede para continuar." : "Debes abrir la caja antes de registrar cobros."}</p>
-                  </>
-                )}
-              </aside>
-            </div>
-            );
-          })()}
+            </section>
+          ) : (
+            <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>La caja de hoy aún no se abre. Tu rol puede ver los saldos, pero no abrir caja ni cobrar.</span></div>
+          )}
+        </div>
+        );
+      })()}
+      {tab === "hoy" && cajaAbierta && (movForm || cajaMovs.length > 0) && (
+        <div style={{ display: "grid", gap: 12 }}>
           {movForm && (
             <Card style={{ padding: 16 }}>
               <h4 style={{ margin: "0 0 10px", color: NAVY }}>Movimiento de efectivo</h4>
@@ -4290,7 +4307,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         </div>
       )}
 
-      {tab === "cobros" && (<div style={{ display: "grid", gap: 16 }}>
+      {tab === "hoy" && (<div style={{ display: "grid", gap: 16 }}>
       {conectado && cajaError && (
         <Card style={{ padding: 14, background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)" }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -4298,25 +4315,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <div style={{ flex: 1, fontSize: 13, color: "var(--dc-danger-700)" }}>No se pudieron cargar los saldos de caja. No uses los datos de abajo como reales.</div>
             <Btn small kind="ghost" onClick={recargarCaja}><Repeat size={14} strokeWidth={1.75} /> Reintentar</Btn>
           </div>
-        </Card>
-      )}
-      {terminadosPorPac.size > 0 && (
-        <Card className="dc-term">
-          <div className="dc-term__cab">
-            <span className="dc-term__ico"><CheckCheck size={18} strokeWidth={2} /></span>
-            <div><h3>Tratamientos terminados por cobrar</h3><span>El doctor los marcó como realizados. El cobro ya está listo: solo confirma el medio de pago.</span></div>
-            <b>S/ {terminados.reduce((a, t) => a + t.costo, 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b>
-          </div>
-          <ul>
-            {[...terminadosPorPac.values()].map((x) => (
-              <li key={x.pid}>
-                <PersonaCelda nombre={x.paciente} sub={x.fases.map((f) => f.nombre).join(" · ")} />
-                <span className="dc-term__cuando">{x.fases[0].terminadaEn ? `Terminado ${new Date(x.fases[0].terminadaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}` : "Terminado"}</span>
-                <em>S/ {x.total.toFixed(2)}</em>
-                {puedeAbrirCaja && <button type="button" className="dc-term__btn" disabled={!cajaAbierta} title={cajaAbierta ? "Cobrar lo terminado" : "Abre la caja para cobrar"} onClick={() => setPago({ pid: x.pid, nombre: x.paciente, monto: x.total, faseIds: x.fases.map((f) => f.faseId), items: x.fases.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) })}><DollarSign size={14} strokeWidth={2} /> Cobrar</button>}
-              </li>
-            ))}
-          </ul>
         </Card>
       )}
       {conectado && porCobrarHoy.length > 0 && (
@@ -4338,24 +4336,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       <div className="dc-cob">
         <Card className="dc-cob__lista">
           <div className="dc-cob__cab">
-            <div><h3>Saldos por cobrar</h3><span>{porCobrar.length} {porCobrar.length === 1 ? "paciente" : "pacientes"} con plan en curso</span></div>
-            <div className="dc-cob__chips">
-              {porCobrar.some((x) => x.pagado === 0) && <span className="is-aviso" title="Pacientes con plan que aún no hicieron ningún pago">{porCobrar.filter((x) => x.pagado === 0).length} sin ningún pago</span>}
-              <span title={`Cobrado este mes – ${sedeNombreCobros()}`}>Cobrado en el mes <b>{sol(cobradoMes)}</b></span>
+            <div><h3>Cuentas por cobrar</h3><span>Pacientes con trabajo terminado sin pagar o con saldo de su plan</span></div>
+            <div className="dc-cob__chips" role="radiogroup" aria-label="Filtrar cuentas">
+              <button type="button" role="radio" aria-checked={filtroCob === "listos"} className={filtroCob === "listos" ? "is-on" : ""} onClick={() => setFiltroCob("listos")}>Listos para cobrar ({porCobrar.filter((x) => x.porCobrar > 0).length})</button>
+              <button type="button" role="radio" aria-checked={filtroCob === "todos"} className={filtroCob === "todos" ? "is-on" : ""} onClick={() => setFiltroCob("todos")}>Todos ({porCobrar.length})</button>
             </div>
           </div>
+          {!cajaAbierta && !conectado && <div className="fm-aviso-edad is-info dc-cob__cerrada"><KeyRound size={15} strokeWidth={2} /><span><b>Abre la caja para cobrar.</b> Al pulsar «Cobrar» te llevamos a la apertura.</span>{puedeAbrirCaja && <button type="button" onClick={() => { setTab("hoy"); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { /* */ } }}>Abrir caja</button>}</div>}
           {conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : !porCobrar.length ? <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todo cobrado" sub="No hay saldos pendientes en esta sede." /> : (
-            <ListaFiltrable rows={porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} vistaClave="cobros" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
+            <ListaFiltrable rows={filtroCob === "listos" && porCobrar.some((x) => x.porCobrar > 0) ? porCobrar.filter((x) => x.porCobrar > 0) : porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} vistaClave="cobros" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
               { key: "p", label: "Paciente", w: "minmax(150px,1.2fr)", cell: (x) => <PersonaCelda nombre={x.p.nombre} /> },
               { key: "sede", label: "Sede", w: "minmax(130px,1fr)", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") || "—" },
-              { key: "fases", label: "Fases", w: "70px", a: "center", cell: (x) => <span className="dc-tp__sub">{x.pend}</span> },
-              { key: "cob", label: "Cobrado", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
-              { key: "saldo", label: "Saldo", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num is-mal">S/ {x.saldo.toFixed(2)}</span> },
-              { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!cajaAbierta} title={cajaAbierta ? "Registrar cobro" : "Abre la caja para cobrar"} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
+              { key: "listo", label: "Listo para cobrar", w: "minmax(140px,1fr)", cell: (x) => x.porCobrar > 0 ? <span className="dc-tp__num is-mal" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>S/ {x.porCobrar.toFixed(2)}{x.vencido > 0 ? <small className="dc-cob__venc"> · vencido</small> : null}</span> : <span className="dc-tp__sub">—</span> },
+              { key: "cob", label: "Pagado del plan", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
+              { key: "saldo", label: "Saldo del plan", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {x.saldo.toFixed(2)}</span> },
+              { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={!cajaAbierta ? "Abre la caja para cobrar" : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono"} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
             ] }} cols={[
               { key: "paciente", label: "Paciente", get: (x) => x.p.nombre || "" },
               { key: "sede", label: "Sede", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") },
-              { key: "fases", label: "Fases pendientes", get: (x) => String(x.pend), sortVal: (x) => x.pend },
+              { key: "fases", label: "Procedimientos pendientes", get: (x) => String(x.pend), sortVal: (x) => x.pend },
               { key: "avance", label: "Cobrado", get: (x) => `${x.total ? Math.round((x.pagado / x.total) * 100) : 0}%`, sortVal: (x) => (x.total ? x.pagado / x.total : 0) },
               { key: "saldo", label: "Saldo", get: (x) => x.saldo.toFixed(2), sortVal: (x) => x.saldo },
             ]}>{(lista) => (
@@ -4363,13 +4362,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 {lista.map((x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; const col = colorDe(x.p.nombre); const pc = pct >= 75 ? "#16A36A" : pct >= 40 ? "#0E9199" : "#D97706"; return (
                   <div key={x.p.id} className="dc-cob__fila">
                     <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(x.p.nombre)}</span>
-                    <div className="dc-cob__quien"><b>{x.p.nombre}{terminadosPorPac.has(x.p.id) && <em className="dc-cob__listo" title="Tiene tratamiento terminado: su cobro está arriba, en «Tratamientos terminados»">Terminado · listo para cobrar</em>}</b><span><MapPin size={11} strokeWidth={2} /> {x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} <i /> {x.pend} {x.pend === 1 ? "fase pendiente" : "fases pendientes"}</span></div>
+                    <div className="dc-cob__quien"><b>{x.p.nombre}{x.porCobrar > 0 && <em className="dc-cob__listo" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>Listo para cobrar · S/ {x.porCobrar.toFixed(2)}</em>}</b><span><MapPin size={11} strokeWidth={2} /> {x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} <i /> {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span></div>
                     <div className="dc-cob__avance" title={`Cobrado S/ ${x.pagado} de S/ ${x.total}`}>
                       <span className="dc-cob__anillo" style={{ "--p": pct, "--c": pc }}><b>{pct}%</b></span>
                       <div><small>Cobrado</small><span>S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</span></div>
                     </div>
-                    <div className="dc-cob__saldo"><small>Saldo</small><b>S/ {x.saldo.toFixed(2)}</b></div>
-                    <button type="button" className="dc-cob__btn" disabled={!cajaAbierta} title={cajaAbierta ? "Registrar cobro" : "Abre la caja para cobrar"} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><DollarSign size={15} strokeWidth={2} /> Cobrar</button>
+                    <div className="dc-cob__saldo"><small>Saldo del plan</small><b>S/ {x.saldo.toFixed(2)}</b></div>
+                    <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={!cajaAbierta ? "Abre la caja para cobrar" : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono"} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button>
                   </div>
                 ); })}
               </div>
@@ -4596,7 +4595,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   <Card className="dc-cz__bloq">
                     <span><Lock size={24} strokeWidth={1.9} /></span>
                     <div><b>El arqueo se habilita con la caja abierta</b><p>Abre la caja del día para contar la gaveta y cerrar con el resultado del cuadre.</p></div>
-                    <button type="button" className="dc-ap2__cta" onClick={() => setTab("apertura")}><KeyRound size={15} strokeWidth={2} /> Ir a apertura</button>
+                    <button type="button" className="dc-ap2__cta" onClick={() => setTab("hoy")}><KeyRound size={15} strokeWidth={2} /> Abrir caja</button>
                   </Card>
                 )}
               </div>
@@ -4747,7 +4746,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         return (
         <div style={{ display: "grid", gap: 16 }}>
           <ListaFiltrable rows={movs} sub="movimientos" exportTitulo="Ingresos y egresos del día" extra={<>
-            <span className={`dc-flujo__neto${netoHoy < 0 ? " is-neg" : ""}`} title="Cobros menos egresos de hoy">Neto del día <b>{netoHoy < 0 ? "− " : ""}S/ {Math.abs(netoHoy).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b></span>
             {puedeEgresos && <button type="button" className="dc-flujo__nuevo" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button>}
           </>} cols={[
             { key: "tipo", label: "Tipo", get: (m) => (m.tipo === "ingreso" ? "Ingreso" : "Egreso") },
@@ -4987,7 +4985,7 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
         { key: "motivo", label: "Motivo", w: "minmax(130px,1.3fr)", a: "left", get: (c) => c.motivo, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{c.motivo}</span> },
         { key: "medico", label: "Odontólogo", w: "minmax(124px,1.1fr)", a: "left", get: (c) => (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre || "—", cell: (c) => { const m = MEDICOS.find((x) => x.id === c.medicoId); return <span style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "inline-flex", alignItems: "center", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: m?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m?.nombre || "—"}</span></span>; } },
         { key: "llegada", label: "Llegada", w: "minmax(100px,0.8fr)", a: "center", get: (c) => c.llegada ? "En sala" : "Por llegar", cell: (c) => c.llegada ? pill("var(--dc-ok-soft)", "var(--dc-ok-700)", <CheckCircle2 size={13} strokeWidth={1.75} />, "En sala") : pill("var(--dc-warn-soft)", "var(--dc-warn-600)", <Clock size={12} strokeWidth={1.75} />, "Por llegar") },
-        { key: "estado", label: "Estado", w: "minmax(100px,0.8fr)", a: "center", get: (c) => c.estado, cell: (c) => <Badge estado={c.estado} /> },
+        { key: "estado", label: "Estado", w: "minmax(100px,0.8fr)", a: "center", get: (c) => estadoCita(c), cell: (c) => <EstadoPill entidad="cita" estado={estadoCita(c)} /> },
         { key: "saldo", label: "Saldo", w: "minmax(88px,0.7fr)", a: "right", get: (c) => datosPago(c.paciente).saldo, cell: (c) => { const s = datosPago(c.paciente).saldo; return <span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, color: s > 0 ? RED : "var(--dc-ok-700)" }}>S/ {s.toFixed(0)}</span>; } },
         { key: "acc", label: "Acciones", w: "minmax(150px,1.1fr)", a: "center", noFilter: true, noSort: true, cell: (c) => { const dp = datosPago(c.paciente); return <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", gap: 7, flexWrap: "wrap", justifyContent: "center" }}><Btn small kind="ghost" onClick={() => checkin(c)}><UserCheck size={14} strokeWidth={1.75} /> {c.llegada ? "Anular" : "Llegada"}</Btn>{dp.saldo > 0 && <Btn small kind="red" onClick={() => setPago({ monto: dp.saldo, nombre: c.paciente })}><CreditCard size={14} strokeWidth={1.75} /> Cobrar</Btn>}</span>; } },
       ]} />
@@ -6326,19 +6324,11 @@ const INVENTARIO_INIT = [
 /* ---- Servicios / catálogo (estilo Doctocliq: Administración > Servicios) ---- */
 const SERV_CATS = ["Odontología general", "Ortodoncia", "Endodoncia", "Periodoncia", "Cirugía", "Estética", "Odontopediatría", "Prótesis"];
 const SERV_CAT_COL = { "Odontología general": DS.c.primary, Ortodoncia: "var(--dc-purple)", Endodoncia: "var(--dc-red)", Periodoncia: "var(--dc-ok-700)", Cirugía: "var(--dc-danger)", Estética: "var(--dc-warn-700)", Odontopediatría: PED, Prótesis: "#2563EB" };
-const SERVICIOS_INIT = [
-  { id: 1, nombre: "Consulta / evaluación", cat: "Odontología general", monto: 50 },
-  { id: 2, nombre: "Profilaxis (limpieza dental)", cat: "Odontología general", monto: 120 },
-  { id: 3, nombre: "Blanqueamiento dental", cat: "Estética", monto: 400 },
-  { id: 4, nombre: "Resina / obturación", cat: "Odontología general", monto: 150 },
-  { id: 5, nombre: "Endodoncia (unirradicular)", cat: "Endodoncia", monto: 350 },
-  { id: 6, nombre: "Extracción simple", cat: "Cirugía", monto: 120 },
-  { id: 7, nombre: "Corona de porcelana", cat: "Prótesis", monto: 800 },
-  { id: 8, nombre: "Ortodoncia — cuota inicial", cat: "Ortodoncia", monto: 500 },
-  { id: 9, nombre: "Ortodoncia — cuota mensual", cat: "Ortodoncia", monto: 180 },
-];
-// Catálogo de servicios vigente (lo edita el módulo Servicios; default SERVICIOS_INIT).
-const getServicios = () => { try { const s = JSON.parse(localStorage.getItem("dc_data_v1_servicios") || "null"); return Array.isArray(s) && s.length ? s : SERVICIOS_INIT; } catch { return SERVICIOS_INIT; } };
+// SRV-01: un solo catálogo (compartido/catalogo.js). Este adaptador lo expone con la
+// forma que usan las pantallas antiguas (monto, cat, especialidad).
+const espNombre = (id) => (ESPECIALIDADES.find((e) => e.id === Number(id)) || {}).nombre || "General";
+const servicioVista = (s) => ({ ...s, monto: Number(s.precio) || 0, cat: espNombre(s.esp), especialidad: s.especialidad || espNombre(s.esp), categoria: s.categoria || espNombre(s.esp) });
+const getServicios = () => leerCatalogo().filter((s) => s.activo !== false).map(servicioVista);
 function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () => {}, can }) {
   // Quien solo puede ver no crea servicios ni toca precios. El odontólogo entra aquí
   // para consultar el catálogo cuando presupuesta, no para gestionarlo.
@@ -6359,7 +6349,12 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     seguro: false,
     activo: e.activo !== false,
   });
-  const [demoItems, setDemoItems] = usePersist("servicios", SERVICIOS_INIT);
+  const dbSrv = useContext(DatosDemoCtx);
+  const demoItems = (dbSrv?.catalogo || CATALOGO_SEED).map(servicioVista);
+  const setDemoItems = (fn) => dbSrv?.setCatalogo && dbSrv.setCatalogo((prev) => {
+    const next = typeof fn === "function" ? fn((prev || CATALOGO_SEED).map(servicioVista)) : fn;
+    return next.map(({ monto, cat, ...x }) => ({ ...x, precio: Number(monto) || 0, esp: x.esp || (ESPECIALIDADES.find((e) => e.nombre === (x.especialidad || cat)) || {}).id || 1, codigo: x.codigo || `S${String(x.id).padStart(2, "0")}`, activo: x.activo !== false }));
+  });
   const [srv, setSrv] = useState([]);
   const cargar = () => {
     if (!conectado) return;
@@ -6914,13 +6909,13 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
   // estado de las entregas -gerencia, o el odontologo segun la matriz- no lo hace.
   const puedeGestionar = can ? can("laboratorio", "crear") : true;
   const pidDe = (nombre) => (pacientes.find((p) => p.nombre === nombre) || PACIENTES_INIT.find((p) => p.nombre === nombre))?.id;
-  const DEMO_CASOS = [
-    { id: 1, paciente: "Rosa Linares", trabajo: "Corona de porcelana – pieza 36", lab: "Laboratorio Dental Lima", enviado: addDays(-6), entrega: addDays(2), estado: "en_proceso" },
-    { id: 2, paciente: "Pedro Gómez", trabajo: "Corona pieza 47", lab: "ProDent Lab", enviado: addDays(-9), entrega: addDays(-1), estado: "recibido" },
-    { id: 3, paciente: "María Chávez", trabajo: "Férula de descarga", lab: "Laboratorio Dental Lima", enviado: addDays(-2), entrega: addDays(5), estado: "enviado" },
-  ];
   const conectado = !!auth.token;
-  const [casos, setCasos] = useState(() => conectado ? [] : DEMO_CASOS);
+  // LAB-02: en la demostración los casos son los mismos que ve la ficha (Archivos ›
+  // Laboratorio) y el Inicio: una sola lista en el contexto de datos.
+  const dbLab = useContext(DatosDemoCtx);
+  const [casosRem, setCasosRem] = useState([]);
+  const casos = conectado ? casosRem : (dbLab?.labCasos || []);
+  const setCasos = conectado ? setCasosRem : (dbLab?.setLabCasos || (() => {}));
   const [filtroLab, setFiltroLab] = useState("todos");
   const bE = { enviado: "solicitado", en_proceso: "en_proceso", recibido: "listo", entregado: "entregado" };
   const fE = { solicitado: "enviado", en_proceso: "en_proceso", listo: "recibido", entregado: "entregado" };
@@ -6931,20 +6926,20 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
   const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
   const avanzar = (id) => {
     if (conectado) { const c = casos.find((x) => x.id === id); if (!c) return; const i = LAB_FLUJO.indexOf(c.estado); const n = LAB_FLUJO[Math.min(LAB_FLUJO.length - 1, i + 1)]; api.laboratorio.actualizar(id, { estado: bE[n] }).then(() => { notify(`${c.paciente}: ${LAB_INFO[n].l}.`); recargar(); }).catch(() => notify("Error al avanzar el caso.")); return; }
-    setCasos((cs) => cs.map((c) => { if (c.id !== id) return c; const i = LAB_FLUJO.indexOf(c.estado); const n = LAB_FLUJO[Math.min(LAB_FLUJO.length - 1, i + 1)]; notify(`${c.paciente}: ${LAB_INFO[n].l}.`); const pid = pidDe(c.paciente); if (pid && updFicha) updFicha(pid, (cur) => ({ ...cur, lab: (cur.lab || []).map((l) => l.id === id ? { ...l, estado: n } : l) })); return { ...c, estado: n }; }));
+    setCasos((cs) => cs.map((c) => { if (c.id !== id) return c; const i = LAB_FLUJO.indexOf(c.estado); const n = LAB_FLUJO[Math.min(LAB_FLUJO.length - 1, i + 1)]; notify(`${c.paciente}: ${LAB_INFO[n].l}.`); return { ...c, estado: n }; }));
   };
   const [detalle, setDetalle] = useState(null);
-  const crear = () => { if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (conectado) { notify("Crear envíos desde aquí estará disponible pronto en modo conectado."); setNuevo(null); return; } const id = Date.now(); const caso = { id, paciente: nuevo.paciente, trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); const pid = pidDe(nuevo.paciente); if (pid && updFicha) updFicha(pid, (cur) => ({ ...cur, lab: [{ id, trabajo: caso.trabajo, lab: caso.lab, entrega: caso.entrega, estado: "enviado" }, ...(cur.lab || [])] })); notify("Caso enviado a laboratorio y anotado en la ficha del paciente."); setNuevo(null); };
+  const crear = () => { if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (conectado) { notify("Crear envíos desde aquí estará disponible pronto en modo conectado."); setNuevo(null); return; } const id = Date.now(); const caso = { id, pacienteId: pidDe(nuevo.paciente) || null, paciente: nuevo.paciente, trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); notify("Caso enviado a laboratorio. Ya aparece en la ficha del paciente (Archivos › Laboratorio)."); setNuevo(null); };
   const faltanDias = (c) => Math.round((new Date(c.entrega) - new Date(fmt(hoy))) / 86400000);
   // DC-42: KPI y tabla desde el mismo conjunto filtrado.
   const casosVista = filtroLab === "todos" ? casos
-    : filtroLab === "atrasados" ? casos.filter((c) => c.estado !== "entregado" && faltanDias(c) < 0)
+    : filtroLab === "atrasados" ? casos.filter((c) => labAtrasado(c, fmt(hoy)))
     : casos.filter((c) => c.estado === filtroLab);
-  const atrasados = casosVista.filter((c) => c.estado !== "entregado" && faltanDias(c) < 0);
+  const atrasados = casosVista.filter((c) => labAtrasado(c, fmt(hoy)));
   const kpis = [["En proceso", casosVista.filter((c) => c.estado === "en_proceso" || c.estado === "enviado").length, "var(--dc-warn-600)", <FlaskConical size={18} strokeWidth={1.75} />], ["Por entregar", casosVista.filter((c) => c.estado === "recibido").length, "var(--dc-info-ink)", <Clock size={18} strokeWidth={1.75} />], ["Atrasados", atrasados.length, "var(--dc-red)", <AlertTriangle size={18} strokeWidth={1.75} />], ["Entregados", casosVista.filter((c) => c.estado === "entregado").length, "var(--dc-ok-700)", <CheckCircle2 size={18} strokeWidth={1.75} />]];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
-      {(() => { const activos = casos.filter((c) => c.estado !== "entregado").length; const atr = casos.filter((c) => c.estado !== "entregado" && faltanDias(c) < 0); return (
+      {(() => { const activos = casos.filter((c) => c.estado !== "entregado").length; const atr = casos.filter((c) => labAtrasado(c, fmt(hoy))); return (
         <section className="dc-esp-hero dc-lab-hero">
           <div className="dc-esp-hero__txt">
             <div className="dc-esp-hero__num"><b>{activos}</b><span>{activos === 1 ? "caso en curso" : "casos en curso"}</span></div>
@@ -6967,7 +6962,7 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
       ); })()}
       <div className="dc-chips-fila" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {[["todos", "Todos", "#0E9199"], ["enviado", "Enviado", "#2563EB"], ["en_proceso", "En proceso", "#D97706"], ["recibido", "Recibido", "#6D4FD1"], ["entregado", "Entregado", "#16A36A"], ["atrasados", "Atrasados", "#D0563F"]].map(([k, l, c]) => {
-          const n = k === "todos" ? casos.length : k === "atrasados" ? casos.filter((x) => x.estado !== "entregado" && faltanDias(x) < 0).length : casos.filter((x) => x.estado === k).length;
+          const n = k === "todos" ? casos.length : k === "atrasados" ? casos.filter((x) => labAtrasado(x, fmt(hoy))).length : casos.filter((x) => x.estado === k).length;
           return <button key={k} type="button" className={`dc-cat${filtroLab === k ? " is-on" : ""}`} style={{ "--c": c }} onClick={() => setFiltroLab(k)}>{k !== "todos" && <i />}{l}<span>{n}</span></button>;
         })}
       </div>
@@ -6989,7 +6984,7 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
         { key: "estado", label: "Estado", w: "130px", a: "center", get: (c) => (LAB_INFO[c.estado] || { l: c.estado || "—" }).l, cell: (c) => { const I = LAB_INFO[c.estado] || { l: c.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; return <span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>; } },
         { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? <Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Entregado</span> },
       ]} />
-      {detalle && (() => { const I = LAB_INFO[detalle.estado] || { l: detalle.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; const atrasado = detalle.estado !== "entregado" && detalle.entrega < fmt(hoy); return (
+      {detalle && (() => { const I = LAB_INFO[detalle.estado] || { l: detalle.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; const atrasado = labAtrasado(detalle, fmt(hoy)); return (
         <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detalle.trabajo} sub={detalle.paciente} onClose={() => setDetalle(null)} maxW={520} footer={detalle.estado !== "entregado" ? <Btn small onClick={() => { avanzar(detalle.id); setDetalle(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
           <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 18 }}>
             {LAB_FLUJO.map((st, i) => { const idx = LAB_FLUJO.indexOf(detalle.estado); const done = i <= idx; return (
@@ -7173,7 +7168,7 @@ function Periodontograma({ pacientes: pacProp, notify, can }) {
   const [pacRemoto, setPacRemoto] = useState(null);
   useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni, fechaNacimiento: p.fechaNacimiento })))).catch(() => {}); }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
-  const [pid, setPid] = useState(auth.token ? null : (pacProp[0]?.id || null));
+  const [pid, setPid] = useState(pacienteFijo || (auth.token ? null : (pacProp[0]?.id || null)));
   useEffect(() => {
     if (!conectado || !pacRemoto) return;
     if (!pacRemoto.length) { setPid(null); return; }
@@ -7329,13 +7324,11 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
     { n: "Mapfre", cob: 60, estado: "activo" }, { n: "La Positiva", cob: 50, estado: "activo" }, { n: "SIS", cob: 100, estado: "evaluación" },
   ];
   // Liquidaciones ligadas al paciente por ID; el total sale del cargo real de su ficha (plan).
-  const [liq, setLiq] = useState(auth.token ? [] : [
-    { id: 1, pid: 2, aseg: "Pacífico EPS", cobPct: 80, estado: "aprobado" },
-    { id: 2, pid: 3, aseg: "Rímac Seguros", cobPct: 70, estado: "enviado" },
-    { id: 3, pid: 5, aseg: "Mapfre", cobPct: 60, estado: "pagado" },
-    { id: 4, pid: 8, aseg: "Pacífico EPS", cobPct: 80, estado: "enviado" },
-  ]);
-  const mapEstadoSeg = (be) => ({ por_enviar: "enviado", enviado: "enviado", en_revision: "aprobado", pagado: "pagado", observado: "enviado" }[be] || "enviado");
+  // SEG-01: una sola lista de liquidaciones (contexto) que también lee el Inicio.
+  const dbSeg = useContext(DatosDemoCtx);
+  const liq = dbSeg?.liquidaciones || [];
+  const setLiq = dbSeg?.setLiquidaciones || (() => {});
+  const mapEstadoSeg = (be) => ({ por_enviar: "borrador", enviado: "enviado", en_revision: "aprobado", pagado: "pagado", observado: "observado" }[be] || "enviado");
   const [remoto, setRemoto] = useState(null);
   const [segurosError, setSegurosError] = useState(null);
   const recargarLiq = () => {
@@ -7352,12 +7345,12 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
       });
   };
   useEffect(() => { recargarLiq(); }, []); // eslint-disable-line
-  const LI = { enviado: { l: "Enviado", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" }, aprobado: { l: "Aprobado", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" }, pagado: { l: "Pagado", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)" } };
+  const LI = Object.fromEntries(["borrador", "enviado", "observado", "aprobado", "pagado"].map((k) => { const e = estadoInfo("liquidacion", k); return [k, { l: e.label, bg: tint(e.color, 0.12), fg: e.color }]; }));
   const [detalleLiq, setDetalleLiq] = useState(null);
   const totalDe = (pid) => (fichas[pid]?.tratamiento || []).reduce((s, f) => s + f.costo, 0);
   const nombreDe = (pid) => (pacientes.find((p) => p.id === pid) || PACIENTES_INIT.find((p) => p.id === pid))?.nombre || "—";
   const liqView = conectado ? (remoto || []) : liq.map((l) => { const total = totalDe(l.pid) || 0; const cob = Math.round(total * l.cobPct / 100); return { ...l, paciente: nombreDe(l.pid), total, cob, copago: total - cob }; });
-  const avanzar = (id) => { if (conectado) { const it = (remoto || []).find((x) => x.id === id); if (!it) return; const flow = ["por_enviar", "enviado", "en_revision", "pagado"]; const n = flow[Math.min(flow.length - 1, flow.indexOf(it.estadoBE) + 1)]; api.seguros.actualizar(id, { estado: n }).then(() => { notify(`${it.paciente}: liquidación actualizada.`); recargarLiq(); }).catch(() => notify("Error al avanzar la liquidación.")); return; } setLiq((l) => l.map((x) => { if (x.id !== id) return x; const f = ["enviado", "aprobado", "pagado"]; const n = f[Math.min(2, f.indexOf(x.estado) + 1)]; notify(`${nombreDe(x.pid)}: liquidación ${LI[n].l.toLowerCase()}.`); return { ...x, estado: n }; })); };
+  const avanzar = (id) => { if (conectado) { const it = (remoto || []).find((x) => x.id === id); if (!it) return; const flow = ["por_enviar", "enviado", "en_revision", "pagado"]; const n = flow[Math.min(flow.length - 1, flow.indexOf(it.estadoBE) + 1)]; api.seguros.actualizar(id, { estado: n }).then(() => { notify(`${it.paciente}: liquidación actualizada.`); recargarLiq(); }).catch(() => notify("Error al avanzar la liquidación.")); return; } setLiq((l) => l.map((x) => { if (x.id !== id) return x; const f = ["borrador", "enviado", "aprobado", "pagado"]; const n = x.estado === "observado" ? "enviado" : f[Math.min(3, f.indexOf(x.estado) + 1)]; notify(`${nombreDe(x.pid)}: liquidación ${LI[n].l.toLowerCase()}.`); return { ...x, estado: n }; })); };
   const porCobrar = liqView.filter((l) => l.estado !== "pagado").reduce((s, l) => s + l.cob, 0);
   const recuperado = liqView.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.cob, 0);
   // DC-43: cobertura promedio + # aseguradoras desde liquidaciones (misma fuente que la tabla).
@@ -7382,7 +7375,7 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
       return { n, cob, estado: "activo" };
     });
   const iniAseg = (n) => String(n || "").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
-  const COLS_LIQ = [["enviado", "Enviadas", "Esperan respuesta de la aseguradora", "#2F6FDE", Send], ["aprobado", "Aprobadas", "Listas para cobrar", "#6D4FD1", CheckCircle2], ["pagado", "Pagadas", "Ya recuperadas", "#16A36A", Wallet]];
+  const COLS_LIQ = [["borrador", "Borradores", "Por enviar a la aseguradora", "#667085", FileText], ["observado", "Observadas", "La aseguradora pidió corregir algo", "#B45309", AlertTriangle], ["enviado", "Enviadas", "Esperan respuesta de la aseguradora", "#2F6FDE", Send], ["aprobado", "Aprobadas", "Listas para cobrar", "#6D4FD1", CheckCircle2], ["pagado", "Pagadas", "Ya recuperadas", "#16A36A", Wallet]];
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <section className="dc-esp-hero">
@@ -7421,7 +7414,7 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
         { key: "cob", label: "Seguro", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-ok">S/ {Number(x.cob).toLocaleString("es-PE")}</span> },
         { key: "cop", label: "Copago", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</span> },
         { key: "tot", label: "Total", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {Number(x.total).toLocaleString("es-PE")}</span> },
-        { key: "est", label: "Estado", w: "150px", a: "center", cell: (x) => { const c = COLS_LIQ.find(([k]) => k === x.estado); return <span className="dc-pill" style={{ "--c": c ? c[3] : "#8A9CA1" }}><i /> {c ? c[1] : x.estado}</span>; } },
+        { key: "est", label: "Estado", w: "150px", a: "center", cell: (x) => <EstadoPill entidad="liquidacion" estado={x.estado} /> },
       ] }} cols={[
         { key: "paciente", label: "Paciente", get: (x) => x.paciente || "" },
         { key: "aseg", label: "Aseguradora", get: (x) => x.aseg || "" },
@@ -7441,7 +7434,7 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
                   <span>Copago <b className="is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</b></span>
                   <span>Total <b>S/ {Number(x.total).toLocaleString("es-PE")}</b></span>
                 </div>
-                {x.estado !== "pagado" && <button type="button" className="dc-seg__av" onClick={(e) => { e.stopPropagation(); avanzar(x.id); }}>{x.estado === "enviado" ? "Marcar aprobada" : "Marcar pagada"} <ChevronRight size={13} strokeWidth={2.2} /></button>}
+                {x.estado !== "pagado" && <button type="button" className="dc-seg__av" onClick={(e) => { e.stopPropagation(); avanzar(x.id); }}>{({ borrador: "Enviar", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={13} strokeWidth={2.2} /></button>}
               </article>
             ); })}
           </section>
@@ -7449,7 +7442,8 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
       </div>
       )}</ListaFiltrable>
       {detalleLiq && (() => { const x = detalleLiq; const I = LI[x.estado]; return (
-        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={x.estado !== "pagado" ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}>
+        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={x.estado !== "pagado" ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>{({ borrador: "Enviar a la aseguradora", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}>
+          {x.estado === "observado" && x.motivo && <div style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", borderRadius: "var(--dc-r-md)", padding: "10px 12px", fontSize: 13, marginBottom: 12 }}><b>Observación de la aseguradora:</b> {x.motivo}</div>}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
             {[["Total tratamiento", `S/ ${x.total}`, NAVY], ["Cubre seguro", `S/ ${x.cob}`, "var(--dc-ok-700)"], ["Copago paciente", `S/ ${x.copago}`, "var(--dc-warn-600)"]].map(([l, v, col]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "12px 14px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 600, color: col, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{v}</div></div>)}
           </div>
@@ -7463,6 +7457,110 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
 
 /* ---- Formularios / anamnesis digital pre-cita ---- */
 const FORM_TIPOS = ["Ficha de admisión", "Anamnesis / historia médica", "Declaración de salud", "Actualización de datos"];
+
+/* ── Documentos del paciente (DOC-01, DOC-02, FIC-04) ──
+   Un solo flujo para consentimientos y formularios: se envían por enlace, el paciente
+   firma o completa, y el estado es el mismo en la ficha y en la bandeja de Pendientes.
+   pacienteFijo: dentro de la ficha. Sin él: bandeja de todos los pendientes. */
+function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () => {}, soloPendientes = false, onAbrirPaciente = null }) {
+  const db = useContext(DatosDemoCtx);
+  const docsAll = db?.documentos || [];
+  const setDocs = db?.setDocumentos || (() => {});
+  const pacDe = (id) => pacientes.find((p) => String(p.id) === String(id)) || PACIENTES_INIT.find((p) => String(p.id) === String(id)) || null;
+  const docs = docsAll.filter((d) => (pacienteFijo == null || String(d.pacienteId) === String(pacienteFijo)) && (!soloPendientes || d.estado === "pendiente"));
+  const [form, setForm] = useState(null);
+  const [firmaDoc, setFirmaDoc] = useState(null);
+  const [firmante, setFirmante] = useState({ nombre: "", dni: "", relacion: "" });
+  const hecho = (d) => d.estado === "firmado" || d.estado === "completado";
+  const etiquetaPend = (d) => (d.clase === "consentimiento" ? "Por firmar" : "Por completar");
+  const reenviar = (d) => { setDocs((xs) => xs.map((x) => (x.id === d.id ? { ...x, reenviadoEn: fmt(hoy) } : x))); notify(`Enlace reenviado por WhatsApp a ${pacDe(d.pacienteId)?.nombre || "el paciente"}.`); };
+  const abrirFirma = (d) => { const pac = pacDe(d.pacienteId); setFirmante({ nombre: pac?.apoderadoNombre || "", dni: pac?.apoderadoDni || "", relacion: pac?.apoderadoParentesco || "" }); setFirmaDoc(d); };
+  const esMenorDoc = firmaDoc ? esPediatrico(pacDe(firmaDoc.pacienteId)?.nacimiento) : false;
+  const confirmarFirma = () => {
+    if (esMenorDoc && !firmante.nombre.trim()) { notify("El paciente es menor: escribe quién firma (padre, madre o tutor)."); return; }
+    setDocs((xs) => xs.map((x) => (x.id === firmaDoc.id ? { ...x, estado: "firmado", fecha: fmt(hoy), firmanteNombre: esMenorDoc ? firmante.nombre : undefined } : x)));
+    notify("Consentimiento firmado en consultorio y archivado con fecha y hora."); setFirmaDoc(null);
+  };
+  const enviar = () => {
+    const pid = pacienteFijo ?? form.pacienteId;
+    if (!pid) { notify("Elige el paciente."); return; }
+    setDocs((xs) => [{ id: `${form.clase[0]}${Date.now()}`, clase: form.clase, pacienteId: pid, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...xs]);
+    notify(form.clase === "consentimiento" ? "Consentimiento enviado al paciente para firma en línea." : "Formulario enviado al paciente."); setForm(null);
+  };
+  const nPend = docs.filter((d) => !hecho(d)).length;
+  return (
+    <Card className="dc-docs">
+      <div className="dc-docs__cab">
+        <div><h3>{soloPendientes ? "Documentos por firmar o completar" : "Documentos"}</h3><span>Consentimientos y formularios{nPend ? ` · ${nPend} pendiente${nPend > 1 ? "s" : ""}` : ""}</span></div>
+        {!soloPendientes && <Btn small onClick={() => setForm({ clase: "consentimiento", tipo: CONSENT_TIPOS[0], pacienteId: pacienteFijo || pacientes[0]?.id || null })}><Send size={14} strokeWidth={1.75} /> Enviar documento</Btn>}
+      </div>
+      {docs.length === 0 ? <Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo={soloPendientes ? "Nada pendiente" : "Sin documentos"} sub={soloPendientes ? "Todos los consentimientos y formularios están firmados o completados." : "Envía un consentimiento o un formulario para que el paciente lo firme o complete."} /> : (
+        <DataTable bare minWidth={0} sub="documentos" exportar={false} rows={docs} defaultSort={{ key: "fecha", dir: "desc" }} cols={[
+          ...(pacienteFijo == null ? [{ key: "pac", label: "Paciente", w: "minmax(150px,1.1fr)", a: "left", get: (d) => pacDe(d.pacienteId)?.nombre || "—", cell: (d) => onAbrirPaciente ? <button type="button" className="dc-link" onClick={() => onAbrirPaciente(d.pacienteId)}>{pacDe(d.pacienteId)?.nombre || "—"}</button> : <span>{pacDe(d.pacienteId)?.nombre || "—"}</span> }] : []),
+          { key: "tipo", label: "Documento", w: "minmax(180px,1.4fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span className="dc-doc-tipo"><span>{d.clase === "consentimiento" ? <Shield size={14} strokeWidth={1.9} /> : <FileText size={14} strokeWidth={1.9} />}</span>{d.tipo}</span> },
+          { key: "clase", label: "Tipo", w: "120px", a: "left", get: (d) => (d.clase === "consentimiento" ? "Consentimiento" : "Formulario") },
+          { key: "fecha", label: "Fecha", w: "110px", a: "left", get: (d) => d.fecha, cell: (d) => <span className="dc-tp__sub">{fechaLegible(d.fecha)}</span> },
+          { key: "estado", label: "Estado", w: "130px", a: "center", get: (d) => (hecho(d) ? (d.clase === "consentimiento" ? "Firmado" : "Completado") : etiquetaPend(d)), cell: (d) => hecho(d) ? <EstadoPill entidad="documento" estado={d.estado} /> : <EstadoPill entidad="documento" estado="enviado">{etiquetaPend(d)}</EstadoPill> },
+          { key: "acc", label: "Acciones", w: "220px", a: "right", noSort: true, noFilter: true, cell: (d) => hecho(d)
+            ? <span className="dc-tp__sub">{d.clase === "consentimiento" ? "Archivado con fecha y hora" : "Respuestas guardadas"}</span>
+            : <span style={{ display: "inline-flex", gap: 6 }}>
+                <Btn small kind="ghost" onClick={() => reenviar(d)}><Send size={13} strokeWidth={1.9} /> Reenviar enlace</Btn>
+                {d.clase === "consentimiento" && <Btn small onClick={() => abrirFirma(d)}><Pencil size={13} strokeWidth={1.9} /> Firmar en consultorio</Btn>}
+              </span> },
+        ]} />
+      )}
+      {form && (
+        <Modal icon={<Send size={20} strokeWidth={1.75} />} titulo="Enviar documento" sub="El paciente lo firma o completa desde su celular" onClose={() => setForm(null)} maxW={540}
+          footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={14} strokeWidth={1.75} /> Enviar</Btn></>}>
+          <div style={{ display: "grid", gridTemplateColumns: pacienteFijo == null ? "1fr 1fr" : "1fr", gap: 14 }}>
+            {pacienteFijo == null && <label className="dc-campo-lbl">Paciente<Select value={form.pacienteId} onChange={(v) => setForm({ ...form, pacienteId: v })} options={pacientes.map((p) => ({ value: p.id, label: p.nombre }))} /></label>}
+            <label className="dc-campo-lbl">Clase<Select value={form.clase} onChange={(v) => setForm({ ...form, clase: v, tipo: v === "consentimiento" ? CONSENT_TIPOS[0] : FORM_TIPOS[0] })} options={[{ value: "consentimiento", label: "Consentimiento" }, { value: "formulario", label: "Formulario" }]} /></label>
+            <label className="dc-campo-lbl">Documento<Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={(form.clase === "consentimiento" ? CONSENT_TIPOS : FORM_TIPOS).map((t) => ({ value: t, label: t }))} /></label>
+          </div>
+        </Modal>
+      )}
+      {firmaDoc && <FirmaModal doc={{ ...firmaDoc, paciente: pacDe(firmaDoc.pacienteId)?.nombre || "" }} onClose={() => setFirmaDoc(null)} onConfirm={confirmarFirma} esMenor={esMenorDoc} firmante={firmante} setFirmante={setFirmante} />}
+    </Card>
+  );
+}
+
+/* ── Archivos de la ficha (IMG-01, FIC-03, LAB-03) ──
+   Radiografías, fotos, documentos y casos de laboratorio del paciente, leídos de las
+   mismas listas que las bandejas transversales. */
+function ArchivosPaciente({ pid, sub = null, pacientes = [], notify, can, sedeActiva = 1, misSedes = SEDE_IDS, onIrLaboratorio }) {
+  const db = useContext(DatosDemoCtx);
+  const [t, setT] = useState(sub || "rx");
+  useEffect(() => { if (sub) setT(sub); }, [sub]);
+  const casos = (db?.labCasos || []).filter((c) => String(c.pacienteId) === String(pid));
+  const docsPend = (db?.documentos || []).filter((d) => String(d.pacienteId) === String(pid) && d.estado === "pendiente").length;
+  const hoyISO = fmt(hoy);
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <Pestanas etiqueta="Archivos del paciente" valor={t} onChange={setT} opciones={[
+        { id: "rx", label: "Radiografías", icon: Scan },
+        { id: "fotos", label: "Fotos", icon: Camera },
+        { id: "docs", label: "Documentos", icon: FileText, badge: docsPend },
+        { id: "lab", label: "Laboratorio", icon: FlaskConical, badge: casos.filter((c) => labAtrasado(c, hoyISO)).length },
+      ]} />
+      {t === "rx" && <Radiografias key="rx" pacienteFijo={pid} pacientes={pacientes} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} />}
+      {t === "fotos" && <Radiografias key="fotos" pacienteFijo={pid} pacientes={pacientes} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} soloFotos />}
+      {t === "docs" && <DocumentosPaciente pacienteFijo={pid} pacientes={pacientes} notify={notify} />}
+      {t === "lab" && (
+        <Card className="dc-docs">
+          <div className="dc-docs__cab"><div><h3>Casos de laboratorio</h3><span>Trabajos enviados para este paciente</span></div>{onIrLaboratorio && <Btn small kind="ghost" onClick={onIrLaboratorio}><FlaskConical size={14} strokeWidth={1.75} /> Ir a Laboratorio</Btn>}</div>
+          {casos.length === 0 ? <Vacio icon={<FlaskConical size={22} strokeWidth={1.75} />} titulo="Sin trabajos de laboratorio" sub="Los casos enviados al laboratorio para este paciente aparecerán aquí." /> : (
+            <DataTable bare minWidth={0} sub="casos" exportar={false} rows={casos} cols={[
+              { key: "trabajo", label: "Trabajo", w: "minmax(180px,1.4fr)", a: "left", get: (c) => c.trabajo },
+              { key: "lab", label: "Laboratorio", w: "minmax(140px,1fr)", a: "left", get: (c) => c.lab },
+              { key: "entrega", label: "Entrega", w: "120px", a: "left", get: (c) => c.entrega, cell: (c) => <span className="dc-tp__sub">{fechaLegible(c.entrega)}{labAtrasado(c, hoyISO) && <b className="dc-lab-atr"> · Atrasado</b>}</span> },
+              { key: "estado", label: "Estado", w: "130px", a: "center", get: (c) => estadoInfo("laboratorio", c.estado).label, cell: (c) => <EstadoPill entidad="laboratorio" estado={c.estado} /> },
+            ]} />
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
 function Formularios({ pacientes: pacProp, notify }) {
   const conectado = !!auth.token;
   const [pacRemoto, setPacRemoto] = useState(null);
@@ -7569,7 +7667,7 @@ const RX_SOLO = ["panoramica", "periapical", "bitewing", "oclusal", "cefalometri
 const RX_PIEZAS = new Set(["periapical", "bitewing", "oclusal"]);
 const FOTO_VISTAS = { intraoral_frontal: "Intraoral frontal", intraoral_oclusal: "Intraoral oclusal", intraoral_lateral: "Intraoral lateral", extraoral_frontal: "Extraoral frontal", extraoral_perfil: "Perfil", sonrisa: "Sonrisa" };
 const FOTO_MOMENTOS = { antes: "Antes", durante: "Durante", despues: "Después", control: "Control" };
-function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = SEDE_IDS, can, soloFotos = false }) {
+function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeActiva = 1, misSedes = SEDE_IDS, can, soloFotos = false }) {
   // Borrar del expediente es irreversible: se pide el permiso explicito de eliminar,
   // no basta con poder subir. El backend lo exige igual (radiografias.eliminar).
   const puedeBorrarRx = can ? can("radiografias", "eliminar") : true;
@@ -7679,7 +7777,7 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
 
   return (
     <div className={`dc-im ${esFotos ? "is-fotos" : "is-rx"}`} style={{ display: "grid", gap: 16 }}>
-      <PacienteBar pacientes={pacientes} pacienteId={pid} setPacienteId={setPid} modulo={esFotos ? "Fotografía clínica" : "Radiografías"} accion={
+      <PacienteBar soloAccion={!!pacienteFijo} pacientes={pacientes} pacienteId={pid} setPacienteId={setPid} modulo={esFotos ? "Fotografía clínica" : "Radiografías"} accion={
         <div className="dc-rx-acc">
           <label className="dc-rx-sede" title="Sede donde se registra">
             <MapPin size={14} strokeWidth={1.9} />
@@ -7883,6 +7981,29 @@ const GUIA_PASOS = [
  * hay forma de notarlo: fue exactamente lo que paso con Reportes para el administrador
  * de sede y el odontologo, que veian cifras inventadas sin saberlo.
  */
+const TAB_FICHA_DE_RUTA = { odontograma: "odontograma", perio: "perio", tratamientos: "cuenta", recetas: "receta", radiografias: "archivos", fotos: "archivos", consentimientos: "consentimientos", formularios: "consentimientos" };
+function RedirFicha({ vista, pacienteActivo, setVista, notify }) {
+  useEffect(() => {
+    const tab = TAB_FICHA_DE_RUTA[vista] || "resumen";
+    if (pacienteActivo?.id) setVista("pacientes", { pacienteId: pacienteActivo.id, tab });
+    else { setVista("pacientes"); notify("Elige un paciente: lo clínico se trabaja dentro de su ficha."); }
+  }, [vista]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
+/* NAV-08: un módulo que el plan no incluye muestra su aviso, sin redirigir en silencio. */
+function PlanBloqueado({ modulo, onVerPlanes }) {
+  const nombre = (MODULOS.find((m) => m.id === modDeVista(modulo)) || {}).label || "Este módulo";
+  const plan = PLAN_NOMBRE[planMinimo(modDeVista(modulo))] || "superior";
+  return (
+    <Card className="dc-bloq">
+      <span className="dc-bloq__ico"><Lock size={22} strokeWidth={1.9} /></span>
+      <div><h3>{nombre} está disponible en el plan {plan}</h3><p>Tu plan actual no lo incluye. Puedes ver qué trae cada plan y cambiarlo cuando quieras.</p></div>
+      <Btn onClick={onVerPlanes}><Crown size={15} strokeWidth={1.9} /> Ver planes</Btn>
+    </Card>
+  );
+}
+
 function AvisoBackend({ vista, onReintentar }) {
   const [fallo, setFallo] = useState(null);
   useEffect(() => alFallarPeticion((f) => setFallo(f)), []);
@@ -8031,6 +8152,14 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [fichas, setFichas] = usePersist("fichas", () => JSON.parse(JSON.stringify(FICHA_CLINICA)));
   const fichaDe = (pid) => fichas[pid] || {};
   const updFicha = (pid, patch) => setFichas((f) => { const cur = f[pid] || {}; const nx = typeof patch === "function" ? patch(cur) : { ...cur, ...patch }; return { ...f, [pid]: nx }; });
+  // Fuente única de la demostración (spec UX/UI §5.3): catálogo de servicios, egresos de
+  // caja, documentos del paciente, casos de laboratorio y liquidaciones de seguro. Las
+  // pantallas transversales y la ficha leen estas mismas listas.
+  const [catalogo, setCatalogo] = usePersist("catalogo", CATALOGO_SEED);
+  const [egresos, setEgresos] = usePersist("egresos", EGRESOS_DEMO);
+  const [documentos, setDocumentos] = usePersist("documentos", DOCUMENTOS_SEED);
+  const [labCasos, setLabCasos] = usePersist("lab", LAB_SEED);
+  const [liquidaciones, setLiquidaciones] = usePersist("liquidaciones", LIQ_SEED);
   const [espera, setEspera] = usePersist("espera", ESPERA_INIT);   // lista de espera compartida (P1-3)
   const [pacienteActivo, setPacienteActivo] = useState(null); // paciente en atención (P1-1)
   const [inventario, setInventario] = usePersist("inventario", INVENTARIO_INIT); // insumos (P2-1)
@@ -8090,10 +8219,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [subAbierto, setSubAbierto] = useState({}); // submenús del sidebar abiertos (por etiqueta del padre)
   // Menú por rol: grupos plegables (se recuerda lo que cada quien abre o cierra),
   // favoritos fijados arriba y buscador con Ctrl + K.
-  const GRUPOS_ROL = { recepcion: ["Inicio", "Agenda", "Pacientes y clínica", "Caja y cobros"], medico: ["Inicio", "Agenda", "Pacientes y clínica"], admin_sede: ["Inicio", "Agenda", "Caja y cobros"], gerencia: ["Inicio", "Reportes", "Caja y cobros"], admin: ["Inicio", "Agenda", "Pacientes y clínica"], ti: ["Administración"] };
-  const FAVS_ROL = { recepcion: ["agenda_cal", "pacientes", "facturacion"], medico: ["agenda", "pacientes", "odontograma"], admin_sede: ["dashboard", "agenda_cal", "facturacion"], gerencia: ["gerencial", "reportes", "metas"], admin: ["dashboard", "agenda_cal", "pacientes", "facturacion"], ti: ["usuarios", "permisos", "integraciones"] };
-  const [gruposAb, setGruposAb] = usePersist("sb_grupos2_" + rol, () => (GRUPOS_ROL[rol] || null));
-  const [favs, setFavs] = usePersist("sb_favs_" + rol, () => (FAVS_ROL[rol] || []));
+  const GRUPOS_ROL = null; // con 17 destinos el menú entra entero: todos los grupos abiertos
+  // Favoritos vacíos por defecto (NAV-01): solo lo que cada usuario fija.
+  const FAVS_ROL = {};
+  const [gruposAb, setGruposAb] = usePersist("sb_grupos3_" + rol, () => GRUPOS_ROL);
+  const [favs, setFavs] = usePersist("sb_favs2_" + rol, () => (FAVS_ROL[rol] || []));
   const [buscador, setBuscador] = useState(false);
   useEffect(() => {
     const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); setBuscador((v) => !v); } };
@@ -8167,12 +8297,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         irHash(dest);
         return;
       }
-      if (!modAllowed(mod)) {
-        setVistaRaw("plan");
-        irHash("plan");
-        notify(`“${canon}” se desbloquea desde el plan ${PLAN_NOMBRE[planMinimo(mod)]}.`);
-        return;
-      }
+      // NAV-08: sin redirección silenciosa; la pantalla muestra «Disponible en el plan…».
       setVistaRaw(canon);
     };
     window.addEventListener("hashchange", onHash);
@@ -8218,9 +8343,33 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const misPasos = GUIA_PASOS.filter((p) => { const m = modDeVista(p.target); return mods.includes(m) && modAllowed(m) && can(m, "ver"); });
   // Acciones del botón "Crear", cada una con el módulo que necesita. La de sistemas es
   // dar de alta un usuario; sin ella el desplegable le salía vacío.
-  const ACCIONES_CREAR = [["cita", "Nueva cita", Calendar, "agenda", "Agenda un paciente", "#0E8C95"], ["paciente", "Nuevo paciente", UserPlus, "pacientes", "Crea su ficha", "#6D4FD1"],
-                          ["servicio", "Nuevo servicio", ClipboardList, "servicios", "Tratamiento y precio", "#2563EB"], ["egreso", "Registrar egreso", Wallet, "facturacion", "Gasto de caja", "#D0563F"],
-                          ["usuario", "Nuevo usuario", UserPlus, "usuarios", "Acceso para el equipo", "#B7791F"]];
+  // Menú «Crear» por rol (NAV-10): solo acciones del día. Las altas de servicio y de
+  // usuario quedan en sus pantallas de administración.
+  const ACCIONES_CREAR = rol === "medico"
+    ? [["cita", "Nueva cita", Calendar, "agenda", "Agenda un paciente", "#0E8C95"],
+       ["evolucion", "Nueva evolución", ClipboardList, "pacientes", "En la historia clínica", "#6D4FD1"],
+       ["receta", "Nueva receta", Pill, "pacientes", "Desde la ficha del paciente", "#2563EB"]]
+    : [["cita", "Nueva cita", Calendar, "agenda", "Agenda un paciente", "#0E8C95"],
+       ["paciente", "Nuevo paciente", UserPlus, "pacientes", "Crea su ficha", "#6D4FD1"],
+       ["cobro", "Registrar cobro", CreditCard, "facturacion", "Cobrar en caja", "#16A36A"],
+       ["egreso", "Registrar egreso", Wallet, "facturacion", "Gasto de caja", "#D0563F"]];
+  const crearAccion = (k, t) => {
+    if (k === "cobro") { setVista("caja"); return; }
+    if (k === "egreso") { setVista("caja_movimientos"); setCrearIntent("egreso"); return; }
+    if (k === "evolucion" || k === "receta") {
+      if (pacienteActivo?.id) { setVista("pacientes", { pacienteId: pacienteActivo.id, tab: "historia" }); return; }
+      setVista("pacientes"); notify(k === "receta" ? "Elige el paciente para emitir la receta." : "Elige el paciente para registrar la evolución."); return;
+    }
+    setVista(t); if (k === "paciente" || k === "cita") setCrearIntent(k);
+  };
+  const crearBtnRef = useRef(null);
+  // GLO-11: Esc cierra el menú «Crear» y devuelve el foco al botón +.
+  useEffect(() => {
+    if (!crearMenu) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") { setCrearMenu(false); try { crearBtnRef.current?.focus(); } catch (er) { /* */ } } };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [crearMenu]); // eslint-disable-line react-hooks/exhaustive-deps
   const hayQueCrear = ACCIONES_CREAR.some(([, , , t]) => mods.includes(t) && can(t, "crear"));
   // Si el módulo abierto deja de estar permitido (rol/permiso o plan), redirige al primero disponible.
   useEffect(() => {
@@ -8350,86 +8499,49 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   // NAV-01 (Excel 08/09/2026 + revision2): Lista de espera y Comisiones top-level si hay permiso.
   const NAV_GRUPOS = [
-    // Ordenado por cómo se trabaja en la clínica: el día, la agenda, el paciente,
-    // la comunicación, la caja, los números, la logística y la administración.
+    // Spec UX/UI §3: 17 destinos en 8 grupos. Los módulos clínicos viven dentro de la
+    // ficha del paciente; Caja y Agenda tienen su navegación interna (pestañas/vistas).
+    // `match` = rutas antiguas o internas que marcan el mismo destino como activo.
     { grupo: "Inicio", items: [
       { id: "dashboard", label: "Pendientes de hoy", icon: LayoutDashboard },
       { id: "gerencial", label: "Panel gerencial", icon: BarChart3 },
     ] },
     { grupo: "Agenda", items: [
-      { label: "Citas", icon: Calendar, children: [
-        { id: "agenda", label: "Hoy", mod: "agenda" },
-        { id: "agenda_cal", label: "Calendario", mod: "agenda" },
-        { id: "agenda_consolidado", label: "Consolidado", mod: "agenda" },
-      ] },
+      { id: "agenda", label: "Agenda", icon: Calendar, match: ["agenda_cal", "agenda_consolidado"] },
       { id: "espera", label: "Lista de espera", icon: Bell },
-      { id: "disponibilidad", label: "Mi disponibilidad", icon: Clock },
+      ...(rol === "medico" ? [{ id: "disponibilidad", label: "Mi disponibilidad", icon: Clock }] : []),
     ] },
-    { grupo: "Pacientes y clínica", items: [
-      { id: "pacientes", label: "Pacientes", icon: Users },
-      { id: "odontograma", label: "Odontograma", icon: Smile },
-      { id: "perio", label: "Periodontograma", icon: HeartPulse },
-      { id: "tratamientos", label: "Tratamientos", icon: ClipboardList },
-      { id: "recetas", label: "Recetas", icon: Pill },
-      { id: "radiografias", label: "Radiografías", icon: Scan },
-      { id: "fotos", label: "Fotografía clínica", icon: Camera },
-      { id: "consentimientos", label: "Consentimientos", icon: ShieldPlus },
-      { id: "formularios", label: "Formularios del paciente", icon: FileText },
+    { grupo: "Pacientes", items: [
+      { id: "pacientes", label: "Pacientes", icon: Users, match: ["odontograma", "perio", "tratamientos", "recetas", "radiografias", "fotos", "consentimientos", "formularios"] },
     ] },
     { grupo: "Comunicación", items: [
       { id: "whatsapp", label: "WhatsApp + IA", icon: MessageSquare, tag: "IA" },
-      { label: "Recordatorios", icon: BellRing, children: [
-        { id: "recall", label: "Automatizaciones", mod: "recall" },
-        { id: "recall_hist", label: "Historial de envíos", mod: "recall" },
-        { id: "recall_sat", label: "Satisfacción", mod: "recall" },
-      ] },
-      { id: "resenas", label: "Reseñas", icon: Star },
+      { id: "recall", label: "Recordatorios", icon: BellRing, match: ["recall_hist"] },
+      { id: "satisfaccion", label: "Satisfacción y reseñas", icon: Star, mod: "resenas", match: ["recall_sat", "resenas"] },
     ] },
-    { grupo: "Caja y cobros", items: [
-      { label: "Caja", icon: CreditCard, children: [
-        { id: "caja_apertura", label: "Apertura", mod: "facturacion" },
-        { id: "facturacion", label: "Cobros", mod: "facturacion" },
-        ...(can("facturacion", "ver") ? [{ id: "caja_movimientos", label: "Ingresos y egresos", mod: "facturacion" }] : []),
-        { id: "caja_cierre", label: "Cierre del día", mod: "facturacion" },
-        { id: "caja_historial", label: "Historial", mod: "facturacion" },
-      ] },
-      { id: "caja_sunat", label: "Facturación electrónica", icon: Receipt },
-      { id: "caja_links", label: "Links de pago", icon: Link2 },
+    { grupo: "Caja", items: [
+      { id: "caja", label: "Caja", icon: CreditCard, mod: "facturacion", match: ["facturacion", "caja_apertura", "caja_cierre", "caja_historial", "caja_movimientos", "caja_links", "caja_sunat"] },
       { id: "seguros", label: "Seguros y EPS", icon: Umbrella },
     ] },
     { grupo: "Reportes", items: [
-      { label: "Producción y comisiones", icon: TrendingUp, children: [
-        { id: "reportes", label: "Resumen", mod: "reportes" },
-        { id: "reportes_aus", label: "Ausentismo", mod: "reportes" },
-      ], corto: "Producción" },
-      // NAV-11: #/comisiones es alias de reportes (sin segunda entrada de menú)
-      { id: "metas", label: "Metas", icon: Target },
-      { id: "miproduccion", label: "Mi producción", icon: Wallet },
+      { id: "reportes", label: "Reportes", icon: TrendingUp, match: ["reportes_aus", "comisiones", "metas", "reportes_ocs"] },
+      ...(rol === "medico" ? [{ id: "miproduccion", label: "Mi producción", icon: Wallet }] : []),
     ] },
-    { grupo: "Inventario y servicios", items: [
-      { id: "servicios", label: "Servicios y precios", icon: Tag },
-      { label: "Inventario", icon: Package, children: [
-        { id: "inventario", label: "Productos", mod: "inventario" },
-        { id: "inventario_compras", label: "Compras", mod: "inventario" },
-        { id: "inventario_consumo", label: "Consumo", mod: "inventario" },
-        { id: "inventario_prov", label: "Proveedores", mod: "inventario" },
-      ] },
+    { grupo: "Operación", items: [
+      { id: "inventario", label: "Inventario", icon: Package, match: ["inventario_compras", "inventario_consumo", "inventario_prov"] },
       { id: "laboratorio", label: "Laboratorio", icon: FlaskConical },
     ] },
     { grupo: "Administración", items: [
-      { id: "config", label: "Configuración", icon: Settings },
-      { id: "usuarios", label: "Usuarios", icon: UserCog },
-      { id: "permisos", label: "Permisos por rol", icon: Shield },
+      { id: "config", label: "Configuración", icon: Settings, match: ["servicios"] },
+      { id: "usuarios", label: "Usuarios y permisos", icon: UserCog, match: ["permisos", "auditoria"] },
       { id: "integraciones", label: "Integraciones", icon: Plug },
       { id: "plan", label: "Mi plan", icon: Crown },
-      { id: "auditoria", label: "Auditoría y accesos", icon: ShieldCheck },
-      { id: "plataforma", label: "Plataforma (clínicas)", icon: Globe },
     ] },
   ].map((g) => ({
     ...g,
     items: g.items
       .map((it) => (it.children ? { ...it, children: it.children.filter((c) => mods.includes(c.mod)) } : it))
-      .filter((it) => (it.children ? it.children.length > 0 : mods.includes(modDeVista(it.id)))),
+      .filter((it) => (it.children ? it.children.length > 0 : mods.includes(it.mod || modDeVista(it.id)))),
   })).filter((g) => g.items.length);
   const NAV = NAV_GRUPOS.flatMap((g) => g.items.flatMap((it) => it.children ? it.children : [it]));
 
@@ -8460,69 +8572,86 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const orgUnaSede = auth.token ? (sedesOrg.length > 0 ? sedesOrg.length === 1 : false) : false;
   const puedeMultisede = multisede && !esSuper && !orgUnaSede && sedesDelSelector.length > 1;
 
-  const irCaja = (t) => setVista({ cobros: "facturacion", apertura: "caja_apertura", cierre: "caja_cierre", historial: "caja_historial", movimientos: "caja_movimientos", links: "caja_links", sunat: "caja_sunat" }[t] || "facturacion");
+  const irCaja = (t) => setVista({ hoy: "caja", cobros: "caja", apertura: "caja_apertura", cierre: "caja_cierre", historial: "caja_historial", movimientos: "caja_movimientos", links: "caja_links", sunat: "caja_sunat" }[t] || "facturacion");
   const irInventario = (t) => setVista({ productos: "inventario", compras: "inventario_compras", consumo: "inventario_consumo", proveedores: "inventario_prov" }[t] || "inventario");
   const render = () => {
+    if (vista !== "plan" && !["usuarios", "permisos", "auditoria"].includes(vista) && !modAllowed(modDeVista(vista))) return <PlanBloqueado modulo={vista} onVerPlanes={() => setVista("plan")} />;
     switch (vista) {
       case "plataforma": return <Plataforma notify={notify} />;
       case "gerencial": return <Gerencial citas={cf} sede={sede} />;
-      case "reportes": return <Reportes citas={cf} can={can} />;
-      case "reportes_aus": return <Reportes citas={cf} can={can} tab="ausencias" />;
-      case "servicios": return <Servicios notify={notify} can={can} crearIntent={crearIntent === "servicio"} onIntentDone={() => setCrearIntent(null)} />;
+      // Reportes (spec §3): una página con pestañas. Metas y comisiones se editan en
+      // Configuración › Doctores; aquí solo se ve el avance (NAV-07).
+      case "reportes": case "comisiones": case "metas": case "reportes_aus": case "reportes_ocs": {
+        const t = vista === "reportes_aus" ? "ausentismo" : vista === "reportes_ocs" ? "ocupacion" : "produccion";
+        return (<div style={{ display: "grid", gap: 14 }}>
+          <Pestanas etiqueta="Reportes" valor={t} onChange={(x) => setVista({ produccion: "reportes", ausentismo: "reportes_aus", ocupacion: "reportes_ocs" }[x])} opciones={[{ id: "produccion", label: "Producción y comisiones", icon: TrendingUp }, { id: "ausentismo", label: "Ausentismo", icon: UserX }, { id: "ocupacion", label: "Ocupación de sillones", icon: Armchair }]} />
+          {t === "ocupacion" ? <React.Suspense fallback={null}><OcupacionSillones /></React.Suspense> : <Reportes key={t} citas={cf} can={can} tab={t === "ausentismo" ? "ausencias" : undefined} />}
+        </div>);
+      }
+      // Un solo catálogo de servicios (NAV-06): Configuración › Servicios y precios.
+      case "servicios": return <Configuracion notify={notify} rol={rol} can={can} seccionInicial="servicios" />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
       case "agenda": return <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />;
       case "agenda_consolidado": return <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={MEDICOS} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense>;
       case "agenda_cal": return <Agenda key="agenda-cal" vistaInicial="calendario" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />;
       case "disponibilidad": return <Disponibilidad notify={notify} usuario={usuario} citas={citas} setCitas={setCitas} horarioClinica={horarioClinica} />;
-      case "pacientes": return <PacientesView pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
+      // Rutas clínicas antiguas (NAV-02): llevan a la pestaña de la ficha del paciente en
+      // atención o, si no hay uno, al directorio con el aviso «Elige un paciente».
+      case "odontograma": case "perio": case "tratamientos": case "recetas": case "radiografias": case "fotos": case "consentimientos": case "formularios":
+        return <RedirFicha vista={vista} pacienteActivo={pacienteActivo} setVista={setVista} notify={notify} />;
+      case "pacientes": return <PacientesView consumirInsumos={consumirInsumos} sedeActiva={sedeActiva} misSedes={misSedes} onIr={setVista} pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
         onAgendarPaciente={(pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta" }); setVista("agenda"); }}
         onCobrarPaciente={(pac) => { setCobroDesdeFicha({ pid: pac.id, nombre: pac.nombre }); setVista("caja"); }} />;
-      case "odontograma": return <Odontograma pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} pacienteActivo={pacienteActivo} sedeActiva={sedeActiva} can={can} rol={rol} />;
-      case "tratamientos": return <Tratamientos pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} can={can} pacienteActivo={pacienteActivo} consumirInsumos={consumirInsumos} />;
-      case "recetas": return <Recetas pacientes={pf} notify={notify} updFicha={updFicha} fichas={fichas} />;
-      case "consentimientos": return <Consentimientos pacientes={pf} notify={notify} />;
       case "inventario": return <Inventario key="inv-productos" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_compras": return <Inventario key="inv-compras" tabInicial="compras" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_consumo": return <Inventario key="inv-consumo" tabInicial="consumo" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_prov": return <Inventario key="inv-prov" tabInicial="proveedores" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "laboratorio": return <Laboratorio pacientes={pf} notify={notify} can={can} updFicha={updFicha} />;
-      case "perio": return <Periodontograma pacientes={pf} notify={notify} can={can} />;
-      case "radiografias": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} />;
-      case "fotos": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} soloFotos />;
       case "recall": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} />;
       case "recall_hist": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="historial" />;
-      case "recall_sat": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="satisfaccion" />;
-      case "formularios": return <Formularios pacientes={pf} notify={notify} />;
+      // Satisfacción y reseñas (NAV-05): un destino con dos pestañas.
+      case "satisfaccion": case "recall_sat": case "resenas": {
+        const t = vista === "recall_sat" ? "encuestas" : "resenas";
+        return (<div style={{ display: "grid", gap: 14 }}>
+          <Pestanas etiqueta="Satisfacción y reseñas" valor={t} onChange={(x) => setVista(x === "encuestas" ? "recall_sat" : "satisfaccion")} opciones={[{ id: "resenas", label: "Reseñas públicas", icon: Star }, { id: "encuestas", label: "Encuestas (NPS)", icon: Smile }]} />
+          {t === "encuestas" ? <Recall key="sat" pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="satisfaccion" /> : <Resenas notify={notify} can={can} citas={cf} />}
+        </div>);
+      }
       case "seguros": return <Seguros notify={notify} pacientes={pf} fichas={fichas} />;
-      case "resenas": return <Resenas notify={notify} can={can} citas={cf} />;
       case "plan": return <Plan notify={notify} plan={plan} setPlan={setPlan} esSuper={esSuper} can={can} />;
       case "espera": return <Espera notify={notify} esp={espera} setEsp={setEspera} />;
       case "tickets": return <Tickets citas={cf} setCitas={setCitas} fichas={fichas} notify={notify} />;
-      case "facturacion": return <Facturacion key="caja" tab="cobros" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
-      case "caja_apertura": return <Facturacion key="caja" tab="apertura" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "facturacion": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_apertura": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_cierre": return <Facturacion key="caja" tab="cierre" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_historial": return <Facturacion key="caja" tab="historial" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
-      case "caja_movimientos": return <Facturacion key="caja" tab="movimientos" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_movimientos": return <Facturacion key="caja" tab="movimientos" onTab={irCaja} abrirEgreso={crearIntent === "egreso"} onEgresoAbierto={() => setCrearIntent(null)} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_links": return <Facturacion key="caja" tab="links" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_sunat": return <Facturacion key="caja" tab="sunat" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
-      case "caja": return <Facturacion pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
-      case "metas": return <Metas notify={notify} can={can} />;
-      // Alias históricos → misma pantalla Producción y comisiones (2 pestañas).
-      case "comisiones": return <Reportes citas={cf} can={can} />;
+      case "caja": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "miproduccion": return <MiProduccion usuario={usuario} citas={citas} />;
       case "integraciones": return <Integraciones notify={notify} />;
       case "config": return <Configuracion notify={notify} rol={rol} can={can} />;
-      case "usuarios": return <GestionUsuarios staff={staff} setStaff={setStaff} notify={notify} rolePerms={rolePerms} usuarioActual={usuario} can={can} />;
-      case "permisos": return <GestionPermisos rolePerms={rolePerms} setRolePerms={setRolePerms} notify={notify} onRefreshMe={refreshMe} />;
-      case "auditoria": return <Auditoria />;
+      // Usuarios y permisos (NAV-08): usuarios, permisos por rol y auditoría en pestañas.
+      case "usuarios": case "permisos": case "auditoria": {
+        const opc = [{ id: "usuarios", label: "Usuarios", icon: UserCog }, mods.includes("permisos") && { id: "permisos", label: "Permisos por rol", icon: Shield, locked: !modAllowed("permisos") }, mods.includes("auditoria") && { id: "auditoria", label: "Auditoría y accesos", icon: ShieldCheck, locked: !modAllowed("auditoria") }].filter(Boolean);
+        const bloqueada = vista !== "usuarios" && !modAllowed(vista);
+        return (<div style={{ display: "grid", gap: 14 }}>
+          <Pestanas etiqueta="Usuarios y permisos" valor={vista} onChange={(x) => setVista(x)} opciones={opc.map((o) => ({ ...o, label: o.locked ? `${o.label} 🔒` : o.label }))} />
+          {bloqueada ? <PlanBloqueado modulo={vista} onVerPlanes={() => setVista("plan")} />
+            : vista === "usuarios" ? <GestionUsuarios staff={staff} setStaff={setStaff} notify={notify} rolePerms={rolePerms} usuarioActual={usuario} can={can} />
+            : vista === "permisos" ? <GestionPermisos rolePerms={rolePerms} setRolePerms={setRolePerms} notify={notify} onRefreshMe={refreshMe} />
+            : <Auditoria />}
+        </div>);
+      }
       default: return null;
     }
   };
 
   const RolIcon = R.icon;
   return (
-    <DatosDemoCtx.Provider value={{ fichas, updFicha, citas, setCitas, pacientes, setPacientes, horarioClinica, sillones, setSillones, dispMedicos, setDispMedicos, bloqueos: bloqueosDemo, setBloqueos: setBloqueosDemo, asignaciones, setAsignaciones }}>
+    <DatosDemoCtx.Provider value={{ fichas, updFicha, citas, setCitas, pacientes, setPacientes, horarioClinica, sillones, setSillones, dispMedicos, setDispMedicos, bloqueos: bloqueosDemo, setBloqueos: setBloqueosDemo, asignaciones, setAsignaciones, catalogo, setCatalogo, egresos, setEgresos, documentos, setDocumentos, labCasos, setLabCasos, liquidaciones, setLiquidaciones, inventario }}>
     <div className="dc-shell" style={{ display: "flex", height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 500, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}
@@ -8534,7 +8663,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
             {!colap && <span className="dc-sb__name"><span>Dento <b>Check</b></span><small>Sonríe+</small></span>}
           </button>
           {rol !== "superadmin" && hayQueCrear && (
-            <button type="button" className="dc-sb__mas" aria-label="Crear" title="Crear: cita, paciente, servicio…" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 8, left: Math.max(8, r.left - (colap ? 0 : 180)) })); }}><Plus size={16} strokeWidth={2.25} /></button>
+            <button ref={crearBtnRef} type="button" className="dc-sb__mas" aria-label="Crear" title={rol === "medico" ? "Crear: cita, evolución, receta" : "Crear: cita, paciente, cobro, egreso"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 8, left: Math.max(8, r.left - (colap ? 0 : 180)) })); }}><Plus size={16} strokeWidth={2.25} /></button>
           )}
         </div>
         <div className={`dc-sb__acc${colap ? " is-colap" : ""}`}>
@@ -8543,7 +8672,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
               <div className="dc-sb__crearmenu" role="menu" style={{ top: crearMenu.top, left: crearMenu.left }}>
                 <div className="dc-sb__crearmenu-tit">Crear nuevo</div>
                 {ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear")).map(([k, l, Ic, t, sub, col]) => (
-                  <button key={k} type="button" role="menuitem" style={{ "--c": col }} onClick={() => { setCrearMenu(false); setVista(t); setSidebarOpen(false); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }}><span className="dc-sb__crearico"><Ic size={16} strokeWidth={1.9} /></span><span className="dc-sb__creartxt"><b>{l}</b><small>{sub}</small></span></button>
+                  <button key={k} type="button" role="menuitem" style={{ "--c": col }} onClick={() => { setCrearMenu(false); setSidebarOpen(false); crearAccion(k, t); }}><span className="dc-sb__crearico"><Ic size={16} strokeWidth={1.9} /></span><span className="dc-sb__creartxt"><b>{l}</b><small>{sub}</small></span></button>
                 ))}
               </div>
             </>)}
@@ -8584,7 +8713,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
             const idx = {};
             NAV_GRUPOS.forEach((g) => g.items.forEach((it) => {
               if (it.children) it.children.forEach((c) => { idx[c.id] = { id: c.id, label: c.label, padre: it.corto || it.label, icon: it.icon, mod: c.mod, grupo: g.grupo }; });
-              else idx[it.id] = { id: it.id, label: it.label, icon: it.icon, mod: modDeVista(it.id), grupo: g.grupo };
+              else idx[it.id] = { id: it.id, label: it.label, icon: it.icon, mod: it.mod || modDeVista(it.id), grupo: g.grupo, match: it.match };
             }));
             const esFav = (id) => favs.includes(id);
             const togFav = (id) => setFavs((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id].slice(-6)));
@@ -8593,11 +8722,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                 onClick={(e) => { e.stopPropagation(); togFav(id); }}>{esFav(id) ? <PinOff size={12} strokeWidth={2} /> : <Pin size={12} strokeWidth={2} />}</span>
             );
             const bloqueados = [];
-            const libre = (it) => { const locked = !modAllowed(it.children ? it.children[0].mod : modDeVista(it.id)); if (locked) bloqueados.push(it); return !locked; };
+            const libre = (it) => { const locked = !modAllowed(it.children ? it.children[0].mod : (it.mod || modDeVista(it.id))); if (locked) bloqueados.push(it); return !locked; };
             // Lo fijado en favoritos sale de su grupo: el menú no repite entradas.
             const grupos = NAV_GRUPOS.map((g) => ({ ...g, items: g.items.filter(libre).filter((it) => it.children || !favs.includes(it.id)) })).filter((g) => g.items.length);
             const favItems = favs.map((id) => idx[id]).filter((x) => x && modAllowed(x.mod));
-            const activoEn = (g) => g.items.some((it) => it.children ? it.children.some((c) => c.id === vista) : it.id === vista);
+            const esActivo = (it) => it.id === vista || (it.match || []).includes(vista);
+            const activoEn = (g) => g.items.some((it) => it.children ? it.children.some((c) => c.id === vista) : esActivo(it));
             const abiertoG = (g) => colap || activoEn(g) || !gruposAb || gruposAb.includes(g.grupo);
             const togG = (g) => setGruposAb((cur) => { const base = cur || grupos.map((x) => x.grupo); return base.includes(g.grupo) ? base.filter((x) => x !== g.grupo) : [...base, g.grupo]; });
             const item = (it) => {
@@ -8626,7 +8756,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                 );
               }
               // Si está en favoritos, el resaltado va allí: una sola marca de "estás aquí".
-              const Icon = it.icon; const active = vista === it.id && !esFav(it.id);
+              const Icon = it.icon; const active = esActivo(it) && !esFav(it.id);
               return (
                 <button type="button" key={it.id} className={`dc-sb__item${active ? " is-on" : ""}`} aria-label={colap ? it.label : undefined} title={it.label} aria-current={active ? "page" : undefined} onClick={() => ir(it.id)}>
                   <span className="dc-sb__ico"><Icon size={18} strokeWidth={1.75} />{colap && it.id === "whatsapp" && waUnread > 0 && <span className="dc-sb__dot" />}</span>
@@ -8643,7 +8773,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
               {favItems.length > 0 && (
                 <div className="dc-sb__grupo dc-sb__grupo--fav">
                   {!colap && <div className="dc-sb__titulo"><span>Favoritos</span></div>}
-                  {favItems.map((f) => { const Icon = f.icon; const active = vista === f.id; return (
+                  {favItems.map((f) => { const Icon = f.icon; const active = vista === f.id || (f.match || []).includes(vista); return (
                     <button type="button" key={"fav-" + f.id} className={`dc-sb__item${active ? " is-on" : ""}`} title={f.padre ? `${f.padre} › ${f.label}` : f.label} aria-label={colap ? f.label : undefined} aria-current={active ? "page" : undefined} onClick={() => ir(f.id)}>
                       <span className="dc-sb__ico"><Icon size={18} strokeWidth={1.75} /></span>
                       {!colap && <><span className="dc-sb__label">{f.padre ? <>{f.label} <small>{f.padre}</small></> : f.label}</span>{pin(f.id)}</>}
@@ -8661,26 +8791,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                   {ab && g.items.map(item)}
                 </div>
               ); })}
-              {bloqueados.length > 0 && !colap && (
-                <button type="button" className="dc-sb__mas-plan" onClick={() => { ir("plan"); }} title={`Disponibles con un plan superior: ${bloqueados.map((b) => b.corto || b.label).join(", ")}`}>
-                  <Lock size={13} strokeWidth={2} />
-                  <span><b>{bloqueados.length} módulo{bloqueados.length > 1 ? "s" : ""} más</b><small>{bloqueados.map((b) => b.corto || b.label).join(" · ")}</small></span>
-                  <ChevronRight size={14} strokeWidth={2} />
-                </button>
-              )}
             </>);
           })()}
         </nav>
         <div className="dc-sb__pie">
-            {rol !== "superadmin" && !onbDismissed && misPasos.length > 0 && (() => { const done = misPasos.filter((p) => pasos[p.id]).length; if (done >= misPasos.length) return null; return (
-              <div className="dc-sb__guia">
-                <button type="button" onClick={() => setShowPasos(true)} title="Guía del sistema: el recorrido de un paciente, paso a paso">
-                  <span className="dc-sb__guiaico"><Compass size={16} strokeWidth={2} /></span>
-                  {!colap && <span className="dc-sb__guiatxt"><b>Guía del sistema</b><small>{done} de {misPasos.length} vistos</small><i><em style={{ width: `${(done / misPasos.length) * 100}%` }} /></i></span>}
-                </button>
-                {!colap && <button type="button" className="dc-mini-btn dc-sb__onbx" aria-label="Ocultar la guía" title="Ocultar la guía" onClick={(e) => { e.stopPropagation(); setOnbDismissed(true); }}><X size={13} strokeWidth={2} /></button>}
-              </div>
-            ); })()}
           <div className="dc-sb__user">
             <div className="dc-sb__avatar" title={usuario.nombre} style={{ background: R.color }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
             {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{R.label}</div>
@@ -8688,6 +8802,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                 ? <button type="button" className="dc-sb__planchip" title="Ver mi plan" onClick={() => { setVista("plan"); setSidebarOpen(false); }}><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</button>
                 : <span className="dc-sb__planchip"><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</span>)}
             </div>}
+            {rol !== "superadmin" && misPasos.length > 0 && <button type="button" className="dc-mini-btn dc-sb__ayuda" aria-label="Ayuda: guía del sistema" title="Ayuda: guía del sistema" onClick={() => { setShowPasos(true); setSidebarOpen(false); }}>?</button>}
             <button type="button" className="dc-mini-btn dc-sb__out" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={onLogout}><LogOut size={15} strokeWidth={2} /></button>
           </div>
         </div>
@@ -8708,7 +8823,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       {buscador && <Buscador onClose={() => setBuscador(false)} grupos={NAV_GRUPOS} modAllowed={modAllowed} pacientes={pf}
         onIr={(id, extra) => { setBuscador(false); setSidebarOpen(false); setVista(id, extra); }}
         acciones={ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear"))}
-        onCrear={(k, t) => { setBuscador(false); setSidebarOpen(false); setVista(t); if (k === "paciente" || k === "servicio" || k === "cita") setCrearIntent(k); }} />}
+        onCrear={(k, t) => { setBuscador(false); setSidebarOpen(false); crearAccion(k, t); }} />}
       {showPasos && (() => {
         const done = misPasos.filter((p) => pasos[p.id]).length;
         const abierto = misPasos.find((p) => p.id === pasoAbierto) || misPasos.find((p) => !pasos[p.id]) || misPasos[0];
@@ -10016,7 +10131,7 @@ function PortalPaciente({ usuario, onLogout }) {
                   <div key={c.id} onClick={() => setVerCita(c)} title="Ver detalle" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 14, padding: "12px 6px", borderTop: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)" }}>
                     <div style={{ width: 50, textAlign: "center" }}><div style={{ fontWeight: 500, color: NAVY }}>{c.hora}</div></div>
                     <div style={{ flex: 1 }}><div style={{ fontWeight: 500, color: NAVY, textTransform: "capitalize" }}>{fechaLegible(c.fecha)}</div><div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{c.motivo}</div></div>
-                    <Badge estado={c.estado} /><ChevronRight size={16} strokeWidth={1.75} color="var(--dc-ink-400)" />
+                    <EstadoPill entidad="cita" estado={estadoCita(c)} /><ChevronRight size={16} strokeWidth={1.75} color="var(--dc-ink-400)" />
                   </div>
                 ))}
                 {misCitas.length === 0 && <Vacio icon={<Calendar size={22} strokeWidth={1.75} />} titulo="Sin citas" sub="Aún no tienes citas. Agenda la primera cuando quieras." />}

@@ -59,7 +59,10 @@ function injectarEstiloSistema(doc) {
     }
     const st = doc.createElement("style");
     st.id = "dc-integrado";
-    st.textContent = reglas.join("\n") + `
+    // ODO-02 / ODO-04: el presupuesto vive en «Plan y cuenta» y sus botones están en la
+    // barra del sistema; aquí no se repiten.
+    const ocultos = "section.ppto,#b-resumen{display:none!important}";
+    st.textContent = ocultos + reglas.join("\n") + `
 :root:root:root{--ui:"Inter Variable","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:var(--ui);
   --fondo:#FFFFFF;--panel:#FFFFFF;--papel:#FFFFFF;--panel-2:#F4F9F9;--linea:#E3EFEF;--linea-2:#CFE3E4;
   --t900:#10262B;--t700:#33494F;--t500:#5B7075;--t400:#7C9499;--t300:#A9BCBF;
@@ -112,12 +115,18 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   conExpediente = true,
   onFaseChange,
   demoEstados = null,
+  /** Demostración: dibujo guardado en la ficha (formato del iframe) y aviso de cambios. */
+  demoDatos = null,
+  onDemoCambio = null,
+  /** Dentro del sistema el presupuesto se arma en «Plan y cuenta» (ODO-02): se oculta el del iframe. */
+  ocultarPlanPropio = true,
 }, ref) {
   const iframeRef = useRef(null);
   const [syncState, setSyncState] = useState("idle");
   const [frameReady, setFrameReady] = useState(false);
   const [autoH, setAutoH] = useState(860);
   const lastJson = useRef("");
+  const lastDemo = useRef("");
   const hydrated = useRef(false);
   const faseDesdeIframe = useRef(null);
 
@@ -173,10 +182,11 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     if (!pacienteId) return;
     if (!auth.token) {
       // Sin servidor: el dibujo muestra los mismos hallazgos que la ficha.
-      const datos = estadosAppAHtml(demoEstados || {});
+      const datos = demoDatos || estadosAppAHtml(demoEstados || {});
       postToIframe({ type: "dento-odontograma-hydrate", fase: capa, datos });
       hydrated.current = true;
       lastJson.current = JSON.stringify(datos);
+      lastDemo.current = JSON.stringify(datos);
       setTimeout(measureIframe, 80);
       return;
     }
@@ -255,6 +265,10 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       if (!d) return;
       if (d.type === "dento-odontograma-state") {
         persistir(d);
+        if (!auth.token && typeof onDemoCambio === "function" && d.datos && hydrated.current) {
+          const js = JSON.stringify(d.datos);
+          if (js !== lastDemo.current) { lastDemo.current = js; onDemoCambio(d.datos, d.fase || capa); }
+        }
         if (d.fase && typeof onFaseChange === "function") {
           faseDesdeIframe.current = d.fase;
           onFaseChange(d.fase);
@@ -268,7 +282,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [persistir, onNavTab, onFaseChange, measureIframe]);
+  }, [persistir, onNavTab, onFaseChange, measureIframe, onDemoCambio, capa]);
 
   useEffect(() => {
     hydrated.current = false;

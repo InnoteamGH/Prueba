@@ -25,17 +25,13 @@ describe("A26 — menú sin duplicados", () => {
     assert.ok(end > start, "NAV flatten");
     const block = app.slice(start, end);
     assert.match(block, /\{ id: "espera", label: "Lista de espera", icon:/);
-    // NAV-11 (revision5): "Producción y comisiones" cubre comisiones sin menú duplicado
-    // Producción y comisiones puede ser entrada directa o grupo con submódulos (Resumen/Ausentismo).
-    assert.match(block, /(?:\{ id: "comisiones", label: "Comisiones", icon:|\{ id: "reportes", label: "Producción y comisiones", icon:|\{ label: "Producción y comisiones", icon: \w+, children: \[\s*\{ id: "reportes")/);
-    assert.equal((block.match(/label: "Producción y comisiones"/g) || []).length, 1, "una sola entrada de Producción y comisiones");
+    // Spec UX/UI 2026-10 §3: un solo destino «Reportes» (producción, comisiones,
+    // ausentismo y ocupación son pestañas) y los módulos clínicos viven en la ficha.
+    assert.equal((block.match(/label: "Reportes"/g) || []).length, 1, "una sola entrada de Reportes");
     assert.match(block, /id: "dashboard"/);
-    assert.match(block, /id: "odontograma"/);
-    assert.match(block, /id: "perio"/);
-    assert.match(block, /id: "tratamientos"/);
-    assert.match(block, /id: "recetas"/);
-    assert.match(block, /id: "consentimientos"/);
-    assert.match(block, /id: "radiografias"/);
+    assert.match(block, /id: "pacientes", label: "Pacientes", icon: Users, match: \[[^\]]*"odontograma"[^\]]*"perio"[^\]]*"tratamientos"/);
+    assert.doesNotMatch(block, /\{ id: "odontograma", label:/);
+    assert.match(block, /"recetas"[^\]]*"radiografias"[^\]]*"consentimientos"/);
   });
 });
 

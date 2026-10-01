@@ -180,10 +180,10 @@ function WizList({ items, icon, vacio }) {
   );
 }
 
-function Configuracion({ notify = () => {}, rol = "", can }) {
+function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "servicios" }) {
   const conectado = !!auth.token;
   const fiscalReadOnly = rol === "admin_sede" || (can ? !can("config", "editar") : false);
-  const [tab, setTab] = useState("servicios");
+  const [tab, setTab] = useState(seccionInicial);
   const [sedes, setSedes] = useState([]);
   const [esps, setEsps] = useState([]);
   const [meds, setMeds] = useState([]);

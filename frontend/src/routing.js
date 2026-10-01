@@ -19,7 +19,7 @@ const MOD_IDS = new Set([
   "disponibilidad", "formularios", "seguros", "tratamientos", "recetas", "radiografias", "fotos", "recall",
   "recall_hist", "recall_sat", "reportes_aus",
   "inventario_compras", "inventario_consumo", "inventario_prov",
-  "caja_apertura", "caja_cierre", "caja_historial", "caja_movimientos", "caja_links", "caja_sunat",
+  "caja_apertura", "caja_cierre", "caja_historial", "caja_movimientos", "caja_links", "caja_sunat", "satisfaccion", "reportes_ocs",
 ]);
 
 /** UUID de sede demo/prod (backend Supabase). Si ya es UUID, se respeta. */
@@ -38,7 +38,7 @@ export function canonVista(vista) {
 
 export function hashDeVista(vista, extra = {}) {
   const v = canonVista(vista);
-  if (v === "pacientes" && extra.pacienteId) return `#/pacientes/${extra.pacienteId}`;
+  if (v === "pacientes" && extra.pacienteId) return `#/pacientes/${extra.pacienteId}${extra.tab ? `/${extra.tab}` : ""}`;
   const id = MOD_IDS.has(v) || MOD_IDS.has(vista) ? v : DEFAULT;
   return `#/${id}`;
 }
@@ -50,7 +50,7 @@ export function parseHash(hash) {
   // NEW-18: #/login es ruta propia (cierra shell autenticado en App).
   if (parts[0] === "login") return { vista: "login", pacienteId: null, desconocida: false };
   if (parts[0] === "pacientes" && parts[1]) {
-    return { vista: "pacientes", pacienteId: parts[1], desconocida: false };
+    return { vista: "pacientes", pacienteId: parts[1], tab: parts[2] || null, desconocida: false };
   }
   // NEW-34: rutas inexistentes (#/sedes, #/inventario, #/admin…) → destino efectivo + flag.
   if (!MOD_IDS.has(parts[0])) {

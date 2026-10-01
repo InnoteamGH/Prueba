@@ -9,6 +9,7 @@ import { CalendarRange, CheckCircle2, Clock, Download, UserX, XCircle, Users, Ca
 import api from "../api/client";
 import OcupacionSillones from "./OcupacionSillones";
 import { ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, exportarExcel, colorDe } from "../comun";
+import { estadoCita } from "../compartido/estados";
 
 const PROGRAMADA = ["pendiente", "confirmada", "en_sala", "en_atencion"];
 const PERDIDA = ["cancelada", "reprogramada", "cerrada_sistema"];
@@ -68,7 +69,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
   const exportar = () => exportarExcel({
     nombreArchivo: `citas_${rango.desde}_${rango.hasta}.xlsx`, hoja: "Citas", titulo: `Consolidado de citas — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`,
     columnas: [{ key: "fecha", label: "Fecha", w: 12 }, { key: "hora", label: "Hora", w: 8 }, { key: "paciente", label: "Paciente", w: 26 }, { key: "medico", label: "Doctor", w: 24 }, { key: "motivo", label: "Motivo", w: 26 }, { key: "estadoL", label: "Estado", w: 14 }, { key: "sedeNombre", label: "Sede", w: 16 }],
-    filas: filas.map((c) => ({ ...c, estadoL: (ESTADO_BADGE[c.estado] || {}).l || c.estado })),
+    filas: filas.map((c) => ({ ...c, estadoL: (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado })),
   }).catch(() => notify("No se pudo generar el Excel."));
 
   const KPIS = [
@@ -143,7 +144,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
             { key: "hora", label: "Hora", get: (c) => c.hora },
             { key: "paciente", label: "Paciente", get: (c) => c.paciente },
             ...(esMedico ? [] : [{ key: "medico", label: "Doctor", get: (c) => c.medico }]),
-            { key: "estado", label: "Estado", get: (c) => (ESTADO_BADGE[c.estado] || {}).l || c.estado },
+            { key: "estado", label: "Estado", get: (c) => (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado },
             { key: "sede", label: "Sede", get: (c) => c.sedeNombre },
           ]}>
           {(lista, vista) => {

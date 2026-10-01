@@ -17,6 +17,8 @@ import {
 } from "./panelGerencialUtil";
 import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES } from "../comun";
 import { SILLONES_DEMO } from "../compartido/sillones";
+import * as M from "../compartido/metricas";
+import { labAtrasado } from "../compartido/estados";
 import "./panelGerencial.css";
 import ResumenMes, { avanceDemo } from "./ResumenMes";
 import { ResumenOcupacion } from "./OcupacionSillones";
@@ -800,23 +802,31 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
       pacientesAtendidosHoy: new Set(atendidasHoy.map((c) => c.paciente)).size,
       ranking,
     });
+    // Saldos, vencido, nuevos e inventario: las mismas consultas que Caja, Pacientes e
+    // Inventario (compartido/metricas.js), para que la cifra coincida en todas partes.
     const pacs = pacientes.map((p) => {
-      const f = fichas[p.id] || {};
-      const total = (f.tratamiento || []).reduce((a, x) => a + (Number(x.costo) || 0), 0);
-      const pagado = (f.pagos || []).reduce((a, x) => a + (Number(x.monto) || 0), 0);
-      const suyas = citas.filter((c) => c.pacienteId === p.id || c.paciente === p.nombre);
-      const pasadas = suyas.filter((c) => c.fecha <= fecha && c.estado !== "cancelada").map((c) => c.fecha).sort();
-      return { id: p.id, nombre: p.nombre, saldo: Math.max(0, total - pagado), ultimaCita: pasadas[pasadas.length - 1] || p.ultima || null, numeroDeCitas: suyas.length, creadoEn: p.creadoEn || null };
+      const cta = M.cuentaPaciente(fichas[p.id]);
+      const suyas = citas.filter((c) => M.citaDePaciente(c, p));
+      return { id: p.id, nombre: p.nombre, saldo: cta.saldoPlan, porCobrar: cta.porCobrar, vencido: cta.vencido, ultimaCita: M.ultimaVisita(p, citas), numeroDeCitas: suyas.length, creadoEn: p.creadoEn || null };
     });
     setPacResumen(pacs);
-    const deuda = pacs.reduce((a, p) => a + p.saldo, 0);
+    const cart = M.cartera(fichas, pacientes);
+    const aging = M.antiguedadDeuda(cart).map((t) => t.v);
+    const nomP = (id) => (pacientes.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
+    const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado");
+    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha));
+    const alertasDemo = [
+      cart.conVencido.length && { titulo: `${cart.conVencido.length} paciente(s) con saldo vencido`, detalle: cart.conVencido.map((f) => f.p.nombre).slice(0, 3).join(", "), monto: cart.vencido },
+      liqObs.length && { titulo: `${liqObs.length} liquidación(es) de seguro observada(s)`, detalle: liqObs.map((l) => `${l.aseg} (${nomP(l.pid)})`).join(", "), cantidad: liqObs.length },
+      labAtr.length && { titulo: `${labAtr.length} caso(s) de laboratorio atrasado(s)`, detalle: labAtr.map((c) => c.trabajo).join(", "), cantidad: labAtr.length },
+    ].filter(Boolean);
     setInd({
-      deudaPorAntiguedad: { hasta30: Math.round(deuda * 0.52), de31a60: Math.round(deuda * 0.27), de61a90: Math.round(deuda * 0.13), masDe90: deuda - Math.round(deuda * 0.52) - Math.round(deuda * 0.27) - Math.round(deuda * 0.13) },
+      deudaPorAntiguedad: { hasta30: aging[0], de31a60: aging[1], de61a90: aging[2], masDe90: aging[3] },
       conversionPlanes: { aceptado: Math.round(18400 * fa), pendiente: Math.round(6200 * fa), rechazado: Math.round(2100 * fa) },
       // Reparte la producción del mes (la misma del resumen) entre especialidades.
       porEspecialidad: [["Ortodoncia", 0.271], ["Endodoncia", 0.239], ["Odontología general", 0.218], ["Rehabilitación", 0.174], ["Periodoncia", 0.057], ["Odontopediatría", 0.041]].map(([nombre, k]) => ({ nombre, produccion: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) * k) })),
-      cartera: { nuevos: pacs.filter((p) => p.creadoEn && (Date.now() - new Date(p.creadoEn).getTime()) <= 30 * 86400000).length || 4 },
-      alertas: [],
+      cartera: { nuevos: M.nuevos30(pacientes, citas).length, vencido: cart.vencido },
+      alertas: alertasDemo,
     });
     setRep({ funnel: { conversaciones: 46, agendadas: 19 } });
     setPagos(pagosTodos);
@@ -827,7 +837,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
       ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),
       ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${Number(pg.monto).toFixed(2)}` })),
     ].sort((a, b) => String(a.hora).localeCompare(String(b.hora))));
-    setInventarioValorizado(8450);
+    setInventarioValorizado(M.inventarioValorizado(demoDb?.inventario || []));
     setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false).length);
     setNSedes(2);
   }, [demoDb, citasProp, fecha]);

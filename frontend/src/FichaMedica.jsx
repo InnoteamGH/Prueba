@@ -910,7 +910,13 @@ const ALERGIA_FAMILIA = [
 ];
 const MIN_ALERGIA_MATCH = 4;
 
-export default function FichaMedica({ pacienteId, onClose, notify = () => { }, can, onAgendar, onCobrar, rol: rolProp, sedeId = null, initialTab = null, pacienteDemo = null }) {
+// Pestañas de la ficha (FIC-01): Resumen · Historia clínica · Odontograma · Plan y cuenta ·
+// Archivos · Datos. Las pestañas antiguas se reciben y caen en su nuevo lugar.
+const TAB_ALIAS = { receta: ["historia"], perio: ["odontograma", "perio"], ortodoncia: ["odontograma", "orto"], laboratorio: ["archivos", "lab"], consentimientos: ["archivos", "docs"], filiacion: ["datos"], registro: ["datos"], plan: ["cuenta"] };
+const TABS_FICHA = ["resumen", "historia", "odontograma", "cuenta", "archivos", "datos"];
+const normTabFicha = (t) => { if (TAB_ALIAS[t]) return TAB_ALIAS[t]; return [TABS_FICHA.includes(t) ? t : "resumen"]; };
+
+export default function FichaMedica({ pacienteId, onClose, notify = () => { }, can, onAgendar, onCobrar, rol: rolProp, sedeId = null, initialTab = null, pacienteDemo = null, pagina = false, slots = null, onTabChange = null }) {
   const conectado = !!auth.token;
   const rol = rolProp || auth.sesion?.rol || "";
   // Evitar click-through: al cerrar, el mismo click puede caer en el sidebar del shell
@@ -944,11 +950,20 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const demoDb = useContext(DatosDemoCtx);   // demostración: datos vivos (fichas, citas) del sistema
   const demoFicha = demoDb && demoDb.fichas ? demoDb.fichas[pacienteId] : null;
   const demoCitas = demoDb ? demoDb.citas : null;
-  const [tab, setTab] = useState(initialTab || "resumen");
+  const [tab, setTabState] = useState(() => normTabFicha(initialTab || "resumen")[0]);
+  const [subOdo, setSubOdo] = useState(() => normTabFicha(initialTab || "")[1] || "odo");      // odo | perio | orto
+  const [subArch, setSubArch] = useState(() => normTabFicha(initialTab || "")[1] || null);    // rx | fotos | docs | lab
+  const setTab = (t) => {
+    const [a, b] = normTabFicha(t);
+    setTabState(a);
+    if (a === "odontograma") setSubOdo(b || "odo");
+    if (a === "archivos") setSubArch(b || null);
+    if (onTabChange) onTabChange(a);
+  };
   // Odontograma y periodontograma usan todo el ancho: se pide al menú lateral que se
   // contraiga mientras esa pestaña está abierta (lo escucha MainApp).
   useEffect(() => {
-    const amplia = tab === "odontograma" || tab === "perio";
+    const amplia = tab === "odontograma";
     window.dispatchEvent(new CustomEvent("dc-vista-amplia", { detail: amplia }));
   }, [tab]);
   useEffect(() => () => window.dispatchEvent(new CustomEvent("dc-vista-amplia", { detail: false })), []);
@@ -1064,7 +1079,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     if (!conectado || !pacienteId) return;
     api.auditoria({ pacienteId }).then((list) => setRegSrv(list || [])).catch(() => setRegSrv([]));
   };
-  useEffect(() => { if (tab === "registro" && regSrv == null) cargarRegistro(); }, [tab]); // eslint-disable-line
+  useEffect(() => { if (tab === "datos" && regSrv == null) cargarRegistro(); }, [tab]); // eslint-disable-line
   // Lo hecho en esta sesión queda en el registro al instante (en demostración es la única fuente).
   const anotar = (tipo, accion, detalle = "") => setRegLocal((cur) => [{ id: `loc-${Date.now()}-${cur.length}`, ts: new Date().toISOString(), usuario: auth.sesion?.nombre || "Tú", rol: auth.sesion?.rol || "", tipo, accion, detalle, origen: "Esta sesión" }, ...cur]);
 
@@ -1360,28 +1375,22 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     ["resumen", "Resumen", LayoutGrid],
     ["historia", "Historia clínica", ClipboardList],
     ["odontograma", "Odontograma", Smile],
-    ["perio", "Periodontograma", Activity],
-    ["receta", "Receta", Pill],
-    ["ortodoncia", "Ortodoncia", Braces],
-    ["cuenta", "Cuenta", CreditCard],
-    ["laboratorio", "Laboratorio", FlaskConical],
-    ["consentimientos", "Consentimientos", Shield],
+    ["cuenta", "Plan y cuenta", CreditCard],
     ["archivos", "Archivos", Image],
-    ["filiacion", "Filiación", User],
-    ["registro", "Registro", History],
-  ].filter(([k]) => (k !== "receta" || puedeRecetar)
-                 && (k !== "perio" || puedePerio)
-                 && (k !== "archivos" || puedeArchivos)
-                 && (k !== "odontograma" || puedeOdontograma)
-                 && (k !== "ortodoncia" || puedeOrto)
-                 && (k !== "laboratorio" || puedeLab)
-                 && (k !== "consentimientos" || puedeConsent)
-                 && (k !== "registro" || puedeRegistro)
-                 // El periodontograma mide bolsa y recesion, y eso no se hace en
-                 // denticion temporal: no se le ofrece a un menor de 13. Si por un
-                 // caso concreto hicieran falta, basta con que el paciente pase a la
-                 // etapa de transicion o se le registre desde otra via.
-                 && (k !== "perio" || etapa !== "pediatrico"));
+    ["datos", "Datos", User],
+  ].filter(([k]) => (k !== "archivos" || puedeArchivos || puedeConsent || puedeLab)
+                 && (k !== "odontograma" || puedeOdontograma));
+  // Sub-vistas del odontograma (FIC-08): Periodontograma y Ortodoncia solo si el paciente
+  // tiene un plan de ese tipo, o si alguien las inicia desde aquí.
+  const planTxt = arr(demoFicha?.tratamiento || d?.tratamientos).map((t) => String(t.nombre || "")).join(" ").toLowerCase();
+  const tienePerio = /periodont|destartraje|raspaje|curetaje/.test(planTxt);
+  const tieneOrto = /ortodon|bracket|alineador/.test(planTxt);
+  const [subExtra, setSubExtra] = useState({});
+  const subOdoOpc = [
+    ["odo", "Odontograma"],
+    puedePerio && etapa !== "pediatrico" && (tienePerio || subExtra.perio || subOdo === "perio") && ["perio", "Periodontograma"],
+    puedeOrto && (tieneOrto || subExtra.orto || subOdo === "orto") && ["orto", "Ortodoncia"],
+  ].filter(Boolean);
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
   const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: `1px solid ${SOFT}`, fontSize: "var(--dc-ficha-fs)", color: NAVY, outline: "none", boxSizing: "border-box", background: puedeEscribirClinico ? "var(--dc-white)" : "var(--dc-bg)" };
   const lbl = { fontSize: "var(--dc-ficha-fs)", fontWeight: 500, color: TEXT, display: "block", marginBottom: 6 };
@@ -1596,9 +1605,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(11,18,32,.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 24, overflowY: "auto", pointerEvents: "auto" }}
+      className={pagina ? "fm-pagina" : undefined}
+      style={pagina ? undefined : { position: "fixed", inset: 0, zIndex: 60, background: "rgba(11,18,32,.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: 24, overflowY: "auto" }}
       onMouseDown={(e) => {
-        if (e.target !== e.currentTarget) return;
+        if (pagina || e.target !== e.currentTarget) return;
         e.preventDefault();
         pedirCerrar();
       }}
@@ -1607,7 +1617,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 61, cursor: "default" }} />
       )}
       {modalAtencion()}
-      <div className="fm" data-densidad={densFicha} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 1200, background: BG, borderRadius: "var(--dc-r-lg)", boxShadow: "0 40px 90px -25px rgba(11,18,32,.55)", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 560, opacity: cerrando ? 0.96 : 1 }}>
+      <div className="fm" data-densidad={densFicha} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={pagina ? { width: "100%", background: BG, borderRadius: "var(--dc-r-lg)", border: "1px solid var(--dc-line)", overflow: "visible", display: "flex", flexDirection: "column" } : { width: "100%", maxWidth: 1200, background: BG, borderRadius: "var(--dc-r-lg)", boxShadow: "0 40px 90px -25px rgba(11,18,32,.55)", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 560, opacity: cerrando ? 0.96 : 1 }}>
         <style>{`
           .fm[data-densidad="clinica"] { --dc-ficha-fs: 17px; --dc-ficha-row: 64px; }
           .fm[data-densidad="admin"] { --dc-ficha-fs: 15px; --dc-ficha-row: 56px; }
@@ -1676,7 +1686,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {onAgendar && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
             {onCobrar && debe && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
             {puedeEscribirClinico && <button onClick={() => { anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }} style={btn("ghost")}><Printer size={15} strokeWidth={1.75} /> Imprimir HC</button>}
-            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>
+            {pagina ? null : <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>}
           </div>
         </div>
         {!errorFicha && (
@@ -1696,7 +1706,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <button onClick={cargar} style={{ ...btn("teal"), fontSize: 14, padding: "9px 20px" }}>Reintentar</button>
           </div>
         ) : (
-        <div className={`fm-cols${["odontograma", "perio"].includes(tab) ? " is-ancho" : ""}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 0, flex: 1, minHeight: 0 }}>
+        <div className={`fm-cols${tab !== "resumen" ? " is-ancho" : ""}`} style={{ display: "grid", gridTemplateColumns: tab === "resumen" ? "minmax(0,1fr) 300px" : "minmax(0,1fr)", gap: 0, flex: 1, minHeight: 0 }}>
           {/* El rail izquierdo se retiró: la identidad va en la cabecera y las secciones en pestañas. */}
           {/* Contenido */}
           <div className="fm-content" style={{ padding: 22, display: "grid", gap: 14, alignContent: "start", overflowY: "auto" }}>
@@ -1812,7 +1822,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </>
             )}
 
-            {tab === "consentimientos" && (
+            {tab === "archivos" && !slots?.archivos && (
               <div style={card}>
                 <div style={{ ...secTitle, display: "flex", alignItems: "center", gap: 8 }}><Shield size={16} strokeWidth={1.75} /> Consentimientos informados</div>
                 {consentimientos.length === 0
@@ -1838,7 +1848,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </div>
             )}
 
-            {tab === "filiacion" && fil && (() => {
+            {tab === "datos" && fil && (() => {
               const FL = F.filiacion || {};
               const setFL = (k, v) => setFc((cur) => ({ ...(cur || {}), filiacion: { ...((cur || {}).filiacion || {}), [k]: v } }));
               const campo = (label, val, on, extra = {}) => <div className="fm-fil__c"><label style={lbl}>{label}</label><input style={inp} value={val || ""} onChange={(e) => on(e.target.value)} {...extra} /></div>;
@@ -2129,7 +2139,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </div>
             )}
 
-            {tab === "registro" && (() => {
+            {tab === "datos" && puedeRegistro && (() => {
               const fuenteSrv = conectado && Array.isArray(regSrv) ? registroDesdeServidor(regSrv, p) : [];
               const usaSrv = fuenteSrv.length > 0;
               const base = !conectado ? registroDemo(p) : usaSrv ? fuenteSrv : [];
@@ -2203,15 +2213,27 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               );
             })()}
 
-            {tab === "odontograma" && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} pacienteHc={p.numeroHistoria || p.nroHistoria || ""} sedeId={sedeId} /></div>}
+            {tab === "odontograma" && subOdoOpc.length > 1 && (
+              <div className="fm-sub" role="tablist" aria-label="Vistas del odontograma">
+                {subOdoOpc.map(([k2, l]) => <button key={k2} type="button" role="tab" aria-selected={subOdo === k2} className={subOdo === k2 ? "is-on" : ""} onClick={() => setSubOdo(k2)}>{l}</button>)}
+              </div>
+            )}
+            {tab === "odontograma" && subOdo === "odo" && (puedePerio || puedeOrto) && (!tienePerio || !tieneOrto) && puedeEscribirClinico && (
+              <div className="fm-sub-iniciar">
+                {puedePerio && etapa !== "pediatrico" && !tienePerio && !subExtra.perio && <button type="button" onClick={() => { setSubExtra((x) => ({ ...x, perio: true })); setSubOdo("perio"); }}><Activity size={13} strokeWidth={2} /> Iniciar periodontograma</button>}
+                {puedeOrto && !tieneOrto && !subExtra.orto && <button type="button" onClick={() => { setSubExtra((x) => ({ ...x, orto: true })); setSubOdo("orto"); }}><Braces size={13} strokeWidth={2} /> Iniciar ortodoncia</button>}
+              </div>
+            )}
+            {tab === "odontograma" && subOdo === "odo" && slots?.odontograma && slots.odontograma(pacienteId)}
+            {tab === "odontograma" && subOdo === "odo" && !slots?.odontograma && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} pacienteHc={p.numeroHistoria || p.nroHistoria || ""} sedeId={sedeId} /></div>}
 
-            {tab === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura={!puedeEscribirClinico} />}
+            {tab === "odontograma" && subOdo === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura={!puedeEscribirClinico} />}
 
-            {tab === "receta" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
+            {tab === "historia" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
 
-            {tab === "ortodoncia" && <Ortodoncia pacienteId={pacienteId} notify={notify} />}
+            {tab === "odontograma" && subOdo === "orto" && <Ortodoncia pacienteId={pacienteId} notify={notify} />}
 
-            {tab === "laboratorio" && (
+            {tab === "archivos" && !slots?.archivos && (
               <div style={card}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <FlaskConical size={16} strokeWidth={1.75} color={TEAL} />
@@ -2236,7 +2258,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </div>
             )}
 
-            {tab === "cuenta" && (
+            {tab === "cuenta" && slots?.plan && slots.plan(pacienteId)}
+            {tab === "cuenta" && !slots?.plan && (
               <>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: -4 }}>
                   {onCobrar && debe && (
@@ -2277,7 +2300,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </>
             )}
 
-            {tab === "archivos" && (
+            {tab === "archivos" && slots?.archivos && slots.archivos(pacienteId, subArch)}
+            {tab === "archivos" && !slots?.archivos && (
               <div style={card}>
                 <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 12 }}>Radiografías, fotos y documentos ({rx.length})</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
@@ -2309,7 +2333,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               Estaban en sus pestañas, asi que para saber cuanto debe el paciente habia
               que salir del odontograma y volver. Se oculta por debajo de 1180px, donde
               ya no cabe sin estrujar la zona de trabajo. */}
-          <aside className={`fm-lateral${["odontograma", "perio"].includes(tab) ? " is-oculta" : ""}`} style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", display: "grid", gap: 14, alignContent: "start" }}>
+          <aside hidden={tab !== "resumen"} className={`fm-lateral${tab !== "resumen" ? " is-oculta" : ""}`} style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", display: "grid", gap: 14, alignContent: "start" }}>
             <div>
               <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 10 }}>Presupuesto</div>
               {arr(d?.tratamientos).length === 0

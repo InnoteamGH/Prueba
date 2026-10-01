@@ -29,7 +29,7 @@ describe("SPEC v8 A23 jerarquía", () => {
   it("Facturación y Reportes tienen cabecera de pantalla", () => {
     // Caja abre con su cabecera de color: estado, cifras del día y pasos del proceso
     // (el h1 sigue en la cabecera de la app).
-    assert.match(app, /className=\{`dc-cjh\$\{[\s\S]*?aria-label="Caja del día"/);
+    assert.match(app, /className="dc-cj4__franja"[\s\S]*?Cobrado hoy[\s\S]*?Por cobrar/);
     assert.match(reportes, /titulo="Producción y comisiones"/);
   });
 });

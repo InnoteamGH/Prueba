@@ -6,10 +6,11 @@
  *   - Top de tratamientos: GET /tratamientos/resumen?desde&hasta → [{ nombre, numeroDeVentas, importeTotal }]
  * Demo: cifras de ejemplo coherentes con el equipo de demostración.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, Target, Trophy, Users, Wallet } from "lucide-react";
 import api, { auth } from "../api/client";
-import { MEDICOS } from "../comun";
+import { DatosDemoCtx, MEDICOS } from "../comun";
+import { salidasMes } from "../compartido/metricas";
 
 const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -23,7 +24,6 @@ const DEMO_TOP = [
   { nombre: "Resina compuesta", ventas: 44, importe: 3960 },
   { nombre: "Extracción simple", ventas: 18, importe: 2700 },
 ];
-const DEMO_SALIDAS = [["Alquiler", 2800], ["Laboratorio", 2140], ["Insumos", 1930], ["Planilla", 4200], ["Servicios (luz/agua)", 385], ["Marketing", 450], ["Otros", 575]];
 
 /** Avance del mes para las cifras de demostración (las de ejemplo son de un mes casi completo). */
 export const avanceDemo = (d = new Date()) => {
@@ -38,6 +38,8 @@ export default function ResumenMes({ kd, acciones = null }) {
   const hasta = ymd(hoy);
   const [egresos, setEgresos] = useState(null);
   const [top, setTop] = useState(null);
+  // GER-02: en la demostración las salidas son los egresos que Caja registró (misma lista).
+  const db = useContext(DatosDemoCtx);
 
   useEffect(() => {
     if (!conectado) return;
@@ -51,10 +53,10 @@ export default function ResumenMes({ kd, acciones = null }) {
       const f = avanceDemo(hoy);
       const equipo = MEDICOS.map((m) => ({ nombre: m.nombre, prod: Math.round((m.prodDemo || 0) * f), meta: m.meta || 0 }));
       const facturado = equipo.reduce((a, x) => a + x.prod, 0);
-      const salCat = DEMO_SALIDAS.map(([k, v]) => [k, Math.round(v * f)]);
+      const sal = salidasMes(db?.egresos || [], { mes: desde.slice(0, 7) });
       return {
         facturado, anterior: Math.round(facturado * 0.91), meta: equipo.reduce((a, x) => a + x.meta, 0), equipo,
-        salidas: salCat.reduce((a, [, v]) => a + v, 0), salidasUsd: 40, salidasCat: [...salCat].sort((a, b) => b[1] - a[1]),
+        salidas: sal.pen, salidasUsd: sal.usd, salidasCat: sal.porCat,
         top: DEMO_TOP.map((t) => ({ ...t, importe: Math.round(t.importe * f), ventas: Math.max(1, Math.round(t.ventas * f)) })),
       };
     }
@@ -72,7 +74,7 @@ export default function ResumenMes({ kd, acciones = null }) {
       salidasCat: Object.entries(cat).sort((a, b) => b[1] - a[1]),
       top: (top || []).map((t) => ({ nombre: t.nombre || "—", ventas: Number(t.numeroDeVentas) || 0, importe: Number(t.importeTotal) || 0 })).sort((a, b) => b.importe - a.importe).slice(0, 6),
     };
-  }, [conectado, kd, egresos, top, desde]);
+  }, [conectado, kd, egresos, top, desde, db?.egresos]);
 
   const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
   const ritmo = (hoy.getDate() / diasMes) * 100;

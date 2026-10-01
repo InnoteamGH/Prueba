@@ -10,6 +10,7 @@
    renombres claves, solo valores (misma regla que antes).
    ============================================================================ */
 import { abrirDocumento, datosImpresion } from "./util/membrete";
+import { estadoInfo, ESTADOS } from "./compartido/estados.js";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2, Download, FileSpreadsheet, FileText} from "lucide-react";
@@ -177,7 +178,7 @@ export const permisosEfectivos = (usuario, rolePerms) => mergePerms((rolePerms &
 export const modulosVisibles = (perms) => MODULOS.filter((m) => (perms?.[m.id] || []).includes("ver")).map((m) => m.id);
 /* Rutas de sub-vista que pertenecen a un módulo (para permisos/validación de navegación). */
 /* Rutas de sub-vista → módulo de permisos (no colapsar agenda_cal en el router). */
-export const VISTA_ALIAS = { agenda_cal: "agenda", agenda_consolidado: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", inventario_compras: "inventario", inventario_consumo: "inventario", inventario_prov: "inventario", caja_apertura: "facturacion", caja_cierre: "facturacion", caja_historial: "facturacion", caja_movimientos: "facturacion", caja_links: "facturacion", caja_sunat: "facturacion", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
+export const VISTA_ALIAS = { agenda_cal: "agenda", agenda_consolidado: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", inventario_compras: "inventario", inventario_consumo: "inventario", inventario_prov: "inventario", caja_apertura: "facturacion", caja_cierre: "facturacion", caja_historial: "facturacion", caja_movimientos: "facturacion", caja_links: "facturacion", caja_sunat: "facturacion", caja: "facturacion", satisfaccion: "resenas", reportes_ocs: "reportes", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
 export const modDeVista = (v) => VISTA_ALIAS[v] || v;
 
 /* Catálogo de módulos (para la matriz de permisos y la navegación). */
@@ -204,7 +205,6 @@ export const MODULOS = [
   { id: "resenas",      label: "Reseñas y reputación" },
   { id: "plan",         label: "Mi plan y facturación" },
   { id: "espera",       label: "Lista de espera" },
-  { id: "tickets",      label: "Tickets de citas" },
   { id: "facturacion",  label: "Facturación / cobros" },
   { id: "comisiones",   label: "Comisiones" },
   { id: "metas",        label: "Metas de producción" },
@@ -954,10 +954,10 @@ export const FICHA_CLINICA = {
     notas: { 16: "Caries oclusal moderada, requiere obturación." },
     alergias: ["Penicilina"], antecedentes: ["Bruxismo"],
     tratamiento: [
-      { id: 1, nombre: "Limpieza y profilaxis", costo: 80, estado: "atendida" },
-      { id: 2, nombre: "Curación pieza 16", costo: 120, estado: "atendida" },
-      { id: 3, nombre: "Endodoncia pieza 26", costo: 350, estado: "terminada", terminadaEn: new Date(new Date().setHours(10, 40, 0, 0)).toISOString() },
-      { id: 4, nombre: "Corona pieza 36", costo: 450, estado: "pendiente" },
+      { id: 1, servicioId: 2, nombre: "Limpieza y profilaxis", costo: 80, estado: "atendida", atendidaEn: "2026-04-10" },
+      { id: 2, servicioId: 3, pieza: 16, cara: "O", nombre: "Curación con resina · pieza 16 (O)", costo: 120, estado: "atendida", atendidaEn: "2026-05-12" },
+      { id: 3, servicioId: 6, pieza: 26, nombre: "Endodoncia · pieza 26", costo: 350, estado: "terminada", terminadaEn: new Date(new Date().setHours(10, 40, 0, 0)).toISOString() },
+      { id: 4, servicioId: 7, pieza: 36, nombre: "Corona · pieza 36", costo: 450, estado: "pendiente" },
     ],
     pagos: [
       { fecha: "2026-04-10", concepto: "Limpieza", monto: 80, metodo: "Yape" },
@@ -973,8 +973,8 @@ export const FICHA_CLINICA = {
     odontograma: { 11: { caras: { center: "obturado" } }, 47: { whole: "endodoncia" } },
     notas: {}, alergias: [], antecedentes: ["Hipertensión"],
     tratamiento: [
-      { id: 1, nombre: "Endodoncia pieza 47", costo: 350, estado: "atendida" },
-      { id: 2, nombre: "Corona pieza 47", costo: 450, estado: "pendiente" },
+      { id: 1, servicioId: 6, pieza: 47, nombre: "Endodoncia · pieza 47", costo: 350, estado: "atendida", atendidaEn: "2026-04-28" },
+      { id: 2, servicioId: 7, pieza: 47, nombre: "Corona · pieza 47", costo: 450, estado: "pendiente" },
     ],
     pagos: [{ fecha: "2026-04-28", concepto: "Endodoncia pieza 47", monto: 350, metodo: "Tarjeta" }],
     ahorro: 40,
@@ -984,8 +984,8 @@ export const FICHA_CLINICA = {
     odontograma: { 21: { caras: { center: "caries", top: "caries" } }, 38: { whole: "extraer" } },
     notas: { 38: "Tercera molar incluida, evaluar exodoncia." }, alergias: ["Látex"], antecedentes: [],
     tratamiento: [
-      { id: 1, nombre: "Control de brackets", costo: 150, estado: "atendida" },
-      { id: 2, nombre: "Extracción pieza 38", costo: 200, estado: "pendiente" },
+      { id: 1, servicioId: 12, nombre: "Control de ortodoncia", costo: 150, estado: "atendida", atendidaEn: "2026-06-01" },
+      { id: 2, servicioId: 9, pieza: 38, nombre: "Extracción simple · pieza 38", costo: 120, estado: "pendiente" },
     ],
     pagos: [{ fecha: "2026-06-01", concepto: "Control ortodoncia", monto: 150, metodo: "Efectivo" }],
     ahorro: 120,
@@ -995,8 +995,8 @@ export const FICHA_CLINICA = {
     odontograma: { 16: { caras: { center: "caries" } }, 36: { whole: "corona" } },
     notas: { 16: "Caries inicial, control en próxima visita." }, alergias: [], antecedentes: [],
     tratamiento: [
-      { id: 1, nombre: "Sellantes preventivos", costo: 120, estado: "atendida" },
-      { id: 2, nombre: "Curación pieza 16", costo: 90, estado: "terminada", terminadaEn: new Date(new Date().setHours(9, 25, 0, 0)).toISOString() },
+      { id: 1, servicioId: 5, nombre: "Sellantes preventivos", costo: 120, estado: "atendida", atendidaEn: "2026-06-10" },
+      { id: 2, servicioId: 3, pieza: 16, cara: "O", nombre: "Curación con resina · pieza 16 (O)", costo: 120, estado: "terminada", terminadaEn: new Date(new Date().setHours(9, 25, 0, 0)).toISOString() },
     ],
     pagos: [{ fecha: "2026-06-10", concepto: "Sellantes preventivos", monto: 120, metodo: "Efectivo" }],
     ahorro: 30, recetas: [],
@@ -1005,9 +1005,9 @@ export const FICHA_CLINICA = {
     odontograma: { 12: { caras: { center: "obturado" } } },
     notas: {}, alergias: [], antecedentes: [],
     tratamiento: [
-      { id: 1, nombre: "Instalación de brackets", costo: 1500, estado: "atendida" },
-      { id: 2, nombre: "Control mensual", costo: 150, estado: "atendida" },
-      { id: 3, nombre: "Control mensual", costo: 150, estado: "pendiente" },
+      { id: 1, servicioId: 11, nombre: "Instalación de brackets", costo: 1500, estado: "atendida", atendidaEn: "2026-03-01" },
+      { id: 2, servicioId: 12, nombre: "Control de ortodoncia", costo: 150, estado: "atendida", atendidaEn: "2026-05-01" },
+      { id: 3, servicioId: 12, nombre: "Control de ortodoncia", costo: 150, estado: "pendiente" },
     ],
     pagos: [
       { fecha: "2026-03-01", concepto: "Instalación de brackets", monto: 1500, metodo: "Tarjeta" },
@@ -1019,8 +1019,8 @@ export const FICHA_CLINICA = {
     odontograma: { 36: { caras: { center: "caries" } }, 46: { whole: "obturado" } },
     notas: {}, alergias: ["Aspirina"], antecedentes: [],
     tratamiento: [
-      { id: 1, nombre: "Profilaxis", costo: 80, estado: "atendida" },
-      { id: 2, nombre: "Curación pieza 36", costo: 130, estado: "pendiente" },
+      { id: 1, servicioId: 2, nombre: "Limpieza y profilaxis", costo: 80, estado: "atendida", atendidaEn: "2026-05-30" },
+      { id: 2, servicioId: 3, pieza: 36, cara: "O", nombre: "Curación con resina · pieza 36 (O)", costo: 120, estado: "pendiente" },
     ],
     pagos: [{ fecha: "2026-05-30", concepto: "Profilaxis", monto: 80, metodo: "Plin" }],
     ahorro: 0, recetas: [],
@@ -1029,32 +1029,31 @@ export const FICHA_CLINICA = {
     odontograma: { 26: { whole: "endodoncia" } },
     notas: { 26: "Endodoncia en curso, falta segunda sesión." }, alergias: [], antecedentes: ["Diabetes"],
     tratamiento: [
-      { id: 1, nombre: "Endodoncia pieza 26 (1ra sesión)", costo: 200, estado: "atendida" },
-      { id: 2, nombre: "Endodoncia pieza 26 (2da sesión)", costo: 150, estado: "pendiente" },
-      { id: 3, nombre: "Corona pieza 26", costo: 450, estado: "pendiente" },
+      { id: 1, servicioId: 6, pieza: 26, nombre: "Endodoncia · pieza 26", costo: 350, estado: "pendiente", etapa: "En curso: falta la 2.ª sesión" },
+      { id: 2, servicioId: 7, pieza: 26, nombre: "Corona · pieza 26", costo: 450, estado: "pendiente" },
     ],
-    pagos: [{ fecha: "2026-06-05", concepto: "Endodoncia 1ra sesión", monto: 200, metodo: "Tarjeta" }],
+    pagos: [{ fecha: "2026-06-05", concepto: "Abono endodoncia pieza 26", monto: 200, metodo: "Tarjeta" }],
     ahorro: 50, recetas: [{ fecha: "2026-06-05", texto: "Ibuprofeno 600mg c/8h por 3 días" }],
     historia: [{ fecha: "2026-06-05", titulo: "Endodoncia", detalle: "Primera sesión de tratamiento de conducto. Sin complicaciones." }] },
   8: {
     odontograma: { 21: { caras: { center: "caries" } } },
     notas: {}, alergias: [], antecedentes: [],
-    tratamiento: [{ id: 1, nombre: "Limpieza dental", costo: 80, estado: "atendida" }],
+    tratamiento: [{ id: 1, servicioId: 2, nombre: "Limpieza y profilaxis", costo: 80, estado: "atendida", atendidaEn: "2026-03-18" }],
     pagos: [{ fecha: "2026-03-18", concepto: "Limpieza dental", monto: 80, metodo: "Efectivo" }],
     ahorro: 0, recetas: [],
     historia: [{ fecha: "2026-03-18", titulo: "Limpieza dental", detalle: "Profilaxis de rutina. Se detecta caries incipiente en pieza 21." }] },
   9: {
     odontograma: { 11: { caras: { top: "fractura" } } },
     notas: { 11: "Fractura de esmalte, evaluar reconstrucción." }, alergias: ["Penicilina"], antecedentes: [],
-    tratamiento: [{ id: 1, nombre: "Reconstrucción pieza 11", costo: 280, estado: "pendiente" }],
+    tratamiento: [{ id: 1, servicioId: 4, pieza: 11, cara: "V", nombre: "Reconstrucción estética · pieza 11 (V)", costo: 180, estado: "terminada", terminadaEn: new Date(Date.now() - 35 * 864e5).toISOString() }],
     pagos: [], ahorro: 0, recetas: [],
     historia: [{ fecha: "2026-06-12", titulo: "Evaluación", detalle: "Fractura en incisivo central superior. Se programa reconstrucción estética." }] },
   10: {
     odontograma: { 31: { whole: "obturado" } },
     notas: {}, alergias: [], antecedentes: ["Tabaquismo"],
     tratamiento: [
-      { id: 1, nombre: "Destartraje (limpieza profunda)", costo: 180, estado: "atendida" },
-      { id: 2, nombre: "Control periodontal", costo: 120, estado: "pendiente" },
+      { id: 1, servicioId: 13, nombre: "Destartraje (limpieza profunda)", costo: 180, estado: "atendida", atendidaEn: "2026-06-08" },
+      { id: 2, servicioId: 14, nombre: "Control periodontal", costo: 120, estado: "terminada", terminadaEn: new Date(Date.now() - 45 * 864e5).toISOString() },
     ],
     pagos: [{ fecha: "2026-06-08", concepto: "Destartraje", monto: 180, metodo: "Yape" }],
     ahorro: 40, recetas: [{ fecha: "2026-06-08", texto: "Enjuague con clorhexidina 0.12% por 14 días" }],
@@ -1069,18 +1068,53 @@ PACIENTES_INIT.forEach((p) => {
   p.presupuesto = { total, pagado };
 });
 
-export const ESTADO_BADGE = {
-  pendiente: { l: "Pendiente", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" },
-  confirmada: { l: "Confirmada", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" },
-  en_sala: { l: "En sala", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" },
-  en_atencion: { l: "En atención", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" },
-  atendida: { l: "Atendida", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)" },
-  terminada: { l: "Terminado · por cobrar", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" },
-  cancelada: { l: "Cancelada", bg: "var(--dc-fee)", fg: "var(--dc-danger-700)" },
-  no_show: { l: "No asistió", bg: "var(--dc-danger-soft)", fg: "var(--dc-warn-600)" },
-  reprogramada: { l: "Reprogramada", bg: "var(--dc-bg)", fg: "var(--dc-purple)" },
-  cerrada_sistema: { l: "Cerrada por sistema", bg: "var(--dc-bg)", fg: "var(--dc-ink-400)" },
-};
+export const EGRESOS_DEMO = [
+  { id: 1, fecha: fmt(hoy), concepto: "Movilidad y mensajería", categoria: "Otros", monto: 35, metodo: "efectivo" },
+  { id: 2, fecha: fmt(hoy), concepto: "Resinas y adhesivos", categoria: "Insumos", monto: 320, metodo: "transferencia" },
+  { id: 3, fecha: fmt(hoy), concepto: "Laboratorio — corona pieza 36 (Rosa Linares)", categoria: "Laboratorio", monto: 180, metodo: "transferencia", labCasoId: 1 },
+  { id: 4, fecha: fmt(hoy), concepto: "Repuesto de micromotor (proveedor en dólares)", categoria: "Equipos", monto: 40, metodo: "efectivo", moneda: "USD" },
+  { id: 5, fecha: addDays(-1), concepto: "Campaña Instagram Ads", categoria: "Marketing", monto: 150, metodo: "tarjeta" },
+  { id: 6, fecha: addDays(-3), concepto: "Guantes, mascarillas y eyectores", categoria: "Insumos", monto: 410, metodo: "transferencia" },
+  { id: 7, fecha: addDays(-5), concepto: "Luz y agua del local", categoria: "Servicios (luz/agua)", monto: 385, metodo: "transferencia" },
+  { id: 8, fecha: addDays(-6), concepto: "Alquiler del consultorio", categoria: "Alquiler", monto: 2800, metodo: "transferencia" },
+  { id: 9, fecha: addDays(-8), concepto: "Prótesis parcial — laboratorio", categoria: "Laboratorio", monto: 520, metodo: "transferencia" },
+  { id: 10, fecha: addDays(-9), concepto: "Compra varios", categoria: "Otros", monto: 260, metodo: "efectivo" },
+];
+
+/* Documentos del paciente (consentimientos y formularios): una sola entidad que leen la
+   ficha (Archivos › Documentos) y la bandeja de Pendientes de hoy. */
+export const DOCUMENTOS_SEED = [
+  { id: "c1", clase: "consentimiento", pacienteId: 1, tipo: "Endodoncia · pieza 26", fecha: addDays(-3), estado: "firmado" },
+  { id: "c2", clase: "consentimiento", pacienteId: 3, tipo: "Exodoncia · pieza 38", fecha: addDays(-1), estado: "pendiente" },
+  { id: "c3", clase: "consentimiento", pacienteId: 5, tipo: "Ortodoncia", fecha: addDays(-5), estado: "firmado" },
+  { id: "c4", clase: "consentimiento", pacienteId: 25, tipo: "Odontopediatría (sellantes)", fecha: fmt(hoy), estado: "pendiente" },
+  { id: "f1", clase: "formulario", pacienteId: 1, tipo: "Anamnesis / historia médica", fecha: addDays(-2), estado: "completado" },
+  { id: "f2", clase: "formulario", pacienteId: 4, tipo: "Ficha de admisión", fecha: addDays(-1), estado: "pendiente" },
+  { id: "f3", clase: "formulario", pacienteId: 7, tipo: "Declaración de salud", fecha: addDays(-4), estado: "completado" },
+];
+
+/* Casos de laboratorio: paciente, pieza, procedimiento del presupuesto, proveedor y egreso. */
+export const LAB_SEED = [
+  { id: 1, pacienteId: 1, paciente: "Rosa Linares", pieza: 36, procedimientoId: 4, trabajo: "Corona de porcelana · pieza 36", lab: "Laboratorio Dental Lima", enviado: addDays(-6), entrega: addDays(2), estado: "en_proceso", egresoId: 3 },
+  { id: 2, pacienteId: 2, paciente: "Pedro Gómez", pieza: 47, procedimientoId: 2, trabajo: "Corona · pieza 47", lab: "ProDent Lab", enviado: addDays(-9), entrega: addDays(-1), estado: "recibido" },
+  { id: 3, pacienteId: 3, paciente: "María Chávez", trabajo: "Férula de descarga", lab: "Laboratorio Dental Lima", enviado: addDays(-7), entrega: addDays(-1), estado: "enviado" },
+];
+
+/* Liquidaciones de seguro: Borrador → Enviada → Observada → Aprobada → Pagada. */
+export const LIQ_SEED = [
+  { id: 1, pid: 2, aseg: "Pacífico EPS", cobPct: 80, estado: "aprobado" },
+  { id: 2, pid: 3, aseg: "Rímac Seguros", cobPct: 70, estado: "enviado" },
+  { id: 3, pid: 5, aseg: "Mapfre", cobPct: 60, estado: "pagado" },
+  { id: 4, pid: 8, aseg: "Pacífico EPS", cobPct: 80, estado: "enviado" },
+  { id: 5, pid: 1, aseg: "La Positiva", cobPct: 50, estado: "observado", motivo: "Falta la radiografía periapical de la pieza 26." },
+  { id: 6, pid: 6, aseg: "Mapfre", cobPct: 60, estado: "borrador" },
+];
+
+// R4: etiquetas y colores salen del catálogo único (compartido/estados.js).
+export const ESTADO_BADGE = Object.fromEntries([
+  ...Object.keys(ESTADOS.cita).map((k) => ["cita", k]),
+  ["procedimiento", "terminada"],
+].map(([ent, k]) => { const e = estadoInfo(ent, k); return [k, { l: e.label, bg: `color-mix(in srgb, ${e.color} 12%, transparent)`, fg: e.color }]; }));
 
 /* ---- UI ---- */
 // Superficie base: blanca, borde fino y sombra mínima. Sin efecto vidrio: sobre un
@@ -1527,6 +1561,28 @@ export function useVista(clave, opciones) {
    selector de forma de ver. Es componente (no hook suelto) para poder usarse dentro de
    ramas condicionales sin romper el orden de los hooks. */
 /* Celda de persona para tablas: iniciales en su color, nombre y dato secundario. */
+/* Pestañas de una página (Caja, Reportes, Usuarios y permisos, Satisfacción…).
+   opciones: [{ id, label, icon, badge }]. */
+export function Pestanas({ opciones = [], valor, onChange, etiqueta = "Secciones" }) {
+  const lista = opciones.filter(Boolean);
+  if (lista.length < 2) return null;
+  return (
+    <nav className="dc-pest" role="tablist" aria-label={etiqueta}>
+      {lista.map((o) => { const Ic = o.icon; const on = valor === o.id; return (
+        <button key={o.id} type="button" role="tab" aria-selected={on} className={on ? "is-on" : ""} onClick={() => onChange(o.id)}>
+          {Ic && <Ic size={14} strokeWidth={2} />} {o.label}{o.badge ? <em>{o.badge}</em> : null}
+        </button>
+      ); })}
+    </nav>
+  );
+}
+
+/* Chip de estado único (spec R4): misma etiqueta y mismo color en toda la app. */
+export function EstadoPill({ entidad, estado, children }) {
+  const e = estadoInfo(entidad, estado);
+  return <span className="dc-pill" style={{ "--c": e.color }}><i /> {children || e.label}</span>;
+}
+
 export function PersonaCelda({ nombre, sub, size = 34 }) {
   const col = colorDe(nombre || "");
   return (
@@ -1715,7 +1771,9 @@ export const ModHead = ({ sub, accion }) => (!sub && !accion) ? null : (
   </div>
 );
 // Barra de paciente unificada para los módulos clínicos.
-export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, accion, sedeLabel = null, extra = null }) => {
+export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, accion, sedeLabel = null, extra = null, soloAccion = false }) => {
+  // Dentro de la ficha el paciente ya está en el encabezado único (GLO-08): solo las acciones.
+  if (soloAccion) return accion ? <div className="dc-pbar-acc">{accion}</div> : null;
   const chip = { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, borderRadius: "var(--dc-r-full)", padding: "3px 10px", whiteSpace: "nowrap" };
   const p = pacientes.find((x) => x.id === pacienteId) || null;
   if (!pacientes.length) {
