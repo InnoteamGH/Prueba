@@ -381,6 +381,8 @@ export const api = {
   },
   sillones: {
     listar: (sedeId) => request("GET", `/sillones${sedeId ? `?sedeId=${sedeId}` : ""}`),
+    crear: (d) => request("POST", "/sillones", d),
+    actualizar: (id, d) => request("PUT", `/sillones/${id}`, d),
   },
   egresos: {
     listar: () => request("GET", "/egresos"),

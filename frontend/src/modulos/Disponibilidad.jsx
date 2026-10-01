@@ -1,8 +1,9 @@
 /* Módulo Disponibilidad. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import { AlertCircle, AlertTriangle, BellRing, CalendarCheck, Check, ChevronRight, Clock, Lock, MapPin, Repeat, Send, Trash2, X } from "lucide-react";
 import api, { auth } from "../api/client";
-import {Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, nombreSede, puede, toMin, tint} from "../comun";
+import { DISP_DEMO } from "../compartido/sillones";
+import {DatosDemoCtx, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, nombreSede, puede, toMin, tint} from "../comun";
 
 function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica = { horario: {}, feriados: [] } }) {
   // Los días y las horas los pone el horario de la clínica, no este módulo: es lo que
@@ -48,6 +49,18 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   const [diasAtiende, setDiasAtiende] = useState(() => DOW_SEMANA.map(() => true));
   const conectado = !!auth.token;
   const [guardandoDisp, setGuardandoDisp] = useState(false);
+  // Demostración: el horario del doctor vive en los datos compartidos, los mismos que
+  // usan la agenda y el modal de agendado para validar sus citas.
+  const demoDb = useContext(DatosDemoCtx);
+  const miMedId = (MEDICOS.find((m) => m.nombre === usuario?.nombre) || {}).id ?? null;
+  const misBloquesDemo = (demoDb?.dispMedicos || DISP_DEMO).filter((d) => d.medicoId === miMedId);
+  const [jornadaCargada, setJornadaCargada] = useState(null);
+  useEffect(() => {
+    if (conectado || miMedId == null || !misBloquesDemo.length) return;
+    setDiasAtiende(DOW_SEMANA.map((d) => misBloquesDemo.some((b) => Number(b.diaSemana) === d)));
+    const ini = misBloquesDemo.map((b) => b.horaInicio).sort()[0], fin = misBloquesDemo.map((b) => b.horaFin).sort().slice(-1)[0];
+    setJornada({ ini, fin }); setJornadaCargada({ ini, fin });
+  }, [conectado, miMedId]); // eslint-disable-line
   // Carga la disponibilidad guardada del médico (días + jornada) al abrir.
   useEffect(() => {
     if (!conectado) return;
@@ -61,7 +74,27 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
     }).catch(() => {});
   }, []); // eslint-disable-line
   const guardarDisp = async () => {
-    if (!conectado) { notify("Disponibilidad guardada. Tu agenda ya la usa."); return; }
+    if (!conectado) {
+      if (miMedId == null || !demoDb?.setDispMedicos) { notify("Disponibilidad guardada. Tu agenda ya la usa."); return; }
+      // Días que ya no atiende: fuera. Días nuevos: la jornada. Si cambió la jornada, se
+      // reemplazan los bloques del día (pueden ser mañana en una sede y tarde en otra).
+      const cambioJornada = !jornadaCargada || jornadaCargada.ini !== jornada.ini || jornadaCargada.fin !== jornada.fin;
+      demoDb.setDispMedicos((ds) => {
+        const otros = ds.filter((d) => d.medicoId !== miMedId);
+        const mios = ds.filter((d) => d.medicoId === miMedId);
+        const nuevos = [];
+        DOW_SEMANA.forEach((dow, i) => {
+          if (!diasAtiende[i]) return;
+          const delDia = mios.filter((d) => Number(d.diaSemana) === dow);
+          if (delDia.length && !cambioJornada) nuevos.push(...delDia);
+          else nuevos.push({ id: `d${miMedId}-${dow}-${Date.now()}`, medicoId: miMedId, sede: null, diaSemana: dow, horaInicio: jornada.ini, horaFin: jornada.fin });
+        });
+        return [...otros, ...nuevos];
+      });
+      setJornadaCargada({ ...jornada });
+      notify("Disponibilidad guardada. La agenda ya no te cita fuera de estos días y horas.");
+      return;
+    }
     const dias = diasAtiende.map((on, idx) => on ? { diaSemana: idx + 1, horaInicio: jornada.ini, horaFin: jornada.fin } : null).filter(Boolean);
     setGuardandoDisp(true);
     try {

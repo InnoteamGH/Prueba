@@ -25,6 +25,7 @@ Estados:
 | **Caja: revisar categoría de egresos** | Finanzas › Caja › Ingresos y egresos › «Egresos por categoría» (hoy o este mes), con reclasificación en línea y aviso de gastos en «Otros» | 🟡 | **Nuevo** `PUT /egresos/:id` con `{ categoria }` |
 | **Caja: moneda (soles y dólares)** | Cobro (selector Soles/Dólares con tipo de cambio), egresos (selector de moneda), apertura y cierre | 🟡 | Ver sección 4 |
 | **Consolidado de ver citas** | Atención › Agenda › **Consolidado de citas**. Rango (hoy, semana, mes, 30 días o fechas), indicadores por estado, citas por doctor y vistas Tabla / Por día / Por doctor, con exportación a Excel | ✅ | `GET /citas?desde=&hasta=` (ya existe) |
+| **Sillones y horario del doctor** | Configuración › **Sillones** (flexible, fijo de un doctor o de una especialidad; exclusivo o preferente) y › Horarios por doctor. Agendar, reprogramar y asignar desde la lista de espera validan doctor, sillón y bloqueos | 🟡 | Ver «Sillones y disponibilidad» en la sección 4 |
 
 ## 2. Doctor
 
@@ -167,6 +168,33 @@ Lo que todavía no existe es el **envío a SUNAT**. Por eso el sistema dice «to
 
 **Qué debe definir la clínica.** Qué proveedor usará; si los servicios llevan IGV o están exonerados (algunos servicios de salud tienen tratamiento especial); y las series por sede (por ejemplo `B001` para San Isidro y `B002` para Surco).
 
+### Sillones y disponibilidad del doctor
+
+**Cómo funciona.** Cada sillón tiene un uso:
+
+| Uso | Qué significa | Ejemplo |
+|---|---|---|
+| Flexible | Lo usa el doctor que esté libre; cambia de doctor según el día | Sillón 1 y 2 de San Isidro |
+| Fijo de un doctor | Es el sillón habitual de ese doctor; se le propone siempre a él | Sillón 2 de Surco, Dra. Quispe |
+| De una especialidad | Está equipado para una especialidad | Sillón Kids, odontopediatría |
+
+Además, un sillón fijo o de especialidad puede ser **exclusivo** (nadie más lo usa) o **preferente** (otros pueden usarlo si está libre, con aviso). Un sillón también puede estar **fuera de servicio** con su motivo.
+
+**Reglas al agendar, al arrastrar en el calendario y al asignar desde la lista de espera.**
+1. El doctor atiende ese día, a esa hora y en esa sede (Configuración › Horarios por doctor). Si no tiene horario configurado, no se le limita.
+2. El doctor no tiene otra cita que se cruce (se usa la duración de cada cita).
+3. El sillón está en servicio, acepta a ese doctor o especialidad y está libre.
+4. No hay un bloqueo de agenda (almuerzo, ausencia, mantenimiento) en ese rango.
+
+El modal de agendado propone solo el sillón (el propio del doctor, luego el de su especialidad, luego uno flexible) y cambia de sede si el doctor a esa hora atiende en otra. Al arrastrar una cita a otra hora, si su sillón queda ocupado se busca otro libre.
+
+**Qué falta del backend.** El frontend ya aplica estas reglas, pero el servidor debe validarlas también, porque WhatsApp y otras integraciones crean citas sin pasar por la pantalla.
+- `GET /sillones?sedeId=`: devolver por sillón `id`, `sedeId`, `numero`, `nombre`, `uso` (`flexible`, `doctor` o `especialidad`), `medicoId`, `especialidadId`, `exclusivo`, `activo` y `nota`.
+- **Nuevos** `POST /sillones` y `PUT /sillones/:id` con esos mismos campos.
+- `GET /disponibilidad` sin `medicoId`: devolver el horario de todos los doctores, con `sedeId` por bloque (un doctor puede atender en una sede en la mañana y en otra en la tarde).
+- `POST /citas` y `PUT /citas/:id`: rechazar con un mensaje claro si el doctor no atiende, si tiene otra cita encima, si el sillón no lo acepta o está ocupado, o si hay un bloqueo.
+- `POST /bloqueos`: opcionalmente `medicoId` o `sillon`, para bloquear solo a un doctor o un sillón.
+
 ---
 
 ## 5. Lista de cambios de backend
@@ -186,3 +214,6 @@ Lo que todavía no existe es el **envío a SUNAT**. Por eso el sistema dice «to
 13. Pacientes: devolver `numeroHistoria` y el médico tratante (`medicoId`), para numerar los documentos y saber quién firma cuando imprime recepción.
 14. Facturación electrónica: integración con un proveedor OSE o PSE. En el pago o comprobante, devolver `tipoComprobante`, `sunatEstado` (`pendiente`, `aceptado`, `observado` o `rechazado`), `sunatMensaje`, `hash`, `qr`, `xmlUrl`, `cdrUrl` y `pdfUrl`. Se necesitan el resumen diario de boletas y la nota de crédito al anular.
 15. Imágenes clínicas: en `radiografias`, aceptar y devolver `piezas` (radiografía), `vista` y `momento` (foto clínica: antes, durante, después o control).
+16. Sillones: `GET /sillones` con `uso`, `medicoId`, `especialidadId`, `exclusivo`, `activo` y `nota`. Nuevos `POST /sillones` y `PUT /sillones/:id`.
+17. `GET /disponibilidad` sin filtro: el horario de todos los doctores, con `sedeId` en cada bloque.
+18. `POST /citas` y `PUT /citas/:id`: validar el horario del doctor, los cruces del doctor, el sillón (uso, servicio y ocupación) y los bloqueos, igual que el frontend.

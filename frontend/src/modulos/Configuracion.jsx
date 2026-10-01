@@ -1,9 +1,10 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
-import React, { useState, useEffect } from "react";
-import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid} from "lucide-react";
+import React, { useState, useEffect, useContext } from "react";
+import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
 import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
-import {Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda} from "../comun";
+import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
+import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda} from "../comun";
 
 const BANCOS_PE = [
   { id: "bcp", nombre: "BCP — Banco de Crédito", cuenta: [14] },
@@ -189,6 +190,14 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   const [edit, setEdit] = useState(null);   // { tipo, item }
   const [medHor, setMedHor] = useState("");  // médico seleccionado en Horarios
   const [disp, setDisp] = useState([]);
+  // Sillones y horario de doctores de la demostración: viven en los datos compartidos
+  // para que la agenda y el modal de agendado usen exactamente lo que se configura aquí.
+  const demoDb = useContext(DatosDemoCtx);
+  const [silRemoto, setSilRemoto] = useState([]);
+  const sillones = conectado ? silRemoto : (demoDb?.sillones || SILLONES_DEMO).map(normSillon);
+  const [citasHoySil, setCitasHoySil] = useState([]);
+  useEffect(() => { if (conectado && tab === "sillones") api.citas.listar(fmt(new Date())).then((r) => setCitasHoySil(r || [])).catch(() => setCitasHoySil([])); }, [tab]); // eslint-disable-line
+  const cargarSillones = () => { if (conectado) api.sillones.listar().then((r) => setSilRemoto((r || []).map(normSillon))).catch(() => setSilRemoto([])); };
   const [promos, setPromos] = useState(() => (auth.token ? [] : [
     { id: "p1", titulo: "Blanqueamiento con 20% de descuento", descripcion: "Solo pacientes con limpieza reciente", descuento: "20%", activa: true, desde: "", hasta: "" },
     { id: "p2", titulo: "Evaluación de ortodoncia gratis", descripcion: "Incluye fotografías y plan de tratamiento", descuento: "Gratis", activa: true, desde: "", hasta: "" },
@@ -300,10 +309,13 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
     api.promociones.listar().then((r) => setPromos(r || [])).catch(() => {});
     cargarGoLive();
     cargarClinica();
+    cargarSillones();
   };
   useEffect(() => { cargar(); }, []); // eslint-disable-line
   const cargarDisp = (mid) => { if (conectado && mid) api.disponibilidad.listar(mid).then((r) => setDisp(r || [])).catch(() => setDisp([])); else setDisp([]); };
   useEffect(() => { cargarDisp(medHor); }, [medHor]); // eslint-disable-line
+  const dispDemo = demoDb?.dispMedicos || DISP_DEMO;
+  const dispVista = conectado ? disp : dispDemo.filter((d) => String(d.medicoId) === String(medHor)).map((d) => ({ ...d, sedeId: d.sede }));
   const espNombre = (id) => (esps.find((e) => e.id === id) || {}).nombre || "—";
 
   const guardar = () => {
@@ -314,6 +326,23 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
     // nombre vacío y quedaba una fila en blanco en el catálogo de la clínica.
     if (["sede", "servicio", "doctor"].includes(edit.tipo) && !String(it.nombre || "").trim()) {
       notify(edit.tipo === "sede" ? "Ponle un nombre a la sede." : edit.tipo === "servicio" ? "Ponle un nombre al servicio." : "Escribe el nombre del doctor.");
+      return;
+    }
+    if (edit.tipo === "sillon") {
+      const numero = Number(it.numero);
+      if (!String(it.nombre || "").trim()) { notify("Ponle un nombre al sillón."); return; }
+      if (!Number.isInteger(numero) || numero <= 0) { notify("El número del sillón debe ser 1 o mayor."); return; }
+      if (it.uso === "doctor" && !it.medicoId) { notify("Elige el doctor de este sillón."); return; }
+      if (it.uso === "especialidad" && !it.especialidadId) { notify("Elige la especialidad de este sillón."); return; }
+      if (sillones.some((x) => x.id !== it.id && String(x.sede) === String(it.sede) && x.numero === numero)) { notify(`Ya existe el sillón N.º ${numero} en esa sede.`); return; }
+      const num = (v) => (v === "" || v == null ? null : (conectado ? v : Number(v)));
+      const reg = { nombre: it.nombre.trim(), numero, sede: num(it.sede), uso: it.uso || "flexible", medicoId: it.uso === "doctor" ? num(it.medicoId) : null, especialidadId: it.uso === "especialidad" ? num(it.especialidadId) : null, exclusivo: it.uso !== "flexible" && !!it.exclusivo, activo: it.activo !== false, nota: it.activo === false ? (it.nota || "") : "" };
+      if (!conectado) {
+        demoDb?.setSillones((ss) => it.id ? ss.map((x) => (x.id === it.id ? { ...x, ...reg } : x)) : [...ss, { ...reg, id: `s${Date.now()}` }]);
+        notify("Sillón guardado."); setEdit(null); return;
+      }
+      const payload = { ...reg, sedeId: reg.sede }; delete payload.sede;
+      (it.id ? api.sillones.actualizar(it.id, payload) : api.sillones.crear(payload)).then(() => { notify("Sillón guardado."); setEdit(null); cargarSillones(); }).catch(err);
       return;
     }
     if (edit.tipo === "sede" && !auth.token) {
@@ -359,12 +388,19 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
   const delPromo = (id) => api.promociones.borrar(id).then(() => { notify("Promoción eliminada."); cargar(); }).catch(() => notify("No se pudo eliminar."));
   const addHorario = (h) => {
     if (!medHor) { notify("Elige un doctor primero."); return; }
+    if (h.horaFin <= h.horaInicio) { notify("La hora de fin debe ser mayor que la de inicio."); return; }
+    if (!conectado) {
+      const choca = dispDemo.some((d) => String(d.medicoId) === String(medHor) && Number(d.diaSemana) === Number(h.diaSemana) && d.horaInicio < h.horaFin && h.horaInicio < d.horaFin);
+      if (choca) { notify("Ese bloque se cruza con otro horario del mismo día."); return; }
+      demoDb?.setDispMedicos((ds) => [...ds, { id: `d${Date.now()}`, medicoId: Number(medHor), sede: h.sedeId ? Number(h.sedeId) : null, diaSemana: Number(h.diaSemana), horaInicio: h.horaInicio, horaFin: h.horaFin }]);
+      notify("Horario agregado."); return;
+    }
     api.disponibilidad.crear({ medicoId: medHor, sedeId: h.sedeId || null, diaSemana: h.diaSemana, horaInicio: h.horaInicio, horaFin: h.horaFin, activo: true })
       .then(() => { notify("Horario agregado."); cargarDisp(medHor); }).catch(() => notify("No se pudo agregar (revisa las horas)."));
   };
-  const delHorario = (id) => api.disponibilidad.borrar(id).then(() => { notify("Horario eliminado."); cargarDisp(medHor); }).catch(() => {});
+  const delHorario = (id) => !conectado ? (demoDb?.setDispMedicos((ds) => ds.filter((d) => d.id !== id)), notify("Horario eliminado.")) : api.disponibilidad.borrar(id).then(() => { notify("Horario eliminado."); cargarDisp(medHor); }).catch(() => {});
 
-  const TABS = [["puesta", "Puesta en marcha", Navigation, "Pasos para operar", "#0E9199"], ["empresa", "Datos de la clínica", Briefcase, "RUC, logo y facturación", "#28527A"], ["atencion", "Horario de atención", Clock, "Días y horas de la clínica", "#2F6FDE"], ["servicios", "Servicios y precios", ClipboardList, "Catálogo y tarifas", "#16A36A"], ["doctores", "Doctores", Stethoscope, "Equipo clínico", "#6D4FD1"], ["sedes", "Sedes", Building2, "Locales de atención", "#D97706"], ["horarios", "Horarios por doctor", Clock, "Disponibilidad de agenda", "#0E9EB0"], ["promos", "Promociones", Megaphone, "Ofertas del agente IA", "#E0694F"]];
+  const TABS = [["puesta", "Puesta en marcha", Navigation, "Pasos para operar", "#0E9199"], ["empresa", "Datos de la clínica", Briefcase, "RUC, logo y facturación", "#28527A"], ["atencion", "Horario de atención", Clock, "Días y horas de la clínica", "#2F6FDE"], ["servicios", "Servicios y precios", ClipboardList, "Catálogo y tarifas", "#16A36A"], ["doctores", "Doctores", Stethoscope, "Equipo clínico", "#6D4FD1"], ["sedes", "Sedes", Building2, "Locales de atención", "#D97706"], ["sillones", "Sillones", Armchair, "Uso y doctores", "#0B6C78"], ["horarios", "Horarios por doctor", Clock, "Disponibilidad de agenda", "#0E9EB0"], ["promos", "Promociones", Megaphone, "Ofertas del agente IA", "#E0694F"]];
   const cab = (titulo, sub, accion) => (
     <div className="dc-cfg__cab"><div><h3>{titulo}</h3><span>{sub}</span></div>{accion}</div>
   );
@@ -712,12 +748,51 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
         </section>
       )}
 
+      {tab === "sillones" && (() => {
+        const hoyISO = fmt(new Date());
+        const citasHoy = (conectado ? citasHoySil : (demoDb?.citas || [])).filter((c) => c.fecha === hoyISO && !["cancelada", "no_show", "reprogramada"].includes(c.estado));
+        const nomMed = (id) => (meds.find((m) => String(m.id) === String(id)) || {}).nombre || "";
+        const ctxNom = { medicos: meds, especialidades: esps };
+        const grupos = (sedes.length ? sedes : [{ id: null, nombre: "Clínica" }]).map((sd) => ({ sd, lista: sillonesDeSede(sillones, sd.id) }));
+        const ICU = { flexible: Repeat, doctor: Stethoscope, especialidad: Tag };
+        return (
+          <section className="dc-cfg__panel">
+            {cab("Sillones", "Cada sillón puede ser flexible, el habitual de un doctor o de una especialidad. La agenda propone y valida el sillón con estas reglas.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sillon", item: { uso: "flexible", activo: true, exclusivo: false, sede: sedes[0]?.id ?? null } })}><Plus size={14} strokeWidth={2.2} /> Nuevo sillón</button>)}
+            <div className="dc-sil__reglas">
+              {USOS_SILLON.map((u) => { const I = ICU[u.v]; return <div key={u.v} className={`is-${u.v}`}><I size={15} strokeWidth={2} /><div><b>{u.l}</b><small>{u.d}</small></div></div>; })}
+              <div className="is-lock"><Lock size={15} strokeWidth={2} /><div><b>Exclusivo o preferente</b><small>Exclusivo: nadie más lo usa. Preferente: otros pueden usarlo si está libre, con aviso.</small></div></div>
+            </div>
+            {grupos.map(({ sd, lista }) => (
+              <div key={String(sd.id)} className="dc-sil__sede">
+                <h4><Building2 size={14} strokeWidth={2} /> {sd.nombre}<span>{lista.length} {lista.length === 1 ? "sillón" : "sillones"}</span></h4>
+                {lista.length === 0 ? <p className="dc-cfg__nada">Sin sillones en esta sede.</p> : (
+                  <div className="dc-sil__grid">
+                    {lista.map((x) => { const et = etiquetaUso(x, ctxNom); const cs = citasHoy.filter((c) => String(c.sede ?? c.sedeId) === String(x.sede) && String(c.sillon) === String(x.numero)); const docsHoy = [...new Set(cs.map((c) => c.medico || nomMed(c.medicoId)).filter(Boolean))]; const I = ICU[x.uso] || Armchair; return (
+                      <article key={x.id} className={`dc-sil__card is-${et.tono}`}>
+                        <header>
+                          <span className="dc-sil__ico"><Armchair size={18} strokeWidth={2} /></span>
+                          <div><b>{x.nombre}</b><small>N.º {x.numero}</small></div>
+                          <button type="button" className="dc-row-action" aria-label={`Editar ${x.nombre}`} title="Editar" onClick={() => setEdit({ tipo: "sillon", item: { ...x } })}><Pencil size={14} strokeWidth={2} /></button>
+                        </header>
+                        <div className="dc-sil__uso"><I size={13} strokeWidth={2.2} /> {et.txt}{x.activo && x.uso !== "flexible" && <em>{x.exclusivo ? "Exclusivo" : "Preferente"}</em>}</div>
+                        {!x.activo && x.nota && <p className="dc-sil__nota"><Wrench size={12} strokeWidth={2.2} /> {x.nota}</p>}
+                        <footer><Users size={12} strokeWidth={2.2} /> {cs.length ? <>Hoy: {cs.length} {cs.length === 1 ? "cita" : "citas"} · {docsHoy.join(", ")}</> : "Hoy sin citas"}</footer>
+                      </article>
+                    ); })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
+        );
+      })()}
+
       {tab === "horarios" && (() => {
         const nuevo = { diaSemana: 1, horaInicio: "09:00", horaFin: "13:00", sedeId: "" };
         return (
           <div style={{ ...card, padding: "18px 20px" }}>
             <h3 style={{ margin: "0 0 4px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Horarios de atención</h3>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 14 }}>Define la disponibilidad de cada doctor. El agente de WhatsApp solo ofrece estos horarios.</div>
+            <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginBottom: 14 }}>Define en qué días, horas y sede atiende cada doctor. La agenda no deja citarlo fuera de estos bloques y el agente de WhatsApp solo ofrece estos horarios.</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
               <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Doctor:</span>
               <Select width={240} value={medHor} onChange={setMedHor} placeholder="— Selecciona —"
@@ -725,11 +800,12 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
             </div>
             {medHor ? (<>
               <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-                {disp.length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Este doctor no tiene horarios configurados.</div>}
-                {[...disp].sort((a, b) => (a.diaSemana === 0 ? 7 : a.diaSemana) - (b.diaSemana === 0 ? 7 : b.diaSemana) || String(a.horaInicio).localeCompare(String(b.horaInicio))).map((d) => (
+                {dispVista.length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Este doctor no tiene horarios configurados: la agenda no le pone límite de horas.</div>}
+                {[...dispVista].sort((a, b) => (a.diaSemana === 0 ? 7 : a.diaSemana) - (b.diaSemana === 0 ? 7 : b.diaSemana) || String(a.horaInicio).localeCompare(String(b.horaInicio))).map((d) => (
                   <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 13px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
                     <span style={{ fontWeight: 500, color: NAVY, width: 44 }}>{(DIAS_SEM.find((x) => x.v === d.diaSemana) || {}).l || d.diaSemana}</span>
                     <span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{String(d.horaInicio).slice(0, 5)} – {String(d.horaFin).slice(0, 5)}</span>
+                    {d.sedeId != null && <span className="dc-pill">{(sedes.find((x) => String(x.id) === String(d.sedeId)) || {}).nombre || "Sede"}</span>}
                     <span style={{ flex: 1 }} />
                     <button onClick={() => delHorario(d.id)} style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-white)", color: RED, borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} strokeWidth={1.75} /> Quitar</button>
                   </div>
@@ -769,12 +845,12 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
       })()}
 
       </div>
-      {edit && (() => { const it = edit.item; const set = (k, v) => setEdit((e) => ({ ...e, item: { ...e.item, [k]: v } })); const T = { sede: "Sede", servicio: "Servicio", doctor: "Doctor", promo: "Promoción" }[edit.tipo];
+      {edit && (() => { const it = edit.item; const set = (k, v) => setEdit((e) => ({ ...e, item: { ...e.item, [k]: v } })); const T = { sede: "Sede", servicio: "Servicio", doctor: "Doctor", promo: "Promoción", sillon: "Sillón" }[edit.tipo];
         return (
           <Modal icon={<Settings size={20} strokeWidth={1.75} />} titulo={`${it.id ? "Editar" : "Nuevo"} ${T.toLowerCase()}`} onClose={() => setEdit(null)} maxW={460}
             footer={<><Btn small kind="ghost" onClick={() => setEdit(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> Guardar</Btn></>}>
             <div style={{ display: "grid", gap: 12 }}>
-              {edit.tipo !== "promo" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Nombre<input className="dc-premium-inp" value={it.nombre || ""} onChange={(e) => set("nombre", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder={edit.tipo === "servicio" ? "Ej. Blanqueamiento dental" : edit.tipo === "doctor" ? "Ej. Dra. Carla Mendoza" : "Ej. Sede San Isidro"} /></label>}
+              {edit.tipo !== "promo" && edit.tipo !== "sillon" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Nombre<input className="dc-premium-inp" value={it.nombre || ""} onChange={(e) => set("nombre", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder={edit.tipo === "servicio" ? "Ej. Blanqueamiento dental" : edit.tipo === "doctor" ? "Ej. Dra. Carla Mendoza" : "Ej. Sede San Isidro"} /></label>}
               {edit.tipo === "servicio" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Precio (S/)<input className="dc-premium-inp" type="number" value={it.precioBase ?? ""} onChange={(e) => set("precioBase", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="80" /></label>}
               {edit.tipo === "promo" && <>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Título<input className="dc-premium-inp" value={it.titulo || ""} onChange={(e) => set("titulo", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. Blanqueamiento con 20% dto" /></label>
@@ -793,8 +869,26 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Usuario vinculado<input className="dc-premium-inp" value={it.usuarioId || it.usuario || ""} readOnly style={{ ...inp, marginTop: 5, background: "var(--dc-bg)" }} placeholder="Sin usuario vinculado" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Comisión %<input className="dc-premium-inp" type="number" value={it.porcentajeComision ?? ""} onChange={(e) => set("porcentajeComision", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 40" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Meta mensual (S/)<input className="dc-premium-inp" type="number" value={it.metaMensual ?? ""} onChange={(e) => set("metaMensual", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 8000 – vacío = sin meta" /></label>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Sillón preferido<input className="dc-premium-inp" type="number" min="1" max="8" value={it.sillonPreferido ?? ""} onChange={(e) => set("sillonPreferido", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Sin preferencia" /></label>
+                <p style={{ margin: 0, fontSize: 12, color: "var(--dc-ink-500)" }}>Su sillón fijo, si lo tiene, se define en Configuración › Sillones.</p>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--dc-ink-700)", cursor: "pointer" }}><input type="checkbox" checked={it.activo !== false} onChange={(e) => set("activo", e.target.checked)} /> Activo (visible en agenda y WhatsApp)</label>
+              </>}
+              {edit.tipo === "sillon" && <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 110px", gap: 10 }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Nombre<input className="dc-premium-inp" value={it.nombre || ""} onChange={(e) => set("nombre", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. Sillón Kids" /></label>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>N.º<input className="dc-premium-inp" type="number" min="1" value={it.numero ?? ""} onChange={(e) => set("numero", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="1" /></label>
+                </div>
+                {sedes.length > 0 && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Sede<Select value={it.sede ?? ""} onChange={(v) => set("sede", v)} placeholder="— Selecciona —" options={sedes.map((x) => ({ value: x.id, label: x.nombre }))} /></label>}
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Uso del sillón</span>
+                  <div className="dc-sil__usos" role="radiogroup" aria-label="Uso del sillón">
+                    {USOS_SILLON.map((u) => <button key={u.v} type="button" role="radio" aria-checked={it.uso === u.v} className={it.uso === u.v ? "is-on" : ""} onClick={() => set("uso", u.v)}><b>{u.l}</b><small>{u.d}</small></button>)}
+                  </div>
+                </div>
+                {it.uso === "doctor" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Doctor<Select value={it.medicoId ?? ""} onChange={(v) => set("medicoId", v)} placeholder="— Selecciona —" options={meds.filter((m) => m.activo !== false).map((m) => ({ value: m.id, label: m.nombre }))} /></label>}
+                {it.uso === "especialidad" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Especialidad<Select value={it.especialidadId ?? ""} onChange={(v) => set("especialidadId", v)} placeholder="— Selecciona —" options={esps.map((e) => ({ value: e.id, label: e.nombre }))} /></label>}
+                {it.uso !== "flexible" && <label className="dc-sil__chk"><input type="checkbox" checked={!!it.exclusivo} onChange={(e) => set("exclusivo", e.target.checked)} /><span><b>Exclusivo</b><small>{it.exclusivo ? (it.uso === "doctor" ? "Solo ese doctor puede usarlo." : "Solo citas de esa especialidad.") : "Preferente: otros pueden usarlo si está libre, con aviso."}</small></span></label>}
+                <label className="dc-sil__chk"><input type="checkbox" checked={it.activo !== false} onChange={(e) => set("activo", e.target.checked)} /><span><b>En servicio</b><small>{it.activo !== false ? "Disponible para agendar." : "No se puede agendar en este sillón."}</small></span></label>
+                {it.activo === false && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Motivo<input className="dc-premium-inp" value={it.nota || ""} onChange={(e) => set("nota", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. mantenimiento de la lámpara" /></label>}
               </>}
               {edit.tipo === "sede" && <>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Dirección<input className="dc-premium-inp" value={it.direccion || ""} onChange={(e) => set("direccion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Av. Conquistadores 145, San Isidro" /></label>

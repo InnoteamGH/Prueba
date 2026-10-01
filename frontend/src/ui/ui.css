@@ -4418,3 +4418,90 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
   .dc-rx-sede .dc-sel { flex: 1; min-width: 0; width: auto !important; }
 }
 .dc-modal .dc-modal__body .dc-im__herr label, .dc-modal .dc-modal__body .dc-im__herr label span { color: #CFE3E6 !important; }
+
+/* ── Configuración › Sillones ─────────────────────────────────────────── */
+.dc-sil__reglas{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:4px 0 18px}
+.dc-sil__reglas>div{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-radius:var(--dc-r-md);background:var(--dc-bg-soft,#F6F9FA);border:1px solid var(--dc-line)}
+.dc-sil__reglas svg{flex-shrink:0;margin-top:2px;color:var(--c,#0E9199)}
+.dc-sil__reglas b{display:block;font-size:13px;font-weight:600;color:var(--dc-ink-900,#12313A)}
+.dc-sil__reglas small{display:block;font-size:12px;color:var(--dc-ink-500);line-height:1.4;margin-top:2px}
+.dc-sil__reglas .is-flexible{--c:#0E9199}.dc-sil__reglas .is-doctor{--c:#6D4FD1}.dc-sil__reglas .is-especialidad{--c:#D97706}.dc-sil__reglas .is-lock{--c:#28527A}
+.dc-sil__sede{margin-top:6px}
+.dc-sil__sede+.dc-sil__sede{margin-top:20px}
+.dc-sil__sede h4{display:flex;align-items:center;gap:7px;margin:0 0 10px;font-size:14px;font-weight:600;color:var(--dc-ink-900,#12313A)}
+.dc-sil__sede h4 span{margin-left:auto;font-size:12px;font-weight:500;color:var(--dc-ink-400)}
+.dc-sil__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.dc-sil__card{--c:#0E9199;position:relative;display:flex;flex-direction:column;gap:9px;padding:14px;border-radius:var(--dc-r-lg);background:#fff;border:1px solid var(--dc-line);box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 20px -16px rgba(16,24,40,.25);overflow:hidden}
+.dc-sil__card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--c)}
+.dc-sil__card.is-doc{--c:#6D4FD1}.dc-sil__card.is-esp{--c:#D97706}.dc-sil__card.is-off{--c:#98A2B3;background:repeating-linear-gradient(45deg,#fff,#fff 8px,#F7F8FA 8px,#F7F8FA 16px)}
+.dc-sil__card header{display:flex;align-items:center;gap:10px}
+.dc-sil__card header>div{flex:1;min-width:0}
+.dc-sil__card header b{display:block;font-size:14px;font-weight:600;color:var(--dc-ink-900,#12313A)}
+.dc-sil__card header small{font-size:12px;color:var(--dc-ink-400)}
+.dc-sil__ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 12%,#fff)}
+.dc-sil__uso{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;font-weight:500;color:var(--c)}
+.dc-sil__uso em{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 12%,#fff)}
+.dc-sil__nota{display:flex;align-items:center;gap:6px;margin:0;font-size:12px;color:var(--dc-ink-500)}
+.dc-sil__card footer{display:flex;align-items:center;gap:6px;padding-top:9px;border-top:1px dashed var(--dc-line);font-size:12px;color:var(--dc-ink-500)}
+.dc-sil__usos{display:grid;gap:6px;margin-top:6px}
+.dc-sil__usos button{display:block;text-align:left;padding:9px 12px;border-radius:var(--dc-r-md);border:1.5px solid var(--dc-line);background:#fff;cursor:pointer;transition:border-color .15s,background .15s}
+.dc-sil__usos button b{display:block;font-size:13px;font-weight:600;color:var(--dc-ink-900,#12313A)}
+.dc-sil__usos button small{display:block;font-size:12px;color:var(--dc-ink-500)}
+.dc-sil__usos button.is-on{border-color:#0E9199;background:color-mix(in srgb,#0E9199 7%,#fff);box-shadow:0 0 0 3px color-mix(in srgb,#0E9199 14%,transparent)}
+.dc-sil__chk{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--dc-r-md);border:1px solid var(--dc-line);background:#fff;cursor:pointer}
+.dc-sil__chk input{margin-top:3px;accent-color:#0E9199}
+.dc-sil__chk b{display:block;font-size:13px;font-weight:600;color:var(--dc-ink-900,#12313A)}
+.dc-sil__chk small{display:block;font-size:12px;color:var(--dc-ink-500)}
+
+/* ── Agendar cita: horario del doctor, sillones y validación ─────────── */
+.dc-agm__turno{display:flex;align-items:flex-start;gap:7px;margin-top:-6px;padding:8px 10px;border-radius:var(--dc-r-md);background:color-mix(in srgb,#0E9199 7%,#fff);border:1px solid color-mix(in srgb,#0E9199 22%,#fff);font-size:12px;color:var(--dc-ink-700);line-height:1.45}
+.dc-agm__turno svg{flex-shrink:0;margin-top:2px;color:#0E9199}
+.dc-agm__turno b{font-weight:600;color:#0B6C78}
+.dc-agm__turno.is-no{background:var(--dc-warn-soft,#FFF7E6);border-color:var(--dc-amber-soft,#F8DDA8)}
+.dc-agm__turno.is-no svg{color:var(--dc-warn-600,#C98A12)}
+.dc-agm__auto{font-style:normal;margin-left:8px;font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#0B6C78;background:color-mix(in srgb,#0E9199 12%,#fff);padding:2px 7px;border-radius:999px}
+.dc-agm__sils{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+.dc-agm__sils button{--c:#0E9199;display:flex;flex-direction:column;gap:3px;text-align:left;padding:9px 10px;border-radius:var(--dc-r-md);border:1.5px solid var(--dc-line);background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s;min-width:0}
+.dc-agm__sils button:hover:not(:disabled){border-color:color-mix(in srgb,var(--c) 55%,#fff)}
+.dc-agm__silh{display:flex;align-items:center;gap:6px;color:var(--c)}
+.dc-agm__silh b{font-size:13px;font-weight:600;color:var(--dc-ink-900,#12313A);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-agm__silh svg:last-child:not(:first-child){margin-left:auto;color:#D99A0E;fill:#F5C451}
+.dc-agm__sils small{font-size:11.5px;color:var(--dc-ink-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-agm__sils .is-propio{--c:#6D4FD1}
+.dc-agm__sils .is-ajeno{--c:#C98A12}
+.dc-agm__sils .is-on{border-color:var(--c);background:color-mix(in srgb,var(--c) 8%,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 15%,transparent)}
+.dc-agm__sils button:disabled{cursor:not-allowed;background:repeating-linear-gradient(45deg,#fff,#fff 6px,#F5F6F8 6px,#F5F6F8 12px);opacity:.75}
+.dc-agm__sils .is-ocupado small{color:var(--dc-danger-700,#B42318)}
+.dc-agm__val{display:grid;gap:6px}
+.dc-agm__val p{display:flex;align-items:flex-start;gap:7px;margin:0;padding:8px 10px;border-radius:var(--dc-r-md);font-size:12.5px;line-height:1.45}
+.dc-agm__val svg{flex-shrink:0;margin-top:2px}
+.dc-agm__val .is-err{background:#FEF3F2;color:#B42318;border:1px solid #FECDCA}
+.dc-agm__val .is-avi{background:#FFF8EB;color:#93590B;border:1px solid #F8DDA8}
+
+/* ── Calendario de la agenda v2 ───────────────────────────────────────── */
+.dc-cal__res{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:9px 18px;border-bottom:1px solid var(--dc-bg);background:linear-gradient(180deg,#FBFDFD,#fff);font-size:12.5px;color:var(--dc-ink-500)}
+.dc-cal__res>span{display:inline-flex;align-items:center;gap:6px}
+.dc-cal__res b{color:var(--dc-ink-900,#12313A);font-weight:600;font-variant-numeric:tabular-nums}
+.dc-cal__res i{width:8px;height:8px;border-radius:50%;background:#8FA3A7}
+.dc-cal__res .is-ok i{background:#16A36A}.dc-cal__res .is-pend i{background:#C98A12}
+.dc-cal__res .is-ocup{margin-left:auto}
+.dc-cal__res em{display:inline-block;width:90px;height:6px;border-radius:999px;background:#E8EEF0;overflow:hidden}
+.dc-cal__res em u{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0E9199,#0B6C78)}
+.dc-cal__cel{transition:background .12s}
+.dc-cal__cel.is-libre:hover{background:color-mix(in srgb,#0E9199 6%,#fff)}
+.dc-cal__cel.is-libre:hover::after{content:"+ Agendar";position:absolute;inset:auto 6px 5px auto;font-size:11px;font-weight:600;color:#0B6C78;background:#fff;border:1px solid color-mix(in srgb,#0E9199 30%,#fff);padding:1px 7px;border-radius:999px;pointer-events:none}
+.dc-cal__cel.is-libre:has(>div)::after{display:none}
+.dc-cal__cel.is-noat{background:repeating-linear-gradient(135deg,#F7F9FA,#F7F9FA 5px,#EEF2F4 5px,#EEF2F4 10px)}
+.dc-cal__cel.is-fs{background:repeating-linear-gradient(45deg,#FAFAFB,#FAFAFB 6px,#F1F2F5 6px,#F1F2F5 12px)}
+.dc-cal__cel.is-drop-no{cursor:no-drop}
+.dc-cal__now{position:absolute;left:0;right:0;height:0;border-top:2px solid #E0694F;z-index:3;pointer-events:none}
+.dc-cal__now::before{content:"";position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#E0694F}
+.dc-cal__stag{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.02em;color:#0B6C78;background:color-mix(in srgb,#0E9199 13%,#fff);border-radius:5px;padding:0 4px;line-height:15px}
+.dc-cal__uso{display:inline-block;max-width:100%;margin-top:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0;color:#0B6C78;background:color-mix(in srgb,#0E9199 12%,#fff)}
+.dc-cal__uso.is-doc{color:#5B3FC0;background:color-mix(in srgb,#6D4FD1 12%,#fff)}
+.dc-cal__uso.is-esp{color:#9A5B06;background:color-mix(in srgb,#D97706 13%,#fff)}
+.dc-cal__uso.is-off{color:#667085;background:#F2F4F7}
+.dc-cal__silsub{display:block;margin-top:3px;font-size:11px;color:var(--dc-ink-400);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0;font-weight:500}
+.dc-cal__silsub.is-no{color:#B54708}
+@media (max-width:640px){.dc-cal__res{padding:8px 12px;gap:6px 12px}.dc-cal__res .is-ocup{margin-left:0}}
+.dc-cal__cel.is-hoy{background:color-mix(in srgb,#0E9199 3.5%,#fff)}

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
-import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
+import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
+import {Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
@@ -14,6 +14,8 @@ const WhatsAppInbox = React.lazy(() => import("./modulos/WhatsAppInbox"));
 const PanelGerencial = React.lazy(() => import("./modulos/PanelGerencial"));
 const Metas = React.lazy(() => import("./modulos/Metas"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
+import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
+import { useReglasAgenda } from "./compartido/useReglasAgenda";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
@@ -746,7 +748,7 @@ const sillonDe = (c) => {
   return null;
 };
 
-function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango }) {
+function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null }) {
   const [modo, setModo] = useState("semana");   // mes | semana | dia | sillon
   const [dlOpen, setDlOpen] = useState(false);   // menú de descarga del rango visible
   const [off, setOff] = useState(0);             // semana
@@ -757,14 +759,18 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const [sedeF, setSedeF] = useState("all");     // filtro por sede
   const [drag, setDrag] = useState(null);        // cita arrastrada
   const [over, setOver] = useState(null);        // celda destino resaltada
-  const [sillonesCat, setSillonesCat] = useState(SILLONES_CAL.map((n) => ({ numero: n, nombre: `Sillón ${n}` })));
-  useEffect(() => {
-    if (!auth.token) return;
-    api.sillones.listar().then((rows) => {
-      const list = (rows || []).map((r) => ({ numero: Number(r.numero) || 0, nombre: r.nombre || `Sillón ${r.numero}` })).filter((s) => s.numero > 0);
-      if (list.length) setSillonesCat(list.sort((a, b) => a.numero - b.numero));
-    }).catch(() => {});
-  }, []);
+  const [overOk, setOverOk] = useState(null);    // ¿se puede soltar en la celda resaltada? { ok, motivo }
+  // Sillones con su uso (flexible / de un doctor / de una especialidad), por sede.
+  const silTodos = (reglas && reglas.sillones && reglas.sillones.length) ? reglas.sillones : SILLONES_CAL.map((n) => ({ id: `x${n}`, sede: null, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true }));
+  const sedesSil = [...new Set(silTodos.map((x) => String(x.sede)))];
+  const nombreSedeCal = (id) => (citas.find((c) => String(c.sede) === String(id) && c.sedeNombre && c.sedeNombre !== "—") || {}).sedeNombre || (id !== "null" && nombreSede(Number(id))) || "Clínica";
+  const [sedeSil, setSedeSil] = useState(() => (sedeInicial != null && sedesSil.includes(String(sedeInicial)) ? String(sedeInicial) : sedesSil[0]));
+  // Si se cambia la sede activa (menú lateral) el calendario por sillón la sigue.
+  useEffect(() => { if (sedeInicial != null && sedesSil.includes(String(sedeInicial))) setSedeSil(String(sedeInicial)); }, [sedeInicial]); // eslint-disable-line
+  const sedeSilEf = sedesSil.includes(String(sedeSil)) ? String(sedeSil) : sedesSil[0];
+  const sillonesCat = silTodos.filter((x) => String(x.sede) === sedeSilEf).sort((a, b) => a.numero - b.numero);
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => { const t = setInterval(() => setAhora(new Date()), 60000); return () => clearInterval(t); }, []);
 
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const hoyD = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
@@ -818,6 +824,19 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   // Fin de la cita según su duración (para mostrar el rango horario en el bloque).
   const finCita = (c) => { if (!c.hora) return ""; const [h, m] = c.hora.split(":").map(Number); const dur = Number(c.duracionMin) || 30; const t = h * 60 + m + dur; return `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
 
+  // Horario del doctor (Configuración › Horarios por doctor): sombrea las horas en que no atiende.
+  const turnosDoc = (medKey, dISO) => (reglas && reglas.disp ? turnosDelDia(reglas.disp, medKey, dISO) : []);
+  const conHorario = (medKey) => !!(reglas && reglas.disp && reglas.disp.some((d) => String(d.medicoId) === String(medKey)));
+  const noAtiende = (medKey, dISO, h) => {
+    if (!conHorario(medKey)) return false;
+    const ts = turnosDoc(medKey, dISO);
+    return !ts.some((t) => toMin(String(t.horaInicio).slice(0, 5)) < (h + 1) * 60 && h * 60 < toMin(String(t.horaFin).slice(0, 5)));
+  };
+  const txtTurnos = (ts) => ts.map((t) => `${String(t.horaInicio).slice(0, 5)}–${String(t.horaFin).slice(0, 5)}`).join(" · ");
+  // Línea de "ahora": en la fila de la hora actual de la columna de hoy.
+  const nowH = ahora.getHours(), nowPct = Math.round(ahora.getMinutes() / 60 * 100);
+  const ACTIVA = (c) => !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(c.estado);
+
   // Mes
   const mesRef = new Date(hoyD.getFullYear(), hoyD.getMonth() + mesOff, 1);
   const mesGrid = (() => { const startDow = (mesRef.getDay() + 6) % 7; const start = new Date(mesRef); start.setDate(1 - startDow); return [...Array(42)].map((_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; }); })();
@@ -836,16 +855,16 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const docsVis = docs.filter((d) => !oculto.has(d.key));
   const columnas = modo === "sillon"
     ? [
-        ...sillonesCat.map((s) => ({ key: "s" + s.numero, label: s.nombre || `Sillón ${s.numero}`, sub: null, on: false, sil: s.numero, dISO: iso(diaSel), date: diaSel })),
-        { key: "sin", label: "Sin asignar", sub: null, on: false, sil: null, dISO: iso(diaSel), date: diaSel },
+        ...sillonesCat.map((s) => ({ key: "s" + s.numero, label: s.nombre || `Sillón ${s.numero}`, sub: null, on: false, sil: s.numero, silObj: s, dISO: iso(diaSel), date: diaSel })),
+        ...(citasDe(iso(diaSel)).some((c) => String(c.sede) === sedeSilEf && sillonDe(c) == null) ? [{ key: "sin", label: "Sin sillón", sub: null, on: false, sil: null, dISO: iso(diaSel), date: diaSel }] : []),
       ]
     : modo === "doctores"
     ? (docsVis.length ? docsVis : [{ key: "sin", nombre: "Sin asignar" }]).map((d) => ({ key: "d" + d.key, label: d.nombre, sub: null, on: false, medKey: d.key, dISO: iso(diaSel), date: diaSel }))
     : (modo === "dia" ? [diaSel] : semana).map((d) => ({ key: iso(d), label: NOM[(d.getDay() + 6) % 7], sub: d.getDate(), on: iso(d) === hoyISO, dISO: iso(d), date: d }));
-  const celda = (colDef, h) => modo === "sillon" ? enCelda(colDef.dISO, h).filter((c) => sillonDe(c) === colDef.sil)
+  const celda = (colDef, h) => modo === "sillon" ? enCelda(colDef.dISO, h).filter((c) => sillonDe(c) === colDef.sil && (sedesSil.length < 2 || String(c.sede) === sedeSilEf))
     : modo === "doctores" ? enCelda(colDef.dISO, h).filter((c) => (c.medicoId || c.medico || "sin") === colDef.medKey)
     : enCelda(colDef.dISO, h);
-  const patchDe = (colDef, h) => modo === "sillon" ? { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, sillon: colDef.sil }
+  const patchDe = (colDef, h) => modo === "sillon" ? { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, sillon: colDef.sil, ...(sedesSil.length > 1 && sedeSilEf !== "null" ? { sede: colDef.silObj ? colDef.silObj.sede : undefined } : {}) }
     : modo === "doctores" ? { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, medicoId: colDef.medKey }
     : { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00` };
   const gcols = `52px repeat(${columnas.length},minmax(0,1fr))`;
@@ -890,7 +909,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
       onClick={() => onCita && onCita(c)} title={`${c.hora}–${finCita(c)} (${Number(c.duracionMin) || 30} min) – ${c.paciente} – ${c.medico || ""} – ${EST_LABEL[c.estado] || ""}${arrastrable ? " – arrastra para mover" : ""}`}
       style={{ textAlign: "left", border: `1px solid ${tint(col, 0.251)}`, borderLeft: `4px solid ${col}`, background: `linear-gradient(135deg, ${tint(col, 0.082)}, ${tint(col, 0.02)})`, backdropFilter: "blur(8px)", borderRadius: "var(--dc-r-md)", padding: "5px 8px", cursor: arrastrable ? "grab" : "pointer", minWidth: 0, opacity: cancel ? 0.55 : 1, minHeight: alto, boxShadow: `0 4px 12px ${tint(col, 0.082)}, inset 0 2px 4px rgba(255,255,255,0.6)`, transition: "all .15s" }}
       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 6px 16px ${tint(col, 0.145)}, inset 0 2px 4px rgba(255,255,255,0.8)`; if (arrastrable) e.currentTarget.style.transform = "translateY(-1px) scale(1.01)"; }} onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 4px 12px ${tint(col, 0.082)}, inset 0 2px 4px rgba(255,255,255,0.6)`; if (arrastrable) e.currentTarget.style.transform = "none"; }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: cancel ? "line-through" : "none", display: "flex", alignItems: "center", gap: 3 }}>{c.confirmadoWa && <CheckCheck size={11} strokeWidth={1.75} color="var(--dc-ok-700)" style={{ flexShrink: 0 }} />}{c.agendadoPorIa && !c.confirmadoWa && <MessageSquare size={10} strokeWidth={1.75} color="var(--dc-ok-700)" style={{ flexShrink: 0 }} />}<span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{horaLbl} {c.paciente}</span></div>
+      <div style={{ fontSize: 12, fontWeight: 500, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: cancel ? "line-through" : "none", display: "flex", alignItems: "center", gap: 3 }}>{c.confirmadoWa && <CheckCheck size={11} strokeWidth={1.75} color="var(--dc-ok-700)" style={{ flexShrink: 0 }} />}{c.agendadoPorIa && !c.confirmadoWa && <MessageSquare size={10} strokeWidth={1.75} color="var(--dc-ok-700)" style={{ flexShrink: 0 }} />}<span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, minWidth: 0 }}>{horaLbl} {c.paciente}</span>{modo !== "sillon" && sillonDe(c) != null && <span className="dc-cal__stag" title={`Sillón ${sillonDe(c)}`}>S{sillonDe(c)}</span>}</div>
       <div style={{ fontSize: 12, color: col, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: "var(--dc-r-full)", background: col, flexShrink: 0 }} />{c.medico || c.motivo || ""}</div>
     </div>
   ); };
@@ -908,10 +927,14 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           <div style={{ fontWeight: 600, color: INK, fontSize: 16, fontFamily: DISPLAY_FONT, textTransform: "capitalize", letterSpacing: "-.01em" }}>{titulo}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {modo === "sillon" && sedesSil.length > 1 && (
+            <Select small width={170} ariaLabel="Sede de los sillones" value={sedeSilEf} onChange={(v) => setSedeSil(String(v))}
+                    options={sedesSil.map((id) => ({ value: id, label: nombreSedeCal(id) }))} />
+          )}
           <Select small width={172} ariaLabel="Filtrar por estado" value={estadoF} onChange={setEstadoF}
                   options={[{ value: "all", label: "Todos los estados" },
                             ...Object.entries(EST_LABEL).map(([k, l]) => ({ value: k, label: l }))]} />
-          {sedesCal.length > 1 && (
+          {sedesCal.length > 1 && modo !== "sillon" && (
             <Select small width={158} ariaLabel="Filtrar por sede" value={sedeF} onChange={setSedeF}
                     options={[{ value: "all", label: "Todas las sedes" },
                               ...sedesCal.map((s) => ({ value: s, label: s }))]} />
@@ -948,6 +971,30 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
         </div>
       )}
 
+      {(() => {
+        const porSede = modo === "sillon" && sedesSil.length > 1;
+        const rc = rangoCitas.filter((c) => ACTIVA(c) && (!porSede || String(c.sede) === sedeSilEf));
+        const conf = rc.filter((c) => c.estado === "confirmada" || c.estado === "atendida" || c.estado === "en_atencion").length;
+        const pend = rc.filter((c) => c.estado === "pendiente").length;
+        const diaISO = iso(diaSel);
+        const delDia = citas.filter((c) => c.fecha === diaISO && ACTIVA(c) && visible(c));
+        // Ocupación del día: minutos agendados en los sillones de la sede sobre las horas que abre.
+        const jd = estadoDiaCal(diaSel);
+        const horasAbierto = jd.cerrado ? 0 : Math.max(0, (jd.cierra ?? 20) - (jd.abre ?? 8));
+        const sils = (porSede ? sillonesCat : silTodos).filter((x) => x.activo !== false);
+        const minAg = delDia.filter((c) => !porSede || String(c.sede) === sedeSilEf).reduce((a, c) => a + (Number(c.duracionMin) || 30), 0);
+        const ocup = horasAbierto && sils.length ? Math.min(100, Math.round(minAg / (horasAbierto * 60 * sils.length) * 100)) : null;
+        return (
+          <div className="dc-cal__res">
+            <span><b>{rc.length}</b> {rc.length === 1 ? "cita" : "citas"} {modo === "mes" ? "en el mes" : (modo === "semana" || modo === "tabla") ? "en la semana" : "en el día"}</span>
+            <span className="is-ok"><i />{conf} confirmadas</span>
+            <span className="is-pend"><i />{pend} por confirmar</span>
+            {(modo === "dia" || modo === "sillon" || modo === "doctores") && ocup != null && <span className="is-ocup" title="Minutos agendados sobre la capacidad de los sillones en el horario de atención">
+              Ocupación de sillones{porSede ? ` · ${nombreSedeCal(sedeSilEf).replace(/^Sede\s+/, "")}` : ""} <em><u style={{ width: `${ocup}%` }} /></em> <b>{ocup}%</b>
+            </span>}
+          </div>
+        );
+      })()}
       {modo === "mes" ? (
         <div style={{ padding: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6, marginBottom: 6 }}>
@@ -1014,19 +1061,32 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                   <div style={{ fontSize: 12, color: col.on ? DS.c.primary : "var(--dc-ink-500)", fontWeight: 500, textTransform: "uppercase", letterSpacing: ".04em" }}>{col.label}</div>
                   {col.sub != null && <div style={{ fontSize: 16, fontWeight: 500, color: col.on ? "#fff" : NAVY, fontFamily: DISPLAY_FONT, width: 30, height: 30, borderRadius: "var(--dc-r-full)", margin: "3px auto 0", display: "grid", placeItems: "center", background: col.on ? DS.c.primary : "transparent", boxShadow: col.on ? `0 4px 10px -2px ${tint(DS.c.primary, 0.502)}` : "none" }}>{col.sub}</div>}
                   {cerrado && <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".04em", marginTop: 1 }}>Cerrado</div>}
+                  {modo === "sillon" && col.silObj && (() => { const et = etiquetaUso(col.silObj, reglas || {}); const n = citasDe(col.dISO).filter((c) => ACTIVA(c) && sillonDe(c) === col.sil && (sedesSil.length < 2 || String(c.sede) === sedeSilEf)); const docsN = [...new Set(n.map((c) => (c.medico || "").replace(/^Dra?\.\s*/, "").split(" ")[0]).filter(Boolean))]; return (<>
+                    <span className={`dc-cal__uso is-${et.tono}`} title={col.silObj.exclusivo ? "Exclusivo" : col.silObj.uso !== "flexible" ? "Preferente: otros pueden usarlo si está libre" : "Lo usa el doctor que esté libre"}>{et.txt}</span>
+                    <small className="dc-cal__silsub">{n.length ? `${n.length} ${n.length === 1 ? "cita" : "citas"}${docsN.length ? " · " + docsN.join(", ") : ""}` : "Libre todo el día"}</small>
+                  </>); })()}
+                  {modo === "doctores" && col.medKey !== "sin" && conHorario(col.medKey) && (() => { const ts = turnosDoc(col.medKey, col.dISO); return <small className={`dc-cal__silsub${ts.length ? "" : " is-no"}`}>{ts.length ? txtTurnos(ts) : "No atiende hoy"}</small>; })()}
                 </div>
               ); })}
             </div>
             {HORAS.map((h) => (
               <div key={h} style={{ display: "grid", gridTemplateColumns: gcols, borderBottom: "1px solid rgba(15,23,42,0.04)", minHeight: modo === "dia" || modo === "sillon" ? 58 : 52 }}>
                 <div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, padding: "6px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{String(h).padStart(2, "0")}:00</div>
-                {columnas.map((col, i) => { const cs = celda(col, h); const overKey = col.key + "-" + h; const isOver = over === overKey; const cerr = fueraHorario(col.date, h); const blk = bloqueoEnCelda(col.date, h); const libre = cs.length === 0 && !blk && !cerr && !!onNuevo; return (
-                  <div key={i} title={blk ? `Bloqueado: ${blk.motivo || "no disponible"}` : cerr ? "Fuera del horario de atención" : (libre ? "Clic para agendar aquí" : undefined)}
+                {columnas.map((col, i) => { const cs = celda(col, h); const overKey = col.key + "-" + h; const isOver = over === overKey; const cerr = fueraHorario(col.date, h); const blk = bloqueoEnCelda(col.date, h);
+                  const fueraServ = modo === "sillon" && col.silObj && col.silObj.activo === false;
+                  const noAt = modo === "doctores" && col.medKey !== "sin" && !cerr && noAtiende(col.medKey, col.dISO, h);
+                  const libre = cs.length === 0 && !blk && !cerr && !fueraServ && !noAt && !!onNuevo;
+                  const esAhora = col.dISO === hoyISO && h === nowH;
+                  const malo = isOver && overOk && !overOk.ok;
+                  return (
+                  <div key={i} className={`dc-cal__cel${modo === "semana" && col.dISO === hoyISO ? " is-hoy" : ""}${libre ? " is-libre" : ""}${noAt ? " is-noat" : ""}${fueraServ ? " is-fs" : ""}${isOver ? (malo ? " is-drop-no" : " is-drop") : ""}`}
+                    title={malo ? overOk.motivo : blk ? `Bloqueado: ${blk.motivo || "no disponible"}` : cerr ? "Fuera del horario de atención" : fueraServ ? `${col.silObj.nombre} fuera de servicio` : noAt ? "El doctor no atiende a esta hora" : (libre ? "Clic para agendar aquí" : undefined)}
                     onClick={libre ? () => onNuevo(patchDe(col, h)) : undefined}
-                    onDragOver={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); if (over !== overKey) setOver(overKey); } } : undefined}
-                    onDragLeave={onReagendar ? () => { if (over === overKey) setOver(null); } : undefined}
-                    onDrop={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); onReagendar(drag.id, patchDe(col, h)); setDrag(null); setOver(null); } } : undefined}
-                    style={{ borderLeft: "1px solid rgba(15,23,42,0.04)", padding: 3, display: "flex", flexDirection: "column", gap: 3, cursor: libre ? "pointer" : "default", background: isOver ? (tint(DS.c.primary, 0.071)) : blk ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-fee) 6px,var(--dc-fee) 12px)" : (cerr ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-bg) 6px,var(--dc-bg) 12px)" : "transparent"), outline: isOver ? `2px dashed ${DS.c.primary}` : "none", outlineOffset: -2 }}>
+                    onDragOver={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); if (over !== overKey) { setOver(overKey); if (validar) { const r = validar(drag, patchDe(col, h)); setOverOk({ ok: r.errores.length === 0, motivo: r.errores[0] || "" }); } } } } : undefined}
+                    onDragLeave={onReagendar ? () => { if (over === overKey) { setOver(null); setOverOk(null); } } : undefined}
+                    onDrop={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); onReagendar(drag.id, patchDe(col, h)); setDrag(null); setOver(null); setOverOk(null); } } : undefined}
+                    style={{ borderLeft: "1px solid rgba(15,23,42,0.04)", padding: 3, display: "flex", flexDirection: "column", gap: 3, position: "relative", cursor: libre ? "pointer" : "default", background: isOver ? (malo ? "#FEF3F2" : tint(DS.c.primary, 0.071)) : blk ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-fee) 6px,var(--dc-fee) 12px)" : (cerr ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-bg) 6px,var(--dc-bg) 12px)" : undefined), outline: isOver ? `2px dashed ${malo ? "#D92D20" : DS.c.primary}` : "none", outlineOffset: -2 }}>
+                    {esAhora && <span className="dc-cal__now" style={{ top: `${nowPct}%` }} aria-hidden="true" />}
                     {blk && cs.length === 0 && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", opacity: .8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{blk.motivo || "Bloqueado"}</span>}
                     {cs.map((c) => <Bloque key={c.id} c={c} />)}
                   </div>
@@ -1036,7 +1096,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           </div>
         </div>
       )}
-      {onReagendar && modo !== "mes" && modo !== "tabla" && <div style={{ padding: "8px 18px", borderTop: "1px solid var(--dc-bg)", fontSize: 12, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 6 }}><Repeat size={13} strokeWidth={1.75} /> Arrastra una cita para cambiar {modo === "sillon" ? "sillón u hora" : "fecha u hora"}.</div>}
+      {onReagendar && modo !== "mes" && modo !== "tabla" && <div style={{ padding: "8px 18px", borderTop: "1px solid var(--dc-bg)", fontSize: 12, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 6 }}><Repeat size={13} strokeWidth={1.75} /> Arrastra una cita para cambiar {modo === "sillon" ? "sillón u hora" : modo === "doctores" ? "doctor u hora" : "fecha u hora"}. Si el doctor no atiende o el sillón está ocupado, no se suelta; al cambiar la hora se busca otro sillón libre.</div>}
     </div>
   );
 }
@@ -1169,6 +1229,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const [bloqForm, setBloqForm] = useState(null);       // modal para crear bloqueo
   const [esperaResumen, setEsperaResumen] = useState([]); // resumen de la lista de espera (el gestor vive en su submódulo)
   const recargarBloqueos = () => { if (conectado) api.bloqueos.listar().then((r) => setBloqueos(r || [])).catch(() => {}); };
+  const demoDb = useContext(DatosDemoCtx);
+  const reglasAg = useReglasAgenda();
+  const bloqueosEf = conectado ? bloqueos : (demoDb?.bloqueos || []);
   useEffect(() => { recargar(); recargarSaldos(); recargarBloqueos(); if (conectado) { api.clinica.get().then((r) => setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] })).catch(() => {}); api.espera.listar().then((r) => setEsperaResumen(r || [])).catch(() => {}); } }, []); // eslint-disable-line
   useEffect(() => {
     if (!agendarDesdeFicha) return;
@@ -1193,7 +1256,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     notify("Esta cita no tiene un paciente registrado todavía.");
   };
   const [agendar, setAgendar] = useState(false);
-  const puedeAgendar = conectado && (rol === "recepcion" || rol === "admin" || rol === "gerencia");
+  // En la demostración también se agenda (el modal usa los datos compartidos).
+  const puedeAgendar = (conectado || !!demoDb) && (rol === "recepcion" || rol === "admin" || rol === "gerencia");
   // En demo filtra por id numérico de MEDICOS. Conectado el backend restringe por rol;
   // no comparar UUID de la API con id de demostración (dejaba el calendario vacío).
   const miId = rol === "medico" && !conectado ? (medicos.find((m) => m.nombre === usuario?.nombre) || {}).id : null;
@@ -1206,11 +1270,37 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const nom = (id) => medicos.find((m) => m.id === id)?.nombre || "—";
   const set = (id, estado, msg) => { if (conectado) { api.citas.cambiarEstado(id, estado).then(() => { msg && notify(msg); recargar(); }).catch(() => notify("Error al cambiar el estado.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, estado } : c)); msg && notify(msg); };
   const checkIn = (id) => { if (conectado) { api.citas.checkin(id).then(() => { notify("Check-in registrado."); recargar(); }).catch(() => notify("Error en el check-in.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, llegada: true, estado: c.estado === "pendiente" ? "confirmada" : c.estado } : c)); notify("Check-in registrado."); };
-  // Reprogramar (drag en el calendario): cambia fecha/hora (y sillón si aplica).
-  const reagendarCita = (id, patch) => {
+  // Reprogramar (drag en el calendario): cambia fecha/hora (y sillón o doctor si aplica).
+  // Antes se movía sin mirar nada; ahora pasa por las mismas reglas que agendar:
+  // horario del doctor, cruce con sus otras citas, sillón permitido y libre, bloqueos.
+  const validarMovida = (c, patch) => {
+    const ctx = { ...reglasAg, citas: conectado ? (remotoAll || []) : citasProp, bloqueos: bloqueosEf };
+    let nueva = { ...c, ...patch, medicoId: patch.medicoId != null && patch.medicoId !== "sin" ? (typeof c.medicoId === "number" ? Number(patch.medicoId) : patch.medicoId) : c.medicoId };
+    let ev = evaluarCita(ctx, nueva);
+    let nuevoSillon = null;
+    // Al cambiar la hora o el doctor, si el sillón ya no sirve se busca otro libre de la misma sede.
+    if (patch.sillon === undefined && ev.errores.length) {
+      const sinSil = evaluarCita(ctx, { ...nueva, sillon: null });
+      const n = sinSil.errores.length ? null : sugerirSillon(ctx, nueva);
+      if (n != null && String(n) !== String(nueva.sillon)) { const alt = { ...nueva, sillon: n }; const ev2 = evaluarCita(ctx, alt); if (!ev2.errores.length) { nueva = alt; ev = ev2; nuevoSillon = n; } }
+    }
+    return { ...ev, patch: nuevoSillon != null ? { ...patch, sillon: nuevoSillon } : patch, nuevoSillon, medicoId: nueva.medicoId };
+  };
+  const reagendarCita = (id, patch0) => {
+    const c0 = (conectado ? (remotoAll || []) : citasProp).find((x) => String(x.id) === String(id));
+    if (patch0.medicoId === "sin") { notify("Elige la columna de un doctor."); return; }
+    let patch = patch0;
+    let extra = "";
+    if (c0) {
+      const r = validarMovida(c0, patch0);
+      if (r.errores.length) { notify(`No se movió: ${r.errores[0]}`); return; }
+      patch = { ...r.patch, ...(patch0.medicoId != null ? { medicoId: r.medicoId } : {}) };
+      if (r.nuevoSillon != null) extra = ` Pasa al sillón ${r.nuevoSillon}.`;
+      if (r.avisos.length) extra += ` ${r.avisos[0]}`;
+    }
     if (conectado) { api.put(`/citas/${id}`, patch).then(() => { notify("Cita reprogramada."); recargar(); recargarAll(); }).catch(() => notify("Error al reprogramar.")); return; }
-    setCitas((cs) => cs.map((c) => c.id === id ? { ...c, ...patch } : c));
-    notify(`Cita reprogramada a ${patch.hora}${patch.fecha ? " – " + fechaLegible(patch.fecha) : ""}.`);
+    setCitas((cs) => cs.map((c) => c.id === id ? { ...c, ...patch, ...(patch.medicoId != null ? { medico: undefined } : {}) } : c));
+    notify(`Cita reprogramada a ${patch.hora}${patch.fecha ? " – " + fechaLegible(patch.fecha) : ""}`.replace(/\.?$/, ".") + extra);
   };
   const stats = [["Citas hoy", citasHoyActivas.length, NAVY], ["Presentes", presentesHoy.length, "var(--dc-ok-700)"], ["Por llegar", porLlegarHoy.length, "var(--dc-warn-600)"]];
   // Amarre espera → citas: "Asignar" abre un modal para elegir doctor, fecha y hora.
@@ -1222,16 +1312,44 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     }
     // Demo (sin backend): flujo ligero con datos de ejemplo.
     const med = MEDICOS.find((m) => m.nombre === p.medico) || MEDICOS[0];
-    const usadas = new Set(todasHoy.map((c) => c.hora));
-    let hh = 9; while (hh < 20 && usadas.has(`${String(hh).padStart(2, "0")}:00`)) hh++;
-    setAsignarPac({ ...p, medicoId: med.id, fecha: fmt(hoy), hora: `${String(hh).padStart(2, "0")}:00` });
+    // Primera hora de hoy (o de mañana) en que el doctor atiende y queda un sillón libre.
+    const ctxE = { ...reglasAg, citas: citasProp, bloqueos: bloqueosEf };
+    const libreEn = (fecha, desde) => {
+      for (let m = desde; m <= 19 * 60 + 30; m += 30) {
+        const hora = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+        const t = turnosDelDia(reglasAg.disp, med.id, fecha).find((x) => toMin(x.horaInicio) <= m && m < toMin(x.horaFin));
+        const b = { medicoId: med.id, esp: med.esp, sede: (t && t.sede) ?? med.sede, fecha, hora, duracionMin: 30 };
+        const sil = sugerirSillon(ctxE, b);
+        if (sil != null && !evaluarCita(ctxE, { ...b, sillon: sil }).errores.length) return hora;
+      }
+      return null;
+    };
+    const ahoraM = new Date().getHours() * 60 + new Date().getMinutes();
+    const hoyH = libreEn(fmt(hoy), Math.max(8 * 60, Math.ceil((ahoraM + 1) / 30) * 30));
+    const fecha = hoyH ? fmt(hoy) : addDays(1);
+    setAsignarPac({ ...p, medicoId: med.id, fecha, hora: hoyH || libreEn(fecha, 8 * 60) || "09:00" });
+  };
+  const planAsignar = (p) => {
+    const med0 = MEDICOS.find((m) => m.id === Number(p.medicoId)) || {};
+    const turnos = turnosDelDia(reglasAg.disp, p.medicoId, p.fecha);
+    const tSede = turnos.find((t) => toMin(t.horaInicio) <= toMin(p.hora) && toMin(p.hora) < toMin(t.horaFin));
+    const sede = (tSede && tSede.sede) ?? med0.sede ?? 1;
+    const borrador = { pacienteId: p.pacienteId || null, medicoId: Number(p.medicoId), esp: med0.esp || 1, sede, fecha: p.fecha, hora: p.hora, duracionMin: 30 };
+    const ctxE = { ...reglasAg, citas: citasProp, bloqueos: bloqueosEf };
+    const sillon = sugerirSillon(ctxE, borrador);
+    const ev = evaluarCita(ctxE, { ...borrador, sillon });
+    return { borrador, sillon, ev, turnos };
   };
   const confirmarAsignar = () => {
     const p = asignarPac;
     if (!p.medicoId || !p.fecha || !p.hora) { notify("Elige doctor, fecha y hora."); return; }
     const nid = Date.now();
-    const sede = todasHoy[0]?.sede ?? 1;
-    setCitas((cs) => [...cs, { id: nid, pacienteId: p.pacienteId || null, paciente: p.n, dni: "", medicoId: p.medicoId, esp: 1, sede, fecha: p.fecha, hora: p.hora, motivo: `${p.e} (desde lista de espera)`, estado: "confirmada", llegada: false }]);
+    // La cita desde la lista de espera pasa por las mismas reglas que agendar: sede del
+    // doctor ese día, su horario, cruces y un sillón que lo acepte.
+    const { borrador, sillon, ev } = planAsignar(p);
+    if (ev.errores.length) { notify(ev.errores[0]); return; }
+    if (sillon == null) { notify("No hay sillón libre a esa hora en la sede del doctor."); return; }
+    setCitas((cs) => [...cs, { id: nid, pacienteId: p.pacienteId || null, paciente: p.n, dni: "", ...borrador, sillon, motivo: `${p.e} (desde lista de espera)`, estado: "confirmada", llegada: false }]);
     setEspera((e) => (e || []).filter((x) => x.id !== p.id));
     const esHoy = p.fecha === fmt(hoy);
     if (esHoy) { setNuevaCita(nid); setTimeout(() => setNuevaCita((v) => (v === nid ? null : v)), 6000); }
@@ -1243,6 +1361,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const atend = todasHoy.filter((c) => c.estado === "atendida").length;
   const avance = todasHoy.length ? Math.round((atend / todasHoy.length) * 100) : 0;
   const EST = { pendiente: { c: "var(--dc-ink-500)", l: "Pendiente" }, confirmada: { c: DS.c.primary, l: "Confirmada" }, en_sala: { c: "var(--dc-purple)", l: "En sala" }, en_atencion: { c: "var(--dc-warn-600)", l: "En atención" }, atendida: { c: "var(--dc-ok-700)", l: "Atendida" }, cancelada: { c: "var(--dc-red)", l: "Cancelada" }, no_show: { c: "var(--dc-warn-600)", l: "No asistió" }, reprogramada: { c: "var(--dc-purple)", l: "Reprogramada" }, cerrada_sistema: { c: "var(--dc-ink-400)", l: "Cerrada por sistema" } };
+  const nombreSillon = (c) => { if (!c.sillon) return ""; const x = (reglasAg.sillones || []).find((y) => String(y.sede) === String(c.sede) && String(y.numero) === String(c.sillon)); return x ? x.nombre : `Sillón ${c.sillon}`; };
   const COLS_AGENDA = [
     { key: "hora", label: "Hora", get: (c) => c.hora, w: "76px", a: "center",
       cell: (c) => { const e = EST[c.estado] || EST.pendiente; const esProx = proxima && c.id === proxima.id; const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
@@ -1261,8 +1380,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         </div>); } },
     { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(128px,1.2fr)", a: "left",
       cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
-    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(100px,0.8fr)", a: "left",
-      cell: (c) => <div style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 6, minWidth: 0 }}><MapPin size={12} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sedeNombre || cortaSede(c.sede)}</span></div> },
+    { key: "sede", label: "Sede · sillón", get: (c) => `${c.sedeNombre || nombreSede(c.sede)} ${nombreSillon(c)}`, w: "minmax(118px,0.9fr)", a: "left",
+      cell: (c) => <div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 6, minWidth: 0 }}><MapPin size={12} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sedeNombre || cortaSede(c.sede)}</span></div>{nombreSillon(c) && <div style={{ fontSize: 12, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}><Armchair size={12} strokeWidth={1.75} style={{ flexShrink: 0 }} />{nombreSillon(c)}</div>}</div> },
     { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(120px,1.3fr)", a: "left",
       cell: (c) => { const base = c.motivo.replace(/\s*\([^)]*\)\s*/g, " ").trim(); const hasDet = base !== c.motivo; return (
         <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", gap: 6, minWidth: 0 }} title={c.motivo}>
@@ -1395,6 +1514,13 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
                       options={HORAS_SEL.map((h) => ({ value: h, label: h }))} />
             </div>
           </div>
+          {(() => { const pl = planAsignar(asignarPac); const silN = pl.sillon != null ? ((reglasAg.sillones || []).find((x) => String(x.sede) === String(pl.borrador.sede) && x.numero === pl.sillon) || {}).nombre : null; return (
+            <div className="dc-agm__val" style={{ marginTop: 14 }}>
+              {pl.turnos.length > 0 && <p className="is-avi" style={{ background: "#F0FAFA", color: "#0B6C78", borderColor: "#BFE6E6" }}><Clock size={13} strokeWidth={2.2} /> Ese día atiende {pl.turnos.map((t) => `${String(t.horaInicio).slice(0, 5)}–${String(t.horaFin).slice(0, 5)} (${nombreSede(t.sede).replace(/^Sede\s+/, "")})`).join(" y ")}.</p>}
+              {pl.ev.errores.map((m, i) => <p key={i} className="is-err"><Lock size={13} strokeWidth={2.2} /> {m}</p>)}
+              {!pl.ev.errores.length && (silN ? <p className="is-avi" style={{ background: "#F4F1FE", color: "#5B3FC0", borderColor: "#DDD3FB" }}><Armchair size={13} strokeWidth={2.2} /> Se asigna {silN} en {nombreSede(pl.borrador.sede)}.</p> : <p className="is-err"><Lock size={13} strokeWidth={2.2} /> No hay sillón libre a esa hora en la sede del doctor.</p>)}
+            </div>
+          ); })()}
         </Modal>
         );
       })()}
@@ -1461,7 +1587,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
         cols={COLS_AGENDA} />
-      </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={reagendarCita} horario={horarioClinica.horario} feriados={horarioClinica.feriados} bloqueos={bloqueos} onNuevo={puedeAgendar ? (patch) => setAgendar(patch) : undefined} />}
+      </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf} reglas={reglasAg} validar={validarMovida} sedeInicial={sedeActiva} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
       {fmId && (
         <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
           <FichaMedica pacienteId={fmId} onClose={() => { setFmId(null); setFichaCita(null); }} notify={notify} can={can} rol={rol}
@@ -1483,7 +1609,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           if (bloqForm.horaFin <= bloqForm.horaInicio) { notify("La hora de fin debe ser mayor que la de inicio."); return; }
           const payload = { horaInicio: bloqForm.horaInicio, horaFin: bloqForm.horaFin, motivo: bloqForm.motivo || "Bloqueado",
             fecha: bloqForm.tipo === "dia" ? bloqForm.fecha : null, diaSemana: bloqForm.tipo === "semanal" ? Number(bloqForm.diaSemana) : null };
-          if (!conectado) { notify("Bloqueo registrado (demo)."); setBloqForm(null); return; }
+          if (!conectado) { demoDb?.setBloqueos((bs) => [...(bs || []), { ...payload, id: `b${Date.now()}` }]); notify("Horario bloqueado."); setBloqForm(null); return; }
           api.bloqueos.crear(payload).then(() => { notify("Horario bloqueado."); setBloqForm(null); recargarBloqueos(); }).catch(() => notify("No se pudo crear el bloqueo."));
         };
         return (
@@ -7886,6 +8012,16 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   useEffect(() => { localStorage.setItem("dc_vista_" + rol, vista); }, [vista, rol]);
   const [citas, setCitas] = usePersist("citas", CITAS_INIT);
   const [pacientes, setPacientes] = usePersist("pacientes", PACIENTES_INIT);
+  // Sillones (con su uso: flexible, fijo de un doctor o de una especialidad), horario de
+  // cada doctor y bloqueos de agenda de la demostración. Con sesión vienen del servidor.
+  const [sillones, setSillones] = usePersist("sillones", SILLONES_DEMO);
+  const [dispMedicos, setDispMedicos] = usePersist("disp_medicos", DISP_DEMO);
+  const [bloqueosDemo, setBloqueosDemo] = usePersist("bloqueos", []);
+  // Citas guardadas antes de que existiera la regla de sillones: se les asigna uno.
+  useEffect(() => {
+    if (auth.token) return;
+    setCitas((cs) => completarSillones(cs, { sillones: sillones.map(normSillon), medicos: MEDICOS, especialidades: ESPECIALIDADES }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Historia clínica ÚNICA y editable (antes era una constante estática): todos los
   // módulos clínicos leen y escriben aquí. Es la columna vertebral del proceso.
   const [fichas, setFichas] = usePersist("fichas", () => JSON.parse(JSON.stringify(FICHA_CLINICA)));
@@ -8376,7 +8512,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   const RolIcon = R.icon;
   return (
-    <DatosDemoCtx.Provider value={{ fichas, updFicha, citas, setCitas, pacientes, setPacientes, horarioClinica }}>
+    <DatosDemoCtx.Provider value={{ fichas, updFicha, citas, setCitas, pacientes, setPacientes, horarioClinica, sillones, setSillones, dispMedicos, setDispMedicos, bloqueos: bloqueosDemo, setBloqueos: setBloqueosDemo }}>
     <div className="dc-shell" style={{ display: "flex", height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 500, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}
