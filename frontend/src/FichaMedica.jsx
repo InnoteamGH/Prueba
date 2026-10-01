@@ -888,11 +888,11 @@ function registroDemo(pac) {
   const hace = (dias, h, m) => { const x = new Date(base); x.setDate(x.getDate() - dias); x.setHours(h, m); return x.toISOString(); };
   const nom = pac?.nombre || "el paciente";
   return [
-    { id: "dm1", ts: hace(0, 9, 12), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "Consulta del día", origen: "Sede Miraflores · Chrome en Windows" },
-    { id: "dm2", ts: hace(0, 8, 47), usuario: "Lucía Paz", rol: "Recepción", tipo: "acceso", accion: "Abrió la historia clínica", detalle: `Confirmó la cita de ${nom}`, origen: "Sede Miraflores · Chrome en Windows" },
+    { id: "dm1", ts: hace(0, 9, 12), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "Consulta del día", origen: "Sede San Isidro · Chrome en Windows" },
+    { id: "dm2", ts: hace(0, 8, 47), usuario: "Lucía Ramírez", rol: "Recepción", tipo: "acceso", accion: "Abrió la historia clínica", detalle: `Confirmó la cita de ${nom}`, origen: "Sede San Isidro · Chrome en Windows" },
     { id: "dm3", ts: hace(3, 17, 5), usuario: "Roberto Díaz", rol: "Administrador", tipo: "imprimir", accion: "Imprimió la historia clínica", detalle: "Copia solicitada por el paciente", origen: "Sede San Isidro · Edge en Windows" },
-    { id: "dm4", ts: hace(12, 11, 30), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "editar", accion: "Modificó la anamnesis", detalle: "Antecedentes: agregó «Bruxismo»", origen: "Sede Miraflores · Safari en iPad" },
-    { id: "dm5", ts: hace(12, 11, 2), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "", origen: "Sede Miraflores · Safari en iPad" },
+    { id: "dm4", ts: hace(12, 11, 30), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "editar", accion: "Modificó la anamnesis", detalle: "Antecedentes: agregó «Bruxismo»", origen: "Sede San Isidro · Safari en iPad" },
+    { id: "dm5", ts: hace(12, 11, 2), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "", origen: "Sede San Isidro · Safari en iPad" },
   ];
 }
 const PLANTILLAS_EVO = [
