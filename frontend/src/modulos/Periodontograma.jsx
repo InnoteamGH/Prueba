@@ -421,7 +421,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
         <div className="pgc-kpis">
           {KPI.map(([l, v, u, d, c]) => <div key={l} className="pgc-kpi"><small>{l}</small><b className={c ? `is-${c}` : ""}>{v}{u && <u>{u}</u>}{d}</b></div>)}
         </div>
-        <div className="pgc-prog" title="Sitios sondados"><span>{hechos}/{tot}</span><i style={{ "--p": `${tot ? (hechos / tot) * 100 : 0}%` }} /></div>
+        <div className="pgc-prog" title="Sitios sondados"><span>Sitios registrados {hechos}/{tot}</span><i style={{ "--p": `${tot ? (hechos / tot) * 100 : 0}%` }} /></div>
         <span className={`pgc-estado is-${soloLectura ? "ro" : guardado?.tipo || "ok"}`}>
           {soloLectura ? "Solo lectura" : !conectado ? "Demostración" : guardado?.tipo === "guardando" ? "Guardando…" : guardado?.tipo === "error" ? "Sin guardar" : guardado?.hora ? `Guardado ${guardado.hora}` : "Al día"}
         </span>

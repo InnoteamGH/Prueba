@@ -596,7 +596,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             </div>
           ) : chat.modo === "ia" ? (
             <div className="wa-pie">
-              <div className="wa-pie__ayuda"><Bot size={13} strokeWidth={1.75} /> {modoDemo ? "Modo demo: simula un mensaje del paciente (como si escribiera por WhatsApp):" : "La IA responde sola. Simula un mensaje del paciente:"}</div>
+              <div className="wa-pie__ayuda"><Bot size={13} strokeWidth={1.75} /> {modoDemo ? "Modo demo: simula un mensaje del paciente (como si escribiera por WhatsApp):" : "Demostración: simula un mensaje del paciente para ver cómo responde la IA:"}</div>
               <div className="wa-chips">{sugs.map((s, i) => <button key={i} type="button" className="wa-chip" onClick={() => recibir(s)}>{s}</button>)}</div>
             </div>
           ) : (

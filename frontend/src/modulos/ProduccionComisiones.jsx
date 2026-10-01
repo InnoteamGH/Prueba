@@ -478,7 +478,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
       ["Escala de esta pantalla", `0 – ${ESCALA_AUSENTISMO_MAX}%`],
       ["La clínica ahora", clinica.sinDato ? "—" : fmtTasa(clinica.tasa)],
     ],
-    fuente: "Misma regla que el panel de sede y mi producción.",
+    fuente: "Producción = procedimientos terminados × precio del catálogo.",
     tono: "riesgo",
   });
 
@@ -557,14 +557,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
             <div className="dc-kpi__sub">Canceladas y no asistidas</div>
           </div>
         </button>
-        <button type="button" className="dc-kpi" onClick={fichaUmbral}>
-          <span className="dc-kpi__icon" style={{ background: "var(--dc-danger-100)", color: "var(--dc-danger-700)" }} aria-hidden="true">!</span>
-          <div className="dc-kpi__body">
-            <div className="dc-kpi__label">Umbral de alerta</div>
-            <div className="dc-kpi__value">{UMBRAL_AUSENTISMO}%</div>
-            <div className="dc-kpi__sub">La app lo pinta en rojo a partir de ahí</div>
-          </div>
-        </button>
+        {/* REP-03: el umbral (15%) es un parámetro, no un KPI: se ve como la línea roja del gráfico. */}
         <button type="button" className="dc-kpi" onClick={fichaCoste}>
           <span className="dc-kpi__icon" style={{ background: "var(--dc-brand-100)", color: "var(--dc-brand-600)" }} aria-hidden="true">S/</span>
           <div className="dc-kpi__body">
@@ -618,10 +611,6 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                       ? " Está en o por encima del umbral: conviene reforzar recordatorios."
                       : " Está por debajo del 15%: la asistencia no es el problema principal."}</>}
               </p>
-              <p className="dc-nota dc-nota--aviso">
-                <b>Sin rellenos.</b> Si no llega el dato, esta pantalla muestra un guion — nunca un
-                porcentaje inventado.
-              </p>
             </div>
             <div className="dc-split__rule">
               <p className="dc-rotulo">Qué se suma en esa cifra</p>
@@ -648,8 +637,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
         </div>
         <p className="dc-card__foot">
           Canceladas y no asistidas se enseñan <b>por separado</b>: una cancelación se arregla con
-          lista de espera; una falta, con recordatorios. Reprogramada queda fuera del cálculo
-          (decisión de producto pendiente).
+          lista de espera; una falta, con recordatorios.
         </p>
       </section>
 
@@ -1014,11 +1002,6 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
               </div>
               )}</ListaFiltrable>
             </div>
-            <p className="dc-card__foot">
-              Misma regla que el panel gerencial (atendidas × precio base). El <b>{moneyFmt(totalProd)}</b> coincide
-              con «Producción del mes» cuando eliges el mismo tramo de fechas; el gerencial por defecto es mes en curso
-              y aquí, si no filtras, suelen ser 6 meses.
-            </p>
           </section>
 
           <div className="dc-grid g-2a">
@@ -1073,9 +1056,6 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
                   })}
                 />
               </div>
-              <p className="dc-card__foot">
-                Acumulado en vez de barras sueltas, con lo cobrado de cada mes escrito bajo su nombre.
-              </p>
             </section>
 
             <section className="dc-card">

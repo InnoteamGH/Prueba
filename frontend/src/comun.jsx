@@ -347,11 +347,11 @@ export const AUDITORIA = [
 
 /* Clínicas (tenants) conectadas a la plataforma — visible solo para el Superusuario (AWG). */
 export const CLINICAS_INIT = [
-  { id: 1, nombre: "Clínica Dental Sonríe+", ruc: "20123456789", plan: "grande", sedes: 2, usuarios: 12, pacientes: 24, estado: "activa", mrr: 499, ultimo: "Hace 5 min" },
-  { id: 2, nombre: "OdontoSalud Perú", ruc: "20456789012", plan: "mediana", sedes: 1, usuarios: 6, pacientes: 312, estado: "activa", mrr: 299, ultimo: "Hace 1 h" },
+  { id: 1, nombre: "Clínica Dental Sonríe+", ruc: "20123456789", plan: "mediana", sedes: 2, usuarios: 14, pacientes: 24, estado: "activa", mrr: 498, ultimo: "Hace 5 min" },
+  { id: 2, nombre: "OdontoSalud Perú", ruc: "20456789012", plan: "mediana", sedes: 1, usuarios: 6, pacientes: 312, estado: "activa", mrr: 349, ultimo: "Hace 1 h" },
   { id: 3, nombre: "Dental Sur EIRL", ruc: "20567890123", plan: "pequena", sedes: 1, usuarios: 3, pacientes: 88, estado: "trial", mrr: 0, ultimo: "Hace 2 h" },
-  { id: 4, nombre: "Sonrisa Perfecta", ruc: "20678901234", plan: "grande", sedes: 3, usuarios: 19, pacientes: 540, estado: "activa", mrr: 499, ultimo: "Ayer" },
-  { id: 5, nombre: "Clínica Mlilenium Dental", ruc: "20789012345", plan: "mediana", sedes: 2, usuarios: 9, pacientes: 271, estado: "activa", mrr: 299, ultimo: "Hace 3 h" },
+  { id: 4, nombre: "Sonrisa Perfecta", ruc: "20678901234", plan: "grande", sedes: 3, usuarios: 19, pacientes: 540, estado: "activa", mrr: 699, ultimo: "Ayer" },
+  { id: 5, nombre: "Clínica Mlilenium Dental", ruc: "20789012345", plan: "mediana", sedes: 2, usuarios: 9, pacientes: 271, estado: "activa", mrr: 498, ultimo: "Hace 3 h" },
   { id: 6, nombre: "OrtoKids", ruc: "20890123456", plan: "pequena", sedes: 1, usuarios: 4, pacientes: 64, estado: "trial", mrr: 0, ultimo: "Hace 30 min" },
   { id: 7, nombre: "Dental Plaza Norte", ruc: "20901234567", plan: "mediana", sedes: 1, usuarios: 7, pacientes: 195, estado: "suspendida", mrr: 0, ultimo: "Hace 12 días" },
 ];
@@ -415,11 +415,11 @@ export const addDays = (n) => { const d = hoyAhora(); d.setDate(d.getDate() + n)
 // SAT-01: reseñas públicas (1–5). Una sola lista: la lee Satisfacción y reseñas y
 // Mi producción (las que mencionan al doctor).
 export const RESENAS_SEED = [
-  { id: 1, nombre: "Lucía V.", estrellas: 5, fecha: addDays(-1), texto: "Excelente atención, la Dra. Mendoza muy amable y el local impecable.", resp: "", medicoId: 1 },
-  { id: 2, nombre: "Andrés P.", estrellas: 5, fecha: addDays(-3), texto: "Me agendaron por WhatsApp en segundos, todo súper rápido.", resp: "¡Gracias Andrés! Te esperamos en tu control." },
-  { id: 3, nombre: "María C.", estrellas: 4, fecha: addDays(-6), texto: "Buen servicio, solo esperé un poco más de lo previsto.", resp: "" },
-  { id: 4, nombre: "Diego C.", estrellas: 5, fecha: addDays(-9), texto: "Precios claros y me explicaron todo el tratamiento. Recomendado.", resp: "", medicoId: 1 },
-  { id: 5, nombre: "Rosa L.", estrellas: 5, fecha: addDays(-12), texto: "El portal para ver mis pagos y citas es muy práctico.", resp: "" },
+  { id: 1, nombre: "Lucía V.", estrellas: 5, fecha: addDays(-1), texto: "Excelente atención, la Dra. Mendoza muy amable y el local impecable.", resp: "", medicoId: 1, origen: "google" },
+  { id: 2, nombre: "Andrés P.", estrellas: 5, fecha: addDays(-3), texto: "Me agendaron por WhatsApp en segundos, todo súper rápido.", resp: "¡Gracias Andrés! Te esperamos en tu control.", origen: "google" },
+  { id: 3, nombre: "María C.", estrellas: 4, fecha: addDays(-6), texto: "Buen servicio, solo esperé un poco más de lo previsto.", resp: "", origen: "portal" },
+  { id: 4, nombre: "Diego C.", estrellas: 5, fecha: addDays(-9), texto: "Precios claros y me explicaron todo el tratamiento. Recomendado.", resp: "", medicoId: 1, origen: "google" },
+  { id: 5, nombre: "Rosa L.", estrellas: 5, fecha: addDays(-12), texto: "El portal para ver mis pagos y citas es muy práctico.", resp: "", origen: "portal" },
 ];
 export const fmtHoy = () => fmt(hoyAhora());
 

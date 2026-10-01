@@ -836,7 +836,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     ].map(([nombre, n, imp]) => ({ nombre, numeroDeVentas: Math.max(1, Math.round(n * fa)), importeTotal: Math.round(imp * fa) })));
     setActividad([
       ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),
-      ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${Number(pg.monto).toFixed(2)}` })),
+      ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${(Number(pg.monto)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })),
     ].sort((a, b) => String(a.hora).localeCompare(String(b.hora))));
     setInventarioValorizado(M.inventarioValorizado(demoDb?.inventario || []));
     setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false).length);
@@ -991,7 +991,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     cols: [["Odontólogo"], ["Meta", "n"]],
     filas: ranking.map((r) => [r.nombre || r.medico || "—", r.meta != null ? moneyFmt(r.meta) : "Sin meta"]),
     vacio: "Ningún odontólogo tiene meta.",
-    falta: meta.vacia ? "Define la meta mensual en la ficha de cada odontólogo (Configuración → Doctores) o con Definir en Equipo." : undefined,
+    falta: meta.vacia ? "Define la meta mensual en la ficha de cada odontólogo (Configuración › Doctores)." : undefined,
     fuente: meta.vacia ? undefined : "Producción del mes cruzada con las metas del equipo.",
     tono: meta.vacia ? "aviso" : "brand",
   });
@@ -1608,80 +1608,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
         </section>
       </div>
 
-      {/* Equipo */}
-      <section aria-label="Producción por odontólogo este mes" style={{ marginBottom: "var(--dc-sp-5)" }}>
-        <h2 style={{ fontSize: "var(--dc-fs-lg)", lineHeight: "var(--dc-lh-lg)", margin: "0 0 var(--dc-sp-3)" }}>Equipo</h2>
-        <div className="dc-table-wrap">
-          <div className="dc-table-head" role="row">
-            <ThOrden st={stEq} k="nombre">Odontólogo</ThOrden><ThOrden st={stEq} k="estado">Estado</ThOrden><ThOrden st={stEq} k="citas" a="right" className="num">Citas</ThOrden>
-            <ThOrden st={stEq} k="prod" a="right" className="num">Producción</ThOrden><ThOrden st={stEq} k="meta" a="right" className="der">Meta del mes</ThOrden>
-          </div>
-          {!ranking.length && (
-            <div className="dc-table-row"><div className="persona"><span className="persona__t"><span className="nom">Sin odontólogos en el ranking</span></span></div></div>
-          )}
-          {ranking.map((r) => {
-            const prod = Number(r.produccion) || 0;
-            const citasN = Number(r.citas ?? r.atendidas ?? 0) || 0;
-            const nombre = r.nombre || r.medico || "—";
-            const medId = r.id || r.medicoId;
-            const tieneMeta = r.meta != null && Number(r.meta) > 0;
-            return (
-              <div className="dc-table-row clic" key={medId || nombre} role="button" tabIndex={0}
-                onClick={() => abrir({
-                  t: nombre,
-                  s: r.especialidad || "Equipo",
-                  cifra: moneyFmt(prod),
-                  parte: tieneMeta ? `Meta ${moneyFmt(r.meta)}` : "Sin meta",
-                  cols: [["Campo"], ["Valor"]],
-                  filas: [
-                    ["Citas", String(citasN)],
-                    ["Producción", moneyFmt(prod)],
-                    ["Meta", tieneMeta ? moneyFmt(r.meta) : "Sin meta"],
-                  ],
-                  tono: "brand",
-                })}>
-                <div className="persona">
-                  <span className="ini" style={{ background: prod > 0 ? "var(--dc-brand-100)" : "var(--dc-bg-alt)", color: prod > 0 ? "var(--dc-brand-600)" : "var(--dc-ink-500)" }}>
-                    {inicialesDe(nombre)}
-                  </span>
-                  <span className="persona__t">
-                    <span className="nom">{nombre}</span>
-                    {r.especialidad && <span className="esp">{r.especialidad}</span>}
-                  </span>
-                </div>
-                <div data-label="Estado">
-                  {prod > 0
-                    ? <span className="dc-chip dc-chip--vivo">Facturó</span>
-                    : <span style={{ color: "var(--dc-ink-400)" }}>Sin actividad</span>}
-                </div>
-                <div className="num" data-label="Citas">{citasN}</div>
-                <div className="num" data-label="Producción" style={{ color: prod > 0 ? undefined : "var(--dc-ink-400)" }}>{moneyFmt(prod)}</div>
-                <div className="der" data-label="Meta del mes">
-                  {tieneMeta ? (
-                    <span className="dc-money">{moneyFmt(r.meta)}</span>
-                  ) : (
-                    <span className="sin-meta">
-                      Sin meta
-                      <b role="button" tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMetaEdit({ id: medId, nombre });
-                          setMetaVal("");
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.stopPropagation();
-                            setMetaEdit({ id: medId, nombre });
-                          }
-                        }}>Definir</b>
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      {/* GER-04: la producción por odontólogo vive en un solo bloque («Producción del equipo vs. meta», arriba); el detalle está en Reportes. */}
 
       <div className="dc-pie">
         <span>

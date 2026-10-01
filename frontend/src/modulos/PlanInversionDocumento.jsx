@@ -300,8 +300,8 @@ export default function PlanInversionDocumento({
                       <td className="pieza">{rotuloPieza(l)}</td>
                       <td>{l.nom}</td>
                       <td>{l.cant}</td>
-                      <td className="imp">S/ {Number(l.v).toFixed(2)}</td>
-                      <td className="imp">S/ {(Number(l.v) * Number(l.cant)).toFixed(2)}</td>
+                      <td className="imp">S/ {(Number(l.v)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="imp">S/ {((Number(l.v) * Number(l.cant))).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                   {chunk.length === 0 && (
@@ -313,9 +313,9 @@ export default function PlanInversionDocumento({
               {esUltimaPlan && (
                 <>
                   <div style={{ marginTop: 14, textAlign: "right", fontFamily: "system-ui,sans-serif", fontSize: 14 }}>
-                    <div>Subtotal: <b>S/ {totales.subtotal.toFixed(2)}</b></div>
-                    {doc.descuento?.activo ? <div>Descuento: <b>− S/ {totales.descuento.toFixed(2)}</b></div> : null}
-                    <div style={{ fontSize: 18, marginTop: 4 }}>Total: <b>S/ {totales.total.toFixed(2)}</b></div>
+                    <div>Subtotal: <b>S/ {(totales.subtotal).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div>
+                    {doc.descuento?.activo ? <div>Descuento: <b>− S/ {(totales.descuento).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div> : null}
+                    <div style={{ fontSize: 18, marginTop: 4 }}>Total: <b>S/ {(totales.total).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div>
                     {igvNota ? <div className="plan-inv-muted">{igvNota}</div> : null}
                   </div>
                   <section style={{ marginTop: 22 }}>

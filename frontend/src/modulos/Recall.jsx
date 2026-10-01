@@ -232,7 +232,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
                     <blockquote>{r.comentario}</blockquote>
                     <figcaption>
                       <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 11.5, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente || "P")}</span>
-                      <div><b>{r.paciente || "Paciente"}</b>{r.calificacion ? estrellas(r.calificacion) : r.medico ? <span>{r.medico}</span> : null}</div>
+                      <div><b>{r.paciente || "Paciente"}</b>{/* SAT-02: en encuestas solo la escala 0–10. */}{r.nps != null ? <span className="dc-sat__nps">{r.nps}/10</span> : r.medico ? <span>{r.medico}</span> : null}</div>
                       {r.nps != null && <span className="dc-sat__nps">{r.nps}<small>/10</small></span>}
                     </figcaption>
                   </figure>

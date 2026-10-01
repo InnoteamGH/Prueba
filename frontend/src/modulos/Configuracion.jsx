@@ -360,7 +360,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
       setSedes((ss) => (it.id ? ss.map((x) => (x.id === it.id ? { ...x, ...it } : x)) : [...ss, { ...it, id }]));
       guardarDemo({ sedes: { [id]: { nombre: it.nombre, direccion: it.direccion || "", telefonos: it.telefono || "", horario: it.horarioDocumento || "", correo: it.correo || "", serieDocumento: it.serieDocumento || "" } } });
       refrescarDatosDemo();
-      notify("Sede guardada (demo)."); setEdit(null); return;
+      notify("Sede guardada."); setEdit(null); return;
     }
     if (edit.tipo === "sede") {
       // Dirección, teléfonos, horario, correo y serie salen en el membrete de los
@@ -432,7 +432,6 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
         ); })}
       </nav>
       <div className="dc-cfg__main">
-      {!conectado && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>Datos de ejemplo. Inicia sesión con una cuenta de la clínica para editar la configuración.</span></div>}
 
       {tab === "puesta" && (() => {
         const listo = goLive?.listoParaOperar;

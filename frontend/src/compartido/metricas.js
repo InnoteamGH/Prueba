@@ -220,3 +220,11 @@ export function mensajesMes(historial, { mes = hoyISO().slice(0, 7) } = {}) {
 
 /* ── M-16 · Comisión del doctor = producción × % de su ficha ── */
 export const comisionDe = (produccionDoctor, pct) => Math.round(num(produccionDoctor) * num(pct) / 100);
+
+/* ── GLO-06 · Formatos únicos es-PE ── */
+// Montos en tablas y documentos: «S/ 1,000.00». En KPIs: «S/ 1,000».
+export const sol2 = (n) => Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const sol0 = (n) => Math.round(Number(n || 0)).toLocaleString("es-PE");
+// Fecha corta para listas «mié 30 set.» y para tablas exportables «30/09/2026».
+export const fechaCorta = (iso) => { const d = new Date(String(iso).slice(0, 10) + "T00:00:00"); return isNaN(d) ? String(iso || "—") : d.toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" }).replace(",", ""); };
+export const fechaDoc = (iso) => { const s = String(iso || "").slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.split("-").reverse().join("/") : (s || "—"); };

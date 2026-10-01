@@ -72,10 +72,10 @@ describe("SPEC v8 A15/A36 gerencial densididad", () => {
 });
 
 describe("SPEC v8 A16 altura máxima", () => {
-  it("DataTable acepta maxHeight y Pacientes/Usuarios lo usan", () => {
+  it("DataTable acepta maxHeight; Pacientes y Usuarios crecen con la página (Spec UX/UI PAC-02)", () => {
     assert.match(comun, /maxHeight/);
-    assert.match(app, /Directorio de pacientes[\s\S]{0,120}maxHeight=\{560\}/);
-    assert.match(app, /Directorio de usuarios[\s\S]{0,80}maxHeight=\{560\}/);
+    assert.doesNotMatch(app, /Directorio de pacientes[\s\S]{0,120}maxHeight=\{560\}/);
+    assert.doesNotMatch(app, /Directorio de usuarios[\s\S]{0,80}maxHeight=\{560\}/);
   });
 });
 

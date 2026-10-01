@@ -92,7 +92,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
           </div>
           <label><span>Desde</span><input type="date" value={rango.desde} max={rango.hasta} onChange={(e) => { setPreset("x"); setRango({ ...rango, desde: e.target.value }); }} /></label>
           <label><span>Hasta</span><input type="date" value={rango.hasta} min={rango.desde} onChange={(e) => { setPreset("x"); setRango({ ...rango, hasta: e.target.value }); }} /></label>
-          <button type="button" className="dc-cons__exp" onClick={exportar} disabled={!filas.length}><Download size={15} strokeWidth={2} /> Excel</button>
+          {/* GLO-04: se exporta desde la barra de la tabla (lo filtrado). */}
         </div>
         <dl className="dc-cons__cifras">
           {KPIS.map(([l, v, , c, s]) => (
@@ -109,7 +109,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
         <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : "Sin citas en el rango"} sub="Cambia las fechas para ver otro periodo." /></Card>
       ) : (
         <ListaFiltrable rows={filas} sub="citas" vistaClave="citas_consolidado"
-          vistas={[{ id: "dia", label: "Por día", icon: CalendarDays }, ...(esMedico ? [] : [{ id: "doctor", label: "Por doctor", icon: Users }])]}
+          vistas={[{ id: "dia", label: "Por día", icon: CalendarDays }]}
           tabla={{ primero: true, minWidth: 860, onRowClick: onAbrirCita, cols: [
             { key: "f", label: "Fecha", w: "120px", cell: (c) => <span className="dc-tp__num">{fechaLegible(c.fecha)}</span> },
             { key: "h", label: "Hora", w: "70px", cell: (c) => <span className="dc-tp__num">{c.hora}</span> },

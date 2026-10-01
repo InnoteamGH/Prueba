@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useContext } from "react";
 import { AlertCircle, AlertTriangle, BellRing, CalendarCheck, Check, ChevronRight, Clock, Lock, MapPin, Repeat, Send, Trash2, X } from "lucide-react";
 import api, { auth } from "../api/client";
 import { DISP_DEMO } from "../compartido/sillones";
-import {DatosDemoCtx, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, nombreSede, puede, toMin, tint} from "../comun";
+import {DatosDemoCtx, Pestanas, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, nombreSede, puede, toMin, tint} from "../comun";
 
 function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica = { horario: {}, feriados: [] } }) {
   // Los días y las horas los pone el horario de la clínica, no este módulo: es lo que
@@ -190,6 +190,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
     }
     return out;
   });
+  const [tabDisp, setTabDisp] = useState("horario");
   const [sust, setSust] = useState(null);                       // cita para la que se pide sustitución
   const [sustDest, setSustDest] = useState("");
   const [sustMotivo, setSustMotivo] = useState("");
@@ -315,17 +316,14 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
-        {[["Horas libres esta semana", libresSemana, "var(--dc-ok-700)", <CalendarCheck size={18} strokeWidth={1.75} />], ["Bloqueos activos", bloqueos.length + recGrupos.length, "var(--dc-red)", <Lock size={18} strokeWidth={1.75} />], ["Días que atiendes", diasAtiende.filter(Boolean).length, TEAL, <Clock size={18} strokeWidth={1.75} />], ["Sustituciones por revisar", pendientesRecibidas, DS.c.primary, <BellRing size={18} strokeWidth={1.75} />]].map(([l, v, c, ic], i) => (
-          <Card key={i} style={{ padding: 16 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ background: tint(c, 0.082), color: c, width: 34, height: 34, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center" }}>{ic}</div></div><div style={{ fontSize: 21, fontWeight: 600, color: NAVY, marginTop: 4, fontFamily: DISPLAY_FONT }}>{v}</div></Card>
-        ))}
-      </div>
-
       <Card style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, background: "var(--dc-info-soft)", border: "1px solid var(--dc-sky)" }}>
         <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: "var(--dc-info-soft)", color: "var(--dc-info-ink)", display: "grid", placeItems: "center", flexShrink: 0 }}><AlertCircle size={18} strokeWidth={1.75} /></div>
         <div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>La clínica atiende {semana.length} día(s) a la semana; aquí solo salen esos. Tu disponibilidad solo se puede modificar con <strong>1 semana de anticipación</strong> (desde el <strong>{fechaLegible(limiteEdicion)}</strong>). Las franjas con <MapPin size={11} strokeWidth={1.75} style={{ verticalAlign: -1 }} /> son citas ya agendadas — incluidas las de <strong>otra sede</strong>. Si no podrás atender, pide una <strong>sustitución</strong> (por cita o el día completo) a un colega de la especialidad de cada cita.</div>
       </Card>
 
+      {/* AGE-11: dos pestañas. Las citas del día a día se ven en la Agenda. */}
+      <Pestanas etiqueta="Mi disponibilidad" valor={tabDisp} onChange={setTabDisp} opciones={[{ id: "horario", label: "Mi horario" }, { id: "sust", label: `Sustituciones${recibidas.filter((r) => r.estado === "pendiente").length ? ` (${recibidas.filter((r) => r.estado === "pendiente").length})` : ""}` }]} />
+      {tabDisp === "horario" && <>
       <Card style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div>
@@ -412,7 +410,8 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
           <Btn small onClick={guardarDisp} disabled={guardandoDisp}><Check size={15} strokeWidth={1.75} /> {guardandoDisp ? "Guardando…" : "Guardar"}</Btn>
         </div>
       </Card>
-
+      </>}
+      {tabDisp === "sust" && <>
       {/* Solicitudes de sustitución (recibidas / enviadas) */}
       {(recibidas.length > 0 || enviadas.length > 0) && (
         <Card style={{ overflow: "hidden" }}>
@@ -476,6 +475,8 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
           ); })}
         </Card>
       )}
+      {!(recibidas.length > 0 || enviadas.length > 0) && <Card style={{ padding: 18, fontSize: 13, color: "var(--dc-ink-500)" }}>Sin solicitudes de sustitución.</Card>}
+      </>}
 
       {/* Modal: solicitar sustitución */}
       {sust && (

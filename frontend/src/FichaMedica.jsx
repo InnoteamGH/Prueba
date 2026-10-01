@@ -37,12 +37,19 @@ const SOFT = "var(--dc-bg)";                                                    
 const SHADOW = "0 1px 2px rgba(16,24,40,.04), 0 6px 20px -8px rgba(16,24,40,.10)";  // sombra premium
 
 const money = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rolMedico = (n) => (/^dra\./i.test(rotuloMedico(n)) ? "Odontóloga" : "Odontólogo");
 const rotuloMedico = (n) => {
   const s = String(n || "").trim();
   if (!s) return "";
   // Quitar prefijos repetidos (Dr. / Dra. / Dr(a).) y dejar uno solo.
   const limpio = s.replace(/^(?:\s*(?:dr\(a\)\.?|dra\.?|dr\.?)\s*)+/i, "").trim();
-  return limpio ? `Dr(a). ${limpio}` : "";
+  if (!limpio) return "";
+  // FIC-10: el título en el género del profesional (de su ficha); «Dr(a).» solo si no se sabe.
+  const med = MEDICOS.find((m) => m.nombre.replace(/^(?:dra?\.)\s*/i, "") === limpio);
+  if (med) return med.nombre;
+  if (/^dra\./i.test(s)) return `Dra. ${limpio}`;
+  if (/^dr\./i.test(s)) return `Dr. ${limpio}`;
+  return `Dr(a). ${limpio}`;
 };
 const edadDe = (iso) => { if (!iso) return null; const b = new Date(iso + "T00:00:00"); if (isNaN(b)) return null; const h = new Date(); let e = h.getFullYear() - b.getFullYear(); const m = h.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && h.getDate() < b.getDate())) e--; return e >= 0 && e < 120 ? e : null; };
 const iniciales = (n) => (n || "?").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -756,7 +763,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
           const its = arr(parseJson(r.items, []));
           return (
             <div key={r.id || i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 16px", borderTop: `1px solid ${LINE}` }}>
-              <div style={{ minWidth: 82 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{r.fecha}</div><div style={{ fontSize: 12, color: MUTED }}>{r.medico}</div></div>
+              <div style={{ minWidth: 82 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{M.fechaCorta(r.fecha)}</div><div style={{ fontSize: 12, color: MUTED }}>{r.medico}</div></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{its.length ? its.map((x) => x.medicamento).filter(Boolean).join(", ") : "Receta"}</div>
                 {r.indicaciones && <div style={{ fontSize: 12, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.indicaciones}</div>}
@@ -866,11 +873,11 @@ function registroDesdeFicha(d, rx, consent) {
   arrX(d?.historia).filter((h) => !h.local).forEach((h, i) => {
     const vacia = !String(h.diagnostico || "").trim() && !String(h.detalle || "").trim();
     const adenda = h.titulo === "Adenda";
-    out.push({ id: `h-${h.id || i}`, ts: h.creadoEn || (h.fecha ? `${h.fecha}T${h.hora || "12:00"}:00` : ""), usuario: h.medico || h.creadoPor || "—", rol: "Odontólogo",
+    out.push({ id: `h-${h.id || i}`, ts: h.creadoEn || (h.fecha ? `${h.fecha}T${h.hora || "12:00"}:00` : ""), usuario: h.medico || h.creadoPor || "—", rol: rolMedico(h.medico || h.creadoPor),
       tipo: adenda ? "adenda" : "crear", accion: adenda ? "Agregó una adenda" : vacia ? "Se abrió la evolución de la cita" : "Registró una evolución",
       detalle: [h.diagnostico, h.detalle].filter(Boolean).join(" — ").slice(0, 160) });
   });
-  arrX(d?.recetas).forEach((r, i) => out.push({ id: `r-${r.id || i}`, ts: r.creadoEn || (r.fecha ? `${r.fecha}T12:00:00` : ""), usuario: r.medico || "—", rol: "Odontólogo", tipo: "crear", accion: "Emitió una receta", detalle: r.indicaciones || r.texto || "" }));
+  arrX(d?.recetas).forEach((r, i) => out.push({ id: `r-${r.id || i}`, ts: r.creadoEn || (r.fecha ? `${r.fecha}T12:00:00` : ""), usuario: r.medico || "—", rol: rolMedico(r.medico), tipo: "crear", accion: "Emitió una receta", detalle: r.indicaciones || r.texto || "" }));
   arrX(rx).filter((x) => !x.local).forEach((x, i) => out.push({ id: `x-${x.id || i}`, ts: x.creadoEn || (x.fecha ? `${x.fecha}T12:00:00` : ""), usuario: x.subidoPor || "—", rol: "", tipo: "crear", accion: `Anexó ${String(x.tipo || "un archivo").toLowerCase()}`, detalle: x.nota || "" }));
   arrX(consent).filter((c) => c.firmado && !c.local).forEach((c, i) => out.push({ id: `c-${c.id || i}`, ts: c.fechaFirma || c.creadoEn || "", usuario: c.firmanteNombre || "Paciente", rol: "Firmante", tipo: "firma", accion: "Firmó un consentimiento", detalle: c.tipo || c.titulo || "" }));
   return out.filter((e) => e.ts);
@@ -1722,14 +1729,16 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           <div className="fm-content" style={{ padding: 22, display: "grid", gap: 14, alignContent: "start", overflowY: "auto" }}>
             {/* Etiquetas / Notas / Alergias: solo en el resumen (antes se repetían en todas
                 las secciones y empujaban el contenido casi 300 px hacia abajo). */}
-            {tab === "resumen" && (() => {
+            {/* FIC-09: la alergia se ve como chip en el encabezado y se edita en Historia clínica. */}
+            {(tab === "resumen" || tab === "historia") && (() => {
               const mini = { ...card, padding: 13 };
               const head = (Ic, c, txt) => <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}><span style={{ width: 22, height: 22, borderRadius: "var(--dc-r-sm)", background: tint(c, 0.086), color: c, display: "grid", placeItems: "center" }}><Ic size={13} strokeWidth={2} /></span><span style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{txt}</span></div>;
               const addInp = { width: "100%", padding: "7px 10px", borderRadius: "var(--dc-r-sm)", border: `1px solid ${SOFT}`, fontSize: 12, outline: "none", background: "var(--dc-white)", boxSizing: "border-box" };
               const pill = (c) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "3px 7px 3px 10px", borderRadius: "var(--dc-r-full)" });
               const hayAlergia = arr(p.alergias).length > 0;
               return (
-                <div className="fm-minis" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div className="fm-minis" style={{ display: "grid", gridTemplateColumns: tab === "resumen" ? "1fr 1fr" : "1fr", gap: 12 }}>
+                  {tab === "resumen" && <>
                   <div className="fm-mini is-tags" style={mini}>
                     {head(Tag, "var(--dc-info-700)", "Etiquetas")}
                     {arr(p.tags).length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{arr(p.tags).map((t) => <span key={t} style={pill("var(--dc-info-700)")}>{t}<X size={12} strokeWidth={2} style={{ cursor: "pointer" }} onClick={() => delTag(t)} /></span>)}</div>}
@@ -1739,13 +1748,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     {head(FileText, "var(--dc-warn-600)", "Notas")}
                     <textarea defaultValue={p.comentario || ""} onBlur={(e) => { if ((e.target.value || "") !== (p.comentario || "")) savePac({ comentario: e.target.value }); }} rows={2} placeholder="Notas del paciente…" style={{ ...addInp, resize: "vertical", fontFamily: "inherit", color: TEXT }} />
                   </div>
-                  <div className={`fm-mini is-alerg${hayAlergia ? " is-hay" : ""}`} style={{ ...mini, background: "var(--dc-bg)", border: `1px solid ${hayAlergia ? "var(--dc-danger-mid)" : "var(--dc-bg)"}` }}>
+                  </>}
+                  {tab === "historia" && <div className={`fm-mini is-alerg${hayAlergia ? " is-hay" : ""}`} style={{ ...mini, background: "var(--dc-bg)", border: `1px solid ${hayAlergia ? "var(--dc-danger-mid)" : "var(--dc-bg)"}` }}>
                     {head(AlertTriangle, "var(--dc-danger)", "Alergias")}
                     {hayAlergia && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{arr(p.alergias).map((a) => <span key={a} style={pill("var(--dc-danger)")}>{a}{puedeEscribirClinico && <X size={12} strokeWidth={2} style={{ cursor: "pointer" }} onClick={() => delAlergia(a)} />}</span>)}</div>}
                     {puedeEscribirClinico
                       ? <input value={alergIn} onChange={(e) => setAlergIn(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAlergia(); }} placeholder="Agregar alergia…" style={addInp} />
                       : (!hayAlergia && <div style={{ fontSize: 12, color: MUTED }}>Sin alergias registradas – solo lectura</div>)}
-                  </div>
+                  </div>}
                 </div>
               );
             })()}
