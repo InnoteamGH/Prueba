@@ -144,10 +144,27 @@ export function bloqueoQuePisa(bloqueos, { fecha, hora, duracionMin, medicoId, s
 }
 
 /** Estado de cada sillón de la sede para esa cita: libre, ocupado o no permitido. */
+/** Asignación del día (turno) que cubre la hora de la cita en ese sillón, si la hay. */
+export function asignacionDe(asignaciones, s, { fecha, hora, duracionMin }) {
+  if (!fecha || !hora) return null;
+  const ini = aMin(hora), fin = ini + (Number(duracionMin) || 30);
+  return (asignaciones || []).find((a) => a.fecha === fecha && mismo(a.sede, s.sede) && mismo(a.sillon, s.numero) && aMin(a.desde) < fin && ini < aMin(a.hasta)) || null;
+}
+
 export function estadoSillones(ctx, cita) {
-  const { sillones, citas, medicos = [], especialidades = [] } = ctx;
+  const { sillones, citas, medicos = [], especialidades = [], asignaciones = [], bloqueos = [] } = ctx;
   return sillonesDeSede(sillones, sedeDe(cita)).map((s) => {
-    const regla = reglaSillon(s, { medicoId: cita.medicoId, esp: cita.esp ?? cita.especialidadId }, { medicos, especialidades });
+    let regla = reglaSillon(s, { medicoId: cita.medicoId, esp: cita.esp ?? cita.especialidadId }, { medicos, especialidades });
+    // Turno del día: manda sobre el uso habitual del sillón.
+    const asig = s.activo ? asignacionDe(asignaciones, s, cita) : null;
+    if (asig) {
+      const m = medicos.find((x) => mismo(x.id, asig.medicoId));
+      regla = mismo(asig.medicoId, cita.medicoId) ? { nivel: "propio", motivo: "", turno: asig }
+        : { nivel: "no", motivo: `${s.nombre} está asignado a ${m ? m.nombre : "otro doctor"} de ${asig.desde} a ${asig.hasta}.`, turno: asig };
+    }
+    // Bloqueo solo de este sillón (mantenimiento, por ejemplo).
+    const blq = bloqueoQuePisa((bloqueos || []).filter((b) => b.sillon != null), { ...cita, sillon: s.numero, sede: s.sede });
+    if (blq && regla.nivel !== "no") regla = { nivel: "no", motivo: `${s.nombre} bloqueado: ${blq.motivo || "no disponible"} (${String(blq.horaInicio).slice(0, 5)}–${String(blq.horaFin).slice(0, 5)}).` };
     const ocup = cruces(citas, { ...cita, excluirId: cita.id }).filter((c) => mismo(sedeDe(c), s.sede) && mismo(c.sillon, s.numero));
     const estado = regla.nivel === "no" ? "no" : ocup.length ? "ocupado" : regla.nivel;
     return { s, estado, regla, ocupante: ocup[0] || null };
@@ -183,7 +200,8 @@ export function evaluarCita(ctx, cita) {
     else if (est.estado === "ocupado") errores.push(`${sil.nombre} está ocupado por ${est.ocupante.paciente || "otra cita"} (${String(est.ocupante.hora).slice(0, 5)}).`);
     else if (est.estado === "ajeno") avisos.push(`${est.regla.motivo} Se puede usar porque está libre.`);
   }
-  const blq = bloqueoQuePisa(bloqueos, { ...cita, sede: sedeDe(cita) });
+  // Los bloqueos de un sillón ya se reflejan en el estado del sillón.
+  const blq = bloqueoQuePisa((bloqueos || []).filter((b) => b.sillon == null), { ...cita, sede: sedeDe(cita) });
   if (blq) errores.push(`Ese horario está bloqueado: ${blq.motivo || "no disponible"} (${String(blq.horaInicio).slice(0, 5)}–${String(blq.horaFin).slice(0, 5)}).`);
   return { errores, avisos };
 }

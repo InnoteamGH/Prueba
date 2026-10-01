@@ -16,6 +16,7 @@ const Metas = React.lazy(() => import("./modulos/Metas"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
+import FacturacionSunat from "./modulos/FacturacionSunat";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
@@ -748,7 +749,7 @@ const sillonDe = (c) => {
   return null;
 };
 
-function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null }) {
+function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null, onAsignar = null, onQuitarAsignacion = null }) {
   const [modo, setModo] = useState("semana");   // mes | semana | dia | sillon
   const [dlOpen, setDlOpen] = useState(false);   // menú de descarga del rango visible
   const [off, setOff] = useState(0);             // semana
@@ -760,6 +761,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const [drag, setDrag] = useState(null);        // cita arrastrada
   const [over, setOver] = useState(null);        // celda destino resaltada
   const [overOk, setOverOk] = useState(null);    // ¿se puede soltar en la celda resaltada? { ok, motivo }
+  const [turno, setTurno] = useState(null);      // modal de turno del sillón: { s, fecha, medicoId, desde, hasta }
   // Sillones con su uso (flexible / de un doctor / de una especialidad), por sede.
   const silTodos = (reglas && reglas.sillones && reglas.sillones.length) ? reglas.sillones : SILLONES_CAL.map((n) => ({ id: `x${n}`, sede: null, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true }));
   const sedesSil = [...new Set(silTodos.map((x) => String(x.sede)))];
@@ -811,12 +813,16 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   };
   const fueraHorario = (d, h) => { if (!d) return false; const e = estadoDiaCal(d); if (e.cerrado) return true; if (e.abre != null && h < e.abre) return true; if (e.cierra != null && h >= e.cierra) return true; return false; };
   // Bloqueo (almuerzo/ausencia/mantenimiento) que cubre esa fecha+hora.
-  const bloqueoEnCelda = (d, h) => {
+  // Un bloqueo puede ser de toda la agenda, de un doctor o de un sillón: estos dos solo
+  // se pintan en su columna (vista Doctores o Sillón).
+  const bloqueoEnCelda = (d, h, col = {}) => {
     if (!d) return null;
     const isoD = iso(d), dow = d.getDay(), hh = String(h).padStart(2, "0");
     return (bloqueos || []).find((b) => {
       const aplica = (b.fecha && String(b.fecha).slice(0, 10) === isoD) || (!b.fecha && Number(b.diaSemana) === dow);
       if (!aplica) return false;
+      if (b.medicoId != null && !(modo === "doctores" && String(col.medKey) === String(b.medicoId))) return false;
+      if (b.sillon != null && !(modo === "sillon" && col.silObj && String(col.silObj.numero) === String(b.sillon) && (b.sede == null || String(col.silObj.sede) === String(b.sede)))) return false;
       const ini = (b.horaInicio || "").slice(0, 2), fin = (b.horaFin || "").slice(0, 2);
       return hh >= ini && hh < fin;
     }) || null;
@@ -1065,6 +1071,10 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                     <span className={`dc-cal__uso is-${et.tono}`} title={col.silObj.exclusivo ? "Exclusivo" : col.silObj.uso !== "flexible" ? "Preferente: otros pueden usarlo si está libre" : "Lo usa el doctor que esté libre"}>{et.txt}</span>
                     <small className="dc-cal__silsub">{n.length ? `${n.length} ${n.length === 1 ? "cita" : "citas"}${docsN.length ? " · " + docsN.join(", ") : ""}` : "Libre todo el día"}</small>
                   </>); })()}
+                  {modo === "sillon" && col.silObj && (() => { const turnos = (reglas?.asignaciones || []).filter((a) => a.fecha === col.dISO && String(a.sede) === String(col.silObj.sede) && String(a.sillon) === String(col.silObj.numero)); return (<>
+                    {turnos.map((a) => <span key={a.id} className="dc-cal__turno" title={`Turno del día: ${a.desde}–${a.hasta}`}>{((reglas?.medicos || []).find((m) => String(m.id) === String(a.medicoId)) || {}).nombre?.replace(/^Dra?\.\s*/, "").split(" ")[0] || "Doctor"} · {a.desde}–{a.hasta}</span>)}
+                    {onAsignar && col.silObj.activo !== false && <button type="button" className="dc-cal__asig" onClick={() => setTurno({ s: col.silObj, fecha: col.dISO, medicoId: "", desde: "08:00", hasta: "13:00", rango: "manana" })}>{turnos.length ? "Turnos" : "+ Asignar doctor"}</button>}
+                  </>); })()}
                   {modo === "doctores" && col.medKey !== "sin" && conHorario(col.medKey) && (() => { const ts = turnosDoc(col.medKey, col.dISO); return <small className={`dc-cal__silsub${ts.length ? "" : " is-no"}`}>{ts.length ? txtTurnos(ts) : "No atiende hoy"}</small>; })()}
                 </div>
               ); })}
@@ -1072,7 +1082,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
             {HORAS.map((h) => (
               <div key={h} style={{ display: "grid", gridTemplateColumns: gcols, borderBottom: "1px solid rgba(15,23,42,0.04)", minHeight: modo === "dia" || modo === "sillon" ? 58 : 52 }}>
                 <div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500, padding: "6px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{String(h).padStart(2, "0")}:00</div>
-                {columnas.map((col, i) => { const cs = celda(col, h); const overKey = col.key + "-" + h; const isOver = over === overKey; const cerr = fueraHorario(col.date, h); const blk = bloqueoEnCelda(col.date, h);
+                {columnas.map((col, i) => { const cs = celda(col, h); const overKey = col.key + "-" + h; const isOver = over === overKey; const cerr = fueraHorario(col.date, h); const blk = bloqueoEnCelda(col.date, h, col);
                   const fueraServ = modo === "sillon" && col.silObj && col.silObj.activo === false;
                   const noAt = modo === "doctores" && col.medKey !== "sin" && !cerr && noAtiende(col.medKey, col.dISO, h);
                   const libre = cs.length === 0 && !blk && !cerr && !fueraServ && !noAt && !!onNuevo;
@@ -1096,6 +1106,43 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           </div>
         </div>
       )}
+      {turno && (() => {
+        const meds = (reglas?.medicos || []);
+        const delDia = (reglas?.asignaciones || []).filter((a) => a.fecha === turno.fecha && String(a.sede) === String(turno.s.sede) && String(a.sillon) === String(turno.s.numero)).sort((a, b) => a.desde.localeCompare(b.desde));
+        const nom = (id) => (meds.find((m) => String(m.id) === String(id)) || {}).nombre || "Doctor";
+        const choca = delDia.find((a) => a.desde < turno.hasta && turno.desde < a.hasta);
+        const ajenas = citas.filter((c) => c.fecha === turno.fecha && String(c.sede) === String(turno.s.sede) && sillonDe(c) === turno.s.numero && ACTIVA(c) && turno.medicoId && String(c.medicoId) !== String(turno.medicoId) && c.hora >= turno.desde && c.hora < turno.hasta);
+        const tsDoc = turno.medicoId ? turnosDoc(turno.medicoId, turno.fecha) : [];
+        const atiende = !turno.medicoId || !conHorario(turno.medicoId) || tsDoc.some((t) => String(t.horaInicio).slice(0, 5) <= turno.desde && turno.hasta <= String(t.horaFin).slice(0, 5) && (t.sede == null || String(t.sede) === String(turno.s.sede)));
+        const RANGOS = [["manana", "Mañana", "08:00", "13:00"], ["tarde", "Tarde", "14:00", "19:00"], ["dia", "Todo el día", "08:00", "20:00"]];
+        const guardarT = () => {
+          if (!turno.medicoId) return;
+          if (turno.hasta <= turno.desde) return;
+          if (choca) return;
+          onAsignar({ sede: turno.s.sede, sillon: turno.s.numero, fecha: turno.fecha, desde: turno.desde, hasta: turno.hasta, medicoId: turno.medicoId });
+          setTurno({ ...turno, medicoId: "" });
+        };
+        return (
+          <Modal icon={<Armchair size={20} strokeWidth={1.75} />} titulo={`Turnos de ${turno.s.nombre}`} sub={`${fechaLegible(turno.fecha)} · ${nombreSedeCal(String(turno.s.sede))}`} size="corto" onClose={() => setTurno(null)}
+            footer={<><Btn small kind="ghost" onClick={() => setTurno(null)}>Cerrar</Btn><Btn small onClick={guardarT} disabled={!turno.medicoId || !!choca || turno.hasta <= turno.desde}><Check size={14} strokeWidth={2} /> Asignar</Btn></>}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <p className="dc-cal__tnota">Durante el turno el sillón queda reservado para ese doctor, aunque normalmente sea flexible o de otro doctor. Fuera del turno vuelve a su uso habitual ({etiquetaUso(turno.s, reglas || {}).txt.toLowerCase()}).</p>
+              {delDia.length > 0 && <div className="dc-cal__tlista">{delDia.map((a) => <div key={a.id}><Armchair size={14} strokeWidth={2} /><b>{nom(a.medicoId)}</b><span>{a.desde}–{a.hasta}</span>{onQuitarAsignacion && <button type="button" aria-label={`Quitar turno de ${nom(a.medicoId)}`} onClick={() => onQuitarAsignacion(a.id)}><X size={13} strokeWidth={2.2} /></button>}</div>)}</div>}
+              <label className="dc-fe__lbl">Doctor<Select value={turno.medicoId} onChange={(v) => setTurno({ ...turno, medicoId: v })} placeholder="— Selecciona —" options={meds.map((m) => { const ts = turnosDoc(m.id, turno.fecha); return { value: m.id, label: m.nombre, sub: conHorario(m.id) ? (ts.length ? `Atiende ${txtTurnos(ts)}` : "No atiende ese día") : "Sin horario configurado" }; })} /></label>
+              <div className="dc-fe__seg" role="radiogroup" aria-label="Turno">{RANGOS.map(([k, l, d, h]) => <button key={k} type="button" className={turno.rango === k ? "is-on" : ""} onClick={() => setTurno({ ...turno, rango: k, desde: d, hasta: h })}>{l}</button>)}</div>
+              <div className="dc-fe__duo">
+                <label className="dc-fe__lbl">Desde<input className="dc-premium-inp" type="time" value={turno.desde} onChange={(e) => setTurno({ ...turno, rango: "", desde: e.target.value })} /></label>
+                <label className="dc-fe__lbl">Hasta<input className="dc-premium-inp" type="time" value={turno.hasta} onChange={(e) => setTurno({ ...turno, rango: "", hasta: e.target.value })} /></label>
+              </div>
+              {(choca || !atiende || ajenas.length > 0) && <div className="dc-agm__val">
+                {choca && <p className="is-err"><Lock size={13} strokeWidth={2.2} /> Se cruza con el turno de {nom(choca.medicoId)} ({choca.desde}–{choca.hasta}).</p>}
+                {!atiende && <p className="is-avi"><Info size={13} strokeWidth={2.2} /> {nom(turno.medicoId)} no atiende en esta sede todo ese rango ({tsDoc.length ? txtTurnos(tsDoc) : "no atiende ese día"}).</p>}
+                {ajenas.length > 0 && <p className="is-avi"><Info size={13} strokeWidth={2.2} /> Hay {ajenas.length} {ajenas.length === 1 ? "cita" : "citas"} de otro doctor en este sillón en ese rango; se mantienen, pero conviene moverlas.</p>}
+              </div>}
+            </div>
+          </Modal>
+        );
+      })()}
       {onReagendar && modo !== "mes" && modo !== "tabla" && <div style={{ padding: "8px 18px", borderTop: "1px solid var(--dc-bg)", fontSize: 12, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 6 }}><Repeat size={13} strokeWidth={1.75} /> Arrastra una cita para cambiar {modo === "sillon" ? "sillón u hora" : modo === "doctores" ? "doctor u hora" : "fecha u hora"}. Si el doctor no atiende o el sillón está ocupado, no se suelta; al cambiar la hora se busca otro sillón libre.</div>}
     </div>
   );
@@ -1587,7 +1634,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
         cols={COLS_AGENDA} />
-      </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf} reglas={reglasAg} validar={validarMovida} sedeInicial={sedeActiva} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
+      </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf} reglas={reglasAg} validar={validarMovida} sedeInicial={sedeActiva}
+        onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
+        onQuitarAsignacion={puedeAgendar ? (id) => { if (conectado) { api.sillones.quitarAsignacion(id).then(() => notify("Turno quitado.")).catch(() => notify("No se pudo quitar.")); return; } demoDb?.setAsignaciones((xs) => (xs || []).filter((x) => x.id !== id)); notify("Turno quitado."); } : null} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
       {fmId && (
         <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
           <FichaMedica pacienteId={fmId} onClose={() => { setFmId(null); setFichaCita(null); }} notify={notify} can={can} rol={rol}
@@ -1608,7 +1657,11 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         const guardarBloq = () => {
           if (bloqForm.horaFin <= bloqForm.horaInicio) { notify("La hora de fin debe ser mayor que la de inicio."); return; }
           const payload = { horaInicio: bloqForm.horaInicio, horaFin: bloqForm.horaFin, motivo: bloqForm.motivo || "Bloqueado",
-            fecha: bloqForm.tipo === "dia" ? bloqForm.fecha : null, diaSemana: bloqForm.tipo === "semanal" ? Number(bloqForm.diaSemana) : null };
+            fecha: bloqForm.tipo === "dia" ? bloqForm.fecha : null, diaSemana: bloqForm.tipo === "semanal" ? Number(bloqForm.diaSemana) : null,
+            ...(bloqForm.aplica === "doctor" ? { medicoId: conectado ? bloqForm.medicoId : Number(bloqForm.medicoId) } : {}),
+            ...(bloqForm.aplica === "sillon" ? (() => { const [sd, n] = String(bloqForm.sillonKey || "").split("|"); return { sede: conectado ? sd : Number(sd), sillon: Number(n) }; })() : {}) };
+          if (bloqForm.aplica === "doctor" && !bloqForm.medicoId) { notify("Elige el doctor."); return; }
+          if (bloqForm.aplica === "sillon" && !bloqForm.sillonKey) { notify("Elige el sillón."); return; }
           if (!conectado) { demoDb?.setBloqueos((bs) => [...(bs || []), { ...payload, id: `b${Date.now()}` }]); notify("Horario bloqueado."); setBloqForm(null); return; }
           api.bloqueos.crear(payload).then(() => { notify("Horario bloqueado."); setBloqForm(null); recargarBloqueos(); }).catch(() => notify("No se pudo crear el bloqueo."));
         };
@@ -1621,6 +1674,11 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
                 <button key={k} onClick={() => setBloqForm({ ...bloqForm, tipo: k })} style={{ padding: "7px 14px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: bloqForm.tipo === k ? "#fff" : "transparent", color: bloqForm.tipo === k ? NAVY : "var(--dc-ink-400)", boxShadow: bloqForm.tipo === k ? DS.sh.sm : "none" }}>{l}</button>
               ))}
             </div>
+            <div><label style={lblSty}>Aplica a</label>
+              <div className="dc-fe__seg" role="radiogroup" aria-label="A quién aplica">{[["toda", "Toda la agenda"], ["doctor", "Un doctor"], ["sillon", "Un sillón"]].map(([k, l]) => <button key={k} type="button" className={(bloqForm.aplica || "toda") === k ? "is-on" : ""} onClick={() => setBloqForm({ ...bloqForm, aplica: k, motivo: k === "sillon" ? "Mantenimiento de sillón" : k === "doctor" ? "Ausencia del doctor" : bloqForm.motivo })}>{l}</button>)}</div>
+            </div>
+            {bloqForm.aplica === "doctor" && <div><label style={lblSty}>Doctor</label><Select value={bloqForm.medicoId || ""} onChange={(v) => setBloqForm({ ...bloqForm, medicoId: v })} placeholder="— Selecciona —" options={(reglasAg.medicos || []).map((m) => ({ value: m.id, label: m.nombre }))} /></div>}
+            {bloqForm.aplica === "sillon" && <div><label style={lblSty}>Sillón</label><Select value={bloqForm.sillonKey || ""} onChange={(v) => setBloqForm({ ...bloqForm, sillonKey: v })} placeholder="— Selecciona —" options={(reglasAg.sillones || []).map((x) => ({ value: `${x.sede}|${x.numero}`, label: x.nombre, sub: nombreSede(x.sede) || "" }))} /></div>}
             {bloqForm.tipo === "dia"
               ? <div><label style={lblSty}>Fecha</label><input className="dc-premium-inp" type="date" value={bloqForm.fecha} onChange={(e) => setBloqForm({ ...bloqForm, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} /></div>
               : <div><label style={lblSty}>Día de la semana</label><Select value={bloqForm.diaSemana} onChange={(v) => setBloqForm({ ...bloqForm, diaSemana: v })} options={DIAS_B.map(([v, l]) => ({ value: v, label: l }))} /></div>}
@@ -4021,7 +4079,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       <div className="dc-cjh__top">
         <div className="dc-cjh__estado">
           <span className="dc-cjh__chip"><i />{cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>
-          <h2>{sedeNombre()}</h2>
+          <h2>{!cajaAbierta && !cerradaHoyReg && sedeRequierePick && !sedeUuid() ? "Caja del día" : sedeNombre()}</h2>
           <p>{fechaLegible(fmt(hoy))}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}${apertura?.abiertaPorNombre ? ` · ${apertura.abiertaPorNombre}` : ""}` : cerradaHoyReg ? ` · cerró ${horaDe(cerradaHoyReg.cerradaEn)} · ${difTxt(cerradaHoyReg.diferencia)}` : " · ábrela para empezar a cobrar"}</p>
         </div>
         <dl className="dc-cjh__cifras">
@@ -4048,6 +4106,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </React.Fragment>
         ); })}
         <span className="dc-cjh__div" aria-hidden="true" />
+        <button type="button" className={`dc-cjh__extra${tab === "sunat" ? " is-on" : ""}`} onClick={() => setTab("sunat")}><Receipt size={14} strokeWidth={2} /> Facturación electrónica</button>
         <button type="button" className={`dc-cjh__extra${tab === "historial" ? " is-on" : ""}`} onClick={() => setTab("historial")}><History size={14} strokeWidth={2} /> Historial</button>
         <button type="button" className={`dc-cjh__extra${tab === "links" ? " is-on" : ""}`} onClick={() => setTab("links")}><Link2 size={14} strokeWidth={2} /> Links de pago{linksPend ? <em>{linksPend}</em> : null}</button>
       </nav>
@@ -4082,18 +4141,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
         </Modal>
       )}
-      {tab === "cobros" && <section className="dc-esp-hero dc-caja-hero">
-        <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>S/ {montoPorCobrar.toLocaleString("es-PE")}</b><span>por cobrar</span></div>
-          <p>{porCobrar.length} {porCobrar.length === 1 ? "plan en curso" : "planes en curso"}, {conectado ? "boleta aún sin envío a SUNAT" : "demo sin envío a SUNAT"}</p>
-        </div>
-        <div className="dc-esp-hero__cifras">
-          <div title={`Cobrado este mes – ${sedeNombreCobros()}`}><b>S/ {cobradoMes.toLocaleString("es-PE")}</b><span>Cobrado este mes</span></div>
-          <div><b>{porCobrar.filter((x) => x.pagado === 0).length}</b><span>Sin ningún pago</span></div>
-        </div>
-        <span />
-        {puedeConfig && <button type="button" className="dc-esp-hero__agregar" onClick={() => setDatosFact(true)}><FileText size={15} strokeWidth={1.9} /> Datos de facturación</button>}
-      </section>}
+      {tab === "sunat" && <FacturacionSunat notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
+        sedes={(misSedes || [1, 2]).map((n) => ({ id: n, nombre: nombreSede(n) }))}
+        pagos={pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", sede: pg.sede ?? (Array.isArray(p.sedes) ? p.sedes[0] : p.sede) ?? 1 })))} />}
 
       {tab === "apertura" && (
         <div className="dc-ap" style={{ display: "grid", gap: 16 }}>
@@ -4291,6 +4341,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         <Card className="dc-cob__lista">
           <div className="dc-cob__cab">
             <div><h3>Saldos por cobrar</h3><span>{porCobrar.length} {porCobrar.length === 1 ? "paciente" : "pacientes"} con plan en curso</span></div>
+            <div className="dc-cob__chips">
+              {porCobrar.some((x) => x.pagado === 0) && <span className="is-aviso" title="Pacientes con plan que aún no hicieron ningún pago">{porCobrar.filter((x) => x.pagado === 0).length} sin ningún pago</span>}
+              <span title={`Cobrado este mes – ${sedeNombreCobros()}`}>Cobrado en el mes <b>{sol(cobradoMes)}</b></span>
+            </div>
           </div>
           {conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : !porCobrar.length ? <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todo cobrado" sub="No hay saldos pendientes en esta sede." /> : (
             <ListaFiltrable rows={porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} vistaClave="cobros" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
@@ -4334,7 +4388,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <div><small>Boletas hoy</small><b className="is-neutro">{boletasHoyActivas.length}</b></div>            {boletasHoyActivas.some((b) => b.moneda === "USD") && <div className="dc-cob__usd"><small>Recibido en dólares</small><b>US$ {boletasHoyActivas.filter((b) => b.moneda === "USD").reduce((a, b) => a + (Number(b.montoOriginal) || 0), 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Ya sumado en soles al tipo de cambio del cobro</span></div>}
           </div>
           <Card className="dc-cob__boletas">
-            <div className="dc-cob__boletas-cab"><h4>Boletas de hoy</h4><span>{boletasHoy.length}</span></div>
+            <div className="dc-cob__boletas-cab"><h4>Comprobantes de hoy</h4><span>{boletasHoy.length}</span></div>
         {boletasHoy.length === 0 ? <Vacio icon={<FileText size={24} strokeWidth={1.75} />} titulo="Sin boletas hoy" sub="Los comprobantes del día aparecerán aquí." />
           : boletasHoy.map((b, i) => (
             <div key={b.id || i} className="dc-bolrow" style={{ borderTop: i ? "1px solid var(--dc-line)" : "none", opacity: b.anulado ? 0.65 : 1 }}>
@@ -4348,6 +4402,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               )}
             </div>
           ))}
+            <div className="dc-cob__fe">
+              <button type="button" onClick={() => setTab("sunat")}><Receipt size={15} strokeWidth={2} /><span><b>Facturación electrónica</b><small>{conectado ? "Estado ante SUNAT de cada comprobante" : "Vista previa del envío a SUNAT"}</small></span><ChevronRight size={15} strokeWidth={2} /></button>
+              {puedeConfig && <button type="button" className="is-sec" onClick={() => setDatosFact(true)}><FileText size={14} strokeWidth={2} /> Datos del emisor</button>}
+            </div>
           </Card>
         </aside>
       </div>
@@ -8017,6 +8075,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [sillones, setSillones] = usePersist("sillones", SILLONES_DEMO);
   const [dispMedicos, setDispMedicos] = usePersist("disp_medicos", DISP_DEMO);
   const [bloqueosDemo, setBloqueosDemo] = usePersist("bloqueos", []);
+  const [asignaciones, setAsignaciones] = usePersist("asig_sillones", []);   // turnos del día por sillón
   // Citas guardadas antes de que existiera la regla de sillones: se les asigna uno.
   useEffect(() => {
     if (auth.token) return;
@@ -8401,6 +8460,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         { id: "caja_historial", label: "Historial", mod: "facturacion" },
         ...(can("facturacion", "ver") ? [{ id: "caja_movimientos", label: "Ingresos y egresos", mod: "facturacion" }] : []),
         { id: "caja_links", label: "Links de pago", mod: "facturacion" },
+        { id: "caja_sunat", label: "Facturación electrónica", mod: "facturacion" },
       ] },
       { id: "metas", label: "Metas de producción", icon: Target },
       { id: "seguros", label: "Seguros y EPS", icon: Umbrella },
@@ -8451,7 +8511,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const orgUnaSede = auth.token ? (sedesOrg.length > 0 ? sedesOrg.length === 1 : false) : false;
   const puedeMultisede = multisede && !esSuper && !orgUnaSede && sedesDelSelector.length > 1;
 
-  const irCaja = (t) => setVista({ cobros: "facturacion", apertura: "caja_apertura", cierre: "caja_cierre", historial: "caja_historial", movimientos: "caja_movimientos", links: "caja_links" }[t] || "facturacion");
+  const irCaja = (t) => setVista({ cobros: "facturacion", apertura: "caja_apertura", cierre: "caja_cierre", historial: "caja_historial", movimientos: "caja_movimientos", links: "caja_links", sunat: "caja_sunat" }[t] || "facturacion");
   const irInventario = (t) => setVista({ productos: "inventario", compras: "inventario_compras", consumo: "inventario_consumo", proveedores: "inventario_prov" }[t] || "inventario");
   const render = () => {
     switch (vista) {
@@ -8496,6 +8556,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "caja_historial": return <Facturacion key="caja" tab="historial" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_movimientos": return <Facturacion key="caja" tab="movimientos" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_links": return <Facturacion key="caja" tab="links" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      case "caja_sunat": return <Facturacion key="caja" tab="sunat" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja": return <Facturacion pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "metas": return <Metas notify={notify} can={can} />;
       // Alias históricos → misma pantalla Producción y comisiones (2 pestañas).
@@ -8512,7 +8573,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   const RolIcon = R.icon;
   return (
-    <DatosDemoCtx.Provider value={{ fichas, updFicha, citas, setCitas, pacientes, setPacientes, horarioClinica, sillones, setSillones, dispMedicos, setDispMedicos, bloqueos: bloqueosDemo, setBloqueos: setBloqueosDemo }}>
+    <DatosDemoCtx.Provider value={{ fichas, updFicha, citas, setCitas, pacientes, setPacientes, horarioClinica, sillones, setSillones, dispMedicos, setDispMedicos, bloqueos: bloqueosDemo, setBloqueos: setBloqueosDemo, asignaciones, setAsignaciones }}>
     <div className="dc-shell" style={{ display: "flex", height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 500, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}

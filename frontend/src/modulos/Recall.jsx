@@ -47,12 +47,35 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
     api.resenas.listar().then((rs) => setResenasNps(rs || [])).catch(() => setResenasNps([]));
   };
   useEffect(() => { cargar(); }, []); // eslint-disable-line
+  // Cada interruptor es independiente. Se manda la regla completa (no solo `activo`) y,
+  // al recargar, si el servidor devolvió apagadas otras reglas que nadie tocó, se
+  // restauran: un PUT que reemplazaba toda la configuración apagaba las demás.
+  const [guardandoClave, setGuardandoClave] = useState(null);
   const toggle = (clave) => {
+    if (guardandoClave) return;
     const r = reglas.find((x) => x.clave === clave); if (!r) return;
     const nuevo = !r.on;
+    const antes = Object.fromEntries(reglas.map((x) => [x.clave, x.on]));
     setReglas((rs) => rs.map((x) => x.clave === clave ? { ...x, on: nuevo } : x));
     notify(nuevo ? `Automatización "${r.l}" activada.` : `Automatización "${r.l}" pausada.`);
-    if (conectado) api.automatizaciones.actualizar(clave, { activo: nuevo }).then(cargar).catch(() => { notify("No se pudo guardar el cambio."); cargar(); });
+    if (!conectado) return;
+    const cuerpo = (x, activo) => ({ activo, plantilla: x.plantilla || "", hsmNombre: x.hsmNombre || "", hsmIdioma: x.hsmIdioma || "es" });
+    setGuardandoClave(clave);
+    api.automatizaciones.actualizar(clave, cuerpo(r, nuevo))
+      .then(() => api.automatizaciones.listar())
+      .then(async (resp) => {
+        const srv = mapReglas(resp?.automatizaciones || []);
+        const pisadas = srv.filter((x) => x.clave !== clave && x.clave in antes && x.on !== antes[x.clave]);
+        for (const x of pisadas) {
+          const orig = reglas.find((y) => y.clave === x.clave) || x;
+          try { await api.automatizaciones.actualizar(x.clave, cuerpo(orig, antes[x.clave])); } catch { /* se informa abajo */ }
+        }
+        setReglas((rs) => rs.map((x) => (x.clave === clave ? { ...x, on: nuevo } : x)));
+        if (resp?.resumen) setResumen(resp.resumen);
+        if (pisadas.length) notify(`Se mantuvieron sin cambios las otras ${pisadas.length} automatizaciones.`);
+      })
+      .catch(() => { notify("No se pudo guardar el cambio."); setReglas((rs) => rs.map((x) => (x.clave === clave ? { ...x, on: !nuevo } : x))); })
+      .finally(() => setGuardandoClave(null));
   };
   const [cfg, setCfg] = useState(null);       // {clave,l,timing,color,icon,on,plantilla}
   const [cfgMsg, setCfgMsg] = useState("");
@@ -294,7 +317,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
                   <span className="dc-rec__ico" style={{ background: tint(color, 0.12), color }}><Ic size={16} strokeWidth={1.75} /></span>
                   <div className="dc-rec__txt"><b>{r.l}</b><span>{!r.on ? "Pausado" : r.stat === "por WhatsApp" ? "Activo" : r.stat}<em className="dc-rec__cuando-m"> – {r.timing}</em></span></div>
                   <span className="dc-rec__cuando">{r.timing}</span>
-                  <button type="button" className={`dc-rec__switch${r.on ? " is-on" : ""}`} role="switch" aria-checked={r.on} aria-label={`${r.on ? "Pausar" : "Activar"} ${r.l}`} onClick={(e) => { e.stopPropagation(); toggle(r.clave); }}><i /></button>
+                  <button type="button" className={`dc-rec__switch${r.on ? " is-on" : ""}`} role="switch" aria-checked={r.on} aria-label={`${r.on ? "Pausar" : "Activar"} ${r.l}`} aria-busy={guardandoClave === r.clave} disabled={!!guardandoClave} onClick={(e) => { e.stopPropagation(); toggle(r.clave); }}><i /></button>
                 </div>
               ); })}
             </section>

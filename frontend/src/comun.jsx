@@ -9,10 +9,10 @@
    siguen siendo la fuente única de verdad; solo cambiaron de archivo. No
    renombres claves, solo valores (misma regla que antes).
    ============================================================================ */
-import { abrirDocumento } from "./util/membrete";
+import { abrirDocumento, datosImpresion } from "./util/membrete";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import {AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2} from "lucide-react";
+import {AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2, Download, FileSpreadsheet, FileText} from "lucide-react";
 
 export const NAVY = "var(--dc-navy)", RED = "var(--dc-red)", BG = "var(--dc-bg)", INK = "var(--dc-ink-alt)", TEAL = "var(--dc-teal)", WARM = "var(--dc-warn-700)";
 
@@ -177,7 +177,7 @@ export const permisosEfectivos = (usuario, rolePerms) => mergePerms((rolePerms &
 export const modulosVisibles = (perms) => MODULOS.filter((m) => (perms?.[m.id] || []).includes("ver")).map((m) => m.id);
 /* Rutas de sub-vista que pertenecen a un módulo (para permisos/validación de navegación). */
 /* Rutas de sub-vista → módulo de permisos (no colapsar agenda_cal en el router). */
-export const VISTA_ALIAS = { agenda_cal: "agenda", agenda_consolidado: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", inventario_compras: "inventario", inventario_consumo: "inventario", inventario_prov: "inventario", caja_apertura: "facturacion", caja_cierre: "facturacion", caja_historial: "facturacion", caja_movimientos: "facturacion", caja_links: "facturacion", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
+export const VISTA_ALIAS = { agenda_cal: "agenda", agenda_consolidado: "agenda", recall_hist: "recall", recall_sat: "recall", reportes_aus: "reportes", inventario_compras: "inventario", inventario_consumo: "inventario", inventario_prov: "inventario", caja_apertura: "facturacion", caja_cierre: "facturacion", caja_historial: "facturacion", caja_movimientos: "facturacion", caja_links: "facturacion", caja_sunat: "facturacion", caja: "facturacion", comisiones: "reportes", periodontograma: "perio", fotos: "radiografias" };
 export const modDeVista = (v) => VISTA_ALIAS[v] || v;
 
 /* Catálogo de módulos (para la matriz de permisos y la navegación). */
@@ -413,17 +413,182 @@ export const fmtHoy = () => fmt(hoyAhora());
 /* ── Exportación (Excel real .xlsx + PDF) ──
    columnas: [{ key, label, w? }]  –  filas: array de objetos por key.
    Excel: SheetJS por import dinámico (no engorda el bundle; se carga solo al exportar). */
-export async function exportarExcel({ nombreArchivo, hoja = "Datos", titulo, columnas, filas }) {
-  const XLSX = await import("xlsx");
-  const aoa = [];
-  if (titulo) { aoa.push([titulo]); aoa.push([]); }
-  aoa.push(columnas.map((c) => c.label));
-  for (const r of filas) aoa.push(columnas.map((c) => r[c.key] ?? ""));
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = columnas.map((c) => ({ wch: c.w || 18 }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, (hoja || "Datos").slice(0, 31));
-  XLSX.writeFile(wb, nombreArchivo.endsWith(".xlsx") ? nombreArchivo : nombreArchivo + ".xlsx");
+export async function exportarExcel({ nombreArchivo, hoja = "Datos", titulo, subtitulo = "", columnas, filas }) {
+  const archivo = nombreArchivo.endsWith(".xlsx") ? nombreArchivo : nombreArchivo + ".xlsx";
+  try {
+    await exportarExcelMembrete({ archivo, hoja, titulo, subtitulo, columnas, filas });
+  } catch (e) {
+    // Respaldo sin formato si la librería con estilos no carga.
+    const XLSX = await import("xlsx");
+    const aoa = [];
+    if (titulo) { aoa.push([titulo]); aoa.push([]); }
+    aoa.push(columnas.map((c) => c.label));
+    for (const r of filas) aoa.push(columnas.map((c) => r[c.key] ?? ""));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = columnas.map((c) => ({ wch: c.w || 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, (hoja || "Datos").slice(0, 31));
+    XLSX.writeFile(wb, archivo);
+  }
+}
+/* Excel con el membrete de la clínica: logo, nombre, razón social y RUC, datos de la
+   sede que emite, título del reporte, cabecera con el color de la marca, filas
+   alternadas, filtros, cabecera fija y pie con la fecha de emisión. */
+async function exportarExcelMembrete({ archivo, hoja, titulo, subtitulo, columnas, filas }) {
+  const ExcelJS = (await import("exceljs")).default;
+  const { empresa: e = {}, sede: s = {} } = datosImpresion() || {};
+  const wb = new ExcelJS.Workbook();
+  wb.creator = e.nombre || "Dento Check"; wb.created = new Date();
+  const n = Math.max(columnas.length, 4);
+  const ws = wb.addWorksheet((hoja || "Datos").replace(/[\\/?*[\]:]/g, " ").slice(0, 31), {
+    pageSetup: { paperSize: 9, orientation: columnas.length > 6 ? "landscape" : "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.6, header: 0.2, footer: 0.3 } },
+    views: [{ showGridLines: false }],
+  });
+  const MARCA = "FF0B6C78", TINTA = "FF12313A", GRIS = "FF667085", LINEA = "FFD9E3E6", ZEBRA = "FFF3F8F9";
+  ws.columns = columnas.map((c) => ({ width: Math.max(10, Math.min(48, c.w || 18)) }));
+  // Logo (PNG o JPG) en la esquina; si no hay o es SVG, va el nombre en grande.
+  let conLogo = false;
+  if (e.logo) {
+    try {
+      const resp = await fetch(e.logo); const blob = await resp.blob();
+      const ext = /png/i.test(blob.type) ? "png" : /jpe?g/i.test(blob.type) ? "jpeg" : null;
+      if (ext) {
+        const buf = await blob.arrayBuffer();
+        const id = wb.addImage({ buffer: buf, extension: ext });
+        const dim = await new Promise((ok) => { const im = new Image(); im.onload = () => ok([im.naturalWidth, im.naturalHeight]); im.onerror = () => ok([200, 60]); im.src = URL.createObjectURL(blob); });
+        const alto = 54, ancho = Math.min(190, Math.round(alto * dim[0] / Math.max(1, dim[1])));
+        ws.addImage(id, { tl: { col: 0.15, row: 0.25 }, ext: { width: ancho, height: alto } });
+        conLogo = true;
+      }
+    } catch { /* sin logo */ }
+  }
+  const colDatos = conLogo ? Math.min(3, n) : 1;    // los datos de la empresa a la derecha del logo
+  const fila = (r, txt, font, alto) => { const c = ws.getCell(r, colDatos); c.value = txt; c.font = font; c.alignment = { vertical: "middle" }; if (n > colDatos) ws.mergeCells(r, colDatos, r, n); if (alto) ws.getRow(r).height = alto; };
+  fila(1, e.nombre || "Clínica", { name: "Calibri", size: 16, bold: true, color: { argb: TINTA } }, 22);
+  fila(2, [e.razonSocial, e.ruc ? `RUC ${e.ruc}` : ""].filter(Boolean).join("  ·  "), { size: 10, color: { argb: GRIS } });
+  fila(3, [s.nombre, s.direccion].filter(Boolean).join("  ·  "), { size: 10, color: { argb: GRIS } });
+  fila(4, [s.telefonos, s.correo || e.web].filter(Boolean).join("  ·  "), { size: 10, color: { argb: GRIS } });
+  // Línea de la marca bajo el membrete.
+  for (let c = 1; c <= n; c++) ws.getCell(5, c).border = { bottom: { style: "medium", color: { argb: MARCA } } };
+  ws.getRow(5).height = 6;
+  const z = (x) => String(x).padStart(2, "0"); const ah = new Date();
+  const cuando = `${z(ah.getDate())}/${z(ah.getMonth() + 1)}/${ah.getFullYear()} ${z(ah.getHours())}:${z(ah.getMinutes())}`;
+  ws.getCell(7, 1).value = titulo || hoja || "Reporte";
+  ws.getCell(7, 1).font = { size: 14, bold: true, color: { argb: MARCA } };
+  ws.mergeCells(7, 1, 7, n);
+  ws.getCell(8, 1).value = [subtitulo, `${filas.length} ${filas.length === 1 ? "registro" : "registros"}`, `Emitido ${cuando}`].filter(Boolean).join("  ·  ");
+  ws.getCell(8, 1).font = { size: 10, italic: true, color: { argb: GRIS } };
+  ws.mergeCells(8, 1, 8, n);
+  // Cabecera de la tabla.
+  const R0 = 10;
+  const cab = ws.getRow(R0);
+  columnas.forEach((c, i) => {
+    const cell = cab.getCell(i + 1);
+    cell.value = c.label;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10.5 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: MARCA } };
+    cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+    cell.border = { top: { style: "thin", color: { argb: MARCA } }, bottom: { style: "thin", color: { argb: MARCA } } };
+  });
+  cab.height = 22;
+  // Números como números (montos con dos decimales) para que se puedan sumar.
+  const aNumero = (v) => {
+    if (typeof v === "number") return v;
+    const t = String(v ?? "").trim();
+    if (/^-?(S\/|US\$)?\s?-?[\d,]+(\.\d+)?%?$/.test(t) && !/^0\d/.test(t.replace(/^(S\/|US\$)\s?/, ""))) {
+      const num = Number(t.replace(/^(S\/|US\$)\s?/, "").replace(/,/g, "").replace(/%$/, ""));
+      // DNI, teléfonos y códigos (enteros largos sin formato) se quedan como texto.
+      const plano = /^\d+$/.test(t);
+      if (Number.isFinite(num) && t.replace(/[^\d]/g, "").length < 12 && !(plano && t.length > 6)) return { num, moneda: /^S\//.test(t) ? "S/" : /^US\$/.test(t) ? "US$" : null, pct: /%$/.test(t), dec: /\.\d/.test(t) };
+    }
+    return null;
+  };
+  filas.forEach((r, k) => {
+    const row = ws.getRow(R0 + 1 + k);
+    columnas.forEach((c, i) => {
+      const raw = r[c.key];
+      const cell = row.getCell(i + 1);
+      const nv = aNumero(raw);
+      if (nv && typeof nv === "object") {
+        cell.value = nv.pct ? nv.num / 100 : nv.num;
+        cell.numFmt = nv.pct ? "0%" : nv.moneda ? `"${nv.moneda} "#,##0.00` : nv.dec ? "#,##0.00" : "0";
+        cell.alignment = { horizontal: "right", vertical: "top" };
+      } else if (typeof nv === "number") {
+        cell.value = nv; cell.alignment = { horizontal: "right", vertical: "top" };
+      } else {
+        cell.value = raw == null ? "" : String(raw);
+        cell.alignment = { vertical: "top", wrapText: String(raw ?? "").length > 40 };
+      }
+      cell.font = { size: 10, color: { argb: TINTA } };
+      if (k % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ZEBRA } };
+      cell.border = { bottom: { style: "hair", color: { argb: LINEA } } };
+    });
+  });
+  if (filas.length) ws.autoFilter = { from: { row: R0, column: 1 }, to: { row: R0, column: columnas.length } };
+  ws.views = [{ state: "frozen", ySplit: R0, showGridLines: false }];
+  const pie = R0 + filas.length + 2;
+  ws.getCell(pie, 1).value = `${[e.razonSocial || e.nombre, e.ruc ? `RUC ${e.ruc}` : ""].filter(Boolean).join(" · ")} — Generado con Dento Check el ${cuando}`;
+  ws.getCell(pie, 1).font = { size: 9, color: { argb: GRIS } };
+  ws.mergeCells(pie, 1, pie, n);
+  ws.headerFooter.oddFooter = `&L&8${(e.nombre || "").replace(/&/g, "&&")}&R&8Página &P de &N`;
+  ws.pageSetup.printTitlesRow = `${R0}:${R0}`;
+  const buf = await wb.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const a = document.createElement("a"); a.href = url; a.download = archivo; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+/* Botón «Exportar» de tablas y listas: Excel o PDF, ambos con el membrete de la
+   clínica. Exporta lo que se está viendo (con los filtros y el orden aplicados). */
+export function BotonExportar({ titulo, cols, filas, sub = "registros" }) {
+  const [abierto, setAbierto] = useState(false);
+  const usables = (cols || []).filter((c) => (c.get || c.cell || c.exportar) && c.label && typeof c.label === "string" && c.key !== "acc" && !c.noExport);
+  if (!usables.length) return null;
+  const columnas = usables.map((c) => ({ key: c.key, label: c.label, w: Math.max(10, Math.min(40, String(c.label).length + 8)) }));
+  // Se exporta lo que se ve en la celda (no el valor interno de orden o búsqueda).
+  const datos = async () => {
+    let aTexto = null;
+    if (usables.some((c) => c.cell && !c.exportar)) {
+      try {
+        const { renderToStaticMarkup } = await import("react-dom/server");
+        const tmp = document.createElement("div");
+        aTexto = (el) => {
+          tmp.innerHTML = renderToStaticMarkup(<>{el}</>).replace(/<small/g, "<i>·</i><small").replace(/<[^>]+>/g, (t) => ` ${t} `);
+          // Fuera avatares con iniciales, íconos y adornos: solo el dato.
+          tmp.querySelectorAll("svg, [aria-hidden=true]").forEach((x) => x.remove());
+          tmp.querySelectorAll("*").forEach((x) => { const t = x.textContent.trim(); if (!x.children.length && /^[A-ZÁÉÍÓÚÑ]{1,3}$/.test(t) && /radius|__av|avatar/i.test(`${x.getAttribute("style") || ""} ${x.className || ""}`)) x.remove(); });
+          return tmp.textContent.replace(/\s+/g, " ").replace(/^(· )+|( ·)+$/g, "").replace(/(· ){2,}/g, "· ").trim();
+        };
+      } catch { aTexto = null; }
+    }
+    const valor = (c, r) => {
+      try {
+        if (c.exportar) return c.exportar(r) ?? "";
+        if (c.cell && aTexto) { const t = aTexto(c.cell(r)); if (t || !c.get) return t; }
+        const v = c.get ? c.get(r) : ""; return v == null || typeof v === "object" ? "" : v;
+      } catch { try { const v = c.get ? c.get(r) : ""; return v == null || typeof v === "object" ? "" : v; } catch { return ""; } }
+    };
+    const rows = (filas || []).map((r) => Object.fromEntries(usables.map((c) => [c.key, valor(c, r)])));
+    // Ancho de columna según el contenido.
+    columnas.forEach((col) => { const largo = Math.max(String(col.label).length, ...rows.slice(0, 200).map((r) => String(r[col.key] ?? "").length)); col.w = Math.max(10, Math.min(48, largo + 3)); });
+    return rows;
+  };
+  const nombre = String(titulo || sub || "reporte").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const fecha = new Date().toISOString().slice(0, 10);
+  const excel = async () => { setAbierto(false); await exportarExcel({ nombreArchivo: `${nombre}_${fecha}.xlsx`, hoja: titulo || "Datos", titulo, subtitulo: "", columnas, filas: await datos() }); };
+  const pdf = async () => { setAbierto(false); const filasPdf = await datos(); exportarPDF({ titulo, subtitulo: `${(filas || []).length} ${sub}`, columnas, filas: filasPdf }); };
+  return (
+    <div className="dc-exp">
+      <button type="button" className="dc-exp__btn" onClick={() => setAbierto((v) => !v)} aria-haspopup="menu" aria-expanded={abierto} title="Exportar lo que se ve, con el membrete de la clínica"><Download size={14} strokeWidth={2} /> <span>Exportar</span></button>
+      {abierto && <>
+        <div className="dc-exp__velo" onClick={() => setAbierto(false)} />
+        <div className="dc-exp__menu" role="menu">
+          <small>{(filas || []).length} {sub} · con membrete</small>
+          <button type="button" role="menuitem" onClick={excel}><FileSpreadsheet size={16} strokeWidth={1.9} /><span><b>Excel</b><em>Logo, datos de la empresa y filtros</em></span></button>
+          <button type="button" role="menuitem" onClick={pdf}><FileText size={16} strokeWidth={1.9} /><span><b>PDF</b><em>Listo para imprimir o enviar</em></span></button>
+        </div>
+      </>}
+    </div>
+  );
 }
 export const escHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 /* PDF bien formateado vía ventana de impresión (Guardar como PDF). Sin dependencias extra.
@@ -1302,12 +1467,12 @@ export function ThOrden({ st, k, children, className = "", a = "left" }) {
 /* Barra de las listas: cuántos hay, un buscador y «Ordenar por». Reemplaza la fila de
    pastillas por columna, que repetía la tabla y no se entendía. En modo tabla el orden
    lo hacen los encabezados y aquí queda sólo el buscador. */
-export function FiltroCabecera({ st, total, filtradas, sub = "registros", className = "", extra = null, modoTabla = false }) {
+export function FiltroCabecera({ st, total, filtradas, sub = "registros", className = "", extra = null, modoTabla = false, exportar = null }) {
   const { cols, sortCol, sortDir, setSortCol, setSortDir, q, setQ } = st;
   const ordenables = cols.filter((c) => !c.noSort && (c.sortVal || c.get));
   const buscable = !modoTabla && total > 6 && cols.some((c) => !c.noFilter && c.get);
   const verOrden = !modoTabla && ordenables.length > 0 && total > 3;
-  if (!buscable && !verOrden && !extra) return null;
+  if (!buscable && !verOrden && !extra && !exportar) return null;
   return (
     <div className={`dc-fcab ${className}`}>
       <span className="dc-fcab__cant"><b>{filtradas}</b> {sub}{q.trim() ? ` de ${total}` : ""}</span>
@@ -1328,7 +1493,7 @@ export function FiltroCabecera({ st, total, filtradas, sub = "registros", classN
             {sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2.2} /> : <ChevronDown size={14} strokeWidth={2.2} />}</button>}
         </div>
       )}
-      {extra && <div className="dc-fcab__extra">{extra}</div>}
+      {(extra || exportar) && <div className="dc-fcab__extra">{extra}{exportar && <BotonExportar {...exportar} sub={sub} />}</div>}
     </div>
   );
 }
@@ -1401,7 +1566,7 @@ export function TablaPremium({ cols, rows, onRowClick, minWidth = 640, st = null
   );
 }
 
-export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", tabla = null, modoTabla = false, children }) {
+export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", tabla = null, modoTabla = false, exportTitulo = "", children }) {
   const { lista, st } = useFiltroTabla(rows, cols, defaultSort);
   // Con `tabla` la lista ofrece también la vista Tabla, con el diseño común del portal.
   const opciones = tabla
@@ -1413,6 +1578,7 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
   return (
     <div className={`dc-lf ${className}`}>
       <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub} modoTabla={enTabla}
+        exportar={exportTitulo !== false && lista.length ? { titulo: exportTitulo || (sub ? sub[0].toUpperCase() + sub.slice(1) : "Reporte"), cols: tabla ? tabla.cols : cols, filas: lista } : null}
         extra={(extra || vistas) ? <>{extra}{vistas && <SelectorVista opciones={vistas} valor={vista} onChange={setVista} />}</> : null} />
       {lista.length === 0 && (rows || []).length > 0
         ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con la búsqueda." />
@@ -1423,7 +1589,7 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
   );
 }
 
-export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true }) {
+export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true, exportar = true, exportTitulo = "" }) {
   const { lista, anyF, limpiar, st } = useFiltroTabla(rows, cols, defaultSort);
   const { sortCol, sortDir, colFilters, q, setQ } = st;
   // Mismo patrón que las listas: un buscador para toda la tabla y el orden en el encabezado.
@@ -1449,7 +1615,7 @@ export function DataTable({ cols, rows, onRowClick, titulo, sub, empty, minWidth
     : { overflowX: "auto" };
   return (
     <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
-      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span>{anyF && <button type="button" className="dc-dt__limpiar" onClick={limpiar}>Limpiar filtros</button>}</div><div className="dc-dt__acc">{cajaBuscar}{accion}</div></div>}
+      {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span>{anyF && <button type="button" className="dc-dt__limpiar" onClick={limpiar}>Limpiar filtros</button>}</div><div className="dc-dt__acc">{cajaBuscar}{accion}{exportar && lista.length > 0 && <BotonExportar titulo={exportTitulo || titulo} cols={cols} filas={lista} sub={etiquetaCant(lista.length, sub)} />}</div></div>}
       {!titulo && cajaBuscar && <div className="dc-dt__barra"><span className="dc-fcab__cant"><b>{lista.length}</b> {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}</span>{cajaBuscar}</div>}
       <div style={scrollStyle}>
         {/* NAV-07: width fluido (100%) cuando minWidth <= 0 para evitar desborde de 340px;

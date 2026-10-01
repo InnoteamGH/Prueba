@@ -166,6 +166,12 @@ Lo que todavía no existe es el **envío a SUNAT**. Por eso el sistema dice «to
 - Factura para empresas: RUC del cliente obligatorio y su razón social. El cobro debe permitir elegir entre boleta y factura.
 - Tareas programadas para el resumen diario de boletas y para reintentar los pendientes.
 
+**Pantalla ya lista en el frontend** (Caja › Facturación electrónica): estado de la conexión, flujo del comprobante, indicadores (emitidos, aceptados, por enviar, por atender), tabla de comprobantes con XML, CDR, reenvío y nota de crédito, resumen diario de boletas, series por sede y modal de conexión con el proveedor. Sin sesión muestra una vista previa con comprobantes simulados. Endpoints que usa (**nuevos**):
+- `GET` y `PUT /facturacion-electronica/config`: `{ proveedor, ambiente, url, token, afectacion, envioAuto, horaResumen, series: { [sedeId]: { boleta, factura, ncBoleta, ncFactura } } }`. El token se guarda cifrado y nunca se devuelve.
+- `POST /facturacion-electronica/probar`: prueba las credenciales con el proveedor.
+- `GET /facturacion-electronica/comprobantes?desde=&hasta=`: `[{ id, tipo, serie, numero, fecha, cliente, doc, concepto, base, igv, total, estado, mensaje, ref, sede }]`.
+- `POST /facturacion-electronica/comprobantes/:id/reenviar` y `POST /facturacion-electronica/comprobantes/:id/nota-credito` con `{ motivo, tipoMotivo }`.
+
 **Qué debe definir la clínica.** Qué proveedor usará; si los servicios llevan IGV o están exonerados (algunos servicios de salud tienen tratamiento especial); y las series por sede (por ejemplo `B001` para San Isidro y `B002` para Surco).
 
 ### Sillones y disponibilidad del doctor
@@ -193,7 +199,10 @@ El modal de agendado propone solo el sillón (el propio del doctor, luego el de 
 - **Nuevos** `POST /sillones` y `PUT /sillones/:id` con esos mismos campos.
 - `GET /disponibilidad` sin `medicoId`: devolver el horario de todos los doctores, con `sedeId` por bloque (un doctor puede atender en una sede en la mañana y en otra en la tarde).
 - `POST /citas` y `PUT /citas/:id`: rechazar con un mensaje claro si el doctor no atiende, si tiene otra cita encima, si el sillón no lo acepta o está ocupado, o si hay un bloqueo.
-- `POST /bloqueos`: opcionalmente `medicoId` o `sillon`, para bloquear solo a un doctor o un sillón.
+- `POST /bloqueos`: aceptar `medicoId` (ausencia de un doctor) o `sedeId` + `sillon` (mantenimiento de un sillón). El calendario ya los pinta solo en su columna.
+- **Turnos del día por sillón**: `GET /sillones/asignaciones?desde=&hasta=`, `POST /sillones/asignaciones` con `{ sedeId, sillon, fecha, desde, hasta, medicoId }` y `DELETE /sillones/asignaciones/:id`. Durante el turno el sillón es solo de ese doctor.
+- **Duración por servicio**: `GET /catalogo/especialidades` con `duracionMin`; el modal la usa como duración propuesta.
+- **Primer hueco libre**: hoy lo calcula el frontend con `GET /citas?desde=&hasta=` de 14 días. Si el volumen crece, conviene un `GET /agenda/huecos?especialidadId=&medicoId=&desde=` en el servidor.
 
 ---
 
@@ -217,3 +226,7 @@ El modal de agendado propone solo el sillón (el propio del doctor, luego el de 
 16. Sillones: `GET /sillones` con `uso`, `medicoId`, `especialidadId`, `exclusivo`, `activo` y `nota`. Nuevos `POST /sillones` y `PUT /sillones/:id`.
 17. `GET /disponibilidad` sin filtro: el horario de todos los doctores, con `sedeId` en cada bloque.
 18. `POST /citas` y `PUT /citas/:id`: validar el horario del doctor, los cruces del doctor, el sillón (uso, servicio y ocupación) y los bloqueos, igual que el frontend.
+19. Facturación electrónica: endpoints `/facturacion-electronica/*` (configuración, prueba de conexión, comprobantes, reenvío y nota de crédito).
+20. Sillones: turnos del día (`/sillones/asignaciones`) y bloqueos por doctor o por sillón.
+21. Catálogo de servicios: `duracionMin` por especialidad.
+22. Recordatorios: `PUT /automatizaciones/:clave` debe actualizar solo esa automatización (recibe la regla completa: `activo`, `plantilla`, `hsmNombre`, `hsmIdioma`). Si reemplazara toda la configuración, apagar una apagaría las demás; el frontend ahora lo detecta y las restaura.

@@ -75,7 +75,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   useEffect(() => {
     if (demo) {
       cargarPac();
-      setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre })));
+      setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, duracionMin: e.duracionMin })));
       setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp })));
       setSeds(SEDES.map((x) => ({ id: x.id, nombre: x.nombre })));
       if (!base?.sedeId) setF((x) => (x.sedeId ? x : { ...x, sedeId: SEDES[0].id }));
@@ -171,6 +171,61 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     const v = n != null ? String(n) : "";
     setF((x) => (x.sillon === v ? x : { ...x, sillon: v }));
   }, [sillonAuto, f.medicoId, f.sedeId, f.fecha, f.hora, f.duracionMin, f.especialidadId, citasDia, reglas.listo]); // eslint-disable-line
+  // Duración según el servicio (endodoncia 60 min, limpieza 30…) mientras no se cambie a mano.
+  const [durAuto, setDurAuto] = useState(true);
+  const espEf = f.especialidadId || (medSel ? (medSel.esp ?? medSel.especialidadId) : "");
+  const espObj = esps.find((e) => String(e.id) === String(espEf));
+  const durServicio = Number(espObj?.duracionMin ?? espObj?.duracion) || null;
+  useEffect(() => {
+    if (!durAuto || !durServicio) return;
+    setF((x) => (x.duracionMin === durServicio ? x : { ...x, duracionMin: durServicio }));
+  }, [durAuto, durServicio]); // eslint-disable-line
+  // Primer hueco libre: recorre los próximos 14 días con el doctor elegido (o los de la
+  // especialidad) dentro de su horario, con un sillón que lo acepte y sin cruces.
+  const [huecos, setHuecos] = useState(null);       // null | "buscando" | [{...}]
+  const buscarHuecos = async () => {
+    setHuecos("buscando");
+    const candidatos = f.medicoId ? meds.filter((m) => String(m.id) === String(f.medicoId)) : medsF;
+    const desdeD = new Date(fmt(hoy) + "T00:00:00");
+    const dias = [...Array(14)].map((_, i) => { const d = new Date(desdeD); d.setDate(d.getDate() + i); return fmt(d); });
+    let citasRango = demo ? (demoDb.citas || []) : [];
+    if (!demo) { try { citasRango = ((await api.citas.listar(null, dias[0], dias[dias.length - 1])) || []).map((c) => ({ ...c, sede: c.sedeId ?? c.sede, hora: String(c.hora || "").slice(0, 5) })); } catch { citasRango = []; } }
+    const ahoraMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const dur = Number(f.duracionMin) || 30;
+    const res = [], vistos = new Set();
+    for (const fecha of dias) {
+      for (const m of candidatos) {
+        if (res.length >= 4) break;
+        const ts = turnosDelDia(ctxReglas.disp, m.id, fecha);
+        const conH = (ctxReglas.disp || []).some((d) => String(d.medicoId) === String(m.id));
+        const bloques = conH ? ts : [{ horaInicio: "08:00", horaFin: "20:00", sede: f.sedeId || seds[0]?.id }];
+        for (const t of bloques) {
+          const sedeT = t.sede ?? t.sedeId ?? f.sedeId ?? seds[0]?.id;
+          const sils = sillonesDeSede(reglas.sillones, sedeT);
+          const ctxT = { ...ctxReglas, citas: citasRango, sillones: sils.length ? sils : sillonesSede };
+          let hallado = null;
+          for (let mm = toMin(String(t.horaInicio).slice(0, 5)); mm + dur <= toMin(String(t.horaFin).slice(0, 5)); mm += 30) {
+            if (fecha === fmt(hoy) && mm <= ahoraMin) continue;
+            const hora = `${String(Math.floor(mm / 60)).padStart(2, "0")}:${String(mm % 60).padStart(2, "0")}`;
+            if (citaFueraDeHorario(fecha, hora, dur, horarioClinica.horario, horarioClinica.feriados, sedeNumDeUuid(seds, sedeT)).fuera) continue;
+            const b = { medicoId: m.id, esp: f.especialidadId || m.especialidadId || m.esp, sede: sedeT, fecha, hora, duracionMin: dur, pacienteId: f.pacienteId || null };
+            const sil = sugerirSillon(ctxT, b);
+            if (sil == null) continue;
+            if (evaluarCita(ctxT, { ...b, sillon: sil }).errores.length) continue;
+            hallado = { ...b, sillon: sil, medico: m.nombre, silNombre: (ctxT.sillones.find((x) => x.numero === sil) || {}).nombre || `Sillón ${sil}` }; break;
+          }
+          if (hallado && !vistos.has(`${m.id}|${fecha}`)) { vistos.add(`${m.id}|${fecha}`); res.push(hallado); break; }
+        }
+      }
+      if (res.length >= 4) break;
+    }
+    setHuecos(res);
+  };
+  const usarHueco = (h) => {
+    setHoraAuto(false); setSillonAuto(false);
+    setF((x) => ({ ...x, medicoId: h.medicoId, sedeId: h.sede, fecha: h.fecha, hora: h.hora, sillon: String(h.sillon) }));
+    setHuecos(null);
+  };
   const evaluacion = f.medicoId && f.sedeId ? evaluarCita(ctxSede, citaBorrador()) : { errores: [], avisos: [] };
   const estSil = f.medicoId && f.sedeId ? estadoSillones(ctxSede, citaBorrador()) : sillonesSede.map((x) => ({ s: x, estado: x.activo ? "libre" : "no", regla: {} }));
   const turnosHoy = f.medicoId ? turnosDelDia(ctxReglas.disp, f.medicoId, f.fecha) : [];
@@ -324,6 +379,10 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crearNuevo}>Crear y usar</Btn></div>
             </div>}
           </div>
+          <label><span style={lbl}>Servicio</span>
+            <Select value={f.especialidadId} onChange={(v) => { setDurAuto(true); setSillonAuto(true); setF({ ...f, especialidadId: v, medicoId: f.medicoId && v && meds.find((m) => String(m.id) === String(f.medicoId) && String(m.especialidadId) !== String(v)) ? "" : f.medicoId }); }} placeholder="Cualquiera"
+                    options={[{ value: "", label: "Cualquiera" }, ...esps.map((e) => ({ value: e.id, label: e.nombre, sub: e.duracionMin ? `${e.duracionMin} min` : undefined }))]} />
+          </label>
           <label><span style={lbl}>Doctor{req}</span>
             <Select value={f.medicoId} onChange={(v) => { setSillonAuto(true); setHoraAuto(true); setF({ ...f, medicoId: v }); }} placeholder="Seleccionar"
                     options={medsF.map((m) => { const ts = turnosDelDia(ctxReglas.disp, m.id, f.fecha, f.sedeId || null); const conH = (ctxReglas.disp || []).some((d) => String(d.medicoId) === String(m.id)); return { value: m.id, label: m.nombre, sub: !conH ? "Sin horario configurado" : ts.length ? `Atiende ${ts.map((t) => `${String(t.horaInicio).slice(0, 5)}–${String(t.horaFin).slice(0, 5)}`).join(" · ")}` : "No atiende ese día en esta sede" }; })} />
@@ -340,7 +399,15 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           </label>
           <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>
           <div>
-            <span style={lbl}>Fecha y hora</span>
+            <div className="dc-agm__fh"><span style={{ ...lbl, marginBottom: 0 }}>Fecha y hora</span>
+              <button type="button" onClick={buscarHuecos} disabled={huecos === "buscando"}><Search size={13} strokeWidth={2.2} /> {huecos === "buscando" ? "Buscando…" : `Primer hueco libre${f.medicoId ? "" : espObj ? ` de ${espObj.nombre.toLowerCase()}` : ""}`}</button>
+            </div>
+            {Array.isArray(huecos) && <div className="dc-agm__huecos">
+              {huecos.length === 0 ? <p>Sin huecos en los próximos 14 días con estas condiciones.</p> : huecos.map((h, i) => (
+                <button key={i} type="button" onClick={() => usarHueco(h)}><b>{h.fecha === fmt(hoy) ? "Hoy" : fechaLegible(h.fecha)} · {h.hora}</b><small>{h.medico} · {(seds.find((x) => String(x.id) === String(h.sede)) || {}).nombre?.replace(/^Sede\s+/, "") || "Sede"} · {h.silNombre}</small></button>
+              ))}
+              <button type="button" className="is-cerrar" onClick={() => setHuecos(null)} aria-label="Cerrar sugerencias">×</button>
+            </div>}
             <div style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, marginBottom: 6 }}>
               {fechaLegible(f.fecha)} – {f.hora}
             </div>
@@ -352,8 +419,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             {pasada && <div style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>Fecha pasada</div>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-            <label><span style={lbl}>Duración</span>
-              <Select value={f.duracionMin} onChange={(v) => setF({ ...f, duracionMin: Number(v) })}
+            <label><span style={lbl}>Duración{durAuto && durServicio && Number(f.duracionMin) === durServicio && <em className="dc-agm__auto">según {espObj.nombre.toLowerCase()}</em>}</span>
+              <Select value={f.duracionMin} onChange={(v) => { setDurAuto(false); setF({ ...f, duracionMin: Number(v) }); }}
                       options={[15, 30, 45, 60, 90, 120].map((m) => ({ value: m, label: m >= 60 ? `${m / 60} h${m % 60 ? " 30 min" : ""}` : `${m} min` }))} />
             </label>
           </div>
@@ -393,10 +460,6 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           {!masDatos && <label><span style={lbl}>Nota de la cita</span><textarea className="dc-premium-inp" value={f.nota} onChange={(e) => setF({ ...f, nota: e.target.value })} rows={2} placeholder="Ej. viene por promoción…" style={{ ...inp, resize: "vertical" }} /></label>}
         </div>
         {masDatos && <div style={{ display: "grid", gap: 14, alignContent: "start", borderLeft: "1px solid var(--dc-line)", paddingLeft: 20 }}>
-          <label><span style={lbl}>Servicio / especialidad</span>
-            <Select value={f.especialidadId} onChange={(v) => setF({ ...f, especialidadId: v, medicoId: "" })} placeholder="Cualquiera"
-                    options={[{ value: "", label: "Cualquiera" }, ...esps.map((e) => ({ value: e.id, label: e.nombre }))]} />
-          </label>
           <div><span style={lbl}>¿Cómo llegó?</span>{canalBtns}</div>
           <label><span style={lbl}>Nota de la cita</span><textarea className="dc-premium-inp" value={f.nota} onChange={(e) => setF({ ...f, nota: e.target.value })} rows={3} placeholder="Ej. viene por promoción…" style={{ ...inp, resize: "vertical" }} /></label>
         </div>}

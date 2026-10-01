@@ -17,6 +17,7 @@ import {
 import { pluralEs, ThOrden, useFiltroTabla } from "../comun";
 import "./panelGerencial.css";
 import ResumenMes from "./ResumenMes";
+import OcupacionSillones from "./OcupacionSillones";
 
 const COLORES_ESP = [
   "var(--dc-accent-cyan)",
@@ -1024,6 +1025,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           </div>
         </div>
       </section>
+
+      <OcupacionSillones />
 
       {/* Caja | Actividad */}
       <div className="dc-grid g-2a">

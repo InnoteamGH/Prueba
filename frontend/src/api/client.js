@@ -383,6 +383,10 @@ export const api = {
     listar: (sedeId) => request("GET", `/sillones${sedeId ? `?sedeId=${sedeId}` : ""}`),
     crear: (d) => request("POST", "/sillones", d),
     actualizar: (id, d) => request("PUT", `/sillones/${id}`, d),
+    // Turnos del día: un sillón asignado a un doctor en una fecha y rango de horas.
+    asignaciones: (desde, hasta) => request("GET", `/sillones/asignaciones${desde ? `?desde=${desde}&hasta=${hasta || desde}` : ""}`),
+    asignar: (d) => request("POST", "/sillones/asignaciones", d),
+    quitarAsignacion: (id) => request("DELETE", `/sillones/asignaciones/${id}`),
   },
   egresos: {
     listar: () => request("GET", "/egresos"),
@@ -459,6 +463,15 @@ export const api = {
   notificaciones: {
     listar: () => request("GET", "/notificaciones"),
     crear: (n) => request("POST", "/notificaciones", n),
+  },
+  // Facturación electrónica (proveedor OSE/PSE). Nuevo en el backend: ver docs/requisitos-minimos.md.
+  sunat: {
+    config: () => request("GET", "/facturacion-electronica/config"),
+    guardarConfig: (cfg) => request("PUT", "/facturacion-electronica/config", cfg),
+    probar: (cfg) => request("POST", "/facturacion-electronica/probar", cfg),
+    comprobantes: (desde, hasta) => request("GET", `/facturacion-electronica/comprobantes${desde ? `?desde=${desde}&hasta=${hasta || desde}` : ""}`),
+    reenviar: (id) => request("POST", `/facturacion-electronica/comprobantes/${encodeURIComponent(id)}/reenviar`),
+    notaCredito: (id, d) => request("POST", `/facturacion-electronica/comprobantes/${encodeURIComponent(id)}/nota-credito`, d),
   },
   automatizaciones: {
     listar: () => request("GET", "/automatizaciones"),

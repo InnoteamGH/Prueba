@@ -27,8 +27,9 @@ describe("SPEC v8 A23 jerarquía", () => {
     assert.match(comun, /<h2 className="dc-title"[\s\S]*?>\{titulo\}<\/h2>/);
   });
   it("Facturación y Reportes tienen cabecera de pantalla", () => {
-    // Caja abre con su franja de color (el h1 sigue en la cabecera de la app).
-    assert.match(app, /className="dc-esp-hero dc-caja-hero"/);
+    // Caja abre con su cabecera de color: estado, cifras del día y pasos del proceso
+    // (el h1 sigue en la cabecera de la app).
+    assert.match(app, /className=\{`dc-cjh\$\{[\s\S]*?aria-label="Caja del día"/);
     assert.match(reportes, /titulo="Producción y comisiones"/);
   });
 });
