@@ -15,7 +15,7 @@ export default function Metas({ notify = () => {}, can }) {
   const cargar = () => {
     if (!conectado) {
       // Demo: odontólogos de ejemplo con su producción del mes.
-      const list = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: ESPECIALIDADES.find((e) => e.id === m.esp)?.nombre, metaMensual: m.meta, prodMes: m.prodDemo, citasMes: m.citasDemo, porcentajeComision: 30 }));
+      const list = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: ESPECIALIDADES.find((e) => e.id === m.esp)?.nombre, metaMensual: m.meta, prodMes: m.prodDemo, citasMes: m.citasDemo, porcentajeComision: m.comision ?? null }));
       setMeds(list);
       const d = {};
       list.forEach((m) => { d[m.id] = String(m.metaMensual); });

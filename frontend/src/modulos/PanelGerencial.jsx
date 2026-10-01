@@ -831,7 +831,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     setRep({ funnel: { conversaciones: 46, agendadas: 19 } });
     setPagos(pagosTodos);
     setTratResumen([
-      ["Profilaxis y limpieza", 42, 4200], ["Resina compuesta", 44, 3960], ["Extracción simple", 18, 2700], ["Curación", 20, 1800], ["Sellantes", 12, 720],
+      // GER-03: servicios del catálogo único (Odontología general), mismos importes que el Top del mes.
+      ["Curación con resina", 44, 5280], ["Limpieza y profilaxis", 42, 3360], ["Reconstrucción estética", 14, 2520], ["Consulta / evaluación", 30, 1500],
     ].map(([nombre, n, imp]) => ({ nombre, numeroDeVentas: Math.max(1, Math.round(n * fa)), importeTotal: Math.round(imp * fa) })));
     setActividad([
       ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),

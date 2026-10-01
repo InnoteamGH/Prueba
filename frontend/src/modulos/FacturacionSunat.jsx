@@ -30,6 +30,7 @@ const AFECTACION = [
   { v: "inafecto", l: "Inafecto" },
 ];
 const ESTADO = {
+  sin_enviar: { l: "Sin enviar", c: "is-off", ic: Clock },
   aceptado: { l: "Aceptado", c: "is-ok", ic: CheckCircle2 },
   pendiente: { l: "Por enviar", c: "is-pend", ic: Clock },
   observado: { l: "Observado", c: "is-aviso", ic: AlertTriangle },
@@ -75,7 +76,9 @@ function simular(pagos, cfg, overrides) {
     const total = moneda === "USD" ? (p.montoOriginal != null ? Number(p.montoOriginal) : Math.round((Number(p.monto) || 0) / 3.75 * 100) / 100) : (Number(p.monto) || 0);
     const base = cfg.afectacion === "gravado" ? Math.round((total / 1.18) * 100) / 100 : total;
     let estado = String(p.fecha).slice(0, 10) >= hoyISO ? "pendiente" : "aceptado", mensaje = "";
-    if (i === iObs) { estado = "observado"; mensaje = "La dirección del cliente supera los 100 caracteres. SUNAT lo aceptó con observación."; }
+    // FAC-01: sin proveedor conectado nada llega a SUNAT: todos quedan «Sin enviar».
+    if (!cfg.proveedor) { estado = "sin_enviar"; }
+    else if (i === iObs) { estado = "observado"; mensaje = "La dirección del cliente supera los 100 caracteres. SUNAT lo aceptó con observación."; }
     if (i === iRech) { estado = "rechazado"; mensaje = "El número de documento del cliente no es válido. Corrígelo y vuelve a enviar."; }
     const id = `${serie}-${num8(cont[serie])}`;
     return {
@@ -93,7 +96,7 @@ function simular(pagos, cfg, overrides) {
 const EstadoChip = ({ e, msg }) => { const x = ESTADO[e] || ESTADO.pendiente; const I = x.ic; return <span className={`dc-fe__chip ${x.c}`} title={msg || x.l}><I size={12} strokeWidth={2.4} /> {x.l}</span>; };
 
 /* ───────────────────────── Caja › Facturación ───────────────────────── */
-export default function FacturacionSunat({ pagos = [], sedes = [], notify = () => {}, abrirBoleta = () => {} }) {
+export default function FacturacionSunat({ pagos = [], sedes = [], notify = () => {}, abrirBoleta = () => {}, onIntegraciones = null }) {
   const conectado = !!auth.token;
   const listaSedes = sedes.length ? sedes : sedesPorDefecto();
   const [cfg, setCfg] = useState(() => leerCfg(listaSedes));
@@ -115,7 +118,7 @@ export default function FacturacionSunat({ pagos = [], sedes = [], notify = () =
     ["todos", "Todos", comprobantes.length],
     ["Boleta", "Boletas", comprobantes.filter((c) => c.tipo === "Boleta").length],
     ["Factura", "Facturas", comprobantes.filter((c) => c.tipo === "Factura").length],
-    ["pendiente", "Por enviar", cuenta("pendiente")],
+    ...(cfg.proveedor || conectado ? [["pendiente", "Por enviar", cuenta("pendiente")]] : [["sin_enviar", "Sin enviar", cuenta("sin_enviar")]]),
     ["atender", "Por atender", atender.length],
   ];
   const visibles = filtro === "todos" ? comprobantes
@@ -196,6 +199,9 @@ export default function FacturacionSunat({ pagos = [], sedes = [], notify = () =
         <BotonExportar titulo="Comprobantes electrónicos" cols={cols} filas={visibles} sub="comprobantes" />
       </div>
 
+      {!cfg.proveedor && (
+        <div className="dc-fe__aviso-sin"><PlugZap size={18} strokeWidth={2} /><div><b>Sin proveedor de facturación electrónica</b><span>Los comprobantes se emiten en el sistema y quedan «Sin enviar» hasta conectar un proveedor (OSE/PSE).</span></div>{onIntegraciones && <button type="button" className="dc-fe__btn" onClick={onIntegraciones}>Ir a Integraciones</button>}</div>
+      )}
       <DataTable sub="comprobantes" minWidth={0} rows={visibles} defaultSort={{ key: "fecha", dir: "desc" }}
         empty={<div className="dc-fe__vacio"><Receipt size={22} strokeWidth={1.75} /><b>Sin comprobantes</b><span>Los cobros de caja generan aquí su boleta o factura.</span></div>}
         cols={cols} exportar={false} />

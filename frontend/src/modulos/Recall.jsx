@@ -166,6 +166,13 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
   ];
   const ESTADO_ENVIO = { entregado: { l: "Entregado", bg: "var(--dc-line)", fg: "var(--dc-ink-700)", ic: Check }, leido: { l: "Leído", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)", ic: CheckCircle2 }, respondido: { l: "Respondió", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)", ic: MessageSquare }, error: { l: "No enviado", bg: "var(--dc-fee2)", fg: "var(--dc-danger-700)", ic: AlertTriangle } };
   const histView = (histReal && histReal.length ? histReal : (conectado ? [] : HIST_ENVIOS));
+  // RCL-01 / M-14: el banner cuenta los mensajes del mes que lista el Historial (misma fuente).
+  const mesEnv = (() => {
+    const mes = fmt(hoy).slice(0, 7);
+    const del = histView.filter((h) => String(h.fecha || "").slice(0, 7) === mes);
+    if (conectado && resumen && !(histReal && histReal.length)) return { total: Number(resumen.mensajesMes) || 0, enviados: Number(resumen.mensajesMes) || 0 };
+    return { total: del.length, enviados: del.filter((h) => h.estado !== "error").length };
+  })();
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       {subtab === "satisfaccion" ? (() => {
@@ -174,7 +181,6 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
         const n = rs.length;
         const prom = rs.filter((r) => r.nps >= 9).length, det = rs.filter((r) => r.nps <= 6).length, pas = n - prom - det;
         const nps = n ? Math.round((prom - det) / n * 100) : 0;
-        const califAvg = n ? (rs.reduce((s, r) => s + (r.calificacion || 0), 0) / n).toFixed(1) : "—";
         const pct = (x) => n ? Math.round(x / n * 100) : 0;
         const comentarios = fuenteResenas.filter((r) => r.comentario && r.comentario.trim()).slice(0, 12);
         const bajos = rs.filter((r) => r.nps <= 6);
@@ -187,11 +193,6 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
               <span className="dc-sat-hero__eti">NPS de la clínica</span>
               <b>{n ? (nps > 0 ? `+${nps}` : `${nps}`) : "—"}</b>
               <span>{n ? `${n} ${n === 1 ? "respuesta" : "respuestas"} a la encuesta` : "Aún sin respuestas"}</span>
-            </div>
-            <div className="dc-sat-hero__calif">
-              <span className="dc-sat-hero__eti">Calificación media</span>
-              <div><b>{califAvg}</b><small>/5</small></div>
-              {n > 0 && estrellas(califAvg)}
             </div>
             <div className="dc-sat-hero__dist">
               <div className="dc-sat-hero__barra" role="img" aria-label={`Promotores ${pct(prom)}%, neutrales ${pct(pas)}%, detractores ${pct(det)}%`}>
@@ -233,41 +234,18 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
         ); })() : subtab === "historial" ? (
         (() => {
           const cuenta = (e) => histView.filter((h) => h.estado === e).length;
-          const leidos = cuenta("leido") + cuenta("respondido");
-          const filtrados = filtroEnv === "todos" ? histView : histView.filter((h) => (filtroEnv === "leido" ? h.estado === "leido" || h.estado === "respondido" : h.estado === filtroEnv));
+          // RCL-02: estados excluyentes; cada chip cuenta solo los suyos (un solo conteo por estado).
+          const filtrados = filtroEnv === "todos" ? histView : histView.filter((h) => h.estado === filtroEnv);
           const agrupar = (lst) => { const dias = [];
           lst.forEach((h) => { const d = String(h.fecha || "").slice(0, 10); let g = dias.find((x) => x.d === d); if (!g) { g = { d, items: [] }; dias.push(g); } g.items.push(h); }); return dias; };
           const etiquetaDia = (d) => (d === fmt(hoy) ? "Hoy" : d === addDays(-1) ? "Ayer" : (() => { const t = fechaLegible(d); return t.charAt(0).toUpperCase() + t.slice(1); })());
-          const pctDe = (x) => (histView.length ? Math.round((x / histView.length) * 100) : 0);
           return (
           <>
-            <section className="dc-esp-hero dc-env-hero">
-              <div className="dc-esp-hero__txt">
-                <div className="dc-esp-hero__num"><b>{histView.length}</b><span>mensajes automáticos</span></div>
-                <p>Enviados por WhatsApp en los últimos días</p>
-              </div>
-              <div className="dc-env-hero__estado">
-                <div className="dc-form-hero__barra dc-env-hero__barra" role="img" aria-label="Estado de los envíos">
-                  {[["entregado", "#9AD9D6"], ["leido", "#7FB8FF"], ["respondido", "#6EE7A8"], ["error", "#F59A8D"]].map(([k, c]) => { const n = cuenta(k); return n ? <i key={k} style={{ width: `${pctDe(n)}%`, background: c }} /> : null; })}
-                </div>
-                <div className="dc-env-hero__ley">
-                  <span><i style={{ background: "#9AD9D6" }} />Entregados {cuenta("entregado")}</span>
-                  <span><i style={{ background: "#7FB8FF" }} />Leídos {cuenta("leido")}</span>
-                  <span><i style={{ background: "#6EE7A8" }} />Respondieron {cuenta("respondido")}</span>
-                  <span><i style={{ background: "#F59A8D" }} />No enviados {cuenta("error")}</span>
-                </div>
-              </div>
-              <div className="dc-esp-hero__cifras">
-                <div><b>{pctDe(histView.length - cuenta("error"))}%</b><span>Entrega</span></div>
-                <div><b>{pctDe(leidos)}%</b><span>Lectura</span></div>
-                <div><b>{pctDe(cuenta("respondido"))}%</b><span>Respuesta</span></div>
-              </div>
-            </section>
             <Card className="dc-env">
               <div className="dc-env__cab">
                 <h3>Historial de envíos</h3>
                 <div className="dc-env__filtros" role="tablist" aria-label="Filtrar por estado">
-                  {[["todos", "Todos", histView.length], ["leido", "Leídos", leidos], ["respondido", "Respondieron", cuenta("respondido")], ["error", "No enviados", cuenta("error")]].map(([k, l, c]) => (
+                  {[["todos", "Todos", histView.length], ["entregado", "Entregado", cuenta("entregado")], ["leido", "Leído", cuenta("leido")], ["respondido", "Respondió", cuenta("respondido")], ["error", "No enviado", cuenta("error")]].map(([k, l, c]) => (
                     <button key={k} type="button" role="tab" aria-selected={filtroEnv === k} onClick={() => setFiltroEnv(k)}>{l} <span>{c}</span></button>
                   ))}
                 </div>
@@ -303,8 +281,8 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
           </div>
           <div className="dc-rec__cifras">
             <div><b>{activas}/{reglas.length}</b><span>Activas</span></div>
-            <div><b>{resumen && resumen.mensajesMes > 0 ? resumen.mensajesMes.toLocaleString("es-PE") : "0"}</b><span>Enviados este mes</span></div>
-            <div><b>{resumen && resumen.mensajesMes > 0 ? `${resumen.tasaEntrega}%` : "—"}</b><span>Entrega</span></div>
+            <div><b>{mesEnv.enviados.toLocaleString("es-PE")}</b><span>Enviados este mes</span></div>
+            <div><b>{mesEnv.total ? `${Math.round((mesEnv.enviados / mesEnv.total) * 100)}%` : "—"}</b><span>Entrega</span></div>
             <span className="dc-rec__dnd" title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día"><Shield size={13} strokeWidth={1.75} /> No molestar 21:00–08:00 – máx. 3 al día</span>
           </div>
         </div>

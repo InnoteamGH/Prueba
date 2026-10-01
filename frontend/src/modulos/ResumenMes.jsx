@@ -16,14 +16,15 @@ const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"];
 
+// GER-03: nombres del catálogo único de servicios (compartido/catalogo.js).
 const DEMO_TOP = [
-  { nombre: "Ortodoncia (controles)", ventas: 38, importe: 9800 },
+  { nombre: "Control de ortodoncia", ventas: 38, importe: 5700 },
   { nombre: "Endodoncia", ventas: 21, importe: 7350 },
-  { nombre: "Corona de zirconio", ventas: 9, importe: 6300 },
-  { nombre: "Profilaxis y limpieza", ventas: 42, importe: 4200 },
-  { nombre: "Resina compuesta", ventas: 44, importe: 3960 },
-  { nombre: "Extracción simple", ventas: 18, importe: 2700 },
-];
+  { nombre: "Corona", ventas: 9, importe: 4050 },
+  { nombre: "Limpieza y profilaxis", ventas: 42, importe: 3360 },
+  { nombre: "Curación con resina", ventas: 44, importe: 5280 },
+  { nombre: "Extracción simple", ventas: 18, importe: 2160 },
+].sort((a, b) => b.importe - a.importe);
 
 /** Avance del mes para las cifras de demostración (las de ejemplo son de un mes casi completo). */
 export const avanceDemo = (d = new Date()) => {

@@ -12,7 +12,7 @@ import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden } from "..
 function datosDemo() {
   const porMedico = MEDICOS.map((m) => {
     const produccion = m.prodDemo || 0;
-    const porcentaje = 40;
+    const porcentaje = m.comision ?? 0; // REP-01: el % de la ficha del doctor
     return {
       medicoId: m.id, nombre: m.nombre, atendidas: m.citasDemo || 0, produccion, porcentaje,
       comision: Math.round(produccion * porcentaje / 100),
@@ -819,7 +819,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
     cifra: moneyFmt(m.produccion),
     parte: `${m.atendidas || 0} citas`,
     sub: `Comisión ${moneyFmt(m.comision)} (${m.porcentaje}%).`,
-    como: "Producción = citas atendidas × precio base de la especialidad de cada cita. Comisión = producción × % del odontólogo (40% por defecto).",
+    como: "Producción = citas atendidas × precio base de la especialidad de cada cita. Comisión = producción × % del odontólogo (se define en Configuración › Doctores).",
     cols: [["Concepto"], ["Valor", "n"]],
     filas: [
       ["Citas atendidas", String(m.atendidas || 0)],
@@ -875,7 +875,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
               t: "Comisión devengada",
               s: "Producción × porcentaje",
               cifra: moneyFmt(totalCom),
-              como: "Cada odontólogo: producción × su % (40% por defecto si no está editado). No es lo cobrado ni lo pagado.",
+              como: "Cada odontólogo: producción × su % (Configuración › Doctores). No es lo cobrado ni lo pagado.",
               cols: [["Odontólogo"], ["%", "n"], ["Comisión", "n"]],
               filas: porMedico.map((m) => [m.nombre, `${m.porcentaje}%`, moneyFmt(m.comision)]),
               total: moneyFmt(totalCom),

@@ -19,6 +19,7 @@ import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, s
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
+import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
 import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat } from "./modulos/FacturacionSunat";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
@@ -50,7 +51,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {DatosDemoCtx, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -529,11 +530,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   // Integraciones del panel de sistemas. Definidas aquí y no dentro de su tarjeta
   // porque la cabecera también necesita saber cuántas están con incidencia.
   const INTEGRACIONES_TI = [["WhatsApp Business API (Meta)", "operativo", "Última sync hace 2 min"],
-                            ["Pasarela de pago (Culqi)", "operativo", "Transacciones OK"],
+                            (() => { const pa = pasarelaActiva(); return [`Pasarela de pago${pa ? ` (${pa.n})` : ""}`, pa ? "operativo" : "pendiente", pa ? "Transacciones OK" : "Sin conectar"]; })(),
                             // Decía "incidencia – 2 comprobantes observados", que da por hecha una
                             // integración activa con SUNAT, mientras la tarjeta de administración de
                             // esta misma demostración dice que todavía no se envían.
-                            ["Facturación electrónica (SUNAT)", "pendiente", "Integración aún no activada"],
+                            proveedorSunat() ? ["Facturación electrónica (SUNAT)", "operativo", "Proveedor conectado"] : ["Facturación electrónica (SUNAT)", "pendiente", "Sin proveedor: comprobantes «Sin enviar»"],
                             ["Respaldo automático", "operativo", "Último backup 03:00 h"],
                             ["Servidor de correo", "operativo", "Cola vacía"]];
   const incidenciasTI = INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").length;
@@ -573,7 +574,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const horaAhora = new Date().getHours();
   const porHoraQuedan = porHora.filter((x) => x.h >= horaAhora);
   const libres = porHoraQuedan.filter((x) => x.n === 0).length;    // franjas sin cita que aún quedan
-  const cuposLibres = Math.max(0, porHoraQuedan.length * capHora - ch.filter((c) => parseInt(c.hora, 10) >= horaAhora).length);
+  // M-04: cupos libres = horas de sillón abiertas − horas agendadas (misma función que
+  // Agenda y Ocupación de sillones), en cupos de 30 min.
+  const cuposLibres = conectado
+    ? Math.max(0, porHoraQuedan.length * capHora - ch.filter((c) => parseInt(c.hora, 10) >= horaAhora).length)
+    : M.cuposLibres({ citas, sillones: dbDash?.sillones || [], fecha: fmt(hoy), sede: sedeActiva, jornadaDe: (sid) => jornadaClinica(horarioDeSede(horarioClinica.horario, sid), horarioClinica.feriados, fmt(hoy)) }).cupos30;
   const colHora = (x) => x.n === 0 ? "var(--dc-line)" : x.pct >= 100 ? "var(--dc-red)" : x.pct >= 60 ? "var(--dc-warn-600)" : DS.c.primary;
   const num = (v) => Number(v || 0).toLocaleString();
   const bloque = (valor, color, pie) => (
@@ -4235,7 +4240,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
         </Modal>
       )}
-      {tab === "sunat" && <FacturacionSunat notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
+      {tab === "sunat" && <FacturacionSunat onIntegraciones={() => { window.location.hash = "#/integraciones"; }} notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
         sedes={(misSedes || [1, 2]).map((n) => ({ id: n, nombre: nombreSede(n) }))}
         pagos={pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", sede: pg.sede ?? (Array.isArray(p.sedes) ? p.sedes[0] : p.sede) ?? 1 })))} />}
 
@@ -4847,7 +4852,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         <div style={{ display: "grid", gap: 16 }}>
           <div className="fm-aviso-edad is-info">
             <Zap size={15} strokeWidth={2} />
-            <span><b>Pasarela sin conectar.</b> Cuando se conecte (Niubiz, Culqi o similar), el paciente pagará desde su celular y el cobro entrará a Caja.</span>
+            {/* LNK-01: el mismo proveedor y estado que Integraciones. */}
+            {(() => { const pa = pasarelaActiva(); return pa
+              ? <span><b>Links de pago con {pa.n}.</b> El paciente paga desde su celular y el cobro entra a Caja.</span>
+              : <span><b>Pasarela sin conectar.</b> Conecta Izipay (o Culqi / Niubiz) en Integraciones para que el paciente pague desde su celular.</span>; })()}
           </div>
           {links.length === 0 ? <Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." />{nuevoLink}</Card> : (
           <ListaFiltrable rows={links} sub="links" extra={<>
@@ -5035,10 +5043,11 @@ function MiProduccion({ usuario, citas }) {
   const prodHoy = R ? (Number(R.produccionHoy) || 0)
     : misCitas.filter((c) => c.fecha === fmt(hoy) && (c.estado === "atendida" || c.estado === "en_atencion")).reduce((s, c) => s + precio(c), 0);
   const mesProd = R ? (Number(R.produccionMes) || 0) : (Number(miMed.prodDemo) || 0);
-  const mesAnterior = R ? (Number(R.produccionMesAnterior) || 0) : 7900;
-  const comision = R ? (Number(R.comisionMes) || 0) : mesProd * 0.4;
-  // El porcentaje pactado con este medico. En demostracion, el 40 del ejemplo.
-  const pctComision = R ? (R.porcentajeComision != null ? Number(R.porcentajeComision) : null) : 40;
+  // REP-02: sin histórico en la demostración no se inventa el mes anterior.
+  const mesAnterior = R ? (Number(R.produccionMesAnterior) || 0) : 0;
+  // REP-01 / M-16: un solo % por doctor (su ficha) y comisión = producción × %.
+  const pctComision = R ? (R.porcentajeComision != null ? Number(R.porcentajeComision) : null) : (miMed.comision ?? null);
+  const comision = R ? (Number(R.comisionMes) || 0) : M.comisionDe(mesProd, pctComision || 0);
   const atenciones = R ? (R.atenciones || 0) : (Number(miMed.citasDemo) || 0);
   const ticket = R ? Math.round(Number(R.ticketPromedio) || 0) : Math.round(mesProd / atenciones);
   const deltaProd = mesAnterior > 0 ? Math.round(((mesProd - mesAnterior) / mesAnterior) * 100) : 0;
@@ -5061,10 +5070,10 @@ function MiProduccion({ usuario, citas }) {
   const PALETA = ["var(--dc-purple)", DS.c.accent, DS.c.primary, "var(--dc-ok-700)", "var(--dc-ink-500)"];
   const porTrat = R?.porEspecialidad?.length
     ? R.porEspecialidad.slice(0, 5).map((e, i) => ({ n: e.especialidad, v: Math.round(Number(e.produccion) || 0), c: PALETA[i] || "var(--dc-ink-500)" }))
-    : [
-    { n: "Endodoncia", v: 3500, c: "var(--dc-purple)" }, { n: "Ortodoncia", v: 2400, c: DS.c.primary },
-    { n: "Rehabilitación", v: 1900, c: DS.c.primary }, { n: "Limpieza / Profilaxis", v: 900, c: "var(--dc-ok-700)" }, { n: "Otros", v: 500, c: "var(--dc-ink-500)" },
-  ];
+    // REP-02: en la demostración el reparto sale de los servicios de SUS especialidades
+    // (catálogo único), no de especialidades ajenas.
+    : (() => { const pesos = [0.34, 0.26, 0.18, 0.12, 0.1]; const sv = leerCatalogo().filter((x) => x.activo !== false && espsDe(miMed).includes(x.esp)).slice(0, 5);
+        return sv.map((x, i) => ({ n: x.nombre, v: Math.round(mesProd * (pesos[i] || 0.05)), c: PALETA[i] || "var(--dc-ink-500)" })); })();
   const totalTrat = porTrat.reduce((s, t) => s + t.v, 0) || 1;
   const top = porTrat[0] || { n: "—", v: 0 }; const topPct = Math.round((top.v / totalTrat) * 100);
 
@@ -5090,7 +5099,7 @@ function MiProduccion({ usuario, citas }) {
     );
   }
   const kpis = [
-    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: deltaProd, desc: `Suma de tus tratamientos facturados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% vs. el mes anterior (S/ ${mesAnterior.toLocaleString()}).` },
+    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: mesAnterior > 0 ? deltaProd : null, desc: mesAnterior > 0 ? `Suma de tus tratamientos facturados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% vs. el mes anterior (S/ ${mesAnterior.toLocaleString()}).` : "Suma de tus tratamientos terminados este mes. Aún no hay mes anterior para comparar." },
     // El porcentaje sale del que tiene pactado este médico (backend: porcentajeComision),
     // no de un 40% escrito a mano: el importe ya se calculaba con el suyo y la etiqueta
     // decía otra cosa.
@@ -5104,7 +5113,8 @@ function MiProduccion({ usuario, citas }) {
       ? (R.calificacion != null
           ? [{ l: "Calificación", v: `${R.calificacion} ★`, icon: Star, color: "var(--dc-warn-600)", sub: `${R.resenas} reseña${R.resenas === 1 ? "" : "s"}`, desc: `Tu promedio en ${R.resenas} reseña${R.resenas === 1 ? "" : "s"} de pacientes. Una nota alta atrae más pacientes por recomendación.` }]
           : [{ l: "Calificación", v: "—", icon: Star, color: "var(--dc-warn-600)", sub: "sin reseñas todavía", desc: "Todavía ningún paciente ha calificado tu atención. Las encuestas automáticas se envían tras la cita." }])
-      : [{ l: "Calificación", v: "4.9 ★", icon: Star, color: "var(--dc-warn-600)", sub: "120 reseñas", desc: `Tu promedio de calificación en 120 reseñas de pacientes. Una nota alta atrae más pacientes por recomendación.` }]),
+      : (() => { const mias = RESENAS_SEED.filter((r) => r.medicoId === miMed.id); const pr = mias.length ? (mias.reduce((a, r) => a + r.estrellas, 0) / mias.length).toFixed(1) : null;
+          return [{ l: "Calificación", v: pr ? `${pr} ★` : "—", icon: Star, color: "var(--dc-warn-600)", sub: mias.length ? `${mias.length} reseña${mias.length === 1 ? "" : "s"} que te mencionan` : "sin reseñas todavía", desc: "Promedio de las reseñas públicas (1–5) que te mencionan. Es la misma lista de Satisfacción y reseñas." }]; })()),
   ];
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -5186,12 +5196,12 @@ function MiProduccion({ usuario, citas }) {
           <div style={{ display: "grid", gap: 10 }}>
             {[
               [`${top.n} es tu mayor fuente: ${topPct}% de tus ingresos. Reservar más cupos de esta especialidad sube tu producción.`, DS.c.primary],
-              [`Tu producción creció ${deltaProd}% vs el mes anterior. Si mantienes el ritmo, cierras el mes en ~S/ ${Math.round(mesProd * 1.05).toLocaleString()}.`, "var(--dc-ok-700)"],
+              mesAnterior > 0 && [`Tu producción ${deltaProd >= 0 ? "creció" : "bajó"} ${Math.abs(deltaProd)}% vs el mes anterior.`, deltaProd >= 0 ? "var(--dc-ok-700)" : "var(--dc-warn-600)"],
               [`Tus atenciones dejan de media S/ ${ticket}. Proponer tratamientos integrales (no solo limpiezas) lo sube.`, DS.c.primary],
               [noShow != null
                 ? `Ausentismo ${noShow}%. Confirmar por WhatsApp 24h antes reduce los espacios vacíos.`
                 : "Sin dato de ausentismo todavía. Cuando haya citas en el mes, verás el porcentaje aquí.", DS.c.primary],
-            ].map(([txt, c], i) => (
+            ].filter(Boolean).map(([txt, c], i) => (
               <div key={i} style={{ display: "flex", gap: 10, fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.45 }}><span style={{ width: 6, height: 6, borderRadius: "var(--dc-r-full)", background: c, marginTop: 6, flexShrink: 0 }} /><span>{txt}</span></div>
             ))}
           </div>
@@ -5212,9 +5222,10 @@ function MiProduccion({ usuario, citas }) {
 function Integraciones({ notify }) {
   const cats = [
     { cat: "Pagos en línea y POS", ic: CreditCard, c: "#2F6FDE", items: [
-      { n: "Culqi", d: "Tarjeta + Yape + Plin. 3.44% + IGV, sin mensualidad, liquidez el mismo día con BCP. Ideal para clínicas.", estado: "conectado", rec: true },
-      { n: "Izipay", d: "POS físico + web, abono inmediato. Bueno si la clínica ya cobra presencial.", estado: "disponible" },
-      { n: "Niubiz", d: "Acepta Amex/Diners y cuotas. Conviene a alto volumen con tarifa negociada.", estado: "disponible" },
+      ...PASARELAS.map((pa) => ({ n: pa.n, d: pa.d, rec: pa.rec, estado: pasarelaActiva()?.id === pa.id ? "conectado" : "disponible" })),
+    ] },
+    { cat: "Facturación electrónica", ic: Receipt, c: "#B45309", items: [
+      { n: "Proveedor OSE / PSE (SUNAT)", d: proveedorSunat() ? "Firma y envía a SUNAT las boletas y facturas que emite Caja." : "Sin proveedor conectado: Caja emite los comprobantes y quedan «Sin enviar». Se configura en Caja › Comprobantes SUNAT.", estado: proveedorSunat() ? "conectado" : "pendiente" },
     ] },
     { cat: "Mensajería e IA", ic: MessageSquare, c: "#16A36A", items: [
       { n: "WhatsApp Cloud API (Meta)", d: "Canal oficial para el agente IA. Más económico a escala que intermediarios.", estado: "conectado", rec: true },
@@ -5275,7 +5286,7 @@ function Integraciones({ notify }) {
       })()}
       {its.length === 0 && <Card style={{ padding: 0 }}><Vacio icon={<Plug size={22} strokeWidth={1.75} />} titulo="Sin integraciones" sub="No hay conectores disponibles por ahora." /></Card>}
       {detInt && <Modal icon={<Plug size={20} strokeWidth={1.75} />} tone={detInt.estado === "conectado" ? "var(--dc-ok-700)" : NAVY} titulo={detInt.n} sub={detInt.cat} onClose={() => setDetInt(null)} maxW={480}
-        footer={detInt.estado === "conectado" ? <Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
+        footer={detInt.estado === "conectado" ? <Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { const pa = PASARELAS.find((x) => x.n === detInt.n); if (pa) { setPasarelaActiva(pa.id); notify(`${pa.n} es ahora la pasarela de pago. Links de pago ya la usa.`); } else notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           {detInt.rec && <span style={{ fontSize: 12, fontWeight: 500, background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", padding: "3px 9px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 4 }}><Star size={10} strokeWidth={1.75} /> Recomendado</span>}
           {detInt.estado === "conectado" ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={14} strokeWidth={1.75} /> Conectado</span> : <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={13} strokeWidth={1.75} /> Disponible</span>}
@@ -6561,6 +6572,19 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
     }
     return [...m.values()].map((x) => ({ ...x, categoria: x.ultima ? `última compra ${fechaLegible(x.ultima)}` : "—" }));
   }, [ordenes]);
+  // INV-02: en la demostración también se agregan desde las órdenes de Compras, así el
+  // «Total comprado» es la suma de las órdenes. El laboratorio no es proveedor de
+  // insumos: sus trabajos viven en Laboratorio.
+  const proveedoresDemo = useMemo(() => {
+    const m = new Map();
+    for (const o of COMPRAS_DEMO) {
+      if (o.estado === "anulada") continue;
+      const base = PROVEEDORES_DEMO.find((x) => x.nombre === o.proveedor) || {};
+      const a = m.get(o.proveedor) || { id: o.proveedor, nombre: o.proveedor, contacto: base.contacto || "—", categoria: base.categoria || "—", compras: 0, total: 0 };
+      a.compras++; a.total += Number(o.total) || 0; m.set(o.proveedor, a);
+    }
+    return [...m.values()];
+  }, []);
   useEffect(() => { if (tab === "compras" || tab === "proveedores") recargarOC(); }, [tab, conectado]); // eslint-disable-line
 
   const accionOC = (id, accion, ok) => {
@@ -6762,7 +6786,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
       )}
       {tab === "proveedores" && puedeGestionar && (
         <>
-        {(() => { const provs = conectado ? proveedoresReales : PROVEEDORES_DEMO; const tot = provs.reduce((x, p) => x + (Number(p.total) || 0), 0); const comp = provs.reduce((x, p) => x + (Number(p.compras) || 0), 0); const top = [...provs].sort((x, y) => (y.total || 0) - (x.total || 0))[0]; return (
+        {(() => { const provs = conectado ? proveedoresReales : proveedoresDemo; const tot = provs.reduce((x, p) => x + (Number(p.total) || 0), 0); const comp = provs.reduce((x, p) => x + (Number(p.compras) || 0), 0); const top = [...provs].sort((x, y) => (y.total || 0) - (x.total || 0))[0]; return (
           <section className="dc-esp-hero dc-inv-hero">
             <div className="dc-esp-hero__txt">
               <div className="dc-esp-hero__num"><b>{provs.length}</b><span>proveedores</span></div>
@@ -6775,7 +6799,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             </div>
           </section>
         ); })()}
-        <DataTable titulo="Proveedores" sub="proveedores" minWidth={780} rows={conectado ? proveedoresReales : PROVEEDORES_DEMO} defaultSort={{ key: "total", dir: "desc" }} empty={<Vacio icon={<Building2 size={22} strokeWidth={1.75} />} titulo="Sin proveedores" sub="La lista se arma sola con las órdenes de compra: registra una y el proveedor aparece aquí." />} cols={[
+        <DataTable titulo="Proveedores" sub="proveedores" minWidth={780} rows={conectado ? proveedoresReales : proveedoresDemo} defaultSort={{ key: "total", dir: "desc" }} empty={<Vacio icon={<Building2 size={22} strokeWidth={1.75} />} titulo="Sin proveedores" sub="La lista se arma sola con las órdenes de compra: registra una y el proveedor aparece aquí." />} cols={[
           { key: "nombre", label: "Proveedor", w: "minmax(180px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg, ${tint(colorDe(p.nombre), 0.22)}, ${tint(colorDe(p.nombre), 0.08)})`, color: colorDe(p.nombre), fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div></div></div> },
           { key: "contacto", label: "Contacto", w: "minmax(150px,1fr)", a: "left", get: (p) => p.contacto || "", cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.contacto || "—"}</span> },
           { key: "categoria", label: "Categoría", w: "minmax(150px,1fr)", a: "left", get: (p) => p.categoria, cell: (p) => p.categoria ? <span className="dc-pill" style={{ "--c": colorDe(p.categoria) }}><i /> {p.categoria}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span> },
@@ -7079,7 +7103,7 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
           <p>S/ {actual.precio}/mes – {totalMods(actual.id)} módulos activos – renueva el {fechaLegible(addDays(26))}</p>
         </div>
         <div className="dc-esp-hero__cifras">
-          <div><b>{sedesUsadas == null ? "—" : `${sedesUsadas}/${actual.sedesIncl}`}</b><span>Sedes incluidas</span></div>
+          <div><b>{sedesUsadas == null ? "—" : `${sedesUsadas} ${sedesUsadas === 1 ? "sede" : "sedes"}`}</b><span>{sedesUsadas == null ? "Sedes" : sedesExtra > 0 ? `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"} + ${sedesExtra} adicional${sedesExtra === 1 ? "" : "es"}` : `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"}`}</span></div>
           <div><b>{odontologos == null ? "—" : actual.odontologos === "ilim" ? odontologos : `${odontologos}/${actual.odontologos}`}</b><span>Odontólogos</span></div>
           <div><b>{totalPacientes == null ? "—" : totalPacientes}</b><span>Pacientes, ilimitados</span></div>
         </div>
@@ -7087,15 +7111,8 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
         <div className="dc-hero-acc"><span className="dc-plan__activo"><CheckCircle2 size={14} strokeWidth={2.2} /> Activo</span></div>
       </section>
 
-      {/* Banner de prueba: los "11 de 14 días" son de ejemplo, con sesión no se enseña. */}
-      {!conectado && (
-        <div className="dc-plan__trial">
-          <span className="dc-plan__trial-ico"><Sparkles size={17} strokeWidth={2} /></span>
-          <div><b>Prueba PRO, 14 días gratis</b><span>Te quedan <strong>11 de 14 días</strong> y hasta <strong>{PACIENTES_TRIAL} pacientes</strong>. Sin tarjeta hasta que decidas.</span></div>
-          <div className="dc-plan__trial-barra"><i style={{ width: "78%" }} /><small>11 días restantes</small></div>
-          <button type="button" onClick={() => notify("Activa tu plan cuando quieras para no perder acceso.")}>Activar plan</button>
-        </div>
-      )}
+      {/* PLN-01: un solo estado de suscripción (Activo, con mensualidades pagadas). El
+          banner de «Prueba PRO» contradecía ese estado y se quitó. */}
 
       <section className="dc-plan__fila">
         {uso.map((x, k) => { const pct = Math.round((x.u / x.lim) * 100); const col = pct >= 80 ? "#D97706" : ["#0E9199", "#16A36A", "#6D4FD1"][k % 3]; return (
@@ -7208,13 +7225,7 @@ function Resenas({ notify, citas = [], can }) {
     setSolicitando(false);
   };
   const encuestasAuto = citas.filter((c) => c.estado === "atendida").length; // P2-3: NPS automático tras atención
-  const [reviews, setReviews] = useState([
-    { id: 1, nombre: "Lucía V.", estrellas: 5, fecha: addDays(-1), texto: "Excelente atención, la Dra. Mendoza muy amable y el local impecable.", resp: "" },
-    { id: 2, nombre: "Andrés P.", estrellas: 5, fecha: addDays(-3), texto: "Me agendaron por WhatsApp en segundos, todo súper rápido.", resp: "¡Gracias Andrés! Te esperamos en tu control." },
-    { id: 3, nombre: "María C.", estrellas: 4, fecha: addDays(-6), texto: "Buen servicio, solo esperé un poco más de lo previsto.", resp: "" },
-    { id: 4, nombre: "Diego C.", estrellas: 5, fecha: addDays(-9), texto: "Precios claros y me explicaron todo el tratamiento. Recomendado.", resp: "" },
-    { id: 5, nombre: "Rosa L.", estrellas: 5, fecha: addDays(-12), texto: "El portal para ver mis pagos y citas es muy práctico.", resp: "" },
-  ]);
+  const [reviews, setReviews] = useState(RESENAS_SEED);
   const conectado = !!auth.token;
   const mapRev = (r) => ({ id: r.id, nombre: r.paciente || "Paciente", estrellas: r.calificacion || 0, fecha: r.fecha, texto: r.comentario || "", resp: r.respondida ? "Respondida" : "" });
   const recargar = () => { if (conectado) api.resenas.listar().then((r) => setReviews((r || []).map(mapRev))).catch(() => notify("No se pudo cargar reseñas.")); };
@@ -7224,7 +7235,6 @@ function Resenas({ notify, citas = [], can }) {
   const [filtroRes, setFiltroRes] = useState("todas");
   const prom = (reviews.reduce((a, r) => a + r.estrellas, 0) / reviews.length).toFixed(1);
   const dist = [5, 4, 3, 2, 1].map((s) => ({ s, n: reviews.filter((r) => r.estrellas === s).length }));
-  const recomiendan = reviews.length ? Math.round((reviews.filter((r) => r.estrellas >= 4).length / reviews.length) * 100) : 0;
   const sinResp = reviews.filter((r) => !r.resp).length;
   const responder = (id) => { const t = (resp[id] || "").trim(); if (conectado) { api.resenas.marcar(id, true).then(() => { notify("Reseña marcada como respondida."); recargar(); }).catch(() => notify("Error al responder.")); setResp((s) => ({ ...s, [id]: "" })); return; } if (!t) return; setReviews((rs) => rs.map((r) => r.id === id ? { ...r, resp: t } : r)); setResp((s) => ({ ...s, [id]: "" })); notify("Respuesta publicada."); };
   const estrellas = (n, size = 15) => [1, 2, 3, 4, 5].map((i) => <Star key={i} className={i <= n ? "is-on" : ""} size={size} strokeWidth={1.75} color="var(--dc-warn)" fill={i <= n ? "var(--dc-warn)" : "none"} />);
@@ -7242,7 +7252,6 @@ function Resenas({ notify, citas = [], can }) {
           ); })}
         </div>
         <div className="dc-esp-hero__cifras dc-res-hero__cifras">
-          <div><b>{recomiendan}%</b><span>Recomiendan</span></div>
           <div><b>{sinResp}</b><span>Por responder</span></div>
           <div><b>{encuestasAuto}</b><span>Encuestas</span></div>
         </div>
@@ -8589,7 +8598,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         </div>);
       }
       // Un solo catálogo de servicios (NAV-06): Configuración › Servicios y precios.
-      case "servicios": return <Configuracion notify={notify} rol={rol} can={can} seccionInicial="servicios" />;
+      case "servicios": return <Configuracion notify={notify} rol={rol} can={can} seccionInicial="servicios" serviciosSlot={<Servicios notify={notify} can={can} />} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
       case "agenda": return <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />;
@@ -8632,7 +8641,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "caja": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "miproduccion": return <MiProduccion usuario={usuario} citas={citas} />;
       case "integraciones": return <Integraciones notify={notify} />;
-      case "config": return <Configuracion notify={notify} rol={rol} can={can} />;
+      case "config": return <Configuracion notify={notify} rol={rol} can={can} serviciosSlot={<Servicios notify={notify} can={can} />} />;
       // Usuarios y permisos (NAV-08): usuarios, permisos por rol y auditoría en pestañas.
       case "usuarios": case "permisos": case "auditoria": {
         const opc = [{ id: "usuarios", label: "Usuarios", icon: UserCog }, mods.includes("permisos") && { id: "permisos", label: "Permisos por rol", icon: Shield, locked: !modAllowed("permisos") }, mods.includes("auditoria") && { id: "auditoria", label: "Auditoría y accesos", icon: ShieldCheck, locked: !modAllowed("auditoria") }].filter(Boolean);

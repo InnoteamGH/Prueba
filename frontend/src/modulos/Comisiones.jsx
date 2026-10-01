@@ -38,7 +38,7 @@ function Comisiones({ citas, can }) {
   // gerencial y "Mi producción". Antes aquí se calculaba aparte -12 citas × 160- y salía
   // 1.920 contra una meta de 12.000: la misma doctora al 16% aquí y al 77% al lado.
   const demo = MEDICOS.map((m) => { const prod = Number(m.prodDemo) || 0; const meta = Number(m.meta) || null;
-    return { ...m, n: Number(m.citasDemo) || 0, prod, com: prod * 0.4, meta, pct: pctDe(prod, meta), pctCom: 40 }; }).sort((a, b) => b.prod - a.prod);
+    return { ...m, n: Number(m.citasDemo) || 0, prod, com: Math.round(prod * (m.comision ?? 0) / 100), meta, pct: pctDe(prod, meta), pctCom: m.comision ?? null }; }).sort((a, b) => b.prod - a.prod);
 
   const data = (real?.porMedico?.length)
     ? real.porMedico.map((m) => {

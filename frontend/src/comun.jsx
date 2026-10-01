@@ -378,12 +378,12 @@ export const ESPECIALIDADES = [
  * `citasDemo` es el número de atenciones que corresponde a esa producción.
  */
 export const MEDICOS = [
-  { id: 1, nombre: "Dra. Carla Mendoza", cop: "24493", esp: 1, esps: [1, 4], sede: 1, sedes: [1, 2], foto: "CM", color: NAVY, meta: 12000, prodDemo: 9200, citasDemo: 58 },
-  { id: 2, nombre: "Dr. Luis Paredes", cop: "18762", esp: 2, esps: [2], sede: 1, sedes: [1], foto: "LP", color: "var(--dc-brand-mid)", meta: 10000, prodDemo: 7800, citasDemo: 49 },
-  { id: 3, nombre: "Dra. Ana Quispe", cop: "31045", esp: 3, esps: [3], sede: 2, sedes: [2], foto: "AQ", color: DS.c.primary, meta: 8500, prodDemo: 6400, citasDemo: 41 },
-  { id: 4, nombre: "Dra. Sofía Torres", cop: "27318", esp: 5, esps: [5], sede: 2, sedes: [2], foto: "ST", color: DS.c.accent, meta: 7000, prodDemo: 5100, citasDemo: 33 },
-  { id: 5, nombre: "Dr. Jorge Ramos", cop: "15984", esp: 4, esps: [4], sede: 1, sedes: [1, 2], foto: "JR", color: "var(--dc-info-ink)", meta: 6000, prodDemo: 4200, citasDemo: 28 },
-  { id: 6, nombre: "Dr. Miguel Flores", cop: "33620", esp: 1, esps: [1], sede: 2, sedes: [2], foto: "MF", color: "var(--dc-brand-600)", meta: 5000, prodDemo: 3500, citasDemo: 22 },
+  { id: 1, nombre: "Dra. Carla Mendoza", cop: "24493", esp: 1, esps: [1, 4], sede: 1, sedes: [1, 2], foto: "CM", color: NAVY, meta: 12000, prodDemo: 9200, citasDemo: 58, comision: 40 },
+  { id: 2, nombre: "Dr. Luis Paredes", cop: "18762", esp: 2, esps: [2], sede: 1, sedes: [1], foto: "LP", color: "var(--dc-brand-mid)", meta: 10000, prodDemo: 7800, citasDemo: 49, comision: 35 },
+  { id: 3, nombre: "Dra. Ana Quispe", cop: "31045", esp: 3, esps: [3], sede: 2, sedes: [2], foto: "AQ", color: DS.c.primary, meta: 8500, prodDemo: 6400, citasDemo: 41, comision: 40 },
+  { id: 4, nombre: "Dra. Sofía Torres", cop: "27318", esp: 5, esps: [5], sede: 2, sedes: [2], foto: "ST", color: DS.c.accent, meta: 7000, prodDemo: 5100, citasDemo: 33, comision: 30 },
+  { id: 5, nombre: "Dr. Jorge Ramos", cop: "15984", esp: 4, esps: [4], sede: 1, sedes: [1, 2], foto: "JR", color: "var(--dc-info-ink)", meta: 6000, prodDemo: 4200, citasDemo: 28, comision: 35 },
+  { id: 6, nombre: "Dr. Miguel Flores", cop: "33620", esp: 1, esps: [1], sede: 2, sedes: [2], foto: "MF", color: "var(--dc-brand-600)", meta: 5000, prodDemo: 3500, citasDemo: 22, comision: 30 },
 ];
 export const espsDe = (m) => m ? (m.esps || [m.esp]) : [];
 
@@ -408,6 +408,15 @@ export const fmt = (d) => {
   return z.toISOString().slice(0, 10);
 };
 export const addDays = (n) => { const d = hoyAhora(); d.setDate(d.getDate() + n); return fmt(d); };
+// SAT-01: reseñas públicas (1–5). Una sola lista: la lee Satisfacción y reseñas y
+// Mi producción (las que mencionan al doctor).
+export const RESENAS_SEED = [
+  { id: 1, nombre: "Lucía V.", estrellas: 5, fecha: addDays(-1), texto: "Excelente atención, la Dra. Mendoza muy amable y el local impecable.", resp: "", medicoId: 1 },
+  { id: 2, nombre: "Andrés P.", estrellas: 5, fecha: addDays(-3), texto: "Me agendaron por WhatsApp en segundos, todo súper rápido.", resp: "¡Gracias Andrés! Te esperamos en tu control." },
+  { id: 3, nombre: "María C.", estrellas: 4, fecha: addDays(-6), texto: "Buen servicio, solo esperé un poco más de lo previsto.", resp: "" },
+  { id: 4, nombre: "Diego C.", estrellas: 5, fecha: addDays(-9), texto: "Precios claros y me explicaron todo el tratamiento. Recomendado.", resp: "", medicoId: 1 },
+  { id: 5, nombre: "Rosa L.", estrellas: 5, fecha: addDays(-12), texto: "El portal para ver mis pagos y citas es muy práctico.", resp: "" },
+];
 export const fmtHoy = () => fmt(hoyAhora());
 
 /* ── Exportación (Excel real .xlsx + PDF) ──

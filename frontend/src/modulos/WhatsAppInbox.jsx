@@ -5,6 +5,7 @@ import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building
 import api, { auth } from "../api/client";
 import {MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
 import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";
+import { pasarelaActiva } from "../compartido/integraciones";
 import "./whatsappInbox.css";
 
 function respuestaAgente(texto, ctx) {
@@ -24,7 +25,9 @@ function respuestaAgente(texto, ctx) {
     return { texto: "¡Con gusto te agendo! ¿Qué necesitas? Tenemos general, ortodoncia, endodoncia, periodoncia y odontopediatría. ¿Prefieres San Isidro o Surco?", tools: ["ver_disponibilidad"] };
   }
   if (ctx.proponiendo && /(s[ií]|confirmo|ya|dale|reserva|ese|esa|jueves|mañana|hoy|10:00|15:30|16:00)/.test(t))
-    return { texto: "¡Listo! ✅ Tu cita quedó agendada. Te envío confirmación por WhatsApp y correo, y te recuerdo 48 h y 2 h antes. ¿Algo más?", tools: ["agendar_cita", "enviar_confirmacion"], agenda: true };
+    // WSP-02: la clínica agenda solo con el pago hecho. La IA genera el link de pago y la
+    // cita pasa a la Agenda cuando el link figura Pagado.
+    return { texto: `¡Perfecto! Para separar tu cupo, paga la consulta (S/ 50) con este link de ${(pasarelaActiva() || { n: "pago" }).n}. Apenas se acredite el pago, tu cita queda agendada ✅`, tools: ["generar_link_pago"], linkPago: true };
   if (/(cancelar|reprogramar|cambiar|no podr[eé]|otro d[ií]a)/.test(t))
     return { texto: "Sin problema, reprogramo tu cita. Veo que tienes una el viernes 09:00. ¿Para qué día la movemos? Hay cupos lunes y martes.", tools: ["buscar_cita", "ver_disponibilidad"] };
   if (/(d[oó]nde|direcci[oó]n|ubicad|sede|horario|abren)/.test(t))
@@ -321,11 +324,17 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
         if (c.id !== activo) return c;
         const add = [{ de: "ia", txt: r.texto, t: ahora(), tools: r.tools }];
         if (r.escalar) add.push({ de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", t: ahora() });
+        if (r.linkPago) add.push({ de: "pago", id: `LP-${Date.now()}`, monto: 50, proveedor: (pasarelaActiva() || { n: "—" }).n, estado: "pendiente", t: ahora() });
         return { ...c, modo: r.escalar ? "humano" : c.modo, msgs: [...c.msgs, ...add] };
       }));
       setCtx({ proponiendo: !!r.propone });
       if (r.agenda) abrirAgendar("Agendado desde WhatsApp");
+      if (r.linkPago) notify("Link de pago enviado. La cita se agenda cuando figure Pagado.");
     }, 650);
+  };
+  const marcarPagado = (idLink) => {
+    setChats((cs) => cs.map((c) => c.id !== activo ? c : { ...c, msgs: [...c.msgs.map((m) => m.id === idLink ? { ...m, estado: "pagado" } : m), { de: "ia", txt: "Recibimos tu pago ✅ Tu cita quedó agendada. Te recuerdo 48 h y 2 h antes. ¿Algo más?", t: ahora(), tools: ["agendar_cita", "enviar_confirmacion"] }] }));
+    abrirAgendar("Agendado desde WhatsApp (pago recibido)");
   };
   const enviarHumano = () => {
     if (!input.trim()) return;
@@ -355,6 +364,13 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   // el primer mensaje de cada racha del mismo emisor.
   const burbuja = (m, i, primero) => {
     if (m.de === "sistema") return <div key={i} className="wa-sis"><span>{m.txt}</span></div>;
+    if (m.de === "pago") return (
+      <div key={i} className={`wa-pago is-${m.estado}`}>
+        <span className="wa-pago__t"><b>Link de pago · S/ {m.monto}</b><small>{m.proveedor} · {m.id}</small></span>
+        <span className="wa-pago__est">{m.estado === "pagado" ? "Pagado" : "Pendiente de pago"}</span>
+        {m.estado !== "pagado" && <button type="button" onClick={() => marcarPagado(m.id)} title="En la demostración, simula que el paciente pagó">Simular pago</button>}
+      </div>
+    );
     const sale = m.de !== "paciente";
     const cls = `wa-b ${sale ? "wa-b--out" : "wa-b--in"}${m.de === "ia" ? " wa-b--ia" : ""}${primero ? " wa-b--cola" : ""}`;
     return (

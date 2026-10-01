@@ -1,4 +1,5 @@
 import { abrirDocumento } from "./util/membrete";
+import * as M from "./compartido/metricas";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
@@ -1146,9 +1147,15 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // Resumen: última visita atendida y próxima cita programada.
   const citasArr = arr(d?.citas);
   const atendidas = citasArr.filter((c) => c.fecha && c.fecha <= hoy && /atend|complet|lleg/i.test(String(c.estado)));
-  const ultimaVisita = (atendidas[0] || citasArr.filter((c) => c.fecha && c.fecha <= hoy)[0] || null);
+  // FIC-06 / M-10: en la demostración, las mismas definiciones que Pacientes y el Panel
+  // (última cita Atendida; próxima = la de hoy o futura no atendida más cercana).
+  const pacM = { ...(pacienteDemo || {}), ...p, id: pacienteId };
+  const ultFechaM = !conectado && demoCitas ? M.ultimaVisita(pacM, demoCitas) : null;
+  const ultimaVisita = !conectado && demoCitas
+    ? (ultFechaM ? { fecha: ultFechaM, especialidad: (demoCitas.find((c) => c.fecha === ultFechaM && M.citaDePaciente(c, pacM)) || {}).motivo || "—" } : null)
+    : (atendidas[0] || citasArr.filter((c) => c.fecha && c.fecha <= hoy)[0] || null);
   const futuras = citasArr.filter((c) => c.fecha && c.fecha >= hoy && /program|confirm|pend/i.test(String(c.estado))).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
-  const proximaCita = futuras[0] || null;
+  const proximaCita = !conectado && demoCitas ? M.proximaCita(pacM, demoCitas) : (futuras[0] || null);
 
   const guardarFiliacion = () => {
     if (!fil) return;
@@ -1671,6 +1678,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 {!errorFicha && arr(p.alergias).map((a) => <ChipAlergia key={a}>⚠ {a}</ChipAlergia>)}
                 {!errorFicha && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias</span>}
                 {esPed && (p.apoderadoNombre ? <span>Apoderado: {p.apoderadoNombre}</span> : <span className="is-debe">Menor sin apoderado</span>)}
+                {/* GLO-08: la próxima cita vive en el encabezado único del paciente. */}
+                {!errorFicha && proximaCita && <span className="is-info">Próxima cita: {proximaCita.fecha === M.hoyISO() ? "hoy" : new Date(proximaCita.fecha + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })}{proximaCita.hora ? ` · ${String(proximaCita.hora).slice(0, 5)}` : ""}</span>}
                 {errorFicha && <span className="is-debe">Error al consultar datos clínicos</span>}
               </div>
             </div>

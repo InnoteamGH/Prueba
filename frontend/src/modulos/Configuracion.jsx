@@ -180,7 +180,7 @@ function WizList({ items, icon, vacio }) {
   );
 }
 
-function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "servicios" }) {
+function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "servicios", serviciosSlot = null }) {
   const conectado = !!auth.token;
   const fiscalReadOnly = rol === "admin_sede" || (can ? !can("config", "editar") : false);
   const [tab, setTab] = useState(seccionInicial);
@@ -666,7 +666,10 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
         );
       })()}
 
-      {tab === "servicios" && (
+      {/* SRV-01 / NAV-06: el catálogo único de servicios (lo leen Agenda, Odontograma,
+          Presupuesto, Caja y la IA) se edita aquí y solo aquí. */}
+      {tab === "servicios" && serviciosSlot && <section className="dc-cfg__panel">{serviciosSlot}</section>}
+      {tab === "servicios" && !serviciosSlot && (
         <section className="dc-cfg__panel">
           {cab("Servicios y precios", "El agente de WhatsApp y los presupuestos usan estos precios.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "servicio", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo servicio</button>)}
           {esps.length === 0 ? <p className="dc-cfg__nada">Sin servicios aún.</p> : (
