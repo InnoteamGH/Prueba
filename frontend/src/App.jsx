@@ -7146,12 +7146,12 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
 }
 
 /* ---- Periodontograma: pantalla del módulo (el sondaje vive en modulos/Periodontograma) ---- */
-function Periodontograma({ pacientes: pacProp, notify, can }) {
+function Periodontograma({ pacientes: pacProp, notify, can, pacienteActivo = null, pacienteFijo = null }) {
   const conectado = !!auth.token;
   const [pacRemoto, setPacRemoto] = useState(null);
   useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni, fechaNacimiento: p.fechaNacimiento })))).catch(() => {}); }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
-  const [pid, setPid] = useState(pacienteFijo || (auth.token ? null : (pacProp[0]?.id || null)));
+  const [pid, setPid] = useState(pacienteFijo || pacienteActivo || (auth.token ? null : (pacProp[0]?.id || null)));
   useEffect(() => {
     if (!conectado || !pacRemoto) return;
     if (!pacRemoto.length) { setPid(null); return; }
@@ -7964,42 +7964,10 @@ const TAB_FICHA_DE_RUTA = { odontograma: "odontograma", perio: "perio", tratamie
 function RedirFicha({ vista, pacienteActivo, setVista, notify }) {
   useEffect(() => {
     const tab = TAB_FICHA_DE_RUTA[vista] || "resumen";
-    if (pacienteActivo?.id) setVista("pacientes", { pacienteId: pacienteActivo.id, tab });
+    if (pacienteActivo) setVista("pacientes", { pacienteId: pacienteActivo, tab });
     else { setVista("pacientes"); notify("Elige un paciente: lo clínico se trabaja dentro de su ficha."); }
   }, [vista]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
-}
-
-/* Odontograma y Periodontograma desde el menú: se elige el paciente y se abre su ficha
-   en esa vista (el estado clínico sigue siendo uno solo, el de la ficha). */
-function ElegirPacienteClinico({ vista, pacientes = [], pacienteActivo, onElegir }) {
-  const [q, setQ] = useState("");
-  const esPerio = vista === "perio";
-  const titulo = esPerio ? "Periodontograma" : "Odontograma";
-  const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const lista = pacientes.filter((p) => !q.trim() || norm(p.nombre).includes(norm(q)) || String(p.dni || "").includes(q.trim()));
-  return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <section className="dc-esp-hero">
-        <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>{titulo}</b></div>
-          <p>Elige el paciente para abrir su {titulo.toLowerCase()}.</p>
-        </div>
-        {pacienteActivo?.id && <button type="button" className="dc-esp-hero__btn" onClick={() => onElegir(pacienteActivo.id)}>Continuar con {pacienteActivo.nombre}</button>}
-      </section>
-      <Card className="dc-elegir">
-        <input className="dc-premium-inp dc-elegir__buscar" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre o DNI…" aria-label="Buscar paciente" />
-        <div className="dc-elegir__lista">
-          {lista.length === 0 ? <p className="dc-elegir__vacio">Ningún paciente coincide con la búsqueda.</p> : lista.slice(0, 60).map((p) => (
-            <button key={p.id} type="button" className="dc-elegir__fila" onClick={() => onElegir(p.id)}>
-              <PersonaCelda nombre={p.nombre} sub={p.dni ? `DNI ${p.dni}` : undefined} />
-              <span className="dc-elegir__ir">Abrir {titulo.toLowerCase()} <ChevronRight size={14} strokeWidth={2} /></span>
-            </button>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
 }
 
 /* NAV-08: un módulo que el plan no incluye muestra su aviso, sin redirigir en silencio. */
@@ -8369,7 +8337,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     if (k === "cobro") { setVista("caja"); return; }
     if (k === "egreso") { setVista("caja_movimientos"); setCrearIntent("egreso"); return; }
     if (k === "evolucion" || k === "receta") {
-      if (pacienteActivo?.id) { setVista("pacientes", { pacienteId: pacienteActivo.id, tab: "historia" }); return; }
+      if (pacienteActivo) { setVista("pacientes", { pacienteId: pacienteActivo, tab: "historia" }); return; }
       setVista("pacientes"); notify(k === "receta" ? "Elige el paciente para emitir la receta." : "Elige el paciente para registrar la evolución."); return;
     }
     setVista(t); if (k === "paciente" || k === "cita") setCrearIntent(k);
@@ -8545,9 +8513,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     { grupo: "Operación", items: [
       { id: "inventario", label: "Inventario", icon: Package, match: ["inventario_compras", "inventario_consumo", "inventario_prov"] },
       { id: "laboratorio", label: "Laboratorio", icon: FlaskConical },
+      // Catálogo único de servicios (precios, duración, especialidad): entrada propia en el menú.
+      { id: "servicios", label: "Servicios y precios", icon: ClipboardList },
     ] },
     { grupo: "Administración", items: [
-      { id: "config", label: "Configuración", icon: Settings, match: ["servicios"] },
+      { id: "config", label: "Configuración", icon: Settings },
       { id: "usuarios", label: "Usuarios y permisos", icon: UserCog, match: ["permisos", "auditoria"] },
       { id: "integraciones", label: "Integraciones", icon: Plug },
       { id: "plan", label: "Mi plan", icon: Crown },
@@ -8604,7 +8574,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         </div>);
       }
       // Un solo catálogo de servicios (NAV-06): Configuración › Servicios y precios.
-      case "servicios": return <Configuracion notify={notify} rol={rol} can={can} seccionInicial="servicios" serviciosSlot={<Servicios notify={notify} can={can} />} />;
+      case "servicios": return <Servicios notify={notify} can={can} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
       // NAV-04: Agenda es un destino con selector de vista. Día = lista operativa;
@@ -8620,8 +8590,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "disponibilidad": return <Disponibilidad notify={notify} usuario={usuario} citas={citas} setCitas={setCitas} horarioClinica={horarioClinica} />;
       // Rutas clínicas antiguas (NAV-02): llevan a la pestaña de la ficha del paciente en
       // atención o, si no hay uno, al directorio con el aviso «Elige un paciente».
-      case "odontograma": case "perio":
-        return <ElegirPacienteClinico key={vista} vista={vista} pacientes={pf} pacienteActivo={pacienteActivo} onElegir={(id) => setVista("pacientes", { pacienteId: id, tab: vista === "perio" ? "perio" : "odontograma" })} />;
+      // Desde el menú se abren directo, con el selector de paciente arriba. Leen y
+      // escriben el mismo estado que la pestaña de la ficha.
+      case "odontograma": return <Odontograma pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} pacienteActivo={pacienteActivo} sedeActiva={sedeActiva} can={can} rol={rol} />;
+      case "perio": return <Periodontograma pacientes={pf} notify={notify} can={can} pacienteActivo={pacienteActivo} />;
       case "tratamientos": case "recetas": case "radiografias": case "fotos": case "consentimientos": case "formularios":
         return <RedirFicha vista={vista} pacienteActivo={pacienteActivo} setVista={setVista} notify={notify} />;
       case "pacientes": return <PacientesView consumirInsumos={consumirInsumos} sedeActiva={sedeActiva} misSedes={misSedes} onIr={setVista} pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}

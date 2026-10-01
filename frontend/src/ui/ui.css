@@ -5164,13 +5164,3 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
   /* Caja: pestañas desplazables con degradado. */
   .dc-cj4__tabs { overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
 }
-/* Selector de paciente para Odontograma / Periodontograma */
-.dc-elegir { padding: 14px !important; display: grid; gap: 10px; }
-.dc-elegir__buscar { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--dc-line); font-size: 14px; outline: none; }
-.dc-elegir__lista { display: grid; }
-.dc-elegir__fila { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 8px; border-top: 1px solid var(--dc-line); border-radius: 8px; }
-.dc-elegir__fila:first-child { border-top: 0; }
-.dc-elegir__fila:hover { background: var(--dc-bg); }
-.dc-elegir__fila:focus-visible { box-shadow: var(--dc-focus); }
-.dc-elegir__ir { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--dc-primary, #0D7D86); white-space: nowrap; }
-.dc-elegir__vacio { margin: 8px; font-size: 13px; color: var(--dc-ink-500); }
