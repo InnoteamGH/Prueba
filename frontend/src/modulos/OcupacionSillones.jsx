@@ -64,22 +64,25 @@ export default function OcupacionSillones() {
 
   if (!sillones.length) return null;
   return (
-    <section className="dc-ocs" aria-label="Ocupación de sillones">
-      <header className="dc-ocs__cab">
-        <span className="dc-ocs__ico"><Armchair size={18} strokeWidth={2} /></span>
-        <div><h3>Ocupación de sillones</h3><span>Minutos agendados sobre las horas que abre cada sede · {rango}</span></div>
-        <div className="dc-ocs__nav">
+    <section className="dc-ocs dc-ocs--rep" aria-label="Ocupación de sillones">
+      {/* Misma franja que el resto de pantallas: cifra principal, cifras con punto y acción. */}
+      <section className="dc-esp-hero dc-ocs-hero">
+        <div className="dc-esp-hero__txt">
+          <div className="dc-esp-hero__num"><b>{datos.pct ?? "—"}%</b><span>ocupación de la semana</span></div>
+          <p>Minutos agendados sobre las horas que abre cada sede · {rango}</p>
+        </div>
+        <div className="dc-esp-hero__cifras">
+          <div><b>{horasLibres} h</b><span>Horas libres en sillón</span></div>
+          {masLibre && <div><b>{masLibre.s.nombre}</b><span>Más libre · {masLibre.pct}%</span></div>}
+          {diaLleno && <div><b>{DIAS[datos.porDia.indexOf(diaLleno)]} {diaLleno.fecha.slice(8)}</b><span>Día más lleno · {diaLleno.pct}%</span></div>}
+        </div>
+        <span />
+        <div className="dc-ocs__nav dc-ocs__nav--hero">
           <button type="button" aria-label="Semana anterior" onClick={() => setOff(off - 1)}><ChevronLeft size={15} strokeWidth={2} /></button>
           <button type="button" className={off === 0 ? "is-on" : ""} onClick={() => setOff(0)}>Esta semana</button>
           <button type="button" aria-label="Semana siguiente" onClick={() => setOff(off + 1)}><ChevronRight size={15} strokeWidth={2} /></button>
         </div>
-      </header>
-      <div className="dc-ocs__kpis">
-        <div><small>Ocupación de la semana</small><b>{datos.pct ?? "—"}%</b><i><u style={{ width: `${datos.pct || 0}%` }} /></i></div>
-        <div><small>Horas libres en sillón</small><b>{horasLibres} h</b><em>cupos que se pueden llenar</em></div>
-        {masLibre && <div><small>Sillón más libre</small><b>{masLibre.s.nombre}</b><em>{nomSede(masLibre.s.sede)} · {masLibre.pct}%</em></div>}
-        {diaLleno && <div><small>Día más lleno</small><b>{DIAS[datos.porDia.indexOf(diaLleno)]} {diaLleno.fecha.slice(8)}</b><em>{diaLleno.pct}% de ocupación</em></div>}
-      </div>
+      </section>
       <div className="dc-ocs__tabla" role="table" aria-label="Ocupación por sillón y día">
         <div className="dc-ocs__fila is-cab" role="row"><span role="columnheader">Sillón</span>{dias.map((f, i) => <span key={f} role="columnheader">{DIAS[i]} <small>{f.slice(8)}</small></span>)}<span role="columnheader">Semana</span></div>
         {sedes.map((sd) => (

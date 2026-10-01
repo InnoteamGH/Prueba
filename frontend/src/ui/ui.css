@@ -3844,7 +3844,7 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
   }
   /* Título y acción principal en la primera línea; lo demás debajo, a lo ancho */
   .dc-esp-hero > * { order: 5; flex: 1 1 100% !important; }
-  .dc-esp-hero > .dc-esp-hero__txt { order: 0; flex: 1 1 0 !important; }
+  .dc-esp-hero > .dc-esp-hero__txt { order: 0; flex: 1 1 0 !important; min-width: 55%; }
   .dc-esp-hero > .dc-esp-hero__agregar, .dc-esp-hero > .dc-esp-hero__btn, .dc-esp-hero > .dc-hero-acc { order: 1; flex: 0 0 auto !important; width: auto !important; }
   .dc-esp-hero > .dc-esp-hero__prox { order: 2; }
   .dc-esp-hero > .dc-esp-hero__cifras { order: 3; }
@@ -5131,20 +5131,8 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .fm-pagina .fm-lateral { max-width: 300px; }
 .fm-lateral { overflow-x: hidden; }
 
-/* GLO-01 · PageHeader: en pantallas de lista el banner es solo título + subtítulo +
-   acción. Los KPIs se quedan en tableros (Pendientes, Panel, Reportes, Caja y Mi plan
-   con .is-tablero). Los conteos viven en los chips de filtro. */
-.dc-esp-hero:not(.is-tablero) { display: flex !important; flex-wrap: wrap; align-items: center; gap: 10px 16px !important; padding: 12px 18px !important; min-height: 0; }
-.dc-esp-hero:not(.is-tablero) > .dc-esp-hero__txt { flex: 1 1 260px; }
-.dc-esp-hero:not(.is-tablero) .dc-esp-hero__num b { font-size: 22px; }
-.dc-esp-hero:not(.is-tablero) .dc-esp-hero__cifras,
-.dc-esp-hero:not(.is-tablero) .dc-esp-hero__prox,
-.dc-esp-hero:not(.is-tablero) .dc-lab-flujo,
-.dc-esp-hero:not(.is-tablero) .dc-form-hero__barra,
-.dc-esp-hero:not(.is-tablero) > span:empty { display: none !important; }
-.dc-esp-hero:not(.is-tablero) .dc-hero-acc,
-.dc-esp-hero:not(.is-tablero) > .dc-esp-hero__btn,
-.dc-esp-hero:not(.is-tablero) > .dc-esp-hero__agregar { margin-left: auto; }
+/* Franjas superiores: todas siguen el mismo patrón (cifra principal + subtítulo, cifras
+   con punto de color a la derecha y acción), a pedido de la clínica. */
 .dc-row-btn { border: 1px solid var(--dc-line); background: #fff; color: var(--dc-primary, #0D7D86); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .dc-row-btn:hover { background: var(--dc-bg); }
 .dc-sat__nps { font-size: 12px; font-weight: 700; color: var(--dc-primary, #0D7D86); background: #E6F6F6; border-radius: 999px; padding: 2px 8px; }
@@ -5181,3 +5169,10 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-sb:not(.is-colap) .dc-sb__urol { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.25; }
 .dc-sb:not(.is-colap) .dc-sb__who { flex: 1; min-width: 0; }
 .dc-sb:not(.is-colap) .dc-sb__planchip { white-space: nowrap; }
+.dc-odo-bar__foto { display: inline-flex; flex-shrink: 0; border-radius: 14px; box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
+/* Ocupación de sillones como reporte: franja verde arriba y la tabla en su tarjeta. */
+.dc-ocs.dc-ocs--rep { margin: 0; padding: 0; background: none; border: 0; box-shadow: none; display: grid; gap: 14px; }
+.dc-ocs--rep .dc-ocs__tabla { background: #fff; border: 1px solid var(--dc-line); border-radius: var(--dc-r-lg); padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 14px 30px -26px rgba(11,108,120,.5); }
+.dc-ocs__nav--hero button { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.22); color: #fff; }
+.dc-ocs__nav--hero .is-on { background: #fff; border-color: #fff; color: #0B6C78; }
+.dc-kpis.dc-kpis--hero[aria-label="Indicadores de ausentismo"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -945,6 +945,10 @@ function reg(f,pz){const d=est.datos[f]; if(!d[pz])d[pz]={caras:{},raices:{},pie
 function color(h,cal){return h.col==='e'?(cal==='malo'?'r':'a'):h.col;}
 
 (function sembrar(){
+  /* Ejemplo solo para ver la pantalla suelta. Dentro de la app (bridge) el odontograma
+     arranca vacío y muestra únicamente lo guardado del paciente: si no, se veían estas
+     marcas un instante antes de cargar las reales. */
+  if(/[?&]bridge=1(?:&|$)/.test(location.search||'')) return;
   const S=(f,pz,t,v)=>{const r=reg(f,pz);
     if(t==='cara') r.caras[v.c]={h:v.h,c:v.col};
     else if(t==='raiz') r.raices[v.r]={h:v.h,c:v.col};

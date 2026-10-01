@@ -548,7 +548,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
 
   return (
     <>
-      <section className="dc-kpis dc-kpis--3" aria-label="Indicadores de ausentismo">
+      <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores de ausentismo">
         <button type="button" className="dc-kpi" onClick={fichaPerdidas}>
           <span className="dc-kpi__icon" style={{ background: "var(--dc-warn-100)", color: "var(--dc-warn-700)" }} aria-hidden="true">⊘</span>
           <div className="dc-kpi__body">

@@ -164,6 +164,21 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   const activo = useRef(false);
   const raizRef = useRef(null);
   const scrollRef = useRef(null);
+  // Ancho de columna según el espacio disponible: el gráfico ocupa todo el ancho de la
+  // tarjeta (mínimo 54 px por pieza, como antes; máximo 88 px). El dibujo escala sin deformarse.
+  const [colPx, setColPx] = useState(COL);
+  const roRef = useRef(null);
+  // Ref de callback: el contenedor puede montarse después (al cargar el sondaje).
+  const medirScroll = (el) => {
+    scrollRef.current = el;
+    if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
+    if (!el || typeof ResizeObserver === "undefined") return;
+    roRef.current = new ResizeObserver(([e]) => {
+      const w = e.contentRect.width - 84;
+      setColPx(Math.max(COL, Math.min(88, Math.floor(w / 16))));
+    });
+    roRef.current.observe(el);
+  };
   // Proforma: plan sugerido por el sondaje, editable antes de emitirla.
   const [pf, setPf] = useState(null); // { plan, desc }
   const demoDb = useContext(DatosDemoCtx);
@@ -378,8 +393,8 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
     </div>
   );
   const svg = (cara, abajo) => (
-    <div className="pgc-svgw" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const n = arco[Math.floor((e.clientX - r.left) / COL)]; if (n) elegirDiente(n); }}>
-      <svg viewBox={`0 0 ${arco.length * COL} ${H}`} width={arco.length * COL} height={H} role="img" aria-label={`Sondaje ${cara === "v" ? "vestibular" : interna.toLowerCase()}`}
+    <div className="pgc-svgw" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const n = arco[Math.floor((e.clientX - r.left) / colPx)]; if (n) elegirDiente(n); }}>
+      <svg viewBox={`0 0 ${arco.length * COL} ${H}`} width={arco.length * colPx} height={Math.round(H * colPx / COL)} role="img" aria-label={`Sondaje ${cara === "v" ? "vestibular" : interna.toLowerCase()}`}
         dangerouslySetInnerHTML={{ __html: svgCara(arco, cara, abajo, dientes, cmp ? previo : null, sel) }} />
     </div>
   );
@@ -451,8 +466,8 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
               <span><i className="is-mg" />Margen</span><span><i className="is-bolsa" />Bolsa</span><span><i className="is-enc" />Encía</span>{cmp && <span><i className="is-prev" />Anterior</span>}
             </div>
           </div>
-          <div className="pgc-scroll" ref={scrollRef}>
-            <div className="pgc-carta">
+          <div className="pgc-scroll" ref={medirScroll}>
+            <div className="pgc-carta" style={{ "--pg-col": `${colPx}px` }}>
               {filaCiclo("movilidad", "Movilidad")}
               {filaCiclo("furca", "Furca")}
               {filaDots("v", "placa", "Placa")}
