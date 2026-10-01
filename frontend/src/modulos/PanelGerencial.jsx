@@ -2,7 +2,7 @@
  * Panel Gerencial — sustituye el DashLienzo de #/gerencial.
  * Layout SPEC §3.2 – animaciones HTML §6 – fichas de dato §7.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import api, { auth } from "../api/client";
 import {
   curvaCajaAcumulada,
@@ -14,9 +14,10 @@ import {
   metaEstado,
   moneyFmt,
 } from "./panelGerencialUtil";
-import { pluralEs, ThOrden, useFiltroTabla } from "../comun";
+import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES } from "../comun";
+import { SILLONES_DEMO } from "../compartido/sillones";
 import "./panelGerencial.css";
-import ResumenMes from "./ResumenMes";
+import ResumenMes, { avanceDemo } from "./ResumenMes";
 import OcupacionSillones from "./OcupacionSillones";
 
 const COLORES_ESP = [
@@ -778,8 +779,61 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
   const abrir = useCallback((d) => setFicha(d), []);
   const cerrar = useCallback(() => setFicha(null), []);
 
+  // Demostración: el panel se arma con los mismos datos que usa el resto del sistema
+  // (citas, pacientes, fichas, sillones), para que cada bloque cuadre con los demás
+  // en vez de mostrar ceros junto al resumen del mes.
+  const demoDb = useContext(DatosDemoCtx);
+  const cargarDemo = useCallback(() => {
+    const citas = (demoDb?.citas || citasProp || []);
+    const deHoy = citas.filter((c) => c.fecha === fecha);
+    const pacientes = demoDb?.pacientes || [];
+    const fichas = demoDb?.fichas || {};
+    const precio = (c) => (ESPECIALIDADES.find((e) => e.id === c.esp) || {}).precio || 80;
+    const atendidasHoy = deHoy.filter((c) => c.estado === "atendida");
+    const pagosTodos = pacientes.flatMap((p) => ((fichas[p.id] || {}).pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, pacienteId: p.id })));
+    const fa = avanceDemo();
+    const ranking = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, produccion: Math.round(m.prodDemo * fa), meta: m.meta, citas: Math.max(1, Math.round(m.citasDemo * fa)) }));
+    setCitasHoy(deHoy);
+    setKd({
+      ingresosMes: ranking.reduce((a, r) => a + r.produccion, 0), ingresosMesAnterior: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) / 0.91), hayMeta: true, metaMensualClinica: ranking.reduce((a, r) => a + r.meta, 0),
+      produccionDia: atendidasHoy.reduce((a, c) => a + precio(c), 0),
+      pacientesAtendidosHoy: new Set(atendidasHoy.map((c) => c.paciente)).size,
+      ranking,
+    });
+    const pacs = pacientes.map((p) => {
+      const f = fichas[p.id] || {};
+      const total = (f.tratamiento || []).reduce((a, x) => a + (Number(x.costo) || 0), 0);
+      const pagado = (f.pagos || []).reduce((a, x) => a + (Number(x.monto) || 0), 0);
+      const suyas = citas.filter((c) => c.pacienteId === p.id || c.paciente === p.nombre);
+      const pasadas = suyas.filter((c) => c.fecha <= fecha && c.estado !== "cancelada").map((c) => c.fecha).sort();
+      return { id: p.id, nombre: p.nombre, saldo: Math.max(0, total - pagado), ultimaCita: pasadas[pasadas.length - 1] || p.ultima || null, numeroDeCitas: suyas.length, creadoEn: p.creadoEn || null };
+    });
+    setPacResumen(pacs);
+    const deuda = pacs.reduce((a, p) => a + p.saldo, 0);
+    setInd({
+      deudaPorAntiguedad: { hasta30: Math.round(deuda * 0.52), de31a60: Math.round(deuda * 0.27), de61a90: Math.round(deuda * 0.13), masDe90: deuda - Math.round(deuda * 0.52) - Math.round(deuda * 0.27) - Math.round(deuda * 0.13) },
+      conversionPlanes: { aceptado: Math.round(18400 * fa), pendiente: Math.round(6200 * fa), rechazado: Math.round(2100 * fa) },
+      // Reparte la producción del mes (la misma del resumen) entre especialidades.
+      porEspecialidad: [["Ortodoncia", 0.271], ["Endodoncia", 0.239], ["Odontología general", 0.218], ["Rehabilitación", 0.174], ["Periodoncia", 0.057], ["Odontopediatría", 0.041]].map(([nombre, k]) => ({ nombre, produccion: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) * k) })),
+      cartera: { nuevos: pacs.filter((p) => p.creadoEn && (Date.now() - new Date(p.creadoEn).getTime()) <= 30 * 86400000).length || 4 },
+      alertas: [],
+    });
+    setRep({ funnel: { conversaciones: 46, agendadas: 19 } });
+    setPagos(pagosTodos);
+    setTratResumen([
+      ["Profilaxis y limpieza", 42, 4200], ["Resina compuesta", 44, 3960], ["Extracción simple", 18, 2700], ["Curación", 20, 1800], ["Sellantes", 12, 720],
+    ].map(([nombre, n, imp]) => ({ nombre, numeroDeVentas: Math.max(1, Math.round(n * fa)), importeTotal: Math.round(imp * fa) })));
+    setActividad([
+      ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),
+      ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${Number(pg.monto).toFixed(2)}` })),
+    ].sort((a, b) => String(a.hora).localeCompare(String(b.hora))));
+    setInventarioValorizado(8450);
+    setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false).length);
+    setNSedes(2);
+  }, [demoDb, citasProp, fecha]);
+
   const recargar = useCallback(() => {
-    if (!conectado) return;
+    if (!conectado) { cargarDemo(); return; }
     api.gerencial().then(setKd).catch(() => setKd({ error: true }));
     api.gerencialIndicadores().then(setInd).catch(() => setInd({ errorDeCarga: true }));
     api.gerencialReportes().then(setRep).catch(() => setRep({ errorDeCarga: true }));
@@ -813,7 +867,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     api.sedes.listar().then((rows) => {
       setNSedes(Array.isArray(rows) ? rows.length : null);
     }).catch(() => setNSedes(null));
-  }, [conectado, fecha, citasProp]);
+  }, [conectado, fecha, citasProp, cargarDemo]);
 
   useEffect(() => { recargar(); }, [recargar]);
 
@@ -1424,7 +1478,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
         <div className="dc-card__body">
           <div className="dc-split" style={{ gridTemplateColumns: "250px 1fr" }}>
             <div>
-              <p className="dc-rotulo">Ocupación – {franjas} franjas</p>
+              <p className="dc-rotulo">Franjas horarias con citas – {ocupadas} de {franjas}</p>
               <div className="gate" aria-label={`Ocupación: ${ocupadas} de ${franjas}`}>
                 {Array.from({ length: franjas }, (_, g) => (
                   <i key={g} className={g < ocupadas ? (g === ocupadas - 1 ? "hoy" : "on") : undefined} />

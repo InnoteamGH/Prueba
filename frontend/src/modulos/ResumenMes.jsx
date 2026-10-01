@@ -25,6 +25,12 @@ const DEMO_TOP = [
 ];
 const DEMO_SALIDAS = [["Alquiler", 2800], ["Laboratorio", 2140], ["Insumos", 1930], ["Planilla", 4200], ["Servicios (luz/agua)", 385], ["Marketing", 450], ["Otros", 575]];
 
+/** Avance del mes para las cifras de demostración (las de ejemplo son de un mes casi completo). */
+export const avanceDemo = (d = new Date()) => {
+  const dias = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  return Math.min(1, Math.max(0.12, (d.getDate() / dias) * 1.08));
+};
+
 export default function ResumenMes({ kd, acciones = null }) {
   const conectado = !!auth.token;
   const hoy = new Date();
@@ -41,12 +47,15 @@ export default function ResumenMes({ kd, acciones = null }) {
 
   const d = useMemo(() => {
     if (!conectado) {
-      const equipo = MEDICOS.map((m) => ({ nombre: m.nombre, prod: m.prodDemo || 0, meta: m.meta || 0 }));
+      // Las cifras de ejemplo avanzan con el mes: el día 1 no puede llevar ya el 75 %.
+      const f = avanceDemo(hoy);
+      const equipo = MEDICOS.map((m) => ({ nombre: m.nombre, prod: Math.round((m.prodDemo || 0) * f), meta: m.meta || 0 }));
       const facturado = equipo.reduce((a, x) => a + x.prod, 0);
+      const salCat = DEMO_SALIDAS.map(([k, v]) => [k, Math.round(v * f)]);
       return {
         facturado, anterior: Math.round(facturado * 0.91), meta: equipo.reduce((a, x) => a + x.meta, 0), equipo,
-        salidas: DEMO_SALIDAS.reduce((a, [, v]) => a + v, 0), salidasUsd: 40, salidasCat: [...DEMO_SALIDAS].sort((a, b) => b[1] - a[1]),
-        top: DEMO_TOP,
+        salidas: salCat.reduce((a, [, v]) => a + v, 0), salidasUsd: 40, salidasCat: [...salCat].sort((a, b) => b[1] - a[1]),
+        top: DEMO_TOP.map((t) => ({ ...t, importe: Math.round(t.importe * f), ventas: Math.max(1, Math.round(t.ventas * f)) })),
       };
     }
     const delMes = (egresos || []).filter((e) => String(e.fecha || "").slice(0, 10) >= desde);
@@ -108,7 +117,7 @@ export default function ResumenMes({ kd, acciones = null }) {
           {d.meta > 0 ? (
             <>
               <div className="dc-rm__meta" role="img" aria-label={`Avance ${avance.toFixed(0)}% de la meta`}><i style={{ width: `${Math.min(100, avance)}%` }} /><span style={{ left: `${Math.min(100, ritmo)}%` }} title="Ritmo esperado a hoy" /></div>
-              <em><i className={avance >= ritmo ? "is-up" : "is-down"}>{avance.toFixed(0)}%</i> logrado · proyección {soles(proyeccion)}</em>
+              <em><i className={avance >= ritmo ? "is-up" : "is-down"}>{avance.toFixed(0)}%</i> logrado · {hoy.getDate() >= 5 ? `cierre estimado ${soles(proyeccion)}` : "estimado de cierre desde el día 5"}</em>
             </>
           ) : <em>Define las metas del equipo en Metas</em>}
         </article>

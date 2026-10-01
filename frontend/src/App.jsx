@@ -8130,9 +8130,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [subAbierto, setSubAbierto] = useState({}); // submenús del sidebar abiertos (por etiqueta del padre)
   // Menú por rol: grupos plegables (se recuerda lo que cada quien abre o cierra),
   // favoritos fijados arriba y buscador con Ctrl + K.
-  const GRUPOS_ROL = { recepcion: ["Atención", "Clínico"], medico: ["Atención", "Clínico"], admin_sede: ["Atención", "Clínico", "Finanzas"], gerencia: ["General", "Finanzas"], admin: ["General", "Atención", "Clínico"], ti: ["Administración"] };
+  const GRUPOS_ROL = { recepcion: ["Inicio", "Agenda", "Pacientes y clínica", "Caja y cobros"], medico: ["Inicio", "Agenda", "Pacientes y clínica"], admin_sede: ["Inicio", "Agenda", "Caja y cobros"], gerencia: ["Inicio", "Reportes", "Caja y cobros"], admin: ["Inicio", "Agenda", "Pacientes y clínica"], ti: ["Administración"] };
   const FAVS_ROL = { recepcion: ["agenda_cal", "pacientes", "facturacion"], medico: ["agenda", "pacientes", "odontograma"], admin_sede: ["dashboard", "agenda_cal", "facturacion"], gerencia: ["gerencial", "reportes", "metas"], admin: ["dashboard", "agenda_cal", "pacientes", "facturacion"], ti: ["usuarios", "permisos", "integraciones"] };
-  const [gruposAb, setGruposAb] = usePersist("sb_grupos_" + rol, () => (GRUPOS_ROL[rol] || null));
+  const [gruposAb, setGruposAb] = usePersist("sb_grupos2_" + rol, () => (GRUPOS_ROL[rol] || null));
   const [favs, setFavs] = usePersist("sb_favs_" + rol, () => (FAVS_ROL[rol] || []));
   const [buscador, setBuscador] = useState(false);
   useEffect(() => {
@@ -8390,45 +8390,64 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   // NAV-01 (Excel 08/09/2026 + revision2): Lista de espera y Comisiones top-level si hay permiso.
   const NAV_GRUPOS = [
-    { grupo: "General", items: [
-      { id: "plataforma", label: "Plataforma (clínicas)", icon: Globe },
-      { id: "gerencial", label: "Dashboard gerencial", icon: BarChart3 },
-      { label: "Producción y comisiones", icon: TrendingUp, children: [
-        { id: "reportes", label: "Resumen", mod: "reportes" },
-        { id: "reportes_aus", label: "Ausentismo", mod: "reportes" },
-      ], corto: "Producción" },
-      // NAV-11: #/comisiones es alias de reportes (sin segunda entrada de menú)
-    ] },
-    { grupo: "Atención", items: [
+    // Ordenado por cómo se trabaja en la clínica: el día, la agenda, el paciente,
+    // la comunicación, la caja, los números, la logística y la administración.
+    { grupo: "Inicio", items: [
       { id: "dashboard", label: "Pendientes de hoy", icon: LayoutDashboard },
-      { id: "whatsapp", label: "WhatsApp + IA", icon: MessageSquare, tag: "IA" },
-      { label: "Agenda", icon: Calendar, children: [
+      { id: "gerencial", label: "Panel gerencial", icon: BarChart3 },
+    ] },
+    { grupo: "Agenda", items: [
+      { label: "Citas", icon: Calendar, children: [
         { id: "agenda", label: "Hoy", mod: "agenda" },
         { id: "agenda_cal", label: "Calendario", mod: "agenda" },
-        { id: "agenda_consolidado", label: "Consolidado de citas", mod: "agenda" },
+        { id: "agenda_consolidado", label: "Consolidado", mod: "agenda" },
       ] },
       { id: "espera", label: "Lista de espera", icon: Bell },
       { id: "disponibilidad", label: "Mi disponibilidad", icon: Clock },
-      { label: "Recordatorios", icon: BellRing, children: [
-        { id: "recall", label: "Automatizaciones", mod: "recall" },
-        { id: "recall_hist", label: "Historial de envíos", mod: "recall" },
-        { id: "recall_sat", label: "Satisfacción", mod: "recall" },
-      ] },
-      { id: "formularios", label: "Formularios", icon: ClipboardList },
-      { id: "resenas", label: "Reseñas", icon: Star },
     ] },
-    { grupo: "Clínico", items: [
+    { grupo: "Pacientes y clínica", items: [
       { id: "pacientes", label: "Pacientes", icon: Users },
       { id: "odontograma", label: "Odontograma", icon: Smile },
       { id: "perio", label: "Periodontograma", icon: HeartPulse },
       { id: "tratamientos", label: "Tratamientos", icon: ClipboardList },
       { id: "recetas", label: "Recetas", icon: Pill },
-      { id: "consentimientos", label: "Consentimientos", icon: ShieldPlus },
       { id: "radiografias", label: "Radiografías", icon: Scan },
-      { id: "fotos", label: "Fotografías", icon: Camera },
+      { id: "fotos", label: "Fotografía clínica", icon: Camera },
+      { id: "consentimientos", label: "Consentimientos", icon: ShieldPlus },
+      { id: "formularios", label: "Formularios del paciente", icon: FileText },
     ] },
-    { grupo: "Operaciones", items: [
-      { id: "servicios", label: "Servicios", icon: ClipboardList },
+    { grupo: "Comunicación", items: [
+      { id: "whatsapp", label: "WhatsApp + IA", icon: MessageSquare, tag: "IA" },
+      { label: "Recordatorios", icon: BellRing, children: [
+        { id: "recall", label: "Automatizaciones", mod: "recall" },
+        { id: "recall_hist", label: "Historial de envíos", mod: "recall" },
+        { id: "recall_sat", label: "Satisfacción", mod: "recall" },
+      ] },
+      { id: "resenas", label: "Reseñas", icon: Star },
+    ] },
+    { grupo: "Caja y cobros", items: [
+      { label: "Caja", icon: CreditCard, children: [
+        { id: "caja_apertura", label: "Apertura", mod: "facturacion" },
+        { id: "facturacion", label: "Cobros", mod: "facturacion" },
+        ...(can("facturacion", "ver") ? [{ id: "caja_movimientos", label: "Ingresos y egresos", mod: "facturacion" }] : []),
+        { id: "caja_cierre", label: "Cierre del día", mod: "facturacion" },
+        { id: "caja_historial", label: "Historial", mod: "facturacion" },
+      ] },
+      { id: "caja_sunat", label: "Facturación electrónica", icon: Receipt },
+      { id: "caja_links", label: "Links de pago", icon: Link2 },
+      { id: "seguros", label: "Seguros y EPS", icon: Umbrella },
+    ] },
+    { grupo: "Reportes", items: [
+      { label: "Producción y comisiones", icon: TrendingUp, children: [
+        { id: "reportes", label: "Resumen", mod: "reportes" },
+        { id: "reportes_aus", label: "Ausentismo", mod: "reportes" },
+      ], corto: "Producción" },
+      // NAV-11: #/comisiones es alias de reportes (sin segunda entrada de menú)
+      { id: "metas", label: "Metas", icon: Target },
+      { id: "miproduccion", label: "Mi producción", icon: Wallet },
+    ] },
+    { grupo: "Inventario y servicios", items: [
+      { id: "servicios", label: "Servicios y precios", icon: Tag },
       { label: "Inventario", icon: Package, children: [
         { id: "inventario", label: "Productos", mod: "inventario" },
         { id: "inventario_compras", label: "Compras", mod: "inventario" },
@@ -8437,29 +8456,14 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       ] },
       { id: "laboratorio", label: "Laboratorio", icon: FlaskConical },
     ] },
-    { grupo: "Finanzas", items: [
-      { label: "Caja", icon: CreditCard, children: [
-        { id: "facturacion", label: "Cobros", mod: "facturacion" },
-        { id: "caja_apertura", label: "Apertura", mod: "facturacion" },
-        { id: "caja_cierre", label: "Cierre del día", mod: "facturacion" },
-        { id: "caja_historial", label: "Historial", mod: "facturacion" },
-        ...(can("facturacion", "ver") ? [{ id: "caja_movimientos", label: "Ingresos y egresos", mod: "facturacion" }] : []),
-        { id: "caja_links", label: "Links de pago", mod: "facturacion" },
-        { id: "caja_sunat", label: "Facturación electrónica", mod: "facturacion" },
-      ] },
-      { id: "metas", label: "Metas de producción", icon: Target },
-      { id: "seguros", label: "Seguros y EPS", icon: Umbrella },
-      { id: "miproduccion", label: "Mi producción", icon: TrendingUp },
-    ] },
     { grupo: "Administración", items: [
-      { id: "plan", label: "Mi plan", icon: CreditCard },
+      { id: "config", label: "Configuración", icon: Settings },
       { id: "usuarios", label: "Usuarios", icon: UserCog },
       { id: "permisos", label: "Permisos por rol", icon: Shield },
       { id: "integraciones", label: "Integraciones", icon: Plug },
-      // Faltaba la entrada: la pantalla existía, el permiso existía y el backend
-      // también, pero no había dónde pulsar para abrirla.
-      { id: "config", label: "Configuración", icon: Settings },
+      { id: "plan", label: "Mi plan", icon: Crown },
       { id: "auditoria", label: "Auditoría y accesos", icon: ShieldCheck },
+      { id: "plataforma", label: "Plataforma (clínicas)", icon: Globe },
     ] },
   ].map((g) => ({
     ...g,
