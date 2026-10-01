@@ -4106,9 +4106,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </React.Fragment>
         ); })}
         <span className="dc-cjh__div" aria-hidden="true" />
-        <button type="button" className={`dc-cjh__extra${tab === "sunat" ? " is-on" : ""}`} onClick={() => setTab("sunat")}><Receipt size={14} strokeWidth={2} /> Facturación electrónica</button>
-        <button type="button" className={`dc-cjh__extra${tab === "historial" ? " is-on" : ""}`} onClick={() => setTab("historial")}><History size={14} strokeWidth={2} /> Historial</button>
-        <button type="button" className={`dc-cjh__extra${tab === "links" ? " is-on" : ""}`} onClick={() => setTab("links")}><Link2 size={14} strokeWidth={2} /> Links de pago{linksPend ? <em>{linksPend}</em> : null}</button>
+        <button type="button" className={`dc-cjh__extra${tab === "sunat" ? " is-on" : ""}`} onClick={() => setTab("sunat")} title="Facturación electrónica (SUNAT)"><Receipt size={14} strokeWidth={2} /> <span className="dc-cjh__xt">Facturación</span></button>
+        <button type="button" className={`dc-cjh__extra${tab === "historial" ? " is-on" : ""}`} onClick={() => setTab("historial")} title="Historial de cajas"><History size={14} strokeWidth={2} /> <span className="dc-cjh__xt">Historial</span></button>
+        <button type="button" className={`dc-cjh__extra${tab === "links" ? " is-on" : ""}`} onClick={() => setTab("links")} title="Links de pago"><Link2 size={14} strokeWidth={2} /> <span className="dc-cjh__xt">Links de pago</span>{linksPend ? <em>{linksPend}</em> : null}</button>
       </nav>
     </section>
   );
@@ -4187,8 +4187,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                       <div><small>Caja abierta en {sedeNombre()}</small><b>Lista para cobrar</b><p>Desde {apertura.abiertaEn ? new Date(apertura.abiertaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "—"}{apertura.abiertaPorNombre ? `, por ${apertura.abiertaPorNombre}` : ""}{apertura.nota ? ` – ${apertura.nota}` : ""}</p></div>
                     </div>
                     <div className="dc-ap2__atajos">
-                      <button type="button" style={{ "--t": "#0E9199" }} onClick={() => setTab("cobros")}><span><CreditCard size={19} strokeWidth={1.9} /></span><b>Cobrar</b><small>Saldos de pacientes</small></button>
-                      <button type="button" style={{ "--t": "#6D4FD1" }} onClick={() => setTab("cierre")}><span><Calculator size={19} strokeWidth={1.9} /></span><b>Cierre y arqueo</b><small>Cuenta la gaveta</small></button>
                       <button type="button" style={{ "--t": "#D97706" }} onClick={() => setMovForm({ tipo: "retiro", monto: "", nota: "" })}><span><ArrowUpDown size={19} strokeWidth={1.9} /></span><b>Retiro o ingreso</b><small>Mover efectivo</small></button>
                       {puedeAbrirCaja && <button type="button" style={{ "--t": "#28527A" }} onClick={registrarCambioTurno}><span><Repeat size={19} strokeWidth={1.9} /></span><b>Cambio de turno</b><small>Registrar relevo</small></button>}
                     </div>
@@ -4251,9 +4249,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-ap2__tmedios">{destActivos.map((d) => { const [Ico, col] = medioUi(d.tipo || d.id); return <span key={d.id || d.label} style={{ "--m": col }}><Ico size={12} strokeWidth={2.2} /> {d.label || d.tipo}</span>; })}</div>
                 <div className="dc-ap2__tcorte" />
                 <div className="dc-ap2__ttotal"><span>Fondo inicial</span><b>S/ {fondoVal.toFixed(2)}</b></div>
-                {cajaAbierta ? (
-                  <button type="button" className="dc-ap2__cta is-alt" onClick={() => setTab("cierre")}><Calculator size={16} strokeWidth={2} /> Ir al cierre del día</button>
-                ) : (
+                {cajaAbierta ? null : (
                   <>
                     <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>
                     <p>{sedeRequierePick && !cajaSedePick ? "Elige la sede para continuar." : "Debes abrir la caja antes de registrar cobros."}</p>
@@ -4315,7 +4311,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <PersonaCelda nombre={x.paciente} sub={x.fases.map((f) => f.nombre).join(" · ")} />
                 <span className="dc-term__cuando">{x.fases[0].terminadaEn ? `Terminado ${new Date(x.fases[0].terminadaEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}` : "Terminado"}</span>
                 <em>S/ {x.total.toFixed(2)}</em>
-                {puedeAbrirCaja && <button type="button" className="dc-term__btn" onClick={() => setPago({ pid: x.pid, nombre: x.paciente, monto: x.total, faseIds: x.fases.map((f) => f.faseId), items: x.fases.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) })}><DollarSign size={14} strokeWidth={2} /> Cobrar</button>}
+                {puedeAbrirCaja && <button type="button" className="dc-term__btn" disabled={!cajaAbierta} title={cajaAbierta ? "Cobrar lo terminado" : "Abre la caja para cobrar"} onClick={() => setPago({ pid: x.pid, nombre: x.paciente, monto: x.total, faseIds: x.fases.map((f) => f.faseId), items: x.fases.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) })}><DollarSign size={14} strokeWidth={2} /> Cobrar</button>}
               </li>
             ))}
           </ul>
@@ -4364,7 +4360,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 {lista.map((x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; const col = colorDe(x.p.nombre); const pc = pct >= 75 ? "#16A36A" : pct >= 40 ? "#0E9199" : "#D97706"; return (
                   <div key={x.p.id} className="dc-cob__fila">
                     <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(x.p.nombre)}</span>
-                    <div className="dc-cob__quien"><b>{x.p.nombre}</b><span><MapPin size={11} strokeWidth={2} /> {x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} <i /> {x.pend} {x.pend === 1 ? "fase pendiente" : "fases pendientes"}</span></div>
+                    <div className="dc-cob__quien"><b>{x.p.nombre}{terminadosPorPac.has(x.p.id) && <em className="dc-cob__listo" title="Tiene tratamiento terminado: su cobro está arriba, en «Tratamientos terminados»">Terminado · listo para cobrar</em>}</b><span><MapPin size={11} strokeWidth={2} /> {x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} <i /> {x.pend} {x.pend === 1 ? "fase pendiente" : "fases pendientes"}</span></div>
                     <div className="dc-cob__avance" title={`Cobrado S/ ${x.pagado} de S/ ${x.total}`}>
                       <span className="dc-cob__anillo" style={{ "--p": pct, "--c": pc }}><b>{pct}%</b></span>
                       <div><small>Cobrado</small><span>S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</span></div>
@@ -4603,7 +4599,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               </div>
               <aside className="dc-cz__lado">
                 <Card className="dc-cz__cobros">
-                  <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#16A36A" }}><Receipt size={20} strokeWidth={1.9} /></span><div><h3>Cobros de hoy</h3><span>{c.cantidad} {c.cantidad === 1 ? "cobro" : "cobros"}</span></div></div>
+                  <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#16A36A" }}><Receipt size={20} strokeWidth={1.9} /></span><div><h3>Cobros por medio de pago</h3><span>{c.cantidad} {c.cantidad === 1 ? "cobro" : "cobros"} · para cuadrar con el POS, Yape y bancos</span></div></div>
                   {(() => {
                     const lst = metodos.map(([k, v]) => ({ k, v: Number(v), col: medioUi(k)[1], Ico: medioUi(k)[0] }));
                     let acc = 0;
@@ -4623,16 +4619,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     <div><span>Comisión estimada</span><b className="is-mal">− {nfmt(totalComision)}</b></div>
                     <div className="is-neto"><span>Neto estimado</span><b>{nfmt(netoHoyCierre)}</b></div>
                   </div>
-                </Card>
-                <Card className="dc-cz__movs">
-                  <div className="dc-cz__movcab"><h4>Movimientos del día</h4><span>{(c.movimientos || []).length}</span></div>
+                  {(c.movimientos || []).length > 0 && <div className="dc-cz__movcab"><h4>Detalle de cobros</h4><span>{(c.movimientos || []).length}</span></div>}
                   {(c.movimientos || []).length > 0 && (() => { const cnt = {}; (c.movimientos || []).forEach((m) => { const k = medioKey(m.metodo); cnt[k] = (cnt[k] || 0) + 1; }); const ks = Object.keys(cnt); return ks.length > 1 ? (
                     <div className="dc-cz__medios" role="tablist" aria-label="Filtrar por medio de pago">
                       <button type="button" role="tab" aria-selected={medioFil === "todos"} className={medioFil === "todos" ? "is-on" : ""} onClick={() => setMedioFil("todos")}>Todos <i>{(c.movimientos || []).length}</i></button>
                       {ks.map((k) => { const [Ico, col] = medioUi(k); return <button key={k} type="button" role="tab" aria-selected={medioFil === k} className={medioFil === k ? "is-on" : ""} style={{ "--m": col }} onClick={() => setMedioFil(k)}><Ico size={12} strokeWidth={2.2} /> {METODO_LBL[k] || k} <i>{cnt[k]}</i></button>; })}
                     </div>
                   ) : null; })()}
-                  {(c.movimientos || []).length === 0 ? <p className="dc-cz__nada">Los cobros del día aparecerán aquí.</p> : <ListaFiltrable rows={(c.movimientos || []).filter((m) => medioFil === "todos" || medioKey(m.metodo) === medioFil)} sub="cobros" className="dc-cz__lf" cols={[
+                  {(c.movimientos || []).length === 0 ? null : <ListaFiltrable rows={(c.movimientos || []).filter((m) => medioFil === "todos" || medioKey(m.metodo) === medioFil)} sub="cobros" className="dc-cz__lf" cols={[
                     { key: "paciente", label: "Paciente", get: (m) => m.paciente || "" },
                     { key: "hora", label: "Hora", get: (m) => m.hora || "" },
                     { key: "metodo", label: "Medio", get: (m) => m.metodo || "" },
@@ -4761,19 +4755,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         ];
         return (
         <div style={{ display: "grid", gap: 16 }}>
-          <section className="dc-esp-hero dc-caja-sub">
-            <div className="dc-esp-hero__txt">
-              <div className="dc-esp-hero__num"><b className={netoHoy < 0 ? "is-neg" : ""}>{netoHoy < 0 ? "− " : ""}S/ {Math.abs(netoHoy).toLocaleString("es-PE")}</b><span>neto del día</span></div>
-              <p>Flujo de caja de hoy – {fechaLegible(fmt(hoy))}</p>
-            </div>
-            <div className="dc-esp-hero__cifras">
-              <div><b>S/ {ingresosHoy.toLocaleString("es-PE")}</b><span>Ingresos, {boletasHoyActivas.length} {boletasHoyActivas.length === 1 ? "cobro" : "cobros"}</span></div>
-              <div><b>S/ {totEgresosHoy.toLocaleString("es-PE")}</b><span>Egresos, {egresosHoy.length} {egresosHoy.length === 1 ? "gasto" : "gastos"}{totEgresosHoyUsd ? ` + US$ ${totEgresosHoyUsd.toFixed(2)}` : ""}</span></div>
-            </div>
-            <span />
-            {puedeEgresos && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn is-coral" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button></div>}
-          </section>
-          <ListaFiltrable rows={movs} sub="movimientos" cols={[
+          <ListaFiltrable rows={movs} sub="movimientos" exportTitulo="Ingresos y egresos del día" extra={<>
+            <span className={`dc-flujo__neto${netoHoy < 0 ? " is-neg" : ""}`} title="Cobros menos egresos de hoy">Neto del día <b>{netoHoy < 0 ? "− " : ""}S/ {Math.abs(netoHoy).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b></span>
+            {puedeEgresos && <button type="button" className="dc-flujo__nuevo" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button>}
+          </>} cols={[
             { key: "tipo", label: "Tipo", get: (m) => (m.tipo === "ingreso" ? "Ingreso" : "Egreso") },
             { key: "concepto", label: "Concepto", get: (m) => m.concepto || "" },
             { key: "detalle", label: "Paciente o categoría", get: (m) => m.detalle || "" },
