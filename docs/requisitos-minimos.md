@@ -135,6 +135,38 @@ La proforma y el resumen del odontograma ya no usan datos de ejemplo:
 - **COP:** sale del registro del médico (Configuración › Médicos).
 - **Historia clínica:** se usa `numeroHistoria` del paciente y, si no existe, el DNI. Es la misma regla que la historia clínica.
 
+### Facturación electrónica SUNAT
+
+**Estado actual.** El frontend ya arma el comprobante completo:
+- emisor con razón social, RUC validado con su dígito verificador y dirección de la sede;
+- serie por sede y numeración correlativa;
+- cliente con DNI;
+- detalle, operación gravada, IGV 18 % y total;
+- impresión en A4 con membrete.
+
+Lo que todavía no existe es el **envío a SUNAT**. Por eso el sistema dice «todavía no se envía a SUNAT» o, en la demo, «Demo · sin SUNAT», y nunca «emitida».
+
+**Cómo se integra.** Recomendamos un proveedor autorizado (OSE o PSE), por ejemplo Nubefact, Efact o Bizlinks, en lugar de firmar y enviar directamente a SUNAT:
+1. Al confirmar un cobro, el backend crea el pago y el comprobante en estado `pendiente`.
+2. El backend envía el comprobante al proveedor por su API REST (JSON). El proveedor firma con el certificado digital de la clínica y lo envía a SUNAT.
+3. La respuesta trae el CDR (constancia de recepción). El backend guarda el estado y los archivos: `aceptado`, `observado` o `rechazado`, con el XML, el CDR, el PDF, el hash y el código QR.
+4. Las boletas se informan en el **resumen diario**; las facturas se envían una por una.
+5. **Anular** un cobro ya aceptado no lo borra. Se emite una **nota de crédito** (o una comunicación de baja), y el motivo ya lo pide el modal de anulación.
+6. Si SUNAT o el proveedor no responden, el comprobante queda `pendiente` y se reintenta solo. El frontend lo muestra con su estado.
+
+**Qué ya está listo en el frontend.**
+- Cada boleta de «Boletas de hoy» muestra su estado SUNAT (Aceptado, Observado, Rechazado o Pendiente de envío) a partir del campo `sunatEstado`, con el detalle en `sunatMensaje`.
+- La boleta impresa muestra el número oficial que devuelva el backend.
+
+**Qué falta del backend.**
+- Contrato con el proveedor y el certificado digital (o el que provee el propio proveedor).
+- Credenciales por empresa (RUC) y una serie por sede.
+- Campos en el pago o comprobante: `tipoComprobante` (`03` boleta, `01` factura), `sunatEstado`, `sunatMensaje`, `hash`, `qr`, `xmlUrl`, `cdrUrl`, `pdfUrl`.
+- Factura para empresas: RUC del cliente obligatorio y su razón social. El cobro debe permitir elegir entre boleta y factura.
+- Tareas programadas para el resumen diario de boletas y para reintentar los pendientes.
+
+**Qué debe definir la clínica.** Qué proveedor usará; si los servicios llevan IGV o están exonerados (algunos servicios de salud tienen tratamiento especial); y las series por sede (por ejemplo `B001` para San Isidro y `B002` para Surco).
+
 ---
 
 ## 5. Lista de cambios de backend
@@ -152,3 +184,5 @@ La proforma y el resumen del odontograma ya no usan datos de ejemplo:
 11. Catálogo de servicios: precios de los tratamientos periodontales (`IHO`, `PRO`, `RAR`, `REE`, `CIR`, `FUR`, `FER`, `MAN`) para la proforma del periodontograma.
 12. Sesión (`/auth/login` o `/auth/me`): devolver `medicoId` y `cop` cuando el usuario es odontólogo. `GET /catalogo/medicos` debe incluir `cop`.
 13. Pacientes: devolver `numeroHistoria` y el médico tratante (`medicoId`), para numerar los documentos y saber quién firma cuando imprime recepción.
+14. Facturación electrónica: integración con un proveedor OSE o PSE. En el pago o comprobante, devolver `tipoComprobante`, `sunatEstado` (`pendiente`, `aceptado`, `observado` o `rechazado`), `sunatMensaje`, `hash`, `qr`, `xmlUrl`, `cdrUrl` y `pdfUrl`. Se necesitan el resumen diario de boletas y la nota de crédito al anular.
+15. Imágenes clínicas: en `radiografias`, aceptar y devolver `piezas` (radiografía), `vista` y `momento` (foto clínica: antes, durante, después o control).

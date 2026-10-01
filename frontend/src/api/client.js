@@ -58,9 +58,13 @@ export const auth = {
   get sesion() { try { return JSON.parse(localStorage.getItem("dc_sesion") || "null"); } catch { return null; } },
   set sesion(v) { v ? localStorage.setItem("dc_sesion", JSON.stringify(v)) : localStorage.removeItem("dc_sesion"); },
   logout() {
+    // Sesión real: se borra lo clínico que pudiera quedar en el navegador. En la
+    // demostración los datos son de ejemplo y se conservan, para poder seguir el flujo
+    // entre roles (recepción agenda, la doctora atiende, caja cobra).
+    const eraReal = !!this.token;
     this.token = null;
     this.sesion = null;
-    limpiarCacheClinicaLocal();
+    if (eraReal) limpiarCacheClinicaLocal();
     emitirCierreSesion();
   },
 };

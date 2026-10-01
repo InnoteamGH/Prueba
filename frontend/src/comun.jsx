@@ -1169,6 +1169,11 @@ export function DashLienzo({ role, titulo, sub, widgets }) {
 // Modal centrado reutilizable (header con degradado + cuerpo con scroll).
 // size: confirm|corto|largo → 420|560|720 (SPEC §15.7). maxW sigue disponible.
 const MODAL_SIZE = { confirm: 420, corto: 560, largo: 720 };
+/* Datos vivos de la demostración (fichas, citas) compartidos con la Ficha médica: lo que
+   se registra en Agenda, Caja u Odontograma aparece en la historia y viceversa. Con
+   backend conectado cada módulo lee de la API y este contexto no se usa. */
+export const DatosDemoCtx = React.createContext(null);
+
 /* Todos los modales llevan la cabecera de la marca; el `tone` sólo distingue los que
    avisan de algo (peligro, advertencia, éxito) en el ícono y en una línea de color. */
 function tonoModal(t) {

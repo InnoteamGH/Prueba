@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route} from "lucide-react";
+import {Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
@@ -32,7 +32,7 @@ import {
 import { metaEstado, colorEstado, labelEstado, inicialCara } from "./util/odontogramaEstado";
 import { formatearFDI } from "./util/formatearFDI";
 import PlanInversionDocumento from "./modulos/PlanInversionDocumento";
-import { abrirDocumento, datosDemo, fijarDatosImpresion, normalizarImpresion, resolverVars, useDatosImpresion } from "./util/membrete";
+import { abrirDocumento, datosDemo, datosImpresion, fijarDatosImpresion, normalizarImpresion, resolverVars, useDatosImpresion } from "./util/membrete";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 
 /* ============================================================================
@@ -43,7 +43,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
    ============================================================================ */
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
-import {EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {DatosDemoCtx, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -1286,10 +1286,14 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           : rol === "medico" && c.estado === "en_atencion" ? <ActionBtn onClick={() => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); abrirFichaCita(c, "historia"); }} color="var(--dc-ok-700)">Finalizar</ActionBtn>
           : rol === "medico" && c.estado === "atendida" ? <ActionBtn subtle onClick={() => abrirFichaCita(c, "historia")} color={DS.c.primary}>Evolución</ActionBtn>
           : rol !== "medico" && c.estado === "confirmada" && c.llegada ? <ActionBtn onClick={() => set(c.id, "en_atencion", `Llamando a ${c.paciente} a consultorio…`)} color="var(--dc-warn-600)">Llamar</ActionBtn>
+          // Recepción registra la llegada (check-in) desde la fila: antes no había forma.
+          : rol !== "medico" && puedeOperarAgenda && abierta && !c.llegada && c.estado !== "en_atencion" && c.fecha === fmt(hoy) ? <ActionBtn onClick={() => checkIn(c.id)} color="var(--dc-ok-700)">Llegó</ActionBtn>
           : rol !== "medico" && conectado && c.pacienteId && saldos[c.pacienteId] > 0 ? <ActionBtn onClick={() => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede })} color={DS.c.primary}>Cobrar S/ {saldos[c.pacienteId].toFixed(0)}</ActionBtn>
           : puedeOperarAgenda && abierta ? <ActionBtn subtle onClick={() => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora })} color={DS.c.primary}>Reprogramar</ActionBtn>
           : null;
         const opciones = puedeOperarAgenda && abierta ? [
+          c.estado === "pendiente" && { label: "Confirmar cita", onClick: () => set(c.id, "confirmada", `Cita de ${c.paciente} confirmada.`) },
+          !c.llegada && c.fecha === fmt(hoy) && { label: "Marcar llegada", onClick: () => checkIn(c.id) },
           { label: "Reprogramar", onClick: () => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora }) },
           !c.llegada && { label: "Marcar no asistió", onClick: () => set(c.id, "no_show", `${c.paciente}: marcada como no asistió.`) },
           { label: "Cancelar cita", peligro: true, onClick: () => setCancelCita(c) },
@@ -1566,7 +1570,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // Modo conectado (JWT presente): los datos vienen del backend real; si no, demo.
   const conectado = !!auth.token;
   const sedeInt = (uuid) => (uuid && String(uuid).endsWith("a2")) ? 2 : 1;
-  const mapPac = (p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", sede: sedeInt(p.sedeRegistroId), sedes: [sedeInt(p.sedeRegistroId)], ultima: (p.creadoEn || "").toString().slice(0, 10) || null, nacimiento: p.fechaNacimiento || "", creadoEn: p.creadoEn || null, alergias: p.alergias || [], genero: p.genero || "", distrito: p.distrito || "", aseguradora: p.aseguradora || "", comentario: p.comentario || "", tags: Array.isArray(p.tags) ? p.tags : [], marketing: p.marketing === true, canal: p.canal || null,
+  const mapPac = (p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", sede: sedeInt(p.sedeRegistroId), sedes: [sedeInt(p.sedeRegistroId)], ultima: p.ultimaVisita || null, nacimiento: p.fechaNacimiento || "", creadoEn: p.creadoEn || null, alergias: p.alergias || [], genero: p.genero || "", distrito: p.distrito || "", aseguradora: p.aseguradora || "", comentario: p.comentario || "", tags: Array.isArray(p.tags) ? p.tags : [], marketing: p.marketing === true, canal: p.canal || null,
     // El backend los devuelve (PacienteController 56-59) y aqui se descartaban: al editar
     // un menor quedaban vacios en el formulario y al guardar se borraba su apoderado.
     apoderadoNombre: p.apoderadoNombre || "", apoderadoParentesco: p.apoderadoParentesco || "",
@@ -1723,7 +1727,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     const sedes = form.sedes.length ? form.sedes : [1];
     const d = { nombre: form.nombre, dni: form.dni, telefono: form.telefono, email: form.email, nacimiento: form.nacimiento, genero: form.genero, distrito: form.distrito, canal: form.canal, aseguradora: form.aseguradora, marketing: form.marketing, sedes, tags: form.tags || [], comentario: form.comentario || "", tarea: form.tarea || "", apoderadoNombre: form.apoderadoNombre || "", apoderadoParentesco: form.apoderadoParentesco || "", apoderadoDni: form.apoderadoDni || "", apoderadoTelefono: form.apoderadoTelefono || "" };
     if (form.id) setPacientes((ps) => ps.map((p) => p.id === form.id ? { ...p, ...d } : p));
-    else setPacientes((ps) => [...ps, { id: Math.max(0, ...ps.map((p) => p.id)) + 1, ...d, ultima: fmt(hoy) }]);
+    else setPacientes((ps) => [...ps, { id: Math.max(0, ...ps.map((p) => p.id)) + 1, ...d, ultima: null, creadoEn: new Date().toISOString() }]);
     notify(form.id ? "Paciente actualizado." : `${form.nombre} registrado con sus datos de marketing.`);
     setForm(null);
   };
@@ -1946,7 +1950,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         return (
         <Modal icon={<Users size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar paciente" : "Nuevo paciente"} sub={form.id ? "Actualiza los datos del paciente" : "Registra un nuevo paciente y sus datos para marketing"} onClose={() => setForm(null)} size="largo" maxW={720}
         footer={<>{form.id && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear paciente"}</Btn></>}>
-        <div style={secTit}><User size={14} strokeWidth={1.75} /> Datos personales</div>
+        <div className="dc-msec" style={secTit}><User size={14} strokeWidth={1.75} /> Datos personales</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
             <label style={lblSty}>DNI <span style={{ color: RED }}>*</span> <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– consulta RENIEC</span></label>
@@ -2009,7 +2013,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
             </div>
           </div>
         </>)}
-        <div style={secTit}><Megaphone size={14} strokeWidth={1.75} /> Marketing y segmentación</div>
+        <div className="dc-msec" style={secTit}><Megaphone size={14} strokeWidth={1.75} /> Marketing y segmentación</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
             <label style={lblSty}>Distrito / zona</label>
@@ -2033,15 +2037,15 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
             </button>
           </div>
         </div>
-        <div style={secTit}><Ticket size={14} strokeWidth={1.75} /> Etiquetas del paciente</div>
+        <div className="dc-msec" style={secTit}><Ticket size={14} strokeWidth={1.75} /> Etiquetas del paciente</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {TAGS_DISP.map((t) => { const on = (form.tags || []).includes(t); const col = TAG_COLOR[t] || "var(--dc-slate)"; return (
             <button key={t} type="button" onClick={() => toggleTag(t)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${col}` : "1.5px solid var(--dc-line)", background: on ? tint(col, 0.086) : "#fff", color: on ? col : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{on ? <Check size={14} strokeWidth={1.75} /> : <Plus size={14} strokeWidth={1.75} />} {t}</button>
           ); })}
         </div>
-        <div style={secTit}><MessageSquare size={14} strokeWidth={1.75} /> Nota / comentario</div>
+        <div className="dc-msec" style={secTit}><MessageSquare size={14} strokeWidth={1.75} /> Nota / comentario</div>
         <textarea className="dc-premium-inp" value={form.comentario} onChange={(e) => setForm({ ...form, comentario: e.target.value })} rows={2} placeholder="Ej. Prefiere horarios de mañana; requiere premedicación…" style={{ width: "100%", padding: "11px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }} />
-        <div style={secTit}><MapPin size={14} strokeWidth={1.75} /> Sedes donde se atiende</div>
+        <div className="dc-msec" style={secTit}><MapPin size={14} strokeWidth={1.75} /> Sedes donde se atiende</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(conectado ? SEDES.filter((s) => sedeIds.includes(s.id)) : SEDES).map((s) => { const on = normSedes(form.sedes).includes(s.id); return (
             <button key={s.id} type="button" onClick={() => toggleSede(s.id)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 13px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${NAVY}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-bg)" : "#fff", color: on ? NAVY : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{on ? <CheckCircle2 size={15} strokeWidth={1.75} color={NAVY} /> : <MapPin size={15} strokeWidth={1.75} />} {s.nombre}</button>
@@ -3014,7 +3018,7 @@ function Tratamientos({ pacientes: pacProp, fichas, updFicha, notify, pacienteAc
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Pieza<br /><input className="dc-premium-inp" value={nueva.pieza || ""} onChange={(e) => setNueva({ ...nueva, pieza: e.target.value.replace(/\D/g, "").slice(0, 2) })} placeholder="16" style={{ ...inp, marginTop: 4 }} /></label>
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Cara<br /><input className="dc-premium-inp" value={nueva.cara || ""} onChange={(e) => setNueva({ ...nueva, cara: e.target.value })} placeholder="O" style={{ ...inp, marginTop: 4 }} /></label>
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Costo (S/)<br /><input className="dc-premium-inp" type="number" value={nueva.costo} onChange={(e) => setNueva({ ...nueva, costo: e.target.value })} placeholder="120" style={{ ...inp, marginTop: 4 }} /></label>
-              <div style={{ display: "flex", gap: 6 }}><Btn small onClick={agregarFase}><Check size={15} strokeWidth={1.75} /></Btn><Btn small kind="ghost" onClick={() => setNueva(null)}><X size={15} strokeWidth={1.75} /></Btn></div>
+              <div style={{ display: "flex", gap: 6 }}><Btn small onClick={agregarFase} aria-label="Agregar fase" title="Agregar fase"><Check size={15} strokeWidth={1.75} /></Btn><Btn small kind="ghost" onClick={() => setNueva(null)} aria-label="Cancelar" title="Cancelar"><X size={15} strokeWidth={1.75} /></Btn></div>
             </div>
           </div>
         )}
@@ -3771,8 +3775,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     : pacientes.flatMap((p) => (fichas[p.id]?.tratamiento || []).filter((f) => f.estado === "terminada").map((f) => ({ pid: p.id, paciente: p.nombre, faseId: f.id, nombre: f.nombre, costo: Number(f.costo) || 0, medico: f.medico || "", terminadaEn: f.terminadaEn || null })));
   const terminadosPorPac = terminados.reduce((m, t) => { const x = m.get(t.pid) || { pid: t.pid, paciente: t.paciente, fases: [], total: 0 }; x.fases.push(t); x.total += t.costo; m.set(t.pid, x); return m; }, new Map());
   const boletasHoy = conectado
-    ? (caja.boletasHoy || []).map((b) => ({ id: b.id, paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null }))
-    : pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).filter((pg) => pg.fecha === fmt(hoy)).map((pg) => ({ ...pg, paciente: p.nombre, anulado: false })));
+    ? (caja.boletasHoy || []).map((b) => ({ id: b.id, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null }))
+    : pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).filter((pg) => pg.fecha === fmt(hoy)).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", direccion: p.direccion || p.distrito || "", anulado: false })));
   const boletasHoyActivas = boletasHoy.filter((b) => !b.anulado);
   const montoPorCobrar = conectado ? (Number(caja.montoPorCobrar) || 0) : porCobrar.reduce((s, x) => s + x.saldo, 0);
   const montoHoy = conectado ? (Number(caja.montoHoy) || 0) : boletasHoyActivas.reduce((s, b) => s + b.monto, 0);
@@ -3787,7 +3791,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       return;
     }
     const numero = numeroRaw != null ? fmtComprobante(numeroRaw) : peekBoletaLocal(em.serie);
-    setBoletaVer({ serie, numero, cliente: b.paciente, dni: b.dni || "", fecha: b.fecha || fmt(hoy), total: Number(b.monto) || 0, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), items: b.items && b.items.length ? b.items : undefined });
+    setBoletaVer({ serie, numero, cliente: b.paciente, dni: b.dni || "", direccion: b.direccion || "", fecha: b.fecha || fmt(hoy), total: Number(b.monto) || 0, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), items: b.items && b.items.length ? b.items : undefined });
   };
   const metodoLabel = { tarjeta: "Tarjeta (Niubiz)", yape: "Yape (Niubiz)", efectivo: "Efectivo", transferencia: "Transferencia" };
   // El ModalCobro ya registró el pago (backend). Aquí solo marcamos las fases como
@@ -3810,14 +3814,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     // Ítems para la boleta: los tratamientos que se saldan (solo en cobro total).
     if (pago.faseIds && !esParcial) {
       const ids = new Set(pago.faseIds);
-      updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (ids.has(f.id) ? { ...f, estado: "atendida" } : f)), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: "Tratamiento terminado", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: pago.items }] }));
+      updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (ids.has(f.id) ? { ...f, estado: "atendida", atendidaEn: f.atendidaEn || fmt(hoy) } : f)), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: "Tratamiento terminado", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: pago.items }] }));
       notify(`Cobrado S/ ${cobrado.toFixed(2)} de ${pago.nombre}. ${textoComprobante}`);
       setPago(null);
       return;
     }
     const itemsFact = !esParcial ? (fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) : null;
     if (!esParcial) (fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").forEach((f) => consumirInsumos && consumirInsumos(f.nombre));
-    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && f.estado !== "atendida") ? { ...f, estado: "atendida" } : f), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: esParcial ? "Abono en caja" : "Cobro de saldo en caja", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
+    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && f.estado !== "atendida") ? { ...f, estado: "atendida", atendidaEn: fmt(hoy) } : f), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: esParcial ? "Abono en caja" : "Cobro de saldo en caja", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
     notify(`Cobrado S/ ${cobrado.toFixed(2)} de ${pago.nombre}${esParcial ? " (abono)" : ""}. ${textoComprobante}`);
     setPago(null);
   };
@@ -4207,9 +4211,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <div className="dc-cob__boletas-cab"><h4>Boletas de hoy</h4><span>{boletasHoy.length}</span></div>
         {boletasHoy.length === 0 ? <Vacio icon={<FileText size={24} strokeWidth={1.75} />} titulo="Sin boletas hoy" sub="Los comprobantes del día aparecerán aquí." />
           : boletasHoy.map((b, i) => (
-            <div key={b.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: i ? "1px solid var(--dc-line)" : "none", opacity: b.anulado ? 0.65 : 1 }}>
+            <div key={b.id || i} className="dc-bolrow" style={{ borderTop: i ? "1px solid var(--dc-line)" : "none", opacity: b.anulado ? 0.65 : 1 }}>
               <div style={{ background: b.anulado ? "var(--dc-danger-soft)" : "var(--dc-ok-soft)", color: b.anulado ? "var(--dc-danger-700)" : "var(--dc-ok-700)", width: 34, height: 34, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center", flexShrink: 0 }}><CheckCircle2 size={17} strokeWidth={1.75} /></div>
               <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }}>{b.paciente}{b.anulado ? <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-danger-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>Anulado</span> : null}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{b.concepto} – {b.metodo}{b.anulado && b.anuladoMotivo ? ` – ${b.anuladoMotivo}` : ""}</div></div>
+              <SunatChip estado={conectado ? b.sunatEstado : "demo"} mensaje={b.sunatMensaje} />
               <div style={{ fontWeight: 600, color: b.anulado ? "var(--dc-ink-400)" : NAVY, fontFamily: DISPLAY_FONT, textDecoration: b.anulado ? "line-through" : "none", textAlign: "right" }}>S/ {b.monto.toFixed(2)}{b.moneda === "USD" && b.montoOriginal != null && <small className="dc-usd-chip">US$ {Number(b.montoOriginal).toFixed(2)}</small>}</div>
               <button onClick={() => abrirBoleta(b)} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", color: DS.c.primary, fontWeight: 500, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}><FileText size={14} strokeWidth={1.75} /> Boleta</button>
               {conectado && puedeAbrirCaja && b.id && !b.anulado && (
@@ -4848,7 +4853,7 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
           ))}
         </Modal>
       ); })()}
-      {pago && <ModalCobro monto={pago.monto} onClose={() => setPago(null)} onAprobado={() => { setPago(null); notify(`Pago de ${pago.nombre} aprobado. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta electrónica emitida (SUNAT)."}`); }} />}
+      {pago && <ModalCobro monto={pago.monto} onClose={() => setPago(null)} onAprobado={() => { setPago(null); notify(`Pago de ${pago.nombre} aprobado. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta de demostración (no se envía a SUNAT)."}`); }} />}
     </div>
   );
 }
@@ -5778,25 +5783,29 @@ function Auditoria() {
 }
 
 /* ---- Recetas médicas con firma electrónica (paridad con Doctocliq) ---- */
-function Recetas({ pacientes: pacProp, notify, updFicha }) {
+function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   const conectado = !!auth.token;
   const [pacRemoto, setPacRemoto] = useState(null);
   useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
   const nombrePac = (id) => (pacRemoto || []).find((p) => p.id === id)?.nombre || "—";
-  const [recetasDemo, setRecetasDemo] = useState(() => {
+  // Demostración: las recetas salen de la historia de cada paciente (la misma fuente que
+  // la ficha), así una receta emitida en la ficha aparece aquí y viceversa.
+  const recetasDemo = useMemo(() => {
     const out = [];
-    Object.entries(FICHA_CLINICA).forEach(([pid, f]) => (f.recetas || []).forEach((r, i) => {
-      const p = PACIENTES_INIT.find((x) => x.id === Number(pid));
-      if (p) out.push({ id: pid + "-" + i, paciente: p.nombre, fecha: r.fecha, items: [{ med: r.texto, detalle: "" }], indic: "", firmada: true });
+    Object.entries(fichas || FICHA_CLINICA).forEach(([pid, f]) => (f.recetas || []).forEach((r, i) => {
+      const p = (pacProp || []).find((x) => String(x.id) === String(pid)) || PACIENTES_INIT.find((x) => x.id === Number(pid));
+      if (!p) return;
+      let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; }
+      const items = its.length ? its.map((x) => ({ med: [x.medicamento || x.med, x.presentacion, x.dosis].filter(Boolean).join(" "), detalle: [x.frecuencia, x.duracion, x.detalle].filter(Boolean).join(" – ") })) : [{ med: r.texto || "", detalle: "" }];
+      out.push({ id: pid + "-" + i, paciente: p.nombre, fecha: r.fecha, items, indic: r.indicaciones || "", firmada: true });
     }));
-    return out.sort((a, b) => b.fecha.localeCompare(a.fecha));
-  });
+    return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  }, [fichas, pacProp]);
   const [recetasRem, setRecetasRem] = useState([]);
   const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; } return { id: r.id, paciente: nombrePac(r.pacienteId), fecha: r.fecha, indic: r.indicaciones || "", firmada: true, items: Array.isArray(its) ? its : [] }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
   useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto]); // eslint-disable-line
   const recetas = conectado ? recetasRem : recetasDemo;
-  const setRecetas = setRecetasDemo;
   const [form, setForm] = useState(null);
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
   const nuevo = () => setForm({ paciente: pacientes[0]?.nombre || "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
@@ -5813,12 +5822,10 @@ function Recetas({ pacientes: pacProp, notify, updFicha }) {
         .catch(() => notify("No se pudo emitir la receta."));
       return;
     }
-    setRecetas((rs) => [{ id: Date.now(), paciente: form.paciente, fecha: fmt(hoy), indic: form.indic, firmada: true,
-      items: items.map((x) => ({ med: `${x.med}${x.dosis ? " " + x.dosis : ""}`, detalle: [x.frec, x.dur].filter(Boolean).join(" – ") })) }, ...rs]);
     // Queda en la historia clínica del paciente (visible en su ficha).
     const pid = (pacientes.find((p) => p.nombre === form.paciente) || PACIENTES_INIT.find((p) => p.nombre === form.paciente))?.id;
     const texto = items.map((x) => `${x.med}${x.dosis ? " " + x.dosis : ""}${x.frec ? " " + x.frec : ""}${x.dur ? " por " + x.dur : ""}`).join("; ");
-    if (pid && updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), texto }, ...(cur.recetas || [])] }));
+    if (pid && updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), texto, indicaciones: form.indic || "", items: JSON.stringify(items.map((x) => ({ medicamento: x.med, dosis: x.dosis, frecuencia: x.frec, duracion: x.dur }))) }, ...(cur.recetas || [])] }));
     notify("Receta emitida y firmada. Queda en la ficha del paciente y se envía por WhatsApp/correo.");
     setForm(null);
   };
@@ -7409,12 +7416,20 @@ function Formularios({ pacientes: pacProp, notify }) {
 }
 
 /* ---- Radiografías e imágenes clínicas ---- */
-const RX_TIPOS = { panoramica: "Panorámica", periapical: "Periapical", bitewing: "Bitewing", foto: "Foto intraoral" };
+/* Radiografías y fotografía clínica comparten el expediente de imágenes, pero son dos
+   trabajos distintos: la radiografía se LEE (negatoscopio, brillo, contraste, negativo,
+   piezas e informe) y la foto se COMPARA (vista clínica y momento: antes / después). */
+const RX_TIPOS = { panoramica: "Panorámica", periapical: "Periapical", bitewing: "Bitewing (aleta)", oclusal: "Oclusal", cefalometrica: "Cefalométrica", cbct: "Tomografía CBCT", foto: "Foto clínica" };
+const RX_SOLO = ["panoramica", "periapical", "bitewing", "oclusal", "cefalometrica", "cbct"];
+const RX_PIEZAS = new Set(["periapical", "bitewing", "oclusal"]);
+const FOTO_VISTAS = { intraoral_frontal: "Intraoral frontal", intraoral_oclusal: "Intraoral oclusal", intraoral_lateral: "Intraoral lateral", extraoral_frontal: "Extraoral frontal", extraoral_perfil: "Perfil", sonrisa: "Sonrisa" };
+const FOTO_MOMENTOS = { antes: "Antes", durante: "Durante", despues: "Después", control: "Control" };
 function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = SEDE_IDS, can, soloFotos = false }) {
   // Borrar del expediente es irreversible: se pide el permiso explicito de eliminar,
   // no basta con poder subir. El backend lo exige igual (radiografias.eliminar).
   const puedeBorrarRx = can ? can("radiografias", "eliminar") : true;
   const conectado = !!auth.token;
+  const esFotos = !!soloFotos;
   const [pacRemoto, setPacRemoto] = useState(null);
   useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
@@ -7425,197 +7440,275 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
     if (pid && !pacRemoto.some((p) => p.id === pid)) setPid(null);
   }, [pacRemoto]); // eslint-disable-line
   const [visor, setVisor] = useState(null); // estudio abierto en el visor modal
-  const [estudios, setEstudios] = useState({
-    1: [{ id: 1, tipo: "panoramica", fecha: addDays(-30), sede: 1 }, { id: 2, tipo: "periapical", fecha: addDays(-5), sede: 2 }, { id: 3, tipo: "foto", fecha: addDays(-5), sede: 1 }],
-    3: [{ id: 4, tipo: "bitewing", fecha: addDays(-12), sede: 2 }] });
+  const [ajuste, setAjuste] = useState({ brillo: 100, contraste: 100, negativo: false, zoom: 1 });
+  // Demostración: las imágenes viven en la historia de cada paciente (fichas[pid].imagenes)
+  // para que la ficha médica y la atención del día las muestren. Se siembran una vez.
+  const demoDb = React.useContext(DatosDemoCtx);
+  const [estudiosSemilla] = useState({
+    1: [
+      { id: 1, tipo: "panoramica", fecha: addDays(-30), sede: 1, nota: "Control general. Sin lesiones periapicales visibles; restauración en 26." },
+      { id: 2, tipo: "periapical", fecha: addDays(-5), sede: 2, piezas: "26", nota: "Conducto obturado a longitud de trabajo, sin radiolucidez apical." },
+      { id: 5, tipo: "bitewing", fecha: addDays(-60), sede: 1, piezas: "16, 46", nota: "Caries interproximal distal de 16." },
+      { id: 3, tipo: "foto", vista: "intraoral_frontal", momento: "antes", fecha: addDays(-60), sede: 1, nota: "Inicio del tratamiento." },
+      { id: 6, tipo: "foto", vista: "intraoral_frontal", momento: "despues", fecha: addDays(-5), sede: 1, nota: "Tras curación y profilaxis." },
+      { id: 7, tipo: "foto", vista: "sonrisa", momento: "control", fecha: addDays(-5), sede: 1 },
+    ],
+    3: [{ id: 4, tipo: "bitewing", fecha: addDays(-12), sede: 2, piezas: "36, 37" }] });
+  useEffect(() => {
+    if (conectado || !demoDb) return;
+    Object.entries(estudiosSemilla).forEach(([k, arr]) => { if (!(demoDb.fichas[k] && demoDb.fichas[k].imagenes)) demoDb.updFicha(Number(k), (cur) => ({ ...cur, imagenes: arr })); });
+  }, []); // eslint-disable-line
+  const estudios = demoDb ? Object.fromEntries(Object.entries(demoDb.fichas || {}).map(([k, f]) => [k, f.imagenes || estudiosSemilla[k] || []])) : estudiosSemilla;
+  const setEstudios = (fn) => {
+    if (!demoDb) return;
+    const nx = fn(estudios);
+    Object.keys(nx).forEach((k) => { if (nx[k] !== estudios[k]) demoDb.updFicha(Number(k) || k, (cur) => ({ ...cur, imagenes: nx[k] })); });
+  };
   const [rxRem, setRxRem] = useState([]);
-  const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: 1, url: r.url, nota: r.nota })))).catch(() => {}); else setRxRem([]); };
+  const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: 1, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).catch(() => {}); else setRxRem([]); };
   useEffect(() => { recargarRx(); }, [pid, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => p.id === pid) || { id: pid, nombre: "Selecciona un paciente" };
   const lista = conectado ? rxRem : (estudios[pid] || []);
-  const listaVista = soloFotos ? lista.filter((s) => s.tipo === "foto") : lista;
-  // Sede donde se registra el estudio: por defecto la sede activa (geolocalizada), editable.
-  // Se limita a las sedes del usuario que además atiende al paciente (que puede ser multi-sede).
+  const listaVista = esFotos ? lista.filter((s) => s.tipo === "foto") : lista.filter((s) => s.tipo !== "foto");
   const sedesPac = sedesDe(paciente).filter((s) => misSedes.includes(s));
   const opcionesSede = sedesPac.length ? sedesPac : misSedes;
   const [sedeReg, setSedeReg] = useState(opcionesSede.includes(sedeActiva) ? sedeActiva : opcionesSede[0]);
-  useEffect(() => { setSedeReg(opcionesSede.includes(sedeActiva) ? sedeActiva : opcionesSede[0]); }, [pid, sedeActiva]);
+  useEffect(() => { setSedeReg(opcionesSede.includes(sedeActiva) ? sedeActiva : opcionesSede[0]); }, [pid, sedeActiva]); // eslint-disable-line
   const fileRef = useRef(null);
-  const [subiendo, setSubiendo] = useState(null); // { url, tipo, nota, nombre }
+  const [subiendo, setSubiendo] = useState(null); // { url, tipo, nota, nombre, piezas, vista, momento }
   const onFile = (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     if (!f.type.startsWith("image/")) { notify("Selecciona una imagen (JPG o PNG)."); e.target.value = ""; return; }
     if (f.size > 8 * 1024 * 1024) { notify("La imagen supera 8 MB. Usa una más liviana."); e.target.value = ""; return; }
     const rd = new FileReader();
-    rd.onload = () => setSubiendo({ url: rd.result, tipo: soloFotos || /foto|intraoral/i.test(f.name) ? "foto" : /pano/i.test(f.name) ? "panoramica" : "periapical", nota: "", nombre: f.name });
+    rd.onload = () => setSubiendo(esFotos
+      ? { url: rd.result, tipo: "foto", vista: "intraoral_frontal", momento: "antes", nota: "", nombre: f.name }
+      : { url: rd.result, tipo: /pano/i.test(f.name) ? "panoramica" : /bite|aleta/i.test(f.name) ? "bitewing" : "periapical", piezas: "", nota: "", nombre: f.name });
     rd.readAsDataURL(f);
     e.target.value = "";
   };
-  const [borrarRx, setBorrarRx] = useState(null);   // estudio pendiente de confirmar
+  const [borrarRx, setBorrarRx] = useState(null);
   const confirmarBorrado = () => {
     const s = borrarRx;
     if (conectado) {
       api.radiografias.borrar(s.id)
-        .then(() => { notify("Estudio eliminado del expediente."); setBorrarRx(null); setVisor(null); recargarRx(); })
-        .catch(() => notify("No se pudo eliminar el estudio."));
+        .then(() => { notify(esFotos ? "Foto eliminada del expediente." : "Estudio eliminado del expediente."); setBorrarRx(null); setVisor(null); recargarRx(); })
+        .catch(() => notify("No se pudo eliminar."));
       return;
     }
     setEstudios((e) => ({ ...e, [pid]: (e[pid] || []).filter((x) => x.id !== s.id) }));
-    notify("Estudio eliminado del expediente.");
+    notify(esFotos ? "Foto eliminada del expediente." : "Estudio eliminado del expediente.");
     setBorrarRx(null); setVisor(null);
   };
   const guardarEstudio = () => {
     const s = subiendo;
-    if (conectado) { api.radiografias.crear({ pacienteId: pid, tipo: s.tipo, fecha: fmt(hoy), url: s.url, nota: s.nota }).then(() => { notify("Imagen subida al expediente del paciente."); recargarRx(); }).catch(() => notify("Error al subir la imagen.")); setSubiendo(null); return; }
-    setEstudios((e) => ({ ...e, [pid]: [{ id: Date.now(), tipo: s.tipo, fecha: fmt(hoy), sede: sedeReg, url: s.url, nota: s.nota }, ...(e[pid] || [])] }));
-    notify(`Imagen subida al expediente en ${nombreSede(sedeReg)}.`);
+    if (!esFotos && RX_PIEZAS.has(s.tipo) && !String(s.piezas || "").trim()) { notify("Indica la pieza o piezas de la radiografía (ej. 26 o 16, 46)."); return; }
+    const extra = esFotos ? { vista: s.vista, momento: s.momento } : { piezas: s.piezas || "" };
+    if (conectado) { api.radiografias.crear({ pacienteId: pid, tipo: s.tipo, fecha: fmt(hoy), url: s.url, nota: s.nota, ...extra }).then(() => { notify(esFotos ? "Foto guardada en el expediente." : "Radiografía guardada en el expediente."); recargarRx(); }).catch(() => notify("Error al subir la imagen.")); setSubiendo(null); return; }
+    setEstudios((e) => ({ ...e, [pid]: [{ id: Date.now(), tipo: s.tipo, fecha: fmt(hoy), sede: sedeReg, url: s.url, nota: s.nota, ...extra }, ...(e[pid] || [])] }));
+    notify(`${esFotos ? "Foto" : "Radiografía"} guardada en el expediente en ${nombreSede(sedeReg)}.`);
     setSubiendo(null);
   };
+  const tituloDe = (s) => (s.tipo === "foto" ? (FOTO_VISTAS[s.vista] || "Foto clínica") : (RX_TIPOS[s.tipo] || s.tipo));
+  const abrirVisor = (s) => { setAjuste({ brillo: 100, contraste: 100, negativo: false, zoom: 1 }); setVisor(s); };
+  const filtroRx = `brightness(${ajuste.brillo}%) contrast(${ajuste.contraste}%)${ajuste.negativo ? " invert(1)" : ""}`;
+
+  // Miniatura: la radiografía en «placa» oscura; la foto en fondo claro.
+  const miniatura = (s, cls = "") => (
+    <span className={`dc-im__thumb ${s.tipo === "foto" ? "is-foto" : "is-rx"} ${cls}`}>
+      {s.url ? <img src={s.url} alt={tituloDe(s)} /> : (s.tipo === "foto" ? <Smile size={30} strokeWidth={1.4} /> : <Scan size={30} strokeWidth={1.4} />)}
+    </span>
+  );
+  const momentoPill = (s) => s.momento ? <span className={`dc-im__mom is-${s.momento}`}>{FOTO_MOMENTOS[s.momento] || s.momento}</span> : null;
+
+  const base = listaVista;
+  const ult = base.length ? [...base].map((s) => s.fecha).sort().slice(-1)[0] : null;
+  const porTipo = esFotos
+    ? Object.entries(FOTO_MOMENTOS).map(([k, l]) => [l, base.filter((s) => s.momento === k).length]).filter(([, n]) => n)
+    : RX_SOLO.map((k) => [RX_TIPOS[k], base.filter((s) => s.tipo === k).length]).filter(([, n]) => n);
+  // Comparador antes / después: la última foto «antes» contra la última «después» de la misma vista.
+  const par = (() => {
+    if (!esFotos) return null;
+    const des = [...base].filter((s) => s.momento === "despues").sort((x, y) => String(y.fecha).localeCompare(String(x.fecha)))[0];
+    if (!des) return null;
+    const ant = [...base].filter((s) => s.momento === "antes" && s.vista === des.vista).sort((x, y) => String(y.fecha).localeCompare(String(x.fecha)))[0];
+    return ant ? { ant, des } : null;
+  })();
+  const [corte, setCorte] = useState(50);
+
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {soloFotos && <Card style={{ padding: 14, background: "var(--dc-white)", border: "1px solid var(--dc-sky)" }}><div style={{ fontSize: 13, color: "var(--dc-brand-500)" }}>Galería de <strong>fotografía clínica</strong> (intra/extraoral). Se guarda en el expediente del paciente.</div></Card>}
-      <PacienteBar pacientes={pacientes} pacienteId={pid} setPacienteId={setPid} modulo={soloFotos ? "Fotografía clínica" : "Radiografías"} accion={
+    <div className={`dc-im ${esFotos ? "is-fotos" : "is-rx"}`} style={{ display: "grid", gap: 16 }}>
+      <PacienteBar pacientes={pacientes} pacienteId={pid} setPacienteId={setPid} modulo={esFotos ? "Fotografía clínica" : "Radiografías"} accion={
         <div className="dc-rx-acc">
-          <label className="dc-rx-sede" title="Sede donde se registra el estudio">
+          <label className="dc-rx-sede" title="Sede donde se registra">
             <MapPin size={14} strokeWidth={1.9} />
             <span>Registrar en</span>
             <Select small width={170} ariaLabel="Sede" value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: `${nombreSede(s)}${s === sedeActiva ? " (aquí)" : ""}` }))} />
           </label>
-          <button type="button" className="dc-esp-hero__btn" onClick={() => fileRef.current && fileRef.current.click()}><Upload size={14} strokeWidth={1.9} /> Subir imagen</button>
+          <button type="button" className="dc-esp-hero__btn" onClick={() => fileRef.current && fileRef.current.click()}>{esFotos ? <Camera size={14} strokeWidth={1.9} /> : <Upload size={14} strokeWidth={1.9} />} {esFotos ? "Subir foto" : "Subir radiografía"}</button>
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
       } />
-      {(() => { const base = listaVista; const rx = base.filter((s) => s.tipo !== "foto").length; const fotos = base.filter((s) => s.tipo === "foto").length; const ult = base.length ? [...base].map((s) => s.fecha).sort().slice(-1)[0] : null; return (
-        <Card className="dc-env dc-gal">
-          <div className="dc-env__cab">
-            <h3>{soloFotos ? "Fotos del expediente" : "Estudios del expediente"}</h3>
-            <div className="dc-gal__cifras">
-              <span className="dc-gal__c"><b>{base.length}</b> {soloFotos ? "fotos" : "estudios"}</span>
-              {!soloFotos && <span className="dc-gal__c is-rx"><Scan size={13} strokeWidth={2} /><b>{rx}</b> radiografías</span>}
-              <span className="dc-gal__c is-foto"><Camera size={13} strokeWidth={2} /><b>{fotos}</b> fotos</span>
-              {ult && <span className="dc-gal__c"><Calendar size={13} strokeWidth={2} /> Última toma {fechaLegible(ult)}</span>}
-            </div>
+      <section className="dc-im__intro">
+        <span className="dc-im__ico">{esFotos ? <Camera size={20} strokeWidth={1.9} /> : <Scan size={20} strokeWidth={1.9} />}</span>
+        <div>
+          <h3>{esFotos ? "Fotografía clínica" : "Radiografías del paciente"}</h3>
+          <p>{esFotos ? "Fotos intra y extraorales por vista y momento del tratamiento. Compara el antes y el después con el paciente." : "Estudios radiográficos para diagnóstico: se revisan en el negatoscopio con brillo, contraste y negativo, y llevan las piezas y el informe."}</p>
+        </div>
+        <div className="dc-im__cifras">
+          <span><b>{base.length}</b> {esFotos ? (base.length === 1 ? "foto" : "fotos") : (base.length === 1 ? "estudio" : "estudios")}</span>
+          {porTipo.map(([l, n]) => <span key={l}><b>{n}</b> {l}</span>)}
+          {ult && <span><Calendar size={12} strokeWidth={2} /> Última {fechaLegible(ult)}</span>}
+        </div>
+      </section>
+
+      {par && (
+        <Card className="dc-im__comp">
+          <div className="dc-im__compcab"><Columns2 size={16} strokeWidth={2} /><h4>Antes y después</h4><span>{FOTO_VISTAS[par.des.vista] || "Foto"} · {fechaLegible(par.ant.fecha)} → {fechaLegible(par.des.fecha)}</span></div>
+          <div className="dc-im__compare" style={{ "--corte": `${corte}%` }}>
+            <div className="dc-im__lado is-ant">{par.ant.url ? <img src={par.ant.url} alt="Antes" /> : <Smile size={46} strokeWidth={1.2} />}<em>Antes</em></div>
+            <div className="dc-im__lado is-des">{par.des.url ? <img src={par.des.url} alt="Después" /> : <Sparkles size={46} strokeWidth={1.2} />}<em>Después</em></div>
+            <span className="dc-im__barra" aria-hidden="true" />
+            <input type="range" min="0" max="100" value={corte} onChange={(e) => setCorte(Number(e.target.value))} aria-label="Deslizar para comparar" />
           </div>
-          {base.length === 0 ? (
-            <Vacio icon={soloFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={soloFotos ? "Sin fotos" : "Sin estudios"} sub={soloFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía o foto de este paciente."} />
-          ) : (
-            <ListaFiltrable rows={base} sub="imágenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="radiografias"
-              vistas={[{ id: "galeria", label: "Galería", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "linea", label: "Línea de tiempo", icon: History }]}
-              tabla={{ minWidth: 720, onRowClick: (s) => setVisor(s), cols: [
-                { key: "img", label: "", w: "60px", cell: (s) => { const I = s.tipo === "foto" ? Camera : Scan; return <span className={`dc-tp__thumb${s.tipo === "foto" ? " is-foto" : ""}`}>{s.url ? <img src={s.url} alt="" /> : <I size={18} strokeWidth={1.6} />}</span>; } },
-                { key: "tipo", label: "Estudio", w: "minmax(160px,1fr)", cell: (s) => <span className="dc-tp__strong">{RX_TIPOS[s.tipo] || s.tipo}</span> },
-                { key: "fecha", label: "Fecha", w: "140px", cell: (s) => <span className="dc-tp__sub">{fechaLegible(s.fecha)}</span> },
-                { key: "sede", label: "Sede", w: "150px", cell: (s) => <span className="dc-tp__sub">{s.sede ? nombreSede(s.sede) : "—"}</span> },
-                { key: "nota", label: "Nota", w: "minmax(160px,1.4fr)", get: (s) => s.nota || "—" },
-                { key: "acc", label: "", w: "90px", a: "right", cell: (s) => <div className="dc-rxv__acc" onClick={(e) => e.stopPropagation()}><button type="button" onClick={() => setVisor(s)} title="Abrir visor" aria-label="Abrir visor"><Eye size={15} strokeWidth={1.9} /></button>{puedeBorrarRx && <button type="button" className="is-del" onClick={() => setBorrarRx(s)} title="Eliminar estudio" aria-label="Eliminar estudio"><Trash2 size={15} strokeWidth={1.9} /></button>}</div> },
-              ] }} cols={[
-              { key: "tipo", label: "Tipo", get: (s) => RX_TIPOS[s.tipo] || s.tipo || "" },
-              { key: "fecha", label: "Fecha", get: (s) => s.fecha || "" },
-              { key: "sede", label: "Sede", get: (s) => nombreSede(s.sede) || "" },
-              { key: "nota", label: "Nota", get: (s) => s.nota || "" },
-            ]}>{(listaG, vista) => {
-              const Ic = (s) => (s.tipo === "foto" ? Camera : Scan);
-              const miniatura = (s, size) => { const I = Ic(s); return <span className={`dc-rxv__thumb${s.tipo === "foto" ? " is-foto" : ""}`} style={size ? { width: size, height: size } : undefined}>{s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} /> : <I size={size ? Math.round(size / 2.6) : 34} strokeWidth={1.5} />}</span>; };
-              const acciones = (s) => (
-                <div className="dc-rxv__acc">
-                  <button type="button" onClick={() => setVisor(s)} title="Abrir visor" aria-label="Abrir visor"><Eye size={15} strokeWidth={1.9} /></button>
-                  {puedeBorrarRx && <button type="button" className="is-del" onClick={() => setBorrarRx(s)} title="Eliminar estudio" aria-label="Eliminar estudio"><Trash2 size={15} strokeWidth={1.9} /></button>}
-                </div>
-              );
-              if (vista === "lista") return (
-                <div className="dc-rxv__lista">
-                  {listaG.map((s) => { const I = Ic(s); return (
-                    <div key={s.id} className="dc-rxv__fila" onClick={() => setVisor(s)}>
-                      {miniatura(s, 56)}
-                      <div className="dc-rxv__ftxt"><b><I size={13} strokeWidth={2} /> {RX_TIPOS[s.tipo]}</b><span>{s.nota || "Sin nota"}</span></div>
-                      <span className="dc-rxv__fdato"><Calendar size={13} strokeWidth={2} /> {fechaLegible(s.fecha)}</span>
-                      <span className="dc-rxv__fdato"><MapPin size={13} strokeWidth={2} /> {s.sede ? nombreSede(s.sede) : "—"}</span>
-                      <div onClick={(e) => e.stopPropagation()}>{acciones(s)}</div>
-                    </div>
-                  ); })}
-                </div>
-              );
-              if (vista === "linea") {
-                const grupos = []; listaG.forEach((s) => { const g = grupos.find((x) => x.f === s.fecha); if (g) g.items.push(s); else grupos.push({ f: s.fecha, items: [s] }); });
-                return (
-                  <ol className="dc-rxv__tl">
-                    {grupos.map((g) => (
-                      <li key={g.f}>
-                        <div className="dc-rxv__tlf"><b>{fechaLegible(g.f)}</b><span>{g.items.length} {g.items.length === 1 ? "imagen" : "imágenes"}</span></div>
-                        <div className="dc-rxv__tli">
-                          {g.items.map((s) => (
-                            <button key={s.id} type="button" className="dc-rxv__tlc" onClick={() => setVisor(s)}>
-                              {miniatura(s, 88)}
-                              <span><b>{RX_TIPOS[s.tipo]}</b><small>{s.nota || (s.sede ? cortaSede(s.sede) : "")}</small></span>
-                            </button>
-                          ))}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                );
-              }
-              return (
-                <div className="dc-rxv__grid">
-                  {listaG.map((s) => { const I = Ic(s); return (
-                    <article key={s.id} className={`dc-rxv__card${s.tipo === "foto" ? " is-foto" : ""}`}>
-                      <button type="button" className="dc-rxv__img" onClick={() => setVisor(s)} aria-label={`Abrir ${RX_TIPOS[s.tipo]}`}>
-                        {s.url ? <img src={s.url} alt={RX_TIPOS[s.tipo]} /> : <I size={40} strokeWidth={1.3} />}
-                        <span className="dc-rxv__tipo"><I size={12} strokeWidth={2} /> {RX_TIPOS[s.tipo]}</span>
-                        <span className="dc-rxv__ver"><Eye size={14} strokeWidth={2} /> Ver</span>
-                      </button>
-                      <div className="dc-rxv__pie">
-                        <div><b>{fechaLegible(s.fecha)}</b><span>{s.nota || (s.sede ? `Sede ${cortaSede(s.sede)}` : "Sin nota")}</span></div>
-                        {acciones(s)}
-                      </div>
-                    </article>
-                  ); })}
-                </div>
-              );
-            }}</ListaFiltrable>
-          )}
         </Card>
-      ); })()}
+      )}
+
+      <Card className="dc-env dc-gal">
+        {base.length === 0 ? (
+          <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin fotos" : "Sin radiografías"} sub={esFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía de este paciente."} />
+        ) : (
+          <ListaFiltrable rows={base} sub={esFotos ? "fotos" : "estudios"} className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave={esFotos ? "fotos" : "radiografias"}
+            vistas={[{ id: "galeria", label: "Galería", icon: LayoutGrid }, { id: "linea", label: "Línea de tiempo", icon: History }]}
+            tabla={{ minWidth: 720, onRowClick: abrirVisor, cols: [
+              { key: "img", label: "", w: "64px", cell: (s) => miniatura(s, "is-sm") },
+              { key: "tipo", label: esFotos ? "Vista" : "Estudio", w: "minmax(160px,1fr)", get: (s) => tituloDe(s), cell: (s) => <span className="dc-tp__strong">{tituloDe(s)}</span> },
+              ...(esFotos ? [{ key: "momento", label: "Momento", w: "120px", a: "center", get: (s) => FOTO_MOMENTOS[s.momento] || "", cell: (s) => momentoPill(s) || "—" }]
+                : [{ key: "piezas", label: "Piezas", w: "110px", a: "center", get: (s) => s.piezas || "", cell: (s) => s.piezas ? <span className="dc-im__pz">{s.piezas}</span> : "—" }]),
+              { key: "fecha", label: "Fecha", w: "140px", get: (s) => s.fecha || "", cell: (s) => <span className="dc-tp__sub">{fechaLegible(s.fecha)}</span> },
+              { key: "nota", label: esFotos ? "Nota" : "Informe", w: "minmax(160px,1.4fr)", get: (s) => s.nota || "—" },
+            ] }} cols={[
+            { key: "tipo", label: esFotos ? "Vista" : "Estudio", get: (s) => tituloDe(s) },
+            { key: "fecha", label: "Fecha", get: (s) => s.fecha || "" },
+            ...(esFotos ? [{ key: "momento", label: "Momento", get: (s) => FOTO_MOMENTOS[s.momento] || "" }] : [{ key: "piezas", label: "Piezas", get: (s) => s.piezas || "" }]),
+            { key: "nota", label: esFotos ? "Nota" : "Informe", get: (s) => s.nota || "" },
+          ]}>{(listaG, vista) => {
+            const acciones = (s) => (
+              <div className="dc-rxv__acc" onClick={(e) => e.stopPropagation()}>
+                <button type="button" onClick={() => abrirVisor(s)} title="Abrir" aria-label="Abrir"><Eye size={15} strokeWidth={1.9} /></button>
+                {puedeBorrarRx && <button type="button" className="is-del" onClick={() => setBorrarRx(s)} title="Eliminar" aria-label="Eliminar"><Trash2 size={15} strokeWidth={1.9} /></button>}
+              </div>
+            );
+            if (vista === "linea") {
+              const grupos = []; listaG.forEach((s) => { const g = grupos.find((x) => x.f === s.fecha); if (g) g.items.push(s); else grupos.push({ f: s.fecha, items: [s] }); });
+              return (
+                <ol className="dc-rxv__tl">
+                  {grupos.map((g) => (
+                    <li key={g.f}>
+                      <div className="dc-rxv__tlf"><b>{fechaLegible(g.f)}</b><span>{g.items.length} {g.items.length === 1 ? "imagen" : "imágenes"}</span></div>
+                      <div className="dc-rxv__tli">
+                        {g.items.map((s) => (
+                          <button key={s.id} type="button" className="dc-rxv__tlc" onClick={() => abrirVisor(s)}>
+                            {miniatura(s, "is-md")}
+                            <span><b>{tituloDe(s)}</b><small>{esFotos ? (FOTO_MOMENTOS[s.momento] || "") : (s.piezas ? `Piezas ${s.piezas}` : "")}</small></span>
+                          </button>
+                        ))}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              );
+            }
+            return (
+              <div className={`dc-im__grid ${esFotos ? "is-fotos" : "is-rx"}`}>
+                {listaG.map((s) => (
+                  <article key={s.id} className={`dc-im__card ${esFotos ? "is-foto" : "is-rx"}`}>
+                    <button type="button" className="dc-im__img" onClick={() => abrirVisor(s)} aria-label={`Abrir ${tituloDe(s)}`}>
+                      {s.url ? <img src={s.url} alt={tituloDe(s)} /> : (esFotos ? <Smile size={42} strokeWidth={1.2} /> : <Scan size={42} strokeWidth={1.2} />)}
+                      <span className="dc-im__tipo">{esFotos ? <Camera size={12} strokeWidth={2} /> : <Scan size={12} strokeWidth={2} />} {tituloDe(s)}</span>
+                      {esFotos ? momentoPill(s) : (s.piezas ? <span className="dc-im__pz is-sobre">Pieza{String(s.piezas).includes(",") ? "s" : ""} {s.piezas}</span> : null)}
+                      <span className="dc-rxv__ver"><Eye size={14} strokeWidth={2} /> {esFotos ? "Ver foto" : "Abrir en negatoscopio"}</span>
+                    </button>
+                    <div className="dc-im__pie">
+                      <div><b>{fechaLegible(s.fecha)}</b><span>{s.nota || (s.sede ? `Sede ${cortaSede(s.sede)}` : esFotos ? "Sin nota" : "Sin informe")}</span></div>
+                      {acciones(s)}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            );
+          }}</ListaFiltrable>
+        )}
+      </Card>
+
       {borrarRx && (
-        <Modal icon={<Trash2 size={20} strokeWidth={1.75} />} tone="var(--dc-red)" titulo="Eliminar estudio"
-          sub={`${RX_TIPOS[borrarRx.tipo] || "Estudio"} – ${paciente.nombre}`} maxW={430} onClose={() => setBorrarRx(null)}
+        <Modal icon={<Trash2 size={20} strokeWidth={1.75} />} tone="var(--dc-red)" titulo={esFotos ? "Eliminar foto" : "Eliminar radiografía"}
+          sub={`${tituloDe(borrarRx)} – ${paciente.nombre}`} maxW={430} onClose={() => setBorrarRx(null)}
           footer={<><Btn small kind="ghost" onClick={() => setBorrarRx(null)}>Cancelar</Btn>
                    <Btn small kind="red" onClick={confirmarBorrado}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></>}>
           <div style={{ fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.6 }}>
             Se quita del expediente de <b style={{ color: NAVY }}>{paciente.nombre}</b> y <b>no se puede recuperar</b>.
-            Si el estudio es correcto pero está mal clasificado, es mejor volver a subirlo con el tipo adecuado que borrarlo sin más.
+            Si la imagen es correcta pero está mal clasificada, es mejor volver a subirla con el tipo adecuado.
           </div>
         </Modal>
       )}
+
       {visor && (() => { const esFoto = visor.tipo === "foto"; return (
-        <Modal icon={esFoto ? <Camera size={20} strokeWidth={1.75} /> : <Scan size={20} strokeWidth={1.75} />} tone={NAVY} titulo={RX_TIPOS[visor.tipo]} sub={`${fechaLegible(visor.fecha)}${visor.sede ? " – " + nombreSede(visor.sede) : ""}`} onClose={() => setVisor(null)} maxW={620}
-          footer={<><Btn small kind="ghost" onClick={() => setVisor(null)}>Cerrar</Btn><Btn small onClick={() => { if (visor.url) { const a = document.createElement("a"); a.href = visor.url; a.download = `${(RX_TIPOS[visor.tipo] || "estudio").replace(/\s+/g, "_")}_${visor.fecha || ""}.jpg`; document.body.appendChild(a); a.click(); a.remove(); } else notify("Este estudio no tiene imagen para descargar."); }}><Upload size={15} strokeWidth={1.75} /> Descargar</Btn></>}>
-          <div style={{ height: 300, borderRadius: "var(--dc-r-lg)", background: esFoto ? "linear-gradient(135deg, var(--dc-ink-alt), var(--dc-navy))" : "radial-gradient(circle at 50% 40%, var(--dc-ink-700), var(--dc-ink-900))", display: "grid", placeItems: "center", position: "relative", overflow: "hidden" }}>
-            {visor.url ? <img src={visor.url} alt={RX_TIPOS[visor.tipo]} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} /> : (esFoto ? <Camera size={54} strokeWidth={1.75} color="rgba(255,255,255,.5)" /> : <Scan size={54} strokeWidth={1.75} color="rgba(255,255,255,.55)" />)}
-            <span style={{ position: "absolute", top: 12, left: 12, fontSize: 12, fontWeight: 500, color: "#fff", background: "rgba(0,0,0,.5)", padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}>{RX_TIPOS[visor.tipo]}</span>
-            {!visor.url && <span style={{ position: "absolute", bottom: 12, right: 12, fontSize: 12, color: "rgba(255,255,255,.7)" }}>Vista de demostración</span>}
-          </div>
-          {visor.nota && <div style={{ marginTop: 12, fontSize: 13, color: "var(--dc-ink-700)" }}>{visor.nota}</div>}
-          <div style={{ display: "flex", gap: 10, marginTop: 14, fontSize: 13, color: "var(--dc-ink-400)" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar size={13} strokeWidth={1.75} color="var(--dc-ink-400)" /> {fechaLegible(visor.fecha)}</span>
-            {visor.sede && <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin size={13} strokeWidth={1.75} color="var(--dc-ink-400)" /> {nombreSede(visor.sede)}</span>}
+        <Modal icon={esFoto ? <Camera size={20} strokeWidth={1.75} /> : <Scan size={20} strokeWidth={1.75} />} titulo={tituloDe(visor)} sub={`${paciente.nombre} – ${fechaLegible(visor.fecha)}${visor.sede ? " – " + nombreSede(visor.sede) : ""}`} onClose={() => setVisor(null)} maxW={esFoto ? 640 : 760}
+          footer={<><Btn small kind="ghost" onClick={() => setVisor(null)}>Cerrar</Btn><Btn small onClick={() => { if (visor.url) { const a = document.createElement("a"); a.href = visor.url; a.download = `${tituloDe(visor).replace(/\s+/g, "_")}_${visor.fecha || ""}.jpg`; document.body.appendChild(a); a.click(); a.remove(); } else notify("Imagen de demostración: no hay archivo para descargar."); }}><Download size={15} strokeWidth={1.75} /> Descargar</Btn></>}>
+          {esFoto ? (
+            <div className="dc-im__visor is-foto">
+              {visor.url ? <img src={visor.url} alt={tituloDe(visor)} /> : <Smile size={60} strokeWidth={1.2} />}
+              {momentoPill(visor)}
+            </div>
+          ) : (
+            <>
+              <div className="dc-im__visor is-rx">
+                <div className="dc-im__placa" style={{ filter: filtroRx, transform: `scale(${ajuste.zoom})` }}>
+                  {visor.url ? <img src={visor.url} alt={tituloDe(visor)} /> : <Scan size={70} strokeWidth={1} />}
+                </div>
+                <span className="dc-im__tipo">{tituloDe(visor)}</span>
+                {visor.piezas && <span className="dc-im__pz is-sobre">Piezas {visor.piezas}</span>}
+                {!visor.url && <span className="dc-im__demo">Vista de demostración</span>}
+              </div>
+              <div className="dc-im__herr">
+                <label><Sun size={14} strokeWidth={2} /><span>Brillo</span><input type="range" min="50" max="180" value={ajuste.brillo} onChange={(e) => setAjuste({ ...ajuste, brillo: Number(e.target.value) })} /></label>
+                <label><Contrast size={14} strokeWidth={2} /><span>Contraste</span><input type="range" min="50" max="220" value={ajuste.contraste} onChange={(e) => setAjuste({ ...ajuste, contraste: Number(e.target.value) })} /></label>
+                <label><ZoomIn size={14} strokeWidth={2} /><span>Zoom</span><input type="range" min="1" max="3" step="0.1" value={ajuste.zoom} onChange={(e) => setAjuste({ ...ajuste, zoom: Number(e.target.value) })} /></label>
+                <button type="button" className={ajuste.negativo ? "is-on" : ""} onClick={() => setAjuste({ ...ajuste, negativo: !ajuste.negativo })}><Aperture size={14} strokeWidth={2} /> Negativo</button>
+                <button type="button" onClick={() => setAjuste({ brillo: 100, contraste: 100, negativo: false, zoom: 1 })}><RotateCcw size={14} strokeWidth={2} /> Restablecer</button>
+              </div>
+            </>
+          )}
+          <div className="dc-im__info">
+            <div><small>{esFoto ? "Nota" : "Informe radiológico"}</small><p>{visor.nota || (esFoto ? "Sin nota." : "Sin informe registrado.")}</p></div>
+            <div className="dc-im__meta">
+              <span><Calendar size={13} strokeWidth={1.9} /> {fechaLegible(visor.fecha)}</span>
+              {visor.sede && <span><MapPin size={13} strokeWidth={1.9} /> {nombreSede(visor.sede)}</span>}
+              {!esFoto && visor.piezas && <span><Smile size={13} strokeWidth={1.9} /> Piezas {visor.piezas}</span>}
+            </div>
           </div>
         </Modal>
       ); })()}
+
       {subiendo && (
-        <Modal icon={<Upload size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Subir imagen al expediente" sub={`${paciente.nombre} – ${nombreSede(sedeReg)}`} onClose={() => setSubiendo(null)} maxW={560}
+        <Modal icon={esFotos ? <Camera size={20} strokeWidth={1.75} /> : <Upload size={20} strokeWidth={1.75} />} titulo={esFotos ? "Subir foto clínica" : "Subir radiografía"} sub={`${paciente.nombre} – ${nombreSede(sedeReg)}`} onClose={() => setSubiendo(null)} maxW={580}
           footer={<><Btn small kind="ghost" onClick={() => setSubiendo(null)}>Cancelar</Btn><Btn small onClick={guardarEstudio}><Check size={15} strokeWidth={1.75} /> Guardar en el expediente</Btn></>}>
-          <div style={{ borderRadius: "var(--dc-r-lg)", background: "var(--dc-ink-900)", display: "grid", placeItems: "center", overflow: "hidden", maxHeight: 300 }}>
-            <img src={subiendo.url} alt="Previsualización" style={{ maxWidth: "100%", maxHeight: 300, objectFit: "contain", display: "block" }} />
-          </div>
+          <div className={`dc-im__prev ${esFotos ? "is-foto" : "is-rx"}`}><img src={subiendo.url} alt="Previsualización" /></div>
           <div style={{ fontSize: 12, color: "var(--dc-ink-400)", margin: "8px 0 14px", display: "flex", alignItems: "center", gap: 6 }}><Camera size={13} strokeWidth={1.75} /> {subiendo.nombre}</div>
-          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Tipo de estudio</label>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-            {Object.entries(RX_TIPOS).filter(([k]) => !soloFotos || k === "foto").map(([k, l]) => { const on = subiendo.tipo === k; return (
-              <button key={k} onClick={() => setSubiendo({ ...subiendo, tipo: k })} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: "var(--dc-r-md)", border: on ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: on ? (tint(DS.c.primary, 0.078)) : "#fff", color: on ? DS.c.primary : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{k === "foto" ? <Camera size={14} strokeWidth={1.75} /> : <Scan size={14} strokeWidth={1.75} />} {l}</button>
-            ); })}
-          </div>
-          <Field label="Nota (opcional)" value={subiendo.nota} onChange={(v) => setSubiendo({ ...subiendo, nota: v })} placeholder="Ej. Control post-endodoncia pieza 36" />
+          {esFotos ? (
+            <div style={{ display: "grid", gap: 14 }}>
+              <div><label className="dc-im__lbl">Vista</label><div className="dc-im__chips">{Object.entries(FOTO_VISTAS).map(([k, l]) => <button key={k} type="button" className={subiendo.vista === k ? "is-on" : ""} onClick={() => setSubiendo({ ...subiendo, vista: k })}>{l}</button>)}</div></div>
+              <div><label className="dc-im__lbl">Momento del tratamiento</label><div className="dc-im__chips">{Object.entries(FOTO_MOMENTOS).map(([k, l]) => <button key={k} type="button" className={`is-mom-${k}${subiendo.momento === k ? " is-on" : ""}`} onClick={() => setSubiendo({ ...subiendo, momento: k })}>{l}</button>)}</div></div>
+              <Field label="Nota (opcional)" value={subiendo.nota} onChange={(v) => setSubiendo({ ...subiendo, nota: v })} placeholder="Ej. Inicio de blanqueamiento" />
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 14 }}>
+              <div><label className="dc-im__lbl">Tipo de estudio</label><div className="dc-im__chips">{RX_SOLO.map((k) => <button key={k} type="button" className={subiendo.tipo === k ? "is-on" : ""} onClick={() => setSubiendo({ ...subiendo, tipo: k })}>{RX_TIPOS[k]}</button>)}</div></div>
+              <Field label={`Piezas${RX_PIEZAS.has(subiendo.tipo) ? " (obligatorio)" : " (opcional)"}`} value={subiendo.piezas} onChange={(v) => setSubiendo({ ...subiendo, piezas: v })} placeholder="Numeración FDI, ej. 26 o 16, 46" />
+              <Field label="Informe radiológico" value={subiendo.nota} onChange={(v) => setSubiendo({ ...subiendo, nota: v })} placeholder="Ej. Sin radiolucidez periapical; obturación a longitud de trabajo" />
+            </div>
+          )}
         </Modal>
       )}
     </div>
@@ -8242,7 +8335,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         onCobrarPaciente={(pac) => { setCobroDesdeFicha({ pid: pac.id, nombre: pac.nombre }); setVista("caja"); }} />;
       case "odontograma": return <Odontograma pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} pacienteActivo={pacienteActivo} sedeActiva={sedeActiva} can={can} rol={rol} />;
       case "tratamientos": return <Tratamientos pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} can={can} pacienteActivo={pacienteActivo} consumirInsumos={consumirInsumos} />;
-      case "recetas": return <Recetas pacientes={pf} notify={notify} updFicha={updFicha} />;
+      case "recetas": return <Recetas pacientes={pf} notify={notify} updFicha={updFicha} fichas={fichas} />;
       case "consentimientos": return <Consentimientos pacientes={pf} notify={notify} />;
       case "inventario": return <Inventario key="inv-productos" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_compras": return <Inventario key="inv-compras" tabInicial="compras" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
@@ -8283,6 +8376,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   const RolIcon = R.icon;
   return (
+    <DatosDemoCtx.Provider value={{ fichas, updFicha, citas, setCitas, pacientes, setPacientes, horarioClinica }}>
     <div className="dc-shell" style={{ display: "flex", height: "calc(100vh / var(--dc-z, 1))", overflow: "hidden", background: BG, fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif" }}>
       <a href="#dc-main" style={{ position: "absolute", left: -9999, top: 0, zIndex: 200, padding: "10px 14px", background: NAVY, color: "#fff", fontWeight: 500, borderRadius: "var(--dc-r-sm)" }}
          onFocus={(e) => { e.currentTarget.style.left = "12px"; e.currentTarget.style.top = "12px"; }}
@@ -8525,6 +8619,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         </div>
       ); })()}
     </div>
+    </DatosDemoCtx.Provider>
   );
 }
 
@@ -8552,6 +8647,16 @@ const hydrateEmisor = (r) => {
     serie: String(r.comprobanteSerie || r.serie || "B001").toUpperCase().slice(0, 4),
   };
 };
+/* Estado del comprobante ante SUNAT (lo informa el backend tras enviarlo al OSE/PSE):
+   pendiente → aceptado | observado | rechazado. Sin integración se dice tal cual. */
+const SUNAT_ESTADOS = {
+  aceptado: ["Aceptado SUNAT", "is-ok"], observado: ["Observado", "is-aviso"], rechazado: ["Rechazado", "is-mal"],
+  pendiente: ["Pendiente de envío", "is-pend"], demo: ["Demo · sin SUNAT", "is-demo"],
+};
+function SunatChip({ estado, mensaje }) {
+  const [l, c] = SUNAT_ESTADOS[estado] || SUNAT_ESTADOS.pendiente;
+  return <span className={`dc-sunat ${c}`} title={mensaje || l}>{l}</span>;
+}
 /** Dígito verificador SUNAT para RUC peruano (11 dígitos). */
 const validarRucSunat = (ruc) => {
   const s = String(ruc || "").replace(/\D/g, "");
@@ -8574,14 +8679,18 @@ const getEmisor = () => {
   let ls = {};
   try { ls = JSON.parse(localStorage.getItem("dc_emisor") || "{}") || {}; } catch { ls = {}; }
   const clinic = emisorClinica || {};
-  const nombre = (clinic.nombre || ls.nombre || "").trim();
-  const ruc = String(clinic.ruc || ls.ruc || "").replace(/\D/g, "").slice(0, 11);
+  // Respaldo: los mismos datos de empresa y sede del membrete de documentos (en la demo,
+  // la empresa de ejemplo con su RUC), para que la boleta no pida datos que ya existen.
+  let mb = {};
+  try { const d = datosImpresion(); mb = { nombre: d.empresa.razonSocial || d.empresa.nombre, ruc: d.empresa.ruc, dir: d.sede.direccion, tel: d.sede.telefonos, serie: d.sede.serieDocumento ? `B${String(d.sede.serieDocumento).replace(/[^A-Z0-9]/gi, "").slice(0, 3)}` : "" }; } catch { mb = {}; }
+  const nombre = (clinic.nombre || ls.nombre || mb.nombre || "").trim();
+  const ruc = String(clinic.ruc || ls.ruc || mb.ruc || "").replace(/\D/g, "").slice(0, 11);
   return {
     nombre: nombre || "CLÍNICA",
     ruc,
-    dir: clinic.dir || ls.dir || "",
-    tel: clinic.tel || ls.tel || "",
-    serie: String(ls.serie || clinic.serie || "B001").toUpperCase().slice(0, 4),
+    dir: clinic.dir || ls.dir || mb.dir || "",
+    tel: clinic.tel || ls.tel || mb.tel || "",
+    serie: String(ls.serie || clinic.serie || mb.serie || "B001").toUpperCase().slice(0, 4),
   };
 };
 const peekBoletaLocal = (serie = "B001") => String((Number(localStorage.getItem("dc_boleta_seq_" + serie) || "0") || 0) + 1).padStart(8, "0");
@@ -8688,6 +8797,7 @@ function BoletaView({ boleta, onClose }) {
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span style={{ color: "var(--dc-ink-700)" }}>{l}</span><strong>S/ {v.toFixed(2)}</strong></div>
             ))}
             <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid var(--dc-ink-900)", marginTop: 3, fontWeight: 500, fontSize: 13 }}><span>IMPORTE TOTAL VENTA</span><span>S/ {total.toFixed(2)}</span></div>
+            {!auth.token && <div className="dc-bol-demo">Documento de demostración: no se envió a SUNAT y no tiene valor tributario.</div>}
           </div>
           <div style={{ fontSize: 12, marginTop: 10, borderTop: "1px dashed var(--dc-line)", paddingTop: 8, lineHeight: 1.7 }}>
             <div><strong>CONDICIÓN DE PAGO:</strong> AL CONTADO S/ {total.toFixed(2)}</div>
@@ -9360,7 +9470,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
         <div style={{ width: 66, height: 66, background: "var(--dc-ok-soft)", borderRadius: "50%", margin: "0 auto 18px", display: "grid", placeItems: "center" }}><CheckCircle2 size={38} strokeWidth={1.75} color="var(--dc-ok-700)" /></div>
         <div style={{ fontWeight: 500, color: NAVY, fontSize: 18, fontFamily: DISPLAY_FONT }}>¡Cobro aprobado!</div>
         {/* No se afirma el envio a SUNAT: el OSE no esta integrado (README §10, frente 1). */}
-        <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 6 }}>S/ {net.toFixed(2)} – {metaMet.label}{resultado?.vuelto > 0 ? ` – vuelto S/ ${Number(resultado.vuelto).toFixed(2)}` : ""}{cuotas > 1 ? ` – cuota 1 de ${cuotas}` : ""}. {auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta electrónica emitida (SUNAT)."}</div>
+        <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 6 }}>S/ {net.toFixed(2)} – {metaMet.label}{resultado?.vuelto > 0 ? ` – vuelto S/ ${Number(resultado.vuelto).toFixed(2)}` : ""}{cuotas > 1 ? ` – cuota 1 de ${cuotas}` : ""}. {auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta de demostración (no se envía a SUNAT)."}</div>
         <div style={{ marginTop: 18, display: "flex", gap: 10, justifyContent: "center" }}>
           <Btn small kind="ghost" onClick={() => { if (closeRef.current) { clearTimeout(closeRef.current); closeRef.current = null; } abrirBoletaAprobada(); }}><FileText size={15} strokeWidth={1.75} /> Ver boleta</Btn>
           <Btn small onClick={() => { if (closeRef.current) clearTimeout(closeRef.current); onAprobado && onAprobado(resultado); }}><CheckCircle2 size={15} strokeWidth={1.75} /> Listo</Btn>

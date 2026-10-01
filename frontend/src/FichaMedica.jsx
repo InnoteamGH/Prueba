@@ -1,8 +1,8 @@
 import { abrirDocumento } from "./util/membrete";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {AvatarPaciente, Modal, DataTable, PACIENTES_INIT, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {AvatarPaciente, Modal, DatosDemoCtx, DataTable, PACIENTES_INIT, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -525,6 +525,7 @@ function Ortodoncia({ pacienteId, notify }) {
 /* ── Receta médica ── */
 const ITEM_VACIO = () => ({ medicamento: "", presentacion: "", dosis: "", frecuencia: "", duracion: "" });
 function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
+  const demoDb = useContext(DatosDemoCtx);
   const conectado = !!auth.token;
   const [items, setItems] = useState([ITEM_VACIO()]);
   const [indicaciones, setIndicaciones] = useState("");
@@ -631,6 +632,13 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
     if (alertas?.length) {
       body.alertaAlergia = JSON.stringify(alertas);
       body.overrideAlergia = true;
+    }
+    if (!auth.token) {
+      // Demostración: la receta queda en la historia del paciente (y en el módulo Recetas).
+      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, recetas: [{ fecha: new Date().toISOString().slice(0, 10), items: body.items, indicaciones: body.indicaciones, texto: validos.map((x) => [x.medicamento, x.presentacion, x.dosis].filter(Boolean).join(" ")).join("; ") }, ...(cur.recetas || [])] }));
+      notify(alertas.length ? "Receta emitida (alerta de alergia registrada)." : "Receta emitida.");
+      limpiar(); setAlergiaPend(null); onChange && onChange();
+      return;
     }
     api.recetas.crear(body)
       .then(() => {
@@ -933,6 +941,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // El registro de accesos lo ven quien escribe en la historia y quien audita.
   const puedeRegistro = !conectado || !can || can("auditoria", "ver") || puedeEscribirClinico;
   const [d, setD] = useState(null);   // payload de ficha360
+  const demoDb = useContext(DatosDemoCtx);   // demostración: datos vivos (fichas, citas) del sistema
+  const demoFicha = demoDb && demoDb.fichas ? demoDb.fichas[pacienteId] : null;
+  const demoCitas = demoDb ? demoDb.citas : null;
   const [tab, setTab] = useState(initialTab || "resumen");
   // Odontograma y periodontograma usan todo el ancho: se pide al menú lateral que se
   // contraiga mientras esa pestaña está abierta (lo escucha MainApp).
@@ -995,7 +1006,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     // que la pantalla se pueda revisar sin backend.
     if (!conectado && pacienteId != null) {
       const pac = pacienteDemo || PACIENTES_INIT.find((x) => String(x.id) === String(pacienteId));
-      const fc = FICHA_CLINICA[pacienteId] || {};
+      const fc = (demoDb && demoDb.fichas && demoDb.fichas[pacienteId]) || FICHA_CLINICA[pacienteId] || {};
       if (pac) {
         const trat = (fc.tratamiento || []).map((t) => ({ ...t, estado: t.estado === "atendida" ? "completada" : t.estado }));
         const total = trat.reduce((a, t) => a + (Number(t.costo) || 0), 0);
@@ -1003,7 +1014,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         const medNom = (id) => (MEDICOS.find((m) => m.id === id) || {}).nombre || "";
         const historia = (fc.historia || []).map((h, i) => ({ id: `demo-h${i}`, medico: medNom(1), diagnostico: h.diagnostico || h.titulo, ...h }));
         const recetas = (fc.recetas || []).map((r2, i) => ({ id: `demo-r${i}`, medico: medNom(1), indicaciones: r2.indicaciones || r2.texto, ...r2 }));
-        const citas = CITAS_INIT.filter((c) => c.paciente === pac.nombre).map((c) => ({ ...c, medico: medNom(c.medicoId) }));
+        const citas = ((demoDb && demoDb.citas) || CITAS_INIT).filter((c) => c.paciente === pac.nombre || String(c.pacienteId) === String(pac.id)).map((c) => ({ ...c, medico: c.medico || medNom(c.medicoId) }));
         const paciente = { ...pac, fechaNacimiento: pac.fechaNacimiento || pac.nacimiento || "", alergias: fc.alergias || [], antecedentes: fc.antecedentes || [] };
         setD({ paciente, resumen: { saldo: total - pagado, total, pagado, planTotal: total, invertido: pagado }, tratamientos: trat, pagos: fc.pagos || [], recetas, historia, citas });
         setFil({ nombre: pac.nombre || "", dni: pac.dni || "", telefono: pac.telefono || "", email: pac.email || "", fechaNacimiento: paciente.fechaNacimiento, genero: pac.genero || "", distrito: pac.distrito || "", aseguradora: pac.aseguradora && pac.aseguradora !== "Ninguno" ? pac.aseguradora : "",
@@ -1107,6 +1118,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     arr(rx).forEach((x) => ev.push({ k: "archivo", fecha: x.fecha, x }));
     return ev.filter((e) => e.fecha).sort((a, b) => (String(b.fecha).localeCompare(String(a.fecha))) || (String(b.hora || "").localeCompare(String(a.hora || ""))));
   };
+  useEffect(() => {
+    if (conectado || !demoFicha || !Array.isArray(demoFicha.imagenes)) return;
+    setRx((cur) => [...cur.filter((x) => x.local), ...demoFicha.imagenes.map((x) => ({ ...x, tipo: x.tipo === "foto" ? "Foto clínica" : ({ panoramica: "Radiografía panorámica", periapical: "Radiografía periapical", bitewing: "Radiografía bitewing", oclusal: "Radiografía oclusal", cefalometrica: "Cefalometría", cbct: "Tomografía CBCT" }[x.tipo] || x.tipo), nota: [x.piezas ? `Piezas ${x.piezas}` : "", x.nota].filter(Boolean).join(" · ") }))]);
+  }, [demoFicha && demoFicha.imagenes]); // eslint-disable-line
+  // Demostración: si cambia la ficha o la agenda del paciente (una receta, un cobro en
+  // Caja, una cita), la historia se vuelve a armar sola, aunque la ficha esté abierta.
+  useEffect(() => { if (!conectado && demoDb) cargar(); }, [demoFicha, demoCitas]); // eslint-disable-line
   const linea = eventos();
   // Borradores de evolución sin llenar (creados al marcar la cita como atendida).
   const pendientes = arr(d?.historia).filter((h) => h.id && !(h.diagnostico && String(h.diagnostico).trim()) && !(h.detalle && String(h.detalle).trim()));
@@ -1182,6 +1200,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       const med = medicos.find((m) => String(m.id) === String(evoMedico));
       const ahora = new Date();
       setD((cur) => ({ ...cur, historia: [{ id: `demo-h${Date.now()}`, fecha: hoy, hora: ahora.toTimeString().slice(0, 5), creadoEn: ahora.toISOString(), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || "", medico: med?.nombre || "", local: true }, ...arr(cur.historia)] }));
+      // Queda en la historia del sistema (no sólo en esta ventana): al reabrir la ficha sigue ahí.
+      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, historia: [{ fecha: hoy, hora: ahora.toTimeString().slice(0, 5), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medico: med ? med.nombre : "" }, ...(cur.historia || [])] }));
       anotar("crear", "Registró una evolución", evo.diagnostico || evo.detalle);
       setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify("Evolución registrada y firmada.");
       return;

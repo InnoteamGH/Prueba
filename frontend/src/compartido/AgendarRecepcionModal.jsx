@@ -1,10 +1,10 @@
 /* Modal de agendado desde recepción + botón de consulta RENIEC.
    Lo usan App.jsx (Agenda, Espera) y el inbox de WhatsApp, así que vive aparte
    para que el módulo de WhatsApp pueda cargarse en su propio chunk. */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Calendar, Check, ChevronRight, Clock, MessageSquare, Phone, Plus, Search, User, AlertTriangle } from "lucide-react";
 import api, { auth } from "../api/client";
-import {Btn, DS, HORAS_SEL, Modal, NAVY, Select, addDays, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, toMin, tint} from "../comun";
+import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, toMin, tint} from "../comun";
 
 /* ---- RENIEC: autocompletar nombres desde el DNI (solo datos reales del backend) ---- */
 export async function reniecLookup(dni) {
@@ -45,6 +45,7 @@ function sedeNumDeUuid(seds, uuid, fallbackIdx = 0) {
   if (!uuid || !seds.length) return fallbackIdx === 1 ? 2 : 1;
   const hit = seds.find((s) => s.id === uuid);
   if (!hit) return fallbackIdx === 1 ? 2 : 1;
+  if (typeof hit.id === "number") return hit.id;
   const n = Number(hit.numero ?? hit.codigo);
   if (n === 2) return 2;
   if (String(hit.id).endsWith("a2")) return 2;
@@ -61,8 +62,25 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const [horarioClinica, setHorarioClinica] = useState({ horario: {}, feriados: [] });
   const [avisoHorario, setAvisoHorario] = useState(null);
   const [f, setF] = useState({ pacienteId: base?.pacienteId || "", especialidadId: "", medicoId: base?.medicoId || "", sedeId: base?.sedeId || "", fecha: base?.fecha || addDays(1), hora: base?.hora || "10:00", duracionMin: 30, sillon: base?.sillon != null ? String(base.sillon) : "", repetir: "no", veces: 4, avisar: false, motivo: base?.motivo || "", nota: "", canal: base?.canal || "llamada" });
-  const cargarPac = () => api.pacientes.listar().then((r) => setPac((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni })))).catch(() => {});
+  // Demostración: sin servidor se usan los pacientes, doctores, sedes y la agenda del
+  // propio sistema, y la cita se guarda en la agenda compartida (antes el modal quedaba
+  // vacío y no se podía agendar a nadie).
+  const demoDb = useContext(DatosDemoCtx);
+  const demo = !auth.token && !!demoDb;
+  const cargarPac = () => {
+    if (demo) { setPac((demoDb.pacientes || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni }))); return Promise.resolve(); }
+    return api.pacientes.listar().then((r) => setPac((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni })))).catch(() => {});
+  };
   useEffect(() => {
+    if (demo) {
+      cargarPac();
+      setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre })));
+      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp })));
+      setSeds(SEDES.map((x) => ({ id: x.id, nombre: x.nombre })));
+      if (!base?.sedeId) setF((x) => (x.sedeId ? x : { ...x, sedeId: SEDES[0].id }));
+      if (demoDb.horarioClinica) setHorarioClinica({ horario: demoDb.horarioClinica.horario || {}, feriados: demoDb.horarioClinica.feriados || [] });
+      return;
+    }
     cargarPac();
     api.catalogo.especialidades().then((r) => setEsps(r || [])).catch(() => {});
     api.catalogo.medicos().then((r) => setMeds(r || [])).catch(() => {});
@@ -74,6 +92,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     api.clinica.get().then((r) => setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] })).catch(() => {});
   }, []); // eslint-disable-line
   useEffect(() => {
+    if (demo) return;
     api.sillones.listar(f.sedeId || undefined).then((rows) => {
       const list = (rows || []).map((r) => ({ numero: Number(r.numero) || 0, nombre: r.nombre || `Sillón ${r.numero}` })).filter((s) => s.numero > 0);
       if (list.length) setSillones(list.sort((a, b) => a.numero - b.numero));
@@ -90,10 +109,24 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     if (!horaAuto || !f.fecha) return;
     const ocupadas = new Set();
     const apply = () => {
-      const libre = HORAS_SEL.find((h) => !ocupadas.has(h)) || HORAS_SEL[8] || "10:00";
+      // Primera hora libre DENTRO del horario de la clínica y, si es hoy, no pasada
+      // (antes proponía las 06:00 y luego el propio modal rechazaba guardar).
+      const sedeN = sedeNumDeUuid(seds, f.sedeId);
+      const ahoraMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const esHoy = f.fecha === fmt(hoy);
+      const valida = (h) => !ocupadas.has(h) && !citaFueraDeHorario(f.fecha, h, f.duracionMin, horarioClinica.horario, horarioClinica.feriados, sedeN).fuera && (!esHoy || toMin(h) > ahoraMin);
+      const libre = HORAS_SEL.find(valida) || HORAS_SEL.find((h) => !ocupadas.has(h) && !citaFueraDeHorario(f.fecha, h, f.duracionMin, horarioClinica.horario, horarioClinica.feriados, sedeN).fuera) || HORAS_SEL[8] || "10:00";
       setF((x) => (x.hora === libre ? x : { ...x, hora: libre }));
     };
-    if (!auth.token) { apply(); return; }
+    if (!auth.token) {
+      (demoDb?.citas || []).forEach((c) => {
+        if (c.fecha !== f.fecha) return;
+        if (f.medicoId && c.medicoId && String(c.medicoId) !== String(f.medicoId)) return;
+        if (["cancelada", "no_show", "reprogramada"].includes(c.estado)) return;
+        ocupadas.add(String(c.hora || "").slice(0, 5));
+      });
+      apply(); return;
+    }
     api.citas.listar(f.fecha).then((rows) => {
       (rows || []).forEach((c) => {
         if (f.medicoId && c.medicoId && String(c.medicoId) !== String(f.medicoId)) return;
@@ -103,7 +136,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       });
       apply();
     }).catch(() => apply());
-  }, [f.fecha, f.medicoId, horaAuto]); // eslint-disable-line
+  }, [f.fecha, f.medicoId, horaAuto, horarioClinica, f.sedeId, seds.length]); // eslint-disable-line
   const T = DS.c.primary;
   const pacSel = pac.find((p) => p.id === f.pacienteId);
   const pacF = (busca.trim() ? pac.filter((p) => (p.nombre || "").toLowerCase().includes(busca.toLowerCase()) || String(p.dni || "").includes(busca.trim())) : pac).slice(0, 6);
@@ -114,6 +147,13 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const req = <span style={{ color: "var(--dc-red)" }}> *</span>;
   const crearNuevo = () => {
     if (!nuevo?.nombre?.trim()) { notify("Ingresa el nombre del paciente."); return; }
+    if (demo) {
+      const id = Math.max(0, ...(demoDb.pacientes || []).map((p) => Number(p.id) || 0)) + 1;
+      demoDb.setPacientes((ps) => [...ps, { id, nombre: nuevo.nombre.trim(), dni: (nuevo.dni || "").trim(), telefono: "", email: "", sede: Number(f.sedeId) || 1, sedes: [Number(f.sedeId) || 1], ultima: null, creadoEn: new Date().toISOString() }]);
+      setPac((ps) => [...ps, { id, nombre: nuevo.nombre.trim(), dni: (nuevo.dni || "").trim() }]);
+      setF((x) => ({ ...x, pacienteId: id })); setNuevo(null); setAbrePac(false); setBusca(""); notify("Paciente creado.");
+      return;
+    }
     api.pacientes.crear({ nombre: nuevo.nombre.trim(), dni: (nuevo.dni || "").trim() }).then((p) => { cargarPac(); if (p?.id) setF((x) => ({ ...x, pacienteId: p.id })); setNuevo(null); setAbrePac(false); setBusca(""); notify("Paciente creado."); }).catch(() => notify("No se pudo crear el paciente."));
   };
 
@@ -128,6 +168,19 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     const n = f.repetir === "no" ? 1 : Math.max(1, Math.min(12, Number(f.veces) || 1));
     const fechas = []; for (let i = 0; i < n; i++) { const d = new Date(f.fecha + "T00:00:00"); d.setDate(d.getDate() + paso * i); fechas.push(fmt(d)); }
     let ok = 0, fail = 0, avisados = 0, avisarFail = 0, ultimoError = "";
+    if (demo) {
+      const p = pac.find((x) => String(x.id) === String(f.pacienteId)) || {};
+      const med = MEDICOS.find((m) => String(m.id) === String(f.medicoId)) || {};
+      const ocupado = (fch) => (demoDb.citas || []).some((c) => c.fecha === fch && c.hora === f.hora && String(c.medicoId) === String(f.medicoId) && !["cancelada", "no_show", "reprogramada"].includes(c.estado));
+      const libres = fechas.filter((fch) => !ocupado(fch));
+      const base0 = Date.now();
+      demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: Number(sedeId) || 1, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: "pendiente", llegada: false }))]);
+      setGuardando(false); setAvisoHorario(null);
+      if (!libres.length) { notify("Ese horario ya está ocupado para el doctor."); return; }
+      notify(fechas.length > 1 ? `${libres.length} cita(s) agendada(s)${fechas.length - libres.length ? `, ${fechas.length - libres.length} ocupadas` : ""}.` : `Cita agendada para ${p.nombre} el ${fechaLegible(f.fecha)} a las ${f.hora}.`);
+      onCreada();
+      return;
+    }
     for (const fch of fechas) {
       try {
         const r = await api.citas.crear({ ...cuerpo, fecha: fch });
