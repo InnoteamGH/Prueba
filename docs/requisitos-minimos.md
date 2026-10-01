@@ -231,3 +231,20 @@ El modal de agendado propone solo el sillón (el propio del doctor, luego el de 
 20. Sillones: turnos del día (`/sillones/asignaciones`) y bloqueos por doctor o por sillón.
 21. Catálogo de servicios: `duracionMin` por especialidad.
 22. Recordatorios: `PUT /automatizaciones/:clave` debe actualizar solo esa automatización (recibe la regla completa: `activo`, `plantilla`, `hsmNombre`, `hsmIdioma`). Si reemplazara toda la configuración, apagar una apagaría las demás; el frontend ahora lo detecta y las restaura.
+23. Métricas únicas (spec UX/UI, GLO-02): el backend debe calcular cada métrica con la misma definición que usa el frontend en `compartido/metricas.js`, con los mismos filtros (fecha, sede, doctor):
+    - **Por cobrar** = procedimientos terminados aún no pagados. **Saldo vencido** = lo por cobrar con más de 30 días desde que se terminó. **Saldo del plan** = total del presupuesto − pagado.
+    - **Cobrado hoy** = pagos con fecha de hoy (la misma cifra en Caja, Pendientes y Panel).
+    - **Última visita** = última cita Atendida. **Próxima cita** = la de hoy o futura no atendida más cercana.
+    - **Por reactivar** = última visita hace más de 6 meses y sin cita futura. **Nuevos (30 días)** = primera cita atendida en los últimos 30 días.
+    - **Cupos libres** = horas abiertas de los sillones − horas agendadas no canceladas.
+    - **Salidas del mes** = egresos de Caja del mes (soles y dólares por separado).
+    - **Comisión** = producción del doctor × su % (definido en su ficha).
+24. Estados únicos (GLO-07): cita (`pendiente`, `confirmada`, `en_sala` derivado de la llegada, `en_atencion`, `atendida`, `no_show`, `cancelada`, `reprogramada`), procedimiento (agregar `anulado`; no se borra), comprobante (agregar `sin_enviar` cuando no hay proveedor), liquidación de seguro (`borrador`, `enviado`, `observado` con `motivo`, `aprobado`, `pagado`), laboratorio (`por_enviar`, `enviado`, `en_proceso`, `recibido`, `entregado`; «atrasado» es una bandera calculada) y documento (`enviado`, `visto`, `firmado`, `completado`, `vencido`).
+25. Catálogo único de servicios (SRV-01): una sola tabla con `codigo`, `nombre`, `especialidadId`, `duracionMin`, `precio`, `activo` y los hallazgos del odontograma que proponen ese servicio (`hallazgos[]`). Lo leen Agenda, Odontograma, Presupuesto, Caja, Reportes y la IA.
+26. Presupuesto único (ODO-02, PER-01): cada ítem del plan con `servicioId`, `pieza`, `cara`, `precio`, `estado` y `origen` (`odontograma`, `periodontograma` o manual). El odontograma y el periodontograma agregan ítems a este presupuesto; no hay proformas propias.
+27. Laboratorio (LAB-03): el caso guarda `pacienteId`, `pieza`, `procedimientoId` y el egreso asociado (`egresoId`); `GET /laboratorio?pacienteId=` para la ficha.
+28. Documentos del paciente (DOC-01): una sola entidad para consentimientos y formularios (`clase`, `tipo`, `estado`, `fecha`), con `POST /documentos/:id/reenviar` y firma en consultorio.
+29. Integraciones (FAC-01, LNK-01): `GET /integraciones` con el estado real de la pasarela (proveedor activo, p. ej. Izipay) y del proveedor de facturación; Links de pago, Comprobantes y el inicio de TI leen de ahí.
+30. WhatsApp (WSP-02): al proponer un cupo, la IA crea un link de pago y la cita se registra solo cuando el link figura `pagado` (webhook de la pasarela).
+31. Doctores (NAV-07, CFG-02): meta mensual y `porcentajeComision` en la ficha del doctor, que es un usuario con perfil clínico (un doctor = un usuario).
+32. Reseñas (SAT-01/04): separar la encuesta interna (NPS 0–10) de las reseñas públicas (1–5) y devolver el `origen` de cada reseña (`google` o `portal`).

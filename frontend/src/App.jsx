@@ -1589,10 +1589,10 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
               <p>{pluralEs(todasHoy.length, "cita", "citas")} hoy</p>
             </div>
             <div className="dc-ag-hero__cifras">
-              <div><b>{nCitas}</b><span>Activas</span></div>
-              <div><b>{stats[1][1]}</b><span>Presentes</span></div>
-              <div><b>{stats[2][1]}</b><span>Por llegar</span></div>
-              <div><b>{nAv}%</b><span>Avance</span></div>
+              {/* AGE-01: M-01 (citas activas), M-02 (en clínica) y M-03 (por confirmar). */}
+              <div><b>{nCitas}</b><span>Citas</span></div>
+              <div><b>{cnt("en_sala") + cnt("en_atencion")}</b><span>En clínica</span></div>
+              <div><b>{cnt("pendiente")}</b><span>Por confirmar</span></div>
             </div>
             {/* AGE-02: la próxima cita ya se marca en su fila de la tabla. */}
             {segs.length > 0 && (

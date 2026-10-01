@@ -301,6 +301,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   };
 
   const guardar = async () => {
+    // AGE-09: el servicio es obligatorio (define duración, especialidad y doctores).
+    if (!f.especialidadId) { notify("Elige el servicio: define la duración y qué doctores lo atienden."); return; }
     if (!f.pacienteId || !f.medicoId) { notify("Selecciona paciente y doctor."); return; }
     if (!f.sedeId && !seds[0]?.id) { notify("Selecciona la sede."); return; }
     if (!f.sillon) { notify("Selecciona el sillón."); return; }
@@ -379,9 +381,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crearNuevo}>Crear y usar</Btn></div>
             </div>}
           </div>
-          <label><span style={lbl}>Servicio</span>
+          <label><span style={lbl}>Servicio{req}</span>
             <Select value={f.especialidadId} onChange={(v) => { setDurAuto(true); setSillonAuto(true); setF({ ...f, especialidadId: v, medicoId: f.medicoId && v && meds.find((m) => String(m.id) === String(f.medicoId) && String(m.especialidadId) !== String(v)) ? "" : f.medicoId }); }} placeholder="Cualquiera"
-                    options={[{ value: "", label: "Cualquiera" }, ...esps.map((e) => ({ value: e.id, label: e.nombre, sub: e.duracionMin ? `${e.duracionMin} min` : undefined }))]} />
+                    placeholder="Elegir servicio" options={[...esps.map((e) => ({ value: e.id, label: e.nombre, sub: e.duracionMin ? `${e.duracionMin} min` : undefined }))]} />
           </label>
           <label><span style={lbl}>Doctor{req}</span>
             <Select value={f.medicoId} onChange={(v) => { setSillonAuto(true); setHoraAuto(true); setF({ ...f, medicoId: v }); }} placeholder="Seleccionar"
@@ -397,7 +399,6 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             <Select value={f.sedeId} onChange={(v) => { setSillonAuto(true); setF({ ...f, sedeId: v, sillon: "" }); }} placeholder="Seleccionar sede"
                     options={seds.map((s) => ({ value: s.id, label: s.nombre }))} />
           </label>
-          <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>
           <div>
             <div className="dc-agm__fh"><span style={{ ...lbl, marginBottom: 0 }}>Fecha y hora</span>
               <button type="button" onClick={buscarHuecos} disabled={huecos === "buscando"}><Search size={13} strokeWidth={2.2} /> {huecos === "buscando" ? "Buscando…" : `Primer hueco libre${f.medicoId ? "" : espObj ? ` de ${espObj.nombre.toLowerCase()}` : ""}`}</button>
@@ -418,6 +419,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             </div>
             {pasada && <div style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>Fecha pasada</div>}
           </div>
+          <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
             <label><span style={lbl}>Duración{durAuto && durServicio && Number(f.duracionMin) === durServicio && <em className="dc-agm__auto">según {espObj.nombre.toLowerCase()}</em>}</span>
               <Select value={f.duracionMin} onChange={(v) => { setDurAuto(false); setF({ ...f, duracionMin: Number(v) }); }}
