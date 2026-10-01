@@ -5116,3 +5116,11 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-odo-ppto__t .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dc-odo-ppto__t tfoot td { font-weight: 700; background: var(--dc-bg); }
 .fm-top__chips span.is-info { background: #E8F1FE !important; color: #1D4ED8 !important; box-shadow: inset 0 0 0 1px #C7DBFB !important; }
+.dc-sat-alerta { flex-wrap: wrap; }
+.dc-sat-alerta__acc { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.dc-sat-alerta__acc button { border: 1px solid currentColor; background: #fff; color: var(--dc-danger-700, #B42318); border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.dc-sat-alerta__acc button.is-pri { background: var(--dc-danger-700, #B42318); color: #fff; border-color: transparent; }
+.dc-lab-amarres { display: grid; gap: 6px; padding: 12px 0 2px; font-size: 13px; color: var(--dc-ink-700); }
+.fm-pagina .fm-top button { white-space: nowrap; }
+.fm-pagina .fm-lateral { max-width: 300px; }
+.fm-lateral { overflow-x: hidden; }

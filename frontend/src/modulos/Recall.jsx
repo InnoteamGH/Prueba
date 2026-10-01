@@ -1,8 +1,9 @@
 /* Módulo Recall. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
-import React, { useState, useEffect } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
-import {EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint, PersonaCelda} from "../comun";
+import {DatosDemoCtx, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint, PersonaCelda} from "../comun";
+import { porReactivar } from "../compartido/metricas";
 
 function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
@@ -104,7 +105,10 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
     if (conectado) api.automatizaciones.probarHsm(cfg.clave, tel).then((r) => notify(r?.ok ? `Plantilla "${r.plantilla}" enviada a ${tel}.` : "No se pudo enviar (¿plantilla aprobada en Meta?).")).catch(() => notify("No se pudo enviar la plantilla."));
     else notify(`(Demo) Se enviaría la plantilla "${cfgHsm}" a ${tel}.`);
   };
-  const [cola, setCola] = useState(() => conectado ? [] : pacientes.filter((p) => p.ultima && p.ultima < "2026-04-01").slice(0, 6).map((p) => ({ ...p, estado: "por_contactar" })));
+  // RCL-03 / M-08: la única lista «Por reactivar» (Pendientes y Pacientes enlazan aquí).
+  const dbRec = useContext(DatosDemoCtx);
+  const [atendidosBajos, setAtendidosBajos] = useState([]);
+  const [cola, setCola] = useState(() => conectado ? [] : porReactivar(pacientes, dbRec?.citas || []).map((p) => ({ ...p, estado: "por_contactar" })));
   const enviar = (id) => {
     const p = cola.find((x) => x.id === id);
     setCola((c) => c.map((x) => x.id === id ? { ...x, estado: "enviado" } : x));
@@ -207,12 +211,18 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
               </div>
             </div>
           </section>
-          {bajos.length > 0 && (
-            <div className="dc-banda dc-banda--peligro dc-sat-alerta">
+          {/* SAT-03: la alerta se resuelve desde la tarjeta (chat, ficha o marcar atendido). */}
+          {bajos.filter((r) => !atendidosBajos.includes(r.paciente)).map((r) => { const pac = (pacientes || []).find((p) => p.nombre === r.paciente); return (
+            <div key={r.paciente} className="dc-banda dc-banda--peligro dc-sat-alerta">
               <AlertTriangle size={17} strokeWidth={1.75} />
-              <div><b>{bajos.length === 1 ? "1 paciente calificó bajo" : `${bajos.length} pacientes calificaron bajo`}</b><span>El asistente ya se disculpó y ofreció derivar; conviene que alguien del equipo los llame.</span></div>
+              <div><b>{r.paciente} calificó {r.nps}/10</b><span>{r.comentario || "Sin comentario."} El asistente ya se disculpó; conviene que alguien del equipo lo contacte.</span></div>
+              <div className="dc-sat-alerta__acc">
+                <button type="button" onClick={() => { window.location.hash = "#/whatsapp"; }}>Abrir chat</button>
+                {pac && <button type="button" onClick={() => { window.location.hash = `#/pacientes/${pac.id}`; }}>Ver ficha</button>}
+                <button type="button" className="is-pri" onClick={() => { setAtendidosBajos((x) => [...x, r.paciente]); notify(`${r.paciente}: alerta marcada como atendida.`); }}>Marcar como atendido</button>
+              </div>
             </div>
-          )}
+          ); })}
           <Card className="dc-sat">
             <div className="dc-sat__cab"><h3>Comentarios recientes</h3><span>Respuestas de la encuesta automática por WhatsApp</span></div>
             {comentarios.length === 0 ? <Vacio icon={<MessageSquare size={24} strokeWidth={1.75} />} titulo="Sin comentarios aún" sub="Aparecerán cuando los pacientes respondan la encuesta." /> : (

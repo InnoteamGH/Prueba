@@ -767,8 +767,10 @@ const sillonDe = (c) => {
   return null;
 };
 
-function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null, onAsignar = null, onQuitarAsignacion = null }) {
-  const [modo, setModo] = useState("semana");   // mes | semana | dia | sillon
+function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null, onAsignar = null, onQuitarAsignacion = null, modoFijo = null }) {
+  const [modoLoc, setModo] = useState("semana");
+  // NAV-04: el selector de vista vive arriba de la Agenda; aquí solo se dibuja.
+  const modo = modoFijo || modoLoc;   // mes | semana | dia | sillon
   const [dlOpen, setDlOpen] = useState(false);   // menú de descarga del rango visible
   const [off, setOff] = useState(0);             // semana
   const [diaOff, setDiaOff] = useState(0);       // dia / sillon
@@ -958,16 +960,17 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           <Select small width={172} ariaLabel="Filtrar por estado" value={estadoF} onChange={setEstadoF}
                   options={[{ value: "all", label: "Todos los estados" },
                             ...Object.entries(EST_LABEL).map(([k, l]) => ({ value: k, label: l }))]} />
-          {sedesCal.length > 1 && modo !== "sillon" && (
+          {/* AGE-06: sin filtro de sede propio; manda el selector global. */}
+          {false && sedesCal.length > 1 && modo !== "sillon" && (
             <Select small width={158} ariaLabel="Filtrar por sede" value={sedeF} onChange={setSedeF}
                     options={[{ value: "all", label: "Todas las sedes" },
                               ...sedesCal.map((s) => ({ value: s, label: s }))]} />
           )}
-          <div className="dc-cal-modos" style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
-            {[["mes", "Mes"], ["semana", "Semana"], ["dia", "Día"], ["doctores", "Doctores"], ["sillon", "Sillón"], ["tabla", "Tabla"]].map(([k, lbl]) => (
+          {!modoFijo && <div className="dc-cal-modos" style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
+            {[["mes", "Mes"], ["semana", "Semana"], ["dia", "Día"], ["doctores", "Doctores"], ["sillon", "Sillón"]].map(([k, lbl]) => (
               <button key={k} className={modo === k ? "is-on" : ""} onClick={() => setModo(k)} style={{ padding: "6px 13px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: modo === k ? "#fff" : "transparent", color: modo === k ? DS.c.primary : "var(--dc-ink-400)", boxShadow: modo === k ? "0 1px 2px rgba(16,24,40,.12)" : "none" }}>{lbl}</button>
             ))}
-          </div>
+          </div>}
           <div style={{ position: "relative" }}>
             <button onClick={() => setDlOpen((v) => !v)} title="Descargar lo visible" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", cursor: "pointer" }}><Download size={15} strokeWidth={1.75} /> Descargar</button>
             {dlOpen && (<>
@@ -1243,7 +1246,7 @@ function CancelarCitaModal({ cita, onClose, onConfirm }) {
   );
 }
 
-function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onAtender, ofrecerCupo, fichas, esperaState = [], setEspera = () => {}, pacientes = [], setPacientes = () => {}, vistaInicial = "dia", onIrEspera, can, agendarDesdeFicha = null, onAgendarDesdeFichaDone = () => {}, crearIntent = false, onIntentDone = () => {}, sedeActiva = 1 }) {
+function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onAtender, ofrecerCupo, fichas, esperaState = [], setEspera = () => {}, pacientes = [], setPacientes = () => {}, vistaInicial = "dia", calModo = null, onIrEspera, can, agendarDesdeFicha = null, onAgendarDesdeFichaDone = () => {}, crearIntent = false, onIntentDone = () => {}, sedeActiva = 1 }) {
   // Reprogramar y cancelar es operar la agenda. Antes se decidía con `rol !== "medico"`
   // y gerencia -que solo lee- pasaba el filtro y podía cancelar cualquier cita.
   const puedeOperarAgenda = can ? can("agenda", "editar") : rol !== "medico";
@@ -1593,15 +1596,15 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       {/* Resumen del día — Bento Grid Premium */}
       {vista !== "calendario" && (() => {
         const total = todasHoy.length || 1;
-        const cnt = (s) => todasHoy.filter((c) => c.estado === s).length;
-        const presentes = stats[1][1];
+        // M-01: estados excluyentes del catálogo (suman el total del día).
+        const cnt = (s) => todasHoy.filter((c) => estadoCita(c) === s).length;
         const desglose = [
-          { l: "Confirmadas", c: "#7FE0DD", n: cnt("confirmada") },
-          { l: "Presentes", c: "#6EE7A8", n: presentes },
-          { l: "En atención", c: "#FBBF5A", n: cnt("en_atencion") },
-          { l: "Atendidas", c: "#A5B4FC", n: atend },
           { l: "Pendientes", c: "rgba(255,255,255,.45)", n: cnt("pendiente") },
-          { l: "Canceladas", c: "#F59A8D", n: cnt("cancelada") },
+          { l: "Confirmadas", c: "#7FE0DD", n: cnt("confirmada") },
+          { l: "En sala", c: "#FBBF5A", n: cnt("en_sala") },
+          { l: "En atención", c: "#C4B5FD", n: cnt("en_atencion") },
+          { l: "Atendidas", c: "#6EE7A8", n: cnt("atendida") },
+          { l: "No asistió / canceladas", c: "#F59A8D", n: cnt("no_show") + cnt("cancelada") },
         ].filter((x) => x.n > 0);
         // Una sola franja: tres cifras principales y el desglose por estado. Antes eran
         // ocho tarjetas en dos filas que repetían los mismos números.
@@ -1652,7 +1655,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
         cols={COLS_AGENDA} />
-      </>) : <CalendarioAgenda onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf} reglas={reglasAg} validar={validarMovida} sedeInicial={sedeActiva}
+      </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} citas={(conectado ? (remotoAll || []) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf} reglas={reglasAg} validar={validarMovida} sedeInicial={sedeActiva}
         onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
         onQuitarAsignacion={puedeAgendar ? (id) => { if (conectado) { api.sillones.quitarAsignacion(id).then(() => notify("Turno quitado.")).catch(() => notify("No se pudo quitar.")); return; } demoDb?.setAsignaciones((xs) => (xs || []).filter((x) => x.id !== id)); notify("Turno quitado."); } : null} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
 
@@ -2127,7 +2130,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
           <div className="dc-esp-hero__prox dc-pac-hero__reac">
             <span className="dc-pac-hero__ico"><BellRing size={15} strokeWidth={1.75} /></span>
             <div className="dc-esp-hero__prox-txt"><span>+6 meses sin venir</span><b>{reactivar} por reactivar</b></div>
-            {puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={enviarRecordatoriosReactivar} disabled={enviandoRec}><Send size={13} strokeWidth={1.75} /> {enviandoRec ? "Enviando…" : "Recordar"}</button>}
+            {onIr && <button type="button" className="dc-esp-hero__btn" onClick={() => onIr("recall")} title="La lista «Por reactivar» vive en Recordatorios"><Send size={13} strokeWidth={1.75} /> Ver lista</button>}{false && puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={enviarRecordatoriosReactivar} disabled={enviandoRec}><Send size={13} strokeWidth={1.75} /> {enviandoRec ? "Enviando…" : "Recordar"}</button>}
           </div>
         ) : <span />}
         {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
@@ -7025,6 +7028,14 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
             {[["Paciente", detalle.paciente, <UserCheck size={15} strokeWidth={1.75} />], ["Laboratorio", detalle.lab, <FlaskConical size={15} strokeWidth={1.75} />], ["Enviado", fechaLegible(detalle.enviado), <Send size={15} strokeWidth={1.75} />], ["Entrega", fechaLegible(detalle.entrega) + (atrasado ? " – atrasado" : ""), <Calendar size={15} strokeWidth={1.75} />]].map(([k, v, ic]) => (
               <div key={k} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 0", borderBottom: "1px solid var(--dc-line)" }}><span style={{ color: "var(--dc-ink-500)", display: "grid", placeItems: "center" }}>{ic}</span><span style={{ flex: 1, fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>{k}</span><span style={{ fontSize: 13, color: k === "Entrega" && atrasado ? "var(--dc-red)" : NAVY, fontWeight: 500 }}>{v}</span></div>
             ))}
+            {/* LAB-03: amarres del caso con el paciente, el procedimiento del presupuesto y el egreso de Caja. */}
+            {!conectado && (() => { const pid = detalle.pacienteId || pidDe(detalle.paciente); const proc = pid ? ((dbLab?.fichas || {})[pid]?.tratamiento || []).find((t) => t.id === detalle.procedimientoId || (detalle.pieza && String(t.pieza) === String(detalle.pieza))) : null; const egr = (dbLab?.egresos || []).find((e) => e.labCasoId === detalle.id); return (
+              <div className="dc-lab-amarres">
+                {pid && <button type="button" className="dc-link" onClick={() => { setDetalle(null); window.location.hash = `#/pacientes/${pid}/archivos`; }}>Ver ficha de {detalle.paciente}</button>}
+                <span>Procedimiento: <b>{proc ? proc.nombre : "sin vincular"}</b></span>
+                <span>Egreso en Caja: {egr ? <button type="button" className="dc-link" onClick={() => { setDetalle(null); window.location.hash = "#/caja_movimientos"; }}>S/ {Number(egr.monto).toLocaleString("es-PE")} · {fechaLegible(egr.fecha)}</button> : <b>sin registrar</b>}</span>
+              </div>
+            ); })()}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12 }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Estado actual</span><span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "4px 12px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span></div>
           </div>
         </Modal>
@@ -8203,6 +8214,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [pasoAbierto, setPasoAbierto] = useState(null);
   // Botón global "Crear"
   const [crearMenu, setCrearMenu] = useState(false);
+  const [agModo, setAgModo] = usePersist("ag_modo", "semana");
   const [crearIntent, setCrearIntent] = useState(null); // "paciente" | "servicio"
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [colapPref, setColapPref] = usePersist("sidebar_colap", false);
@@ -8601,9 +8613,16 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "servicios": return <Configuracion notify={notify} rol={rol} can={can} seccionInicial="servicios" serviciosSlot={<Servicios notify={notify} can={can} />} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
-      case "agenda": return <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />;
-      case "agenda_consolidado": return <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={MEDICOS} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense>;
-      case "agenda_cal": return <Agenda key="agenda-cal" vistaInicial="calendario" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />;
+      // NAV-04: Agenda es un destino con selector de vista. Día = lista operativa;
+      // Semana/Mes/Por doctor/Por sillón = calendario; Lista = rango + exportar.
+      case "agenda": case "agenda_cal": case "agenda_consolidado": {
+        const vAg = vista === "agenda" ? "dia" : vista === "agenda_consolidado" ? "lista" : agModo;
+        const irAg = (x) => { if (x === "dia") setVista("agenda"); else if (x === "lista") setVista("agenda_consolidado"); else { setAgModo(x); setVista("agenda_cal"); } };
+        return (<div style={{ display: "grid", gap: 14 }}>
+          <Pestanas etiqueta="Vista de la agenda" valor={vAg} onChange={irAg} opciones={[{ id: "dia", label: "Día", icon: List }, { id: "semana", label: "Semana", icon: Columns3 }, { id: "mes", label: "Mes", icon: Calendar }, { id: "doctores", label: "Por doctor", icon: Stethoscope }, { id: "sillon", label: "Por sillón", icon: Armchair }, { id: "lista", label: "Lista", icon: Table2 }]} />
+          {vista === "agenda" ? <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} /> : vista === "agenda_consolidado" ? <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={MEDICOS} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense> : <Agenda key={`agenda-cal-${agModo}`} vistaInicial="calendario" calModo={agModo} citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />}
+        </div>);
+      }
       case "disponibilidad": return <Disponibilidad notify={notify} usuario={usuario} citas={citas} setCitas={setCitas} horarioClinica={horarioClinica} />;
       // Rutas clínicas antiguas (NAV-02): llevan a la pestaña de la ficha del paciente en
       // atención o, si no hay uno, al directorio con el aviso «Elige un paciente».

@@ -1,11 +1,12 @@
 /* Módulo WhatsApp + IA (inbox, agente, configuración del asistente).
    Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
-import {MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
+import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
 import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
+import { proximaCita, cuentaPaciente } from "../compartido/metricas";
 import "./whatsappInbox.css";
 
 function respuestaAgente(texto, ctx) {
@@ -190,6 +191,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   useEffect(() => { const f = () => setAncho(window.innerWidth); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
   const alternarInfo = () => { if (window.innerWidth > PANEL_FIJO) setOcultarInfo((v) => !v); else setVerInfo((v) => !v); };
   const chat = chats.find((c) => c.id === activo);
+  const dbWa = useContext(DatosDemoCtx);
+  const soloDig = (t) => String(t || "").replace(/\D/g, "").slice(-9);
+  const pacDeChat = (c) => { if (!c) return null; const lista = dbWa?.pacientes || []; return lista.find((p) => (c.pacienteId && p.id === c.pacienteId) || (soloDig(p.telefono) && soloDig(p.telefono) === soloDig(c.tel)) || p.nombre === c.nombre) || null; };
   const scrollBottom = (smooth) => { const el = scrollRef.current; if (el) { el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" }); setAtBottom(true); } };
   // Al abrir una conversación: baja al último mensaje.
   useEffect(() => { const t = setTimeout(() => scrollBottom(false), 40); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [activo]);
@@ -576,6 +580,14 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
               <Btn small kind={chat.modo === "ia" ? "primary" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>
             </div>
           </div>
+          {/* WSP-01: contexto del paciente siempre visible en el hilo (no depende del panel). */}
+          {(() => { const pac = pacDeChat(chat); if (!pac) return null; const prox = proximaCita(pac, dbWa?.citas || []); const cta = cuentaPaciente((dbWa?.fichas || {})[pac.id]); return (
+            <div className="wa-ctx">
+              <button type="button" className="wa-ctx__ficha" onClick={() => { window.location.hash = `#/pacientes/${pac.id}`; }}>Ver ficha de {pac.nombre.split(" ")[0]}</button>
+              <span>Próxima cita: <b>{prox ? `${prox.fecha === fmt(hoy) ? "hoy" : new Date(prox.fecha + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })} ${prox.hora || ""}` : "sin agendar"}</b></span>
+              <span>Saldo del plan: <b className={cta.saldoPlan > 0 ? "is-debe" : ""}>{cta.saldoPlan > 0 ? `S/ ${cta.saldoPlan.toLocaleString("es-PE")}` : "al día"}</b></span>
+            </div>
+          ); })()}
           <div ref={scrollRef} className="wa-hilo" onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }}>{hilo(chat.msgs)}</div>
           {!atBottom && <button type="button" className="dc-icon-btn" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" className="wa-bajar"><ChevronDown size={20} strokeWidth={1.75} /></button>}
           {chat.modo === "ia" && conectado && !modoDemo ? (

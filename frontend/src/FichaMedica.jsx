@@ -1,5 +1,6 @@
 import { abrirDocumento } from "./util/membrete";
 import * as M from "./compartido/metricas";
+import { estadoLabel } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
@@ -1775,12 +1776,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {tab === "resumen" && (
               <>
                 {/* La alergia ya se ve en la cabecera y en la tarjeta de alergias. */}
-                <div className="fm-kpis4" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+                {/* R2 / FIC-02: el saldo y la próxima cita ya están en el encabezado del paciente. */}
+                <div className="fm-kpis4" style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
                   {[
                     ["Última visita", ultimaVisita ? fmtFecha(ultimaVisita.fecha) : "—", ultimaVisita && ultimaVisita.especialidad !== "—" ? ultimaVisita.especialidad : "", CalendarDays, NAVY],
-                    ["Próxima cita", proximaCita ? fmtFecha(proximaCita.fecha) : "Sin programar", proximaCita ? (proximaCita.hora || "") : "", Clock, TEAL],
                     ["Tratamientos", String(arr(d?.tratamientos).length || r.tratamientos || 0), "en el plan", ClipboardList, TEAL],
-                    [etiquetaSaldo, money(montoSaldoUi), debe ? "pendiente" : (saldoAFavor > 0.005 ? "crédito" : "al día"), CreditCard, debe ? WARN : GREEN],
                   ].map(([l, v, s, Ic, c]) => { const clickable = l === "Tratamientos" || ((l === "Por pagar" || l === "Saldo a favor") && debe); const titlePorPagar = (l === "Por pagar" || l === "Saldo a favor") && clickable ? "Ver estado de cuenta" : (clickable ? "Ver plan / cuenta" : undefined); return (
                     <div key={l} onClick={clickable ? () => setTab("cuenta") : undefined} style={{ ...card, cursor: clickable ? "pointer" : "default" }} title={titlePorPagar}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em" }}>{React.createElement(Ic, { size: 13, strokeWidth: 1.75 })} {l}</div>
@@ -1801,20 +1801,22 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 )}
                 <div style={card}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ ...secTitle, marginBottom: 0 }}>Últimos movimientos</div>
-                    <button onClick={() => setTab("historia")} style={{ background: "none", border: "none", color: TEAL, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Ver historia completa →</button>
+                    <div style={{ ...secTitle, marginBottom: 0 }}>Últimas entradas</div>
+                    <button onClick={() => setTab("historia")} style={{ background: "none", border: "none", color: TEAL, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Ver historia →</button>
                   </div>
-                  {timelineUI(linea.slice(0, 6), "Aún no hay actividad registrada.")}
+                  {/* FIC-07: el Resumen solo muestra las 3 últimas; se registra en Historia clínica. */}
+                  {timelineUI(linea.slice(0, 3), "Aún no hay actividad registrada.")}
                 </div>
                 <div style={card}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                     <FlaskConical size={16} strokeWidth={1.75} color={TEAL} />
                     <div style={{ ...secTitle, marginBottom: 0 }}>Laboratorio</div>
                   </div>
-                  {labOrdenes.length === 0
+                  {/* FIC-03: en la demostración, los mismos casos que Laboratorio (contexto). */}
+                  {(() => { const labsV = !conectado && demoDb ? (demoDb.labCasos || []).filter((c) => String(c.pacienteId) === String(pacienteId)).map((c) => ({ ...c, tipoTrabajo: c.trabajo, laboratorio: c.lab, estado: estadoLabel("laboratorio", c.estado) })) : labOrdenes; return labsV.length === 0
                     ? <div style={{ fontSize: 13, color: MUTED }}>Sin trabajos de laboratorio registrados para este paciente.</div>
                     : <div style={{ display: "grid", gap: 8 }}>
-                        {labOrdenes.map((o) => (
+                        {labsV.map((o) => (
                           <div key={o.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "8px 0", borderTop: "1px solid var(--dc-line)" }}>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontWeight: 500, color: NAVY }}>{o.tipoTrabajo || o.trabajo || "Trabajo"}</div>
@@ -1826,7 +1828,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                             </div>
                           </div>
                         ))}
-                      </div>}
+                      </div>; })()}
                 </div>
               </>
             )}
@@ -2342,7 +2344,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               Estaban en sus pestañas, asi que para saber cuanto debe el paciente habia
               que salir del odontograma y volver. Se oculta por debajo de 1180px, donde
               ya no cabe sin estrujar la zona de trabajo. */}
-          <aside hidden={tab !== "resumen"} className={`fm-lateral${tab !== "resumen" ? " is-oculta" : ""}`} style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", display: "grid", gap: 14, alignContent: "start" }}>
+          <aside hidden={tab !== "resumen"} className={`fm-lateral${tab !== "resumen" ? " is-oculta" : ""}`} style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", boxSizing: "border-box", minWidth: 0, display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 14, alignContent: "start" }}>
             <div>
               <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 10 }}>Presupuesto</div>
               {arr(d?.tratamientos).length === 0
@@ -2352,7 +2354,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                         <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", flexShrink: 0, border: `2px solid ${t.estado === "completada" ? GREEN : ACCENT}`, background: t.estado === "completada" ? GREEN : "transparent" }} />
                         <span style={{ flex: 1, minWidth: 0, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {t.nombre}{t.pieza ? ` (${t.pieza})` : ""}
+                          {t.nombre}{t.pieza && !/pieza/i.test(String(t.nombre)) ? ` (${t.pieza})` : ""}
                         </span>
                         <span style={{ color: TEXT, fontWeight: 500, flexShrink: 0 }}>{money(t.costo)}</span>
                       </div>
@@ -2367,7 +2369,6 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               {[
                 ["Total", money(r.planTotal), NAVY],
                 ["Pagado", money(r.invertido), GREEN],
-                ["Por pagar", money(porPagar), debe ? WARN : GREEN],
                 ...(saldoAFavor > 0.005 ? [["Saldo a favor", money(saldoAFavor), GREEN]] : []),
               ].map(([l, v, c]) => (
                 <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 13 }}>
@@ -2380,9 +2381,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <div style={{ borderTop: `1px solid ${SOFT}`, paddingTop: 13 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
                 <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Nota de evolución</span>
-                <button onClick={() => setTab("historia")} title="Ver todas las evoluciones" aria-label="Ver todas las evoluciones"
-                  style={{ background: "none", border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-sm)", width: 26, height: 26, cursor: "pointer", color: TEAL, display: "grid", placeItems: "center" }}>
-                  <Plus size={15} strokeWidth={2} />
+                <button onClick={() => setTab("historia")} title="Las evoluciones se registran en Historia clínica"
+                  style={{ background: "none", border: "none", cursor: "pointer", color: TEAL, fontSize: 12.5, fontWeight: 600 }}>
+                  Ver historia →
                 </button>
               </div>
               {(() => {

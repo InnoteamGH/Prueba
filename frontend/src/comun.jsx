@@ -325,6 +325,8 @@ export const STAFF_INIT = [
   { id: 7, nombre: "Dra. Ana Quispe", user: "aquispe", email: "ana@sonrie.pe", rol: "medico", sedes: [2], activo: true, ultimo: "Hace 2 h" },
   { id: 8, nombre: "Dra. Sofía Torres", user: "storres", email: "sofia@sonrie.pe", rol: "medico", sedes: [2], activo: true, ultimo: "Hace 4 h" },
   { id: 9, nombre: "Dr. Jorge Ramos", user: "jramos", email: "jorge@sonrie.pe", rol: "medico", sedes: [1, 2], activo: true, ultimo: "Hace 6 h" },
+  // CFG-02: un doctor = un usuario. El Dr. Miguel Flores atendía sin usuario propio.
+  { id: 14, nombre: "Dr. Miguel Flores", user: "mflores", email: "miguel@sonrie.pe", rol: "medico", sedes: [2], activo: true, ultimo: "Ayer" },
   { id: 10, nombre: "Lucía Ramírez", user: "recepcion", email: "recepcion@sonrie.pe", rol: "recepcion", sedes: [1], activo: true, ultimo: "Hace 8 min" },
   { id: 11, nombre: "Karina Soto", user: "ksoto", email: "recepcion.surco@sonrie.pe", rol: "recepcion", sedes: [2], activo: true, ultimo: "Hace 40 min" },
   { id: 12, nombre: "Diana Pérez", user: "dperez", email: "diana@sonrie.pe", rol: "recepcion", sedes: [1], activo: false, ultimo: "Hace 2 meses" },
@@ -385,6 +387,8 @@ export const MEDICOS = [
   { id: 5, nombre: "Dr. Jorge Ramos", cop: "15984", esp: 4, esps: [4], sede: 1, sedes: [1, 2], foto: "JR", color: "var(--dc-info-ink)", meta: 6000, prodDemo: 4200, citasDemo: 28, comision: 35 },
   { id: 6, nombre: "Dr. Miguel Flores", cop: "33620", esp: 1, esps: [1], sede: 2, sedes: [2], foto: "MF", color: "var(--dc-brand-600)", meta: 5000, prodDemo: 3500, citasDemo: 22, comision: 30 },
 ];
+// Meta y % de comisión editados en Configuración › Doctores (demostración).
+try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); MEDICOS.forEach((m) => { if (o[m.id]) Object.assign(m, o[m.id]); }); } catch (e) { /* sin almacenamiento */ }
 export const espsDe = (m) => m ? (m.esps || [m.esp]) : [];
 
 // NEW-35: "hoy" vivo (no congelado al boot del bundle). Proxy reenvía a new Date().

@@ -291,7 +291,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
     if (!conectado) {
       setSedes(SEDES.map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "" }; }));
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, precioBase: e.precio })));
-      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: true, porcentajeComision: 30, metaMensual: m.meta })));
+      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: true, porcentajeComision: m.comision ?? null, metaMensual: m.meta })));
       setGoLive({
         listoParaOperar: true, total: 4, completados: 4, obligatoriosPendientes: 0,
         items: [
@@ -344,6 +344,16 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
       const payload = { ...reg, sedeId: reg.sede }; delete payload.sede;
       (it.id ? api.sillones.actualizar(it.id, payload) : api.sillones.crear(payload)).then(() => { notify("Sillón guardado."); setEdit(null); cargarSillones(); }).catch(err);
       return;
+    }
+    // NAV-07 / MET-01: meta y % de comisión se editan aquí y solo aquí. En la
+    // demostración se aplican a la ficha del doctor que leen Reportes y Mi producción.
+    if (edit.tipo === "doctor" && !auth.token) {
+      const m = MEDICOS.find((x) => x.id === it.id);
+      const pct = it.porcentajeComision === "" || it.porcentajeComision == null ? null : Math.max(0, Math.min(100, Number(it.porcentajeComision)));
+      const meta = Number(it.metaMensual) > 0 ? Number(it.metaMensual) : null;
+      if (m) { Object.assign(m, { nombre: it.nombre || m.nombre, comision: pct, meta }); try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); o[m.id] = { comision: pct, meta }; localStorage.setItem("dc_data_v1_medicos_cfg", JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } }
+      setMeds((ms) => ms.map((x) => (x.id === it.id ? { ...x, ...it, porcentajeComision: pct, metaMensual: meta } : x)));
+      notify("Doctor guardado. Meta y comisión ya se ven en Reportes y Mi producción."); setEdit(null); return;
     }
     if (edit.tipo === "sede" && !auth.token) {
       const id = it.id || Date.now();

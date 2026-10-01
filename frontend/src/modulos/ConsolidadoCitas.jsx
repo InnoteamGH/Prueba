@@ -7,7 +7,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarRange, CheckCircle2, Clock, Download, UserX, XCircle, Users, CalendarDays, Stethoscope, TrendingUp } from "lucide-react";
 import api from "../api/client";
-import OcupacionSillones from "./OcupacionSillones";
 import { ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, exportarExcel, colorDe } from "../comun";
 import { estadoCita } from "../compartido/estados";
 
@@ -103,27 +102,8 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       </section>
 
 
-      {!esMedico && porDoctor.length > 0 && (
-        <Card className="dc-cons__docs">
-          <div className="dc-cons__cab"><Stethoscope size={17} strokeWidth={2} /><h3>Citas por doctor</h3><span>{porDoctor.length} {porDoctor.length === 1 ? "profesional" : "profesionales"}</span></div>
-          <ul>
-            {porDoctor.map((d) => (
-              <li key={d.medico}>
-                <PersonaCelda nombre={d.medico} sub={`${d.atendidas} atendidas · ${d.noShow} no asistió`} size={30} />
-                <div className="dc-cons__barra" title={`${d.total} citas`}>
-                  <i className="is-at" style={{ width: `${(d.atendidas / maxDoc) * 100}%` }} />
-                  <i className="is-pr" style={{ width: `${(d.programadas / maxDoc) * 100}%` }} />
-                  <i className="is-ns" style={{ width: `${(d.noShow / maxDoc) * 100}%` }} />
-                </div>
-                <b>{d.total}</b>
-              </li>
-            ))}
-          </ul>
-          <div className="dc-cons__ley"><span><i className="is-at" /> Atendidas</span><span><i className="is-pr" /> Programadas</span><span><i className="is-ns" /> No asistió</span></div>
-        </Card>
-      )}
-
-      {!esMedico && <OcupacionSillones />}
+      {/* AGE-07: la vista Lista es solo filtros, conteo y tabla. Citas por doctor está en
+          el Panel y la Ocupación de sillones en Reportes. */}
 
       {filas.length === 0 ? (
         <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : "Sin citas en el rango"} sub="Cambia las fechas para ver otro periodo." /></Card>
