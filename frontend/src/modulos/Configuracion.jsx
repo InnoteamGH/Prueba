@@ -373,7 +373,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
       const payload = { nombre: it.nombre, precioBase: precio };
       (it.id ? api.catalogo.actualizarEspecialidad(it.id, payload) : api.catalogo.crearEspecialidad(payload)).then(() => done("Servicio guardado.")).catch(err);
     } else if (edit.tipo === "doctor") {
-      const payload = { nombre: it.nombre, especialidadId: it.especialidadId || null, cop: it.cop || null, activo: it.activo !== false };
+      const pctC = it.porcentajeComision === "" || it.porcentajeComision == null ? null : Math.max(0, Math.min(100, Number(it.porcentajeComision)));
+      const payload = { nombre: it.nombre, especialidadId: it.especialidadId || null, cop: it.cop || null, activo: it.activo !== false, porcentajeComision: pctC };
       const after = () => {
         const meta = Number(it.metaMensual);
         if (it.id && Number.isFinite(meta)) {

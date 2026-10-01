@@ -17,7 +17,7 @@ const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones")
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
-import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio } from "./compartido/catalogo";
+import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
 import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
@@ -6409,13 +6409,12 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     if (!confirm(`¿Eliminar «${form.nombre}» del catálogo? Los presupuestos y el asistente de WhatsApp dejarán de ofrecerlo.`)) return;
     setItems((it) => it.filter((x) => x.id !== form.id)); setForm(null);
   };
-  const acBtn = { width: 30, height: 30, borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", cursor: "pointer", color: NAVY, display: "grid", placeItems: "center", flexShrink: 0 };
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <section className="dc-esp-hero dc-serv-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>{items.filter((s) => s.activo !== false).length}</b><span>servicios activos</span></div>
-          <p>{puedeGestionar ? "Catálogo con duración, especialidad y precio" : "Catálogo de consulta"}</p>
+          <p>{puedeGestionar ? "Precios con IGV incluido; la tabla muestra el desglose y el total por sede" : "Catálogo de consulta (precios con IGV)"}</p>
         </div>
         <div className="dc-esp-hero__cifras">
           {puedeGestionar && <div><b>S/ {ticket.toLocaleString("es-PE")}</b><span>Precio medio</span></div>}
@@ -6425,18 +6424,20 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         <span />
         {puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={nuevo}><Plus size={14} strokeWidth={2} /> Nuevo servicio</button>}
       </section>
-      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1160 : 980} rows={filtrados} accion={cats.length > 1 ? <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => (x.categoria || x.cat) === c).length})` }))]} /> : null} onRowClick={(s) => editar(s)} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
-        { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span></span>; } },
-        { key: "esp", label: "Especialidad", w: "minmax(140px,1.1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
-        { key: "dur", label: "Duración", w: "100px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
-        { key: "monto", label: sedesLista.length > 1 ? "Base" : "Precio", w: "minmax(110px,0.8fr)", a: "right", get: (s) => s.monto, cell: (s) => <span className="dc-money" style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(Number(s.monto))}</span> },
-        ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "minmax(130px,0.9fr)", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
+      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1120 : 880} rows={filtrados} accion={cats.length > 1 ? <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => (x.categoria || x.cat) === c).length})` }))]} /> : null} onRowClick={(s) => editar(s)} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
+        { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span>{s.activo === false && <span className="dc-pill" style={{ "--c": "#8A9CA1", flexShrink: 0 }}><i /> Inactivo</span>}</span>; } },
+        { key: "esp", label: "Especialidad", w: "minmax(140px,1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
+        { key: "dur", label: "Duración", w: "104px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
+        // Desglose del IGV: el precio del catálogo es el total (IGV incluido), como en Caja.
+        { key: "sinIgv", label: "Sin IGV", w: "104px", a: "right", get: (s) => desgloseIgv(s.monto).base, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(s.monto).base)}</span> },
+        { key: "igv", label: "IGV 18%", w: "96px", a: "right", get: (s) => desgloseIgv(s.monto).igv, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(s.monto).igv)}</span> },
+        { key: "monto", label: sedesLista.length > 1 ? "Total base" : "Total", w: "120px", a: "right", get: (s) => s.monto, cell: (s) => <span className="dc-money" style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(Number(s.monto))}</span> },
+        ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "130px", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={`${propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} · sin IGV S/ ${M.sol2(desgloseIgv(precioServicio({ ...s, precio: s.monto }, sd.id)).base)}`} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
         // SRV-02: la columna Margen solo aparece cuando hay algún costo cargado.
         ...(items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen", w: "140px", a: "right", get: (s) => margenCatalogo(s) ?? -1, cell: (s) => { const m = margenCatalogo(s); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {m.toFixed(0)}</span>; } }] : []),
-        { key: "estado", label: "Estado", w: "110px", a: "center", get: (s) => s.activo === false ? "Inactivo" : "Activo", cell: (s) => s.activo === false
-          ? <span className="dc-pill" style={{ "--c": "#8A9CA1" }}><i /> Inactivo</span>
-          : <span className="dc-pill is-ok"><i /> Activo</span> },
-        ...(puedeGestionar ? [{ key: "acc", label: "Acciones", w: "108px", a: "center", noFilter: true, noSort: true, cell: (s) => <div style={{ display: "flex", gap: 6, justifyContent: "center" }} onClick={(e) => e.stopPropagation()}><button type="button" className="dc-icon-btn" aria-label="Editar" onClick={() => editar(s)} title="Editar" style={acBtn}><Pencil size={15} strokeWidth={1.75} /></button></div> }] : []),
+        // Estado: la mayoría está activa; solo se marca el inactivo junto al nombre.
+        { key: "estado", label: "Estado", soloExport: true, get: (s) => s.activo === false ? "Inactivo" : "Activo" },
+        // Sin columna de lápiz: toda la fila abre la edición del servicio.
       ]} />
       {form && (
         <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar servicio" : "Nuevo servicio"} sub={form.id ? "Actualiza el servicio" : "Agrega un servicio al catálogo"} onClose={() => setForm(null)} size="largo" maxW={720}
@@ -6459,14 +6460,24 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
               <Select value={form.categoria || "Preventivo"} onChange={(v) => setForm({ ...form, categoria: v })}
                       options={["Preventivo", "Restaurador", "Quirúrgico", "Estético", "Odontología general", ...(SERV_CATS || [])].filter((v, i, a) => a.indexOf(v) === i).map((c) => ({ value: c, label: c }))} />
             </div>
-            <Field label={sedesLista.length > 1 ? "Precio base (S/)" : "Precio (S/)"} value={String(form.monto)} onChange={(v) => setForm({ ...form, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
+            <Field label={sedesLista.length > 1 ? "Precio base sin IGV (S/)" : "Precio sin IGV (S/)"} value={form.montoSinIgv ?? (form.monto ? String(desgloseIgv(form.monto).base) : "")} onChange={(v) => { const b = v.replace(/[^\d.]/g, ""); setForm({ ...form, montoSinIgv: b, monto: b ? String(conIgv(b)) : "" }); }} placeholder="0.00" />
+            <Field label={sedesLista.length > 1 ? "Precio base con IGV (S/)" : "Precio con IGV (S/)"} value={String(form.monto)} onChange={(v) => setForm({ ...form, montoSinIgv: undefined, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
+          </div>
+          {Number(form.monto) > 0 && (() => { const d = desgloseIgv(form.monto); return (
+            <div className="dc-igv">
+              <span>Valor de venta <b>S/ {M.sol2(d.base)}</b></span>
+              <span>IGV 18% <b>S/ {M.sol2(d.igv)}</b></span>
+              <span>Total que paga el paciente <b>S/ {M.sol2(d.total)}</b></span>
+            </div>
+          ); })()}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
             <Field label="Coste directo (S/)" value={String(form.coste ?? "")} onChange={(v) => setForm({ ...form, coste: v.replace(/[^\d.]/g, "") })} placeholder="opcional" />
           </div>
           {sedesLista.length > 1 && <>
             <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 4px" }}>Precio por sede</div>
-            <div style={{ fontSize: 12.5, color: "var(--dc-ink-500)", marginBottom: 10 }}>Déjalo vacío para cobrar el precio base. Las citas, presupuestos y cobros de cada sede usan este precio.</div>
+            <div style={{ fontSize: 12.5, color: "var(--dc-ink-500)", marginBottom: 10 }}>Precio con IGV. Déjalo vacío para cobrar el precio base. Las citas, presupuestos y cobros de cada sede usan este precio.</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              {sedesLista.map((sd) => <Field key={sd.id} label={`${sd.nombre} (S/)`} value={String(form.preciosSede?.[sd.id] ?? "")} onChange={(v) => setForm({ ...form, preciosSede: { ...(form.preciosSede || {}), [sd.id]: v.replace(/[^\d.]/g, "") } })} placeholder={form.monto ? `${form.monto} (base)` : "precio base"} />)}
+              {sedesLista.map((sd) => <Field key={sd.id} label={`${sd.nombre} con IGV (S/)${Number(form.preciosSede?.[sd.id]) > 0 ? ` · sin IGV ${M.sol2(desgloseIgv(form.preciosSede[sd.id]).base)}` : ""}`} value={String(form.preciosSede?.[sd.id] ?? "")} onChange={(v) => setForm({ ...form, preciosSede: { ...(form.preciosSede || {}), [sd.id]: v.replace(/[^\d.]/g, "") } })} placeholder={form.monto ? `${form.monto} (base)` : "precio base"} />)}
             </div>
           </>}
           <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 10px" }}>Operación y contabilidad</div>
@@ -8505,7 +8516,16 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     // `match` = rutas antiguas o internas que marcan el mismo destino como activo.
     { grupo: "Inicio", items: [
       { id: "dashboard", label: "Pendientes de hoy", icon: LayoutDashboard },
+    ] },
+    // Reportes arriba, junto al Panel gerencial (pedido de la clínica): cada reporte es
+    // su propia entrada; Metas y comisiones es donde se editan la meta y el % de cada doctor.
+    { grupo: "Reportes", items: [
       { id: "gerencial", label: "Panel gerencial", icon: BarChart3 },
+      { id: "reportes", label: "Producción y comisiones", icon: TrendingUp, match: ["comisiones"] },
+      { id: "reportes_aus", label: "Ausentismo", icon: UserX, mod: "reportes" },
+      { id: "reportes_ocs", label: "Ocupación de sillones", icon: Armchair, mod: "reportes" },
+      { id: "metas", label: "Metas y comisiones", icon: Target },
+      ...(rol === "medico" ? [{ id: "miproduccion", label: "Mi producción", icon: Wallet }] : []),
     ] },
     { grupo: "Agenda", items: [
       { id: "agenda", label: "Agenda", icon: Calendar, match: ["agenda_cal", "agenda_consolidado"] },
@@ -8533,11 +8553,6 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     { grupo: "Caja", items: [
       { id: "caja", label: "Caja", icon: CreditCard, mod: "facturacion", match: ["facturacion", "caja_apertura", "caja_cierre", "caja_historial", "caja_movimientos", "caja_links", "caja_sunat"] },
       { id: "seguros", label: "Seguros y EPS", icon: Umbrella },
-    ] },
-    { grupo: "Reportes", items: [
-      { id: "reportes", label: "Producción y comisiones", icon: TrendingUp, match: ["reportes_aus", "comisiones", "reportes_ocs"] },
-      { id: "metas", label: "Metas y comisiones", icon: Target },
-      ...(rol === "medico" ? [{ id: "miproduccion", label: "Mi producción", icon: Wallet }] : []),
     ] },
     { grupo: "Operación", items: [
       { id: "inventario", label: "Inventario", icon: Package, match: ["inventario_compras", "inventario_consumo", "inventario_prov"] },
@@ -8596,14 +8611,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       // Reportes (spec §3): una página con pestañas. Metas y comisiones se editan en
       // Configuración › Doctores; aquí solo se ve el avance (NAV-07).
       case "metas": return <React.Suspense fallback={null}><Metas notify={notify} can={can} /></React.Suspense>;
-      case "reportes": case "comisiones": case "reportes_aus": case "reportes_ocs": {
-        const t = vista === "reportes_aus" ? "ausentismo" : vista === "reportes_ocs" ? "ocupacion" : "produccion";
-        return (<div style={{ display: "grid", gap: 14 }}>
-          <Pestanas etiqueta="Reportes" valor={t} onChange={(x) => setVista({ produccion: "reportes", ausentismo: "reportes_aus", ocupacion: "reportes_ocs" }[x])} opciones={[{ id: "produccion", label: "Producción y comisiones", icon: TrendingUp }, { id: "ausentismo", label: "Ausentismo", icon: UserX }, { id: "ocupacion", label: "Ocupación de sillones", icon: Armchair }]} />
-          {t === "ocupacion" ? <React.Suspense fallback={null}><OcupacionSillones /></React.Suspense> : <Reportes key={t} citas={cf} can={can} tab={t === "ausentismo" ? "ausencias" : undefined} />}
-        </div>);
-      }
-      // Un solo catálogo de servicios (NAV-06): Configuración › Servicios y precios.
+      // Cada reporte es su propia entrada del menú (grupo Reportes, junto al Panel gerencial).
+      case "reportes": case "comisiones": return <Reportes key="produccion" citas={cf} can={can} />;
+      case "reportes_aus": return <Reportes key="ausencias" citas={cf} can={can} tab="ausencias" />;
+      case "reportes_ocs": return <React.Suspense fallback={null}><OcupacionSillones /></React.Suspense>;
+      // Un solo catálogo de servicios (NAV-06): Operación › Servicios y precios.
       case "servicios": return <Servicios notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;

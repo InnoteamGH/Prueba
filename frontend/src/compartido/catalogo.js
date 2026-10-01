@@ -63,3 +63,13 @@ export function precioCita(cat, espId, sedeId) {
   const s = (cat || []).filter((x) => x.activo !== false && String(x.esp) === String(espId)).sort((a, b) => Number(a.id) - Number(b.id))[0];
   return s ? precioServicio(s, sedeId) : null;
 }
+
+/** IGV (Perú, 18 %). Los precios del catálogo son el total que paga el paciente (IGV
+    incluido), igual que en Caja: valor de venta = total / 1.18. */
+export const IGV_TASA = 0.18;
+export function desgloseIgv(total) {
+  const t = Number(total) || 0;
+  const base = Math.round((t / (1 + IGV_TASA)) * 100) / 100;
+  return { base, igv: Math.round((t - base) * 100) / 100, total: t };
+}
+export const conIgv = (base) => Math.round((Number(base) || 0) * (1 + IGV_TASA) * 100) / 100;

@@ -723,7 +723,7 @@
    ESCALA FINA — densidad y tamaños de una app clínica de uso diario
    ====================================================================== */
 /* Menú lateral */
-.dc-sb { width: 228px; }
+.dc-sb { width: 256px; }
 .dc-sb.is-colap { width: 68px; }
 .dc-sb__brand { height: 56px; padding: 0 14px; }
 .dc-sb__mark { width: 30px; height: 30px; border-radius: 10px; }
@@ -2456,6 +2456,9 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-meta__btn.is-on { color: #fff; background: linear-gradient(118deg, #0B6C78, #14A3A8); box-shadow: 0 8px 16px -10px rgba(11,108,120,.9); }
 .dc-meta__btn:disabled { cursor: default; }
 .dc-meta__btn:focus-visible { box-shadow: var(--dc-focus); }
+.dc-meta__pie { flex-wrap: wrap; }
+.dc-meta__pie .dc-meta__inp { flex: 1 1 130px; }
+.dc-meta__pie .dc-meta__btn { flex: 1 0 100%; justify-content: center; box-sizing: border-box; }
 
 /* ---- Seguros y EPS ---- */
 .dc-seg__tit { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -5169,3 +5172,12 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 }
 .dc-agm__precio { display: block; margin-top: 6px; font-size: 12.5px; color: var(--dc-ink-500); }
 .dc-agm__precio b { color: var(--dc-ink-900); font-variant-numeric: tabular-nums; }
+/* Desglose del IGV en el formulario de servicios */
+.dc-igv { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--dc-brand-050); font-size: 12.5px; color: var(--dc-ink-700); }
+.dc-igv b { color: var(--dc-ink-900); font-variant-numeric: tabular-nums; margin-left: 4px; }
+/* Menú lateral: ninguna opción se corta. Las etiquetas largas pasan a dos líneas
+   y el rol del usuario se lee completo. */
+.dc-sb:not(.is-colap) .dc-sb__label { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; overflow-wrap: anywhere; }
+.dc-sb:not(.is-colap) .dc-sb__urol { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.25; }
+.dc-sb:not(.is-colap) .dc-sb__who { flex: 1; min-width: 0; }
+.dc-sb:not(.is-colap) .dc-sb__planchip { white-space: nowrap; }

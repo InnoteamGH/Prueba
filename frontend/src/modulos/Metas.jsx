@@ -9,6 +9,7 @@ export default function Metas({ notify = () => {}, can }) {
   const puedeEditar = can ? can("metas", "editar") : true;
   const [meds, setMeds] = useState([]);
   const [draft, setDraft] = useState({});
+  const [draftCom, setDraftCom] = useState({});   // % de comisión por doctor
   const [saving, setSaving] = useState(null);
   const [error, setError] = useState(null);
 
@@ -20,6 +21,7 @@ export default function Metas({ notify = () => {}, can }) {
       const d = {};
       list.forEach((m) => { d[m.id] = String(m.metaMensual); });
       setDraft(d);
+      setDraftCom(Object.fromEntries(list.map((m) => [m.id, m.porcentajeComision != null ? String(m.porcentajeComision) : ""])));
       return;
     }
     setError(null);
@@ -30,6 +32,7 @@ export default function Metas({ notify = () => {}, can }) {
         const d = {};
         list.forEach((m) => { d[m.id] = m.metaMensual != null ? String(m.metaMensual) : ""; });
         setDraft(d);
+        setDraftCom(Object.fromEntries(list.map((m) => [m.id, m.porcentajeComision != null ? String(m.porcentajeComision) : ""])));
       })
       .catch((e) => {
         setMeds([]);
@@ -40,20 +43,33 @@ export default function Metas({ notify = () => {}, can }) {
   };
   useEffect(() => { cargar(); }, []); // eslint-disable-line
 
+  // Guarda meta y % de comisión del doctor (los dos se editan aquí y en Configuración › Doctores).
   const guardar = (m) => {
     if (!puedeEditar) { notify("Sin permiso para editar metas."); return; }
     const raw = draft[m.id];
     const n = raw === "" || raw == null ? null : Number(raw);
     if (n != null && (!Number.isFinite(n) || n < 0)) { notify("Meta inválida."); return; }
+    const rawC = draftCom[m.id];
+    const c = rawC === "" || rawC == null ? null : Number(rawC);
+    if (c != null && (!Number.isFinite(c) || c < 0 || c > 100)) { notify("La comisión va de 0 a 100 %."); return; }
     if (!conectado) {
-      setMeds((ms) => ms.map((x) => (x.id === m.id ? { ...x, metaMensual: n } : x)));
-      notify(`Meta de ${m.nombre} guardada (demo).`);
+      const med = MEDICOS.find((x) => String(x.id) === String(m.id));
+      if (med) {
+        Object.assign(med, { meta: n, comision: c });
+        try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); o[m.id] = { ...(o[m.id] || {}), meta: n, comision: c }; localStorage.setItem("dc_data_v1_medicos_cfg", JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ }
+      }
+      setMeds((ms) => ms.map((x) => (x.id === m.id ? { ...x, metaMensual: n, porcentajeComision: c } : x)));
+      notify(`Meta y comisión de ${m.nombre} guardadas.`);
       return;
     }
     setSaving(m.id);
-    api.catalogo.fijarMeta(m.id, n)
-      .then(() => { notify(`Meta de ${m.nombre} guardada.`); cargar(); })
-      .catch((e) => notify(e?.message || "No se pudo guardar la meta."))
+    const cambioCom = String(m.porcentajeComision ?? "") !== String(rawC ?? "");
+    Promise.all([
+      api.catalogo.fijarMeta(m.id, n),
+      cambioCom ? api.catalogo.actualizarMedico(m.id, { nombre: m.nombre, especialidadId: m.especialidadId || null, cop: m.cop || null, activo: m.activo !== false, porcentajeComision: c }) : null,
+    ])
+      .then(() => { notify(`Meta y comisión de ${m.nombre} guardadas.`); cargar(); })
+      .catch((e) => notify(e?.message || "No se pudo guardar."))
       .finally(() => setSaving(null));
   };
 
@@ -73,7 +89,7 @@ export default function Metas({ notify = () => {}, can }) {
       <section className="dc-esp-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>{error ? "—" : soles(metaTotal)}</b><span>meta del mes</span></div>
-          <p>Meta mensual por odontólogo, se usa en reportes y comisiones</p>
+          <p>Meta mensual y % de comisión de cada odontólogo; edítalos aquí</p>
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{error ? "—" : meds.length}</b><span>Odontólogos</span></div>
@@ -110,7 +126,7 @@ export default function Metas({ notify = () => {}, can }) {
             const prod = m.prodMes != null ? Number(m.prodMes) : null;
             const pct = prod != null && meta ? Math.round((prod / meta) * 100) : null;
             const est = pct == null ? "" : pct >= ritmo ? "is-ok" : pct >= ritmo - 15 ? "is-warn" : "is-mal";
-            const cambio = String(draft[m.id] ?? "") !== String(m.metaMensual ?? "");
+            const cambio = String(draft[m.id] ?? "") !== String(m.metaMensual ?? "") || String(draftCom[m.id] ?? "") !== String(m.porcentajeComision ?? "");
             return (
               <article key={m.id} className={`dc-meta ${est}`}>
                 <header>
@@ -127,6 +143,7 @@ export default function Metas({ notify = () => {}, can }) {
                 ) : <p className="dc-meta__nota">El avance se ve en Producción y comisiones.</p>}
                 <div className="dc-meta__pie">
                   <label className="dc-meta__inp"><span>Meta S/</span><input type="number" min="0" step="100" disabled={!puedeEditar} value={draft[m.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [m.id]: e.target.value }))} placeholder="Sin meta" aria-label={`Meta mensual de ${m.nombre}`} /></label>
+                  <label className="dc-meta__inp is-pct"><span>Comisión</span><input type="number" min="0" max="100" step="1" disabled={!puedeEditar} value={draftCom[m.id] ?? ""} onChange={(e) => setDraftCom((d) => ({ ...d, [m.id]: e.target.value }))} placeholder="—" aria-label={`Comisión de ${m.nombre} en %`} /><span>%</span></label>
                   {puedeEditar && <button type="button" className={`dc-meta__btn${cambio ? " is-on" : ""}`} disabled={saving === m.id || !cambio} onClick={() => guardar(m)}><Check size={14} strokeWidth={2.2} /> {saving === m.id ? "Guardando…" : "Guardar"}</button>}
                 </div>
               </article>
