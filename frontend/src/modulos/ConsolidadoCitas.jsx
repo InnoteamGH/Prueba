@@ -7,6 +7,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarRange, CheckCircle2, Clock, Download, UserX, XCircle, Users, CalendarDays, Stethoscope, TrendingUp } from "lucide-react";
 import api from "../api/client";
+import OcupacionSillones from "./OcupacionSillones";
 import { ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, exportarExcel, colorDe } from "../comun";
 
 const PROGRAMADA = ["pendiente", "confirmada", "en_sala", "en_atencion"];
@@ -93,16 +94,13 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
           <label><span>Hasta</span><input type="date" value={rango.hasta} min={rango.desde} onChange={(e) => { setPreset("x"); setRango({ ...rango, hasta: e.target.value }); }} /></label>
           <button type="button" className="dc-cons__exp" onClick={exportar} disabled={!filas.length}><Download size={15} strokeWidth={2} /> Excel</button>
         </div>
+        <dl className="dc-cons__cifras">
+          {KPIS.map(([l, v, , c, s]) => (
+            <div key={l} style={{ "--c": c }} title={s}><dt>{l}</dt><dd>{cargando ? "…" : v}</dd></div>
+          ))}
+        </dl>
       </section>
 
-      <div className="dc-cons__kpis">
-        {KPIS.map(([l, v, Ico, c, s]) => (
-          <div key={l} className="dc-cons__kpi" style={{ "--c": c }}>
-            <span><Ico size={17} strokeWidth={2} /></span>
-            <div><small>{l}</small><b>{cargando ? "…" : v}</b><em>{s}</em></div>
-          </div>
-        ))}
-      </div>
 
       {!esMedico && porDoctor.length > 0 && (
         <Card className="dc-cons__docs">
@@ -123,6 +121,8 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
           <div className="dc-cons__ley"><span><i className="is-at" /> Atendidas</span><span><i className="is-pr" /> Programadas</span><span><i className="is-ns" /> No asistió</span></div>
         </Card>
       )}
+
+      {!esMedico && <OcupacionSillones />}
 
       {filas.length === 0 ? (
         <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : "Sin citas en el rango"} sub="Cambia las fechas para ver otro periodo." /></Card>

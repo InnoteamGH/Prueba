@@ -3,6 +3,7 @@
  * Layout SPEC §3.2 – animaciones HTML §6 – fichas de dato §7.
  */
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Info, RefreshCw } from "lucide-react";
 import api, { auth } from "../api/client";
 import {
   curvaCajaAcumulada,
@@ -18,7 +19,7 @@ import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADE
 import { SILLONES_DEMO } from "../compartido/sillones";
 import "./panelGerencial.css";
 import ResumenMes, { avanceDemo } from "./ResumenMes";
-import OcupacionSillones from "./OcupacionSillones";
+import { ResumenOcupacion } from "./OcupacionSillones";
 
 const COLORES_ESP = [
   "var(--dc-accent-cyan)",
@@ -770,7 +771,6 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
   const [ficha, setFicha] = useState(null);
   const [metaEdit, setMetaEdit] = useState(null);
   const [metaVal, setMetaVal] = useState("");
-  const [reloj, setReloj] = useState("");
   const [inventarioValorizado, setInventarioValorizado] = useState(null);
   const [nSillones, setNSillones] = useState(null);
   const [nSedes, setNSedes] = useState(null);
@@ -871,18 +871,6 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
 
   useEffect(() => { recargar(); }, [recargar]);
 
-  useEffect(() => {
-    const tick = () => {
-      const n = new Date();
-      const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-      const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
-      setReloj(`${dias[n.getDay()]} ${String(n.getDate()).padStart(2, "0")} ${meses[n.getMonth()]} – ${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}:${String(n.getSeconds()).padStart(2, "0")}`);
-    };
-    tick();
-    if (prefersReducedMotion()) return undefined;
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
 
   const meta = metaEstado(kd?.hayMeta, kd?.metaMensualClinica);
   const prodMes = Number(kd?.ingresosMes) || 0;
@@ -1002,10 +990,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
 
       {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
       <ResumenMes kd={kd} acciones={<div className="dc-head-acc" title={subHead}>
-          <span className="dc-chip dc-chip--vivo"><span className="punto" aria-hidden="true" />En vivo</span>
-          <span className="dc-reloj">{reloj}</span>
-          <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={recargar}>Hoy</button>
-          <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={() => abrir({
+          <button type="button" className="dc-rm__ib" aria-label="Actualizar" title="Actualizar datos" onClick={recargar}><RefreshCw size={15} strokeWidth={2} /></button>
+          <button type="button" className="dc-rm__ib" aria-label="Qué mide cada gráfico" title="Qué mide cada gráfico" onClick={() => abrir({
             t: "Qué mide cada gráfico",
             s: "Índice del panel",
             cifra: "11",
@@ -1022,7 +1008,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
             ],
             tono: "cian",
           })}>
-            <span aria-hidden="true">ℹ</span> Qué mide cada gráfico
+            <Info size={15} strokeWidth={2} />
           </button>
         </div>} />
 
@@ -1078,9 +1064,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
             <div className="dc-kpi__sub">{pluralEs(citasHoy.length, "cita", "citas")} en agenda – {enSillon} en sillón</div>
           </div>
         </div>
+        <ResumenOcupacion onVer={() => { window.location.hash = "#/agenda_consolidado"; }} />
       </section>
-
-      <OcupacionSillones />
 
       {/* Caja | Actividad */}
       <div className="dc-grid g-2a">

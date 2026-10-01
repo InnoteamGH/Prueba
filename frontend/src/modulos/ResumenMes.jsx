@@ -85,10 +85,11 @@ export default function ResumenMes({ kd, acciones = null }) {
 
   return (
     <section className="dc-rm" aria-label="Resumen del mes">
+      <div className="dc-rm__hero">
       <header className="dc-rm__tit">
         <h2>Resumen de {MESES[hoy.getMonth()]}</h2>
         <span>Del 1 al {hoy.getDate()} · día {hoy.getDate()} de {diasMes}</span>
-        {acciones && <div className="dc-rm__acc dc-pg dc-pg--top">{acciones}</div>}
+        {acciones && <div className="dc-rm__acc">{acciones}</div>}
       </header>
 
       <div className="dc-rm__kpis">
@@ -121,6 +122,7 @@ export default function ResumenMes({ kd, acciones = null }) {
             </>
           ) : <em>Define las metas del equipo en Metas</em>}
         </article>
+      </div>
       </div>
 
       <div className="dc-rm__dos">

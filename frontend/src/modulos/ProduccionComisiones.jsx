@@ -850,7 +850,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
         />
       ) : (
         <>
-          <section className="dc-kpis" aria-label="Indicadores del periodo">
+          <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores del periodo">
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Producción del periodo",
               s: "Lo facturado por citas atendidas",

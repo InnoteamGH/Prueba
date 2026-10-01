@@ -923,7 +923,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   return (
     <div style={{ ...soft, overflow: "hidden" }}>
       {/* Barra superior */}
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-bg)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div className="dc-cal__barra" style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-bg)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {navBtn(<ChevronRight size={16} strokeWidth={1.75} style={{ transform: "rotate(180deg)" }} />, prev, "Anterior")}
@@ -947,7 +947,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           )}
           <div className="dc-cal-modos" style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
             {[["mes", "Mes"], ["semana", "Semana"], ["dia", "Día"], ["doctores", "Doctores"], ["sillon", "Sillón"], ["tabla", "Tabla"]].map(([k, lbl]) => (
-              <button key={k} onClick={() => setModo(k)} style={{ padding: "6px 13px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: modo === k ? "#fff" : "transparent", color: modo === k ? DS.c.primary : "var(--dc-ink-400)", boxShadow: modo === k ? "0 1px 2px rgba(16,24,40,.12)" : "none" }}>{lbl}</button>
+              <button key={k} className={modo === k ? "is-on" : ""} onClick={() => setModo(k)} style={{ padding: "6px 13px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: modo === k ? "#fff" : "transparent", color: modo === k ? DS.c.primary : "var(--dc-ink-400)", boxShadow: modo === k ? "0 1px 2px rgba(16,24,40,.12)" : "none" }}>{lbl}</button>
             ))}
           </div>
           <div style={{ position: "relative" }}>
@@ -4506,7 +4506,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 }}><FileText size={14} strokeWidth={1.9} /> Imprimir</button>
               </div>
             </section>
-            <div className="dc-cz">
+            <div className={`dc-cz${cajaAbierta ? "" : " is-cerrada"}`}>
               <div className="dc-cz__main">
                 <Card className="dc-cz__arq">
                   <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#0E9199" }}><Vault size={20} strokeWidth={1.9} /></span><div><h3>Efectivo que debería haber</h3><span>Fondo + cobros en efectivo − egresos ± movimientos</span></div></div>
@@ -4651,25 +4651,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
 
       {tab === "historial" && (
         <div style={{ display: "grid", gap: 16 }}>
-          {(() => { const js = histCaja || []; const abiertas = js.filter((r) => r.abierta).length; const dif = js.reduce((a, r) => a + (r.diferencia != null ? Number(r.diferencia) : 0), 0); return (
-          <section className="dc-esp-hero dc-caja-sub">
-            <div className="dc-esp-hero__txt">
-              <div className="dc-esp-hero__num"><b>{js.length}</b><span>{js.length === 1 ? "jornada" : "jornadas"}</span></div>
-              <p>Esperado frente a contado por sede</p>
-            </div>
-            <div className="dc-esp-hero__cifras">
-              <div><b>{abiertas}</b><span>Abiertas</span></div>
-              <div><b>{js.length - abiertas}</b><span>Cerradas</span></div>
-              <div><b>{dif < 0 ? "− " : ""}S/ {Math.abs(dif).toFixed(2)}</b><span>Diferencia total</span></div>
-            </div>
-            <span />
-            <div className="dc-hero-acc dc-rango">
-              <label><span>Desde</span><input type="date" aria-label="Desde" value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
-              <label><span>Hasta</span><input type="date" aria-label="Hasta" value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
-              <button type="button" className="dc-esp-hero__btn" onClick={recargarHistCaja}><Repeat size={14} strokeWidth={1.9} /> Actualizar</button>
-            </div>
-          </section>
-          ); })()}
           {cierreAdmin && (
             <Card style={{ padding: 16, display: "grid", gap: 12, maxWidth: 520, border: "1px solid var(--dc-warn-600)" }}>
               <h4 style={{ margin: 0, color: NAVY }}>Cerrar jornada fuera de fecha</h4>
@@ -4682,8 +4663,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               </div>
             </Card>
           )}
-          {(histCaja || []).length === 0 ? <Card><Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (
-          <ListaFiltrable rows={histCaja} sub="jornadas" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 820, cols: [
+          {(() => { const js = histCaja || []; const dif = js.reduce((a, r) => a + (r.diferencia != null ? Number(r.diferencia) : 0), 0); const rango = (
+            <div className="dc-hero-acc dc-rango">
+              {js.length > 0 && <span className={`dc-flujo__neto${dif < 0 ? " is-neg" : ""}`} title="Suma de sobrantes y faltantes en el rango">Diferencia <b>{dif < 0 ? "− " : ""}S/ {Math.abs(dif).toFixed(2)}</b></span>}
+              <label><span>Desde</span><input type="date" aria-label="Desde" value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
+              <label><span>Hasta</span><input type="date" aria-label="Hasta" value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
+              <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja}><Repeat size={14} strokeWidth={1.9} /></button>
+            </div>
+          ); return js.length === 0 ? <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (
+          <ListaFiltrable rows={histCaja} sub="jornadas" extra={rango} defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 820, cols: [
             { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__strong">{fechaLegible(r.fecha)}</span> },
             { key: "sede", label: "Sede", w: "minmax(140px,1fr)", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—" },
             { key: "quien", label: "Responsable", w: "minmax(160px,1.2fr)", get: (r) => `${r.abiertaPorNombre || "—"}${!r.abierta && r.cerradaPorNombre && r.cerradaPorNombre !== r.abiertaPorNombre ? ` / ${r.cerradaPorNombre}` : ""}` },
@@ -4729,7 +4717,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             })}
           </div>
           )}</ListaFiltrable>
-          )}
+          ); })()}
         </div>
       )}
 
@@ -4853,27 +4841,19 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const activos = links.filter((l) => l.estado === "pendiente");
         const cobrado = links.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.monto, 0);
         const pend = activos.reduce((s, l) => s + l.monto, 0);
+        const nuevoLink = <button type="button" className="dc-flujo__nuevo is-teal" onClick={() => setLinkForm({ paciente: "", monto: "", concepto: "" })}><Plus size={14} strokeWidth={2} /> Nuevo link</button>;
         return (
         <div style={{ display: "grid", gap: 16 }}>
-          <section className="dc-esp-hero dc-caja-sub">
-            <div className="dc-esp-hero__txt">
-              <div className="dc-esp-hero__num"><b>{links.length}</b><span>{links.length === 1 ? "link de pago" : "links de pago"}</span></div>
-              <p>Cobra a distancia desde el celular del paciente</p>
-            </div>
-            <div className="dc-esp-hero__cifras">
-              <div><b>{activos.length}</b><span>Esperando pago</span></div>
-              <div><b>S/ {cobrado.toLocaleString("es-PE")}</b><span>Cobrado</span></div>
-              <div><b>S/ {pend.toLocaleString("es-PE")}</b><span>Pendiente</span></div>
-            </div>
-            <span />
-            <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => setLinkForm({ paciente: "", monto: "", concepto: "" })}><Plus size={14} strokeWidth={2} /> Nuevo link</button></div>
-          </section>
           <div className="fm-aviso-edad is-info">
             <Zap size={15} strokeWidth={2} />
             <span><b>Pasarela sin conectar.</b> Cuando se conecte (Niubiz, Culqi o similar), el paciente pagará desde su celular y el cobro entrará a Caja.</span>
           </div>
-          {links.length === 0 ? <Card><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." /></Card> : (
-          <ListaFiltrable rows={links} sub="links" vistaClave="caja_links" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
+          {links.length === 0 ? <Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." />{nuevoLink}</Card> : (
+          <ListaFiltrable rows={links} sub="links" extra={<>
+            {pend > 0 && <span className="dc-flujo__neto is-aviso" title={`${activos.length} esperando pago`}>Pendiente <b>S/ {pend.toLocaleString("es-PE")}</b></span>}
+            {cobrado > 0 && <span className="dc-flujo__neto" title="Pagado por link">Cobrado <b>S/ {cobrado.toLocaleString("es-PE")}</b></span>}
+            {nuevoLink}
+          </>} vistaClave="caja_links" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
             { key: "p", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (l) => <PersonaCelda nombre={l.paciente} /> },
             { key: "c", label: "Concepto", w: "minmax(160px,1.3fr)", get: (l) => l.concepto || "Pago de tratamiento" },
             { key: "e", label: "Estado", w: "120px", a: "center", cell: (l) => l.estado === "pagado" ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Pagado</span> : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Pendiente</span> },
@@ -7688,10 +7668,6 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
   const momentoPill = (s) => s.momento ? <span className={`dc-im__mom is-${s.momento}`}>{FOTO_MOMENTOS[s.momento] || s.momento}</span> : null;
 
   const base = listaVista;
-  const ult = base.length ? [...base].map((s) => s.fecha).sort().slice(-1)[0] : null;
-  const porTipo = esFotos
-    ? Object.entries(FOTO_MOMENTOS).map(([k, l]) => [l, base.filter((s) => s.momento === k).length]).filter(([, n]) => n)
-    : RX_SOLO.map((k) => [RX_TIPOS[k], base.filter((s) => s.tipo === k).length]).filter(([, n]) => n);
   // Comparador antes / después: la última foto «antes» contra la última «después» de la misma vista.
   const par = (() => {
     if (!esFotos) return null;
@@ -7715,18 +7691,6 @@ function Radiografias({ pacientes: pacProp, notify, sedeActiva = 1, misSedes = S
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
       } />
-      <section className="dc-im__intro">
-        <span className="dc-im__ico">{esFotos ? <Camera size={20} strokeWidth={1.9} /> : <Scan size={20} strokeWidth={1.9} />}</span>
-        <div>
-          <h3>{esFotos ? "Fotografía clínica" : "Radiografías del paciente"}</h3>
-          <p>{esFotos ? "Fotos intra y extraorales por vista y momento del tratamiento. Compara el antes y el después con el paciente." : "Estudios radiográficos para diagnóstico: se revisan en el negatoscopio con brillo, contraste y negativo, y llevan las piezas y el informe."}</p>
-        </div>
-        <div className="dc-im__cifras">
-          <span><b>{base.length}</b> {esFotos ? (base.length === 1 ? "foto" : "fotos") : (base.length === 1 ? "estudio" : "estudios")}</span>
-          {porTipo.map(([l, n]) => <span key={l}><b>{n}</b> {l}</span>)}
-          {ult && <span><Calendar size={12} strokeWidth={2} /> Última {fechaLegible(ult)}</span>}
-        </div>
-      </section>
 
       {par && (
         <Card className="dc-im__comp">

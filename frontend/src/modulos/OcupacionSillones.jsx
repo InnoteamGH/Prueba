@@ -9,13 +9,12 @@ import { useReglasAgenda } from "../compartido/useReglasAgenda";
 
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const INACTIVAS = ["cancelada", "no_show", "reprogramada", "cerrada_sistema"];
-const tono = (p) => p == null ? "is-na" : p >= 85 ? "is-full" : p >= 60 ? "is-alta" : p >= 30 ? "is-media" : "is-baja";
+const tono = (p) => p == null ? "is-na" : p === 0 ? "is-cero" : p >= 85 ? "is-full" : p >= 60 ? "is-alta" : p >= 30 ? "is-media" : "is-baja";
 
-export default function OcupacionSillones() {
+export function useOcupacionSillones(off = 0) {
   const conectado = !!auth.token;
   const demoDb = useContext(DatosDemoCtx);
   const reglas = useReglasAgenda();
-  const [off, setOff] = useState(0);
   const [remotas, setRemotas] = useState([]);
   const [horario, setHorario] = useState({ horario: {}, feriados: [] });
   const lunes = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + off * 7); return d; }, [off]);
@@ -49,6 +48,12 @@ export default function OcupacionSillones() {
     return { filas, porDia, cap, min, pct: cap ? Math.round(min / cap * 100) : null };
   }, [sillones, dias, citas, hor]);
 
+  return { conectado, sillones, dias, datos };
+}
+
+export default function OcupacionSillones() {
+  const [off, setOff] = useState(0);
+  const { conectado, sillones, dias, datos } = useOcupacionSillones(off);
   const conPct = datos.filas.filter((f) => f.pct != null);
   const masLibre = [...conPct].sort((a, b) => a.pct - b.pct)[0];
   const diaLleno = [...datos.porDia].filter((d) => d.pct != null).sort((a, b) => b.pct - a.pct)[0];
@@ -93,5 +98,22 @@ export default function OcupacionSillones() {
       </div>
       <p className="dc-ocs__nota"><Info size={13} strokeWidth={2} /> Bajo 30 % conviene ofrecer esos cupos (recall, lista de espera) o asignar ese sillón a otro doctor; sobre 85 % hay riesgo de demoras.</p>
     </section>
+  );
+}
+
+/* Tarjeta compacta para el Panel gerencial: solo el dato y el enlace al detalle en la Agenda. */
+export function ResumenOcupacion({ onVer }) {
+  const { sillones, datos } = useOcupacionSillones(0);
+  if (!sillones.length) return null;
+  const libres = Math.round((datos.cap - datos.min) / 60);
+  return (
+    <div className="dc-kpi dc-kpi--ocs">
+      <span className="dc-kpi__icon" style={{ background: "#EFEAFE", color: "#6D4FD1" }} aria-hidden="true"><Armchair size={16} strokeWidth={2} /></span>
+      <div className="dc-kpi__body">
+        <div className="dc-kpi__label">Ocupación de sillones · semana</div>
+        <div className="dc-kpi__value">{datos.pct ?? 0}%</div>
+        <div className="dc-kpi__sub">{sillones.length} sillones · {libres} h libres{onVer && <> · <button type="button" className="dc-kpi__link" onClick={onVer}>Ver detalle</button></>}</div>
+      </div>
+    </div>
   );
 }
