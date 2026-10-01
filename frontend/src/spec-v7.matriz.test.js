@@ -25,14 +25,14 @@ describe("A26 — menú sin duplicados", () => {
     assert.ok(end > start, "NAV flatten");
     const block = app.slice(start, end);
     assert.match(block, /\{ id: "espera", label: "Lista de espera", icon:/);
-    // Spec UX/UI 2026-10 §3: un solo destino «Reportes» (producción, comisiones,
-    // ausentismo y ocupación son pestañas) y los módulos clínicos viven en la ficha.
-    assert.equal((block.match(/label: "Reportes"/g) || []).length, 1, "una sola entrada de Reportes");
+    // Pedido del cliente (oct-2026): los módulos clínicos vuelven al menú, cada uno con
+    // su selector de paciente, y las metas con comisión por doctor tienen su entrada.
+    assert.equal((block.match(/label: "Producción y comisiones"/g) || []).length, 1, "una sola entrada de producción");
+    assert.match(block, /\{ id: "metas", label: "Metas y comisiones", icon:/);
     assert.match(block, /id: "dashboard"/);
-    // Odontograma y Periodontograma tienen acceso directo en el menú (eligen paciente y abren su ficha).
     assert.match(block, /\{ id: "odontograma", label: "Odontograma", icon:/);
     assert.match(block, /\{ id: "perio", label: "Periodontograma", icon:/);
-    assert.match(block, /id: "pacientes", label: "Pacientes", icon: Users, match: \[[^\]]*"tratamientos"[^\]]*"recetas"[^\]]*"radiografias"[^\]]*"consentimientos"/);
+    for (const id of ["tratamientos", "recetas", "radiografias", "fotos", "consentimientos", "formularios", "servicios"]) assert.match(block, new RegExp(`\\{ id: "${id}", label:`), id);
   });
 });
 

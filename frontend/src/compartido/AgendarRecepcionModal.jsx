@@ -5,6 +5,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { Calendar, Check, ChevronRight, Clock, MessageSquare, Phone, Plus, Search, User, AlertTriangle, Armchair, Info, Lock, Star } from "lucide-react";
 import { estadoSillones, evaluarCita, sugerirSillon, turnosDelDia, sillonesDeSede, etiquetaUso } from "./sillones";
 import { useReglasAgenda } from "./useReglasAgenda";
+import { CATALOGO_SEED, precioCita, precioServicio } from "./catalogo";
 import api, { auth } from "../api/client";
 import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, toMin, tint} from "../comun";
 
@@ -269,7 +270,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       const ocupado = (fch) => evaluarCita(ctxSede, citaBorrador({ fecha: fch })).errores.length > 0;
       const libres = fechas.filter((fch) => !ocupado(fch));
       const base0 = Date.now();
-      demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: Number(sedeId) || 1, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: "pendiente", llegada: false }))]);
+      demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: Number(sedeId) || 1, precio: precioCita(demoDb.catalogo || CATALOGO_SEED, Number(f.especialidadId) || med.esp || 1, Number(sedeId) || 1) ?? undefined, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: "pendiente", llegada: false }))]);
       setGuardando(false); setAvisoHorario(null);
       if (!libres.length) { notify(evaluarCita(ctxSede, citaBorrador()).errores[0] || "Ese horario no está disponible."); return; }
       notify(fechas.length > 1 ? `${libres.length} cita(s) agendada(s)${fechas.length - libres.length ? `, ${fechas.length - libres.length} ocupadas` : ""}.` : `Cita agendada para ${p.nombre} el ${fechaLegible(f.fecha)} a las ${f.hora}.`);
@@ -300,6 +301,12 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     onCreada();
   };
 
+  // Cada sede cobra su propio precio por el mismo servicio (catálogo › precio por sede).
+  const sedeSel = f.sedeId || seds[0]?.id;
+  const nombreSedeSel = (seds.find((x) => String(x.id) === String(sedeSel)) || {}).nombre || "esta sede";
+  const precioSede = !f.especialidadId ? null : demo
+    ? precioCita(demoDb.catalogo || CATALOGO_SEED, f.especialidadId, sedeSel)
+    : (() => { const e = esps.find((x) => String(x.id) === String(f.especialidadId)); return e && e.precioBase != null ? precioServicio({ precio: e.precioBase, preciosSede: e.preciosSede }, sedeSel) : null; })();
   const guardar = async () => {
     // AGE-09: el servicio es obligatorio (define duración, especialidad y doctores).
     if (!f.especialidadId) { notify("Elige el servicio: define la duración y qué doctores lo atienden."); return; }
@@ -384,6 +391,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           <label><span style={lbl}>Servicio{req}</span>
             <Select value={f.especialidadId} onChange={(v) => { setDurAuto(true); setSillonAuto(true); setF({ ...f, especialidadId: v, medicoId: f.medicoId && v && meds.find((m) => String(m.id) === String(f.medicoId) && String(m.especialidadId) !== String(v)) ? "" : f.medicoId }); }} placeholder="Cualquiera"
                     placeholder="Elegir servicio" options={[...esps.map((e) => ({ value: e.id, label: e.nombre, sub: e.duracionMin ? `${e.duracionMin} min` : undefined }))]} />
+            {precioSede != null && <small className="dc-agm__precio">Precio en {nombreSedeSel}: <b>S/ {Number(precioSede).toFixed(2)}</b></small>}
           </label>
           <label><span style={lbl}>Doctor{req}</span>
             <Select value={f.medicoId} onChange={(v) => { setSillonAuto(true); setHoraAuto(true); setF({ ...f, medicoId: v }); }} placeholder="Seleccionar"

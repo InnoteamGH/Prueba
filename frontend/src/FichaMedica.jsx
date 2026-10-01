@@ -921,8 +921,8 @@ const MIN_ALERGIA_MATCH = 4;
 
 // Pestañas de la ficha (FIC-01): Resumen · Historia clínica · Odontograma · Plan y cuenta ·
 // Archivos · Datos. Las pestañas antiguas se reciben y caen en su nuevo lugar.
-const TAB_ALIAS = { receta: ["historia"], perio: ["odontograma", "perio"], ortodoncia: ["odontograma", "orto"], laboratorio: ["archivos", "lab"], consentimientos: ["archivos", "docs"], filiacion: ["datos"], registro: ["datos"], plan: ["cuenta"] };
-const TABS_FICHA = ["resumen", "historia", "odontograma", "cuenta", "archivos", "datos"];
+const TAB_ALIAS = { receta: ["recetas"], periodontograma: ["perio"], ortodoncia: ["odontograma", "orto"], laboratorio: ["archivos", "lab"], consentimientos: ["archivos", "docs"], filiacion: ["datos"], registro: ["datos"], plan: ["cuenta"] };
+const TABS_FICHA = ["resumen", "historia", "odontograma", "perio", "recetas", "cuenta", "archivos", "datos"];
 const normTabFicha = (t) => { if (TAB_ALIAS[t]) return TAB_ALIAS[t]; return [TABS_FICHA.includes(t) ? t : "resumen"]; };
 
 export default function FichaMedica({ pacienteId, onClose, notify = () => { }, can, onAgendar, onCobrar, rol: rolProp, sedeId = null, initialTab = null, pacienteDemo = null, pagina = false, slots = null, onTabChange = null }) {
@@ -976,13 +976,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     if (!initialTab) return;
     const [a, b] = normTabFicha(initialTab);
     setTabState(a);
-    if (a === "odontograma") setSubOdo((cur) => (b || (cur === "perio" || cur === "orto" ? cur : "odo")));
+    if (a === "odontograma") setSubOdo((cur) => (b || (cur === "orto" ? cur : "odo")));
     if (a === "archivos") setSubArch(b || null);
   }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
   // Odontograma y periodontograma usan todo el ancho: se pide al menú lateral que se
   // contraiga mientras esa pestaña está abierta (lo escucha MainApp).
   useEffect(() => {
-    const amplia = tab === "odontograma";
+    const amplia = tab === "odontograma" || tab === "perio";
     window.dispatchEvent(new CustomEvent("dc-vista-amplia", { detail: amplia }));
   }, [tab]);
   useEffect(() => () => window.dispatchEvent(new CustomEvent("dc-vista-amplia", { detail: false })), []);
@@ -1400,20 +1400,22 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     ["resumen", "Resumen", LayoutGrid],
     ["historia", "Historia clínica", ClipboardList],
     ["odontograma", "Odontograma", Smile],
+    ["perio", "Periodontograma", Activity],
+    ["recetas", "Recetas", Pill],
     ["cuenta", "Plan y cuenta", CreditCard],
     ["archivos", "Archivos", Image],
     ["datos", "Datos", User],
   ].filter(([k]) => (k !== "archivos" || puedeArchivos || puedeConsent || puedeLab)
-                 && (k !== "odontograma" || puedeOdontograma));
+                 && (k !== "odontograma" || puedeOdontograma)
+                 && (k !== "perio" || (puedePerio && etapa !== "pediatrico"))
+                 && (k !== "recetas" || puedeRecetar));
   // Sub-vistas del odontograma (FIC-08): Periodontograma y Ortodoncia solo si el paciente
   // tiene un plan de ese tipo, o si alguien las inicia desde aquí.
   const planTxt = arr(demoFicha?.tratamiento || d?.tratamientos).map((t) => String(t.nombre || "")).join(" ").toLowerCase();
-  const tienePerio = /periodont|destartraje|raspaje|curetaje/.test(planTxt);
   const tieneOrto = /ortodon|bracket|alineador/.test(planTxt);
   const [subExtra, setSubExtra] = useState({});
   const subOdoOpc = [
     ["odo", "Odontograma"],
-    puedePerio && etapa !== "pediatrico" && (tienePerio || subExtra.perio || subOdo === "perio") && ["perio", "Periodontograma"],
     puedeOrto && (tieneOrto || subExtra.orto || subOdo === "orto") && ["orto", "Ortodoncia"],
   ].filter(Boolean);
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
@@ -2249,18 +2251,17 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 {subOdoOpc.map(([k2, l]) => <button key={k2} type="button" role="tab" aria-selected={subOdo === k2} className={subOdo === k2 ? "is-on" : ""} onClick={() => setSubOdo(k2)}>{l}</button>)}
               </div>
             )}
-            {tab === "odontograma" && subOdo === "odo" && (puedePerio || puedeOrto) && (!tienePerio || !tieneOrto) && puedeEscribirClinico && (
+            {tab === "odontograma" && subOdo === "odo" && puedeOrto && !tieneOrto && !subExtra.orto && puedeEscribirClinico && (
               <div className="fm-sub-iniciar">
-                {puedePerio && etapa !== "pediatrico" && !tienePerio && !subExtra.perio && <button type="button" onClick={() => { setSubExtra((x) => ({ ...x, perio: true })); setSubOdo("perio"); }}><Activity size={13} strokeWidth={2} /> Iniciar periodontograma</button>}
                 {puedeOrto && !tieneOrto && !subExtra.orto && <button type="button" onClick={() => { setSubExtra((x) => ({ ...x, orto: true })); setSubOdo("orto"); }}><Braces size={13} strokeWidth={2} /> Iniciar ortodoncia</button>}
               </div>
             )}
             {tab === "odontograma" && subOdo === "odo" && slots?.odontograma && slots.odontograma(pacienteId)}
             {tab === "odontograma" && subOdo === "odo" && !slots?.odontograma && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} pacienteHc={p.numeroHistoria || p.nroHistoria || ""} sedeId={sedeId} /></div>}
 
-            {tab === "odontograma" && subOdo === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura={!puedeEscribirClinico} />}
+            {tab === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura={!puedeEscribirClinico} />}
 
-            {tab === "historia" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
+            {tab === "recetas" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
 
             {tab === "odontograma" && subOdo === "orto" && <Ortodoncia pacienteId={pacienteId} notify={notify} />}
 

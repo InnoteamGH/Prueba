@@ -180,7 +180,7 @@ function WizList({ items, icon, vacio }) {
   );
 }
 
-function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "servicios", serviciosSlot = null }) {
+function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "puesta" }) {
   const conectado = !!auth.token;
   const fiscalReadOnly = rol === "admin_sede" || (can ? !can("config", "editar") : false);
   const [tab, setTab] = useState(seccionInicial);
@@ -410,7 +410,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
   };
   const delHorario = (id) => !conectado ? (demoDb?.setDispMedicos((ds) => ds.filter((d) => d.id !== id)), notify("Horario eliminado.")) : api.disponibilidad.borrar(id).then(() => { notify("Horario eliminado."); cargarDisp(medHor); }).catch(() => {});
 
-  const TABS = [["puesta", "Puesta en marcha", Navigation, "Pasos para operar", "#0E9199"], ["empresa", "Datos de la clínica", Briefcase, "RUC, logo y facturación", "#28527A"], ["atencion", "Horario de atención", Clock, "Días y horas de la clínica", "#2F6FDE"], ["servicios", "Servicios y precios", ClipboardList, "Catálogo y tarifas", "#16A36A"], ["doctores", "Doctores", Stethoscope, "Equipo clínico", "#6D4FD1"], ["sedes", "Sedes", Building2, "Locales de atención", "#D97706"], ["sillones", "Sillones", Armchair, "Uso y doctores", "#0B6C78"], ["horarios", "Horarios por doctor", Clock, "Disponibilidad de agenda", "#0E9EB0"], ["promos", "Promociones", Megaphone, "Ofertas del agente IA", "#E0694F"]];
+  const TABS = [["puesta", "Puesta en marcha", Navigation, "Pasos para operar", "#0E9199"], ["empresa", "Datos de la clínica", Briefcase, "RUC, logo y facturación", "#28527A"], ["atencion", "Horario de atención", Clock, "Días y horas de la clínica", "#2F6FDE"], ["doctores", "Doctores", Stethoscope, "Equipo clínico", "#6D4FD1"], ["sedes", "Sedes", Building2, "Locales de atención", "#D97706"], ["sillones", "Sillones", Armchair, "Uso y doctores", "#0B6C78"], ["horarios", "Horarios por doctor", Clock, "Disponibilidad de agenda", "#0E9EB0"], ["promos", "Promociones", Megaphone, "Ofertas del agente IA", "#E0694F"]];
   const cab = (titulo, sub, accion) => (
     <div className="dc-cfg__cab"><div><h3>{titulo}</h3><span>{sub}</span></div>{accion}</div>
   );
@@ -453,7 +453,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
               </div>
             </div>
             <div className="dc-go__pasos">
-              {(goLive?.items || []).map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["sedes", "doctores", "especialidades", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave === "especialidades" ? "servicios" : it.clave) : null; return (
+              {(goLive?.items || []).map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["servicios", "especialidades"].includes(it.clave) ? () => { window.location.hash = "#/servicios"; } : ["sedes", "doctores", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave) : null; return (
                 <div key={it.clave} className={`dc-go__paso ${it.ok ? "is-ok" : it.obligatorio ? "is-falta" : "is-opc"}`}>
                   <span className="dc-go__n">{it.ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
                   <span className="dc-go__ico"><I size={16} strokeWidth={2} /></span>
@@ -675,36 +675,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "ser
         );
       })()}
 
-      {/* SRV-01 / NAV-06: el catálogo único de servicios (lo leen Agenda, Odontograma,
-          Presupuesto, Caja y la IA) se edita aquí y solo aquí. */}
-      {tab === "servicios" && serviciosSlot && <section className="dc-cfg__panel">{serviciosSlot}</section>}
-      {tab === "servicios" && !serviciosSlot && (
-        <section className="dc-cfg__panel">
-          {cab("Servicios y precios", "El agente de WhatsApp y los presupuestos usan estos precios.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "servicio", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo servicio</button>)}
-          {esps.length === 0 ? <p className="dc-cfg__nada">Sin servicios aún.</p> : (
-            <ListaFiltrable rows={esps} sub="servicios" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_servicios" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 520, onRowClick: (e) => setEdit({ tipo: "servicio", item: { ...e } }), cols: [
-              { key: "n", label: "Servicio", w: "minmax(200px,1.6fr)", cell: (e) => <span className="dc-tp__strong">{e.nombre}</span> },
-              { key: "d", label: "Duración", w: "120px", a: "center", cell: (e) => { const dur = e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin; return <span className="dc-tp__sub">{dur ? `${dur} min` : "—"}</span>; } },
-              { key: "p", label: "Precio", w: "120px", a: "right", cell: (e) => <span className="dc-tp__num">S/ {Number(e.precioBase) || 0}</span> },
-            ] }} cols={[
-              { key: "nombre", label: "Servicio", get: (e) => e.nombre || "" },
-              { key: "dur", label: "Duración", get: (e) => String(e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin || ""), sortVal: (e) => Number(e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin) || 0 },
-              { key: "precio", label: "Precio", get: (e) => String(Number(e.precioBase) || 0), sortVal: (e) => Number(e.precioBase) || 0 },
-            ]}>{(lstS) => (
-            <div className="dc-cfg__servs">
-              {lstS.map((e) => { const col = colorDe(e.nombre); const dur = e.duracionMin || ESPECIALIDADES.find((x) => x.nombre === e.nombre)?.duracionMin; return (
-                <button key={e.id} type="button" className="dc-cfg__serv" style={{ "--c": col }} onClick={() => setEdit({ tipo: "servicio", item: { ...e } })}>
-                  <span className="dc-cfg__sico"><Tag size={15} strokeWidth={2} /></span>
-                  <div><b>{e.nombre}</b>{dur ? <small><Clock size={11} strokeWidth={2.2} /> {dur} min</small> : <small>Sin duración</small>}</div>
-                  <em>S/ {Number(e.precioBase) || 0}</em>
-                  <i className="dc-cfg__edit"><Pencil size={13} strokeWidth={2} /></i>
-                </button>
-              ); })}
-            </div>
-            )}</ListaFiltrable>
-          )}
-        </section>
-      )}
+      {/* SRV-01: el catálogo de servicios y sus precios por sede se editan en el menú
+          Operación › Servicios y precios (un solo lugar). */}
 
       {tab === "doctores" && (
         <section className="dc-cfg__panel">

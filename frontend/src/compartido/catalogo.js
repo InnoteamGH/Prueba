@@ -1,7 +1,7 @@
 /* Catálogo único de servicios (spec UX/UI §5.3, SRV-01).
    Una sola lista con código, nombre, especialidad, duración, precio y estado. La leen
    Agenda (duración), Odontograma y Presupuesto, Caja, Reportes y la IA de WhatsApp.
-   Se edita solo en Configuración › Servicios y precios. */
+   Se edita en el menú Operación › Servicios y precios (precio base y precio por sede). */
 
 // esp = id de ESPECIALIDADES (comun.jsx). hallazgos = estados del odontograma que,
 // marcados «por hacer», proponen este servicio al presupuesto.
@@ -48,3 +48,18 @@ export function nombreItem(servicio, pieza, cara) {
 
 // Superficies del odontograma → letra clínica.
 export const CARA_LETRA = { center: "O", top: "V", bottom: "L", left: "M", right: "D" };
+
+/** Precio de un servicio en una sede (cada sede puede cobrar distinto).
+    preciosSede = { [sedeId]: monto }; sin precio propio usa el precio base. */
+export function precioServicio(servicio, sedeId) {
+  if (!servicio) return 0;
+  const p = sedeId != null && sedeId !== "todas" ? servicio.preciosSede?.[sedeId] : null;
+  return p != null && p !== "" && Number.isFinite(Number(p)) ? Number(p) : Number(servicio.precio) || 0;
+}
+
+/** Precio de la cita según el servicio elegido en la agenda y la sede donde se atiende.
+    El servicio de la agenda es una especialidad: se toma su primer servicio activo del catálogo. */
+export function precioCita(cat, espId, sedeId) {
+  const s = (cat || []).filter((x) => x.activo !== false && String(x.esp) === String(espId)).sort((a, b) => Number(a.id) - Number(b.id))[0];
+  return s ? precioServicio(s, sedeId) : null;
+}

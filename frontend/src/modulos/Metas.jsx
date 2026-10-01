@@ -61,6 +61,7 @@ export default function Metas({ notify = () => {}, can }) {
   const metaTotal = meds.reduce((a, m) => a + (Number(m.metaMensual) || 0), 0);
   const conProd = meds.some((m) => m.prodMes != null);
   const prodTotal = meds.reduce((a, m) => a + (Number(m.prodMes) || 0), 0);
+  const comTotal = meds.reduce((a, m) => a + (Number(m.prodMes) || 0) * (Number(m.porcentajeComision) || 0) / 100, 0);
   const pctTotal = metaTotal ? Math.round((prodTotal / metaTotal) * 100) : 0;
   const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
   const dia = new Date().getDate();
@@ -78,6 +79,7 @@ export default function Metas({ notify = () => {}, can }) {
           <div><b>{error ? "—" : meds.length}</b><span>Odontólogos</span></div>
           <div><b>{error ? "—" : conMeta}</b><span>Con meta</span></div>
           {conProd && <div><b>{pctTotal}%</b><span>Avance, día {dia} de {diasMes}</span></div>}
+          {conProd && <div><b>{soles(comTotal)}</b><span>Comisiones del mes</span></div>}
         </div>
         <span />
       </section>
@@ -93,7 +95,7 @@ export default function Metas({ notify = () => {}, can }) {
           { key: "prod", label: "Producción", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.prodMes != null ? soles(Number(m.prodMes)) : "—"}</span> },
           { key: "meta", label: "Meta", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.metaMensual ? soles(Number(m.metaMensual)) : "—"}</span> },
           { key: "av", label: "Avance", w: "minmax(160px,1fr)", cell: (m) => { const mt = Number(m.metaMensual) || 0; const pct = m.prodMes != null && mt ? Math.round((Number(m.prodMes) / mt) * 100) : null; return pct == null ? <span className="dc-tp__sub">Sin dato</span> : <span className="dc-tp__prog"><i><em style={{ width: `${Math.min(pct, 100)}%` }} /></i><small>{pct}%</small></span>; } },
-          { key: "com", label: "Comisión", w: "100px", a: "right", cell: (m) => <span className="dc-tp__sub">{m.porcentajeComision != null ? `${m.porcentajeComision}%` : "—"}</span> },
+          { key: "com", label: "Comisión", w: "130px", a: "right", cell: (m) => <span className="dc-tp__num">{m.porcentajeComision != null && m.prodMes != null ? soles(Number(m.prodMes) * Number(m.porcentajeComision) / 100) : "—"}<small className="dc-tp__sub"> {m.porcentajeComision != null ? `${m.porcentajeComision}%` : ""}</small></span> },
         ] }} cols={[
           { key: "nombre", label: "Odontólogo", get: (m) => m.nombre || "" },
           { key: "esp", label: "Especialidad", get: (m) => m.especialidad || "" },
@@ -120,6 +122,7 @@ export default function Metas({ notify = () => {}, can }) {
                   <div className="dc-meta__avance">
                     <div className="dc-meta__barra"><i style={{ width: `${Math.min(pct, 100)}%` }} /><s style={{ left: `${ritmo}%` }} title={`Ritmo esperado al día ${dia}: ${ritmo}%`} /></div>
                     <div className="dc-meta__cifras"><span><TrendingUp size={12} strokeWidth={2.2} /> {soles(prod)} producidos</span><span>{m.citasMes != null ? <><Users size={12} strokeWidth={2.2} /> {m.citasMes} citas</> : null}</span></div>
+                    {m.porcentajeComision != null && <div className="dc-meta__com"><span>Comisión del mes ({m.porcentajeComision}% de lo producido)</span><b>{soles(prod * Number(m.porcentajeComision) / 100)}</b>{pct != null && pct < 100 && <small>Faltan {soles(meta - prod)} para la meta, que suman {soles((meta - prod) * Number(m.porcentajeComision) / 100)} más de comisión</small>}{pct != null && pct >= 100 && <small>Meta cumplida</small>}</div>}
                   </div>
                 ) : <p className="dc-meta__nota">El avance se ve en Producción y comisiones.</p>}
                 <div className="dc-meta__pie">

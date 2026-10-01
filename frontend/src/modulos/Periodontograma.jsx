@@ -8,8 +8,8 @@ import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Keyboard, Printer, 
 import api, { auth } from "../api/client";
 import { SUP, INF, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, demoPerio } from "../util/periodontal";
 import { FASES_PERIO, abrirInformePerio, guardarPrecio, sugerirPlan, totalesPlan } from "../util/perioPlan";
-import { DatosDemoCtx } from "../comun";
-import { leerCatalogo, servicioPorId } from "../compartido/catalogo";
+import { DatosDemoCtx, sedesDe } from "../comun";
+import { leerCatalogo, servicioPorId, precioServicio } from "../compartido/catalogo";
 import "./periodontograma.css";
 
 // PER-01: lo que sugiere el sondaje pasa al presupuesto único del paciente. Las partidas
@@ -293,7 +293,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   const datosPac = { nombre: paciente?.nombre || pacienteNombre, dni: paciente?.dni || "", hc: paciente?.hc || paciente?.numeroHc || paciente?.nroHc || "" };
   const abrirProforma = () => {
     const cat = leerCatalogo();
-    setPf({ plan: sugerirPlan(dientes, dx).map((x) => { const sv = servicioPorId(cat, SERV_PERIO[x.cod]); return sv ? { ...x, precio: sv.precio, servicioId: sv.id } : x; }), desc: 0 });
+    setPf({ plan: sugerirPlan(dientes, dx).map((x) => { const sv = servicioPorId(cat, SERV_PERIO[x.cod]); return sv ? { ...x, precio: precioServicio(sv, sedesDe(paciente)[0] || 1), servicioId: sv.id } : x; }), desc: 0 });
   };
   const agregarAlPresupuesto = () => {
     const items = pf.plan.filter((x) => x.incluir).map((x, i) => ({ id: Date.now() + i, servicioId: x.servicioId || null, nombre: `${x.nombre}${x.cant > 1 ? ` ×${x.cant}` : ""}${x.det ? ` · ${x.det}` : ""}`, costo: Math.round(x.cant * x.precio * (1 - (pf.desc || 0) / 100)), estado: "pendiente", origen: "periodontograma" }));

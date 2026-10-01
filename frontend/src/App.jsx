@@ -17,7 +17,7 @@ const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones")
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
-import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId } from "./compartido/catalogo";
+import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
 import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
@@ -2582,6 +2582,15 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
       }).catch(() => {});
     } else setOdRemoto({ estados: {}, notas: {} });
   };
+  // Al abrir un paciente se muestra su último estado: la fase más reciente con marcas
+  // (alta › evolución › inicial), no siempre la inicial.
+  useEffect(() => {
+    if (!conectado || !pacienteId) return;
+    let vivo = true;
+    Promise.all(["alta", "evolucion"].map((f) => api.odontograma.porPaciente(pacienteId, f).then((r) => (r || []).length > 0).catch(() => false)))
+      .then(([hayAlta, hayEvo]) => { if (vivo) setFase(hayAlta ? "alta" : hayEvo ? "evolucion" : "inicial"); });
+    return () => { vivo = false; };
+  }, [pacienteId, conectado]); // eslint-disable-line
   // Al cambiar de fase hay que releer: cada una guarda sus propias marcas.
   useEffect(() => { recargarOd(); }, [pacienteId, conectado, fase]); // eslint-disable-line
 
@@ -2714,9 +2723,11 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   // P0-2: del hallazgo al plan de tratamiento (misma ficha).
   // ODO-02 / ODO-03: del hallazgo al presupuesto único, solo con servicios del catálogo.
   const catalogoOdo = (demoDbOdo?.catalogo || CATALOGO_SEED);
+  // Precio de la sede donde se atiende: la elegida arriba o, con «Todas», la del paciente.
+  const sedePrecioOdo = sedeActiva !== "all" && sedeActiva != null ? Number(sedeActiva) : (sedesDe(pacientes.find((p) => String(p.id) === String(pacienteId)) || {})[0] || 1);
   const yaItem = (servId, pieza) => (fichas[pacienteId]?.tratamiento || []).some((f) => f.estado !== "anulado" && String(f.servicioId) === String(servId) && String(f.pieza) === String(pieza));
   const agregarItems = (lineas) => {
-    const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l, i) => ({ id: Date.now() + i, servicioId: l.serv.id, pieza: Number(l.pieza), cara: l.cara || undefined, nombre: nombreItem(l.serv, l.pieza, l.cara), costo: l.serv.precio, estado: "pendiente", origen: "odontograma" }));
+    const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l, i) => ({ id: Date.now() + i, servicioId: l.serv.id, pieza: Number(l.pieza), cara: l.cara || undefined, nombre: nombreItem(l.serv, l.pieza, l.cara), costo: precioServicio(l.serv, sedePrecioOdo), estado: "pendiente", origen: "odontograma" }));
     if (!nuevos.length) { notify && notify("Los hallazgos por hacer ya están en el presupuesto."); return; }
     updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: [...(cur.tratamiento || []), ...nuevos] }));
     notify && notify(`${nuevos.length === 1 ? "Se agregó 1 ítem" : `Se agregaron ${nuevos.length} ítems`} al presupuesto (Plan y cuenta).`);
@@ -3141,7 +3152,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
 }
 
 /* ---- Tratamientos (plan de tratamiento = fuente de los cargos) ---- */
-function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can }) {
+function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can, sedeActiva = "all" }) {
   // Cobrar una fase es caja, no plan de tratamiento. Gerencia consulta el plan; el
   // cobro lo hace quien tiene caja (recepción, administración).
   const puedeCobrar = can ? can("facturacion", "crear") : true;
@@ -3153,6 +3164,8 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const pacientes = conectado ? (pacRemoto || []) : pacProp;
   const [pacienteId, setPacienteId] = useState(pacienteFijo || pacienteActivo || (auth.token ? null : pacProp[0]?.id) || null);
   useEffect(() => { if (pacienteActivo) setPacienteId(pacienteActivo); }, [pacienteActivo]);
+  // Precio del servicio en la sede elegida arriba o, con «Todas», en la del paciente.
+  const sedePrecioTr = sedeActiva !== "all" && sedeActiva != null ? Number(sedeActiva) : (sedesDe(pacientes.find((p) => String(p.id) === String(pacienteId)) || {})[0] || 1);
   useEffect(() => {
     if (!conectado || !pacRemoto) return;
     if (!pacRemoto.length) { setPacienteId(null); return; }
@@ -3250,8 +3263,8 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
               <Select value="" placeholder="Elegir servicio…"
-                      onChange={(v) => { const s = getServicios().find((x) => String(x.id) === String(v)); if (s) setNueva({ ...nueva, nombre: s.nombre, costo: String(s.monto), servicioId: s.id }); }}
-                      options={getServicios().map((s) => ({ value: s.id, label: `${s.nombre} — S/ ${s.monto}` }))} />
+                      onChange={(v) => { const s = getServicios().find((x) => String(x.id) === String(v)); if (s) setNueva({ ...nueva, nombre: s.nombre, costo: String(precioServicio(s, sedePrecioTr)), servicioId: s.id }); }}
+                      options={getServicios().map((s) => ({ value: s.id, label: `${s.nombre} — S/ ${precioServicio(s, sedePrecioTr)}` }))} />
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "2fr 0.7fr 0.7fr 1fr auto", gap: 10, alignItems: "end" }}>
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Procedimiento<br /><input className="dc-premium-inp" value={nueva.nombre} onChange={(e) => setNueva({ ...nueva, nombre: e.target.value, servicioId: undefined })} placeholder="Ej. Obturación" style={{ ...inp, marginTop: 4 }} /></label>
@@ -6297,7 +6310,9 @@ const SERV_CAT_COL = { "Odontología general": DS.c.primary, Ortodoncia: "var(--
 const espNombre = (id) => (ESPECIALIDADES.find((e) => e.id === Number(id)) || {}).nombre || "General";
 const servicioVista = (s) => ({ ...s, monto: Number(s.precio) || 0, cat: espNombre(s.esp), especialidad: s.especialidad || espNombre(s.esp), categoria: s.categoria || espNombre(s.esp) });
 const getServicios = () => leerCatalogo().filter((s) => s.activo !== false).map(servicioVista);
-function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () => {}, can }) {
+function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () => {}, can, sedeActiva = "all", misSedes = SEDE_IDS }) {
+  // Cada sede puede cobrar distinto el mismo servicio (preciosSede); sin precio propio usa el base.
+  const sedesLista = SEDES.filter((x) => misSedes.map(Number).includes(Number(x.id)));
   // Quien solo puede ver no crea servicios ni toca precios. El odontólogo entra aquí
   // para consultar el catálogo cuando presupuesta, no para gestionarlo.
   const puedeGestionar = can ? can("servicios", "crear") : true;
@@ -6316,6 +6331,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     coste: e.costeDirecto != null && Number(e.costeDirecto) > 0 ? Number(e.costeDirecto) : null,
     seguro: false,
     activo: e.activo !== false,
+    preciosSede: e.preciosSede || {},
   });
   const dbSrv = useContext(DatosDemoCtx);
   const demoItems = (dbSrv?.catalogo || CATALOGO_SEED).map(servicioVista);
@@ -6348,7 +6364,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
   const { media: ticket, n: nConPrecio } = precioMedioCatalogo(items);
   const blank = () => ({ nombre: "", especialidad: "Odontología general", categoria: "Preventivo", monto: "", duracionMin: "30", coste: "", seguro: false, activo: true });
   const nuevo = () => setForm(blank());
-  const editar = (s) => setForm({ ...s, monto: String(s.monto), duracionMin: String(s.duracionMin ?? 30), coste: s.coste != null && s.coste > 0 ? String(s.coste) : "", seguro: !!s.seguro, activo: s.activo !== false });
+  const editar = (s) => setForm({ ...s, preciosSede: { ...(s.preciosSede || {}) }, monto: String(s.monto), duracionMin: String(s.duracionMin ?? 30), coste: s.coste != null && s.coste > 0 ? String(s.coste) : "", seguro: !!s.seguro, activo: s.activo !== false });
   const guardar = () => {
     if (!form.nombre.trim()) { notify("Ponle un nombre al servicio."); return; }
     if (!(Number(form.monto) > 0)) { notify("Indica el precio del servicio (mayor que cero)."); return; }
@@ -6360,6 +6376,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
       coste: costeNum != null && Number.isFinite(costeNum) ? costeNum : 0,
       seguro: !!form.seguro,
       activo: form.activo !== false,
+      preciosSede: Object.fromEntries(Object.entries(form.preciosSede || {}).filter(([, v]) => v !== "" && v != null && Number(v) > 0).map(([k, v]) => [k, Number(v)])),
     };
     if (conectado) {
       const payload = {
@@ -6370,6 +6387,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         costeDirecto: costeNum != null && costeNum > 0 ? costeNum : null,
         activo: fields.activo,
         areaClinica: fields.especialidad,
+        preciosSede: fields.preciosSede,
       };
       (form.id ? api.catalogo.actualizarEspecialidad(form.id, payload) : api.catalogo.crearEspecialidad(payload))
         .then(() => {
@@ -6407,16 +6425,12 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         <span />
         {puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={nuevo}><Plus size={14} strokeWidth={2} /> Nuevo servicio</button>}
       </section>
-      {cats.length > 0 && <div className="dc-chips-fila" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {[["all", "Todas"], ...cats.map((c) => [c, c])].map(([k, l]) => { const on = cat === k; const col = k === "all" ? NAVY : (SERV_CAT_COL[k] || "var(--dc-ink-400)"); return (
-          <button key={k} type="button" className={`dc-cat${on ? " is-on" : ""}`} style={{ "--c": col }} onClick={() => setCat(k)}>{k !== "all" && <i />}{l}<span>{k === "all" ? items.length : items.filter((x) => (x.especialidad || x.cat) === k).length}</span></button>
-        ); })}
-      </div>}
-      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={980} rows={filtrados} onRowClick={(s) => editar(s)} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
+      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1160 : 980} rows={filtrados} accion={cats.length > 1 ? <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => (x.categoria || x.cat) === c).length})` }))]} /> : null} onRowClick={(s) => editar(s)} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
         { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span></span>; } },
         { key: "esp", label: "Especialidad", w: "minmax(140px,1.1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
         { key: "dur", label: "Duración", w: "100px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
-        { key: "monto", label: "Precio", w: "minmax(110px,0.8fr)", a: "right", get: (s) => s.monto, cell: (s) => <span className="dc-money" style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(Number(s.monto))}</span> },
+        { key: "monto", label: sedesLista.length > 1 ? "Base" : "Precio", w: "minmax(110px,0.8fr)", a: "right", get: (s) => s.monto, cell: (s) => <span className="dc-money" style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(Number(s.monto))}</span> },
+        ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "minmax(130px,0.9fr)", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
         // SRV-02: la columna Margen solo aparece cuando hay algún costo cargado.
         ...(items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen", w: "140px", a: "right", get: (s) => margenCatalogo(s) ?? -1, cell: (s) => { const m = margenCatalogo(s); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {m.toFixed(0)}</span>; } }] : []),
         { key: "estado", label: "Estado", w: "110px", a: "center", get: (s) => s.activo === false ? "Inactivo" : "Activo", cell: (s) => s.activo === false
@@ -6445,9 +6459,16 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
               <Select value={form.categoria || "Preventivo"} onChange={(v) => setForm({ ...form, categoria: v })}
                       options={["Preventivo", "Restaurador", "Quirúrgico", "Estético", "Odontología general", ...(SERV_CATS || [])].filter((v, i, a) => a.indexOf(v) === i).map((c) => ({ value: c, label: c }))} />
             </div>
-            <Field label="Precio (S/)" value={String(form.monto)} onChange={(v) => setForm({ ...form, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
+            <Field label={sedesLista.length > 1 ? "Precio base (S/)" : "Precio (S/)"} value={String(form.monto)} onChange={(v) => setForm({ ...form, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
             <Field label="Coste directo (S/)" value={String(form.coste ?? "")} onChange={(v) => setForm({ ...form, coste: v.replace(/[^\d.]/g, "") })} placeholder="opcional" />
           </div>
+          {sedesLista.length > 1 && <>
+            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 4px" }}>Precio por sede</div>
+            <div style={{ fontSize: 12.5, color: "var(--dc-ink-500)", marginBottom: 10 }}>Déjalo vacío para cobrar el precio base. Las citas, presupuestos y cobros de cada sede usan este precio.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              {sedesLista.map((sd) => <Field key={sd.id} label={`${sd.nombre} (S/)`} value={String(form.preciosSede?.[sd.id] ?? "")} onChange={(v) => setForm({ ...form, preciosSede: { ...(form.preciosSede || {}), [sd.id]: v.replace(/[^\d.]/g, "") } })} placeholder={form.monto ? `${form.monto} (base)` : "precio base"} />)}
+            </div>
+          </>}
           <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 10px" }}>Operación y contabilidad</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <Field label="Duración estimada (min)" value={String(form.duracionMin ?? "30")} onChange={(v) => setForm({ ...form, duracionMin: v.replace(/\D/g, "") })} placeholder="30" />
@@ -8491,11 +8512,18 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       { id: "espera", label: "Lista de espera", icon: Bell },
       ...(rol === "medico" ? [{ id: "disponibilidad", label: "Mi disponibilidad", icon: Clock }] : []),
     ] },
-    { grupo: "Pacientes", items: [
-      { id: "pacientes", label: "Pacientes", icon: Users, match: ["tratamientos", "recetas", "radiografias", "fotos", "consentimientos", "formularios"] },
-      // Accesos directos pedidos por la clínica: eligen el paciente y abren su ficha en esa vista.
+    // Módulos clínicos en el menú (pedido de la clínica): cada uno abre directo con el
+    // selector de paciente arriba y comparte los datos con la ficha del paciente.
+    { grupo: "Pacientes y clínica", items: [
+      { id: "pacientes", label: "Pacientes", icon: Users },
       { id: "odontograma", label: "Odontograma", icon: Smile },
       { id: "perio", label: "Periodontograma", icon: Activity },
+      { id: "tratamientos", label: "Tratamientos", icon: ClipboardList },
+      { id: "recetas", label: "Recetas", icon: Pill },
+      { id: "radiografias", label: "Radiografías", icon: Scan },
+      { id: "fotos", label: "Fotografía clínica", icon: Camera },
+      { id: "consentimientos", label: "Consentimientos", icon: FileCheck },
+      { id: "formularios", label: "Formularios", icon: FileText },
     ] },
     { grupo: "Comunicación", items: [
       { id: "whatsapp", label: "WhatsApp + IA", icon: MessageSquare, tag: "IA" },
@@ -8507,7 +8535,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       { id: "seguros", label: "Seguros y EPS", icon: Umbrella },
     ] },
     { grupo: "Reportes", items: [
-      { id: "reportes", label: "Reportes", icon: TrendingUp, match: ["reportes_aus", "comisiones", "metas", "reportes_ocs"] },
+      { id: "reportes", label: "Producción y comisiones", icon: TrendingUp, match: ["reportes_aus", "comisiones", "reportes_ocs"] },
+      { id: "metas", label: "Metas y comisiones", icon: Target },
       ...(rol === "medico" ? [{ id: "miproduccion", label: "Mi producción", icon: Wallet }] : []),
     ] },
     { grupo: "Operación", items: [
@@ -8566,7 +8595,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "gerencial": return <Gerencial citas={cf} sede={sede} />;
       // Reportes (spec §3): una página con pestañas. Metas y comisiones se editan en
       // Configuración › Doctores; aquí solo se ve el avance (NAV-07).
-      case "reportes": case "comisiones": case "metas": case "reportes_aus": case "reportes_ocs": {
+      case "metas": return <React.Suspense fallback={null}><Metas notify={notify} can={can} /></React.Suspense>;
+      case "reportes": case "comisiones": case "reportes_aus": case "reportes_ocs": {
         const t = vista === "reportes_aus" ? "ausentismo" : vista === "reportes_ocs" ? "ocupacion" : "produccion";
         return (<div style={{ display: "grid", gap: 14 }}>
           <Pestanas etiqueta="Reportes" valor={t} onChange={(x) => setVista({ produccion: "reportes", ausentismo: "reportes_aus", ocupacion: "reportes_ocs" }[x])} opciones={[{ id: "produccion", label: "Producción y comisiones", icon: TrendingUp }, { id: "ausentismo", label: "Ausentismo", icon: UserX }, { id: "ocupacion", label: "Ocupación de sillones", icon: Armchair }]} />
@@ -8574,7 +8604,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         </div>);
       }
       // Un solo catálogo de servicios (NAV-06): Configuración › Servicios y precios.
-      case "servicios": return <Servicios notify={notify} can={can} />;
+      case "servicios": return <Servicios notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
       // NAV-04: Agenda es un destino con selector de vista. Día = lista operativa;
@@ -8594,8 +8624,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       // escriben el mismo estado que la pestaña de la ficha.
       case "odontograma": return <Odontograma pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} pacienteActivo={pacienteActivo} sedeActiva={sedeActiva} can={can} rol={rol} />;
       case "perio": return <Periodontograma pacientes={pf} notify={notify} can={can} pacienteActivo={pacienteActivo} />;
-      case "tratamientos": case "recetas": case "radiografias": case "fotos": case "consentimientos": case "formularios":
-        return <RedirFicha vista={vista} pacienteActivo={pacienteActivo} setVista={setVista} notify={notify} />;
+      case "tratamientos": return <Tratamientos sedeActiva={sedeActiva} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} can={can} pacienteActivo={pacienteActivo} consumirInsumos={consumirInsumos} />;
+      case "recetas": return <Recetas pacientes={pf} notify={notify} updFicha={updFicha} fichas={fichas} />;
+      case "radiografias": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} />;
+      case "fotos": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} soloFotos />;
+      case "consentimientos": return <Consentimientos pacientes={pf} notify={notify} />;
+      case "formularios": return <Formularios pacientes={pf} notify={notify} />;
       case "pacientes": return <PacientesView consumirInsumos={consumirInsumos} sedeActiva={sedeActiva} misSedes={misSedes} onIr={setVista} pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
         onAgendarPaciente={(pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta" }); setVista("agenda"); }}
         onCobrarPaciente={(pac) => { setCobroDesdeFicha({ pid: pac.id, nombre: pac.nombre }); setVista("caja"); }} />;
@@ -8628,7 +8662,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "caja": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "miproduccion": return <MiProduccion usuario={usuario} citas={citas} />;
       case "integraciones": return <Integraciones notify={notify} />;
-      case "config": return <Configuracion notify={notify} rol={rol} can={can} serviciosSlot={<Servicios notify={notify} can={can} />} />;
+      case "config": return <Configuracion notify={notify} rol={rol} can={can} />;
       // Usuarios y permisos (NAV-08): usuarios, permisos por rol y auditoría en pestañas.
       case "usuarios": case "permisos": case "auditoria": {
         const opc = [{ id: "usuarios", label: "Usuarios", icon: UserCog }, mods.includes("permisos") && { id: "permisos", label: "Permisos por rol", icon: Shield, locked: !modAllowed("permisos") }, mods.includes("auditoria") && { id: "auditoria", label: "Auditoría y accesos", icon: ShieldCheck, locked: !modAllowed("auditoria") }].filter(Boolean);
