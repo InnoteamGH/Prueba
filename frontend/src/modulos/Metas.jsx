@@ -88,7 +88,8 @@ export default function Metas({ notify = () => {}, can }) {
       )}
       {meds.length > 0 && (
         <ListaFiltrable rows={meds} sub="odontólogos" vistaClave="metas" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
-          { key: "n", label: "Odontólogo", w: "minmax(190px,1.3fr)", cell: (m) => <PersonaCelda nombre={m.nombre} sub={m.especialidad || "Sin especialidad"} /> },
+          { key: "n", label: "Odontólogo", w: "minmax(180px,1.2fr)", cell: (m) => <PersonaCelda nombre={m.nombre} /> },
+          { key: "esp", label: "Especialidad", w: "minmax(140px,1fr)", get: (m) => m.especialidad || "Sin especialidad" },
           { key: "prod", label: "Producción", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.prodMes != null ? soles(Number(m.prodMes)) : "—"}</span> },
           { key: "meta", label: "Meta", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.metaMensual ? soles(Number(m.metaMensual)) : "—"}</span> },
           { key: "av", label: "Avance", w: "minmax(160px,1fr)", cell: (m) => { const mt = Number(m.metaMensual) || 0; const pct = m.prodMes != null && mt ? Math.round((Number(m.prodMes) / mt) * 100) : null; return pct == null ? <span className="dc-tp__sub">Sin dato</span> : <span className="dc-tp__prog"><i><em style={{ width: `${Math.min(pct, 100)}%` }} /></i><small>{pct}%</small></span>; } },

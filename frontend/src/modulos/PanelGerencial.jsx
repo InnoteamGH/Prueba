@@ -3,7 +3,7 @@
  * Layout SPEC §3.2 – animaciones HTML §6 – fichas de dato §7.
  */
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Info, RefreshCw } from "lucide-react";
+import { Info, RefreshCw, BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
 import api, { auth } from "../api/client";
 import {
   curvaCajaAcumulada,
@@ -123,13 +123,13 @@ function FichaDato({ dato, onClose }) {
         data-ancho={ancho}
       >
         <div className="dc-pg-ficha__head">
-          <span className="ico" aria-hidden="true">i</span>
+          <span className="ico" aria-hidden="true"><BarChart3 size={20} strokeWidth={1.9} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 id="dc-pg-ficha-title">{dato.t}</h2>
             <p>{dato.s}</p>
           </div>
           {dato.estado && <span className="dc-chip dc-chip--gris">{dato.estado}</span>}
-          <button ref={closeRef} type="button" className="dc-pg-ficha__cerrar" aria-label="Cerrar" onClick={onClose}>×</button>
+          <button ref={closeRef} type="button" className="dc-pg-ficha__cerrar" aria-label="Cerrar" onClick={onClose}><X size={17} strokeWidth={2} /></button>
         </div>
         <div className="dc-pg-ficha__body">
           <div className="mdl-hero">
@@ -148,12 +148,12 @@ function FichaDato({ dato, onClose }) {
           </div>
           {dato.como && (
             <div className="mdl-bloq">
-              <p className="mdl-seccion">Cómo se calcula</p>
+              <p className="mdl-seccion"><Calculator size={14} strokeWidth={2} /> Cómo se calcula</p>
               <p className="mdl-como">{dato.como}</p>
             </div>
           )}
           <div className="mdl-bloq">
-            <p className="mdl-seccion">El detalle</p>
+            <p className="mdl-seccion"><ListIcon size={14} strokeWidth={2} /> El detalle</p>
             {filas.length === 0 ? (
               <div className="mdl-vacio">{dato.vacio || "Sin filas para mostrar."}</div>
             ) : (
@@ -792,7 +792,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     const atendidasHoy = deHoy.filter((c) => c.estado === "atendida");
     const pagosTodos = pacientes.flatMap((p) => ((fichas[p.id] || {}).pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, pacienteId: p.id })));
     const fa = avanceDemo();
-    const ranking = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, produccion: Math.round(m.prodDemo * fa), meta: m.meta, citas: Math.max(1, Math.round(m.citasDemo * fa)) }));
+    const ranking = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: (ESPECIALIDADES.find((e) => e.id === m.esp) || {}).nombre || "", produccion: Math.round(m.prodDemo * fa), meta: m.meta, citas: Math.max(1, Math.round(m.citasDemo * fa)) }));
     setCitasHoy(deHoy);
     setKd({
       ingresosMes: ranking.reduce((a, r) => a + r.produccion, 0), ingresosMesAnterior: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) / 0.91), hayMeta: true, metaMensualClinica: ranking.reduce((a, r) => a + r.meta, 0),
@@ -1635,7 +1635,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
                   </span>
                   <span className="persona__t">
                     <span className="nom">{nombre}</span>
-                    <span className="esp">{r.especialidad || "—"}</span>
+                    {r.especialidad && <span className="esp">{r.especialidad}</span>}
                   </span>
                 </div>
                 <div data-label="Estado">

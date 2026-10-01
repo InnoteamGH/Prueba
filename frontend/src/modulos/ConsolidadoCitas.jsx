@@ -132,9 +132,10 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
           tabla={{ primero: true, minWidth: 860, onRowClick: onAbrirCita, cols: [
             { key: "f", label: "Fecha", w: "120px", cell: (c) => <span className="dc-tp__num">{fechaLegible(c.fecha)}</span> },
             { key: "h", label: "Hora", w: "70px", cell: (c) => <span className="dc-tp__num">{c.hora}</span> },
-            { key: "p", label: "Paciente", w: "minmax(180px,1.3fr)", cell: (c) => <PersonaCelda nombre={c.paciente} sub={c.motivo} /> },
+            { key: "p", label: "Paciente", w: "minmax(170px,1.2fr)", get: (c) => c.paciente, cell: (c) => <PersonaCelda nombre={c.paciente} /> },
+            { key: "m", label: "Motivo", w: "minmax(150px,1.1fr)", get: (c) => c.motivo || "—" },
             ...(esMedico ? [] : [{ key: "d", label: "Doctor", w: "minmax(150px,1fr)", get: (c) => c.medico }]),
-            { key: "s", label: "Sede", w: "120px", get: (c) => c.sedeNombre },
+            { key: "s", label: "Sede", w: "130px", get: (c) => c.sedeNombre },
             { key: "e", label: "Estado", w: "130px", a: "center", cell: (c) => badge(c.estado) },
           ] }}
           cols={[

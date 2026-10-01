@@ -1410,41 +1410,41 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const EST = { pendiente: { c: "var(--dc-ink-500)", l: "Pendiente" }, confirmada: { c: DS.c.primary, l: "Confirmada" }, en_sala: { c: "var(--dc-purple)", l: "En sala" }, en_atencion: { c: "var(--dc-warn-600)", l: "En atención" }, atendida: { c: "var(--dc-ok-700)", l: "Atendida" }, cancelada: { c: "var(--dc-red)", l: "Cancelada" }, no_show: { c: "var(--dc-warn-600)", l: "No asistió" }, reprogramada: { c: "var(--dc-purple)", l: "Reprogramada" }, cerrada_sistema: { c: "var(--dc-ink-400)", l: "Cerrada por sistema" } };
   const nombreSillon = (c) => { if (!c.sillon) return ""; const x = (reglasAg.sillones || []).find((y) => String(y.sede) === String(c.sede) && String(y.numero) === String(c.sillon)); return x ? x.nombre : `Sillón ${c.sillon}`; };
   const COLS_AGENDA = [
-    { key: "hora", label: "Hora", get: (c) => c.hora, w: "76px", a: "center",
+    { key: "hora", label: "Hora", get: (c) => c.hora, w: "74px", a: "center",
       cell: (c) => { const e = EST[c.estado] || EST.pendiente; const esProx = proxima && c.id === proxima.id; const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>{c.hora}</div>
           {c.id === nuevaCita ? <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", letterSpacing: .4 }}><CheckCircle2 size={9} strokeWidth={1.75} /> NUEVA</span> : esProx && !pasada ? <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 500, color: e.c, letterSpacing: .4 }}><span style={{ width: 5, height: 5, borderRadius: "var(--dc-r-full)", background: e.c, animation: "dcBlink 1.6s ease-in-out infinite" }} /> PRÓXIMA</span> : null}
         </div>); } },
-    { key: "paciente", label: "Paciente", get: (c) => c.paciente + " " + c.dni, w: "minmax(160px,1.6fr)", a: "left",
+    { key: "paciente", label: "Paciente", get: (c) => c.paciente, w: "minmax(150px,1.4fr)", a: "left",
       cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 11, minWidth: 0 }}>
           <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : tint(colorDe(c.paciente), 0.14), color: pasada ? "var(--dc-ink-400)" : colorDe(c.paciente), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12.5, flexShrink: 0, boxShadow: pasada ? "none" : `inset 0 0 0 1.5px ${tint(colorDe(c.paciente), 0.25)}` }}>{iniciales(c.paciente)}</div>
           <div style={{ minWidth: 0 }}>
             <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{c.paciente}{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
-            <span style={{ fontSize: 12, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums", display: "inline-flex", alignItems: "center", gap: 5 }}>DNI {c.dni}{c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> IA</span>}</span>
+            {c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> Agendada por IA</span>}
           </div>
         </div>); } },
-    { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(128px,1.2fr)", a: "left",
+    { key: "dni", label: "DNI", get: (c) => c.dni || "", w: "84px", a: "left", cell: (c) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{c.dni || "—"}</span> },
+    { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(140px,1.3fr)", a: "left",
       cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
-    { key: "sede", label: "Sede · sillón", get: (c) => `${c.sedeNombre || nombreSede(c.sede)} ${nombreSillon(c)}`, w: "minmax(118px,0.9fr)", a: "left",
-      cell: (c) => <div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 6, minWidth: 0 }}><MapPin size={12} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sedeNombre || cortaSede(c.sede)}</span></div>{nombreSillon(c) && <div style={{ fontSize: 12, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}><Armchair size={12} strokeWidth={1.75} style={{ flexShrink: 0 }} />{nombreSillon(c)}</div>}</div> },
-    { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(120px,1.3fr)", a: "left",
+    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "78px", a: "left", noSort: true,
+      cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sedeNombre || cortaSede(c.sede)}</span> },
+    { key: "sillon", label: "Sillón", get: (c) => nombreSillon(c) || "", w: "70px", a: "left", noSort: true,
+      cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{nombreSillon(c) || "—"}</span> },
+    { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(110px,1.2fr)", a: "left",
       cell: (c) => { const base = c.motivo.replace(/\s*\([^)]*\)\s*/g, " ").trim(); const hasDet = base !== c.motivo; return (
         <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", gap: 6, minWidth: 0 }} title={c.motivo}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{base}</span>
           {hasDet && <Info size={13} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} />}
         </div>); } },
-    { key: "llegada", label: "Llegada", get: (c) => (c.llegada ? "Presente" : "Por llegar"), w: "minmax(104px,0.8fr)", a: "center",
-      cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return <div style={{ display: "flex", justifyContent: "center" }}>{pasada ? <span style={{ fontSize: 13, color: "var(--dc-line)" }}>—</span> : c.llegada
-        ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Presente</span>
-        : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Por llegar</span>}</div>; } },
-    { key: "estado", label: "Estado", get: (c) => (EST[c.estado] || EST.pendiente).l, w: "minmax(108px,0.8fr)", a: "center",
-      cell: (c) => { const e = EST[c.estado] || EST.pendiente; return <div style={{ display: "flex", justifyContent: "center" }}><span className="dc-pill" style={{ "--c": e.c }}><i /> {e.l}</span></div>; } },
+    // La llegada se muestra en el mismo estado («En sala») en vez de una columna aparte.
+    { key: "estado", label: "Estado", get: (c) => (c.llegada && (c.estado === "confirmada" || c.estado === "pendiente") ? "En sala" : (EST[c.estado] || EST.pendiente).l), w: "124px", a: "center",
+      cell: (c) => { const enSala = c.llegada && (c.estado === "confirmada" || c.estado === "pendiente"); const e = EST[c.estado] || EST.pendiente; return <div style={{ display: "flex", justifyContent: "center" }}>{enSala ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> En sala</span> : <span className="dc-pill" style={{ "--c": e.c }}><i /> {e.l}</span>}</div>; } },
     // Ancho fijo: cada fila es su propia rejilla, así que un ancho "según contenido"
     // descuadraba la columna de una fila a otra.
     // Una acción principal visible según el estado de la cita; el resto en el menú ⋯.
-    { key: "acc", label: "Acciones", w: "176px", a: "right", noFilter: true, noSort: true, sticky: true,
+    { key: "acc", label: "Acciones", w: "156px", a: "right", noFilter: true, noSort: true, sticky: true,
       cell: (c) => {
         const abierta = c.estado !== "cancelada" && c.estado !== "atendida" && c.estado !== "no_show";
         const principal =
@@ -2026,16 +2026,18 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     setCamp(null);
   };
   const cols = [
-    { key: "paciente", label: "Paciente", w: "minmax(160px,1.5fr)", a: "left", get: (p) => p.nombre + " " + (p.email || ""), cell: (p) => { const col = colorDe(p.nombre); return (
+    { key: "paciente", label: "Paciente", w: "minmax(170px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => { const col = colorDe(p.nombre); return (
       <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
         <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{iniciales(p.nombre)}</div>
-        <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={p.nombre}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><Phone size={11} strokeWidth={1.75} style={{ flexShrink: 0 }} /> {fmtTelDir(p.telefono) || p.email || "—"}</div>{(p.tags || []).length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>{(p.tags || []).slice(0, 3).map((tg) => { const tc = TAG_COLOR[tg] || "var(--dc-slate)"; return <span key={tg} style={{ fontSize: 12, fontWeight: 500, color: tc, background: tint(tc, 0.086), padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{tg}</span>; })}</div>}</div>
+        <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={p.nombre}>{p.nombre}</div>{(p.tags || []).length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>{(p.tags || []).slice(0, 3).map((tg) => { const tc = TAG_COLOR[tg] || "var(--dc-slate)"; return <span key={tg} style={{ fontSize: 12, fontWeight: 500, color: tc, background: tint(tc, 0.086), padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{tg}</span>; })}</div>}</div>
       </div>
     ); } },
+    { key: "dni", label: "DNI", w: "92px", a: "left", get: (p) => p.dni || "", cell: (p) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.dni || "—"}</span> },
+    { key: "telefono", label: "Teléfono", w: "112px", a: "left", get: (p) => p.telefono || "", cell: (p) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{fmtTelDir(p.telefono) || "—"}</span> },
     { key: "ultima", label: "Última cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => ultimaDe(p) || "", cell: (p) => { const u = ultimaDe(p); if (!u) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Sin visitas</span>; const m = mesesSinVenir(p); const c = m >= 6 ? "var(--dc-warn-600)" : m >= 3 ? "var(--dc-ink-400)" : "var(--dc-ok-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 size={13} strokeWidth={1.75} color={c} style={{ flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: c, fontWeight: 500 }}>{relFecha(u, false)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(u)}</div></div></div>; } },
     { key: "proxima", label: "Próxima cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => proxima(p)?.fecha || "zzz", cell: (p) => { const px = proxima(p); if (!px) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar size={12} strokeWidth={1.75} /> Sin agendar</span>; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: DS.c.primary, flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: DS.c.primary, fontWeight: 500 }}>{relFecha(px.fecha, true)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(px.fecha)} – {(px.hora || "").slice(0, 5)}</div></div></div>; } },
     // "Tarea" no existe en el backend: con sesión salía "—" en todas las filas.
-    ...(conectado ? [] : [{ key: "tarea", label: "Tarea", w: "minmax(130px,0.9fr)", a: "left", vacio: (p) => !p.tarea, get: (p) => p.tarea || "zzz", cell: (p) => { const t = p.tarea; if (!t) return <span style={{ fontSize: 12, color: "var(--dc-line-alt)" }}>—</span>; return <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><BellRing size={12} strokeWidth={1.75} /> {t}</span>; } }]),
+    ...(conectado || !lista.some((p) => p.tarea) ? [] : [{ key: "tarea", label: "Tarea", w: "minmax(130px,0.9fr)", a: "left", vacio: (p) => !p.tarea, get: (p) => p.tarea || "zzz", cell: (p) => { const t = p.tarea; if (!t) return <span style={{ fontSize: 12, color: "var(--dc-line-alt)" }}>—</span>; return <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><BellRing size={12} strokeWidth={1.75} /> {t}</span>; } }]),
     // Con sesión, el saldo real del paciente (plan menos pagos); en la demostración, el
     // presupuesto de ejemplo que lleva cada ficha.
     // Con sesión: columna de deuda (saldo pendiente). Verde solo si está al día.
@@ -4344,8 +4346,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
           {conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : !porCobrar.length ? <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todo cobrado" sub="No hay saldos pendientes en esta sede." /> : (
             <ListaFiltrable rows={porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} vistaClave="cobros" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
-              { key: "p", label: "Paciente", w: "minmax(200px,1.4fr)", cell: (x) => <PersonaCelda nombre={x.p.nombre} sub={x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} /> },
-              { key: "fases", label: "Fases pend.", w: "110px", a: "center", cell: (x) => <span className="dc-tp__sub">{x.pend}</span> },
+              { key: "p", label: "Paciente", w: "minmax(150px,1.2fr)", cell: (x) => <PersonaCelda nombre={x.p.nombre} /> },
+              { key: "sede", label: "Sede", w: "minmax(130px,1fr)", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") || "—" },
+              { key: "fases", label: "Fases", w: "70px", a: "center", cell: (x) => <span className="dc-tp__sub">{x.pend}</span> },
               { key: "cob", label: "Cobrado", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
               { key: "saldo", label: "Saldo", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num is-mal">S/ {x.saldo.toFixed(2)}</span> },
               { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!cajaAbierta} title={cajaAbierta ? "Registrar cobro" : "Abre la caja para cobrar"} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
@@ -5453,13 +5456,15 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           </Modal>
         )}
 
-        <DataTable buscar={false} titulo="Directorio de usuarios" sub="usuarios" minWidth={880} maxHeight={560} rows={lista} defaultSort={{ key: "usuario", dir: "asc" }} empty={<Vacio icon={<UserCog size={22} strokeWidth={1.75} />} titulo="Sin usuarios" sub="No hay usuarios que coincidan." />} cols={[
-          { key: "usuario", label: "Usuario", w: "minmax(220px,1.8fr)", a: "left", get: (u) => u.nombre + " " + u.user + " " + u.email, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(R.color, 0.22)}, ${tint(R.color, 0.08)})`, color: R.color, flexShrink: 0 }}>{iniciales(u.nombre.replace(/^Dra?\.\s*/, ""))}</span><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{u.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{u.user} – {u.email}</div></div></div>; } },
-          { key: "rol", label: "Rol", w: "minmax(140px,1fr)", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
-          { key: "sede", label: "Sede", w: "minmax(120px,1fr)", a: "center", get: (u) => etiquetaSedes(u.sedes), cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span> },
-          { key: "ultimo", label: "Último acceso", w: "150px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
-          { key: "estado", label: "Estado", w: "110px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
-          { key: "acc", label: "Acciones", w: "130px", a: "center", noFilter: true, noSort: true, cell: (u) => <div className="dc-us__acc"><button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button><button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button><button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button></div> },
+        <DataTable buscar={false} titulo="Directorio de usuarios" sub="usuarios" minWidth={1060} maxHeight={560} rows={lista} defaultSort={{ key: "usuario", dir: "asc" }} empty={<Vacio icon={<UserCog size={22} strokeWidth={1.75} />} titulo="Sin usuarios" sub="No hay usuarios que coincidan." />} cols={[
+          { key: "usuario", label: "Nombre", w: "minmax(150px,1.2fr)", a: "left", get: (u) => u.nombre, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(R.color, 0.22)}, ${tint(R.color, 0.08)})`, color: R.color, flexShrink: 0 }}>{iniciales(u.nombre.replace(/^Dra?\.\s*/, ""))}</span><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{u.nombre}</div></div></div>; } },
+          { key: "user", label: "Usuario", w: "106px", a: "left", get: (u) => u.user || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>@{u.user}</span> },
+          { key: "email", label: "Correo", w: "minmax(160px,1.4fr)", a: "left", get: (u) => u.email || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || "—"}</span> },
+          { key: "rol", label: "Rol", w: "132px", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
+          { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => etiquetaSedes(u.sedes), cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span> },
+          { key: "ultimo", label: "Acceso", w: "104px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
+          { key: "estado", label: "Estado", w: "96px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
+          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => <div className="dc-us__acc"><button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button><button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button><button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button></div> },
         ]} />
     </div>
   );
@@ -6021,10 +6026,10 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
           <ListaFiltrable rows={recetas} sub="recetas" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="recetas"
             vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }, { id: "lista", label: "Lista", icon: List }, { id: "paciente", label: "Por paciente", icon: Users }]}
             tabla={{ minWidth: 760, cols: [
-              { key: "paciente", label: "Paciente", w: "minmax(180px,1.1fr)", cell: (r) => { const col = colorDe(r.paciente); return <span className="dc-tp__quien"><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente)}</span><b>{r.paciente}</b></span>; } },
+              { key: "paciente", label: "Paciente", w: "minmax(160px,1fr)", cell: (r) => { const col = colorDe(r.paciente); return <span className="dc-tp__quien"><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente)}</span><b>{r.paciente}</b></span>; } },
               { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__sub">{fechaLegible(r.fecha)}</span> },
-              { key: "med", label: "Medicamentos", w: "minmax(220px,1.8fr)", cell: (r) => <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div> },
-              { key: "indic", label: "Indicaciones", w: "minmax(160px,1.2fr)", get: (r) => r.indic || "—" },
+              { key: "med", label: "Medicamentos", w: "minmax(260px,2.2fr)", cell: (r) => <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div> },
+              ...(recetas.some((r) => r.indic) ? [{ key: "indic", label: "Indicaciones", w: "minmax(140px,1fr)", get: (r) => r.indic || "—" }] : []),
               { key: "estado", label: "Estado", w: "110px", a: "right", cell: () => <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span> },
             ] }} cols={[
             { key: "paciente", label: "Paciente", get: (r) => r.paciente || "" },
@@ -6461,22 +6466,22 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
           <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", marginBottom: 10 }}>Identidad y precio</div>
           <Field label="Nombre del servicio" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Profilaxis (limpieza dental)" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
-            <Field label="Especialidad" value={form.especialidad || ""} onChange={(v) => setForm({ ...form, especialidad: v })} placeholder="Odontología general" />
-            {/* DC-34: catálogo operativo completo (API o ESPECIALIDADES ampliado), no solo 5 genéricos */}
-            <div style={{ marginTop: -8 }}>
+            {/* Una sola especialidad, elegida del catálogo (antes había un campo de texto y un desplegable con el mismo dato). */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Especialidad</label>
               <Select value={form.especialidad || ""} placeholder="Elegir del catálogo…"
                       onChange={(v) => setForm({ ...form, especialidad: v })}
-                      options={(conectado ? items : ESPECIALIDADES).map((e) => ({
+                      options={[...(conectado ? items : ESPECIALIDADES).map((e) => ({
                         value: e.especialidad || e.nombre || e.areaClinica || "",
                         label: `${e.especialidad || e.nombre}${e.duracionMin ? ` – ${e.duracionMin} min` : ""}`,
-                      })).filter((o) => o.value)} />
+                      })), ...(form.especialidad && !(conectado ? items : ESPECIALIDADES).some((e) => (e.especialidad || e.nombre) === form.especialidad) ? [{ value: form.especialidad, label: form.especialidad }] : [])].filter((o, i, arr) => o.value && arr.findIndex((x) => x.value === o.value) === i)} />
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Categoría</label>
               <Select value={form.categoria || "Preventivo"} onChange={(v) => setForm({ ...form, categoria: v })}
                       options={["Preventivo", "Restaurador", "Quirúrgico", "Estético", "Odontología general", ...(SERV_CATS || [])].filter((v, i, a) => a.indexOf(v) === i).map((c) => ({ value: c, label: c }))} />
             </div>
-            <Field label="Monto (S/)" value={String(form.monto)} onChange={(v) => setForm({ ...form, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
+            <Field label="Precio (S/)" value={String(form.monto)} onChange={(v) => setForm({ ...form, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
             <Field label="Coste directo (S/)" value={String(form.coste ?? "")} onChange={(v) => setForm({ ...form, coste: v.replace(/[^\d.]/g, "") })} placeholder="opcional" />
           </div>
           <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 10px" }}>Operación y contabilidad</div>
@@ -6776,7 +6781,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           </section>
         ); })()}
         <DataTable titulo="Proveedores" sub="proveedores" minWidth={780} rows={conectado ? proveedoresReales : PROVEEDORES_DEMO} defaultSort={{ key: "total", dir: "desc" }} empty={<Vacio icon={<Building2 size={22} strokeWidth={1.75} />} titulo="Sin proveedores" sub="La lista se arma sola con las órdenes de compra: registra una y el proveedor aparece aquí." />} cols={[
-          { key: "nombre", label: "Proveedor", w: "minmax(180px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg, ${tint(colorDe(p.nombre), 0.22)}, ${tint(colorDe(p.nombre), 0.08)})`, color: colorDe(p.nombre), fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{p.contacto}</div></div></div> },
+          { key: "nombre", label: "Proveedor", w: "minmax(180px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg, ${tint(colorDe(p.nombre), 0.22)}, ${tint(colorDe(p.nombre), 0.08)})`, color: colorDe(p.nombre), fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div></div></div> },
+          { key: "contacto", label: "Contacto", w: "minmax(150px,1fr)", a: "left", get: (p) => p.contacto || "", cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.contacto || "—"}</span> },
           { key: "categoria", label: "Categoría", w: "minmax(150px,1fr)", a: "left", get: (p) => p.categoria, cell: (p) => p.categoria ? <span className="dc-pill" style={{ "--c": colorDe(p.categoria) }}><i /> {p.categoria}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span> },
           { key: "compras", label: "Compras", w: "110px", a: "center", get: (p) => p.compras, cell: (p) => <span className="dc-pill">{p.compras} {p.compras === 1 ? "compra" : "compras"}</span> },
           { key: "total", label: "Total comprado", w: "150px", a: "right", get: (p) => p.total, cell: (p) => <span style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {p.total.toLocaleString()}</span> },
@@ -6803,30 +6809,21 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         </section>
       ); })()}
       <DataTable titulo="Insumos" sub="insumos" minWidth={1040} rows={items} defaultSort={{ key: "cobertura", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub="Agrega tu primer insumo para controlar stock y cobertura." />} cols={[
-        { key: "insumo", label: "Insumo", w: "minmax(200px,1.7fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{it.cat}</div></div></div>; } },
-        { key: "loteVence", label: "Lote", w: "minmax(96px,0.7fr)", a: "left", get: (it) => it.lote || it.fechaVencimiento || "", cell: (it) => {
+        { key: "insumo", label: "Insumo", w: "minmax(180px,1.5fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div></div></div>; } },
+        { key: "cat", label: "Categoría", w: "minmax(110px,0.8fr)", a: "left", get: (it) => it.cat || "—" },
+        ...(items.some((it) => it.lote) ? [{ key: "lote", label: "Lote", w: "90px", a: "left", get: (it) => it.lote || "", cell: (it) => <span style={{ fontSize: 13, color: it.lote ? "var(--dc-ink-700)" : "var(--dc-ink-400)" }}>{it.lote || "—"}</span> }] : []),
+        ...(items.some((it) => it.fechaVencimiento) ? [{ key: "vence", label: "Vence", w: "112px", a: "left", get: (it) => it.fechaVencimiento || "", cell: (it) => {
           const dv = diasVenc(it.fechaVencimiento);
+          if (!it.fechaVencimiento) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>;
           const estVenc = dv === null ? null : dv < 0 ? "vencido" : dv <= 60 ? "alerta" : "ok";
           return (
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{it.lote ? `Lote: ${it.lote}` : <span style={{ color: "var(--dc-ink-400)", fontWeight: 400 }}>Sin lote</span>}</div>
-              <div style={{ fontSize: 12, marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}>
-                {it.fechaVencimiento ? (
-                  <>
-                    <span style={{ color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>{it.fechaVencimiento}</span>
-                    {estVenc === "vencido" ? (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>Vencido</span>
-                    ) : estVenc === "alerta" ? (
-                      <span style={{ fontSize: 11, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{dv === 0 ? "Hoy" : `${dv} d`}</span>
-                    ) : null}
-                  </>
-                ) : (
-                  <span style={{ color: "var(--dc-ink-400)" }}>Sin fecha</span>
-                )}
-              </div>
-            </div>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+              <span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(it.fechaVencimiento)}</span>
+              {estVenc === "vencido" ? <span style={{ fontSize: 11, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>Vencido</span>
+                : estVenc === "alerta" ? <span style={{ fontSize: 11, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{dv === 0 ? "Hoy" : `${dv} d`}</span> : null}
+            </span>
           );
-        } },
+        } }] : []),
         { key: "stock", label: "Stock", w: "minmax(140px,1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{it.unidad}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto" }}>mín {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div> : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
         { key: "cobertura", label: "Cobertura", w: "minmax(100px,0.8fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); if (d >= 999) return <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>—</span>; const c = covColor(d); return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}><Clock size={12} strokeWidth={1.75} /> {d === 0 ? "hoy" : `~${d} d`}</span>; } },
         { key: "pedir", label: "Pedir", w: "minmax(130px,0.9fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}>+{q} {it.unidad}</span>; } },
@@ -7235,7 +7232,7 @@ function Resenas({ notify, citas = [], can }) {
   const recomiendan = reviews.length ? Math.round((reviews.filter((r) => r.estrellas >= 4).length / reviews.length) * 100) : 0;
   const sinResp = reviews.filter((r) => !r.resp).length;
   const responder = (id) => { const t = (resp[id] || "").trim(); if (conectado) { api.resenas.marcar(id, true).then(() => { notify("Reseña marcada como respondida."); recargar(); }).catch(() => notify("Error al responder.")); setResp((s) => ({ ...s, [id]: "" })); return; } if (!t) return; setReviews((rs) => rs.map((r) => r.id === id ? { ...r, resp: t } : r)); setResp((s) => ({ ...s, [id]: "" })); notify("Respuesta publicada."); };
-  const estrellas = (n, size = 15) => [1, 2, 3, 4, 5].map((i) => <Star key={i} size={size} strokeWidth={1.75} color="var(--dc-warn)" fill={i <= n ? "var(--dc-warn)" : "none"} />);
+  const estrellas = (n, size = 15) => [1, 2, 3, 4, 5].map((i) => <Star key={i} className={i <= n ? "is-on" : ""} size={size} strokeWidth={1.75} color="var(--dc-warn)" fill={i <= n ? "var(--dc-warn)" : "none"} />);
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <section className="dc-sat-hero dc-res-hero">
@@ -7269,7 +7266,8 @@ function Resenas({ notify, citas = [], can }) {
           ? <Vacio icon={<Star size={22} strokeWidth={1.75} />} titulo={reviews.length ? "Nada con este filtro" : "Sin reseñas"} sub={reviews.length ? "Prueba con otro filtro." : "Solicita reseñas a tus pacientes recientes para construir tu reputación."} />
           : (
           <ListaFiltrable rows={lista} sub="reseñas" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="resenas" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, onRowClick: (r) => setSel(r), cols: [
-            { key: "n", label: "Paciente", w: "minmax(170px,1fr)", cell: (r) => <PersonaCelda nombre={r.nombre} sub={fechaLegible(r.fecha)} /> },
+            { key: "n", label: "Paciente", w: "minmax(160px,1fr)", cell: (r) => <PersonaCelda nombre={r.nombre} /> },
+            { key: "f", label: "Fecha", w: "110px", cell: (r) => <span className="dc-tp__num">{fechaLegible(r.fecha)}</span> },
             { key: "s", label: "Calificación", w: "120px", cell: (r) => <span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span> },
             { key: "t", label: "Comentario", w: "minmax(240px,2.2fr)", get: (r) => r.texto || "" },
             { key: "e", label: "Estado", w: "140px", a: "right", cell: (r) => r.resp ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-pill is-aviso">Por responder</span> },
@@ -7418,7 +7416,8 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
         )}
       </section>
       <ListaFiltrable rows={liqView} sub="liquidaciones" vistaClave="seguros" vistas={[{ id: "tablero", label: "Tablero", icon: Columns3 }]} tabla={{ minWidth: 820, onRowClick: (x) => setDetalleLiq(x), cols: [
-        { key: "p", label: "Paciente", w: "minmax(170px,1.1fr)", cell: (x) => <PersonaCelda nombre={x.paciente} sub={x.aseg} /> },
+        { key: "p", label: "Paciente", w: "minmax(170px,1.1fr)", cell: (x) => <PersonaCelda nombre={x.paciente} /> },
+        { key: "aseg", label: "Aseguradora", w: "minmax(140px,1fr)", get: (x) => x.aseg || "—" },
         { key: "cob", label: "Seguro", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-ok">S/ {Number(x.cob).toLocaleString("es-PE")}</span> },
         { key: "cop", label: "Copago", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</span> },
         { key: "tot", label: "Total", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {Number(x.total).toLocaleString("es-PE")}</span> },
@@ -9136,11 +9135,11 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   const parcial = netPen > 0 && netPen < saldoMax - 0.009;
 
   const METODOS = [
+    { k: "efectivo", label: "Efectivo", sub: "Se contabiliza en caja", color: "#16A36A", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> },
     { k: "tarjeta", label: "Tarjeta (POS)", sub: "Visa – Mastercard – Amex", color: "#2F6FDE", icon: <CreditCard size={22} strokeWidth={1.75} color="#fff" /> },
     { k: "yape", label: "Yape / QR", sub: "Valida en el POS", color: "#7B3FE4", icon: <YapeGlyph /> },
     { k: "plin", label: "Plin / QR", sub: "Valida en el POS", color: "#0E9EB0", icon: <YapeGlyph /> },
     { k: "transferencia", label: "Transferencia", sub: "Código + foto – interbancaria", color: "#28527A", icon: <Building2 size={22} strokeWidth={1.75} color="#fff" /> },
-    { k: "efectivo", label: "Efectivo", sub: "Se contabiliza en caja", color: "#16A36A", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> },
   ];
   const BANCOS = ["BCP", "Interbank", "BBVA", "Scotiabank", "BanBif", "Interbancaria (CCI)"];
   const metaMet = metodo === "mixto"
@@ -9334,7 +9333,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
       <div className="dc-cobro" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 460, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
         <div className="dc-cobro__head" style={{ background: "radial-gradient(55% 150% at 100% 0%, rgba(125,240,215,.3) 0%, transparent 60%), linear-gradient(118deg, #0C4553 0%, #0B6C78 45%, #0E9199 82%, #22AFAA 100%)", padding: "18px 22px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 12.5, opacity: .85, fontWeight: 600 }}>{auth.token ? "Cobro con comprobante" : "Cobro de demostración"}</div>
+            <div style={{ fontSize: 12.5, opacity: .85, fontWeight: 600 }}>{paciente ? `Cobrar a ${paciente}` : "Cobrar"}{auth.token ? "" : " · demostración"}</div>
             <div style={{ fontSize: 21, fontWeight: 600, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{sym} {aUi(netPen).toFixed(2)}</div>
             {parcial && <div style={{ fontSize: 12, opacity: .9 }}>Abono – saldo {sym} {aUi(saldoMax).toFixed(2)}</div>}
             {moneda === "USD" && <div style={{ fontSize: 12, opacity: .85 }}>≈ S/ {Number(netPen).toFixed(2)} – TC {TC_USD}</div>}
@@ -9409,7 +9408,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
       <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 12 }}>¿Cómo va a pagar?</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {METODOS.map((m) => (
-          <button key={m.k} onClick={() => elegir(m.k)} style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start", padding: "14px 14px", borderRadius: "var(--dc-r-lg)", border: "1.5px solid var(--dc-line)", background: "#fff", cursor: "pointer", textAlign: "left", transition: "all .15s" }}
+          <button key={m.k} onClick={() => elegir(m.k)} style={{ display: "flex", flexDirection: m.k === "efectivo" ? "row" : "column", gridColumn: m.k === "efectivo" ? "1 / -1" : undefined, gap: m.k === "efectivo" ? 12 : 8, alignItems: m.k === "efectivo" ? "center" : "flex-start", padding: "14px 14px", borderRadius: "var(--dc-r-lg)", border: "1.5px solid var(--dc-line)", background: "#fff", cursor: "pointer", textAlign: "left", transition: "all .15s" }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = m.color; e.currentTarget.style.boxShadow = `0 6px 18px ${tint(m.color, 0.133)}`; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dc-line)"; e.currentTarget.style.boxShadow = "none"; }}>
             <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: m.color, display: "grid", placeItems: "center" }}>{m.icon}</div>
@@ -10465,7 +10464,8 @@ function AwgUsuariosGlobales({ notify }) {
       </div>
       <ModHead icon={<Users size={20} strokeWidth={1.75} />} titulo="Usuarios de todos los tenants" sub="Soporte transversal: AWG puede bloquear/desbloquear cuentas de cualquier clínica." />
       <DataTable titulo="Usuarios" sub="usuarios" minWidth={820} rows={users} defaultSort={{ key: "nombre", dir: "asc" }} cols={[
-        { key: "nombre", label: "Usuario", w: "minmax(220px,2fr)", a: "left", get: (u) => `${u.nombre} ${u.email}`, sortVal: (u) => u.nombre, cell: (u) => <PersonaCelda nombre={u.nombre} sub={u.email} /> },
+        { key: "nombre", label: "Usuario", w: "minmax(180px,1.3fr)", a: "left", get: (u) => u.nombre, cell: (u) => <PersonaCelda nombre={u.nombre} /> },
+        { key: "email", label: "Correo", w: "minmax(180px,1.3fr)", a: "left", get: (u) => u.email || "—" },
         { key: "tenant", label: "Tenant", w: "minmax(140px,1fr)", a: "left", get: (u) => u.tenant || "" },
         { key: "rol", label: "Rol", w: "190px", a: "center", get: (u) => (ROLES[u.rol] || {}).label || "", cell: (u) => { const R = ROLES[u.rol]; return <span style={{ whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 600, color: R.color, background: tint(R.color, 0.078), padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{R.label}</span>; } },
         { key: "estado", label: "Estado", w: "120px", a: "center", get: (u) => (u.estado === "activo" ? "Activo" : "Bloqueado"), cell: (u) => (u.estado === "activo" ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Activo</span> : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Bloqueado</span>) },

@@ -333,8 +333,10 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
         </div>
         {cola.length > 0 && (
           <ListaFiltrable rows={cola} sub="pacientes" className="dc-lf--dentro dc-rec__lf" vistaClave="recall_cola" vistas={[{ id: "lista", label: "Lista", icon: CalendarCheck }]} tabla={{ minWidth: 600, cols: [
-            { key: "n", label: "Paciente", w: "minmax(200px,1.4fr)", cell: (p) => <PersonaCelda nombre={p.nombre} /> },
-            { key: "u", label: "Última visita", w: "150px", cell: (p) => <span className="dc-tp__sub">{p.ultima ? fechaLegible(String(p.ultima).slice(0, 10)) : "—"}</span> },
+            { key: "n", label: "Paciente", w: "minmax(180px,1.3fr)", cell: (p) => <PersonaCelda nombre={p.nombre} /> },
+            { key: "t", label: "Teléfono", w: "minmax(120px,0.8fr)", get: (p) => p.telefono ? String(p.telefono).replace(/\D/g, "").replace(/^(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3") : "—" },
+            { key: "m", label: "Sin venir", w: "110px", a: "center", cell: (p) => { const f = p.ultima ? new Date(String(p.ultima).slice(0, 10) + "T00:00:00") : null; const m = f && !isNaN(f) ? Math.max(0, Math.round((hoy - f) / 2629800000)) : null; return <span className="dc-tp__sub">{m == null ? "—" : `${m} ${m === 1 ? "mes" : "meses"}`}</span>; } },
+            { key: "u", label: "Última visita", w: "130px", cell: (p) => <span className="dc-tp__sub">{p.ultima ? fechaLegible(String(p.ultima).slice(0, 10)) : "—"}</span> },
             { key: "e", label: "", w: "140px", a: "right", cell: (p) => p.estado === "enviado" ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Enviado</span> : <button type="button" className="dc-rec__recordar" onClick={() => enviar(p.id)}><Send size={14} strokeWidth={1.75} /> Recordar</button> },
           ] }} cols={[
             { key: "nombre", label: "Paciente", get: (p) => p.nombre || "" },

@@ -699,7 +699,8 @@ function Configuracion({ notify = () => {}, rol = "", can }) {
           {cab("Doctores", "Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "doctor", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nuevo doctor</button>)}
           {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : (
             <ListaFiltrable rows={meds} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_doctores" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
-              { key: "n", label: "Doctor", w: "minmax(200px,1.4fr)", cell: (m) => <PersonaCelda nombre={m.nombre} sub={m.cop || ""} /> },
+              { key: "n", label: "Doctor", w: "minmax(180px,1.3fr)", cell: (m) => <PersonaCelda nombre={m.nombre} /> },
+              { key: "cop", label: "COP", w: "100px", get: (m) => m.cop || "—" },
               { key: "e", label: "Especialidad", w: "minmax(150px,1fr)", get: (m) => espNombre(m.especialidadId) || "—" },
               { key: "c", label: "Comisión", w: "100px", a: "center", cell: (m) => <span className="dc-tp__sub">{m.porcentajeComision != null ? `${m.porcentajeComision}%` : "—"}</span> },
               { key: "mt", label: "Meta", w: "120px", a: "right", cell: (m) => <span className="dc-tp__num">{m.metaMensual != null ? `S/ ${Number(m.metaMensual).toLocaleString("es-PE")}` : "—"}</span> },
