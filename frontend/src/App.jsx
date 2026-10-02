@@ -1337,7 +1337,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // vista y firma), no en un formulario aparte que se saltaba todo eso.
   const abrirFichaCita = (c, tab = null) => {
     setFmTabCita(tab);
-    const pid = c?.pacienteId ?? (conectado ? null : (pacientes.find((x) => x.nombre === c?.paciente) || PACIENTES_INIT.find((x) => x.nombre === c?.paciente) || {}).id);
+    // Solo pacientes visibles (sede): nunca la semilla completa, que incluye otras sedes.
+    const pid = c?.pacienteId ?? (conectado ? null : (pacientes.find((x) => x.nombre === c?.paciente) || {}).id);
     if (pid != null) { setFmId(pid); setFichaCita(c); return; }
     notify("Esta cita no tiene un paciente registrado todavía.");
   };
