@@ -1390,7 +1390,8 @@ export const DatosDemoCtx = React.createContext(null);
    - sede: lo elegido en el menú ("all" o un id);
    - ids: sedes que se ven ahora (la elegida, o todas las del usuario con "all");
    - mias: todas las sedes del usuario; activa: una sede concreta para registrar;
-   - pacientes / citas: ya filtrados por ids (para mostrar; para validar, el total).
+   - pacientes / citas: ya filtrados por ids (para mostrar; para validar, el total);
+   - global: el usuario es de toda la clínica; rol: su rol.
    Sin proveedor (pruebas, portal del paciente) no limita nada. */
 export const SedeCtx = React.createContext(null);
 /** Id de sede comparable: en la demo 1/2; con API llega un UUID que el resto del frontend
@@ -1405,6 +1406,8 @@ export function useSede() {
   return {
     sede: c?.sede ?? "all", ids: c?.ids ?? null, mias: c?.mias ?? null, activa: c?.activa ?? null,
     pacientes: c?.pacientes ?? null, citas: c?.citas ?? null,
+    /** true = el usuario es de toda la clínica (sedes "all"); false = solo algunas sedes. */
+    global: c ? c.global !== false : true, rol: c?.rol ?? null,
     /** ¿Alguna de estas sedes se ve con el filtro actual? (sin sede = sí) */
     enSede: (x) => { const l = [].concat(x ?? []).filter((v) => v != null && v !== ""); return !ver || !l.length || l.some((v) => ver.some((w) => mismaSede(v, w))); },
     /** ¿La sede es del usuario (aunque el filtro muestre otra)? */

@@ -8564,7 +8564,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Contexto de sede para los módulos que no reciben props (modal de agendar, WhatsApp, etc.).
   // Doctores que atienden en las sedes que se ven (Agenda, Consolidado, asignar cupos).
   const medicosSede = useMemo(() => MEDICOS.filter((m) => { const ss = sedesDe(m).map(String); return !ss.length || idsSede.map(String).some((x) => ss.includes(x)); }), [idsSede]);
-  const sedeCtx = useMemo(() => ({ sede, ids: idsSede, mias: misSedes, activa: sedeActiva, pacientes: pf, citas: cf }), [sede, idsSede, misSedes.join(","), sedeActiva, pf, cf]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sedeCtx = useMemo(() => ({ sede, ids: idsSede, mias: misSedes, activa: sedeActiva, pacientes: pf, citas: cf, global: usuario.sedes === "all", rol }), [sede, idsSede, misSedes.join(","), sedeActiva, pf, cf, usuario.sedes, rol]); // eslint-disable-line react-hooks/exhaustive-deps
   // Membrete de los documentos: la empresa es una sola; dirección, teléfonos y horario
   // son los de la sede desde donde se emite (la activa). Ver util/membrete.js.
   useEffect(() => {
