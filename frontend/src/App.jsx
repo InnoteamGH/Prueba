@@ -5337,7 +5337,20 @@ const ROLES_ASIGNABLES = ["admin", "gerencia", "admin_sede", "ti", "medico", "re
 function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, usuarioActual, can }) {
   const conectado = !!auth.token;
   const [permOpen, setPermOpen] = useState(false);   // editor de permisos por usuario
-  const sedeIntU = (uuid) => (uuid && String(uuid).endsWith("a2")) ? 2 : 1;
+  const sedeUs = useSede();
+  // Quien no es de toda la clínica (p. ej. un admin de sede con el permiso de usuarios)
+  // solo ve y edita al personal de sus sedes, y solo asigna sus sedes y roles de sede.
+  const actorGlobal = usuarioActual ? usuarioActual.sedes === "all" : sedeUs.global;
+  // Roles que siempre abarcan toda la cuenta (no se restringen por sede).
+  const orgWide = (rol) => rol === "admin" || rol === "ti";
+  // Gerencia sin sede trabaja para toda la clínica (así entra al iniciar sesión).
+  const puedeSerGlobal = (rol) => ROLES_GLOBALES.includes(rol);
+  const rolesAsignables = actorGlobal ? ROLES_ASIGNABLES : ROLES_ASIGNABLES.filter((r) => !puedeSerGlobal(r));
+  // Sedes que se pueden marcar: con sesión, las reales de la clínica (UUID); sin sesión, las de la demo.
+  const [sedesApi, setSedesApi] = useState([]);
+  useEffect(() => { if (conectado) api.sedes.listar().then((r) => setSedesApi((r || []).map((x) => ({ id: x.id, nombre: x.nombre || "Sede" })))).catch(() => setSedesApi([])); }, []); // eslint-disable-line
+  const sedesClinica = conectado && sedesApi.length ? sedesApi : SEDES.map((x) => ({ id: x.id, nombre: x.nombre }));
+  const sedesAsignables = sedesClinica.filter((x) => actorGlobal || sedeUs.esMia(x.id));
   const mapU = (u) => {
     const ua = u.ultimoAcceso;
     let ultimo = "Nunca";
@@ -5347,14 +5360,18 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         ultimo = Number.isNaN(d.getTime()) ? String(ua) : d.toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" });
       } catch { ultimo = String(ua); }
     }
-    return { id: u.id, nombre: u.nombre, user: (u.email || "").split("@")[0], email: u.email, rol: u.rol, sedes: u.sedeId ? [sedeIntU(u.sedeId)] : "all", activo: u.activo, ultimo };
+    // Todas sus sedes (UUID), no solo la primera. Sin ninguna, solo los roles de toda la
+    // clínica quedan con todas (igual que al iniciar sesión); el resto queda "Sin sede".
+    const lista = (Array.isArray(u.sedeIds) && u.sedeIds.length ? u.sedeIds : Array.isArray(u.sedes) && u.sedes.length ? u.sedes : u.sedeId ? [u.sedeId] : []).map((x) => x?.id ?? x);
+    return { id: u.id, nombre: u.nombre, user: (u.email || "").split("@")[0], email: u.email, rol: u.rol, sedes: lista.length ? lista : (puedeSerGlobal(u.rol) ? "all" : []), activo: u.activo, ultimo };
   };
   const [remoto, setRemoto] = useState(null);
   const [usuariosError, setUsuariosError] = useState(null);
+  const sedesApiUs = sedeUs.sede === "all" && sedeUs.global ? null : (sedeUs.ids || []).map((x) => sedeApiUuid(x));
   const recargar = () => {
     if (!conectado) return;
     setUsuariosError(null);
-    api.usuarios.listar()
+    api.usuarios.listar(sedesApiUs)
       .then((r) => setRemoto((r || []).map(mapU)))
       .catch((e) => {
         setRemoto([]);
@@ -5366,47 +5383,64 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           : "No se pudieron cargar los usuarios.");
       });
   };
-  useEffect(() => { recargar(); }, []); // eslint-disable-line
-  const staff = conectado ? (remoto || []) : staffProp;
+  useEffect(() => { recargar(); }, [sedesApiUs ? sedesApiUs.join(",") : "todas"]); // eslint-disable-line
+  const staffTodo = conectado ? (remoto || []) : staffProp;
+  // Directorio de las sedes que se ven: el personal de toda la clínica trabaja en todas y
+  // siempre aparece; quien no tiene sede solo lo ve quien es de toda la clínica (para asignársela).
+  const usuarioVisible = (u) => {
+    if (u.sedes === "all") return true;
+    const l = normSedes(u.sedes);
+    return l.length ? sedeUs.enSede(l) : actorGlobal;
+  };
+  const staff = staffTodo.filter(usuarioVisible);
+  // Un usuario de sede edita solo a quien es enteramente de sus sedes (no al personal de toda
+  // la clínica ni a quien también trabaja en otra sede).
+  const editable = (u) => actorGlobal || (u.sedes !== "all" && normSedes(u.sedes).length > 0 && normSedes(u.sedes).every((x) => sedeUs.esMia(x)) && rolesAsignables.includes(u.rol));
   const cargaFallida = conectado && !!usuariosError;
   const [q, setQ] = useState("");
   const [filtroRol, setFiltroRol] = useState("todos");
   const [form, setForm] = useState(null); // null = cerrado
 
-  // Roles que siempre abarcan toda la cuenta (no se restringen por sede).
-  const orgWide = (rol) => rol === "admin" || rol === "ti";
   const lista = staff.filter((u) =>
     (filtroRol === "todos" || u.rol === filtroRol) &&
     (q.trim() === "" || (u.nombre + " " + u.user + " " + u.email).toLowerCase().includes(q.toLowerCase())));
   const activos = staff.filter((u) => u.activo).length;
   const porRol = ROLES_ASIGNABLES.map((r) => ({ r, n: staff.filter((u) => u.rol === r).length }));
 
-  const nuevo = () => setForm({ nombre: "", user: "", email: "", rol: "recepcion", sedes: [1], activo: true });
-  const editar = (u) => setForm({ ...u, sedes: u.sedes === "all" ? "all" : normSedes(u.sedes) });
-  const toggleSedeForm = (id) => setForm((f) => { const a = normSedes(f.sedes); return { ...f, sedes: a.includes(id) ? a.filter((x) => x !== id) : [...a, id].sort() }; });
+  // La sede del nuevo usuario arranca en la elegida en el menú (o en la única que puede asignar).
+  const sedesIniciales = () => sedesAsignables.filter((x) => (sedeUs.sede !== "all" ? mismaSede(x.id, sedeUs.sede) : !actorGlobal && sedesAsignables.length === 1)).map((x) => x.id);
+  const nuevo = () => setForm({ nombre: "", user: "", email: "", rol: "recepcion", sedes: sedesIniciales(), activo: true });
+  const editar = (u) => { if (!editable(u)) { notify("Este usuario también trabaja fuera de tus sedes: lo edita la administración general."); return; } setForm({ ...u, sedes: u.sedes === "all" ? "all" : normSedes(u.sedes) }); };
+  const toggleSedeForm = (id) => setForm((f) => { const a = f.sedes === "all" ? [] : normSedes(f.sedes); return { ...f, sedes: a.some((x) => String(x) === String(id)) ? a.filter((x) => String(x) !== String(id)) : [...a, id] }; });
   const guardar = () => {
     if (!form.nombre.trim() || !form.user.trim()) { notify("Completa nombre y usuario."); return; }
+    if (!rolesAsignables.includes(form.rol)) { notify(`Solo la administración general asigna el rol ${ROLES[form.rol]?.label || form.rol}.`); return; }
+    // Sin sede por defecto: un rol de sede necesita al menos una (gerencia puede quedar en "todas").
+    const marcadas = form.sedes === "all" ? "all" : normSedes(form.sedes).filter((x) => sedesAsignables.some((o) => mismaSede(o.id, x)));
+    const sedes = orgWide(form.rol) ? "all" : marcadas === "all" && actorGlobal && puedeSerGlobal(form.rol) ? "all" : marcadas === "all" ? [] : marcadas;
+    if (sedes !== "all" && !sedes.length) { notify("Asigna al menos una sede."); return; }
     if (conectado) {
-      const payload = { nombre: form.nombre, email: form.email || form.user, rol: form.rol, activo: form.activo !== false, permisos: form.permisos || null };
+      // sedeIds: todas sus sedes (UUID); sedeId: la principal, para el servidor que aún guarda una sola.
+      const sedeIds = sedes === "all" ? [] : sedes.map((x) => sedeApiUuid(x));
+      const payload = { nombre: form.nombre, email: form.email || form.user, rol: form.rol, activo: form.activo !== false, permisos: form.permisos || null, sedeIds, sedeId: sedeIds[0] ?? null };
       (form.id ? api.usuarios.actualizar(form.id, payload) : api.usuarios.crear({ ...payload, password: "demo" }))
         .then(() => { notify(form.id ? `Usuario ${form.nombre} actualizado.` : `Usuario ${form.nombre} creado (clave inicial: demo).`); setForm(null); recargar(); })
         .catch((e) => notify("Error al guardar: " + (e.message || "")));
       return;
     }
-    const sedes = orgWide(form.rol) ? "all" : (normSedes(form.sedes).length ? normSedes(form.sedes) : [1]);
-    if (!orgWide(form.rol) && !sedes.length) { notify("Asigna al menos una sede."); return; }
     if (form.id) {
       setStaff((s) => s.map((u) => u.id === form.id ? { ...form, sedes } : u));
       notify(`Usuario ${form.nombre} actualizado.`);
     } else {
-      const id = Math.max(0, ...staff.map((u) => u.id)) + 1;
+      const id = Math.max(0, ...staffTodo.map((u) => Number(u.id) || 0)) + 1;
       setStaff((s) => [...s, { ...form, id, sedes, ultimo: "Nunca" }]);
       notify(`Usuario ${form.nombre} creado como ${ROLES[form.rol].label}.`);
     }
     setForm(null);
   };
-  const toggle = (u) => { if (conectado) { (u.activo ? api.usuarios.desactivar(u.id) : api.usuarios.actualizar(u.id, { activo: true })).then(() => { notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); recargar(); }).catch(() => notify("Error al cambiar el estado.")); return; } setStaff((s) => s.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x)); notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); };
+  const toggle = (u) => { if (!editable(u)) { notify("Solo la administración general puede cambiar a este usuario."); return; } if (conectado) { (u.activo ? api.usuarios.desactivar(u.id) : api.usuarios.actualizar(u.id, { activo: true })).then(() => { notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); recargar(); }).catch(() => notify("Error al cambiar el estado.")); return; } setStaff((s) => s.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x)); notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); };
   const eliminar = (u) => {
+    if (!editable(u)) { notify("Solo la administración general puede dar de baja a este usuario."); return; }
     if (!confirm(`¿Dar de baja a ${u.nombre}? Perderá el acceso a la clínica de inmediato.`)) return;
     if (conectado) { api.usuarios.desactivar(u.id).then(() => { notify(`${u.nombre} desactivado.`); recargar(); }).catch(() => notify("No se pudo desactivar al usuario.")); return; }
     setStaff((s) => s.filter((x) => x.id !== u.id)); notify(`${u.nombre} dado de baja.`);
@@ -5452,22 +5486,34 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
               <label style={{ display: "block" }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Rol</span>
                 <Select value={form.rol} onChange={(v) => setForm({ ...form, rol: v })}
-                        options={ROLES_ASIGNABLES.map((r) => ({ value: r, label: ROLES[r].label }))} />
+                        options={rolesAsignables.map((r) => ({ value: r, label: ROLES[r].label }))} />
               </label>
             </div>
             <div style={{ marginTop: 14 }}>
               <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 8 }}>Sedes {!orgWide(form.rol) && <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– puede ser más de una</span>}</span>
               {orgWide(form.rol) ? (
                 <div style={{ padding: "11px 14px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: "var(--dc-ink-700)", background: "var(--dc-line)", display: "flex", alignItems: "center", gap: 7 }}><Globe size={15} strokeWidth={1.75} color={DS.c.primary} /> Todas las sedes (acceso a toda la cuenta)</div>
-              ) : (
+              ) : (() => {
+                const chip = (on) => ({ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 13px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${NAVY}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-bg)" : "#fff", color: on ? NAVY : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" });
+                const todas = form.sedes === "all";
+                const marcadas = todas ? [] : normSedes(form.sedes);
+                return (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {SEDES.map((s) => { const on = normSedes(form.sedes).includes(s.id); return (
-                    <button key={s.id} type="button" onClick={() => toggleSedeForm(s.id)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 13px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${NAVY}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-bg)" : "#fff", color: on ? NAVY : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-                      {on ? <CheckCircle2 size={15} strokeWidth={1.75} color={NAVY} /> : <MapPin size={15} strokeWidth={1.75} />} {s.nombre}
+                  {/* Gerencia puede ser de toda la clínica: solo la administración general lo decide. */}
+                  {actorGlobal && puedeSerGlobal(form.rol) && (
+                    <button type="button" onClick={() => setForm((f) => ({ ...f, sedes: f.sedes === "all" ? [] : "all" }))} style={chip(todas)}>
+                      {todas ? <CheckCircle2 size={15} strokeWidth={1.75} color={NAVY} /> : <Globe size={15} strokeWidth={1.75} />} Toda la clínica
+                    </button>
+                  )}
+                  {sedesAsignables.map((sd) => { const on = marcadas.some((x) => mismaSede(x, sd.id)); return (
+                    <button key={sd.id} type="button" onClick={() => toggleSedeForm(sd.id)} style={chip(on)}>
+                      {on ? <CheckCircle2 size={15} strokeWidth={1.75} color={NAVY} /> : <MapPin size={15} strokeWidth={1.75} />} {sd.nombre}
                     </button>
                   ); })}
+                  {!(todas && actorGlobal && puedeSerGlobal(form.rol)) && !marcadas.length && <span style={{ alignSelf: "center", fontSize: 12, color: "var(--dc-warn-600)" }}>Marca al menos una sede.</span>}
                 </div>
-              )}
+                );
+              })()}
             </div>
             {/* Permisos: hereda del rol, personalizable por usuario */}
             <div style={{ marginTop: 16 }}>
@@ -5503,10 +5549,10 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           { key: "user", label: "Usuario", w: "106px", a: "left", get: (u) => u.user || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>@{u.user}</span> },
           { key: "email", label: "Correo", w: "minmax(160px,1.4fr)", a: "left", get: (u) => u.email || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || "—"}</span> },
           { key: "rol", label: "Rol", w: "132px", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
-          { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => etiquetaSedes(u.sedes), cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span> },
+          { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? "Sin sede" : etiquetaSedes(u.sedes)), cell: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>Sin sede</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span>) },
           { key: "ultimo", label: "Acceso", w: "104px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
           { key: "estado", label: "Estado", w: "96px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
-          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => <div className="dc-us__acc"><button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button><button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button><button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button></div> },
+          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc"><button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button><button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button><button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button></div> },
         ]} />
     </div>
   );
@@ -6376,13 +6422,30 @@ const servicioVista = (s) => ({ ...s, monto: Number(s.precio) || 0, cat: espNomb
 const getServicios = () => leerCatalogo().filter((s) => s.activo !== false).map(servicioVista);
 function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () => {}, can, sedeActiva = "all", misSedes = SEDE_IDS }) {
   // Cada sede puede cobrar distinto el mismo servicio (preciosSede); sin precio propio usa el base.
-  const sedesLista = SEDES.filter((x) => misSedes.map(Number).includes(Number(x.id)));
+  // Se ven las sedes del filtro del menú (sin contexto, las del usuario).
+  const sedeSrv = useSede();
+  const verIds = sedeSrv.ids || misSedes;
+  const sedesLista = SEDES.filter((x) => verIds.some((v) => mismaSede(v, x.id)));
+  // Con una sola sede a la vista, total, IGV, margen y KPI son los de esa sede, no el base.
+  const sedeUnica = sedesLista.length === 1 ? sedesLista[0] : null;
+  // La clínica tiene más de una sede (un usuario de sede lo implica): el precio del formulario es
+  // el base y cada sede puede tener el suyo.
+  const multiSede = !sedeSrv.global || (sedeSrv.mias || misSedes).length > 1 || sedesLista.length > 1;
   // Quien solo puede ver no crea servicios ni toca precios. El odontólogo entra aquí
   // para consultar el catálogo cuando presupuesta, no para gestionarlo.
   const puedeGestionar = can ? can("servicios", "crear") : true;
+  // El catálogo y el precio base son de toda la clínica: un usuario de sede (admin de sede)
+  // solo fija el precio de sus sedes; no crea, no borra ni cambia el base.
+  const soloSede = !sedeSrv.global;
+  const puedeCatalogo = puedeGestionar && !soloSede;
+  const sedesEditables = sedesLista.filter((x) => sedeSrv.esMia(x.id));
   // Con sesión el catálogo es UNO: especialidades del backend (alias /servicios),
   // con duración/categoría/coste/activo persistidos en servidor (SRV-01).
   const conectado = !!auth.token;
+  // preciosSede: con sesión las claves son UUID de sede; aquí se usan 1/2 como en el resto
+  // de la pantalla y se vuelven a UUID al guardar.
+  const deApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [String((SEDES.find((x) => mismaSede(x.id, k)) || {}).id ?? k), v]));
+  const aApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [sedeApiUuid(k), v]));
   const mapApi = (e) => ({
     id: e.id,
     nombre: e.nombre,
@@ -6395,7 +6458,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     coste: e.costeDirecto != null && Number(e.costeDirecto) > 0 ? Number(e.costeDirecto) : null,
     seguro: false,
     activo: e.activo !== false,
-    preciosSede: e.preciosSede || {},
+    preciosSede: deApi(e.preciosSede),
   });
   const dbSrv = useContext(DatosDemoCtx);
   const demoItems = (dbSrv?.catalogo || CATALOGO_SEED).map(servicioVista);
@@ -6421,15 +6484,27 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
   }));
   const setItems = setDemoItems;
   const [form, setForm] = useState(null);
-  useEffect(() => { if (crearIntent) { setForm({ nombre: "", especialidad: "Odontología general", categoria: "Preventivo", monto: "", duracionMin: "30", coste: "", seguro: false, activo: true }); onIntentDone(); } }, [crearIntent]); // eslint-disable-line
+  useEffect(() => {
+    if (!crearIntent) return;
+    if (puedeCatalogo) setForm({ nombre: "", especialidad: "Odontología general", categoria: "Preventivo", monto: "", duracionMin: "30", coste: "", seguro: false, activo: true });
+    else if (soloSede) notify("Los servicios los crea la administración general. Tú fijas el precio de tu sede: abre un servicio de la lista.");
+    onIntentDone();
+  }, [crearIntent]); // eslint-disable-line
   const [cat, setCat] = useState("all");
   const cats = [...new Set(items.map((s) => s.categoria || s.cat).filter(Boolean))];
   const filtrados = cat === "all" ? items : items.filter((s) => (s.categoria || s.cat) === cat);
-  const { media: ticket, n: nConPrecio } = precioMedioCatalogo(items);
+  // Precio que se muestra: el de la sede a la vista o, con varias, el base.
+  const precioEn = (s, sedeId) => precioServicio({ ...s, precio: s.monto }, sedeId);
+  const propioEn = (s, sedeId) => s.preciosSede?.[sedeId] != null && s.preciosSede[sedeId] !== "";
+  const precioVista = (s) => (sedeUnica ? precioEn(s, sedeUnica.id) : Number(s.monto) || 0);
+  const itemsVista = items.map((s) => ({ ...s, monto: precioVista(s) }));
+  const { media: ticket, n: nConPrecio } = precioMedioCatalogo(itemsVista);
   const blank = () => ({ nombre: "", especialidad: "Odontología general", categoria: "Preventivo", monto: "", duracionMin: "30", coste: "", seguro: false, activo: true });
   const nuevo = () => setForm(blank());
   const editar = (s) => setForm({ ...s, preciosSede: { ...(s.preciosSede || {}) }, monto: String(s.monto), duracionMin: String(s.duracionMin ?? 30), coste: s.coste != null && s.coste > 0 ? String(s.coste) : "", seguro: !!s.seguro, activo: s.activo !== false });
   const guardar = () => {
+    if (!puedeGestionar) return;
+    if (soloSede) { guardarPrecioSede(); return; }
     if (!form.nombre.trim()) { notify("Ponle un nombre al servicio."); return; }
     if (!(Number(form.monto) > 0)) { notify("Indica el precio del servicio (mayor que cero)."); return; }
     const costeNum = form.coste === "" || form.coste == null ? null : Number(form.coste);
@@ -6451,7 +6526,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         costeDirecto: costeNum != null && costeNum > 0 ? costeNum : null,
         activo: fields.activo,
         areaClinica: fields.especialidad,
-        preciosSede: fields.preciosSede,
+        preciosSede: aApi(fields.preciosSede),
       };
       (form.id ? api.catalogo.actualizarEspecialidad(form.id, payload) : api.catalogo.crearEspecialidad(payload))
         .then(() => {
@@ -6470,42 +6545,96 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     notify(form.id ? "Servicio actualizado." : `Servicio «${form.nombre}» creado.`); setForm(null);
   };
   const eliminar = () => {
+    if (!puedeCatalogo) return;
     if (!confirm(`¿Eliminar «${form.nombre}» del catálogo? Los presupuestos y el asistente de WhatsApp dejarán de ofrecerlo.`)) return;
     setItems((it) => it.filter((x) => x.id !== form.id)); setForm(null);
+  };
+  // Usuario de sede: guarda solo el precio de sus sedes; nombre, base y el precio de las
+  // demás sedes quedan como están (y el servidor debe rechazar cualquier otro cambio).
+  const guardarPrecioSede = () => {
+    const propios = {};
+    for (const sd of sedesEditables) {
+      const v = form.preciosSede?.[sd.id];
+      if (v === "" || v == null) { propios[sd.id] = null; continue; }
+      if (!(Number(v) > 0)) { notify(`El precio de ${sd.nombre} debe ser mayor que cero (o déjalo vacío para cobrar el precio base).`); return; }
+      propios[sd.id] = Number(v);
+    }
+    const mezclar = (ps) => { const o = { ...(ps || {}) }; Object.entries(propios).forEach(([k, v]) => { if (v == null) delete o[k]; else o[k] = v; }); return o; };
+    const orig = items.find((x) => x.id === form.id);
+    if (!orig) { setForm(null); return; }
+    const aviso = sedesEditables.length === 1 ? `Precio de ${sedesEditables[0].nombre} guardado. Las próximas citas y cobros de la sede lo usan.` : "Precios de tus sedes guardados.";
+    if (conectado) {
+      const payload = { nombre: orig.nombre, precioBase: Number(orig.monto) || 0, duracionMin: Number(orig.duracionMin) || 30, categoria: orig.categoria || "General", costeDirecto: orig.coste != null && orig.coste > 0 ? orig.coste : null, activo: orig.activo !== false, areaClinica: orig.especialidad, preciosSede: aApi(mezclar(orig.preciosSede)) };
+      api.catalogo.actualizarEspecialidad(orig.id, payload).then(() => { notify(aviso); setForm(null); cargar(); }).catch(() => notify("No se pudo guardar el precio."));
+      return;
+    }
+    setItems((it) => it.map((x) => (x.id === form.id ? { ...x, preciosSede: mezclar(x.preciosSede) } : x)));
+    notify(aviso); setForm(null);
   };
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <section className="dc-esp-hero dc-serv-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>{items.filter((s) => s.activo !== false).length}</b><span>servicios activos</span></div>
-          <p>{puedeGestionar ? "Precios con IGV incluido; la tabla muestra el desglose y el total por sede" : "Catálogo de consulta (precios con IGV)"}</p>
+          <p>{sedeUnica
+            ? `${puedeGestionar ? "Precios" : "Catálogo de consulta, precios"} de ${sedeUnica.nombre} con IGV${multiSede ? "; en gris, los que cobran el precio base" : ""}${soloSede && puedeGestionar ? ". Abre un servicio para fijar el de tu sede" : ""}`
+            : puedeGestionar ? "Precios con IGV incluido; la tabla muestra el desglose y el total por sede" : "Catálogo de consulta (precios con IGV)"}</p>
         </div>
         <div className="dc-esp-hero__cifras">
           {puedeGestionar && <div><b>S/ {ticket.toLocaleString("es-PE")}</b><span>Precio medio</span></div>}
-          {puedeGestionar && <div><b>S/ {Math.max(0, ...serviciosConPrecioSafe(items).map((s) => s.monto)).toLocaleString("es-PE")}</b><span>Más caro</span></div>}
+          {puedeGestionar && <div><b>S/ {Math.max(0, ...serviciosConPrecioSafe(itemsVista).map((s) => s.monto)).toLocaleString("es-PE")}</b><span>Más caro</span></div>}
           <div><b>{cats.length}</b><span>Especialidades</span></div>
         </div>
         <span />
-        {puedeGestionar && <button type="button" className="dc-esp-hero__btn" onClick={nuevo}><Plus size={14} strokeWidth={2} /> Nuevo servicio</button>}
+        {puedeCatalogo && <button type="button" className="dc-esp-hero__btn" onClick={nuevo}><Plus size={14} strokeWidth={2} /> Nuevo servicio</button>}
       </section>
-      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1120 : 880} rows={filtrados} accion={cats.length > 1 ? <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => (x.categoria || x.cat) === c).length})` }))]} /> : null} onRowClick={(s) => editar(s)} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
+      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1120 : 880} rows={filtrados} accion={cats.length > 1 ? <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => (x.categoria || x.cat) === c).length})` }))]} /> : null} onRowClick={puedeGestionar ? (s) => editar(s) : undefined} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
         { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span>{s.activo === false && <span className="dc-pill" style={{ "--c": "#8A9CA1", flexShrink: 0 }}><i /> Inactivo</span>}</span>; } },
         { key: "esp", label: "Especialidad", w: "minmax(140px,1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
         { key: "dur", label: "Duración", w: "104px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
         // Desglose del IGV: el precio del catálogo es el total (IGV incluido), como en Caja.
-        { key: "sinIgv", label: "Sin IGV", w: "104px", a: "right", get: (s) => desgloseIgv(s.monto).base, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(s.monto).base)}</span> },
-        { key: "igv", label: "IGV 18%", w: "96px", a: "right", get: (s) => desgloseIgv(s.monto).igv, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(s.monto).igv)}</span> },
-        { key: "monto", label: sedesLista.length > 1 ? "Total base" : "Total", w: "120px", a: "right", get: (s) => s.monto, cell: (s) => <span className="dc-money" style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(Number(s.monto))}</span> },
+        { key: "sinIgv", label: "Sin IGV", w: "104px", a: "right", get: (s) => desgloseIgv(precioVista(s)).base, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(precioVista(s)).base)}</span> },
+        { key: "igv", label: "IGV 18%", w: "96px", a: "right", get: (s) => desgloseIgv(precioVista(s)).igv, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(precioVista(s)).igv)}</span> },
+        // Con una sede a la vista, su total: el propio en negrita; el base que hereda, atenuado
+        // (igual que las columnas por sede).
+        { key: "monto", label: sedesLista.length > 1 ? "Total base" : sedeUnica && multiSede ? `Total ${cortaSede(sedeUnica.id)}` : "Total", w: "128px", a: "right", get: (s) => precioVista(s), cell: (s) => { const heredado = sedeUnica && multiSede && !propioEn(s, sedeUnica.id); return <span className="dc-money" title={sedeUnica && multiSede ? (heredado ? `${sedeUnica.nombre} cobra el precio base` : `Precio propio de ${sedeUnica.nombre} · base S/ ${M.sol2(Number(s.monto))}`) : undefined} style={{ fontWeight: heredado ? 500 : 600, color: heredado ? "var(--dc-ink-500)" : NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioVista(s))}</span>; } },
         ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "130px", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={`${propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} · sin IGV S/ ${M.sol2(desgloseIgv(precioServicio({ ...s, precio: s.monto }, sd.id)).base)}`} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
         // SRV-02: la columna Margen solo aparece cuando hay algún costo cargado.
-        ...(items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen", w: "140px", a: "right", get: (s) => margenCatalogo(s) ?? -1, cell: (s) => { const m = margenCatalogo(s); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {m.toFixed(0)}</span>; } }] : []),
+        ...(items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen", w: "140px", a: "right", get: (s) => margenCatalogo({ ...s, monto: precioVista(s) }) ?? -1, cell: (s) => { const m = margenCatalogo({ ...s, monto: precioVista(s) }); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {m.toFixed(0)}</span>; } }] : []),
         // Estado: la mayoría está activa; solo se marca el inactivo junto al nombre.
         { key: "estado", label: "Estado", soloExport: true, get: (s) => s.activo === false ? "Inactivo" : "Activo" },
         // Sin columna de lápiz: toda la fila abre la edición del servicio.
       ]} />
-      {form && (
+      {form && soloSede && (() => {
+        const titSede = sedesEditables.length === 1 ? sedesEditables[0].nombre : "tus sedes";
+        return (
+        <Modal icon={<Tag size={20} strokeWidth={1.75} />} titulo={`Precio en ${titSede}`} sub={form.nombre} onClose={() => setForm(null)} maxW={560}
+          footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar} disabled={!sedesEditables.length}><Check size={15} strokeWidth={1.75} /> Guardar precio</Btn></>}>
+          <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>El servicio y su precio base son de toda la clínica y los define la administración general. Aquí fijas lo que cobra tu sede; vacío, cobra el precio base.</span></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, margin: "14px 0" }}>
+            {[["Especialidad", form.especialidad || "—"], ["Duración", `${form.duracionMin || 30} min`], ["Precio base", `S/ ${M.sol2(Number(form.monto) || 0)}`]].map(([l, v]) => (
+              <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "10px 12px", minWidth: 0 }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 14, fontWeight: 600, color: NAVY, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</div></div>
+            ))}
+          </div>
+          {sedesEditables.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "var(--dc-ink-500)" }}>Elige una de tus sedes en el menú para fijar su precio.</p>}
+          <div style={{ display: "grid", gap: 12 }}>
+            {sedesEditables.map((sd) => { const v = form.preciosSede?.[sd.id]; const total = Number(v) > 0 ? Number(v) : Number(form.monto) || 0; const d = desgloseIgv(total); return (
+              <div key={sd.id} style={{ display: "grid", gap: 8 }}>
+                <Field label={`Precio en ${sd.nombre} con IGV (S/)`} value={String(v ?? "")} onChange={(t) => setForm({ ...form, preciosSede: { ...(form.preciosSede || {}), [sd.id]: t.replace(/[^\d.]/g, "") } })} placeholder={form.monto ? `${form.monto} (base)` : "precio base"} />
+                <div className="dc-igv">
+                  <span>Valor de venta <b>S/ {M.sol2(d.base)}</b></span>
+                  <span>IGV 18% <b>S/ {M.sol2(d.igv)}</b></span>
+                  <span>{Number(v) > 0 ? "Total en la sede" : "Total (precio base)"} <b>S/ {M.sol2(d.total)}</b></span>
+                </div>
+              </div>
+            ); })}
+          </div>
+        </Modal>
+        );
+      })()}
+      {form && !soloSede && (
         <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar servicio" : "Nuevo servicio"} sub={form.id ? "Actualiza el servicio" : "Agrega un servicio al catálogo"} onClose={() => setForm(null)} size="largo" maxW={720}
-          footer={<>{form.id && !conectado && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar" : "Crear"}</Btn></>}>
+          footer={<>{form.id && !conectado && puedeCatalogo && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar" : "Crear"}</Btn></>}>
           <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", marginBottom: 10 }}>Identidad y precio</div>
           <Field label="Nombre del servicio" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Profilaxis (limpieza dental)" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
@@ -6524,8 +6653,8 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
               <Select value={form.categoria || "Preventivo"} onChange={(v) => setForm({ ...form, categoria: v })}
                       options={["Preventivo", "Restaurador", "Quirúrgico", "Estético", "Odontología general", ...(SERV_CATS || [])].filter((v, i, a) => a.indexOf(v) === i).map((c) => ({ value: c, label: c }))} />
             </div>
-            <Field label={sedesLista.length > 1 ? "Precio base sin IGV (S/)" : "Precio sin IGV (S/)"} value={form.montoSinIgv ?? (form.monto ? String(desgloseIgv(form.monto).base) : "")} onChange={(v) => { const b = v.replace(/[^\d.]/g, ""); setForm({ ...form, montoSinIgv: b, monto: b ? String(conIgv(b)) : "" }); }} placeholder="0.00" />
-            <Field label={sedesLista.length > 1 ? "Precio base con IGV (S/)" : "Precio con IGV (S/)"} value={String(form.monto)} onChange={(v) => setForm({ ...form, montoSinIgv: undefined, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
+            <Field label={multiSede ? "Precio base sin IGV (S/)" : "Precio sin IGV (S/)"} value={form.montoSinIgv ?? (form.monto ? String(desgloseIgv(form.monto).base) : "")} onChange={(v) => { const b = v.replace(/[^\d.]/g, ""); setForm({ ...form, montoSinIgv: b, monto: b ? String(conIgv(b)) : "" }); }} placeholder="0.00" />
+            <Field label={multiSede ? "Precio base con IGV (S/)" : "Precio con IGV (S/)"} value={String(form.monto)} onChange={(v) => setForm({ ...form, montoSinIgv: undefined, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
           </div>
           {Number(form.monto) > 0 && (() => { const d = desgloseIgv(form.monto); return (
             <div className="dc-igv">
@@ -6537,8 +6666,9 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
             <Field label="Coste directo (S/)" value={String(form.coste ?? "")} onChange={(v) => setForm({ ...form, coste: v.replace(/[^\d.]/g, "") })} placeholder="opcional" />
           </div>
-          {sedesLista.length > 1 && <>
-            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 4px" }}>Precio por sede</div>
+          {/* Con el filtro en una sede, solo el precio de esa sede (los de las demás se conservan). */}
+          {multiSede && sedesLista.length > 0 && <>
+            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 4px" }}>{sedeUnica ? `Precio en ${sedeUnica.nombre}` : "Precio por sede"}</div>
             <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginBottom: 10 }}>Precio con IGV. Déjalo vacío para cobrar el precio base. Las citas, presupuestos y cobros de cada sede usan este precio.</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               {sedesLista.map((sd) => <Field key={sd.id} label={`${sd.nombre} con IGV (S/)${Number(form.preciosSede?.[sd.id]) > 0 ? ` · sin IGV ${M.sol2(desgloseIgv(form.preciosSede[sd.id]).base)}` : ""}`} value={String(form.preciosSede?.[sd.id] ?? "")} onChange={(v) => setForm({ ...form, preciosSede: { ...(form.preciosSede || {}), [sd.id]: v.replace(/[^\d.]/g, "") } })} placeholder={form.monto ? `${form.monto} (base)` : "precio base"} />)}
@@ -6994,16 +7124,36 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
   // LAB-02: en la demostración los casos son los mismos que ve la ficha (Archivos ›
   // Laboratorio) y el Inicio: una sola lista en el contexto de datos.
   const dbLab = useContext(DatosDemoCtx);
+  const sedeLab = useSede();
   const [casosRem, setCasosRem] = useState([]);
-  // Solo los casos de los pacientes que ve el usuario (sus sedes).
-  const casos = conectado ? casosRem : (dbLab?.labCasos || []).filter((c) => !pacientes.length || pacientes.some((p) => String(p.id) === String(c.pacienteId) || p.nombre === c.paciente));
+  // Cada caso es de la sede que lo envió. Los casos viejos sin sede se atribuyen a la
+  // sede principal del paciente (del padrón completo: la lista visible ya viene filtrada).
+  const padron = dbLab?.pacientes || PACIENTES_INIT;
+  const sedeDelCaso = (c) => {
+    if (c.sede != null && c.sede !== "") return c.sede;
+    const p = padron.find((x) => String(x.id) === String(c.pacienteId)) || padron.find((x) => x.nombre === c.paciente);
+    return p ? (p.sede ?? sedesDe(p)[0] ?? null) : null;
+  };
+  const casoVisible = (c) => {
+    const sd = sedeDelCaso(c);
+    if (sd != null) return sedeLab.enSede(sd);
+    // Sin sede ni paciente conocido: solo quien ve toda la clínica sin filtro.
+    if (c.pacienteId != null) return pacientes.some((p) => String(p.id) === String(c.pacienteId));
+    return sedeLab.global && sedeLab.sede === "all";
+  };
+  const casos = (conectado ? casosRem : (dbLab?.labCasos || [])).filter(casoVisible);
   const setCasos = conectado ? setCasosRem : (dbLab?.setLabCasos || (() => {}));
+  // Sedes donde puede registrar un envío: las que se ven ahora (la activa primero).
+  const sedesEnvio = SEDES.filter((x) => sedeLab.enSede(x.id) && sedeLab.esMia(x.id));
+  const variasSedes = !sedeLab.ids || sedeLab.ids.length > 1;
   const [filtroLab, setFiltroLab] = useState("todos");
   const bE = { enviado: "solicitado", en_proceso: "en_proceso", recibido: "listo", entregado: "entregado" };
   const fE = { solicitado: "enviado", en_proceso: "en_proceso", listo: "recibido", entregado: "entregado" };
-  const mapCaso = (o) => ({ id: o.id, paciente: o.paciente || "—", trabajo: o.tipoTrabajo, lab: o.laboratorio, enviado: o.fechaEnvio, entrega: o.fechaEstimada, estado: fE[o.estado] || "enviado" });
-  const recargar = () => { if (conectado) api.laboratorio.listar().then((r) => setCasos((r || []).map(mapCaso))).catch(() => notify("No se pudo cargar laboratorio.")); };
-  useEffect(() => { recargar(); }, []); // eslint-disable-line
+  const mapCaso = (o) => ({ id: o.id, pacienteId: o.pacienteId ?? null, paciente: o.paciente || "—", sede: o.sedeId ?? o.sede ?? null, trabajo: o.tipoTrabajo, lab: o.laboratorio, enviado: o.fechaEnvio, entrega: o.fechaEstimada, estado: fE[o.estado] || "enviado" });
+  // Con sesión se piden solo las sedes que se ven (el servidor también debe cruzarlo con las del usuario).
+  const sedesApiLab = sedeLab.sede === "all" && sedeLab.global ? null : (sedeLab.ids || []).map((x) => sedeApiUuid(x));
+  const recargar = () => { if (conectado) api.laboratorio.listar(null, sedesApiLab).then((r) => setCasos((r || []).map(mapCaso))).catch(() => notify("No se pudo cargar laboratorio.")); };
+  useEffect(() => { recargar(); }, [sedesApiLab ? sedesApiLab.join(",") : "todas"]); // eslint-disable-line
   const [nuevo, setNuevo] = useState(null);
   const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
   const avanzar = (id) => {
@@ -7011,7 +7161,9 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
     setCasos((cs) => cs.map((c) => { if (c.id !== id) return c; const i = LAB_FLUJO.indexOf(c.estado); const n = LAB_FLUJO[Math.min(LAB_FLUJO.length - 1, i + 1)]; notify(`${c.paciente}: ${LAB_INFO[n].l}.`); return { ...c, estado: n }; }));
   };
   const [detalle, setDetalle] = useState(null);
-  const crear = () => { if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (conectado) { notify("Crear envíos desde aquí estará disponible pronto en modo conectado."); setNuevo(null); return; } const id = Date.now(); const caso = { id, pacienteId: pidDe(nuevo.paciente) || null, paciente: nuevo.paciente, trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); notify("Caso enviado a laboratorio. Ya aparece en la ficha del paciente (Archivos › Laboratorio)."); setNuevo(null); };
+  const crear = () => { if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (!nuevo.sede) { notify("Elige la sede que envía el caso."); return; } if (conectado) { notify("Crear envíos desde aquí estará disponible pronto en modo conectado."); setNuevo(null); return; } const id = Date.now(); const caso = { id, pacienteId: pidDe(nuevo.paciente) || null, paciente: nuevo.paciente, sede: Number(nuevo.sede), trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); notify("Caso enviado a laboratorio. Ya aparece en la ficha del paciente (Archivos › Laboratorio)."); setNuevo(null); };
+  // El envío sale de la sede activa; si no es una de las que se ven, de la primera visible.
+  const sedeEnvioDef = (sedesEnvio.find((x) => mismaSede(x.id, sedeLab.activa)) || sedesEnvio[0] || {}).id ?? null;
   const faltanDias = (c) => Math.round((new Date(c.entrega) - new Date(fmt(hoy))) / 86400000);
   // DC-42: KPI y tabla desde el mismo conjunto filtrado.
   const casosVista = filtroLab === "todos" ? casos
@@ -7039,7 +7191,7 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
               <button type="button" className="dc-esp-hero__btn" onClick={() => notify(`Se contactó al laboratorio por ${atr.length} trabajo(s) atrasado(s).`)}><Phone size={13} strokeWidth={1.9} /> Contactar</button>
             </div>
           ) : <span />}
-          {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", trabajo: "", lab: "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
+          {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", sede: sedeEnvioDef, trabajo: "", lab: "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
         </section>
       ); })()}
       <div className="dc-chips-fila" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -7055,6 +7207,8 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Laboratorio<br /><input className="dc-premium-inp" value={nuevo.lab} onChange={(e) => setNuevo({ ...nuevo, lab: e.target.value })} style={{ ...inp, marginTop: 4 }} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", gridColumn: "1 / -1" }}>Trabajo<br /><input className="dc-premium-inp" value={nuevo.trabajo} onChange={(e) => setNuevo({ ...nuevo, trabajo: e.target.value })} placeholder="Corona de porcelana – pieza 36" style={{ ...inp, marginTop: 4 }} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Fecha de entrega<br /><input className="dc-premium-inp" type="date" value={nuevo.entrega} onChange={(e) => setNuevo({ ...nuevo, entrega: e.target.value })} style={{ ...inp, marginTop: 4 }} /></label>
+            {/* El caso queda en la sede que lo envía: solo esa sede lo ve y le llega el egreso. */}
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Sede que envía<br /><Select value={nuevo.sede ?? ""} onChange={(v) => setNuevo({ ...nuevo, sede: v })} placeholder="— Selecciona —" disabled={sedesEnvio.length < 2} options={sedesEnvio.map((x) => ({ value: x.id, label: x.nombre }))} /></label>
           </div>
         </Modal>
       )}
@@ -7062,6 +7216,8 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
         { key: "paciente", label: "Paciente", w: "minmax(150px,1.2fr)", a: "left", get: (c) => c.paciente, cell: (c) => <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{c.paciente}</span> },
         { key: "trabajo", label: "Trabajo", w: "minmax(200px,1.7fr)", a: "left", get: (c) => c.trabajo, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13 }}><FlaskConical size={15} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} /> {c.trabajo}</span> },
         { key: "lab", label: "Laboratorio", w: "minmax(140px,1.1fr)", a: "left", get: (c) => c.lab, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{c.lab}</span> },
+        // Con más de una sede a la vista, de qué sede es cada caso.
+        ...(variasSedes ? [{ key: "sede", label: "Sede", w: "120px", a: "center", get: (c) => cortaSede(sedeDelCaso(c)), cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{cortaSede(sedeDelCaso(c))}</span> }] : []),
         { key: "entrega", label: "Entrega", w: "minmax(160px,1.1fr)", a: "center", get: (c) => c.entrega, cell: (c) => { const d = faltanDias(c); const done = c.estado === "entregado" || c.estado === "recibido"; const atr = labAtrasado(c, fmt(hoy)); const lbl = done ? (c.estado === "recibido" ? "Recibido" : "Entregado") : atr ? `Atrasado ${Math.abs(d)} d` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : d < 0 ? "Vencido" : `Faltan ${d} d`; const col = done ? "var(--dc-ok-700)" : atr ? "var(--dc-red)" : d <= 2 ? "var(--dc-warn-600)" : DS.c.primary; return <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}><span style={{ fontSize: 13, fontWeight: 500, color: col, background: tint(col, 0.078), padding: "3px 11px", borderRadius: "var(--dc-r-full)" }}>{lbl}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{fechaLegible(c.entrega)}</span></div>; } },
         { key: "estado", label: "Estado", w: "130px", a: "center", get: (c) => (LAB_INFO[c.estado] || { l: c.estado || "—" }).l, cell: (c) => { const I = LAB_INFO[c.estado] || { l: c.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; return <span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>; } },
         { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? <Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Entregado</span> },
@@ -7080,7 +7236,7 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
             ); })}
           </div>
           <div style={{ display: "grid", gap: 2 }}>
-            {[["Paciente", detalle.paciente, <UserCheck size={15} strokeWidth={1.75} />], ["Laboratorio", detalle.lab, <FlaskConical size={15} strokeWidth={1.75} />], ["Enviado", fechaLegible(detalle.enviado), <Send size={15} strokeWidth={1.75} />], ["Entrega", fechaLegible(detalle.entrega) + (atrasado ? " – atrasado" : ""), <Calendar size={15} strokeWidth={1.75} />]].map(([k, v, ic]) => (
+            {[["Paciente", detalle.paciente, <UserCheck size={15} strokeWidth={1.75} />], ["Sede", nombreSede(sedeDelCaso(detalle)), <MapPin size={15} strokeWidth={1.75} />], ["Laboratorio", detalle.lab, <FlaskConical size={15} strokeWidth={1.75} />], ["Enviado", fechaLegible(detalle.enviado), <Send size={15} strokeWidth={1.75} />], ["Entrega", fechaLegible(detalle.entrega) + (atrasado ? " – atrasado" : ""), <Calendar size={15} strokeWidth={1.75} />]].map(([k, v, ic]) => (
               <div key={k} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 0", borderBottom: "1px solid var(--dc-line)" }}><span style={{ color: "var(--dc-ink-500)", display: "grid", placeItems: "center" }}>{ic}</span><span style={{ flex: 1, fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>{k}</span><span style={{ fontSize: 13, color: k === "Entrega" && atrasado ? "var(--dc-red)" : NAVY, fontWeight: 500 }}>{v}</span></div>
             ))}
             {/* LAB-03: amarres del caso con el paciente, el procedimiento del presupuesto y el egreso de Caja. */}
@@ -7292,15 +7448,21 @@ function Resenas({ notify, citas = [], can }) {
     setSolicitando(false);
   };
   const encuestasAuto = citas.filter((c) => c.estado === "atendida").length; // P2-3: NPS automático tras atención
-  const [reviews, setReviews] = useState(RESENAS_SEED);
+  // Las reseñas son de cada local (la ficha de Google es por sede): se guardan todas y se
+  // muestran solo las de las sedes que se ven. Sin sede (datos viejos) cuentan como visibles.
+  const sedeRes = useSede();
+  const [todasReviews, setReviews] = useState(RESENAS_SEED);
+  const reviews = todasReviews.filter((r) => sedeRes.enSede(r.sede));
+  const variasSedes = !sedeRes.ids || sedeRes.ids.length > 1;
   const conectado = !!auth.token;
-  const mapRev = (r) => ({ id: r.id, nombre: r.paciente || "Paciente", estrellas: r.calificacion || 0, fecha: r.fecha, texto: r.comentario || "", resp: r.respondida ? "Respondida" : "" });
-  const recargar = () => { if (conectado) api.resenas.listar().then((r) => setReviews((r || []).map(mapRev))).catch(() => notify("No se pudo cargar reseñas.")); };
-  useEffect(() => { recargar(); }, []); // eslint-disable-line
+  const mapRev = (r) => ({ id: r.id, nombre: r.paciente || "Paciente", estrellas: r.calificacion || 0, fecha: r.fecha, texto: r.comentario || "", resp: r.respondida ? "Respondida" : "", sede: r.sedeId ?? null, origen: r.origen || "google" });
+  const sedesApiRes = sedeRes.sede === "all" && sedeRes.global ? null : (sedeRes.ids || []).map((x) => sedeApiUuid(x));
+  const recargar = () => { if (conectado) api.resenas.listar(sedesApiRes).then((r) => setReviews((r || []).map(mapRev))).catch(() => notify("No se pudo cargar reseñas.")); };
+  useEffect(() => { recargar(); }, [sedesApiRes ? sedesApiRes.join(",") : "todas"]); // eslint-disable-line
   const [resp, setResp] = useState({});
   const [sel, setSel] = useState(null); // reseña abierta en modal de detalle/respuesta
   const [filtroRes, setFiltroRes] = useState("todas");
-  const prom = (reviews.reduce((a, r) => a + r.estrellas, 0) / reviews.length).toFixed(1);
+  const prom = reviews.length ? (reviews.reduce((a, r) => a + r.estrellas, 0) / reviews.length).toFixed(1) : "0";
   const dist = [5, 4, 3, 2, 1].map((s) => ({ s, n: reviews.filter((r) => r.estrellas === s).length }));
   const sinResp = reviews.filter((r) => !r.resp).length;
   const responder = (id) => { const t = (resp[id] || "").trim(); if (conectado) { api.resenas.marcar(id, true).then(() => { notify("Reseña marcada como respondida."); recargar(); }).catch(() => notify("Error al responder.")); setResp((s) => ({ ...s, [id]: "" })); return; } if (!t) return; setReviews((rs) => rs.map((r) => r.id === id ? { ...r, resp: t } : r)); setResp((s) => ({ ...s, [id]: "" })); notify("Respuesta publicada."); };
@@ -7339,6 +7501,7 @@ function Resenas({ notify, citas = [], can }) {
           <ListaFiltrable rows={lista} sub="reseñas" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="resenas" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, onRowClick: (r) => setSel(r), cols: [
             { key: "n", label: "Paciente", w: "minmax(160px,1fr)", cell: (r) => <PersonaCelda nombre={r.nombre} /> },
             { key: "f", label: "Fecha", w: "110px", cell: (r) => <span className="dc-tp__num">{fechaLegible(r.fecha)}</span> },
+            ...(variasSedes ? [{ key: "sd", label: "Sede", w: "110px", get: (r) => cortaSede(r.sede) }] : []),
             { key: "s", label: "Calificación", w: "120px", cell: (r) => <span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span> },
             { key: "t", label: "Comentario", w: "minmax(240px,2.2fr)", get: (r) => r.texto || "" },
             { key: "e", label: "Estado", w: "140px", a: "right", cell: (r) => r.resp ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-pill is-aviso">Por responder</span> },
@@ -7364,8 +7527,8 @@ function Resenas({ notify, citas = [], can }) {
           )}</ListaFiltrable>
         ); })()}
       </Card>
-      {sel && (() => { const r = reviews.find((x) => x.id === sel.id) || sel; const col = colorDe(r.nombre); return (
-        <Modal icon={<Star size={20} strokeWidth={1.75} />} titulo={r.nombre} sub={`${fechaLegible(r.fecha)} – reseña en ${r.origen === "portal" ? "el portal del paciente" : "Google"}`} onClose={() => setSel(null)} maxW={520}
+      {sel && (() => { const r = todasReviews.find((x) => x.id === sel.id) || sel; const col = colorDe(r.nombre); return (
+        <Modal icon={<Star size={20} strokeWidth={1.75} />} titulo={r.nombre} sub={`${fechaLegible(r.fecha)} – reseña en ${r.origen === "portal" ? "el portal del paciente" : "Google"}${r.sede != null ? ` – ${nombreSede(r.sede)}` : ""}`} onClose={() => setSel(null)} maxW={520}
           footer={r.resp ? <Btn small kind="ghost" onClick={() => setSel(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setSel(null)}>Cancelar</Btn><Btn small onClick={() => { responder(r.id); setSel(null); }}><Send size={15} strokeWidth={1.75} /> {r.origen === "portal" ? "Responder en el portal" : "Responder en Google"}</Btn></>}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>{r.nombre[0]}</div>
@@ -7402,16 +7565,31 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
   // Liquidaciones ligadas al paciente por ID; el total sale del cargo real de su ficha (plan).
   // SEG-01: una sola lista de liquidaciones (contexto) que también lee el Inicio.
   const dbSeg = useContext(DatosDemoCtx);
-  const liq = (dbSeg?.liquidaciones || []).filter((l) => !pacientes.length || pacientes.some((p) => String(p.id) === String(l.pid)));
+  const sedeSeg = useSede();
+  // Cada liquidación es de la sede donde se trató al paciente. Las viejas sin sede se
+  // atribuyen a la sede principal del paciente (del padrón completo, no del filtrado).
+  const padronSeg = dbSeg?.pacientes || PACIENTES_INIT;
+  const sedePrincipal = (pid) => { const p = padronSeg.find((x) => String(x.id) === String(pid)); return p ? (p.sede ?? sedesDe(p)[0] ?? null) : null; };
+  const sedeDeLiq = (l) => (l.sede != null && l.sede !== "" ? l.sede : sedePrincipal(l.pid ?? l.pacienteId));
+  const liqVisible = (l) => {
+    const sd = sedeDeLiq(l);
+    if (sd != null) return sedeSeg.enSede(sd);
+    const pid = l.pid ?? l.pacienteId;
+    if (pid != null) return pacientes.some((p) => String(p.id) === String(pid));
+    return sedeSeg.global && sedeSeg.sede === "all";
+  };
+  const liq = (dbSeg?.liquidaciones || []).filter(liqVisible);
   const setLiq = dbSeg?.setLiquidaciones || (() => {});
   const mapEstadoSeg = (be) => ({ por_enviar: "borrador", enviado: "enviado", en_revision: "aprobado", pagado: "pagado", observado: "observado" }[be] || "enviado");
   const [remoto, setRemoto] = useState(null);
   const [segurosError, setSegurosError] = useState(null);
+  // Con sesión se piden solo las sedes que se ven y, por si el servidor aún no filtra, se vuelve a filtrar aquí.
+  const sedesApiSeg = sedeSeg.sede === "all" && sedeSeg.global ? null : (sedeSeg.ids || []).map((x) => sedeApiUuid(x));
   const recargarLiq = () => {
     if (!conectado) return;
     setSegurosError(null);
-    api.seguros.listar()
-      .then((r) => setRemoto((r || []).map((l) => ({ id: l.id, paciente: l.paciente || "—", aseg: l.aseguradora, total: Number(l.monto) || 0, cob: Number(l.monto) || 0, copago: 0, estado: mapEstadoSeg(l.estado), estadoBE: l.estado }))))
+    api.seguros.listar(sedesApiSeg)
+      .then((r) => setRemoto((r || []).map((l) => ({ id: l.id, pacienteId: l.pacienteId ?? null, sede: l.sedeId ?? null, paciente: l.paciente || "—", aseg: l.aseguradora, total: Number(l.monto) || 0, cob: Number(l.monto) || 0, copago: 0, estado: mapEstadoSeg(l.estado), estadoBE: l.estado }))))
       .catch((e) => {
         setRemoto([]);
         setSegurosError(e?.status === 404
@@ -7420,12 +7598,17 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
         notify(e?.status === 404 ? "Seguros: endpoint aún no disponible." : "No se pudo cargar seguros.");
       });
   };
-  useEffect(() => { recargarLiq(); }, []); // eslint-disable-line
+  useEffect(() => { recargarLiq(); }, [sedesApiSeg ? sedesApiSeg.join(",") : "todas"]); // eslint-disable-line
   const LI = Object.fromEntries(["borrador", "enviado", "observado", "aprobado", "pagado"].map((k) => { const e = estadoInfo("liquidacion", k); return [k, { l: e.label, bg: tint(e.color, 0.12), fg: e.color }]; }));
   const [detalleLiq, setDetalleLiq] = useState(null);
-  const totalDe = (pid) => (fichas[pid]?.tratamiento || []).reduce((s, f) => s + f.costo, 0);
+  // El total es lo tratado en la sede de la liquidación: un paciente de dos sedes no suma
+  // aquí lo que se le hizo en la otra. Un ítem sin sede cuenta en la sede principal del paciente.
+  const totalDe = (l) => {
+    const sd = sedeDeLiq(l);
+    return (fichas[l.pid]?.tratamiento || []).filter((f) => sd == null || mismaSede(f.sede ?? sedePrincipal(l.pid), sd)).reduce((s, f) => s + (Number(f.costo) || 0), 0);
+  };
   const nombreDe = (pid) => (pacientes.find((p) => p.id === pid) || PACIENTES_INIT.find((p) => p.id === pid))?.nombre || "—";
-  const liqView = conectado ? (remoto || []) : liq.map((l) => { const total = totalDe(l.pid) || 0; const cob = Math.round(total * l.cobPct / 100); return { ...l, paciente: nombreDe(l.pid), total, cob, copago: total - cob }; });
+  const liqView = conectado ? (remoto || []).filter(liqVisible) : liq.map((l) => { const total = totalDe(l) || 0; const cob = Math.round(total * l.cobPct / 100); return { ...l, sede: sedeDeLiq(l), paciente: nombreDe(l.pid), total, cob, copago: total - cob }; });
   const avanzar = (id) => { if (conectado) { const it = (remoto || []).find((x) => x.id === id); if (!it) return; const flow = ["por_enviar", "enviado", "en_revision", "pagado"]; const n = flow[Math.min(flow.length - 1, flow.indexOf(it.estadoBE) + 1)]; api.seguros.actualizar(id, { estado: n }).then(() => { notify(`${it.paciente}: liquidación actualizada.`); recargarLiq(); }).catch(() => notify("Error al avanzar la liquidación.")); return; } setLiq((l) => l.map((x) => { if (x.id !== id) return x; const f = ["borrador", "enviado", "aprobado", "pagado"]; const n = x.estado === "observado" ? "enviado" : f[Math.min(3, f.indexOf(x.estado) + 1)]; notify(`${nombreDe(x.pid)}: liquidación ${LI[n].l.toLowerCase()}.`); return { ...x, estado: n }; })); };
   const porCobrar = liqView.filter((l) => l.estado !== "pagado").reduce((s, l) => s + l.cob, 0);
   const recuperado = liqView.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.cob, 0);
@@ -7523,7 +7706,8 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
             {[["Total tratamiento", `S/ ${x.total}`, NAVY], ["Cubre seguro", `S/ ${x.cob}`, "var(--dc-ok-700)"], ["Copago paciente", `S/ ${x.copago}`, "var(--dc-warn-600)"]].map(([l, v, col]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "12px 14px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 600, color: col, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{v}</div></div>)}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Aseguradora</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{x.aseg} – {x.cobPct}%</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Aseguradora</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{x.aseg}{x.cobPct != null ? ` – ${x.cobPct}%` : ""}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Sede del tratamiento</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{nombreSede(x.sede)}</span></div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Estado</span><span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "4px 12px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span></div>
         </Modal>
       ); })()}

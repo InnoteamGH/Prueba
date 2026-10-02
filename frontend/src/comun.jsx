@@ -413,13 +413,14 @@ export const fmt = (d) => {
 };
 export const addDays = (n) => { const d = hoyAhora(); d.setDate(d.getDate() + n); return fmt(d); };
 // SAT-01: reseñas públicas (1–5). Una sola lista: la lee Satisfacción y reseñas y
-// Mi producción (las que mencionan al doctor).
+// Mi producción (las que mencionan al doctor). Cada reseña es de un local (sede): la
+// de Google es la ficha de esa sede y la del portal, la sede donde se atendió.
 export const RESENAS_SEED = [
-  { id: 1, nombre: "Lucía V.", estrellas: 5, fecha: addDays(-1), texto: "Excelente atención, la Dra. Mendoza muy amable y el local impecable.", resp: "", medicoId: 1, origen: "google" },
-  { id: 2, nombre: "Andrés P.", estrellas: 5, fecha: addDays(-3), texto: "Me agendaron por WhatsApp en segundos, todo súper rápido.", resp: "¡Gracias Andrés! Te esperamos en tu control.", origen: "google" },
-  { id: 3, nombre: "María C.", estrellas: 4, fecha: addDays(-6), texto: "Buen servicio, solo esperé un poco más de lo previsto.", resp: "", origen: "portal" },
-  { id: 4, nombre: "Diego C.", estrellas: 5, fecha: addDays(-9), texto: "Precios claros y me explicaron todo el tratamiento. Recomendado.", resp: "", medicoId: 1, origen: "google" },
-  { id: 5, nombre: "Rosa L.", estrellas: 5, fecha: addDays(-12), texto: "El portal para ver mis pagos y citas es muy práctico.", resp: "", origen: "portal" },
+  { id: 1, nombre: "Lucía V.", estrellas: 5, fecha: addDays(-1), texto: "Excelente atención, la Dra. Mendoza muy amable y el local impecable.", resp: "", medicoId: 1, origen: "google", sede: 2 },
+  { id: 2, nombre: "Andrés P.", estrellas: 5, fecha: addDays(-3), texto: "Me agendaron por WhatsApp en segundos, todo súper rápido.", resp: "¡Gracias Andrés! Te esperamos en tu control.", origen: "google", sede: 1 },
+  { id: 3, nombre: "María C.", estrellas: 4, fecha: addDays(-6), texto: "Buen servicio, solo esperé un poco más de lo previsto.", resp: "", origen: "portal", sede: 2 },
+  { id: 4, nombre: "Diego C.", estrellas: 5, fecha: addDays(-9), texto: "Precios claros y me explicaron todo el tratamiento. Recomendado.", resp: "", medicoId: 1, origen: "google", sede: 1 },
+  { id: 5, nombre: "Rosa L.", estrellas: 5, fecha: addDays(-12), texto: "El portal para ver mis pagos y citas es muy práctico.", resp: "", origen: "portal", sede: 2 },
 ];
 export const fmtHoy = () => fmt(hoyAhora());
 
@@ -1106,21 +1107,23 @@ export const DOCUMENTOS_SEED = [
   { id: "f3", clase: "formulario", pacienteId: 7, tipo: "Declaración de salud", fecha: addDays(-4), estado: "completado" },
 ];
 
-/* Casos de laboratorio: paciente, pieza, procedimiento del presupuesto, proveedor y egreso. */
+/* Casos de laboratorio: paciente, pieza, procedimiento del presupuesto, proveedor y egreso.
+   `sede` es la sede que envía el caso (la ve solo esa sede). */
 export const LAB_SEED = [
-  { id: 1, pacienteId: 1, paciente: "Rosa Linares", pieza: 36, procedimientoId: 4, trabajo: "Corona de porcelana · pieza 36", lab: "Laboratorio Dental Lima", enviado: addDays(-6), entrega: addDays(2), estado: "en_proceso", egresoId: 3 },
-  { id: 2, pacienteId: 2, paciente: "Pedro Gómez", pieza: 47, procedimientoId: 2, trabajo: "Corona · pieza 47", lab: "ProDent Lab", enviado: addDays(-9), entrega: addDays(-1), estado: "recibido" },
-  { id: 3, pacienteId: 3, paciente: "María Chávez", trabajo: "Férula de descarga", lab: "Laboratorio Dental Lima", enviado: addDays(-7), entrega: addDays(-1), estado: "enviado" },
+  { id: 1, pacienteId: 1, paciente: "Rosa Linares", sede: 1, pieza: 36, procedimientoId: 4, trabajo: "Corona de porcelana · pieza 36", lab: "Laboratorio Dental Lima", enviado: addDays(-6), entrega: addDays(2), estado: "en_proceso", egresoId: 3 },
+  { id: 2, pacienteId: 2, paciente: "Pedro Gómez", sede: 1, pieza: 47, procedimientoId: 2, trabajo: "Corona · pieza 47", lab: "ProDent Lab", enviado: addDays(-9), entrega: addDays(-1), estado: "recibido" },
+  { id: 3, pacienteId: 3, paciente: "María Chávez", sede: 2, trabajo: "Férula de descarga", lab: "Laboratorio Dental Lima", enviado: addDays(-7), entrega: addDays(-1), estado: "enviado" },
 ];
 
-/* Liquidaciones de seguro: Borrador → Enviada → Observada → Aprobada → Pagada. */
+/* Liquidaciones de seguro: Borrador → Enviada → Observada → Aprobada → Pagada.
+   `sede`: donde se hizo el tratamiento que se liquida (su total suma solo esa sede). */
 export const LIQ_SEED = [
-  { id: 1, pid: 2, aseg: "Pacífico EPS", cobPct: 80, estado: "aprobado" },
-  { id: 2, pid: 3, aseg: "Rímac Seguros", cobPct: 70, estado: "enviado" },
-  { id: 3, pid: 5, aseg: "Mapfre", cobPct: 60, estado: "pagado" },
-  { id: 4, pid: 8, aseg: "Pacífico EPS", cobPct: 80, estado: "enviado" },
-  { id: 5, pid: 1, aseg: "La Positiva", cobPct: 50, estado: "observado", motivo: "Falta la radiografía periapical de la pieza 26." },
-  { id: 6, pid: 6, aseg: "Mapfre", cobPct: 60, estado: "borrador" },
+  { id: 1, pid: 2, sede: 1, aseg: "Pacífico EPS", cobPct: 80, estado: "aprobado" },
+  { id: 2, pid: 3, sede: 2, aseg: "Rímac Seguros", cobPct: 70, estado: "enviado" },
+  { id: 3, pid: 5, sede: 1, aseg: "Mapfre", cobPct: 60, estado: "pagado" },
+  { id: 4, pid: 8, sede: 1, aseg: "Pacífico EPS", cobPct: 80, estado: "enviado" },
+  { id: 5, pid: 1, sede: 1, aseg: "La Positiva", cobPct: 50, estado: "observado", motivo: "Falta la radiografía periapical de la pieza 26." },
+  { id: 6, pid: 6, sede: 1, aseg: "Mapfre", cobPct: 60, estado: "borrador" },
 ];
 
 // R4: etiquetas y colores salen del catálogo único (compartido/estados.js).

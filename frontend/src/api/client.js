@@ -280,7 +280,8 @@ export const api = {
     planSueltos: () => request("GET", "/clinica/plan-sueltos"),
   },
   promociones: {
-    listar: () => request("GET", "/promociones"),
+    // sedes: las que se ven; las promociones de toda la clínica (sin sede) vienen siempre.
+    listar: (sedes) => request("GET", `/promociones${conQuery({ sedeIds: sedes })}`),
     crear: (p) => request("POST", "/promociones", p),
     actualizar: (id, p) => request("PUT", `/promociones/${id}`, p),
     borrar: (id) => request("DELETE", `/promociones/${id}`),
@@ -310,7 +311,7 @@ export const api = {
     guardar: (d) => request("PUT", "/permisos", d),
   },
   usuarios: {
-    listar: () => request("GET", "/usuarios"),
+    listar: (sedes) => request("GET", `/usuarios${conQuery({ sedeIds: sedes })}`),
     crear: (u) => request("POST", "/usuarios", u),
     actualizar: (id, u) => request("PUT", `/usuarios/${id}`, u),
     desactivar: (id) => request("DELETE", `/usuarios/${id}`),
@@ -508,13 +509,13 @@ export const api = {
     borrar: (id) => request("DELETE", `/inventario/${id}`),
   },
   laboratorio: {
-    listar: (pacienteId) => request("GET", `/laboratorio${pacienteId ? `?pacienteId=${pacienteId}` : ""}`),
+    listar: (pacienteId, sedes) => request("GET", `/laboratorio${conQuery({ pacienteId, sedeIds: sedes })}`),
     crear: (o) => request("POST", "/laboratorio", o),
     actualizar: (id, o) => request("PATCH", `/laboratorio/${id}`, o),
     borrar: (id) => request("DELETE", `/laboratorio/${id}`),
   },
   seguros: {
-    listar: () => request("GET", "/seguros"),
+    listar: (sedes) => request("GET", `/seguros${conQuery({ sedeIds: sedes })}`),
     crear: (s) => request("POST", "/seguros", s),
     actualizar: (id, s) => request("PATCH", `/seguros/${id}`, s),
     borrar: (id) => request("DELETE", `/seguros/${id}`),
@@ -582,7 +583,7 @@ export const api = {
     borrar: (id) => request("DELETE", `/ortodoncia/${id}`),
   },
   resenas: {
-    listar: () => request("GET", "/resenas"),
+    listar: (sedes) => request("GET", `/resenas${conQuery({ sedeIds: sedes })}`),
     crear: (r) => request("POST", "/resenas", r),
     marcar: (id, respondida) => request("PATCH", `/resenas/${id}`, { respondida }),
   },
