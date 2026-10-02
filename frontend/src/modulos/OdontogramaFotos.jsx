@@ -17,7 +17,8 @@ export const FASES_FOTO = [
   ["evolucion", "Evolución", "#B45309", "El estado durante el tratamiento"],
   ["alta", "Alta", "#15803D", "Cómo quedó al terminar"],
 ];
-const vacio = (d) => !d || !Object.keys(d).length;
+// Una fase sin ninguna marca (solo piezas seleccionadas) cuenta como vacía.
+const vacio = (d) => !d || !Object.keys(d).length || hallazgosDe(d).total === 0;
 const CARA = { O: "Oclusal / incisal", V: "Vestibular", L: "Lingual", P: "Palatina", M: "Mesial", D: "Distal" };
 
 /* ── Iframe oculto compartido y cola de capturas ── */
@@ -112,7 +113,7 @@ export function hallazgosDe(datos) {
   });
   const ord = (n) => { const x = Number(n), q = Math.floor(x / 10); return q * 100 + ([1, 4, 5, 8].includes(q) ? 10 - (x % 10) : x % 10); };
   lista.sort((a, b) => ord(a.pieza) - ord(b.pieza));
-  return { rojo, azul, total: rojo + azul, piezas: Object.keys(datos || {}).length, lista };
+  return { rojo, azul, total: rojo + azul, piezas: new Set(lista.map((x) => x.pieza)).size, lista };
 }
 const piezaFdi = (n) => { const s = String(n); return s.length === 2 ? `${s[0]}.${s[1]}` : s; };
 

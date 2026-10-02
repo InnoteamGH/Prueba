@@ -3091,7 +3091,17 @@ construir(); panel();
   function snapshot(){
     try{
       if(typeof est==='undefined') return null;
-      return { type:'dento-odontograma-state', fase: est.fase, datos: est.datos[est.fase]||{}, ts: Date.now() };
+      // Solo piezas con alguna marca o nota: seleccionar una pieza crea su registro vacío,
+      // y eso no es un hallazgo (contaba como «toma» y ocultaba la fase con datos).
+      var src=est.datos[est.fase]||{}, out={};
+      Object.keys(src).forEach(function(pz){
+        var r=src[pz]||{};
+        var tiene=Object.keys(r.caras||{}).some(function(k){return r.caras[k]&&r.caras[k].h;})
+          || Object.keys(r.raices||{}).some(function(k){return r.raices[k]&&r.raices[k].h;})
+          || (r.pieza||[]).length>0 || (r.nota||'').trim()!=='';
+        if(tiene) out[pz]=r;
+      });
+      return { type:'dento-odontograma-state', fase: est.fase, datos: out, ts: Date.now() };
     }catch(e){ return null; }
   }
   function notify(){

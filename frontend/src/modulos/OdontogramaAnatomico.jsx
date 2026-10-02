@@ -181,12 +181,13 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   const abrirDocumento = useCallback((que) => { postToIframe({ type: "dento-odontograma-documento", que }); }, [postToIframe]);
   useImperativeHandle(ref, () => ({ capturarAnexo, abrirDocumento }), [capturarAnexo, abrirDocumento]);
 
-  const hidratarDesdeApi = useCallback(async () => {
+  const hidratarDesdeApi = useCallback(async (faseH = capa) => {
     if (!pacienteId) return;
     if (!auth.token) {
-      // Sin servidor: el dibujo muestra los mismos hallazgos que la ficha.
-      const datos = demoDatos || estadosAppAHtml(demoEstados || {});
-      postToIframe({ type: "dento-odontograma-hydrate", fase: capa, datos });
+      // Sin servidor: lo guardado de esa fase. Solo la inicial cae en los hallazgos de la
+      // ficha; evolución y alta sin guardar empiezan vacías (no copian la inicial).
+      const datos = (faseH === capa ? demoDatos : null) || (faseH === "inicial" ? estadosAppAHtml(demoEstados || {}) : {});
+      postToIframe({ type: "dento-odontograma-hydrate", fase: faseH, datos });
       hydrated.current = true;
       lastJson.current = JSON.stringify(datos);
       lastDemo.current = JSON.stringify(datos);
@@ -194,9 +195,9 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       return;
     }
     try {
-      const rows = await api.odontograma.porPaciente(pacienteId, capa);
+      const rows = await api.odontograma.porPaciente(pacienteId, faseH);
       const datos = apiRowsAHtmlDatos(rows || []);
-      postToIframe({ type: "dento-odontograma-hydrate", fase: capa, datos });
+      postToIframe({ type: "dento-odontograma-hydrate", fase: faseH, datos });
       hydrated.current = true;
       lastJson.current = JSON.stringify(datos);
       setSyncState("ok");
@@ -205,7 +206,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       hydrated.current = true;
       setSyncState("idle");
     }
-  }, [pacienteId, capa, postToIframe, measureIframe, demoEstados]);
+  }, [pacienteId, capa, postToIframe, measureIframe, demoEstados, demoDatos]);
 
   const datosDoc = useDatosImpresion();
   const syncChrome = useCallback(() => {
@@ -267,14 +268,22 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       const d = ev?.data;
       if (!d) return;
       if (d.type === "dento-odontograma-state") {
+        // Cambio de fase desde el dibujo: el iframe solo tiene en memoria la fase con que se
+        // cargó, así que lo que manda ahora es una fase vacía. No se guarda: primero se carga
+        // lo guardado de esa fase (efecto de capa) y recién ahí se aceptan cambios.
+        if (d.fase && d.fase !== capa) {
+          hydrated.current = false;
+          lastJson.current = "";
+          lastDemo.current = "";
+          if (typeof onFaseChange === "function") onFaseChange(d.fase);
+          else hidratarDesdeApi(d.fase);
+          setTimeout(measureIframe, 60);
+          return;
+        }
         persistir(d);
         if (!auth.token && typeof onDemoCambio === "function" && d.datos && hydrated.current) {
           const js = JSON.stringify(d.datos);
           if (js !== lastDemo.current) { lastDemo.current = js; onDemoCambio(d.datos, d.fase || capa); }
-        }
-        if (d.fase && typeof onFaseChange === "function") {
-          faseDesdeIframe.current = d.fase;
-          onFaseChange(d.fase);
         }
         setTimeout(measureIframe, 60);
       }
@@ -285,7 +294,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [persistir, onNavTab, onFaseChange, measureIframe, onDemoCambio, capa]);
+  }, [persistir, onNavTab, onFaseChange, measureIframe, onDemoCambio, capa, hidratarDesdeApi]);
 
   useEffect(() => {
     hydrated.current = false;
@@ -299,11 +308,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     if (!frameReady) return;
     if (capaPrev.current === capa) return;
     capaPrev.current = capa;
-    if (faseDesdeIframe.current === capa) {
-      faseDesdeIframe.current = null;
-      hydrated.current = true;
-      return;
-    }
+    // Venga del padre o del dibujo, al cambiar de fase siempre se carga lo guardado de esa fase.
     hydrated.current = false;
     lastJson.current = "";
     hidratarDesdeApi();

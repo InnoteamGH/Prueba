@@ -2702,7 +2702,14 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   // Al abrir un paciente se muestra su último estado: la fase más reciente con marcas
   // (alta › evolución › inicial), no siempre la inicial.
   useEffect(() => {
-    if (!conectado || !pacienteId) return;
+    if (!pacienteId) return;
+    if (!conectado) {
+      // Demo: la fase más reciente con alguna marca guardada en la ficha.
+      const oh = fichas[pacienteId]?.odoHtml || {};
+      const conMarca = (d) => Object.values(d || {}).some((r) => Object.values(r?.caras || {}).some((x) => x?.h) || Object.values(r?.raices || {}).some((x) => x?.h) || (r?.pieza || []).length);
+      setFase(conMarca(oh.alta) ? "alta" : conMarca(oh.evolucion) ? "evolucion" : "inicial");
+      return;
+    }
     let vivo = true;
     Promise.all(["alta", "evolucion"].map((f) => api.odontograma.porPaciente(pacienteId, f).then((r) => (r || []).length > 0).catch(() => false)))
       .then(([hayAlta, hayEvo]) => { if (vivo) setFase(hayAlta ? "alta" : hayEvo ? "evolucion" : "inicial"); });
