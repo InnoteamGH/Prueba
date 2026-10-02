@@ -26,6 +26,8 @@ import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
 import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, sedeEnLista, sedePrincipal, uuidSede } from "./compartido/cajaSede";
+// Soles y dólares en caja, montos escritos y la boleta de un cobro (compartido/cajaMoneda.js).
+import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
@@ -3843,7 +3845,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 }
 
 /* ---- Caja / Facturación (fuente única: el plan de tratamiento de cada ficha) ---- */
-const EGRESO_CATS = ["Insumos", "Laboratorio", "Alquiler", "Servicios (luz/agua)", "Planilla", "Marketing", "Equipos", "Otros"];
+// Las categorías de egreso (EGRESO_CATS) viven en compartido/cajaMoneda.js: una sola lista.
 // Cada link es de la sede que lo generó: su cobro entra a la caja de esa sede.
 const LINKS_DEMO = [
   { id: 1, sede: 2, paciente: "Rosa Linares", concepto: "Abono ortodoncia", monto: 250, estado: "pagado", fecha: addDays(-1) },
@@ -3853,6 +3855,29 @@ const LINKS_DEMO = [
    leen Caja y Tickets para no cobrar en una sede con la caja cerrada. */
 const claveCajaDemo = (sede, fecha = fmt(hoy)) => `dc_caja_apertura_${fecha}_${numSede(sede) ?? sede}`;
 const aperturaDemo = (sede) => { try { return JSON.parse(localStorage.getItem(claveCajaDemo(sede)) || "null"); } catch { return null; } };
+/* Demostración: cada jornada cerrada (también las de una caja reabierta el mismo día) queda
+   en esta lista, así el historial no pierde el primer cierre al reabrir (C7). */
+const CLAVE_JORNADAS_DEMO = "dc_caja_jornadas_demo";
+const jornadasDemo = () => { try { const a = JSON.parse(localStorage.getItem(CLAVE_JORNADAS_DEMO) || "[]"); return Array.isArray(a) ? a : []; } catch { return []; } };
+const guardarJornadaDemo = (j) => { try { localStorage.setItem(CLAVE_JORNADAS_DEMO, JSON.stringify([j, ...jornadasDemo().filter((x) => x.id !== j.id)].slice(0, 200))); } catch { /* sin almacenamiento */ } };
+/* Una jornada del historial (servidor o demostración) con el arqueo en soles y en dólares
+   y las notas del cierre. La diferencia en US$ se deduce si el servidor no la manda (C3). */
+const numONulo = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
+const mapJornada = (r) => {
+  const espUsd = numONulo(r.efectivoEsperadoUsd), conUsd = numONulo(r.efectivoContadoUsd);
+  return {
+    fondo: Number(r.fondo) || 0, fondoUsd: Number(r.fondoUsd) || 0,
+    efectivoEsperado: numONulo(r.efectivoEsperado), efectivoContado: numONulo(r.efectivoContado), diferencia: numONulo(r.diferencia),
+    efectivoEsperadoUsd: espUsd, efectivoContadoUsd: conUsd,
+    diferenciaUsd: numONulo(r.diferenciaUsd) ?? (espUsd != null && conUsd != null ? red2(conUsd - espUsd) : null),
+    justificacion: r.justificacion || "", observaciones: r.observaciones || "",
+  };
+};
+/* Tipo de cambio de referencia (el último usado en caja o el de la clínica). */
+const tcGuardado = () => { try { const v = Number(localStorage.getItem("dc_tipo_cambio") || TC_DEFECTO); return Number.isFinite(v) && v > 0 ? v : TC_DEFECTO; } catch { return TC_DEFECTO; } };
+const usd2 = (n) => "US$ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/* Hora de Lima (HH:mm) de un instante, para comparar con la hora de los cobros del servidor. */
+const horaLima = (iso) => { try { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Lima" }); } catch { return ""; } };
 
 /* Icono y color de cada medio de pago en Caja. */
 const MEDIO_UI = {
@@ -3865,13 +3890,16 @@ const DENOMS = [[200, "b"], [100, "b"], [50, "b"], [20, "b"], [10, "b"], [5, "m"
 
 function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null, abrirEgreso = false, onEgresoAbierto = () => {} }) {
   const [verApertura, setVerApertura] = useState(false);   // apertura de caja plegada hasta que se pide
-  // Autorización granular: si llega `can` se usa la matriz; si no, se cae al rol.
-  const puedeEgresos = can ? can("facturacion", "aprobar") : rol !== "recepcion" && rol !== "gerencia";
   // Bug #26 re-test: Gerencia debe VER la pestaña Ingresos/egresos (solo lectura), aunque no pueda crear egresos
   const puedeVerMovimientos = can ? can("facturacion", "ver") : rol !== "recepcion";
   // Con varias sedes el administrador general solo supervisa: cada sede abre su caja y emite.
   const { supervisor: supervisaCaja } = useEmiteCobros(can);
   const puedeAbrirCaja = !supervisaCaja && (can ? can("facturacion", "crear") : rol !== "gerencia");
+  // C4: el egreso sale de la gaveta, así que lo registra quien opera la caja (recepción y
+  // administrador de sede), igual aquí que en «Crear › Registrar egreso». Anularlo o
+  // reclasificarlo es de quien aprueba. Autorización granular: con `can` manda la matriz.
+  const puedeRegistrarEgreso = puedeAbrirCaja;
+  const puedeAnularEgreso = can ? can("facturacion", "aprobar") : rol !== "recepcion" && rol !== "gerencia";
   const puedeConfig = can ? can("facturacion", "configurar") : rol !== "recepcion" && rol !== "gerencia";
   const conectado = !!auth.token;
   // Conectado se dice la verdad; en demostracion se conserva el ejemplo de siempre.
@@ -3880,8 +3908,6 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     : "Comprobante de demostración (sin envío a SUNAT).";
   const [pago, setPago] = useState(null); // { pid, nombre, monto }
   const [filtroCob, setFiltroCob] = useState("listos");
-  // Menú «Crear › Registrar egreso»: abre el formulario de egreso al llegar.
-  useEffect(() => { if (abrirEgreso) { nuevoEgreso(); onEgresoAbierto(); } }, [abrirEgreso]); // eslint-disable-line react-hooks/exhaustive-deps
   const [caja, setCaja] = useState({ porCobrar: [], boletasHoy: [], montoPorCobrar: 0, montoHoy: 0 });
   const [cajaError, setCajaError] = useState(false);
   const [histError, setHistError] = useState(false);
@@ -3932,6 +3958,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const cajaStorageKey = () => claveCajaDemo(sedeCaja);
   const nombreUsuarioCaja = () => { try { return (JSON.parse(localStorage.getItem("dc_usuario") || "null") || {}).nombre || "Recepción"; } catch { return "Recepción"; } };
   const [apertura, setApertura] = useState(null);
+  // ¿Ya se leyó la apertura de la sede? «Crear › Registrar egreso» espera a saberlo.
+  const [aperturaLista, setAperturaLista] = useState(false);
   const [jornadaAbiertaPrevia, setJornadaAbiertaPrevia] = useState(null);
   const [cierreAdmin, setCierreAdmin] = useState(null); // { id, fecha, sedeId, fondo }
   const [cierreAdminForm, setCierreAdminForm] = useState({ contado: "", justificacion: "" });
@@ -3940,21 +3968,16 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     if (!r) return null;
     if (!r.abierta && !r.id) return null;
     if (!r.abierta) {
+      // C3: el cierre trae también el arqueo en dólares y las observaciones.
       return {
         id: r.id,
+        ...mapJornada(r),
         abierta: false,
-        fondo: Number(r.fondo) || 0,
-      fondoUsd: Number(r.fondoUsd) || 0,
-        fondoUsd: Number(r.fondoUsd) || 0,
         nota: r.nota || "",
         abiertaEn: r.abiertaEn || null,
         abiertaPorNombre: r.abiertaPorNombre || null,
         cerradaEn: r.cerradaEn || null,
         cerradaPorNombre: r.cerradaPorNombre || null,
-        efectivoContado: r.efectivoContado != null ? Number(r.efectivoContado) : null,
-        efectivoEsperado: r.efectivoEsperado != null ? Number(r.efectivoEsperado) : null,
-        diferencia: r.diferencia != null ? Number(r.diferencia) : null,
-        justificacion: r.justificacion || "",
         destinosActivos: r.destinosActivos || null,
         sede: sedeNombre(),
         fecha: r.fecha || null,
@@ -3969,6 +3992,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       abiertaEn: r.abiertaEn || null,
       abiertaPorNombre: r.abiertaPorNombre || null,
       destinosActivos: r.destinosActivos || null,
+      // C7: si es una reapertura del mismo día, el arqueo cuenta solo lo posterior a ella.
+      reabierta: !!r.reabierta,
       sede: sedeNombre(),
       fecha: r.fecha || null,
     };
@@ -3983,7 +4008,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   ];
   const [destinosCatalogo, setDestinosCatalogo] = useState(DESTINOS_BASE);
   const [destinosSel, setDestinosSel] = useState(() => new Set(["efectivo", "yape", "plin", "pos", "transferencia"]));
-  const [cierreForm, setCierreForm] = useState({ contado: "", justificacion: "", observaciones: "" });
+  const CIERRE_VACIO = { contado: "", contadoUsd: "", justificacion: "", observaciones: "" };
+  const [cierreForm, setCierreForm] = useState(CIERRE_VACIO);
   const [denoms, setDenoms] = useState({});
   const [denomsUsd, setDenomsUsd] = useState({});
   const [cierreBusy, setCierreBusy] = useState(false);
@@ -3997,8 +4023,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // «Yape (Niubiz)», «POS», «tarjeta»… → una sola clave por medio para agrupar y filtrar.
   const medioKey = (x) => { const t = String(x || "otro").toLowerCase(); return ["efectivo", "yape", "plin", "tarjeta", "transferencia", "seguro"].find((k) => t.startsWith(k)) || (t.startsWith("pos") ? "tarjeta" : t); };
   const [histCaja, setHistCaja] = useState(() => conectado ? [] : [
-    // Demostración: la jornada de hoy de cada sede, si ya se cerró, sigue en el historial al recargar.
-    ...SEDES.flatMap((sd) => { const r = aperturaDemo(sd.id); return r && r.abierta === false && r.cerradaEn ? [{ id: `hoy-${sd.id}`, fecha: fmt(hoy), sedeId: sd.id, sedeNombre: sd.nombre, abierta: false, abiertaEn: r.abiertaEn, cerradaEn: r.cerradaEn, abiertaPorNombre: r.abiertaPorNombre, cerradaPorNombre: r.cerradaPorNombre, fondo: r.fondo, efectivoEsperado: r.efectivoEsperado, efectivoContado: r.efectivoContado, diferencia: r.diferencia }] : []; }),
+    // Demostración: las jornadas cerradas (con su arqueo en soles y dólares) siguen en el
+    // historial al recargar, también las de una caja reabierta el mismo día.
+    ...jornadasDemo(),
+    // Dato viejo: el cierre de hoy guardado solo en la apertura de la sede.
+    ...SEDES.flatMap((sd) => { const r = aperturaDemo(sd.id); return r && r.abierta === false && r.cerradaEn && !jornadasDemo().some((j) => j.aperturaId === r.id && j.cerradaEn === r.cerradaEn) ? [{ id: `hoy-${sd.id}`, fecha: fmt(hoy), sedeId: sd.id, sedeNombre: sd.nombre, abierta: false, abiertaEn: r.abiertaEn, cerradaEn: r.cerradaEn, abiertaPorNombre: r.abiertaPorNombre, cerradaPorNombre: r.cerradaPorNombre, ...mapJornada(r) }] : []; }),
     { id: "dj1", sedeId: 1, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 5).toISOString(), cerradaPorNombre: "Carla Mendoza", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 40).toISOString(), fondo: 100, efectivoEsperado: 860, efectivoContado: 860, diferencia: 0, abierta: false },
     { id: "dj2", sedeId: 2, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede Surco", abiertaPorNombre: "Karina Soto", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 30).toISOString(), cerradaPorNombre: "Karina Soto", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 10).toISOString(), fondo: 100, efectivoEsperado: 540, efectivoContado: 530, diferencia: -10, abierta: false },
     { id: "dj3", sedeId: 1, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 8, 0).toISOString(), cerradaPorNombre: "Roberto Díaz", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 20, 5).toISOString(), fondo: 150, efectivoEsperado: 1220, efectivoContado: 1225, diferencia: 5, abierta: false },
@@ -4025,15 +4054,18 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const sid = sedeUuid();
     const pedida = sedeCaja;
     if (conectado && sid) {
+      setAperturaLista(false);
       api.cajaApertura.get(sid, fmt(hoy))
         .then((r) => {
           if (String(sedeCajaRef.current) !== String(pedida)) return;
           setApertura(mapAperturaApi(r));
           setJornadaAbiertaPrevia(r?.jornadaAbiertaPrevia || null);
         })
-        .catch(() => { setApertura(null); setJornadaAbiertaPrevia(null); notify("No se pudo leer la apertura de caja del servidor."); });
+        .catch(() => { setApertura(null); setJornadaAbiertaPrevia(null); notify("No se pudo leer la apertura de caja del servidor."); })
+        .finally(() => { if (String(sedeCajaRef.current) === String(pedida)) setAperturaLista(true); });
       return;
     }
+    setAperturaLista(true);
     if (sedeCaja == null) { setApertura(null); setJornadaAbiertaPrevia(null); return; }
     setApertura(aperturaDemo(sedeCaja));
     setJornadaAbiertaPrevia(null);
@@ -4050,7 +4082,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     // lista se recorta igual en el cliente a las sedes que se ven.
     const sid = sedeUuid();
     api.cajaApertura.historial({ sedeId: sid || undefined, desde: histCajaRango.desde, hasta: histCajaRango.hasta })
-      .then((rows) => setHistCaja(Array.isArray(rows) ? rows : []))
+      .then((rows) => setHistCaja(Array.isArray(rows) ? rows.map((r) => ({ ...r, ...mapJornada(r) })) : []))
       .catch(() => { setHistCaja([]); notify("No se pudo cargar el historial de caja."); });
   };
   // Al cambiar de caja no se arrastra la apertura de la anterior mientras llega la nueva.
@@ -4062,13 +4094,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     if (!puedeAbrirCaja) { notify(supervisaCaja ? "La caja la abre y cobra cada sede (su administrador o recepción). Tú la supervisas." : "Tu rol solo consulta la caja; recepción o administración la abren."); return; }
     const sid = sedeUuid();
     if (!sid) { notify("Elige una sede concreta antes de abrir la caja. No se puede abrir «todas» a la vez."); return; }
+    // C8: el fondo se valida (antes «50.5.5» o un fondo vacío quedaban en 0 sin aviso).
+    const fS = leerMonto(aperturaForm.fondo, { obligatorio: true });
+    if (!fS.ok) { notify(fS.motivo === "vacio" ? "Indica el fondo inicial en soles (escribe 0 si empiezas sin sencillo)." : `Fondo en soles inválido («${aperturaForm.fondo}»): usa números con hasta 2 decimales (ej. 200 o 150.50).`); return; }
+    const fU = leerMonto(aperturaForm.fondoUsd);
+    if (!fU.ok) { notify(`Fondo en dólares inválido («${aperturaForm.fondoUsd}»): usa números con hasta 2 decimales (ej. 50 o 50.50).`); return; }
+    const fondo = fS.valor, fondoUsd = fU.valor;
+    const textoApertura = `Caja abierta en ${sedeNombre()} con fondo S/ ${M.sol2(fondo)}${fondoUsd > 0 ? ` y ${usd2(fondoUsd)}` : ""}.`;
     if (!conectado) {
       if (MODO_DEMO) {
-        const fondoDemo = Number(aperturaForm.fondo) || 0;
-        const ap = { id: "demo", sede: sedeCaja, abierta: true, fondo: fondoDemo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: nombreUsuarioCaja(), destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) };
+        // C7: cada apertura es una sesión distinta. Al reabrir el mismo día, lo que ya existía
+        // (cobros y egresos de la sesión anterior) queda anotado para no contarlo otra vez.
+        const previa = aperturaDemo(sedeCaja);
+        const reabierta = !!(previa && previa.abierta === false && previa.cerradaEn);
+        const previos = [...boletasHoy.map((b) => b._k).filter(Boolean), ...egresosHoy.map((e) => `e:${e.id}`)];
+        const ap = { id: `demo-${Date.now()}`, sede: sedeCaja, abierta: true, fondo, fondoUsd, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: nombreUsuarioCaja(), destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)), reabierta, previos };
         setApertura(ap);
         try { localStorage.setItem(cajaStorageKey(), JSON.stringify(ap)); } catch { /* sin almacenamiento */ }
-        notify(`Caja abierta en ${sedeNombre()} con fondo S/ ${M.sol2(fondoDemo)}.`);
+        setCierreForm(CIERRE_VACIO); setDenoms({}); setDenomsUsd({});
+        notify(textoApertura);
         setTab("hoy");
         return;
       }
@@ -4081,10 +4125,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       recargarHistCaja();
       return;
     }
-    const fondo = Number(aperturaForm.fondo) || 0;
     const destinosActivos = JSON.stringify(destinosCatalogo.filter((d) => destinosSel.has(d.id)));
-    api.cajaApertura.abrir({ sedeId: sid, fondo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || null, fecha: ymdLima(new Date()) || fmt(hoy), destinosActivos })
-      .then((r) => { setApertura(mapAperturaApi({ ...r, abierta: true })); setJornadaAbiertaPrevia(null); notify(`Caja abierta en ${sedeNombre()} con fondo S/ ${M.sol2(fondo)}.`); setTab("hoy"); })
+    api.cajaApertura.abrir({ sedeId: sid, fondo, fondoUsd, nota: aperturaForm.nota || null, fecha: ymdLima(new Date()) || fmt(hoy), destinosActivos })
+      .then((r) => { setApertura(mapAperturaApi({ ...r, abierta: true })); setJornadaAbiertaPrevia(null); setCierreForm(CIERRE_VACIO); setDenoms({}); setDenomsUsd({}); notify(textoApertura); setTab("hoy"); })
       .catch((e) => {
         notify(e?.message || "No se pudo abrir la caja en el servidor.");
         if (e?.status === 409) { recargarApertura(); setTab("historial"); }
@@ -4158,46 +4201,67 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       .then(() => { notify("Pago anulado."); setAnulForm(null); recargarCaja(); recargarCierre(); recargarHist(); })
       .catch((e) => notify(e?.message || "No se pudo anular el pago."));
   };
-  const cerrarApertura = (esperadoEfectivo, usdCierre = null) => {
+  // usd = { requerido, esperado, fondo }: la gaveta en dólares se cuadra aparte (C3). Se exige
+  // contarla si hubo fondo o movimiento en dólares, y justificar si no cuadra.
+  const cerrarApertura = (esperadoEfectivo, usd = null) => {
     if (!puedeAbrirCaja) { notify("Tu rol no puede cerrar la caja."); return; }
-    if (cierreForm.contado === "" || cierreForm.contado == null) { notify("Indica el efectivo contado antes de cerrar."); return; }
-    const contado = Number(cierreForm.contado);
-    if (Number.isNaN(contado)) { notify("Efectivo contado inválido."); return; }
+    const lc = leerMonto(cierreForm.contado, { obligatorio: true });
+    if (!lc.ok) { notify(lc.motivo === "vacio" ? "Indica el efectivo contado en soles antes de cerrar." : `Efectivo contado inválido («${cierreForm.contado}»): usa números con hasta 2 decimales.`); return; }
+    const contado = lc.valor;
     const esperado = Number(esperadoEfectivo);
-    const diff = Math.round((contado - esperado) * 100) / 100;
-    const cerradaHoy = () => ({ ...(apertura || {}), abierta: false, cerradaEn: new Date().toISOString(), cerradaPorNombre: nombreUsuarioCaja(), efectivoContado: contado, efectivoEsperado: esperado, diferencia: diff, justificacion: (cierreForm.justificacion || "").trim() });
-    if (Math.abs(diff) > 0.009 && !(cierreForm.justificacion || "").trim()) {
-      notify("La justificación es obligatoria cuando hay descuadre.");
+    const diff = red2(contado - esperado);
+    let contadoUsd = null, diffUsd = null;
+    if (usd) {
+      const lu = leerMonto(cierreForm.contadoUsd, { obligatorio: !!usd.requerido });
+      if (!lu.ok) { notify(lu.motivo === "vacio" ? `Falta contar la gaveta en dólares antes de cerrar: se esperan ${usd2(usd.esperado)} (escribe 0 si no hay).` : `Dólares contados inválidos («${cierreForm.contadoUsd}»): usa números con hasta 2 decimales.`); return; }
+      if (!lu.vacio || usd.requerido) { contadoUsd = lu.valor; diffUsd = red2(contadoUsd - Number(usd.esperado)); }
+    }
+    const just = (cierreForm.justificacion || "").trim();
+    const obs = (cierreForm.observaciones || "").trim();
+    const descuadreSol = Math.abs(diff) > 0.009, descuadreUsd = diffUsd != null && Math.abs(diffUsd) > 0.009;
+    if ((descuadreSol || descuadreUsd) && !just) {
+      notify(descuadreSol && descuadreUsd ? "La justificación es obligatoria: no cuadran ni los soles ni los dólares."
+        : descuadreUsd ? `La justificación es obligatoria: la gaveta en dólares no cuadra (${diffUsd > 0 ? "sobran" : "faltan"} ${usd2(Math.abs(diffUsd))}).`
+        : "La justificación es obligatoria cuando hay descuadre.");
       return;
     }
-    const resumen = `Esperado S/ ${M.sol2(esperado)} – Contado S/ ${M.sol2(contado)} – Diferencia S/ ${M.sol2(diff)}${diff === 0 ? " (cuadra)" : diff > 0 ? " (sobra)" : " (falta)"}${usdCierre ? ` · Dólares: esperado US$ ${usdCierre.esperado.toFixed(2)}, contado US$ ${usdCierre.contado.toFixed(2)}` : ""}`;
+    const usdCampos = contadoUsd != null ? { fondoUsd: Number(usd.fondo) || 0, efectivoEsperadoUsd: Number(usd.esperado), efectivoContadoUsd: contadoUsd, diferenciaUsd: diffUsd } : {};
+    const cerradaHoy = () => ({ ...(apertura || {}), abierta: false, cerradaEn: new Date().toISOString(), cerradaPorNombre: nombreUsuarioCaja(), efectivoContado: contado, efectivoEsperado: esperado, diferencia: diff, ...usdCampos, justificacion: just, observaciones: obs });
+    const estado = (d) => (Math.abs(d) < 0.01 ? " (cuadra)" : d > 0 ? " (sobra)" : " (falta)");
+    const resumen = `Esperado S/ ${M.sol2(esperado)} – Contado S/ ${M.sol2(contado)} – Diferencia S/ ${M.sol2(diff)}${estado(diff)}${contadoUsd != null ? ` · Dólares: esperado ${usd2(usd.esperado)}, contado ${usd2(contadoUsd)}, diferencia ${usd2(diffUsd)}${estado(diffUsd)}` : ""}`;
     if (!confirm(`¿Cerrar la caja del día?\n\n${resumen}\n\nNo se podrán registrar más cobros hasta reabrir.`)) return;
     const body = {
       efectivoContado: contado,
       efectivoEsperado: esperado,
-      ...(usdCierre ? { efectivoContadoUsd: usdCierre.contado, efectivoEsperadoUsd: usdCierre.esperado } : {}),
-      justificacion: (cierreForm.justificacion || "").trim() || null,
+      ...(contadoUsd != null ? { efectivoContadoUsd: contadoUsd, efectivoEsperadoUsd: Number(usd.esperado), diferenciaUsd: diffUsd } : {}),
+      justificacion: just || null,
+      observaciones: obs || null,
     };
+    const limpiar = () => { setCierreForm(CIERRE_VACIO); setDenoms({}); setDenomsUsd({}); };
     setCierreBusy(true);
     if (conectado && apertura?.id) {
       api.cajaApertura.cerrar(apertura.id, body)
-        .then(() => { setApertura(cerradaHoy()); setCierreForm({ contado: "", justificacion: "", observaciones: "" }); notify("Caja cerrada. " + resumen); setTab("historial"); recargarHistCaja(); })
+        .then(() => { setApertura(cerradaHoy()); limpiar(); notify("Caja cerrada. " + resumen); setTab("historial"); recargarHistCaja(); })
         .catch((e) => notify(e?.message || "No se pudo cerrar la caja."))
         .finally(() => setCierreBusy(false));
       return;
     }
-    // Demostración: la jornada queda registrada como cerrada (con su cuadre) y pasa al historial.
+    // Demostración: la jornada queda registrada como cerrada (con su cuadre en soles y dólares
+    // y sus notas) y pasa al historial; la lista de jornadas sobrevive a una reapertura.
     const cerrada = cerradaHoy();
     try { localStorage.setItem(cajaStorageKey(), JSON.stringify(cerrada)); } catch { /* sin almacenamiento */ }
     setApertura(cerrada);
-    setHistCaja((h) => [{ id: "hoy-" + Date.now(), fecha: fmt(hoy), sedeId: sedeCaja, sedeNombre: sedeNombre(), abierta: false, abiertaEn: cerrada.abiertaEn, cerradaEn: cerrada.cerradaEn, abiertaPorNombre: cerrada.abiertaPorNombre, cerradaPorNombre: cerrada.cerradaPorNombre, fondo: cerrada.fondo, efectivoEsperado: esperado, efectivoContado: contado, diferencia: diff }, ...(h || [])]);
-    setCierreForm({ contado: "", justificacion: "", observaciones: "" });
+    const jornada = { id: `j-${cerrada.id}-${Date.now()}`, aperturaId: cerrada.id, fecha: fmt(hoy), sedeId: sedeCaja, sedeNombre: sedeNombre(), abierta: false, abiertaEn: cerrada.abiertaEn, cerradaEn: cerrada.cerradaEn, abiertaPorNombre: cerrada.abiertaPorNombre, cerradaPorNombre: cerrada.cerradaPorNombre, ...mapJornada(cerrada) };
+    guardarJornadaDemo(jornada);
+    setHistCaja((h) => [jornada, ...(h || [])]);
+    limpiar();
     setCierreBusy(false);
     notify("Caja cerrada. " + resumen);
     setTab("historial");
   };
   const guardarMovCaja = () => {
-    if (!movForm || !(Number(movForm.monto) > 0)) { notify("Indica el monto del movimiento."); return; }
+    const lmov = leerMonto(movForm?.monto, { obligatorio: true });
+    if (!movForm || !lmov.ok || !(lmov.valor > 0)) { notify("Indica el monto del movimiento: mayor que 0 y con hasta 2 decimales."); return; }
     if (!apertura?.id) { notify("Abre la caja primero."); return; }
     if (conectado) {
       api.cajaMovimientos.crear({ aperturaId: apertura.id, tipo: movForm.tipo, monto: Number(movForm.monto), nota: movForm.nota || null })
@@ -4239,8 +4303,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     setPago(payload);
   };
   const [cierre, setCierre] = useState(null);
-  // Cierre del día de la caja que se ve (CAJA-05): el servidor recibe las sedes.
-  const recargarCierre = () => { if (conectado) api.pagos.cierre(undefined, { sedeIds: sedesApi }).then(setCierre).catch(() => {}); };
+  // Cierre del día de la caja que se ve (CAJA-05): el servidor recibe las sedes y, con la caja
+  // abierta, la sesión (aperturaId) para contar solo lo posterior a esa apertura (C7).
+  const recargarCierre = () => { if (conectado) api.pagos.cierre(undefined, { sedeIds: sedesApi, aperturaId: apertura?.abierta ? apertura.id : null }).then(setCierre).catch(() => {}); };
   const demoDb = useContext(DatosDemoCtx) || {};
   const { egresos: egresosDemo, setEgresos: setEgresosDemo } = demoDb;
   const [egresosApi, setEgresosApi] = useState([]);
@@ -4249,9 +4314,37 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // Para mostrar: solo los egresos de la sede de la caja (o de las sedes que se ven). Se
   // escribe siempre sobre la lista completa con actualización funcional (CAJA-04).
   const egresosVis = egresos.filter((e) => deCaja(sedeDeEgreso(e)));
-  const recargarEgresos = () => { if (conectado) api.egresos.listar({ sedeIds: sedesApi }).then((r) => setEgresos((r || []).map((e) => ({ id: e.id, sede: e.sedeId ?? e.sede ?? null, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo", moneda: e.moneda || "PEN" })))).catch(() => {}); };
-  const [egForm, setEgForm] = useState(null);           // { concepto, categoria, monto, metodo, moneda, sede }
-  const nuevoEgreso = () => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN", sede: sedeCaja });
+  const recargarEgresos = () => { if (conectado) api.egresos.listar({ sedeIds: sedesApi }).then((r) => setEgresos((r || []).map((e) => ({ id: e.id, sede: e.sedeId ?? e.sede ?? null, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo", moneda: e.moneda || "PEN", tipoCambio: Number(e.tipoCambio) > 0 ? Number(e.tipoCambio) : null, cajaSesion: e.aperturaId || null, creadoEn: e.creadoEn || e.createdAt || null })))).catch(() => {}); };
+  // TC de referencia: el de la clínica (con sesión) o el último usado al cobrar en esta caja.
+  // Propone el TC de un egreso en dólares y convierte los egresos viejos que no guardaron TC.
+  const [tcClinica, setTcClinica] = useState(null);
+  useEffect(() => { if (conectado) api.clinica.get().then((r) => { const v = Number(r?.tipoCambio); if (Number.isFinite(v) && v > 0) setTcClinica(v); }).catch(() => {}); }, [conectado]);
+  const tcRef = tcClinica || tcGuardado();
+  const [egForm, setEgForm] = useState(null);           // { concepto, categoria, monto, metodo, moneda, tc, sede }
+  // ¿Está abierta la caja de esta sede? La de la caja elegida ya se conoce; con «Todas», en la
+  // demostración se lee su apertura y con sesión se pregunta al servidor.
+  const cajaAbiertaEn = (sede) => {
+    if (sede == null) return Promise.resolve(false);
+    if (sedeCaja != null && mismaSede(sede, sedeCaja)) return Promise.resolve(!!apertura?.abierta);
+    if (!conectado) return Promise.resolve(!!aperturaDemo(sede)?.abierta);
+    return api.cajaApertura.get(uuidDe(sede), fmt(hoy)).then((r) => !!r?.abierta).catch(() => false);
+  };
+  const nuevoEgreso = () => {
+    if (!puedeRegistrarEgreso) {
+      notify(supervisaCaja ? "Los egresos los registra cada sede con su caja abierta (su administrador o recepción). Tú los supervisas." : "Tu rol no registra egresos de caja.");
+      return;
+    }
+    // C4: el egreso sale de la gaveta: con la caja de la sede cerrada no se registra.
+    if (sedeCaja != null && !cajaAbierta) {
+      notify(jornadaAbiertaPrevia?.id ? "Cierra la jornada anterior en Historial y abre la caja antes de registrar un egreso." : `Abre la caja de ${sedeNombre()} antes de registrar un egreso.`);
+      setTab(jornadaAbiertaPrevia?.id ? "historial" : "hoy");
+      return;
+    }
+    setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN", tc: String(tcRef), sede: sedeCaja });
+  };
+  // Menú «Crear › Registrar egreso»: abre el formulario cuando ya se sabe si la caja de la
+  // sede está abierta (la apertura se lee al llegar a Caja), con las mismas reglas.
+  useEffect(() => { if (abrirEgreso && aperturaLista) { nuevoEgreso(); onEgresoAbierto(); } }, [abrirEgreso, aperturaLista]); // eslint-disable-line react-hooks/exhaustive-deps
   // Con sesión se arranca vacío: los dos cobros de ejemplo alimentaban el KPI "Cobrado
   // por links S/ 250 – pagados", dinero que nadie ha pagado.
   const [links, setLinks] = useState(auth.token ? [] : LINKS_DEMO);
@@ -4280,6 +4373,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       setHist((h || []).map((p) => ({
         id: p.id, paciente: p.paciente || "—", sede: p.sede || "—", sedeId: p.sedeId || null,
         concepto: p.concepto || "", monto: Number(p.monto) || 0, metodo: String(p.metodo || ""),
+        moneda: p.moneda || "PEN", montoOriginal: p.montoOriginal != null ? Number(p.montoOriginal) : null, tipoCambio: p.tipoCambio != null ? Number(p.tipoCambio) : null,
+        dni: p.dni || p.pacienteDni || "", usuario: p.usuarioNombre || p.cobradoPorNombre || "",
         comprobante: `${p.comprobanteTipo || ""} ${p.comprobanteSerie || ""} ${p.comprobanteNumero != null ? fmtComprobante(p.comprobanteNumero) : ""}`.trim(),
         comprobanteSerie: p.comprobanteSerie, comprobanteNumero: p.comprobanteNumero, fecha: (p.fecha || "").slice(0, 10),
       })));
@@ -4301,7 +4396,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     else notify(`${cobroDesdeFicha.nombre} no tiene saldo pendiente en caja.`);
     onCobroDesdeFichaDone();
   }, [cobroDesdeFicha, conectado, caja.porCobrar?.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (conectado && tab === "cierre") recargarCierre(); }, [tab]); // eslint-disable-line
+  useEffect(() => { if (conectado && tab === "cierre") recargarCierre(); }, [tab, apertura?.id, apertura?.abierta]); // eslint-disable-line
   // Cuenta única del paciente (M-06/M-07): la misma que leen Pendientes, Panel y la ficha,
   // recortada a la sede de la caja (CAJA-03): un paciente de dos sedes no arrastra aquí lo
   // que se hizo o cobró en la otra. Un dato viejo sin sede es de la sede principal del paciente.
@@ -4325,8 +4420,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const terminadosPorPac = terminados.reduce((m, t) => { const x = m.get(t.pid) || { pid: t.pid, paciente: t.paciente, fases: [], total: 0 }; x.fases.push(t); x.total += t.costo; m.set(t.pid, x); return m; }, new Map());
   const boletasSrv = caja.boletasHoy || [];
   const boletasHoy = conectado
-    ? boletasSrv.filter((b) => deCaja(b.sedeId)).map((b) => ({ id: b.id, sedeId: b.sedeId || null, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null }))
-    : pacientes.flatMap((p) => (fichaVis(p.id)?.pagos || []).filter((pg) => pg.fecha === fmt(hoy)).map((pg) => ({ ...pg, sede: sedeDeRegistro(pg, p), paciente: p.nombre, dni: p.dni || "", direccion: p.direccion || p.distrito || "", anulado: false })));
+    ? boletasSrv.filter((b) => deCaja(b.sedeId)).map((b) => ({ id: b.id, sedeId: b.sedeId || null, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null,
+        // Boleta (C1/C6) y sesión de caja (C7): TC del cobro, documento y dirección del paciente,
+        // quién cobró, a qué apertura pertenece y cuándo se registró.
+        tipoCambio: b.tipoCambio != null ? Number(b.tipoCambio) : null, dni: b.dni || b.pacienteDni || "", direccion: b.direccion || "", usuario: b.usuarioNombre || b.cobradoPorNombre || "", cajaSesion: b.aperturaId || null, creadoEn: b.creadoEn || b.createdAt || null, hora: b.hora || "" }))
+    // Demostración: `_k` (paciente e índice del pago) identifica el cobro para separar las
+    // sesiones de caja de un mismo día (C7).
+    : pacientes.flatMap((p) => { const pac = pacDe(p.id) || p; return (fichas[p.id]?.pagos || []).map((pg, idx) => [pg, idx]).filter(([pg]) => pg.fecha === fmt(hoy) && deCaja(sedeDeRegistro(pg, pac))).map(([pg, idx]) => ({ ...pg, _k: `p:${p.id}:${idx}`, pid: p.id, sede: sedeDeRegistro(pg, pac), paciente: p.nombre, dni: p.dni || "", direccion: p.direccion || p.distrito || "", anulado: false })); });
   const boletasHoyActivas = boletasHoy.filter((b) => !b.anulado);
   // «Por cobrar» = trabajo terminado aún sin pagar (M-06), igual en Caja, Panel y Pendientes.
   const montoPorCobrar = conectado
@@ -4346,9 +4446,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       return;
     }
     const numero = numeroRaw != null ? fmtComprobante(numeroRaw) : peekBoletaLocal(em.serie);
-    setBoletaVer({ serie, numero, sede: sedeB, cliente: b.paciente, dni: b.dni || "", direccion: b.direccion || "", fecha: b.fecha || fmt(hoy), total: Number(b.monto) || 0, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), items: b.items && b.items.length ? b.items : undefined, tipo: b.tipo || "Boleta", docTipo: b.docTipo || "DNI", docNum: b.docNum || b.dni || "", moneda: b.moneda || "PEN", ref: b.refComprobante || undefined });
+    // C1: la misma boleta que «Ver boleta» del cobro (armarBoleta): en dólares, el total es lo
+    // que pagó el paciente en US$, con el TC del cobro y su equivalente en soles.
+    const pac = b.pid != null ? pacDe(b.pid) : null;
+    setBoletaVer(armarBoleta({ ...b, sede: sedeB, dni: b.dni || pac?.dni || "", fecha: b.fecha || fmt(hoy) }, { serie, numero, usuario: sx.nombre || nombreUsuarioCaja() }));
   };
-  const metodoLabel = { tarjeta: "Tarjeta (Niubiz)", yape: "Yape (Niubiz)", efectivo: "Efectivo", transferencia: "Transferencia" };
+  const metodoLabel = { tarjeta: "Tarjeta (Niubiz)", yape: "Yape (Niubiz)", plin: "Plin", efectivo: "Efectivo", transferencia: "Transferencia", mixto: "Pago mixto" };
+  // Lo cobrado en la moneda en que pagó el paciente: «US$ 40.00 (S/ 150.00)» o «S/ 120.00».
+  const cobradoTxt = (res, pen) => (res?.moneda === "USD" && Number(res.montoOriginal) > 0 ? `${usd2(res.montoOriginal)} (S/ ${M.sol2(pen)})` : `S/ ${M.sol2(pen)}`);
   // El ModalCobro ya registró el pago (backend). Aquí solo marcamos las fases como
   // atendidas para saldar el plan y refrescamos la caja.
   const aprobar = (res) => {
@@ -4361,7 +4466,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       // No se afirma que la boleta llego a SUNAT: la integracion con el OSE no existe
       // todavia (frente 1 del README §10). Decir "emitida (SUNAT)" hacia creer a la
       // clinica que estaba declarando ese cobro, que es justo lo contrario de la verdad.
-      notify(`Cobrado S/ ${M.sol2(cobrado)} de ${pago.nombre} – ${metodoLabel[met] || met}${esParcial ? " (abono parcial)" : ""}. ${textoComprobante}`);
+      notify(`Cobrado ${cobradoTxt(res, cobrado)} de ${pago.nombre} – ${metodoLabel[met] || met}${esParcial ? " (abono parcial)" : ""}. ${textoComprobante}`);
       setPago(null); recargarCaja(); recargarHist(); recargarCierre();
       return;
     }
@@ -4369,12 +4474,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     // Ítems para la boleta: los tratamientos que se saldan (solo en cobro total).
     const sedePago = sedeCaja;
     const pac = pacDe(pago.pid);
-    // Guarda el comprobante emitido (serie y número) para volver a mostrar el mismo, no el siguiente.
-    const pagoNuevo = { fecha: fmt(hoy), sede: sedePago, monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, ...(res?.comprobanteSerie ? { comprobanteSerie: res.comprobanteSerie, comprobanteNumero: res.comprobanteNumero } : {}) };
+    // Guarda el comprobante emitido (serie y número) para volver a mostrar el mismo, no el
+    // siguiente, con lo que necesita la boleta (moneda, US$ y TC, quién cobró) y la sesión de
+    // caja con su hora (C1, C7).
+    const ahora = new Date();
+    const pagoNuevo = { fecha: fmt(hoy), sede: sedePago, monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, tipoCambio: res?.moneda === "USD" ? Number(res.tipoCambio) || null : null, creadoEn: ahora.toISOString(), hora: horaLima(ahora), cajaSesion: apertura?.id || null, usuario: sx.nombre || nombreUsuarioCaja(), ...(res?.referencia ? { ref: res.referencia } : {}), ...(res?.mixto ? { mixto: res.mixto } : {}), ...(res?.comprobanteSerie ? { comprobanteSerie: res.comprobanteSerie, comprobanteNumero: res.comprobanteNumero } : {}) };
     if (pago.faseIds && !esParcial) {
       const ids = new Set(pago.faseIds);
       updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (ids.has(f.id) ? { ...f, estado: "atendida", atendidaEn: f.atendidaEn || fmt(hoy) } : f)), pagos: [...(cur.pagos || []), { ...pagoNuevo, concepto: "Tratamiento terminado", items: pago.items }] }));
-      notify(`Cobrado S/ ${M.sol2(cobrado)} de ${pago.nombre}. ${textoComprobante}`);
+      notify(`Cobrado ${cobradoTxt(res, cobrado)} de ${pago.nombre}. ${textoComprobante}`);
       setPago(null);
       return;
     }
@@ -4384,8 +4492,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const itemsFact = !esParcial ? pendSede.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) : null;
     // Lo terminado ya descontó sus insumos al terminarse; aquí solo lo que se cobra sin haberse terminado.
     if (!esParcial) pendSede.filter((f) => f.estado !== "terminada").forEach((f) => consumirInsumos && consumirInsumos(f.nombre, sedePago));
-    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && idsSaldo.has(f.id)) ? { ...f, estado: "atendida", atendidaEn: fmt(hoy) } : f), pagos: [...(cur.pagos || []), { ...pagoNuevo, concepto: esParcial ? "Abono en caja" : "Cobro de saldo en caja", items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
-    notify(`Cobrado S/ ${M.sol2(cobrado)} de ${pago.nombre}${esParcial ? " (abono)" : ""}. ${textoComprobante}`);
+    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && idsSaldo.has(f.id)) ? { ...f, estado: "atendida", atendidaEn: fmt(hoy) } : f), pagos: [...(cur.pagos || []), { ...pagoNuevo, concepto: res?.concepto || (esParcial ? "Abono en caja" : "Cobro de saldo en caja"), items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
+    notify(`Cobrado ${cobradoTxt(res, cobrado)} de ${pago.nombre}${esParcial ? " (abono)" : ""}. ${textoComprobante}`);
     setPago(null);
   };
   const pagosAll = pacientes.flatMap((p) => (fichaVis(p.id)?.pagos || []));
@@ -4395,34 +4503,65 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const pctCobradoGlobal = planTotalGlobal ? Math.round((porCobrar.reduce((s, x) => s + x.pagado, 0) / planTotalGlobal) * 100) : 0;
   // Ingresos y egresos del día (ledger), de la sede de la caja
   const egresosHoy = egresosVis.filter((e) => e.fecha === fmt(hoy));
-  const totEgresosHoy = egresosHoy.filter((e) => e.moneda !== "USD").reduce((s, e) => s + e.monto, 0);
-  const totEgresosHoyUsd = egresosHoy.filter((e) => e.moneda === "USD").reduce((s, e) => s + e.monto, 0);
+  // C5: los egresos en dólares cuentan en el total y en el neto convertidos con su TC, igual
+  // que los cobros en dólares (que ya llegan en soles); además se desglosan por moneda.
+  const totEgHoy = sumarEgresos(egresosHoy, tcRef);
+  const totEgresosHoy = totEgHoy.soles;
+  const totEgresosHoyUsd = totEgHoy.usd;
+  const totCobHoy = sumarCobros(boletasHoyActivas);
   const [catPeriodo, setCatPeriodo] = usePersist("caja_cat_periodo", "mes");
   const [catAbierta, setCatAbierta] = useState(null);
   const reclasificarEgreso = (e, categoria) => {
     if (categoria === e.categoria) return;
+    if (!puedeAnularEgreso) { notify("Reclasificar un egreso es de administración."); return; }
     const hecho = () => { setEgresos((es) => es.map((x) => (x.id === e.id ? { ...x, categoria } : x))); notify(`«${e.concepto}» pasó a ${categoria}.`); };
     if (conectado) { api.egresos.actualizar(e.id, { categoria }).then(hecho).catch(() => notify("No se pudo reclasificar el egreso.")); return; }
     hecho();
   };
   const ingresosHoy = montoHoy;
-  const netoHoy = ingresosHoy - totEgresosHoy;
+  const netoHoy = red2(ingresosHoy - totEgresosHoy);
+  const [egBusy, setEgBusy] = useState(false);
   const guardarEgreso = () => {
-    if (!egForm.concepto.trim() || !(Number(egForm.monto) > 0)) { notify("Completa concepto y monto del egreso."); return; }
+    if (egBusy) return;
+    if (!puedeRegistrarEgreso) { notify("Tu rol no registra egresos de caja."); return; }
+    if (!egForm.concepto.trim()) { notify("Completa el concepto del egreso."); return; }
+    const lm = leerMonto(egForm.monto, { obligatorio: true });
+    if (!lm.ok || !(lm.valor > 0)) { notify("Indica un monto válido para el egreso: mayor que 0 y con hasta 2 decimales."); return; }
+    const usdEg = egForm.moneda === "USD";
+    const tc = usdEg ? Number(String(egForm.tc ?? "").replace(",", ".")) : null;
+    if (usdEg && !(Number.isFinite(tc) && tc > 0)) { notify("Indica el tipo de cambio del egreso en dólares (soles por US$ 1)."); return; }
     // Cada gasto sale de la caja de una sede: sin sede concreta no se registra (CAJA-04).
     const sedeEg = egForm.sede ?? sedeCaja;
     if (sedeEg == null) { notify("Elige la sede del egreso."); return; }
-    if (conectado) {
-      api.egresos.crear({ fecha: fmt(hoy), sedeId: uuidDe(sedeEg), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" })
-        .then(() => { notify(`Egreso registrado: ${egForm.concepto} – ${egForm.moneda === "USD" ? "US$" : "S/"} ${Number(egForm.monto).toFixed(2)}.`); setEgForm(null); recargarEgresos(); })
-        .catch(() => notify("No se pudo registrar el egreso."));
-      return;
-    }
-    setEgresos((es) => [{ id: Math.max(0, ...es.map((e) => e.id)) + 1, sede: sedeEg, fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" }, ...es]);
-    notify(`Egreso registrado en ${nombreSedeEn(sedes, sedeEg)}: ${egForm.concepto} – ${egForm.moneda === "USD" ? "US$" : "S/"} ${Number(egForm.monto).toFixed(2)}.`);
-    setEgForm(null);
+    const monto = lm.valor;
+    const txt = `${egForm.concepto} – ${usdEg ? `${usd2(monto)} (TC ${tc})` : `S/ ${M.sol2(monto)}`}`;
+    setEgBusy(true);
+    // C4: el egreso sale de la gaveta: solo con la caja de esa sede abierta. Queda en la sesión
+    // de caja (aperturaId) para el arqueo de esa sesión (C7).
+    cajaAbiertaEn(sedeEg).then((abierta) => {
+      if (!abierta) { setEgBusy(false); notify(`Abre la caja de ${nombreSedeEn(sedes, sedeEg)} antes de registrar un egreso.`); return; }
+      const sesion = sedeCaja != null && mismaSede(sedeEg, sedeCaja) ? (apertura?.id || null) : (!conectado ? aperturaDemo(sedeEg)?.id || null : null);
+      if (conectado) {
+        api.egresos.crear({ fecha: fmt(hoy), sedeId: uuidDe(sedeEg), concepto: egForm.concepto, categoria: egForm.categoria, monto, metodo: egForm.metodo, moneda: egForm.moneda || "PEN", ...(usdEg ? { tipoCambio: tc } : {}), ...(sesion ? { aperturaId: sesion } : {}) })
+          .then(() => { notify(`Egreso registrado: ${txt}.`); setEgForm(null); recargarEgresos(); })
+          .catch(() => notify("No se pudo registrar el egreso."))
+          .finally(() => setEgBusy(false));
+        return;
+      }
+      setEgresos((es) => [{ id: Math.max(0, ...es.map((e) => Number(e.id) || 0)) + 1, sede: sedeEg, fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto, metodo: egForm.metodo, moneda: egForm.moneda || "PEN", ...(usdEg ? { tipoCambio: tc } : {}), cajaSesion: sesion, creadoEn: new Date().toISOString() }, ...es]);
+      notify(`Egreso registrado en ${nombreSedeEn(sedes, sedeEg)}: ${txt}.`);
+      setEgForm(null);
+      setEgBusy(false);
+    });
   };
-  const eliminarEgreso = (id) => { if (conectado) { api.egresos.eliminar(id).then(() => { notify("Egreso eliminado."); recargarEgresos(); }).catch(() => notify("No se pudo eliminar.")); return; } setEgresos((es) => es.filter((e) => e.id !== id)); };
+  // Anular (eliminar) un egreso es de quien aprueba en caja (C4).
+  const eliminarEgreso = (e) => {
+    if (!puedeAnularEgreso) { notify("Anular un egreso es de administración."); return; }
+    if (!confirm(`¿Anular el egreso «${e.concepto}» (${e.moneda === "USD" ? usd2(e.monto) : `S/ ${M.sol2(e.monto)}`})?`)) return;
+    if (conectado) { api.egresos.eliminar(e.id).then(() => { notify("Egreso anulado."); recargarEgresos(); }).catch(() => notify("No se pudo anular el egreso.")); return; }
+    setEgresos((es) => es.filter((x) => x.id !== e.id));
+    notify("Egreso anulado.");
+  };
   const crearLink = () => {
     if (!linkForm.paciente.trim() || !(Number(linkForm.monto) > 0)) { notify("Indica paciente y monto para el link."); return; }
     // El link es de la sede que lo genera: su cobro entra a esa caja (CAJA-19).
@@ -4440,18 +4579,46 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // franja con cifras distintas y se navegaba sólo desde el menú lateral.
   const horaDe = (iso) => { if (!iso) return ""; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }); };
   const cerradaHoyReg = !cajaAbierta && apertura && apertura.abierta === false && apertura.cerradaEn ? apertura : null;
-  const cobradoUsdHoy = boletasHoyActivas.filter((b) => b.moneda === "USD").reduce((a, b) => a + (Number(b.montoOriginal) || 0), 0);
-  const efCobradoHoy = boletasHoyActivas.filter((b) => String(b.metodo || "efectivo").toLowerCase() === "efectivo" && b.moneda !== "USD").reduce((a, b) => a + b.monto, 0);
-  const efEgresosHoy = egresosHoy.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda !== "USD").reduce((a, e) => a + e.monto, 0);
+  const cobradoUsdHoy = totCobHoy.usd;
+  // C7: el arqueo es de la sesión de caja abierta. Si se reabre el mismo día, el esperado
+  // cuenta solo lo posterior a esa apertura: por la sesión del registro (aperturaId), por lo
+  // que ya existía al abrir (demostración) o por su hora.
+  const yaContados = new Set(cajaAbierta ? apertura?.previos || [] : []);
+  const enSesionCaja = (x, clave = null) => {
+    if (!cajaAbierta || !apertura) return true;
+    const ses = x?.cajaSesion ?? x?.aperturaId;
+    if (ses != null && ses !== "") return String(ses) === String(apertura.id);
+    if (Array.isArray(apertura.previos)) return !(clave && yaContados.has(clave));
+    const t = x?.creadoEn ? new Date(x.creadoEn).getTime() : NaN;
+    const ab = apertura.abiertaEn ? new Date(apertura.abiertaEn).getTime() : NaN;
+    if (!Number.isNaN(t) && !Number.isNaN(ab)) return t >= ab;
+    if (/^\d{2}:\d{2}/.test(x?.hora || "") && apertura.abiertaEn) return String(x.hora).slice(0, 5) >= horaLima(apertura.abiertaEn);
+    return true;
+  };
+  const boletasSesion = boletasHoyActivas.filter((b) => enSesionCaja(b, b._k));
+  const egresosSesion = egresosHoy.filter((e) => enSesionCaja(e, `e:${e.id}`));
+  // Efectivo de un cobro, en soles o en dólares (de un pago mixto solo su parte en efectivo).
+  const efectivoCobro = (b) => {
+    const pen = b.mixto ? Number(b.mixto.efectivo) || 0 : medioKey(b.metodo || "efectivo") === "efectivo" ? Number(b.monto) || 0 : 0;
+    if (b.moneda !== "USD") return { pen, usd: 0 };
+    if (!pen) return { pen: 0, usd: 0 };
+    const tc = Number(b.tipoCambio) > 0 ? Number(b.tipoCambio) : (Number(b.montoOriginal) > 0 && Number(b.monto) > 0 ? b.monto / b.montoOriginal : tcRef);
+    return { pen: 0, usd: !b.mixto && Number(b.montoOriginal) > 0 ? Number(b.montoOriginal) : red2(pen / tc) };
+  };
+  const efSesion = boletasSesion.reduce((a, b) => { const e = efectivoCobro(b); return { pen: a.pen + e.pen, usd: a.usd + e.usd }; }, { pen: 0, usd: 0 });
+  const efCobradoHoy = red2(efSesion.pen);
+  const efEgresosHoy = egresosSesion.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda !== "USD").reduce((a, e) => a + e.monto, 0);
   const gavetaHoy = cajaAbierta ? Math.round(((Number(apertura?.fondo) || 0) + efCobradoHoy - efEgresosHoy + netoMovsCaja) * 100) / 100 : null;
   const sol = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const difTxt = (d) => (d == null ? "" : Math.abs(d) < 0.01 ? "Cuadró exacto" : d > 0 ? `Sobraron ${sol(d)}` : `Faltaron ${sol(-d)}`);
+  // Resultado del cierre con la gaveta en dólares si no cuadró (C3).
+  const difTxtCierre = (r) => { const du = r?.diferenciaUsd == null ? null : Number(r.diferenciaUsd); return `${difTxt(r?.diferencia)}${du != null && Math.abs(du) > 0.009 ? ` · ${du > 0 ? "sobraron" : "faltaron"} ${usd2(Math.abs(du))}` : ""}`; };
   const linksPend = linksVis.filter((l) => l.estado === "pendiente").length;
   const pasos = [
     { id: "apertura", n: 1, l: "Apertura", ic: KeyRound, ok: cajaAbierta || !!cerradaHoyReg, sub: cajaAbierta ? `Abierta ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? `Abrió ${horaDe(cerradaHoyReg.abiertaEn)}` : "Fondo y medios" },
     { id: "cobros", n: 2, l: "Cobros", ic: CreditCard, ok: false, sub: `${boletasHoyActivas.length} ${boletasHoyActivas.length === 1 ? "cobro" : "cobros"} · ${sol(montoHoy)}`, badge: terminadosPorPac.size || null },
-    ...(puedeVerMovimientos ? [{ id: "movimientos", n: 3, l: "Ingresos y egresos", ic: Wallet, ok: false, sub: `${egresosHoy.length} ${egresosHoy.length === 1 ? "egreso" : "egresos"} · ${sol(totEgresosHoy)}` }] : []),
-    { id: "cierre", n: puedeVerMovimientos ? 4 : 3, l: "Cierre y arqueo", ic: Calculator, ok: !!cerradaHoyReg, sub: cerradaHoyReg ? difTxt(cerradaHoyReg.diferencia) : cajaAbierta ? "Al final del día" : "Con la caja abierta" },
+    ...(puedeVerMovimientos ? [{ id: "movimientos", n: 3, l: "Ingresos y egresos", ic: Wallet, ok: false, sub: `${egresosHoy.length} ${egresosHoy.length === 1 ? "egreso" : "egresos"} · ${sol(totEgresosHoy)}${totEgresosHoyUsd ? ` (incl. ${usd2(totEgresosHoyUsd)})` : ""}` }] : []),
+    { id: "cierre", n: puedeVerMovimientos ? 4 : 3, l: "Cierre y arqueo", ic: Calculator, ok: !!cerradaHoyReg, sub: cerradaHoyReg ? difTxtCierre(cerradaHoyReg) : cajaAbierta ? "Al final del día" : "Con la caja abierta" },
   ];
   // En celular la fila de pasos se desliza: el paso activo queda siempre a la vista.
   useEffect(() => {
@@ -4481,11 +4648,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <button key={sd.id ?? "todas"} type="button" role="radio" aria-checked={on} className={`dc-cj4__btn${on ? " is-pri" : ""}`} style={{ height: 28, padding: "0 12px", fontSize: 12 }} onClick={() => setCajaSedePick(sd.id)} title={sd.id == null ? "Saldos de todas las sedes, sin caja" : `Caja de ${sd.nombre}`}>{String(sd.nombre).replace(/^Sede /, "")}</button>
             ); })}
           </span>
-        ) : <span className="dc-cj4__sede">{sedeNombre()}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? ` · ${difTxt(cerradaHoyReg.diferencia)}` : ""}</span>}
-        {sedeRequierePick && sedesCaja.length > 1 && (cajaAbierta || cerradaHoyReg) ? <span className="dc-cj4__cifra">{cajaAbierta ? `Desde ${horaDe(apertura?.abiertaEn)}` : difTxt(cerradaHoyReg.diferencia)}</span> : null}
-        <span className="dc-cj4__cifra">Cobrado hoy <b>{sol(montoHoy)}</b>{cobradoUsdHoy ? <small> + US$ {cobradoUsdHoy.toFixed(2)}</small> : null}</span>
+        ) : <span className="dc-cj4__sede">{sedeNombre()}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? ` · ${difTxtCierre(cerradaHoyReg)}` : ""}</span>}
+        {sedeRequierePick && sedesCaja.length > 1 && (cajaAbierta || cerradaHoyReg) ? <span className="dc-cj4__cifra">{cajaAbierta ? `Desde ${horaDe(apertura?.abiertaEn)}` : difTxtCierre(cerradaHoyReg)}</span> : null}
+        {/* C5: lo cobrado en dólares ya está dentro de los soles (al TC de cada cobro): se dice
+            «incluye», no «+», para no sumarlo dos veces. */}
+        <span className="dc-cj4__cifra" title={cobradoUsdHoy ? `Total en soles. Incluye ${usd2(cobradoUsdHoy)} cobrados en dólares (S/ ${M.sol2(totCobHoy.usdEnSoles)} al TC de cada cobro).` : undefined}>Cobrado hoy <b>{sol(montoHoy)}</b>{cobradoUsdHoy ? <small> (incluye {usd2(cobradoUsdHoy)})</small> : null}</span>
         <span className="dc-cj4__cifra">Por cobrar <b className="is-aviso">{sol(montoPorCobrar)}</b></span>
-        <span className="dc-cj4__cifra" title="Cobrado hoy menos egresos de hoy">Neto del día <b className={netoHoy < 0 ? "is-neg" : ""}>{netoHoy < 0 ? "− " : ""}{sol(Math.abs(netoHoy))}</b></span>
+        <span className="dc-cj4__cifra" title={`Cobrado hoy menos egresos de hoy (${sol(totEgresosHoy)}${totEgresosHoyUsd ? `, incluye ${usd2(totEgresosHoyUsd)} convertidos con su TC` : ""}).`}>Neto del día <b className={netoHoy < 0 ? "is-neg" : ""}>{netoHoy < 0 ? "− " : ""}{sol(Math.abs(netoHoy))}</b></span>
         <div className="dc-cj4__acc">
           {!cajaAbierta && !cerradaHoyReg && puedeAbrirCaja && tab !== "hoy" && <button type="button" className="dc-cj4__btn is-pri" onClick={() => setTab("hoy")}><KeyRound size={14} strokeWidth={2} /> Abrir caja</button>}
           {cajaAbierta && puedeAbrirCaja && tab !== "cierre" && <button type="button" className="dc-cj4__btn" onClick={() => setTab("cierre")}><Lock size={14} strokeWidth={2} /> Cerrar caja</button>}
@@ -4728,7 +4897,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               { key: "metodo", label: "Método", w: "130px", a: "center", get: (p) => p.metodo, cell: (p) => { const c = { tarjeta: DS.c.primary, yape: "var(--dc-ink-500)", efectivo: "var(--dc-ok-700)", transferencia: "var(--dc-navy)" }[p.metodo] || "var(--dc-ink-400)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: c, background: tint(c, 0.078), padding: "3px 10px", borderRadius: "var(--dc-r-full)", textTransform: "capitalize" }}>{p.metodo}</span>; } },
               { key: "comprobante", label: "Comprobante", w: "130px", a: "center", get: (p) => p.comprobante, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", textTransform: "capitalize" }}>{p.comprobante || "—"}</span> },
               { key: "boleta", label: "Boleta", w: "100px", a: "center", get: (p) => (p.comprobanteSerie && p.comprobanteNumero != null ? `${p.comprobanteSerie}-${p.comprobanteNumero}` : ""), cell: (p) => (p.comprobanteSerie && p.comprobanteNumero != null) ? (
-                <button onClick={(e) => { e.stopPropagation(); abrirBoleta({ paciente: p.paciente, comprobanteSerie: p.comprobanteSerie, comprobanteNumero: p.comprobanteNumero, fecha: p.fecha, monto: p.monto, concepto: p.concepto, metodo: p.metodo }); }} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", color: DS.c.primary, fontWeight: 500, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}><FileText size={13} strokeWidth={1.75} /> Ver</button>
+                <button onClick={(e) => { e.stopPropagation(); abrirBoleta({ paciente: p.paciente, sedeId: p.sedeId, comprobanteSerie: p.comprobanteSerie, comprobanteNumero: p.comprobanteNumero, fecha: p.fecha, monto: p.monto, moneda: p.moneda, montoOriginal: p.montoOriginal, tipoCambio: p.tipoCambio, dni: p.dni, usuario: p.usuario, concepto: p.concepto, metodo: p.metodo }); }} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "5px 9px", cursor: "pointer", color: DS.c.primary, fontWeight: 500, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}><FileText size={13} strokeWidth={1.75} /> Ver</button>
               ) : <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</span> },
               { key: "monto", label: "Monto", w: "120px", a: "right", get: (p) => p.monto, cell: (p) => <span style={{ fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(p.monto)}</span> },
             ]} />
@@ -4743,16 +4912,22 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const cierreSede = (() => {
           if (!cierre) return null;
           const movs = cierre.movimientos || [];
-          const quedan = movs.filter((m) => deCaja(m.sedeId));
+          // C7: también se recortan a la sesión abierta si el servidor aún no filtra por aperturaId.
+          const quedan = movs.filter((m) => deCaja(m.sedeId) && enSesionCaja(m));
           if (quedan.length === movs.length) return cierre;
           const pm = {};
           quedan.forEach((m) => { const k0 = medioKey(m.metodo || "efectivo"); const k = k0 === "efectivo" && m.moneda === "USD" ? "efectivo_usd" : k0; pm[k] = (pm[k] || 0) + (Number(m.monto) || 0); });
           return { ...cierre, total: quedan.reduce((a, m) => a + (Number(m.monto) || 0), 0), cantidad: quedan.length, porMetodo: pm, movimientos: quedan, usd: undefined };
         })();
+        // Demostración: los cobros de esta sesión de caja (C7); un pago mixto reparte su monto
+        // entre sus medios (su parte en efectivo va a la gaveta).
         const c = cierreSede || (conectado ? { total: 0, cantidad: 0, porMetodo: {}, movimientos: [] } : (() => {
           const pm = {};
-          boletasHoyActivas.forEach((b) => { const m = medioKey(b.metodo || "efectivo"); const k = m === "efectivo" && b.moneda === "USD" ? "efectivo_usd" : m; pm[k] = (pm[k] || 0) + b.monto; });
-          return { total: boletasHoyActivas.reduce((a, b) => a + b.monto, 0), cantidad: boletasHoyActivas.length, porMetodo: pm, movimientos: boletasHoyActivas.map((b, i) => ({ id: null, hora: b.hora || "", paciente: b.paciente, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), monto: b.monto, _k: i })) };
+          boletasSesion.forEach((b) => {
+            const partes = b.mixto ? Object.entries(b.mixto) : [[b.metodo || "efectivo", b.monto]];
+            partes.forEach(([met, v]) => { const m = medioKey(met); const k = m === "efectivo" && b.moneda === "USD" ? "efectivo_usd" : m; pm[k] = (pm[k] || 0) + (Number(v) || 0); });
+          });
+          return { total: boletasSesion.reduce((a, b) => a + b.monto, 0), cantidad: boletasSesion.length, porMetodo: pm, movimientos: boletasSesion.map((b, i) => ({ id: null, hora: b.hora || "", paciente: b.paciente, concepto: b.moneda === "USD" && b.montoOriginal ? `${b.concepto} – ${usd2(b.montoOriginal)}` : b.concepto, metodo: b.mixto ? "mixto" : String(b.metodo || "").toLowerCase(), monto: b.monto, _k: i })) };
         })());
         const metodos = Object.entries(c.porMetodo || {}).filter(([, v]) => Number(v) > 0);
         const COMISION_PCT = { efectivo: 0, tarjeta: 4.06, yape: 0, plin: 0, transferencia: 0, seguro: 0 };
@@ -4762,21 +4937,27 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const fondoIni = Number(apertura?.fondo) || 0;
         // Dólares: se cuentan en una gaveta aparte. El backend puede mandar `usd: { efectivo }`
         // (en US$) y entonces `porMetodo` trae solo soles; si no, se deduce de los cobros del día.
-        const boletasUsdEf = boletasHoyActivas.filter((b) => b.moneda === "USD" && String(b.metodo || "").toLowerCase() === "efectivo");
-        const cobradoEfectivoUsd = c.usd ? Number(c.usd.efectivo) || 0 : Math.round(boletasUsdEf.reduce((s, b) => s + (Number(b.montoOriginal) || 0), 0) * 100) / 100;
+        // Todo de la sesión de caja abierta (C7): cobros y egresos posteriores a la apertura.
+        const boletasUsdEf = boletasSesion.filter((b) => b.moneda === "USD" && efectivoCobro(b).usd > 0);
+        const cobradoEfectivoUsd = c.usd ? Number(c.usd.efectivo) || 0 : red2(efSesion.usd);
         const usdEnSolesDelBackend = conectado && !c.usd ? boletasUsdEf.reduce((s, b) => s + b.monto, 0) : 0;
         const cobradoEfectivo = (Number((c.porMetodo || {}).efectivo) || 0) - usdEnSolesDelBackend;
-        const egresosEfectivo = egresosHoy.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda !== "USD").reduce((s, e) => s + e.monto, 0);
-        const egresosEfectivoUsd = egresosHoy.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda === "USD").reduce((s, e) => s + e.monto, 0);
+        const egresosEfectivo = egresosSesion.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda !== "USD").reduce((s, e) => s + e.monto, 0);
+        const egresosEfectivoUsd = egresosSesion.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda === "USD").reduce((s, e) => s + e.monto, 0);
         const fondoUsd = Number(apertura?.fondoUsd) || 0;
-        const usdActivo = !!(fondoUsd || cobradoEfectivoUsd || egresosEfectivoUsd || cierreForm.contadoUsd);
+        // C3: con fondo o movimiento en dólares la gaveta en US$ se cuenta sí o sí.
+        const usdRequerido = !!(fondoUsd || cobradoEfectivoUsd || egresosEfectivoUsd);
+        const usdActivo = usdRequerido || !!cierreForm.contadoUsd;
         const esperadoUsd = Math.round((fondoUsd + cobradoEfectivoUsd - egresosEfectivoUsd) * 100) / 100;
-        const contadoUsdNum = cierreForm.contadoUsd === "" || cierreForm.contadoUsd == null ? null : Number(cierreForm.contadoUsd);
-        const diffUsd = contadoUsdNum == null || Number.isNaN(contadoUsdNum) ? null : Math.round((contadoUsdNum - esperadoUsd) * 100) / 100;
+        const lUsd = leerMonto(cierreForm.contadoUsd);
+        const contadoUsdNum = cierreForm.contadoUsd === "" || cierreForm.contadoUsd == null || !lUsd.ok ? null : lUsd.valor;
+        const diffUsd = contadoUsdNum == null ? null : Math.round((contadoUsdNum - esperadoUsd) * 100) / 100;
+        const faltaContarUsd = usdRequerido && contadoUsdNum == null;
         const esperadoEfectivo = cajaAbierta
           ? Math.round((fondoIni + cobradoEfectivo - egresosEfectivo + netoMovsCaja) * 100) / 100
           : null;
-        const contadoNum = cierreForm.contado === "" ? null : Number(cierreForm.contado);
+        const lSol = leerMonto(cierreForm.contado);
+        const contadoNum = cierreForm.contado === "" || !lSol.ok ? null : lSol.valor;
         const diffNum = (contadoNum != null && esperadoEfectivo != null && !Number.isNaN(contadoNum))
           ? Math.round((contadoNum - esperadoEfectivo) * 100) / 100
           : null;
@@ -4787,7 +4968,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <section className="dc-esp-hero dc-caja-sub dc-caja-sub--titulo">
               <div className="dc-esp-hero__txt">
                 <div className="dc-esp-hero__num"><b>Arqueo del día</b></div>
-                <p>{cajaAbierta ? "Cuenta la gaveta y compárala con el efectivo esperado" : "Se habilita con la caja abierta"}</p>
+                <p>{cajaAbierta ? `Cuenta la gaveta y compárala con el efectivo esperado${apertura?.reabierta ? ` · caja reabierta a las ${horaDe(apertura.abiertaEn)}: cuenta solo lo posterior` : ""}` : "Se habilita con la caja abierta"}</p>
               </div>
               <div className="dc-esp-hero__cifras" hidden></div>
               <span />
@@ -4861,18 +5042,20 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                       </div>
                     </div>
                     <div className="dc-cz__notas">
-                      <Field label={Math.abs(diffNum || 0) > 0.009 ? "Justificación (obligatoria)" : "Justificación (si hay descuadre)"} value={cierreForm.justificacion} onChange={(v) => setCierreForm({ ...cierreForm, justificacion: v })} placeholder="Ej. Faltante por cambio no registrado" />
+                      <Field label={Math.abs(diffNum || 0) > 0.009 || Math.abs(diffUsd || 0) > 0.009 ? `Justificación (obligatoria${Math.abs(diffUsd || 0) > 0.009 && !(Math.abs(diffNum || 0) > 0.009) ? ": no cuadran los dólares" : ""})` : "Justificación (si hay descuadre en soles o dólares)"} value={cierreForm.justificacion} onChange={(v) => setCierreForm({ ...cierreForm, justificacion: v })} placeholder="Ej. Faltante por cambio no registrado" />
                       <Field label="Observaciones (opcional)" value={cierreForm.observaciones} onChange={(v) => setCierreForm({ ...cierreForm, observaciones: v })} placeholder="Notas del acta" />
                     </div>
                     <div className="dc-cz__pie">
-                      <span><Lock size={13} strokeWidth={2} /> Al cerrar no se registran más cobros hasta reabrir.</span>
-                      <button type="button" className="dc-ap2__cta" disabled={cierreBusy || !puedeAbrirCaja} onClick={() => cerrarApertura(esperadoEfectivo, usdActivo ? { contado: Number(cierreForm.contadoUsd) || 0, esperado: esperadoUsd } : null)}><Lock size={15} strokeWidth={2} /> {cierreBusy ? "Cerrando…" : "Cerrar caja del día"}</button>
+                      <span>{faltaContarUsd
+                        ? <><DollarSign size={13} strokeWidth={2} /> Falta contar la gaveta en dólares (abajo): se esperan {usd2(esperadoUsd)}.</>
+                        : <><Lock size={13} strokeWidth={2} /> Al cerrar no se registran más cobros hasta reabrir.</>}</span>
+                      <button type="button" className="dc-ap2__cta" disabled={cierreBusy || !puedeAbrirCaja} onClick={() => cerrarApertura(esperadoEfectivo, usdActivo ? { requerido: usdRequerido, esperado: esperadoUsd, fondo: fondoUsd } : null)}><Lock size={15} strokeWidth={2} /> {cierreBusy ? "Cerrando…" : "Cerrar caja del día"}</button>
                     </div>
                   </Card>
                 ) : null}
                 {cajaAbierta && usdActivo && (
                   <Card className="dc-cz__conteo dc-cz__usd">
-                    <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#16A36A" }}><DollarSign size={20} strokeWidth={1.9} /></span><div><h3>Gaveta en dólares</h3><span>Se cuadra aparte de los soles</span></div></div>
+                    <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#16A36A" }}><DollarSign size={20} strokeWidth={1.9} /></span><div><h3>Gaveta en dólares</h3><span>{usdRequerido ? "Se cuadra aparte de los soles · conteo obligatorio para cerrar" : "Se cuadra aparte de los soles"}</span></div></div>
                     <ul className="dc-cz__libro">
                       <li style={{ "--t": "#0E9199" }}><span className="dc-cz__lico"><Wallet size={16} strokeWidth={2} /></span><div><b>Fondo en dólares</b><small>Al abrir la caja</small></div><em>US$ {fondoUsd.toFixed(2)}</em></li>
                       <li style={{ "--t": "#16A36A" }}><span className="dc-cz__lico"><Banknote size={16} strokeWidth={2} /></span><div><b>Cobros en dólares</b><small>{boletasUsdEf.length} pago{boletasUsdEf.length === 1 ? "" : "s"} en efectivo</small></div><em>+ US$ {cobradoEfectivoUsd.toFixed(2)}</em></li>
@@ -4978,39 +5161,59 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               </div>
             </Card>
           )}
-          {(() => { const js = (histCaja || []).filter((r) => deCaja(r.sedeId)); const dif = js.reduce((a, r) => a + (r.diferencia != null ? Number(r.diferencia) : 0), 0); const rango = (
+          {(() => {
+            const js = (histCaja || []).filter((r) => deCaja(r.sedeId));
+            // C8: faltantes y sobrantes por separado (−5 y +5 no son «S/ 0.00»); los dólares aparte.
+            const rs = resumenDiferencias(js), ru = resumenDiferencias(js, "diferenciaUsd");
+            // Resultado de un cierre en una moneda: abierta, cerrada sin arqueo, cuadra, falta o sobra.
+            const estDe = (r, d) => (r.abierta ? "abierta" : d == null ? "cerrada" : Math.abs(d) < 0.01 ? "cuadra" : d < 0 ? "falta" : "sobra");
+            const difUsdDe = (r) => (r.diferenciaUsd != null ? Number(r.diferenciaUsd) : null);
+            // Colores de cada resultado (los mismos de la tarjeta en ui.css).
+            const COL_EST = { cuadra: { "--c": "#16A36A", "--s": "#E3F7EC" }, falta: { "--c": "#DC4A3D", "--s": "#FDE8E6" }, sobra: { "--c": "#D97706", "--s": "#FFF1DC" }, cerrada: { "--c": "#5B6B70", "--s": "#EEF2F3" }, abierta: { "--c": "#6D5BD0", "--s": "#EEEAFD" } };
+            const pillUsd = (r) => { const d = difUsdDe(r); if (d == null) return <span className="dc-tp__sub">—</span>; const est = estDe(r, d); return <span className={`dc-pill ${est === "cuadra" ? "is-ok" : est === "falta" ? "is-mal" : "is-aviso"}`}>{est === "cuadra" ? "Cuadra" : `${est === "falta" ? "Faltan" : "Sobran"} ${usd2(Math.abs(d))}`}</span>; };
+            const rango = (
             <div className="dc-hero-acc dc-rango">
-              {js.length > 0 && <span className={`dc-flujo__neto${dif < 0 ? " is-neg" : ""}`} title="Suma de sobrantes y faltantes en el rango">Diferencia <b>{dif < 0 ? "− " : ""}S/ {M.sol2(Math.abs(dif))}</b></span>}
+              {js.length > 0 && <span className={`dc-flujo__neto${rs.faltantes ? " is-neg" : ""}`} title={`${rs.nFaltantes} ${rs.nFaltantes === 1 ? "cierre con faltante" : "cierres con faltante"} en el rango`}>Faltantes <b>{rs.faltantes ? "− " : ""}S/ {M.sol2(rs.faltantes)}</b></span>}
+              {js.length > 0 && <span className={`dc-flujo__neto${rs.sobrantes ? " is-aviso" : ""}`} title={`${rs.nSobrantes} ${rs.nSobrantes === 1 ? "cierre con sobrante" : "cierres con sobrante"} en el rango`}>Sobrantes <b>{rs.sobrantes ? "+ " : ""}S/ {M.sol2(rs.sobrantes)}</b></span>}
+              {(ru.faltantes > 0 || ru.sobrantes > 0) && <span className={`dc-flujo__neto${ru.faltantes ? " is-neg" : ""}`} title="Descuadres de la gaveta en dólares">Dólares <b>{ru.faltantes ? `− ${usd2(ru.faltantes)}` : ""}{ru.faltantes && ru.sobrantes ? " · " : ""}{ru.sobrantes ? `+ ${usd2(ru.sobrantes)}` : ""}</b></span>}
               <label><span>Desde</span><input type="date" aria-label="Desde" value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
               <label><span>Hasta</span><input type="date" aria-label="Hasta" value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
               <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja}><Repeat size={14} strokeWidth={1.9} /></button>
             </div>
           ); return js.length === 0 ? <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (
-          <ListaFiltrable rows={js} sub="jornadas" extra={rango} defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 820, cols: [
+          <ListaFiltrable rows={js} sub="jornadas" extra={rango} defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 960, cols: [
             { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__strong">{fechaLegible(r.fecha)}</span> },
             { key: "sede", label: "Sede", w: "minmax(140px,1fr)", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—" },
             { key: "quien", label: "Responsable", w: "minmax(160px,1.2fr)", get: (r) => `${r.abiertaPorNombre || "—"}${!r.abierta && r.cerradaPorNombre && r.cerradaPorNombre !== r.abiertaPorNombre ? ` / ${r.cerradaPorNombre}` : ""}` },
             { key: "fondo", label: "Fondo", w: "100px", a: "right", cell: (r) => <span className="dc-tp__num">S/ {M.sol2(Number(r.fondo || 0))}</span> },
             { key: "esp", label: "Esperado", w: "110px", a: "right", cell: (r) => <span className="dc-tp__num">{r.efectivoEsperado != null ? `S/ ${M.sol2(Number(r.efectivoEsperado))}` : "—"}</span> },
             { key: "con", label: "Contado", w: "110px", a: "right", cell: (r) => <span className="dc-tp__num">{r.efectivoContado != null ? `S/ ${M.sol2(Number(r.efectivoContado))}` : "—"}</span> },
-            { key: "est", label: "Resultado", w: "140px", a: "right", cell: (r) => { const d = r.diferencia != null ? Number(r.diferencia) : null; const est = r.abierta ? "abierta" : d == null ? "cerrada" : Math.abs(d) < 0.01 ? "cuadra" : d < 0 ? "falta" : "sobra"; return <span className={`dc-pill ${est === "cuadra" || est === "cerrada" ? "is-ok" : est === "abierta" ? "is-info" : est === "falta" ? "is-mal" : "is-aviso"}`}>{est === "abierta" ? "Abierta" : est === "cuadra" ? "Cuadra" : est === "cerrada" ? "Cerrada" : `${est === "falta" ? "Faltan" : "Sobran"} S/ ${M.sol2(Math.abs(d))}`}</span>; } },
+            { key: "est", label: "Resultado", w: "140px", a: "right", cell: (r) => { const d = r.diferencia != null ? Number(r.diferencia) : null; const est = estDe(r, d); return <span className={`dc-pill ${est === "cuadra" || est === "cerrada" ? "is-ok" : est === "abierta" ? "is-info" : est === "falta" ? "is-mal" : "is-aviso"}`}>{est === "abierta" ? "Abierta" : est === "cuadra" ? "Cuadra" : est === "cerrada" ? "Cerrada" : `${est === "falta" ? "Faltan" : "Sobran"} S/ ${M.sol2(Math.abs(d))}`}</span>; } },
+            { key: "usd", label: "Dólares", w: "140px", a: "right", cell: (r) => (r.efectivoContadoUsd != null || r.fondoUsd ? <span title={`Fondo ${usd2(r.fondoUsd)} · esperado ${r.efectivoEsperadoUsd != null ? usd2(r.efectivoEsperadoUsd) : "—"} · contado ${r.efectivoContadoUsd != null ? usd2(r.efectivoContadoUsd) : "—"}`}>{pillUsd(r)}</span> : <span className="dc-tp__sub">—</span>) },
           ] }} cols={[
             { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
             { key: "sede", label: "Sede", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "" },
             { key: "quien", label: "Responsable", get: (r) => [r.abiertaPorNombre, r.cerradaPorNombre].filter(Boolean).join(" ") },
             { key: "estado", label: "Estado", get: (r) => { const d = r.diferencia != null ? Number(r.diferencia) : null; return r.abierta ? "Abierta" : d == null ? "Cerrada" : Math.abs(d) < 0.01 ? "Cuadra" : d < 0 ? "Faltante" : "Sobrante"; } },
             { key: "dif", label: "Diferencia", get: (r) => (r.diferencia != null ? Number(r.diferencia).toFixed(2) : ""), sortVal: (r) => Math.abs(Number(r.diferencia) || 0) },
+            { key: "difUsd", label: "Diferencia US$", get: (r) => (r.diferenciaUsd != null ? Number(r.diferenciaUsd).toFixed(2) : ""), sortVal: (r) => Math.abs(Number(r.diferenciaUsd) || 0) },
+            { key: "notas", label: "Justificación y observaciones", get: (r) => [r.justificacion, r.observaciones].filter(Boolean).join(" · ") },
           ]}>{(lista) => (
           <div className="dc-jor">
             {lista.map((r) => {
               const f = new Date(`${r.fecha}T12:00:00`);
               const hora = (x) => x ? new Date(x).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "—";
               const d = r.diferencia != null ? Number(r.diferencia) : null;
-              const est = r.abierta ? "abierta" : d == null ? "cerrada" : Math.abs(d) < 0.01 ? "cuadra" : d < 0 ? "falta" : "sobra";
+              const est = estDe(r, d);
+              // El color de la tarjeta avisa también un descuadre en dólares (C3).
+              const dU = difUsdDe(r), estU = estDe(r, dU);
+              const estCard = est === "abierta" ? est : [est, estU].includes("falta") ? "falta" : [est, estU].includes("sobra") ? "sobra" : est;
+              const conUsd = r.efectivoContadoUsd != null || Number(r.fondoUsd) > 0 || r.efectivoEsperadoUsd != null;
+              const txtSol = est === "abierta" ? "Abierta" : est === "cuadra" ? "Cuadra exacto" : est === "cerrada" ? "Cerrada" : `${est === "falta" ? "Faltan" : "Sobran"} S/ ${M.sol2(Math.abs(d))}`;
               const hoyLima = ymdLima(new Date()) || fmt(hoy);
               const esp = Number(r.efectivoEsperado) || 0, con = Number(r.efectivoContado) || 0;
               return (
-              <article key={r.id || r.fecha} className={`dc-jor__card is-${est}`}>
+              <article key={r.id || r.fecha} className={`dc-jor__card is-${estCard}`}>
                 <div className="dc-jor__fecha"><b>{isNaN(f) ? "—" : f.getDate()}</b><span>{isNaN(f) ? r.fecha : f.toLocaleDateString("es-PE", { month: "short" }).replace(".", "")}</span><small>{isNaN(f) ? "" : f.toLocaleDateString("es-PE", { weekday: "short" }).replace(".", "")}</small></div>
                 <div className="dc-jor__info">
                   <b><MapPin size={13} strokeWidth={2} /> {sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—"}</b>
@@ -5021,12 +5224,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   <div><small>Fondo</small><b>S/ {M.sol2(Number(r.fondo || 0))}</b></div>
                   <div><small>Esperado</small><b>{r.efectivoEsperado != null ? `S/ ${M.sol2(esp)}` : "—"}</b></div>
                   <div><small>Contado</small><b>{r.efectivoContado != null ? `S/ ${M.sol2(con)}` : "—"}</b></div>
+                  {conUsd && <>
+                    <div><small>Fondo dólares</small><b>{usd2(r.fondoUsd)}</b></div>
+                    <div><small>Esperado dólares</small><b>{r.efectivoEsperadoUsd != null ? usd2(r.efectivoEsperadoUsd) : "—"}</b></div>
+                    <div><small>Contado dólares</small><b>{r.efectivoContadoUsd != null ? usd2(r.efectivoContadoUsd) : "—"}</b></div>
+                  </>}
                 </div>
                 <div className="dc-jor__res">
-                  <span className="dc-jor__dif">{est === "abierta" ? "Abierta" : est === "cuadra" ? "Cuadra exacto" : est === "cerrada" ? "Cerrada" : `${est === "falta" ? "Faltan" : "Sobran"} S/ ${M.sol2(Math.abs(d))}`}</span>
+                  {/* Con dólares, un resultado por moneda, cada uno con su color. */}
+                  <span className="dc-jor__dif" style={conUsd ? { ...COL_EST[est], whiteSpace: "normal", textAlign: "right" } : undefined}>{conUsd && !r.abierta ? `Soles: ${txtSol.charAt(0).toLowerCase()}${txtSol.slice(1)}` : txtSol}</span>
+                  {!r.abierta && conUsd && <span className="dc-jor__dif" style={{ ...COL_EST[estU], whiteSpace: "normal", textAlign: "right" }}>{dU == null ? "Dólares sin contar" : estU === "cuadra" ? "Dólares: cuadra" : `Dólares: ${estU === "falta" ? "faltan" : "sobran"} ${usd2(Math.abs(dU))}`}</span>}
                   {r.abierta && puedeAbrirCaja && r.fecha !== hoyLima && <button type="button" onClick={() => { setCierreAdmin({ id: r.id, fecha: r.fecha, sedeId: r.sedeId, fondo: Number(r.fondo) || 0 }); setCierreAdminForm({ contado: String(Number(r.fondo) || 0), justificacion: "" }); }}>Cerrar jornada</button>}
                   {r.abierta && r.fecha === hoyLima && <button type="button" onClick={() => setTab("cierre")}>Ir a cierre</button>}
                 </div>
+                {(r.justificacion || r.observaciones) && (
+                  <div style={{ gridColumn: "1 / -1", display: "grid", gap: 2, fontSize: 12, color: "var(--dc-ink-700)", borderTop: "1px dashed var(--dc-line)", paddingTop: 8 }}>
+                    {r.justificacion && <span><b>Justificación:</b> {r.justificacion}</span>}
+                    {r.observaciones && <span><b>Observaciones:</b> {r.observaciones}</span>}
+                  </div>
+                )}
               </article>
               );
             })}
@@ -5051,21 +5267,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </Card>
           );
         }
-        const metCol = { tarjeta: DS.c.primary, yape: "var(--dc-ink-500)", efectivo: "var(--dc-ok-700)", transferencia: "var(--dc-navy)" };
+        const metCol = { tarjeta: DS.c.primary, yape: "#7B3FE4", plin: "#0E9EB0", efectivo: "var(--dc-ok-700)", transferencia: "var(--dc-navy)" };
+        // C5: cada movimiento lleva su monto en soles (`soles`, el que suma) y, si fue en
+        // dólares, su monto en US$ para mostrarlo tal cual.
         const movs = [
-          ...boletasHoyActivas.map((b, i) => ({ id: "i" + i, tipo: "ingreso", concepto: b.concepto || "Cobro", detalle: b.paciente, monto: b.monto, metodo: String(b.metodo || "").toLowerCase() })),
-          ...egresosHoy.map((e) => ({ id: "e" + e.id, tipo: "egreso", concepto: e.concepto, detalle: e.categoria, monto: e.monto, metodo: e.metodo, moneda: e.moneda })),
+          ...boletasHoyActivas.map((b, i) => ({ id: "i" + i, tipo: "ingreso", concepto: b.concepto || "Cobro", detalle: b.paciente, soles: Number(b.monto) || 0, usd: b.moneda === "USD" ? Number(b.montoOriginal) || null : null, metodo: b.mixto ? "mixto" : String(b.metodo || "").toLowerCase() })),
+          ...egresosHoy.map((e) => ({ id: "e" + e.id, tipo: "egreso", concepto: e.concepto, detalle: e.categoria, soles: egresoEnSoles(e, tcRef), usd: e.moneda === "USD" ? Number(e.monto) : null, metodo: e.metodo, eg: e })),
         ];
+        const totUsd = { ingreso: totCobHoy.usd, egreso: totEgresosHoyUsd };
         return (
         <div style={{ display: "grid", gap: 16 }}>
           <ListaFiltrable rows={movs} sub="movimientos" exportTitulo="Ingresos y egresos del día" extra={<>
-            {puedeEgresos && <button type="button" className="dc-flujo__nuevo" onClick={nuevoEgreso}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button>}
+            {puedeRegistrarEgreso && <button type="button" className="dc-flujo__nuevo" onClick={nuevoEgreso} title={cajaAbierta ? undefined : "Abre la caja para registrar egresos"}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button>}
           </>} cols={[
             { key: "tipo", label: "Tipo", get: (m) => (m.tipo === "ingreso" ? "Ingreso" : "Egreso") },
             { key: "concepto", label: "Concepto", get: (m) => m.concepto || "" },
             { key: "detalle", label: "Paciente o categoría", get: (m) => m.detalle || "" },
             { key: "metodo", label: "Medio", get: (m) => m.metodo || "" },
-            { key: "monto", label: "Monto", get: (m) => Number(m.monto || 0).toFixed(2), sortVal: (m) => Number(m.monto) || 0 },
+            { key: "monto", label: "Monto (S/)", get: (m) => Number(m.soles || 0).toFixed(2), sortVal: (m) => Number(m.soles) || 0 },
+            { key: "usd", label: "Monto en US$", get: (m) => (m.usd != null ? Number(m.usd).toFixed(2) : "") },
           ]}>{(flt) => (
           <div className="dc-flujo">
             {[["ingreso", "Ingresos", "Cobros a pacientes", ingresosHoy, ArrowDownRight], ["egreso", "Egresos", "Gastos de la clínica", totEgresosHoy, ArrowUpRight]].map(([t, tit, sub, tot, Ico]) => {
@@ -5074,20 +5294,21 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <section key={t} className={`dc-flujo__col is-${t}`}>
                 <header>
                   <span className="dc-flujo__ico"><Ico size={18} strokeWidth={2} /></span>
-                  <div><h3>{tit}</h3><span>{sub} – {lista.length} {lista.length === 1 ? "movimiento" : "movimientos"}</span></div>
-                  <b>{t === "ingreso" ? "+" : "−"} S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b>
+                  <div><h3>{tit}</h3><span>{sub} – {lista.length} {lista.length === 1 ? "movimiento" : "movimientos"}{totUsd[t] ? ` · incluye ${usd2(totUsd[t])} al TC de cada uno` : ""}</span></div>
+                  <b>{t === "ingreso" ? "+" : "−"} S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
                 </header>
                 {lista.length === 0 ? (
                   <div className="dc-flujo__vacio">{t === "ingreso" ? "Aún no hay cobros hoy." : "Sin gastos registrados hoy."}
-                    {t === "egreso" && puedeEgresos && <button type="button" onClick={nuevoEgreso}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
+                    {t === "egreso" && puedeRegistrarEgreso && <button type="button" onClick={nuevoEgreso}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
                   </div>
                 ) : (
                   <ul>
-                    {lista.map((m) => { const c = metCol[m.metodo] || "var(--dc-ink-400)"; return (
-                      <li key={m.id}>
+                    {lista.map((m) => { const c = metCol[m.metodo] || "var(--dc-ink-400)"; const anular = t === "egreso" && puedeAnularEgreso && m.eg; return (
+                      <li key={m.id} style={anular ? { gridTemplateColumns: "minmax(0, 1fr) auto auto auto" } : undefined}>
                         <div className="dc-flujo__txt"><b>{m.concepto}</b><span>{m.detalle}</span></div>
                         <span className="dc-flujo__met" style={{ color: c, background: tint(c, 0.08) }}>{m.metodo || "—"}</span>
-                        <b className="dc-flujo__monto">{t === "ingreso" ? "+" : "−"} {m.moneda === "USD" ? "US$" : "S/"} {Number(m.monto).toFixed(2)}</b>
+                        <b className="dc-flujo__monto" style={{ textAlign: "right" }}>{t === "ingreso" ? "+" : "−"} {m.usd != null ? usd2(m.usd) : `S/ ${M.sol2(m.soles)}`}{m.usd != null && <small style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--dc-ink-500)" }}>≈ S/ {M.sol2(m.soles)}</small>}</b>
+                        {anular && <button type="button" className="dc-mini-btn is-mal" title="Anular egreso" aria-label={`Anular egreso ${m.concepto}`} onClick={() => eliminarEgreso(m.eg)}><X size={13} strokeWidth={2.2} /></button>}
                       </li>
                     ); })}
                   </ul>
@@ -5102,11 +5323,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             const base = egresosVis.filter((e) => (catPeriodo === "hoy" ? e.fecha === fmt(hoy) : (e.fecha || "").slice(0, 7) === ym));
             const grupos = EGRESO_CATS.map((cat) => {
               const items = base.filter((e) => (EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros") === cat);
-              return { cat, items, pen: items.filter((e) => e.moneda !== "USD").reduce((a, e) => a + e.monto, 0), usd: items.filter((e) => e.moneda === "USD").reduce((a, e) => a + e.monto, 0) };
-            }).filter((g) => g.items.length).sort((a, b) => b.pen - a.pen);
-            const totPen = grupos.reduce((a, g) => a + g.pen, 0) || 1;
+              // El peso de cada categoría se mide en soles con los dólares convertidos (C5).
+              return { cat, items, ...sumarEgresos(items, tcRef) };
+            }).filter((g) => g.items.length).sort((a, b) => b.soles - a.soles);
+            const totSoles = grupos.reduce((a, g) => a + g.soles, 0) || 1;
             const otros = grupos.find((g) => g.cat === "Otros");
-            const CAT_COL = { Insumos: "#0E9199", Laboratorio: "#6D4FD1", Alquiler: "#1E3A5F", "Servicios (luz/agua)": "#D97706", Planilla: "#2563EB", Marketing: "#DB2777", Equipos: "#16A36A", Otros: "#64748B" };
+            const CAT_COL = EGRESO_CAT_COL;
             return (
               <Card className="dc-egcat">
                 <div className="dc-egcat__cab">
@@ -5118,14 +5340,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 {otros && otros.items.length > 0 && <div className="fm-aviso-edad is-info" style={{ margin: "0 0 12px" }}><Tag size={15} strokeWidth={2} /><span><b>{otros.items.length} {otros.items.length === 1 ? "egreso" : "egresos"} en «Otros».</b> Revísalos y asígnales una categoría para que el reporte del mes sea útil.</span></div>}
                 {grupos.length === 0 ? <Vacio icon={<Tag size={22} strokeWidth={1.75} />} titulo="Sin egresos en el periodo" sub="Los gastos que registres aparecerán agrupados aquí." /> : (
                   <ul className="dc-egcat__lista">
-                    {grupos.map((g) => { const col = CAT_COL[g.cat] || "#64748B"; const abierta = catAbierta === g.cat; const pct = Math.round((g.pen / totPen) * 100); return (
+                    {grupos.map((g) => { const col = CAT_COL[g.cat] || "#64748B"; const abierta = catAbierta === g.cat; const pct = Math.round((g.soles / totSoles) * 100); return (
                       <li key={g.cat} className={abierta ? "is-open" : ""} style={{ "--c": col }}>
                         <button type="button" className="dc-egcat__fila" aria-expanded={abierta} onClick={() => setCatAbierta(abierta ? null : g.cat)}>
                           <span className="dc-egcat__dot" />
                           <b>{g.cat}</b>
                           <small>{g.items.length} {g.items.length === 1 ? "gasto" : "gastos"}</small>
                           <span className="dc-egcat__bar"><i style={{ width: `${Math.max(pct, 2)}%` }} /></span>
-                          <em>S/ {g.pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}{g.usd ? <small> + US$ {g.usd.toFixed(2)}</small> : null}</em>
+                          <em title={g.usd ? `≈ S/ ${M.sol2(g.soles)} en soles` : undefined}>{g.pen || !g.usd ? `S/ ${g.pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}` : ""}{g.usd ? <small>{g.pen ? " + " : ""}{usd2(g.usd)}</small> : null}</em>
                           <span className="dc-egcat__pct">{pct}%</span>
                           <ChevronDown size={16} strokeWidth={2} className="dc-egcat__chev" />
                         </button>
@@ -5135,7 +5357,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                               <div key={e.id} className="dc-egcat__item">
                                 <div><b>{e.concepto}</b><span>{fechaLegible(e.fecha)} – {e.metodo}</span></div>
                                 <strong>{e.moneda === "USD" ? "US$" : "S/"} {Number(e.monto).toFixed(2)}</strong>
-                                {puedeEgresos ? <Select small width={170} ariaLabel={`Categoría de ${e.concepto}`} value={EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros"} onChange={(v) => reclasificarEgreso(e, v)} options={EGRESO_CATS} /> : <span className="dc-pill">{e.categoria}</span>}
+                                {puedeAnularEgreso ? <Select small width={170} ariaLabel={`Categoría de ${e.concepto}`} value={EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros"} onChange={(v) => reclasificarEgreso(e, v)} options={EGRESO_CATS} /> : <span className="dc-pill">{e.categoria}</span>}
                               </div>
                             ))}
                           </div>
@@ -5212,14 +5434,16 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         );
       })()}
 
-      {pago && <ModalCobro monto={pago.monto} pacienteId={conectado ? pago.pid : null} sedeId={sedeUuid()} paciente={pago.nombre} items={pago.items || itemsDe(pago.pid)} faseIds={pago.faseIds || null} concepto={pago.faseIds ? "Tratamiento terminado" : "Cobro de saldo en caja"} onClose={() => setPago(null)} onAprobado={aprobar} notify={notify} />}
+      {/* C6: la boleta del cobro lleva el DNI, el correo y la dirección del paciente. */}
+      {pago && (() => { const pacP = pacDe(pago.pid); return <ModalCobro monto={pago.monto} pacienteId={conectado ? pago.pid : null} sedeId={sedeUuid()} paciente={pago.nombre} dni={pacP?.dni || pago.dni || ""} email={pacP?.email || ""} direccion={pacP?.direccion || pacP?.distrito || ""} items={pago.items || itemsDe(pago.pid)} faseIds={pago.faseIds || null} concepto={pago.faseIds ? "Tratamiento terminado" : "Cobro de saldo en caja"} conceptoAbono="Abono en caja" onClose={() => setPago(null)} onAprobado={aprobar} notify={notify} />; })()}
       {boletaVer && <BoletaView boleta={boletaVer} onClose={() => setBoletaVer(null)} />}
       {datosFact && <DatosFacturacion onClose={() => setDatosFact(false)} notify={notify} readOnly={fiscalReadOnly} />}
       {egForm && (() => {
-        const mets = [["efectivo", "Efectivo", DollarSign], ["tarjeta", "Tarjeta", CreditCard], ["transferencia", "Transferencia", Wallet], ["yape", "Yape", Zap]];
+        const ICO_MET = { efectivo: DollarSign, tarjeta: CreditCard, transferencia: Wallet, yape: Zap, plin: Smartphone };
+        const mets = EGRESO_METODOS.map(([k, l]) => [k, l, ICO_MET[k] || Wallet]);
         return (
         <Modal icon={<Wallet size={20} strokeWidth={1.75} />} titulo="Registrar egreso" sub={egForm.sede != null ? `Gasto que sale de la caja de ${nombreSedeEn(sedes, egForm.sede)}` : "Gasto que sale de la caja de una sede"} onClose={() => setEgForm(null)} maxW={520}
-          footer={<><Btn small kind="ghost" onClick={() => setEgForm(null)}>Cancelar</Btn><Btn small kind="red" onClick={guardarEgreso}><Check size={15} strokeWidth={1.75} /> Registrar egreso</Btn></>}>
+          footer={<><Btn small kind="ghost" onClick={() => setEgForm(null)}>Cancelar</Btn><Btn small kind="red" disabled={egBusy} onClick={guardarEgreso}><Check size={15} strokeWidth={1.75} /> {egBusy ? "Registrando…" : "Registrar egreso"}</Btn></>}>
           <Field label="Concepto" value={egForm.concepto} onChange={(v) => setEgForm({ ...egForm, concepto: v })} placeholder="Ej. Compra de guantes y mascarillas" />
           {/* Sin caja elegida (vista «Todas») el gasto se asigna a una sede: sale de su gaveta. */}
           {sedeCaja == null && sedesCaja.length > 1 && (
@@ -5239,6 +5463,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           <div className="dc-moneda-sel" role="radiogroup" aria-label="Moneda del egreso" style={{ marginTop: 14 }}>
             {[["PEN", "Soles (S/)"], ["USD", "Dólares (US$)"]].map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={(egForm.moneda || "PEN") === k} className={(egForm.moneda || "PEN") === k ? "is-on" : ""} onClick={() => setEgForm({ ...egForm, moneda: k })}>{l}</button>)}
           </div>
+          {/* C5: el egreso en dólares guarda su TC para entrar al total y al neto del día en soles. */}
+          {egForm.moneda === "USD" && (() => { const tcN = Number(String(egForm.tc || "").replace(",", ".")); const lm = leerMonto(egForm.monto); return (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14, alignItems: "end" }}>
+              <Field label="Tipo de cambio (S/ por US$ 1)" value={egForm.tc ?? ""} onChange={(v) => setEgForm({ ...egForm, tc: v.replace(/[^\d.,]/g, "") })} placeholder={String(tcRef)} />
+              <div style={{ fontSize: 13, color: "var(--dc-ink-500)", paddingBottom: 10 }}>{lm.ok && lm.valor > 0 && tcN > 0 ? <>Equivale a <b style={{ color: "var(--dc-ink-700)" }}>S/ {M.sol2(red2(lm.valor * tcN))}</b></> : "Se suma a los egresos del día en soles."}</div>
+            </div>
+          ); })()}
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", margin: "16px 0 7px" }}>Método de pago</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {mets.map(([k, l, Ic]) => { const on = egForm.metodo === k; return (
@@ -5298,6 +5529,7 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
   };
   // Se cobra en la caja de la sede de la cita y solo con esa caja abierta.
   const { supervisor: supervisaT } = useEmiteCobros();
+  const sxT = useSede();
   const cobrar = (c, monto) => {
     if (supervisaT) { notify("Cobra la sede de la cita (su administrador o recepción)."); return; }
     const dp = datosPago(c);
@@ -5323,7 +5555,9 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
       const met = { tarjeta: "Tarjeta", yape: "Yape", plin: "Plin", efectivo: "Efectivo", transferencia: "Transferencia", mixto: "Pago mixto" }[res?.metodo] || "Cobro";
       demoDb.updFicha(pago.pid, (cur) => ({ ...cur,
         tratamiento: (cur.tratamiento || []).map((f) => (!res?.parcial && ids.has(f.id) ? { ...f, estado: "atendida", atendidaEn: f.atendidaEn || fmt(hoy) } : f)),
-        pagos: [...(cur.pagos || []), { fecha: fmt(hoy), sede: c.sede, concepto: res?.parcial ? "Abono en recepción" : "Cobro de saldo en recepción", monto: cobrado, metodo: met, moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null }] }));
+        // Con su comprobante, TC, hora, sesión de caja y quién cobró: la boleta y el arqueo de
+        // Caja lo leen igual que un cobro hecho en Caja (C1, C7).
+        pagos: [...(cur.pagos || []), { fecha: fmt(hoy), sede: c.sede, concepto: res?.parcial ? "Abono en recepción" : "Cobro de saldo en recepción", monto: cobrado, metodo: met, moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, tipoCambio: res?.moneda === "USD" ? Number(res.tipoCambio) || null : null, creadoEn: new Date().toISOString(), hora: horaLima(new Date()), cajaSesion: aperturaDemo(c.sede)?.id || null, usuario: sxT.nombre || "", ...(res?.mixto ? { mixto: res.mixto } : {}), ...(res?.comprobanteSerie ? { comprobanteSerie: res.comprobanteSerie, comprobanteNumero: res.comprobanteNumero } : {}) }] }));
     }
     setPago(null);
     notify(`Pago de ${pago.nombre} aprobado en ${nombreSedeEn(sedesApi, c.sede)}. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta de demostración (no se envía a SUNAT)."}`);
@@ -5371,7 +5605,7 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
           ))}
         </Modal>
       ); })()}
-      {pago && <ModalCobro monto={pago.monto} pacienteId={auth.token ? pago.pid : null} sedeId={uuidSede(sedesApi, pago.cita.sede)} paciente={pago.nombre} concepto="Cobro en recepción" onClose={() => setPago(null)} onAprobado={registrarPago} notify={notify} />}
+      {pago && (() => { const pacT = datosPago(pago.cita).pac; return <ModalCobro monto={pago.monto} pacienteId={auth.token ? pago.pid : null} sedeId={uuidSede(sedesApi, pago.cita.sede)} paciente={pago.nombre} dni={pacT?.dni || ""} email={pacT?.email || ""} direccion={pacT?.direccion || pacT?.distrito || ""} concepto="Cobro de saldo en recepción" conceptoAbono="Abono en recepción" onClose={() => setPago(null)} onAprobado={registrarPago} notify={notify} />; })()}
     </div>
   );
 }
@@ -9149,7 +9383,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     : [["cita", "Nueva cita", Calendar, "agenda", "Agenda un paciente", "#0E8C95"],
        ["paciente", "Nuevo paciente", UserPlus, "pacientes", "Crea su ficha", "#6D4FD1"],
        ["cobro", "Registrar cobro", CreditCard, "facturacion", "Cobrar en caja", "#16A36A"],
-       ["egreso", "Registrar egreso", Wallet, "facturacion", "Gasto de caja", "#D0563F"]];
+       // C4: el egreso lo registra quien opera la caja (misma regla que en Caja › Ingresos y
+       // egresos); el administrador general con varias sedes solo supervisa (useEmiteCobros).
+       ...(rol === "admin" && misSedes.length > 1 ? [] : [["egreso", "Registrar egreso", Wallet, "facturacion", "Gasto de caja", "#D0563F"]])];
   const crearAccion = (k, t) => {
     if (k === "cobro") { setVista("caja"); return; }
     if (k === "egreso") { setVista("caja_movimientos"); setCrearIntent("egreso"); return; }
@@ -9877,11 +10113,15 @@ function BoletaView({ boleta, onClose }) {
   const mon = boleta.moneda === "USD" ? "US$" : "S/";
   const docLbl = boleta.docTipo || (tipoDoc === "Factura" ? "RUC" : "DNI");
   const docNum = boleta.docNum || boleta.dni || "";
-  const total = Number(boleta.total) || 0;
-  const opGravada = Math.round((total / 1.18) * 100) / 100;
-  const igv = Math.round((total - opGravada) * 100) / 100;
-  const items = boleta.items && boleta.items.length ? boleta.items : [{ cant: 1, desc: boleta.concepto || "Servicio odontológico", precio: total, importe: opGravada }];
-  const metLbl = { tarjeta: "TARJETA", yape: "YAPE", plin: "PLIN", efectivo: "EFECTIVO", transferencia: "TRANSFERENCIA" }[boleta.metodo] || "CONTADO";
+  // Líneas y totales los arma armarBoleta (compartido/cajaMoneda.js), igual para el cobro y
+  // para Caja: valor de venta sin IGV + IGV = importe, y los importes suman el total (C6).
+  const B = boleta.lineas ? boleta : armarBoleta({ ...boleta, monto: boleta.totalPen ?? boleta.total, montoOriginal: boleta.moneda === "USD" ? boleta.total : undefined }, { serie: boleta.serie, numero: boleta.numero });
+  const total = Number(B.total) || 0;
+  const opGravada = Number(B.opGravada) || 0;
+  const igv = Number(B.igv) || 0;
+  const lineas = B.lineas || [];
+  const usuarioSesion = useSede().nombre;
+  const metLbl = { tarjeta: "TARJETA", yape: "YAPE", plin: "PLIN", efectivo: "EFECTIVO", transferencia: "TRANSFERENCIA", mixto: "PAGO MIXTO", "pago mixto": "PAGO MIXTO" }[boleta.metodo] || "CONTADO";
   const imprimir = () => {
     const w = window.open("", "_blank", "width=460,height=680");
     if (!w) return;
@@ -9910,22 +10150,25 @@ function BoletaView({ boleta, onClose }) {
             <div><strong>Señor(es):</strong> {boleta.cliente}</div>
             <div><strong>Dirección:</strong> {boleta.direccion || "—"}</div>
             <div><strong>{docLbl}:</strong> {docNum || "—"}</div>
-            <div><strong>Moneda:</strong> {boleta.moneda === "USD" ? "Dólares americanos" : "Soles"}</div>
+            <div><strong>Moneda:</strong> {B.moneda === "USD" ? "Dólares americanos (US$)" : "Soles (S/)"}</div>
+            {B.moneda === "USD" && B.tipoCambio && <div><strong>Tipo de cambio:</strong> S/ {Number(B.tipoCambio).toFixed(3)} por US$ 1</div>}
             <div><strong>F. Emisión:</strong> {boleta.fecha}</div>
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10 }}>
             <thead><tr style={{ background: "var(--dc-bg)" }}>
               <th style={{ ...cell, textAlign: "center", fontWeight: 500 }}>Cant</th>
               <th style={{ ...cell, textAlign: "left", fontWeight: 500 }}>Descripción</th>
-              <th style={{ ...cell, textAlign: "right", fontWeight: 500 }}>Precio</th>
-              <th style={{ ...cell, textAlign: "right", fontWeight: 500 }}>Importe</th>
+              <th style={{ ...cell, textAlign: "right", fontWeight: 500 }} title="Valor de venta sin IGV">V. venta</th>
+              <th style={{ ...cell, textAlign: "right", fontWeight: 500 }}>IGV</th>
+              <th style={{ ...cell, textAlign: "right", fontWeight: 500 }} title="Precio de venta con IGV">Importe</th>
             </tr></thead>
             <tbody>
-              {items.map((it, i) => (
+              {lineas.map((it, i) => (
                 <tr key={i}>
                   <td style={{ ...cell, textAlign: "center" }}>{it.cant}</td>
                   <td style={{ ...cell, textAlign: "left" }}>{it.desc}</td>
-                  <td style={{ ...cell, textAlign: "right" }}>{Number(it.precio).toFixed(2)}</td>
+                  <td style={{ ...cell, textAlign: "right" }}>{Number(it.valor).toFixed(2)}</td>
+                  <td style={{ ...cell, textAlign: "right" }}>{Number(it.igv).toFixed(2)}</td>
                   <td style={{ ...cell, textAlign: "right" }}>{Number(it.importe).toFixed(2)}</td>
                 </tr>
               ))}
@@ -9936,13 +10179,15 @@ function BoletaView({ boleta, onClose }) {
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span style={{ color: "var(--dc-ink-700)" }}>{l}</span><strong>{mon} {v.toFixed(2)}</strong></div>
             ))}
             <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid var(--dc-ink-900)", marginTop: 3, fontWeight: 500, fontSize: 13 }}><span>IMPORTE TOTAL VENTA</span><span>{mon} {total.toFixed(2)}</span></div>
+            {B.moneda === "USD" && <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "var(--dc-ink-700)" }}><span>Equivalente en soles{B.tipoCambio ? ` (TC ${Number(B.tipoCambio).toFixed(3)})` : ""}</span><span>S/ {Number(B.totalPen || 0).toFixed(2)}</span></div>}
             {!auth.token && <div className="dc-bol-demo">Documento de demostración: no se envió a SUNAT y no tiene valor tributario.</div>}
           </div>
           <div style={{ fontSize: 12, marginTop: 10, borderTop: "1px dashed var(--dc-line)", paddingTop: 8, lineHeight: 1.7 }}>
             <div><strong>CONDICIÓN DE PAGO:</strong> AL CONTADO {mon} {total.toFixed(2)}</div>
-            <div><strong>SON:</strong> {boleta.moneda === "USD" ? String(numeroALetras(total)).replace(/SOLES?/g, "DÓLARES AMERICANOS") : numeroALetras(total)}</div>
+            <div><strong>SON:</strong> {B.moneda === "USD" ? String(numeroALetras(total)).replace(/SOLES?/g, "DÓLARES AMERICANOS") : numeroALetras(total)}</div>
             <div style={{ marginTop: 4 }}>Observación: {boleta.ref ? `${metLbl} – Op. ${boleta.ref}` : metLbl}</div>
-            <div>Usuario: {boleta.usuario || "sistema"}</div>
+            {/* C6: quien emitió el cobro (o, si no quedó registrado, el usuario de la sesión). */}
+            <div>Usuario: {boleta.usuario || usuarioSesion || "—"}</div>
           </div>
           <div style={{ textAlign: "center", fontSize: 12, color: "var(--dc-ink-400)", marginTop: 12 }}>Representación impresa de la {TIT}</div>
         </div>
@@ -10065,8 +10310,10 @@ function DatosFacturacion({ onClose, notify = () => {}, readOnly = false }) {
   );
 }
 
-function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", email, paciente, dni, items = null, faseIds = null, onClose, onAprobado, notify = () => {} }) {
+// `conceptoAbono`: concepto de la boleta si se cobra solo una parte (por defecto, `concepto`).
+function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", conceptoAbono = null, email, paciente, dni, direccion = "", items = null, faseIds = null, onClose, onAprobado, notify = () => {} }) {
   const real = !!auth.token && !!pacienteId;
+  const sxCobro = useSede();   // quién cobra: va en la boleta (C6)
   const [idempotencyKey] = useState(() => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `pay-${Date.now()}-${Math.random().toString(36).slice(2)}`));
   const [posting, setPosting] = useState(false);
   const postingRef = useRef(false);
@@ -10119,6 +10366,24 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   const monCampos = { ...(moneda === "USD" ? { moneda: "USD", montoOriginal: net, tipoCambio: TC_USD } : { moneda: "PEN" }), ...(faseIds && faseIds.length ? { faseIds } : {}) };
   const conceptoFull = cuotas > 1 ? `${concepto} – Cuota 1 de ${cuotas}` : concepto;
   const parcial = netPen > 0 && netPen < saldoMax - 0.009;
+  // C2: no se cobra más que el saldo. En dólares el tope es el saldo al TC vigente.
+  const maxUi = aUi(saldoMax);
+  const excede = saldoMax > 0 && net > maxUi + 0.004;
+  // Concepto de la boleta: el mismo que guarda la caja para este cobro (C1).
+  const conceptoBoleta = parcial && conceptoAbono ? conceptoAbono : concepto;
+  // C2: al cambiar el TC con dólares elegidos se recalcula lo que se cobra: si se cobraba el
+  // saldo (o una cuota) se recalcula con el TC nuevo; un abono escrito a mano se conserva,
+  // salvo que con el TC nuevo supere el saldo.
+  const cambiarTc = (v) => {
+    const maxAnt = aUi(saldoMax);
+    const enMax = Math.abs((Number(montoCobrar) || 0) - maxAnt) < 0.006;
+    const maxNuevo = Math.round((saldoMax / v) * 100) / 100;
+    if (moneda === "USD" && saldoMax > 0) {
+      if (cuotas > 1) setMontoCobrar(Math.round((maxNuevo / cuotas) * 100) / 100);
+      else if (enMax || (Number(montoCobrar) || 0) > maxNuevo) setMontoCobrar(maxNuevo);
+    }
+    setTcUsd(v);
+  };
 
   const METODOS = [
     { k: "efectivo", label: "Efectivo", sub: "Se contabiliza en caja", color: "#16A36A", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> },
@@ -10132,7 +10397,8 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
     ? { k: "mixto", label: "Pago mixto", color: "#D97706", icon: <Wallet size={22} strokeWidth={1.75} color="#fff" /> }
     : (METODOS.find((m) => m.k === metodo) || {});
 
-  const aprobado = (res) => { setResultado(res); setPaso("aprobado"); closeRef.current = setTimeout(() => onAprobado && onAprobado(res), 2800); };
+  // El resultado lleva el concepto de la boleta y el vuelto en la moneda cobrada (vueltoMon).
+  const aprobado = (res0) => { const res = { ...res0, concepto: conceptoBoleta, vueltoMon: res0.vueltoMon ?? (Number(res0.vuelto) > 0 ? aUi(res0.vuelto) : 0) }; setResultado(res); setPaso("aprobado"); closeRef.current = setTimeout(() => onAprobado && onAprobado(res), 2800); };
   const fallo = (m) => { setMsg(m || "El pago no pudo procesarse."); setPaso("rechazado"); };
 
   const onFoto = (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; if (!f.type.startsWith("image/")) { setMsg("Sube una imagen (foto/captura del comprobante)."); return; } const rd = new FileReader(); rd.onload = () => setFoto(rd.result); rd.readAsDataURL(f); e.target.value = ""; };
@@ -10226,7 +10492,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   };
 
   const elegir = (m) => {
-    if (net <= 0) return;
+    if (net <= 0 || excede) return;   // C2: nunca más que el saldo
     setMetodo(m);
     if (m === "efectivo") {
       setRecibidoEfectivo(String(net));
@@ -10236,7 +10502,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
     else setPaso("pos");
   };
   const abrirMixto = () => {
-    if (net <= 0) return;
+    if (net <= 0 || excede) return;
     const mitad = Math.round((net / 2) * 100) / 100;
     setMixEf(String(mitad));
     setMixOtro(String(Math.round((net - mitad) * 100) / 100));
@@ -10268,7 +10534,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
       setTimeout(() => {
         liberar();
         const loc = nextBoletaLocal(getEmisor(sedeId).serie);
-        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero });
+        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), vueltoMon: vueltoUi, comprobanteSerie: loc.serie, comprobanteNumero: loc.numero });
       }, 700);
       return;
     }
@@ -10292,7 +10558,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
           fallo("Se registró la parte en efectivo, pero falló el segundo método. Revisa el historial de caja.");
           return;
         }
-        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), comprobanteSerie: r2?.comprobanteSerie || r1?.comprobanteSerie, comprobanteNumero: r2?.comprobanteNumero || r1?.comprobanteNumero, pagoId: r2?.id || r1?.id });
+        aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), vueltoMon: vueltoUi, comprobanteSerie: r2?.comprobanteSerie || r1?.comprobanteSerie, comprobanteNumero: r2?.comprobanteNumero || r1?.comprobanteNumero, pagoId: r2?.id || r1?.id });
       })
       .catch((e) => {
         liberar();
@@ -10310,7 +10576,9 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
     if (real && numeroBoleta == null) { notify("El servidor no devolvió número de comprobante."); return; }
     setVerBoleta(true);
   };
-  const boletaObj = { serie: serieBoleta, numero: numeroBoleta, sede: sedeId, cliente: paciente || "Cliente", dni: dni || "", direccion: "", fecha: fmt(hoy), total: netPen, concepto, metodo, ref, items: (!parcial && items && items.length) ? items : undefined };
+  // C1: la misma boleta que se ve después desde Caja (armarBoleta): con la moneda cobrada (en
+  // dólares, el total en US$ con el TC del cobro y su equivalente en soles), el DNI y quién cobró.
+  const boletaObj = armarBoleta({ sede: sedeId, paciente: paciente || "Cliente", dni: dni || "", direccion, fecha: fmt(hoy), monto: resultado?.montoCobrado ?? netPen, moneda: resultado?.moneda || moneda, montoOriginal: resultado?.montoOriginal ?? net, tipoCambio: resultado?.tipoCambio ?? TC_USD, concepto: conceptoBoleta, metodo: resultado?.metodo || metodo, ref, items: (!parcial && items && items.length) ? items : undefined }, { serie: serieBoleta, numero: numeroBoleta, usuario: sxCobro.nombre || "" });
   const chip = (active) => ({ fontSize: 12, fontWeight: 500, padding: "5px 11px", borderRadius: "var(--dc-r-full)", cursor: "pointer", border: active ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: active ? (tint(DS.c.primary, 0.078)) : "#fff", color: active ? DS.c.primary : "var(--dc-ink-400)" });
   const inp2 = { padding: "7px 10px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", boxSizing: "border-box" };
 
@@ -10354,8 +10622,8 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
               onChange={(e) => {
                 const v = Number(e.target.value);
                 if (!Number.isFinite(v) || v <= 0) return;
-                setTcUsd(v);
-                localStorage.setItem("dc_tipo_cambio", String(v));
+                cambiarTc(v);
+                try { localStorage.setItem("dc_tipo_cambio", String(v)); } catch { /* sin almacenamiento */ }
               }}
               onBlur={() => {
                 if (!auth.token || !(Number(tcUsd) > 0)) return;
@@ -10389,12 +10657,18 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
             <label style={{ fontSize: 12, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 6 }}>Descuento promo {sym} <input className="dc-premium-inp" type="number" value={desc} onChange={(e) => setDesc(e.target.value)} style={{ ...inp2, width: 66, padding: "5px 8px", fontSize: 13 }} /></label>
             <div style={{ fontSize: 13, color: "var(--dc-ink-alt)", fontWeight: 500 }}>Cobra ahora: {sym} {net.toFixed(2)}{moneda === "USD" ? ` (S/ ${M.sol2(netPen)})` : ""}{cuotas > 1 ? ` – 1 de ${cuotas}` : ""}{parcial ? " – abono" : ""}</div>
           </div>
+          {excede && (
+            <div role="alert" style={{ marginTop: 10, fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <AlertTriangle size={14} strokeWidth={2} /> Supera el saldo: lo máximo es {sym} {maxUi.toFixed(2)}{moneda === "USD" ? ` (S/ ${M.sol2(saldoMax)} al TC ${TC_USD})` : ""}.
+              <button type="button" onClick={() => { setMontoCobrar(maxUi); setCuotas(1); }} style={chip(false)}>Cobrar el saldo</button>
+            </div>
+          )}
         </div>
       )}
       <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 12 }}>¿Cómo va a pagar?</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {METODOS.map((m) => (
-          <button key={m.k} onClick={() => elegir(m.k)} style={{ display: "flex", flexDirection: m.k === "efectivo" ? "row" : "column", gridColumn: m.k === "efectivo" ? "1 / -1" : undefined, gap: m.k === "efectivo" ? 12 : 8, alignItems: m.k === "efectivo" ? "center" : "flex-start", padding: "14px 14px", borderRadius: "var(--dc-r-lg)", border: "1.5px solid var(--dc-line)", background: "#fff", cursor: "pointer", textAlign: "left", transition: "all .15s" }}
+          <button key={m.k} onClick={() => elegir(m.k)} disabled={excede} aria-disabled={excede} style={{ opacity: excede ? 0.5 : 1, display: "flex", flexDirection: m.k === "efectivo" ? "row" : "column", gridColumn: m.k === "efectivo" ? "1 / -1" : undefined, gap: m.k === "efectivo" ? 12 : 8, alignItems: m.k === "efectivo" ? "center" : "flex-start", padding: "14px 14px", borderRadius: "var(--dc-r-lg)", border: "1.5px solid var(--dc-line)", background: "#fff", cursor: excede ? "not-allowed" : "pointer", textAlign: "left", transition: "all .15s" }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = m.color; e.currentTarget.style.boxShadow = `0 6px 18px ${tint(m.color, 0.133)}`; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dc-line)"; e.currentTarget.style.boxShadow = "none"; }}>
             <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: m.color, display: "grid", placeItems: "center" }}>{m.icon}</div>
@@ -10402,7 +10676,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
           </button>
         ))}
       </div>
-      <button type="button" onClick={abrirMixto} style={{ width: "100%", marginTop: 10, display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: "var(--dc-r-lg)", border: "1.5px dashed var(--dc-line-alt2)", background: "var(--dc-bg-soft)", cursor: "pointer", textAlign: "left" }}>
+      <button type="button" onClick={abrirMixto} disabled={excede} style={{ opacity: excede ? 0.5 : 1, width: "100%", marginTop: 10, display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: "var(--dc-r-lg)", border: "1.5px dashed var(--dc-line-alt2)", background: "var(--dc-bg-soft)", cursor: excede ? "not-allowed" : "pointer", textAlign: "left" }}>
         <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: "var(--dc-ink-alt)", display: "grid", placeItems: "center" }}><Wallet size={20} strokeWidth={1.75} color="#fff" /></div>
         <div><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Pago mixto</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 1 }}>Efectivo + Yape / tarjeta / transferencia – con vuelto</div></div>
       </button>
@@ -10555,12 +10829,12 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
               const liberar = () => { postingRef.current = false; setPosting(false); };
               let concept = `${prevConcepto} – Vuelto ${sym} ${vuelto.toFixed(2)}`;
               if (moneda === "USD") concept += ` – US$ ${net.toFixed(2)} (TC ${TC_USD})`;
-              if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor(sedeId).serie); aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
+              if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor(sedeId).serie); aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), vueltoMon: vuelto, comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
               api.pagos.registrar({ pacienteId, sedeId, concepto: concept, monto: netPen, metodo: "efectivo", descuento: aPen(Number(desc) || 0), ...monCampos }, { headers: { "Idempotency-Key": idempotencyKey } })
                 .then((r) => {
                   if (r?.comprobanteNumero == null || r?.comprobanteNumero === "") { liberar(); fallo("El servidor no asignó número de comprobante."); return; }
                   liberar();
-                  aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), comprobanteSerie: r?.comprobanteSerie, comprobanteNumero: r?.comprobanteNumero, pagoId: r?.id });
+                  aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), vueltoMon: vuelto, comprobanteSerie: r?.comprobanteSerie, comprobanteNumero: r?.comprobanteNumero, pagoId: r?.id });
                 })
                 .catch((e) => {
                   liberar();
@@ -10609,7 +10883,8 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
         <div style={{ width: 66, height: 66, background: "var(--dc-ok-soft)", borderRadius: "50%", margin: "0 auto 18px", display: "grid", placeItems: "center" }}><CheckCircle2 size={38} strokeWidth={1.75} color="var(--dc-ok-700)" /></div>
         <div style={{ fontWeight: 500, color: NAVY, fontSize: 18, fontFamily: DISPLAY_FONT }}>¡Cobro aprobado!</div>
         {/* No se afirma el envio a SUNAT: el OSE no esta integrado (README §10, frente 1). */}
-        <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 6 }}>S/ {M.sol2(net)} – {metaMet.label}{resultado?.vuelto > 0 ? ` – vuelto S/ ${M.sol2(Number(resultado.vuelto))}` : ""}{cuotas > 1 ? ` – cuota 1 de ${cuotas}` : ""}. {auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta de demostración (no se envía a SUNAT)."}</div>
+        {/* C2: el monto y el vuelto en la moneda cobrada (en dólares, con su equivalente en soles). */}
+        <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 6 }}>{sym} {net.toFixed(2)}{moneda === "USD" ? ` (S/ ${M.sol2(netPen)} al TC ${TC_USD})` : ""} – {metaMet.label}{resultado?.vueltoMon > 0 ? ` – vuelto ${sym} ${Number(resultado.vueltoMon).toFixed(2)}` : ""}{cuotas > 1 ? ` – cuota 1 de ${cuotas}` : ""}. {auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta de demostración (no se envía a SUNAT)."}</div>
         <div style={{ marginTop: 18, display: "flex", gap: 10, justifyContent: "center" }}>
           <Btn small kind="ghost" onClick={() => { if (closeRef.current) { clearTimeout(closeRef.current); closeRef.current = null; } abrirBoletaAprobada(); }}><FileText size={15} strokeWidth={1.75} /> Ver boleta</Btn>
           <Btn small onClick={() => { if (closeRef.current) clearTimeout(closeRef.current); onAprobado && onAprobado(resultado); }}><CheckCircle2 size={15} strokeWidth={1.75} /> Listo</Btn>
