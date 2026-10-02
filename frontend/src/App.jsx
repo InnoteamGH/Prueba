@@ -11828,7 +11828,7 @@ export default function App() {
         .dc-premium-inp { background: var(--dc-white); border: 1px solid var(--dc-bg); transition: all 0.2s cubic-bezier(.2,.7,.2,1); }
         .dc-premium-inp:focus { background: var(--dc-white); border-color: var(--dc-primary-alt); box-shadow: var(--dc-focus); outline: none !important; }
         .dc-premium-inp::placeholder { color: var(--dc-ink-400); }
-        @keyframes dcUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes dcUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
         @keyframes dcTabSlide{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:translateX(0)}}
         @keyframes dcPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes dcBlink{0%,100%{opacity:.25}50%{opacity:1}}

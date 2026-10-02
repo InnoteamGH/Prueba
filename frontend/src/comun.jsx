@@ -1848,14 +1848,16 @@ export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
   return (
     <div className="dc-menu" onClick={(e) => e.stopPropagation()}>
       <button ref={btnRef} type="button" className="dc-row-action" aria-label={etiqueta} title={etiqueta} aria-haspopup="menu" aria-expanded={!!pos} onClick={() => (pos ? setPos(null) : abrir())}><MoreHorizontal size={16} strokeWidth={1.75} /></button>
-      {pos && (<>
-        <div onClick={() => setPos(null)} style={{ position: "fixed", inset: 0, zIndex: 190 }} />
-        <div className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onKeyDown={(e) => { if (e.key === "Escape") setPos(null); }}>
+      {/* En el body: un ancestro con transform u overflow (animación de entrada, tabla)
+          desplazaba la lista fija y el clic caía sobre la fila de otro paciente. */}
+      {pos && createPortal(<>
+        <div onClick={(e) => { e.stopPropagation(); setPos(null); }} style={{ position: "fixed", inset: 0, zIndex: 190 }} />
+        <div className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") setPos(null); }}>
           {lista.map((o) => (
             <button key={o.label} type="button" role="menuitem" className={`dc-menu__op${o.peligro ? " dc-menu__op--peligro" : ""}`} onClick={() => { setPos(null); o.onClick(); }}>{o.label}</button>
           ))}
         </div>
-      </>)}
+      </>, document.body)}
     </div>
   );
 }
