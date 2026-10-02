@@ -649,9 +649,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     : carteraDemo.conVencido.map((f) => ({ n: f.p.nombre, v: f.vencido }));
   // Solo lo de los pacientes visibles (sus sedes): el admin de sede no ve avisos de otra sede.
   const deVisible = (pid, nom) => pacientes.some((p) => String(p.id) === String(pid) || (nom && p.nombre === nom));
-  const liqs = conectado ? [] : (dbDash?.liquidaciones || []).filter((l) => deVisible(l.pid));
+  // Liquidaciones y laboratorio: por la sede del registro (si no tiene, la principal del paciente), como en Seguros y Laboratorio.
+  const sedeReg = (x, pid) => x.sede ?? sedesDe(pacientesAll.find((p) => String(p.id) === String(pid)) || {})[0];
+  const liqs = conectado ? [] : (dbDash?.liquidaciones || []).filter((l) => deVisible(l.pid) && sedeCxD.enSede(sedeReg(l, l.pid)));
   const liqObs = liqs.filter((l) => l.estado === "observado"), liqBorr = liqs.filter((l) => l.estado === "borrador");
-  const labAtr = conectado ? [] : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso) && deVisible(c.pacienteId, c.paciente));
+  const labAtr = conectado ? [] : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso) && deVisible(c.pacienteId, c.paciente) && sedeCxD.enSede(sedeReg(c, c.pacienteId)));
   const docsPend = conectado ? [] : (dbDash?.documentos || []).filter((d) => (d.estado === "pendiente" || d.estado === "enviado") && deVisible(d.pacienteId));
   const nomPac = (id) => (pacientesAll.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
   const verCaja = esAdmin || esGer || esAdmSede;
@@ -4235,7 +4237,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const pacsHoy = new Set(citasHoyApi.filter((c) => deCaja(c.sedeId ?? c.sede)).map((c) => c.pacienteId).filter(Boolean));
   useEffect(() => {
     if (!conectado || !cobroDesdeFicha?.pid) return;
-    const hit = (caja.porCobrar || []).find((r) => r.pacienteId === cobroDesdeFicha.pid);
+    const hit = (caja.porCobrar || []).filter((r) => r.sedeId == null || deCaja(r.sedeId)).find((r) => r.pacienteId === cobroDesdeFicha.pid);
     const saldo = hit ? Number(hit.saldo) || 0 : 0;
     if (saldo > 0.5) intentarCobrar({ pid: cobroDesdeFicha.pid, nombre: cobroDesdeFicha.nombre, monto: saldo });
     else notify(`${cobroDesdeFicha.nombre} no tiene saldo pendiente en caja.`);
@@ -6737,8 +6739,10 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
   const conectado = !!auth.token;
   // preciosSede: con sesión las claves son UUID de sede; aquí se usan 1/2 como en el resto
   // de la pantalla y se vuelven a UUID al guardar.
-  const deApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [String((SEDES.find((x) => mismaSede(x.id, k)) || {}).id ?? k), v]));
-  const aApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [sedeApiUuid(k), v]));
+  // Solo se traducen las claves de las sedes de ejemplo (…a1/…a2 ↔ 1/2); un UUID real viaja tal cual.
+  const esDemoUuid = (k) => /^0{8}-0{4}-0{4}-0{4}-0{10}a[12]$/i.test(String(k));
+  const deApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [esDemoUuid(k) ? String(numSede(k)) : String(k), v]));
+  const aApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [/^\d+$/.test(String(k)) ? sedeApiUuid(k) : k, v]));
   const mapApi = (e) => ({
     id: e.id,
     nombre: e.nombre,
@@ -6870,7 +6874,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>{items.filter((s) => s.activo !== false).length}</b><span>servicios activos</span></div>
           <p>{sedeUnica
-            ? `${puedeGestionar ? "Precios" : "Catálogo de consulta, precios"} de ${sedeUnica.nombre} con IGV${multiSede ? "; en gris, los que cobran el precio base" : ""}${soloSede && puedeGestionar ? ". Abre un servicio para fijar el de tu sede" : ""}`
+            ? `${puedeGestionar ? "Precios" : "Precios de consulta"} de ${sedeUnica.nombre}, con IGV${soloSede && puedeGestionar ? " · ábrelo para fijar el de tu sede" : multiSede ? " · en gris, precio base" : ""}`
             : puedeGestionar ? "Precios con IGV incluido; la tabla muestra el desglose y el total por sede" : "Catálogo de consulta (precios con IGV)"}</p>
         </div>
         <div className="dc-esp-hero__cifras">
@@ -9710,7 +9714,8 @@ const getEmisor = (sede = null) => {
     ruc,
     dir: clinic.dir || ls.dir || mb.dir || "",
     tel: clinic.tel || ls.tel || mb.tel || "",
-    serie: String(serieSede(sede) || ls.serie || clinic.serie || mb.serie || "B001").toUpperCase().slice(0, 4),
+    // La serie que el usuario guardó a mano en Datos de facturación manda; si no, la de la sede.
+    serie: String(ls.serie || serieSede(sede) || clinic.serie || mb.serie || "B001").toUpperCase().slice(0, 4),
   };
 };
 const peekBoletaLocal = (serie = "B001") => String((Number(localStorage.getItem("dc_boleta_seq_" + serie) || "0") || 0) + 1).padStart(8, "0");

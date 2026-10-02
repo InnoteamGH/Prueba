@@ -207,7 +207,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   // sedes y nunca los datos de toda la clínica (nombre, logo, cuentas, tipo de cambio, feriados,
   // horario general, sedes nuevas).
   const limitarSede = (rol === "admin_sede" && !!mias) || (ctxSede.mias ? !ctxSede.global : false);
-  const ver = ctxSede.ids || (limitarSede ? mias : null);
+  // Admin general sin filtro: ve todas (también una sede recién creada que aún no está en la lista).
+  const ver = ctxSede.sede === "all" && ctxSede.global ? null : (ctxSede.ids || (limitarSede ? mias : null));
   const sedeVisible = (id) => !ver || (id != null && id !== "" && ver.some((w) => mismaSede(id, w)));
   const sedeEditable = (id) => !limitarSede || (id != null && id !== "" && (mias || []).some((w) => mismaSede(id, w)));
   // Sedes de un doctor: demo (sede/sedes) o API (sedes o sedeIds, como id o como objeto).

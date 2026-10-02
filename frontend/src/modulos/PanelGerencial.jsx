@@ -828,8 +828,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     const aging = M.antiguedadDeuda(cart).map((t) => t.v);
     const nomP = (id) => (pacientes.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
     const dePac = (pid) => pacientes.some((p) => String(p.id) === String(pid));
-    const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado" && dePac(l.pid));
-    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha) && dePac(c.pacienteId ?? c.pid));
+    // Por la sede del registro (si no tiene, la principal del paciente), igual que Seguros y Laboratorio.
+    const sedeReg = (x, pid) => x.sede ?? sedesDe(pacientes.find((p) => String(p.id) === String(pid)) || {})[0];
+    const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado" && dePac(l.pid) && enSede([sedeReg(l, l.pid)]));
+    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha) && dePac(c.pacienteId ?? c.pid) && enSede([sedeReg(c, c.pacienteId ?? c.pid)]));
     const alertasDemo = [
       cart.conVencido.length && { titulo: cart.conVencido.length === 1 ? "1 paciente con saldo vencido" : `${cart.conVencido.length} pacientes con saldo vencido`, detalle: cart.conVencido.map((f) => f.p.nombre).slice(0, 3).join(", "), monto: cart.vencido },
       liqObs.length && { titulo: liqObs.length === 1 ? "1 liquidación de seguro observada" : `${liqObs.length} liquidaciones de seguro observadas`, detalle: liqObs.map((l) => `${l.aseg} (${nomP(l.pid)})`).join(", "), cantidad: liqObs.length },

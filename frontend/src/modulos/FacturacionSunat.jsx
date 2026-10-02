@@ -134,7 +134,7 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
 
   // Primero se simulan (o llegan) todos; después se recortan a las sedes que se ven, con las
   // notas de crédito incluidas (cada NC lleva la sede del comprobante que anula).
-  const comprobantes = useMemo(() => (conectado ? (remoto?.comprobantes || []) : simular(pagos, cfg, overrides)).filter((c) => seVe(c.sede ?? c.sedeId)), [conectado, remoto, pagos, cfg, overrides, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const comprobantes = useMemo(() => (conectado ? (remoto?.comprobantes || []) : simular(pagos, cfg, overrides)).filter((c) => seVe(c.sedeId ?? c.sede)), [conectado, remoto, pagos, cfg, overrides, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
   const cuenta = (e) => comprobantes.filter((c) => c.estado === e).length;
   const atender = comprobantes.filter((c) => c.estado === "observado" || c.estado === "rechazado");
   const FILTROS = [
