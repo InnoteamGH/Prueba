@@ -6,8 +6,9 @@
 import React, { useContext, useMemo, useState } from "react";
 import { BellRing, ClipboardList, Stethoscope, UserPlus, Wallet, Wallet2 } from "lucide-react";
 import { auth } from "../api/client";
-import { DataTable, DatosDemoCtx, Pestanas, Vacio } from "../comun";
+import { DataTable, DatosDemoCtx, Pestanas, Vacio, useSede } from "../comun";
 import * as M from "../compartido/metricas";
+import { fichaDeSede, sedeDeEgreso, sedeEnLista } from "../compartido/cajaSede";
 
 const PERIODOS = [["hoy", "Hoy"], ["semana", "Esta semana"], ["mes", "Este mes"], ["mes_ant", "Mes anterior"], ["3m", "Últimos 3 meses"], ["anio", "Este año"]];
 const iso = M.isoDe;
@@ -44,10 +45,15 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
   const [per, setPer] = useState("mes");
   const r = rango(per);
   const hoy = M.hoyISO();
+  const sx = useSede();
   const pacientes = pacProp || db.pacientes || [], citas = citasProp || db.citas || [];
-  // Solo las fichas de los pacientes visibles y los egresos de las sedes del usuario.
-  const fichas = Object.fromEntries(Object.entries(db.fichas || {}).filter(([pid]) => pacientes.some((p) => String(p.id) === String(pid))));
-  const egresos = (db.egresos || []).filter((e) => !sedes || e.sede == null || sedes.map(String).includes(String(e.sede)));
+  // REPORTES-07: lo que se ve es lo de las sedes elegidas, ítem por ítem y pago por pago (un
+  // paciente de dos sedes no suma aquí lo hecho o cobrado en la otra; un dato viejo sin sede
+  // es de la sede principal del paciente). Los egresos, por la sede de cada gasto.
+  const verSedes = sedes || sx.ids || null;
+  const ver = (sd) => sedeEnLista(sd, verSedes);
+  const fichas = Object.fromEntries(Object.entries(db.fichas || {}).map(([pid, f]) => [pid, f, pacientes.find((p) => String(p.id) === String(pid))]).filter(([, , p]) => p).map(([pid, f, p]) => [pid, fichaDeSede(f, p, ver)]));
+  const egresos = (db.egresos || []).filter((e) => ver(sedeDeEgreso(e)));
   const nomP = (id) => (pacientes.find((p) => String(p.id) === String(id)) || {}).nombre || `Paciente ${id}`;
   const usaPeriodo = rep !== "saldo" && rep !== "recuperar";
 

@@ -72,6 +72,33 @@ function grupoPieza(pz) {
 }
 
 /**
+ * Tarifa con los importes del catálogo vigente en una sede (CAJA-16): cada regla cuyo
+ * hallazgo tiene un servicio en el catálogo (campo `hallazgos`, el mismo que usa el
+ * odontograma para pasar el ítem a Plan y cuenta) toma su nombre y su precio en la sede;
+ * la endodoncia por pieza toma el precio del servicio de endodoncia. Lo que el catálogo no
+ * cubre queda como en la tabla base.
+ * @param {object[]} catalogo servicios ({ nombre, hallazgos, activo, ... })
+ * @param {(servicio: object) => number} precioDe precio del servicio en la sede
+ * @param {object} [base] tarifa de partida
+ */
+export function tarifaDesdeCatalogo(catalogo = [], precioDe = (s) => Number(s && s.precio) || 0, base = tarifa) {
+  const servDe = (clave) => {
+    const ids = [clave, ...Object.keys(ALIAS_HALLAZGO).filter((ui) => ALIAS_HALLAZGO[ui] === clave)];
+    return (catalogo || []).find((s) => s && s.activo !== false && (s.hallazgos || []).some((h) => ids.includes(h))) || null;
+  };
+  const reglas = {};
+  for (const [k, r] of Object.entries(base.reglas || {})) {
+    const s = r && r.cod != null ? servDe(k) : null;
+    reglas[k] = s ? { ...r, nom: s.nombre, v: precioDe(s) } : r;
+  }
+  const endo = servDe("endodoncia");
+  const endodonciaPorPieza = endo
+    ? Object.fromEntries(Object.entries(base.endodonciaPorPieza || {}).map(([g, x]) => [g, { ...x, v: precioDe(endo) }]))
+    : base.endodonciaPorPieza;
+  return { ...base, reglas, endodonciaPorPieza };
+}
+
+/**
  * @param {Array<[number|null, string, string|null]>} hallazgos  [pieza, hallazgoId, ubic]
  * @param {Array<[number|null, number, string|null]>} sueltos    [pieza, cod, maxilar]
  * @param {object} [tar] tarifa override

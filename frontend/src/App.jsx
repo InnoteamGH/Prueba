@@ -23,7 +23,10 @@ import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazg
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
 import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
-import FacturacionSunat, { ConexionSunat } from "./modulos/FacturacionSunat";
+import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
+// Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
+import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, sedeEnLista, sedePrincipal, uuidSede } from "./compartido/cajaSede";
+import { sedeNum as numSede } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
@@ -3278,14 +3281,31 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const puedeCobrar = can ? can("facturacion", "crear") : true;
   const puedeTerminar = can ? can("tratamientos", "editar") || can("tratamientos", "crear") : true;
   const conectado = !!auth.token;
+  const sx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
   const [sedes, setSedes] = useState([]);
-  useEffect(() => { if (conectado) { api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); api.sedes.listar().then((s) => setSedes(s || [])).catch(() => {}); } }, []); // eslint-disable-line
-  const pacientes = conectado ? (pacRemoto || []) : pacProp;
+  const [srvApi, setSrvApi] = useState(null);   // catálogo del servidor (con sesión)
+  // CAJA-12: con sesión el padrón llega completo; se guarda con su sede (misma regla que
+  // Pacientes) y se recorta a las sedes que se ven. CAJA-08: el catálogo y sus precios por
+  // sede salen de /especialidades, no del catálogo de demostración del navegador.
+  useEffect(() => { if (conectado) {
+    api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => { const ss = Array.isArray(p.sedes) && p.sedes.length ? p.sedes.map((x) => x?.id ?? x) : (p.sedeRegistroId ? [p.sedeRegistroId] : []); return { id: p.id, nombre: p.nombre, sede: ss[0] ?? null, sedes: ss }; }))).catch(() => {});
+    api.sedes.listar().then((s) => setSedes(s || [])).catch(() => {});
+    api.catalogo.especialidades().then((r) => setSrvApi((r || []).map((e) => ({ id: e.id, nombre: e.nombre, precio: Number(e.precioBase) || 0, preciosSede: e.preciosSede || {}, activo: e.activo !== false })).filter((x) => x.activo))).catch(() => {});
+  } }, []); // eslint-disable-line
+  const pacientes = conectado ? (pacRemoto || []).filter((p) => sx.enSede(p.sedes)) : pacProp;
+  const servicios = conectado ? (srvApi || []) : getServicios();
   const [pacienteId, setPacienteId] = useState(pacienteFijo || pacienteActivo || (auth.token ? null : pacProp[0]?.id) || null);
   useEffect(() => { if (pacienteActivo) setPacienteId(pacienteActivo); }, [pacienteActivo]);
-  // Precio del servicio en la sede elegida arriba o, con «Todas», en la del paciente.
-  const sedePrecioTr = sedeActiva !== "all" && sedeActiva != null ? Number(sedeActiva) : (sedesDe(pacientes.find((p) => String(p.id) === String(pacienteId)) || {})[0] || 1);
+  // Sede donde se presupuesta y se cobra: la elegida arriba; con «Todas», la principal del
+  // paciente si es una de las tuyas, si no la sede activa. Su precio es el de esa sede.
+  const pacSel = pacientes.find((p) => String(p.id) === String(pacienteId)) || null;
+  const sedePrinc = sedePrincipal(pacSel);
+  const sedeTrab = sx.sede !== "all" && sx.sede != null ? sx.sede
+    : (sedesDe(pacSel || {}).find((x) => sx.esMia(x)) ?? sx.activa ?? (sedeActiva !== "all" ? sedeActiva : null) ?? sedePrinc);
+  const sedePrecioTr = sedeTrab;
+  // Sede de un ítem del plan; uno viejo sin sede es de la sede principal del paciente.
+  const sedeFase = (f) => sedeDeRegistro(f, pacSel) ?? sedeTrab;
   useEffect(() => {
     if (!conectado || !pacRemoto) return;
     if (!pacRemoto.length) { setPacienteId(null); return; }
@@ -3295,10 +3315,12 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const [detF, setDetF] = useState(null); // fase abierta en modal de detalle
   const [planId, setPlanId] = useState(null);
   const [fasesRem, setFasesRem] = useState([]);
-  const recargarTrat = () => { if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); }).catch(() => {}); };
+  const recargarTrat = () => { if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); }).catch(() => {}); };
   useEffect(() => { if (pacienteId) recargarTrat(); else setFasesRem([]); }, [pacienteId, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => p.id === pacienteId) || { id: pacienteId, nombre: "Selecciona un paciente" };
-  const fases = (conectado ? fasesRem : (fichas[pacienteId]?.tratamiento || [])).filter((f) => f.estado !== "anulado");
+  // Para mostrar, solo los ítems de las sedes que se ven: cada sede presupuesta y cobra lo
+  // suyo. Se escribe siempre sobre la ficha completa (setTrat con la lista de la ficha).
+  const fases = (conectado ? fasesRem : (fichas[pacienteId]?.tratamiento || [])).filter((f) => f.estado !== "anulado" && sx.enSede(sedeFase(f)));
   const piezaDeFase = (f) => {
     if (f.piezaNumero != null && f.piezaNumero !== "") return String(f.piezaNumero);
     if (f.pieza != null && f.pieza !== "") return String(f.pieza);
@@ -3309,13 +3331,14 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const nombreFaseLimpio = (f) => String(f.nombre || "").replace(/\s*[-–·]?\s*pieza\s*\d+(\s*\([A-Za-z]+\))?/i, "").trim() || f.nombre;
   const total = fases.reduce((s, f) => s + f.costo, 0), pagado = fases.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0), saldo = total - pagado;
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
-  const sedePago = () => (sedes[0]?.id) || null;
+  // CAJA-06: el pago va a la sede del ítem (nunca «la primera sede» del servidor).
+  const sedePago = (f) => uuidSede(sedes, f ? sedeFase(f) : sedeTrab);
   const setTrat = (fn) => updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: fn(cur.tratamiento || []) }));
-  const addPago = (concepto, monto) => updFicha(pacienteId, (cur) => ({ ...cur, pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto, monto, metodo: "Caja" }] }));
+  const addPago = (concepto, monto, sede) => updFicha(pacienteId, (cur) => ({ ...cur, pagos: [...(cur.pagos || []), { fecha: fmt(hoy), sede: sede ?? sedeTrab, concepto, monto, metodo: "Caja" }] }));
   const agregarFase = () => {
     if (!nueva.nombre.trim()) { notify("Indica el procedimiento."); return; }
     if (conectado) {
-      const payload = { nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0 };
+      const payload = { nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0, sedeId: uuidSede(sedes, sedeTrab) };
       if (nueva.servicioId) payload.servicioId = nueva.servicioId;
       if (nueva.pieza) payload.piezaNumero = Number(nueva.pieza);
       if (nueva.cara && String(nueva.cara).trim()) payload.cara = String(nueva.cara).trim();
@@ -3323,7 +3346,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       if (planId) doAdd(planId); else api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento" }).then((p) => { setPlanId(p.id); doAdd(p.id); }).catch(() => notify("Error al crear el plan."));
       return;
     }
-    setTrat((t) => [...t, { id: Date.now(), nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0, estado: "pendiente", servicioId: nueva.servicioId || null, piezaNumero: nueva.pieza ? Number(nueva.pieza) : null, cara: nueva.cara || null }]); notify("Procedimiento agregado al presupuesto."); setNueva(null);
+    setTrat((t) => [...t, { id: Date.now(), sede: sedeTrab, nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0, estado: "pendiente", servicioId: nueva.servicioId || null, piezaNumero: nueva.pieza ? Number(nueva.pieza) : null, cara: nueva.cara || null }]); notify("Procedimiento agregado al presupuesto."); setNueva(null);
   };
   const quitarFase = (f) => {
     // TRA-04: un procedimiento no se borra, se anula (queda en el historial del plan).
@@ -3343,13 +3366,28 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       return;
     }
     setTrat((t) => t.map((x) => (x.id === f.id ? { ...x, estado: "terminada", terminadaEn: cuando } : x)));
-    consumirInsumos && consumirInsumos(f.nombre);
+    consumirInsumos && consumirInsumos(f.nombre, sedeFase(f));
     notify(`${f.nombre} terminado. El cobro de S/ ${M.sol2(f.costo)} ya está en Caja para recepción.`);
   };
-  const cobrarFase = (f) => {
+  // CAJA-06: cada cobro entra a la caja de la sede del ítem; con esa caja cerrada no se cobra
+  // (igual que en Caja). Con sesión, si no se puede leer la apertura, decide el servidor.
+  const conCajasAbiertas = (sedesCobro, seguir) => {
+    const lista = [...new Map(sedesCobro.filter((sd) => sd != null).map((sd) => [String(sd), sd])).values()];
+    const cerrada = (sd) => notify(`Abre la caja de ${nombreSedeEn(sedes, sd)} antes de cobrar.`);
+    if (conectado) {
+      Promise.all(lista.map((sd) => api.cajaApertura.get(uuidSede(sedes, sd), fmt(hoy)).then((r) => [sd, !!r?.abierta]).catch(() => [sd, true])))
+        .then((rs) => { const c = rs.find(([, abierta]) => !abierta); if (c) cerrada(c[0]); else seguir(); });
+      return;
+    }
+    const c = lista.find((sd) => !aperturaDemo(sd)?.abierta);
+    if (c != null) { cerrada(c); return; }
+    seguir();
+  };
+  const cobrarFase = (f) => conCajasAbiertas([sedeFase(f)], () => cobrarFaseYa(f));
+  const cobrarFaseYa = (f) => {
     if (conectado) {
       api.tratamientos.actualizarFase(f.id, { estado: "atendida" })
-        .then(() => api.pagos.registrar({ pacienteId, sedeId: sedePago(), faseId: f.id, concepto: f.nombre, monto: f.costo, metodo: "efectivo" }))
+        .then(() => api.pagos.registrar({ pacienteId, sedeId: sedePago(f), faseId: f.id, concepto: f.nombre, monto: f.costo, metodo: "efectivo" }))
         .then(() => { notify(`Cobrado: ${f.nombre} — S/ ${M.sol2(f.costo)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); })
         .catch((err) => notify((err && err.message) || "No se pudo cobrar el procedimiento. Verifica el consentimiento firmado."));
       return;
@@ -3357,9 +3395,25 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     if (esInvasivo(f.nombre)) {
       notify(`Aviso: ${f.nombre} es un procedimiento invasivo. Asegúrate de que el consentimiento informado esté firmado.`);
     }
-    setTrat((t) => t.map((x) => x.id === f.id ? { ...x, estado: "atendida" } : x)); addPago(f.nombre, f.costo); if (f.estado !== "terminada") consumirInsumos && consumirInsumos(f.nombre); notify(`Cobrado: ${f.nombre} — S/ ${M.sol2(f.costo)}. Boleta emitida – insumos descontados.`);
+    setTrat((t) => t.map((x) => x.id === f.id ? { ...x, estado: "atendida" } : x)); addPago(f.nombre, f.costo, sedeFase(f)); if (f.estado !== "terminada") consumirInsumos && consumirInsumos(f.nombre, sedeFase(f)); notify(`Cobrado: ${f.nombre} — S/ ${M.sol2(f.costo)}. Boleta emitida – insumos descontados.`);
   };
-  const cobrarSaldo = () => { const pend = fases.filter((f) => f.estado !== "atendida"); if (!pend.length) { notify("No hay saldo por cobrar."); return; } if (conectado) { Promise.all(pend.map((f) => api.tratamientos.actualizarFase(f.id, { estado: "atendida" }))).then(() => api.pagos.registrar({ pacienteId, sedeId: sedePago(), concepto: "Saldo del plan de tratamiento", monto: saldo, metodo: "efectivo" })).then(() => { notify(`Pago registrado: S/ ${M.sol2(saldo)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); }).catch(() => notify("Error al cobrar el saldo.")); return; } pend.forEach((f) => consumirInsumos && consumirInsumos(f.nombre)); setTrat((t) => t.map((x) => x.estado !== "atendida" ? { ...x, estado: "atendida" } : x)); addPago("Saldo del plan de tratamiento", saldo); notify(`Pago registrado: S/ ${M.sol2(saldo)}. Boleta emitida – insumos descontados.`); };
+  // El saldo se cobra por sede: un pago por cada sede con ítems pendientes, cada uno en su caja.
+  const cobrarSaldo = () => {
+    const pend = fases.filter((f) => f.estado !== "atendida");
+    if (!pend.length) { notify("No hay saldo por cobrar."); return; }
+    conCajasAbiertas(pend.map(sedeFase), () => cobrarSaldoYa(pend));
+  };
+  const cobrarSaldoYa = (pend) => {
+    const porSede = new Map();
+    pend.forEach((f) => { const sd = sedeFase(f); const k = String(sd); const g = porSede.get(k) || { sede: sd, fases: [], monto: 0 }; g.fases.push(f); g.monto += f.costo; porSede.set(k, g); });
+    const grupos = [...porSede.values()];
+    if (conectado) { Promise.all(pend.map((f) => api.tratamientos.actualizarFase(f.id, { estado: "atendida" }))).then(() => Promise.all(grupos.map((g) => api.pagos.registrar({ pacienteId, sedeId: uuidSede(sedes, g.sede), concepto: "Saldo del plan de tratamiento", monto: g.monto, metodo: "efectivo" })))).then(() => { notify(`Pago registrado: S/ ${M.sol2(saldo)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); }).catch(() => notify("Error al cobrar el saldo.")); return; }
+    pend.forEach((f) => f.estado !== "terminada" && consumirInsumos && consumirInsumos(f.nombre, sedeFase(f)));
+    const ids = new Set(pend.map((f) => f.id));
+    setTrat((t) => t.map((x) => ids.has(x.id) ? { ...x, estado: "atendida" } : x));
+    grupos.forEach((g) => addPago("Saldo del plan de tratamiento", g.monto, g.sede));
+    notify(`Pago registrado: S/ ${M.sol2(saldo)}. Boleta emitida – insumos descontados.`);
+  };
   const atendidas = fases.filter((f) => f.estado === "atendida").length;
   const avance = fases.length ? Math.round((atendidas / fases.length) * 100) : 0;
   return (
@@ -3383,8 +3437,8 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
               <Select value="" placeholder="Elegir servicio…"
-                      onChange={(v) => { const s = getServicios().find((x) => String(x.id) === String(v)); if (s) setNueva({ ...nueva, nombre: s.nombre, costo: String(precioServicio(s, sedePrecioTr)), servicioId: s.id }); }}
-                      options={getServicios().map((s) => ({ value: s.id, label: `${s.nombre} — S/ ${precioServicio(s, sedePrecioTr)}` }))} />
+                      onChange={(v) => { const s = servicios.find((x) => String(x.id) === String(v)); if (s) setNueva({ ...nueva, nombre: s.nombre, costo: String(precioEnSede(s, sedePrecioTr)), servicioId: s.id }); }}
+                      options={servicios.map((s) => ({ value: s.id, label: `${s.nombre} — S/ ${precioEnSede(s, sedePrecioTr)}` }))} />
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "2fr 0.7fr 0.7fr 1fr auto", gap: 10, alignItems: "end" }}>
               <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Procedimiento<br /><input className="dc-premium-inp" value={nueva.nombre} onChange={(e) => setNueva({ ...nueva, nombre: e.target.value, servicioId: undefined })} placeholder="Ej. Obturación" style={{ ...inp, marginTop: 4 }} /></label>
@@ -3731,10 +3785,15 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
 
 /* ---- Caja / Facturación (fuente única: el plan de tratamiento de cada ficha) ---- */
 const EGRESO_CATS = ["Insumos", "Laboratorio", "Alquiler", "Servicios (luz/agua)", "Planilla", "Marketing", "Equipos", "Otros"];
+// Cada link es de la sede que lo generó: su cobro entra a la caja de esa sede.
 const LINKS_DEMO = [
-  { id: 1, paciente: "Rosa Linares", concepto: "Abono ortodoncia", monto: 250, estado: "pagado", fecha: addDays(-1) },
-  { id: 2, paciente: "Pedro Gómez", concepto: "Saldo endodoncia", monto: 400, estado: "pendiente", fecha: fmt(hoy) },
+  { id: 1, sede: 2, paciente: "Rosa Linares", concepto: "Abono ortodoncia", monto: 250, estado: "pagado", fecha: addDays(-1) },
+  { id: 2, sede: 1, paciente: "Pedro Gómez", concepto: "Saldo endodoncia", monto: 400, estado: "pendiente", fecha: fmt(hoy) },
 ];
+/* Demostración: la apertura del día se guarda por sede (una caja abierta por sede). La
+   leen Caja y Tickets para no cobrar en una sede con la caja cerrada. */
+const claveCajaDemo = (sede, fecha = fmt(hoy)) => `dc_caja_apertura_${fecha}_${numSede(sede) ?? sede}`;
+const aperturaDemo = (sede) => { try { return JSON.parse(localStorage.getItem(claveCajaDemo(sede)) || "null"); } catch { return null; } };
 
 /* Icono y color de cada medio de pago en Caja. */
 const MEDIO_UI = {
@@ -3761,14 +3820,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [pago, setPago] = useState(null); // { pid, nombre, monto }
   const [filtroCob, setFiltroCob] = useState("listos");
   // Menú «Crear › Registrar egreso»: abre el formulario de egreso al llegar.
-  useEffect(() => { if (abrirEgreso) { setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" }); onEgresoAbierto(); } }, [abrirEgreso]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (abrirEgreso) { nuevoEgreso(); onEgresoAbierto(); } }, [abrirEgreso]); // eslint-disable-line react-hooks/exhaustive-deps
   const [caja, setCaja] = useState({ porCobrar: [], boletasHoy: [], montoPorCobrar: 0, montoHoy: 0 });
   const [cajaError, setCajaError] = useState(false);
   const [histError, setHistError] = useState(false);
   const [sedes, setSedes] = useState([]);
   const [hist, setHist] = useState([]);
   const [verHist, setVerHist] = useState(false);
-  const [pacsHoy, setPacsHoy] = useState(new Set());   // pacientes con cita hoy (para "por cobrar de hoy")
   // Las pestañas son submódulos del menú lateral (Caja → Cobros, Apertura…): la vista manda.
   const [tabLocal, setTabLocal] = useState("hoy");  // cobros | apertura | cierre | historial | movimientos | links
   // Pestañas de Caja (NAV-03): hoy (apertura + cobros), movimientos, cierre, historial,
@@ -3777,57 +3835,40 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const tab = ["cobros", "apertura", "caja", "facturacion"].includes(tabRaw) ? "hoy" : tabRaw;
   const setTab = (t) => { const d = (t === "cobros" || t === "apertura") ? "hoy" : t; return onTab ? onTab(d) : setTabLocal(d); };
   // CAJA-01: sede explícita para abrir/cerrar (nunca "all" → primera sede a escondidas).
-  const [cajaSedePick, setCajaSedePick] = useState(null); // uuid o null
+  const sx = useSede();
+  const [cajaSedePick, setCajaSedePick] = useState(null); // sede elegida para la caja con «Todas»
   const sedeRequierePick = sedeFiltro === "all";
-  const sedeUuid = () => {
-    if (sedeRequierePick) {
-      if (cajaSedePick) return cajaSedePick;
-      return null;
-    }
-    if (conectado && sedes.length) {
-      const want = Number(sedeActiva) === 2 ? "a2" : "a1";
-      const hit = sedes.find((s) => String(s.id).endsWith(want)) || sedes[0];
-      return hit?.id || null;
-    }
-    return sedeApiUuid(sedeActiva);
-  };
-  const sedeNombre = () => {
-    const u = sedeUuid();
-    if (!u && sedeRequierePick) return "elige una sede";
-    const hit = sedes.find((s) => s.id === u);
-    return hit?.nombre || nombreSede(sedeActiva) || "Sede";
-  };
-  const sedeNombreCobros = () => {
-    if (sedeFiltro === "all") return "todas tus sedes";
-    return sedeNombre();
-  };
-  const sedesUsuarioUuid = () => {
-    if (!sedes.length) return misSedes.map((n) => sedeApiUuid(n)).filter(Boolean);
-    return misSedes.map((n) => {
-      const want = Number(n) === 2 ? "a2" : "a1";
-      return sedes.find((s) => String(s.id).endsWith(want))?.id;
-    }).filter(Boolean);
-  };
-  const sedesUsuarioNombres = () => {
-    const uuids = sedesUsuarioUuid();
-    return sedes.filter((s) => uuids.includes(s.id)).map((s) => s.nombre);
-  };
+  // Sedes donde el usuario puede operar una caja: con sesión, las de /sedes (todas si es de
+  // toda la clínica); en la demostración, las suyas.
+  const sedesCaja = conectado && sedes.length
+    ? sedes.filter((s) => sx.global || (misSedes || []).some((m) => mismaSede(s.id, m))).map((s) => ({ id: s.id, nombre: s.nombre || nombreSede(s.id) }))
+    : (misSedes || []).map((n) => ({ id: n, nombre: nombreSede(n) }));
+  // Una sola sede de caja: la elegida en el menú o, con «Todas», la elegida aquí. Apertura,
+  // cobros, egresos, links, arqueo e historial usan esta misma sede (CAJA-02, CAJA-09).
+  const sedeCaja = !sedeRequierePick && sedeFiltro != null ? sedeFiltro
+    : sedesCaja.length === 1 ? sedesCaja[0].id
+    : (cajaSedePick != null && sedesCaja.some((s) => String(s.id) === String(cajaSedePick)) ? cajaSedePick : null);
+  // Al cambiar el filtro del menú se suelta la sede elegida aquí (CAJA-10).
+  useEffect(() => { setCajaSedePick(null); }, [sedeFiltro]);
+  // Lo que se ve en Caja: la sede de la caja; sin caja elegida, todas las del filtro
+  // (null = sin límite: usuario de toda la clínica con «Todas las sedes»).
+  const limiteSedes = sedeCaja != null ? [sedeCaja] : (sx.global && sedeRequierePick ? null : (sx.ids || misSedes || null));
+  const deCaja = (x) => sedeEnLista(x, limiteSedes);
+  const uuidDe = (n) => uuidSede(sedes, n);
+  const sedesApi = limiteSedes ? limiteSedes.map(uuidDe).filter(Boolean) : null;   // ?sedeIds= para el servidor
+  const claveVer = `${limiteSedes ? limiteSedes.map(String).join(",") : "*"}|${sedes.length}`;
+  const sedeUuid = () => (sedeCaja != null ? uuidDe(sedeCaja) : null);
+  const sedeNombre = () => (sedeCaja != null ? (nombreSedeEn(sedes, sedeCaja) || "Sede") : "elige una sede");
+  // Pago del historial del servidor: por su sedeId; si solo trae el nombre, por el nombre.
   const pagoEnSedeActiva = (p) => {
-    const sid = sedeUuid();
-    const nombreActivo = sedes.find((s) => s.id === sid)?.nombre || nombreSede(sedeActiva);
-    if (sedeFiltro !== "all" && sedeFiltro != null) {
-      if (p.sedeId && sid) return p.sedeId === sid;
-      return p.sede === nombreActivo || p.sede === sid;
-    }
-    const uuids = sedesUsuarioUuid();
-    const nombres = sedesUsuarioNombres();
-    if (p.sedeId && uuids.length) return uuids.includes(p.sedeId);
-    if (p.sede && nombres.length) return nombres.includes(p.sede);
+    if (!limiteSedes) return true;
+    if (p.sedeId) return deCaja(p.sedeId);
+    if (p.sede && p.sede !== "—") return limiteSedes.some((v) => nombreSedeEn(sedes, v) === p.sede);
     return true;
   };
   const mesActual = fmt(hoy).slice(0, 7);
   const histFiltrado = hist.filter(pagoEnSedeActiva).filter((p) => (p.fecha || "").slice(0, 7) === mesActual);
-  const cajaStorageKey = () => `dc_caja_apertura_${fmt(hoy)}_${sedeActiva || "all"}`;
+  const cajaStorageKey = () => claveCajaDemo(sedeCaja);
   const nombreUsuarioCaja = () => { try { return (JSON.parse(localStorage.getItem("dc_usuario") || "null") || {}).nombre || "Recepción"; } catch { return "Recepción"; } };
   const [apertura, setApertura] = useState(null);
   const [jornadaAbiertaPrevia, setJornadaAbiertaPrevia] = useState(null);
@@ -3886,6 +3927,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [denomsUsd, setDenomsUsd] = useState({});
   const [cierreBusy, setCierreBusy] = useState(false);
   const [cajaMovs, setCajaMovs] = useState([]);
+  // Retiros, ingresos y relevos de la caja de esta sede (en la demostración quedan en memoria con su sede).
+  const movsCaja = cajaMovs.filter((m) => m.sede == null || mismaSede(m.sede, sedeCaja));
   const [movForm, setMovForm] = useState(null); // { tipo, monto, nota }
   const [turnoForm, setTurnoForm] = useState(null); // { cajero, contado, nota }
   const [anulForm, setAnulForm] = useState(null);   // { pagoId, paciente, monto, motivo }
@@ -3893,12 +3936,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // «Yape (Niubiz)», «POS», «tarjeta»… → una sola clave por medio para agrupar y filtrar.
   const medioKey = (x) => { const t = String(x || "otro").toLowerCase(); return ["efectivo", "yape", "plin", "tarjeta", "transferencia", "seguro"].find((k) => t.startsWith(k)) || (t.startsWith("pos") ? "tarjeta" : t); };
   const [histCaja, setHistCaja] = useState(() => conectado ? [] : [
-    // Demostración: la jornada de hoy, si ya se cerró, sigue en el historial al recargar.
-    ...(() => { try { const r = JSON.parse(localStorage.getItem(cajaStorageKey()) || "null"); return r && r.abierta === false && r.cerradaEn ? [{ id: "hoy", fecha: fmt(hoy), sedeNombre: nombreSede(sedeActiva), abierta: false, abiertaEn: r.abiertaEn, cerradaEn: r.cerradaEn, abiertaPorNombre: r.abiertaPorNombre, cerradaPorNombre: r.cerradaPorNombre, fondo: r.fondo, efectivoEsperado: r.efectivoEsperado, efectivoContado: r.efectivoContado, diferencia: r.diferencia }] : []; } catch { return []; } })(),
-    { id: "dj1", fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 5).toISOString(), cerradaPorNombre: "Carla Mendoza", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 40).toISOString(), fondo: 100, efectivoEsperado: 860, efectivoContado: 860, diferencia: 0, abierta: false },
-    { id: "dj2", fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede Surco", abiertaPorNombre: "Luis Paredes", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 30).toISOString(), cerradaPorNombre: "Luis Paredes", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 10).toISOString(), fondo: 100, efectivoEsperado: 540, efectivoContado: 530, diferencia: -10, abierta: false },
-    { id: "dj3", fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 8, 0).toISOString(), cerradaPorNombre: "Roberto Díaz", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 20, 5).toISOString(), fondo: 150, efectivoEsperado: 1220, efectivoContado: 1225, diferencia: 5, abierta: false },
-    { id: "dj4", fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3)), sedeNombre: "Sede Surco", abiertaPorNombre: "Luis Paredes", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3, 8, 15).toISOString(), cerradaPorNombre: "Luis Paredes", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3, 18, 55).toISOString(), fondo: 100, efectivoEsperado: 410, efectivoContado: 410, diferencia: 0, abierta: false },
+    // Demostración: la jornada de hoy de cada sede, si ya se cerró, sigue en el historial al recargar.
+    ...SEDES.flatMap((sd) => { const r = aperturaDemo(sd.id); return r && r.abierta === false && r.cerradaEn ? [{ id: `hoy-${sd.id}`, fecha: fmt(hoy), sedeId: sd.id, sedeNombre: sd.nombre, abierta: false, abiertaEn: r.abiertaEn, cerradaEn: r.cerradaEn, abiertaPorNombre: r.abiertaPorNombre, cerradaPorNombre: r.cerradaPorNombre, fondo: r.fondo, efectivoEsperado: r.efectivoEsperado, efectivoContado: r.efectivoContado, diferencia: r.diferencia }] : []; }),
+    { id: "dj1", sedeId: 1, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 5).toISOString(), cerradaPorNombre: "Carla Mendoza", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 40).toISOString(), fondo: 100, efectivoEsperado: 860, efectivoContado: 860, diferencia: 0, abierta: false },
+    { id: "dj2", sedeId: 2, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1)), sedeNombre: "Sede Surco", abiertaPorNombre: "Luis Paredes", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 8, 30).toISOString(), cerradaPorNombre: "Luis Paredes", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1, 19, 10).toISOString(), fondo: 100, efectivoEsperado: 540, efectivoContado: 530, diferencia: -10, abierta: false },
+    { id: "dj3", sedeId: 1, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2)), sedeNombre: "Sede San Isidro", abiertaPorNombre: "Carla Mendoza", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 8, 0).toISOString(), cerradaPorNombre: "Roberto Díaz", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 2, 20, 5).toISOString(), fondo: 150, efectivoEsperado: 1220, efectivoContado: 1225, diferencia: 5, abierta: false },
+    { id: "dj4", sedeId: 2, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3)), sedeNombre: "Sede Surco", abiertaPorNombre: "Luis Paredes", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3, 8, 15).toISOString(), cerradaPorNombre: "Luis Paredes", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3, 18, 55).toISOString(), fondo: 100, efectivoEsperado: 410, efectivoContado: 410, diferencia: 0, abierta: false },
   ]);
   const [histCajaRango, setHistCajaRango] = useState({ desde: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 14)), hasta: fmt(hoy) });
   useEffect(() => {
@@ -3915,35 +3958,44 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       if (norm.length) setDestinosSel(new Set(norm.map((d) => d.id)));
     }).catch(() => setDestinosCatalogo(DESTINOS_BASE));
   }, [conectado]); // eslint-disable-line react-hooks/exhaustive-deps
+  // La respuesta de otra sede (si se cambió de sede antes de que llegue) se descarta.
+  const sedeCajaRef = useRef(sedeCaja); sedeCajaRef.current = sedeCaja;
   const recargarApertura = () => {
     const sid = sedeUuid();
+    const pedida = sedeCaja;
     if (conectado && sid) {
       api.cajaApertura.get(sid, fmt(hoy))
         .then((r) => {
+          if (String(sedeCajaRef.current) !== String(pedida)) return;
           setApertura(mapAperturaApi(r));
           setJornadaAbiertaPrevia(r?.jornadaAbiertaPrevia || null);
         })
         .catch(() => { setApertura(null); setJornadaAbiertaPrevia(null); notify("No se pudo leer la apertura de caja del servidor."); });
       return;
     }
-    if (sedeRequierePick && !sid) { setApertura(null); setJornadaAbiertaPrevia(null); return; }
-    try { setApertura(JSON.parse(localStorage.getItem(cajaStorageKey()) || "null")); } catch { setApertura(null); }
+    if (sedeCaja == null) { setApertura(null); setJornadaAbiertaPrevia(null); return; }
+    setApertura(aperturaDemo(sedeCaja));
     setJornadaAbiertaPrevia(null);
   };
   const recargarCajaMovs = () => {
-    if (!conectado || !apertura?.id || !apertura.abierta) { setCajaMovs([]); return; }
+    // Demostración: quedan en memoria con su sede; al cerrar la caja se borran los de esa sede.
+    if (!apertura?.id || !apertura.abierta) { setCajaMovs((ms) => (conectado ? [] : ms.filter((m) => m.sede != null && !mismaSede(m.sede, sedeCaja)))); return; }
+    if (!conectado) return;
     api.cajaMovimientos.listar(apertura.id).then((rows) => setCajaMovs(rows || [])).catch(() => setCajaMovs([]));
   };
   const recargarHistCaja = () => {
     if (!conectado) return;
-    const sid = sedeRequierePick ? (cajaSedePick || undefined) : sedeUuid();
+    // Sin caja elegida (usuario de toda la clínica con «Todas»), todas las jornadas; la
+    // lista se recorta igual en el cliente a las sedes que se ven.
+    const sid = sedeUuid();
     api.cajaApertura.historial({ sedeId: sid || undefined, desde: histCajaRango.desde, hasta: histCajaRango.hasta })
       .then((rows) => setHistCaja(Array.isArray(rows) ? rows : []))
       .catch(() => { setHistCaja([]); notify("No se pudo cargar el historial de caja."); });
   };
-  useEffect(() => { recargarApertura(); }, [conectado, sedeActiva, sedes.length, cajaSedePick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Al cambiar de caja no se arrastra la apertura de la anterior mientras llega la nueva.
+  useEffect(() => { setApertura(null); setJornadaAbiertaPrevia(null); recargarApertura(); }, [conectado, String(sedeCaja), sedes.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { recargarCajaMovs(); }, [conectado, apertura?.id, apertura?.abierta]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (tab === "historial" && conectado) recargarHistCaja(); }, [tab, histCajaRango.desde, histCajaRango.hasta, cajaSedePick, sedeActiva]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab === "historial" && conectado) recargarHistCaja(); }, [tab, histCajaRango.desde, histCajaRango.hasta, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
   const [aperturaForm, setAperturaForm] = useState({ fondo: "100", fondoUsd: "", nota: "" });
   const abrirCaja = () => {
     if (!puedeAbrirCaja) { notify("Tu rol solo consulta la caja; recepción o administración la abren."); return; }
@@ -3952,10 +4004,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     if (!conectado) {
       if (MODO_DEMO) {
         const fondoDemo = Number(aperturaForm.fondo) || 0;
-        const ap = { id: "demo", abierta: true, fondo: fondoDemo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: nombreUsuarioCaja(), destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) };
+        const ap = { id: "demo", sede: sedeCaja, abierta: true, fondo: fondoDemo, fondoUsd: Number(aperturaForm.fondoUsd) || 0, nota: aperturaForm.nota || "", abiertaEn: new Date().toISOString(), abiertaPorNombre: nombreUsuarioCaja(), destinosActivos: destinosCatalogo.filter((d) => destinosSel.has(d.id)) };
         setApertura(ap);
         try { localStorage.setItem(cajaStorageKey(), JSON.stringify(ap)); } catch { /* sin almacenamiento */ }
-        notify(`Caja abierta con fondo S/ ${M.sol2(fondoDemo)}.`);
+        notify(`Caja abierta en ${sedeNombre()} con fondo S/ ${M.sol2(fondoDemo)}.`);
         setTab("hoy");
         return;
       }
@@ -4004,7 +4056,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       .catch((e) => notify(e?.message || "No se pudo cerrar la jornada."))
       .finally(() => setCierreAdminBusy(false));
   };
-  const netoMovsCaja = cajaMovs.reduce((s, m) => {
+  const netoMovsCaja = movsCaja.reduce((s, m) => {
     if (m.tipo === "ingreso") return s + (Number(m.monto) || 0);
     if (m.tipo === "retiro") return s - (Number(m.monto) || 0);
     return s; // turno u otros: no afectan efectivo esperado
@@ -4028,7 +4080,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         .catch((e) => notify(e?.message || "No se pudo registrar el cambio de turno."));
       return;
     }
-    setCajaMovs((ms) => [...ms, { id: Date.now(), tipo: "turno", monto: 0, nota, creadoEn: new Date().toISOString() }]);
+    setCajaMovs((ms) => [...ms, { id: Date.now(), sede: sedeCaja, tipo: "turno", monto: 0, nota, creadoEn: new Date().toISOString() }]);
     setTurnoForm(null);
     notify(msg);
   };
@@ -4077,7 +4129,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const cerrada = cerradaHoy();
     try { localStorage.setItem(cajaStorageKey(), JSON.stringify(cerrada)); } catch { /* sin almacenamiento */ }
     setApertura(cerrada);
-    setHistCaja((h) => [{ id: "hoy-" + Date.now(), fecha: fmt(hoy), sedeNombre: sedeNombre(), abierta: false, abiertaEn: cerrada.abiertaEn, cerradaEn: cerrada.cerradaEn, abiertaPorNombre: cerrada.abiertaPorNombre, cerradaPorNombre: cerrada.cerradaPorNombre, fondo: cerrada.fondo, efectivoEsperado: esperado, efectivoContado: contado, diferencia: diff }, ...(h || [])]);
+    setHistCaja((h) => [{ id: "hoy-" + Date.now(), fecha: fmt(hoy), sedeId: sedeCaja, sedeNombre: sedeNombre(), abierta: false, abiertaEn: cerrada.abiertaEn, cerradaEn: cerrada.cerradaEn, abiertaPorNombre: cerrada.abiertaPorNombre, cerradaPorNombre: cerrada.cerradaPorNombre, fondo: cerrada.fondo, efectivoEsperado: esperado, efectivoContado: contado, diferencia: diff }, ...(h || [])]);
     setCierreForm({ contado: "", justificacion: "", observaciones: "" });
     setCierreBusy(false);
     notify("Caja cerrada. " + resumen);
@@ -4092,10 +4144,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         .catch(() => notify("No se pudo registrar el movimiento."));
       return;
     }
-    setCajaMovs((ms) => [...ms, { id: Date.now(), tipo: movForm.tipo, monto: Number(movForm.monto), nota: movForm.nota, creadoEn: new Date().toISOString() }]);
+    setCajaMovs((ms) => [...ms, { id: Date.now(), sede: sedeCaja, tipo: movForm.tipo, monto: Number(movForm.monto), nota: movForm.nota, creadoEn: new Date().toISOString() }]);
     setMovForm(null);
   };
-  const cajaAbierta = !!apertura?.abierta;
+  // Abierta = la caja de la sede elegida (sin sede de caja no hay caja que operar).
+  const cajaAbierta = sedeCaja != null && !!apertura?.abierta;
   // Cobrar a un paciente: si tiene trabajo terminado sin pagar, se cobra eso con sus ítems;
   // si no, se registra un abono a cuenta del plan.
   const cobrarCuenta = (x) => {
@@ -4108,10 +4161,16 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo });
   };
   const intentarCobrar = (payload) => {
+    // Cada cobro entra a la caja de UNA sede: con «Todas» primero se elige cuál (CAJA-10).
+    if (sedeCaja == null) {
+      notify("Elige arriba la caja de la sede donde cobras.");
+      setTab("hoy");
+      return;
+    }
     if (!cajaAbierta) {
       notify(jornadaAbiertaPrevia?.id
         ? "Cierra la jornada anterior en Historial antes de cobrar."
-        : "Abre la caja del día antes de cobrar.");
+        : `Abre la caja de ${sedeNombre()} antes de cobrar.`);
       setTab(jornadaAbiertaPrevia?.id ? "historial" : "hoy");
       try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { /* sin scroll */ }
       return;
@@ -4119,23 +4178,30 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     setPago(payload);
   };
   const [cierre, setCierre] = useState(null);
-  const recargarCierre = () => { if (conectado) api.pagos.cierre().then(setCierre).catch(() => {}); };
-  const { egresos: egresosDemo, setEgresos: setEgresosDemo } = useContext(DatosDemoCtx);
+  // Cierre del día de la caja que se ve (CAJA-05): el servidor recibe las sedes.
+  const recargarCierre = () => { if (conectado) api.pagos.cierre(undefined, { sedeIds: sedesApi }).then(setCierre).catch(() => {}); };
+  const demoDb = useContext(DatosDemoCtx) || {};
+  const { egresos: egresosDemo, setEgresos: setEgresosDemo } = demoDb;
   const [egresosApi, setEgresosApi] = useState([]);
-  const egresos = conectado ? egresosApi : egresosDemo;
+  const egresos = conectado ? egresosApi : (egresosDemo || []);
   const setEgresos = conectado ? setEgresosApi : setEgresosDemo;
-  const recargarEgresos = () => { if (conectado) api.egresos.listar().then((r) => setEgresos((r || []).map((e) => ({ id: e.id, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo", moneda: e.moneda || "PEN" })))).catch(() => {}); };
-  const [egForm, setEgForm] = useState(null);           // { concepto, categoria, monto, metodo }
+  // Para mostrar: solo los egresos de la sede de la caja (o de las sedes que se ven). Se
+  // escribe siempre sobre la lista completa con actualización funcional (CAJA-04).
+  const egresosVis = egresos.filter((e) => deCaja(sedeDeEgreso(e)));
+  const recargarEgresos = () => { if (conectado) api.egresos.listar({ sedeIds: sedesApi }).then((r) => setEgresos((r || []).map((e) => ({ id: e.id, sede: e.sedeId ?? e.sede ?? null, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo", moneda: e.moneda || "PEN" })))).catch(() => {}); };
+  const [egForm, setEgForm] = useState(null);           // { concepto, categoria, monto, metodo, moneda, sede }
+  const nuevoEgreso = () => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN", sede: sedeCaja });
   // Con sesión se arranca vacío: los dos cobros de ejemplo alimentaban el KPI "Cobrado
   // por links S/ 250 – pagados", dinero que nadie ha pagado.
   const [links, setLinks] = useState(auth.token ? [] : LINKS_DEMO);
-  const [linkForm, setLinkForm] = useState(null);       // { paciente, monto, concepto }
+  const linksVis = links.filter((l) => deCaja(l.sede));   // CAJA-19: cada link es de su sede
+  const [linkForm, setLinkForm] = useState(null);       // { paciente, monto, concepto, sede }
   const [boletaVer, setBoletaVer] = useState(null);     // boleta a mostrar
   const [datosFact, setDatosFact] = useState(false);    // config de facturación
   const recargarCaja = () => {
     if (!conectado) return;
     setCajaError(false);
-    api.caja().then((c) => {
+    api.caja({ sedeIds: sedesApi }).then((c) => {
       if (c?.errorDeCarga) {
         setCaja({ porCobrar: [], boletasHoy: [], montoPorCobrar: 0, montoHoy: 0 });
         setCajaError(true);
@@ -4149,7 +4215,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const recargarHist = () => {
     if (!conectado) return;
     setHistError(false);
-    api.pagos.historial().then((h) => {
+    api.pagos.historial({ sedeIds: sedesApi }).then((h) => {
       setHist((h || []).map((p) => ({
         id: p.id, paciente: p.paciente || "—", sede: p.sede || "—", sedeId: p.sedeId || null,
         concepto: p.concepto || "", monto: Number(p.monto) || 0, metodo: String(p.metodo || ""),
@@ -4159,7 +4225,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       setHistError(false);
     }).catch(() => { setHist([]); setHistError(true); });
   };
-  useEffect(() => { if (conectado) { recargarCaja(); recargarHist(); recargarCierre(); recargarEgresos(); api.sedes.listar().then((s) => setSedes(s || [])).catch(() => {}); api.citas.listar().then((cs) => setPacsHoy(new Set((cs || []).map((c) => c.pacienteId).filter(Boolean)))).catch(() => {}); } }, []); // eslint-disable-line
+  // Citas con su sede (para «Por cobrar de hoy»): se recortan a la sede que se ve al pintar.
+  const [citasHoyApi, setCitasHoyApi] = useState([]);
+  useEffect(() => { if (conectado) { api.sedes.listar().then((s) => setSedes(s || [])).catch(() => {}); api.citas.listar().then((cs) => setCitasHoyApi(cs || [])).catch(() => {}); } }, []); // eslint-disable-line
+  // Saldos, pagos, cierre y egresos se piden con la sede: al cambiar la sede del menú o la
+  // caja elegida se vuelven a pedir (CAJA-05).
+  useEffect(() => { if (conectado) { recargarCaja(); recargarHist(); recargarCierre(); recargarEgresos(); } }, [claveVer]); // eslint-disable-line
+  const pacsHoy = new Set(citasHoyApi.filter((c) => deCaja(c.sedeId ?? c.sede)).map((c) => c.pacienteId).filter(Boolean));
   useEffect(() => {
     if (!conectado || !cobroDesdeFicha?.pid) return;
     const hit = (caja.porCobrar || []).find((r) => r.pacienteId === cobroDesdeFicha.pid);
@@ -4169,31 +4241,43 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     onCobroDesdeFichaDone();
   }, [cobroDesdeFicha, conectado, caja.porCobrar?.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (conectado && tab === "cierre") recargarCierre(); }, [tab]); // eslint-disable-line
-  // Cuenta única del paciente (M-06/M-07): la misma que leen Pendientes, Panel y la ficha.
-  const saldoDe = (pid) => { const c = M.cuentaPaciente(fichas[pid]); const t = (fichas[pid]?.tratamiento || []).filter((f) => f.estado !== "anulado"); return { total: c.total, pagado: c.pagado, saldo: c.saldoPlan, porCobrar: c.porCobrar, vencido: c.vencido, terminadosItems: c.terminados, pend: t.filter((f) => f.estado !== "atendida").length }; };
+  // Cuenta única del paciente (M-06/M-07): la misma que leen Pendientes, Panel y la ficha,
+  // recortada a la sede de la caja (CAJA-03): un paciente de dos sedes no arrastra aquí lo
+  // que se hizo o cobró en la otra. Un dato viejo sin sede es de la sede principal del paciente.
+  const pacDe = (pid) => pacientes.find((p) => String(p.id) === String(pid)) || (demoDb.pacientes || []).find((p) => String(p.id) === String(pid)) || null;
+  const fichaVis = (pid) => fichaDeSede(fichas[pid], pacDe(pid), deCaja);
+  const saldoDe = (pid) => { const fv = fichaVis(pid); const c = M.cuentaPaciente(fv); const t = (fv?.tratamiento || []).filter((f) => f.estado !== "anulado"); return { total: c.total, pagado: c.pagado, saldo: c.saldoPlan, porCobrar: c.porCobrar, vencido: c.vencido, terminadosItems: c.terminados, pend: t.filter((f) => f.estado !== "atendida").length }; };
   // Ítems del plan pendientes (para itemizar la boleta): precio con IGV, importe base.
-  const itemsDe = (pid) => (fichas[pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 }));
+  const itemsDe = (pid) => (fichaVis(pid)?.tratamiento || []).filter((f) => f.estado !== "atendida" && f.estado !== "anulado").map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 }));
+  // Con sesión el servidor ya recibe la sede; por si aún no filtra, las filas que traen
+  // sedeId se recortan aquí y los totales se recalculan con las filas que quedan.
+  const porCobrarSrv = caja.porCobrar || [];
   const porCobrar = conectado
-    ? (caja.porCobrar || []).map((r) => ({ p: { id: r.pacienteId, nombre: r.paciente, dni: "", sedes: "", sedeNombre: r.sede || "" }, total: Number(r.total) || 0, pagado: Number(r.pagado) || 0, saldo: Number(r.saldo) || 0, pend: r.pend || 0 }))
+    ? porCobrarSrv.filter((r) => deCaja(r.sedeId)).map((r) => ({ p: { id: r.pacienteId, nombre: r.paciente, dni: "", sedes: "", sedeNombre: r.sede || "" }, total: Number(r.total) || 0, pagado: Number(r.pagado) || 0, saldo: Number(r.saldo) || 0, pend: r.pend || 0 }))
     : pacientes.map((p) => ({ p, ...saldoDe(p.id) })).filter((x) => x.saldo > 0 || x.porCobrar > 0).sort((a, b) => (b.porCobrar - a.porCobrar) || (b.saldo - a.saldo));
   const porCobrarHoy = conectado ? porCobrar.filter((x) => pacsHoy.has(x.p.id)) : [];
   // Tratamientos que el doctor marcó como terminados: el cobro se genera solo.
   // Conectado: caja.terminados = [{ pacienteId, paciente, faseId, nombre, costo, medico, terminadaEn }].
   const terminados = conectado
-    ? (caja.terminados || []).map((t) => ({ pid: t.pacienteId, paciente: t.paciente, faseId: t.faseId, nombre: t.nombre, costo: Number(t.costo) || 0, medico: t.medico || "", terminadaEn: t.terminadaEn || null }))
-    : pacientes.flatMap((p) => (fichas[p.id]?.tratamiento || []).filter((f) => f.estado === "terminada").map((f) => ({ pid: p.id, paciente: p.nombre, faseId: f.id, nombre: f.nombre, costo: Number(f.costo) || 0, medico: f.medico || "", terminadaEn: f.terminadaEn || null })));
+    ? (caja.terminados || []).filter((t) => deCaja(t.sedeId)).map((t) => ({ pid: t.pacienteId, paciente: t.paciente, faseId: t.faseId, nombre: t.nombre, costo: Number(t.costo) || 0, medico: t.medico || "", terminadaEn: t.terminadaEn || null }))
+    : pacientes.flatMap((p) => (fichaVis(p.id)?.tratamiento || []).filter((f) => f.estado === "terminada").map((f) => ({ pid: p.id, paciente: p.nombre, faseId: f.id, nombre: f.nombre, costo: Number(f.costo) || 0, medico: f.medico || "", terminadaEn: f.terminadaEn || null })));
   const terminadosPorPac = terminados.reduce((m, t) => { const x = m.get(t.pid) || { pid: t.pid, paciente: t.paciente, fases: [], total: 0 }; x.fases.push(t); x.total += t.costo; m.set(t.pid, x); return m; }, new Map());
+  const boletasSrv = caja.boletasHoy || [];
   const boletasHoy = conectado
-    ? (caja.boletasHoy || []).map((b) => ({ id: b.id, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null }))
-    : pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).filter((pg) => pg.fecha === fmt(hoy)).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", direccion: p.direccion || p.distrito || "", anulado: false })));
+    ? boletasSrv.filter((b) => deCaja(b.sedeId)).map((b) => ({ id: b.id, sedeId: b.sedeId || null, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null }))
+    : pacientes.flatMap((p) => (fichaVis(p.id)?.pagos || []).filter((pg) => pg.fecha === fmt(hoy)).map((pg) => ({ ...pg, sede: sedeDeRegistro(pg, p), paciente: p.nombre, dni: p.dni || "", direccion: p.direccion || p.distrito || "", anulado: false })));
   const boletasHoyActivas = boletasHoy.filter((b) => !b.anulado);
   // «Por cobrar» = trabajo terminado aún sin pagar (M-06), igual en Caja, Panel y Pendientes.
-  const montoPorCobrar = conectado ? (Number(caja.montoPorCobrar) || 0) : porCobrar.reduce((s, x) => s + (x.porCobrar || 0), 0);
-  const montoHoy = conectado ? (Number(caja.montoHoy) || 0) : boletasHoyActivas.reduce((s, b) => s + b.monto, 0);
+  const montoPorCobrar = conectado
+    ? (porCobrar.length === porCobrarSrv.length ? (Number(caja.montoPorCobrar) || 0) : porCobrar.reduce((s, x) => s + x.saldo, 0))
+    : porCobrar.reduce((s, x) => s + (x.porCobrar || 0), 0);
+  const montoHoy = conectado && boletasHoy.length === boletasSrv.length ? (Number(caja.montoHoy) || 0) : boletasHoyActivas.reduce((s, b) => s + b.monto, 0);
   const fiscalReadOnly = rol === "admin_sede" || (can && !can("config", "editar"));
   const abrirBoleta = (b) => {
     if (!emisorBoletaListo()) { notify("Completa la razón social y un RUC válido (11 dígitos con DV) en Configuración → Datos de facturación."); return; }
-    const em = getEmisor();
+    // Serie de la sede donde se cobró (CAJA-18); con sesión manda la que guardó el servidor.
+    const sedeB = b.sede ?? b.sedeId ?? sedeCaja;
+    const em = getEmisor(sedeB);
     const serie = b.comprobanteSerie || em.serie;
     const numeroRaw = b.comprobanteNumero;
     if (conectado && (numeroRaw == null || numeroRaw === "" || !serie)) {
@@ -4201,7 +4285,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       return;
     }
     const numero = numeroRaw != null ? fmtComprobante(numeroRaw) : peekBoletaLocal(em.serie);
-    setBoletaVer({ serie, numero, cliente: b.paciente, dni: b.dni || "", direccion: b.direccion || "", fecha: b.fecha || fmt(hoy), total: Number(b.monto) || 0, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), items: b.items && b.items.length ? b.items : undefined, tipo: b.tipo || "Boleta", docTipo: b.docTipo || "DNI", docNum: b.docNum || b.dni || "", moneda: b.moneda || "PEN", ref: b.refComprobante || undefined });
+    setBoletaVer({ serie, numero, sede: sedeB, cliente: b.paciente, dni: b.dni || "", direccion: b.direccion || "", fecha: b.fecha || fmt(hoy), total: Number(b.monto) || 0, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), items: b.items && b.items.length ? b.items : undefined, tipo: b.tipo || "Boleta", docTipo: b.docTipo || "DNI", docNum: b.docNum || b.dni || "", moneda: b.moneda || "PEN", ref: b.refComprobante || undefined });
   };
   const metodoLabel = { tarjeta: "Tarjeta (Niubiz)", yape: "Yape (Niubiz)", efectivo: "Efectivo", transferencia: "Transferencia" };
   // El ModalCobro ya registró el pago (backend). Aquí solo marcamos las fases como
@@ -4220,28 +4304,35 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       setPago(null); recargarCaja(); recargarHist(); recargarCierre();
       return;
     }
-    // Demo: abona; salda las fases solo si el pago cubre todo el saldo.
+    // Demo: abona en la caja de esta sede; salda las fases solo si el pago cubre todo el saldo.
     // Ítems para la boleta: los tratamientos que se saldan (solo en cobro total).
+    const sedePago = sedeCaja;
+    const pac = pacDe(pago.pid);
+    const pagoNuevo = { fecha: fmt(hoy), sede: sedePago, monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null };
     if (pago.faseIds && !esParcial) {
       const ids = new Set(pago.faseIds);
-      updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (ids.has(f.id) ? { ...f, estado: "atendida", atendidaEn: f.atendidaEn || fmt(hoy) } : f)), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: "Tratamiento terminado", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: pago.items }] }));
+      updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (ids.has(f.id) ? { ...f, estado: "atendida", atendidaEn: f.atendidaEn || fmt(hoy) } : f)), pagos: [...(cur.pagos || []), { ...pagoNuevo, concepto: "Tratamiento terminado", items: pago.items }] }));
       notify(`Cobrado S/ ${M.sol2(cobrado)} de ${pago.nombre}. ${textoComprobante}`);
       setPago(null);
       return;
     }
-    const itemsFact = !esParcial ? (fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) : null;
-    if (!esParcial) (fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida").forEach((f) => consumirInsumos && consumirInsumos(f.nombre));
-    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && f.estado !== "atendida") ? { ...f, estado: "atendida", atendidaEn: fmt(hoy) } : f), pagos: [...(cur.pagos || []), { fecha: fmt(hoy), concepto: esParcial ? "Abono en caja" : "Cobro de saldo en caja", monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
+    // Solo se saldan los ítems de esta sede; lo de la otra sede se cobra en su caja.
+    const pendSede = (fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida" && f.estado !== "anulado" && mismaSede(sedeDeRegistro(f, pac), sedePago));
+    const idsSaldo = new Set(pendSede.map((f) => f.id));
+    const itemsFact = !esParcial ? pendSede.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) : null;
+    // Lo terminado ya descontó sus insumos al terminarse; aquí solo lo que se cobra sin haberse terminado.
+    if (!esParcial) pendSede.filter((f) => f.estado !== "terminada").forEach((f) => consumirInsumos && consumirInsumos(f.nombre, sedePago));
+    updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (!esParcial && idsSaldo.has(f.id)) ? { ...f, estado: "atendida", atendidaEn: fmt(hoy) } : f), pagos: [...(cur.pagos || []), { ...pagoNuevo, concepto: esParcial ? "Abono en caja" : "Cobro de saldo en caja", items: itemsFact && itemsFact.length ? itemsFact : undefined }] }));
     notify(`Cobrado S/ ${M.sol2(cobrado)} de ${pago.nombre}${esParcial ? " (abono)" : ""}. ${textoComprobante}`);
     setPago(null);
   };
-  const pagosAll = pacientes.flatMap((p) => (fichas[p.id]?.pagos || []));
+  const pagosAll = pacientes.flatMap((p) => (fichaVis(p.id)?.pagos || []));
   const cobradoMes = conectado ? histFiltrado.reduce((s, pg) => s + pg.monto, 0) : pagosAll.filter((pg) => (pg.fecha || "").slice(0, 7) === mesActual).reduce((s, pg) => s + pg.monto, 0);
   const ticketProm = conectado ? (boletasHoyActivas.length ? Math.round(boletasHoyActivas.reduce((s, b) => s + b.monto, 0) / boletasHoyActivas.length) : 0) : (pagosAll.length ? Math.round(pagosAll.reduce((s, pg) => s + pg.monto, 0) / pagosAll.length) : 0);
   const planTotalGlobal = porCobrar.reduce((s, x) => s + x.total, 0);
   const pctCobradoGlobal = planTotalGlobal ? Math.round((porCobrar.reduce((s, x) => s + x.pagado, 0) / planTotalGlobal) * 100) : 0;
-  // Ingresos y egresos del día (ledger)
-  const egresosHoy = egresos.filter((e) => e.fecha === fmt(hoy));
+  // Ingresos y egresos del día (ledger), de la sede de la caja
+  const egresosHoy = egresosVis.filter((e) => e.fecha === fmt(hoy));
   const totEgresosHoy = egresosHoy.filter((e) => e.moneda !== "USD").reduce((s, e) => s + e.monto, 0);
   const totEgresosHoyUsd = egresosHoy.filter((e) => e.moneda === "USD").reduce((s, e) => s + e.monto, 0);
   const [catPeriodo, setCatPeriodo] = usePersist("caja_cat_periodo", "mes");
@@ -4256,20 +4347,26 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const netoHoy = ingresosHoy - totEgresosHoy;
   const guardarEgreso = () => {
     if (!egForm.concepto.trim() || !(Number(egForm.monto) > 0)) { notify("Completa concepto y monto del egreso."); return; }
+    // Cada gasto sale de la caja de una sede: sin sede concreta no se registra (CAJA-04).
+    const sedeEg = egForm.sede ?? sedeCaja;
+    if (sedeEg == null) { notify("Elige la sede del egreso."); return; }
     if (conectado) {
-      api.egresos.crear({ fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" })
+      api.egresos.crear({ fecha: fmt(hoy), sedeId: uuidDe(sedeEg), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" })
         .then(() => { notify(`Egreso registrado: ${egForm.concepto} – ${egForm.moneda === "USD" ? "US$" : "S/"} ${Number(egForm.monto).toFixed(2)}.`); setEgForm(null); recargarEgresos(); })
         .catch(() => notify("No se pudo registrar el egreso."));
       return;
     }
-    setEgresos((es) => [{ id: Math.max(0, ...es.map((e) => e.id)) + 1, fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" }, ...es]);
-    notify(`Egreso registrado: ${egForm.concepto} – ${egForm.moneda === "USD" ? "US$" : "S/"} ${Number(egForm.monto).toFixed(2)}.`);
+    setEgresos((es) => [{ id: Math.max(0, ...es.map((e) => e.id)) + 1, sede: sedeEg, fecha: fmt(hoy), concepto: egForm.concepto, categoria: egForm.categoria, monto: Number(egForm.monto), metodo: egForm.metodo, moneda: egForm.moneda || "PEN" }, ...es]);
+    notify(`Egreso registrado en ${nombreSedeEn(sedes, sedeEg)}: ${egForm.concepto} – ${egForm.moneda === "USD" ? "US$" : "S/"} ${Number(egForm.monto).toFixed(2)}.`);
     setEgForm(null);
   };
   const eliminarEgreso = (id) => { if (conectado) { api.egresos.eliminar(id).then(() => { notify("Egreso eliminado."); recargarEgresos(); }).catch(() => notify("No se pudo eliminar.")); return; } setEgresos((es) => es.filter((e) => e.id !== id)); };
   const crearLink = () => {
     if (!linkForm.paciente.trim() || !(Number(linkForm.monto) > 0)) { notify("Indica paciente y monto para el link."); return; }
-    setLinks((ls) => [{ id: Math.max(0, ...ls.map((l) => l.id)) + 1, paciente: linkForm.paciente, concepto: linkForm.concepto || "Pago de tratamiento", monto: Number(linkForm.monto), estado: "pendiente", fecha: fmt(hoy) }, ...ls]);
+    // El link es de la sede que lo genera: su cobro entra a esa caja (CAJA-19).
+    const sedeLink = linkForm.sede ?? sedeCaja;
+    if (sedeLink == null) { notify("Elige la sede que cobra el link."); return; }
+    setLinks((ls) => [{ id: Math.max(0, ...ls.map((l) => l.id)) + 1, sede: sedeLink, paciente: linkForm.paciente, concepto: linkForm.concepto || "Pago de tratamiento", monto: Number(linkForm.monto), estado: "pendiente", fecha: fmt(hoy) }, ...ls]);
     notify(`Link de ejemplo creado para ${linkForm.paciente} – S/ ${M.sol2(Number(linkForm.monto))}. Todavía no se puede cobrar con él: falta conectar la pasarela.`);
     setLinkForm(null);
   };
@@ -4287,7 +4384,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const gavetaHoy = cajaAbierta ? Math.round(((Number(apertura?.fondo) || 0) + efCobradoHoy - efEgresosHoy + netoMovsCaja) * 100) / 100 : null;
   const sol = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const difTxt = (d) => (d == null ? "" : Math.abs(d) < 0.01 ? "Cuadró exacto" : d > 0 ? `Sobraron ${sol(d)}` : `Faltaron ${sol(-d)}`);
-  const linksPend = links.filter((l) => l.estado === "pendiente").length;
+  const linksPend = linksVis.filter((l) => l.estado === "pendiente").length;
   const pasos = [
     { id: "apertura", n: 1, l: "Apertura", ic: KeyRound, ok: cajaAbierta || !!cerradaHoyReg, sub: cajaAbierta ? `Abierta ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? `Abrió ${horaDe(cerradaHoyReg.abiertaEn)}` : "Fondo y medios" },
     { id: "cobros", n: 2, l: "Cobros", ic: CreditCard, ok: false, sub: `${boletasHoyActivas.length} ${boletasHoyActivas.length === 1 ? "cobro" : "cobros"} · ${sol(montoHoy)}`, badge: terminadosPorPac.size || null },
@@ -4313,8 +4410,17 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const cabeceraCaja = (
     <section className={`dc-cj4${cajaAbierta ? " is-abierta" : cerradaHoyReg ? " is-cerrada" : " is-pendiente"}`} aria-label="Caja del día">
       <div className="dc-cj4__franja">
-        <span className="dc-cj4__estado"><i />{cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>
-        <span className="dc-cj4__sede">{sedeNombre()}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? ` · ${difTxt(cerradaHoyReg.diferencia)}` : ""}</span>
+        <span className="dc-cj4__estado"><i />{sedeCaja == null ? "Elige la caja" : cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>
+        {/* Con «Todas» la caja se elige aquí, siempre a la vista: las cifras y el arqueo son de
+            esa sede; «Todas» solo suma los saldos y no permite abrir, cobrar ni cerrar (CAJA-09). */}
+        {sedeRequierePick && sedesCaja.length > 1 ? (
+          <span role="radiogroup" aria-label="Caja de la sede" style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+            {[{ id: null, nombre: "Todas" }, ...sedesCaja].map((sd) => { const on = sd.id == null ? sedeCaja == null : String(sd.id) === String(sedeCaja); return (
+              <button key={sd.id ?? "todas"} type="button" role="radio" aria-checked={on} className={`dc-cj4__btn${on ? " is-pri" : ""}`} style={{ height: 28, padding: "0 12px", fontSize: 12 }} onClick={() => setCajaSedePick(sd.id)} title={sd.id == null ? "Saldos de todas las sedes, sin caja" : `Caja de ${sd.nombre}`}>{String(sd.nombre).replace(/^Sede /, "")}</button>
+            ); })}
+          </span>
+        ) : <span className="dc-cj4__sede">{sedeNombre()}{cajaAbierta ? ` · desde ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? ` · ${difTxt(cerradaHoyReg.diferencia)}` : ""}</span>}
+        {sedeRequierePick && sedesCaja.length > 1 && (cajaAbierta || cerradaHoyReg) ? <span className="dc-cj4__cifra">{cajaAbierta ? `Desde ${horaDe(apertura?.abiertaEn)}` : difTxt(cerradaHoyReg.diferencia)}</span> : null}
         <span className="dc-cj4__cifra">Cobrado hoy <b>{sol(montoHoy)}</b>{cobradoUsdHoy ? <small> + US$ {cobradoUsdHoy.toFixed(2)}</small> : null}</span>
         <span className="dc-cj4__cifra">Por cobrar <b className="is-aviso">{sol(montoPorCobrar)}</b></span>
         <span className="dc-cj4__cifra" title="Cobrado hoy menos egresos de hoy">Neto del día <b className={netoHoy < 0 ? "is-neg" : ""}>{netoHoy < 0 ? "− " : ""}{sol(Math.abs(netoHoy))}</b></span>
@@ -4365,17 +4471,19 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
         </Modal>
       )}
+      {/* CAJA-17: los comprobantes de ejemplo se numeran con los cobros de TODA la clínica (así
+          un cobro no cambia de número al cambiar de sede) y después se muestran los de las
+          sedes que se ven. Las series son por sede de la clínica (Integraciones). */}
       {tab === "sunat" && <FacturacionSunat onIntegraciones={() => { window.location.hash = "#/integraciones"; }} notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
-        sedes={(misSedes || [1, 2]).map((n) => ({ id: n, nombre: nombreSede(n) }))}
-        pagos={pacientes.flatMap((p) => (fichas[p.id]?.pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", sede: pg.sede ?? (Array.isArray(p.sedes) ? p.sedes[0] : p.sede) ?? 1 })))} />}
+        sedes={(conectado && sedes.length ? sedes : SEDES).map((x) => ({ id: x.id, nombre: x.nombre || nombreSede(x.id) }))}
+        verSedes={limiteSedes} consulta={{ sedeIds: sedesApi }}
+        pagos={(demoDb.pacientes || pacientes).flatMap((p) => (fichas[p.id]?.pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", sede: sedeDeRegistro(pg, p) })))} />}
 
       {tab === "hoy" && !cajaAbierta && (() => {
         // Apertura en un solo bloque (CAJ-02): sede (solo si hace falta elegirla), fondo en
         // soles y dólares, nota y «Abrir caja». Los medios de pago se configuran aparte.
-        const sedesOpc = sedes.length
-          ? sedes.filter((x) => sedesUsuarioUuid().includes(x.id))
-          : misSedes.map((n) => ({ id: sedeApiUuid(n), nombre: nombreSede(n) })).filter((x) => x.id);
-        const bloqueado = (sedeRequierePick && !cajaSedePick) || !!jornadaAbiertaPrevia?.id;
+        const sedesOpc = sedesCaja;
+        const bloqueado = sedeCaja == null || !!jornadaAbiertaPrevia?.id;
         return (
         <div className="dc-ap" style={{ display: "grid", gap: 12 }}>
           {jornadaAbiertaPrevia?.id && (
@@ -4387,20 +4495,20 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           )}
           {puedeAbrirCaja ? (
             <section className={`dc-ap3${verApertura ? " is-abierta" : " is-compacta"}`} aria-label="Abrir caja">
-              <div className="dc-ap3__tit"><span><KeyRound size={18} strokeWidth={2} /></span><div><b>{verApertura ? "Abrir caja" : "La caja está cerrada"}</b><small>{fechaLegible(fmt(hoy))} · {verApertura ? "indica el fondo con el que empiezas" : "ábrela para empezar a cobrar"}</small></div>
+              <div className="dc-ap3__tit"><span><KeyRound size={18} strokeWidth={2} /></span><div><b>{verApertura ? "Abrir caja" : sedeCaja == null ? "Elige la caja de una sede" : `La caja de ${sedeNombre()} está cerrada`}</b><small>{fechaLegible(fmt(hoy))} · {verApertura ? "indica el fondo con el que empiezas" : "ábrela para empezar a cobrar"}</small></div>
                 {!verApertura && <button type="button" className="dc-ap2__cta" onClick={() => setVerApertura(true)}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>}
                 {verApertura && <button type="button" className="dc-ap3__x" onClick={() => setVerApertura(false)}>Cancelar</button>}
               </div>
               {verApertura && <div className="dc-ap3__campos">
-                {sedeRequierePick && (
+                {sedeRequierePick && sedesOpc.length > 1 && (
                   <label className="dc-ap3__campo"><span>Sede</span>
-                    <Select small width={180} ariaLabel="Sede para abrir caja" value={cajaSedePick || ""} placeholder="Elegir sede" onChange={(v) => setCajaSedePick(v)} options={sedesOpc.map((x) => ({ value: x.id, label: x.nombre }))} />
+                    <Select small width={180} ariaLabel="Sede para abrir caja" value={sedeCaja ?? ""} placeholder="Elegir sede" onChange={(v) => setCajaSedePick(v)} options={sedesOpc.map((x) => ({ value: x.id, label: x.nombre }))} />
                   </label>
                 )}
                 <label className="dc-ap3__campo"><span>Fondo inicial</span><span className="dc-ap3__monto"><i>S/</i><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo"><span>Fondo en dólares</span><span className="dc-ap3__monto"><i>US$</i><input inputMode="decimal" aria-label="Fondo inicial en dólares (US$)" value={aperturaForm.fondoUsd} onChange={(e) => setAperturaForm({ ...aperturaForm, fondoUsd: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo is-nota"><span>Nota (opcional)</span><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Ej. turno mañana" /></label>
-                <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado} title={sedeRequierePick && !cajaSedePick ? "Elige la sede" : undefined}><KeyRound size={16} strokeWidth={2} /> Confirmar apertura</button>
+                <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado} title={sedeCaja == null ? "Elige la sede" : undefined}><KeyRound size={16} strokeWidth={2} /> Confirmar apertura</button>
               </div>}
             </section>
           ) : (
@@ -4409,7 +4517,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         </div>
         );
       })()}
-      {tab === "hoy" && cajaAbierta && (movForm || cajaMovs.length > 0) && (
+      {tab === "hoy" && cajaAbierta && (movForm || movsCaja.length > 0) && (
         <div style={{ display: "grid", gap: 12 }}>
           {movForm && (
             <Card style={{ padding: 16 }}>
@@ -4426,10 +4534,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               </div>
             </Card>
           )}
-          {cajaMovs.length > 0 && (
+          {movsCaja.length > 0 && (
             <Card style={{ padding: 14 }}>
               <div style={{ fontWeight: 500, color: NAVY, marginBottom: 8 }}>Movimientos intermedios de hoy</div>
-              {cajaMovs.map((m, i) => (
+              {movsCaja.map((m, i) => (
                 <div key={m.id || i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderTop: i ? "1px solid var(--dc-line)" : "none" }}>
                   <span>{m.tipo === "retiro" ? "Retiro" : m.tipo === "turno" ? "Cambio de turno" : "Ingreso"}{m.nota ? ` – ${m.nota}` : ""}</span>
                   <span style={{ fontWeight: 500, color: m.tipo === "retiro" ? RED : m.tipo === "turno" ? NAVY : "var(--dc-ok-700)", fontVariantNumeric: "tabular-nums" }}>{m.tipo === "turno" ? "—" : `${m.tipo === "retiro" ? "−" : "+"} S/ ${M.sol2(Number(m.monto))}`}</span>
@@ -4568,7 +4676,18 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       </div>)}
 
       {tab === "cierre" && (() => {
-        const c = cierre || (conectado ? { total: 0, cantidad: 0, porMetodo: {}, movimientos: [] } : (() => {
+        // Con sesión, si el servidor aún no recorta por sede, el cierre se rehace con los
+        // movimientos de la sede de la caja (los que traen sedeId) (CAJA-05).
+        const cierreSede = (() => {
+          if (!cierre) return null;
+          const movs = cierre.movimientos || [];
+          const quedan = movs.filter((m) => deCaja(m.sedeId));
+          if (quedan.length === movs.length) return cierre;
+          const pm = {};
+          quedan.forEach((m) => { const k0 = medioKey(m.metodo || "efectivo"); const k = k0 === "efectivo" && m.moneda === "USD" ? "efectivo_usd" : k0; pm[k] = (pm[k] || 0) + (Number(m.monto) || 0); });
+          return { ...cierre, total: quedan.reduce((a, m) => a + (Number(m.monto) || 0), 0), cantidad: quedan.length, porMetodo: pm, movimientos: quedan, usd: undefined };
+        })();
+        const c = cierreSede || (conectado ? { total: 0, cantidad: 0, porMetodo: {}, movimientos: [] } : (() => {
           const pm = {};
           boletasHoyActivas.forEach((b) => { const m = medioKey(b.metodo || "efectivo"); const k = m === "efectivo" && b.moneda === "USD" ? "efectivo_usd" : m; pm[k] = (pm[k] || 0) + b.monto; });
           return { total: boletasHoyActivas.reduce((a, b) => a + b.monto, 0), cantidad: boletasHoyActivas.length, porMetodo: pm, movimientos: boletasHoyActivas.map((b, i) => ({ id: null, hora: b.hora || "", paciente: b.paciente, concepto: b.concepto, metodo: String(b.metodo || "").toLowerCase(), monto: b.monto, _k: i })) };
@@ -4724,8 +4843,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 {!cajaAbierta && (
                   <Card className="dc-cz__bloq">
                     <span><Lock size={24} strokeWidth={1.9} /></span>
-                    <div><b>El arqueo se habilita con la caja abierta</b><p>Abre la caja del día para contar la gaveta y cerrar con el resultado del cuadre.</p></div>
-                    <button type="button" className="dc-ap2__cta" onClick={() => setTab("hoy")}><KeyRound size={15} strokeWidth={2} /> Abrir caja</button>
+                    {sedeCaja == null
+                      ? <div><b>Elige la caja de una sede</b><p>El arqueo es de una sola gaveta: elige arriba la sede para contar y cerrar su caja. Con «Todas» solo ves los cobros sumados.</p></div>
+                      : <div><b>El arqueo se habilita con la caja abierta</b><p>Abre la caja de {sedeNombre()} para contar la gaveta y cerrar con el resultado del cuadre.</p></div>}
+                    {sedeCaja != null && <button type="button" className="dc-ap2__cta" onClick={() => setTab("hoy")}><KeyRound size={15} strokeWidth={2} /> Abrir caja</button>}
                   </Card>
                 )}
               </div>
@@ -4795,7 +4916,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               </div>
             </Card>
           )}
-          {(() => { const js = histCaja || []; const dif = js.reduce((a, r) => a + (r.diferencia != null ? Number(r.diferencia) : 0), 0); const rango = (
+          {(() => { const js = (histCaja || []).filter((r) => deCaja(r.sedeId)); const dif = js.reduce((a, r) => a + (r.diferencia != null ? Number(r.diferencia) : 0), 0); const rango = (
             <div className="dc-hero-acc dc-rango">
               {js.length > 0 && <span className={`dc-flujo__neto${dif < 0 ? " is-neg" : ""}`} title="Suma de sobrantes y faltantes en el rango">Diferencia <b>{dif < 0 ? "− " : ""}S/ {M.sol2(Math.abs(dif))}</b></span>}
               <label><span>Desde</span><input type="date" aria-label="Desde" value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
@@ -4803,7 +4924,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja}><Repeat size={14} strokeWidth={1.9} /></button>
             </div>
           ); return js.length === 0 ? <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (
-          <ListaFiltrable rows={histCaja} sub="jornadas" extra={rango} defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 820, cols: [
+          <ListaFiltrable rows={js} sub="jornadas" extra={rango} defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 820, cols: [
             { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__strong">{fechaLegible(r.fecha)}</span> },
             { key: "sede", label: "Sede", w: "minmax(140px,1fr)", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—" },
             { key: "quien", label: "Responsable", w: "minmax(160px,1.2fr)", get: (r) => `${r.abiertaPorNombre || "—"}${!r.abierta && r.cerradaPorNombre && r.cerradaPorNombre !== r.abiertaPorNombre ? ` / ${r.cerradaPorNombre}` : ""}` },
@@ -4876,7 +4997,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         return (
         <div style={{ display: "grid", gap: 16 }}>
           <ListaFiltrable rows={movs} sub="movimientos" exportTitulo="Ingresos y egresos del día" extra={<>
-            {puedeEgresos && <button type="button" className="dc-flujo__nuevo" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" })}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button>}
+            {puedeEgresos && <button type="button" className="dc-flujo__nuevo" onClick={nuevoEgreso}><Plus size={14} strokeWidth={2} /> Nuevo egreso</button>}
           </>} cols={[
             { key: "tipo", label: "Tipo", get: (m) => (m.tipo === "ingreso" ? "Ingreso" : "Egreso") },
             { key: "concepto", label: "Concepto", get: (m) => m.concepto || "" },
@@ -4896,7 +5017,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 </header>
                 {lista.length === 0 ? (
                   <div className="dc-flujo__vacio">{t === "ingreso" ? "Aún no hay cobros hoy." : "Sin gastos registrados hoy."}
-                    {t === "egreso" && puedeEgresos && <button type="button" onClick={() => setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN" })}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
+                    {t === "egreso" && puedeEgresos && <button type="button" onClick={nuevoEgreso}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
                   </div>
                 ) : (
                   <ul>
@@ -4916,7 +5037,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           )}</ListaFiltrable>
           {(() => {
             const ym = fmt(hoy).slice(0, 7);
-            const base = egresos.filter((e) => (catPeriodo === "hoy" ? e.fecha === fmt(hoy) : (e.fecha || "").slice(0, 7) === ym));
+            const base = egresosVis.filter((e) => (catPeriodo === "hoy" ? e.fecha === fmt(hoy) : (e.fecha || "").slice(0, 7) === ym));
             const grupos = EGRESO_CATS.map((cat) => {
               const items = base.filter((e) => (EGRESO_CATS.includes(e.categoria) ? e.categoria : "Otros") === cat);
               return { cat, items, pen: items.filter((e) => e.moneda !== "USD").reduce((a, e) => a + e.monto, 0), usd: items.filter((e) => e.moneda === "USD").reduce((a, e) => a + e.monto, 0) };
@@ -4969,10 +5090,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       })()}
 
       {tab === "links" && (() => {
-        const activos = links.filter((l) => l.estado === "pendiente");
-        const cobrado = links.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.monto, 0);
+        const activos = linksVis.filter((l) => l.estado === "pendiente");
+        const cobrado = linksVis.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.monto, 0);
         const pend = activos.reduce((s, l) => s + l.monto, 0);
-        const nuevoLink = <button type="button" className="dc-flujo__nuevo is-teal" onClick={() => setLinkForm({ paciente: "", monto: "", concepto: "" })}><Plus size={14} strokeWidth={2} /> Nuevo link</button>;
+        const nuevoLink = <button type="button" className="dc-flujo__nuevo is-teal" onClick={() => setLinkForm({ paciente: "", monto: "", concepto: "", sede: sedeCaja })}><Plus size={14} strokeWidth={2} /> Nuevo link</button>;
         return (
         <div style={{ display: "grid", gap: 16 }}>
           <div className="fm-aviso-edad is-info">
@@ -4982,8 +5103,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               ? <span><b>Links de pago con {pa.n}.</b> El paciente paga desde su celular y el cobro entra a Caja.</span>
               : <span><b>Pasarela sin conectar.</b> Conecta Izipay (o Culqi / Niubiz) en Integraciones para que el paciente pague desde su celular.</span>; })()}
           </div>
-          {links.length === 0 ? <Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." />{nuevoLink}</Card> : (
-          <ListaFiltrable rows={links} sub="links" extra={<>
+          {linksVis.length === 0 ? <Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." />{nuevoLink}</Card> : (
+          <ListaFiltrable rows={linksVis} sub="links" extra={<>
             {pend > 0 && <span className="dc-flujo__neto is-aviso" title={`${activos.length} esperando pago`}>Pendiente <b>S/ {pend.toLocaleString("es-PE")}</b></span>}
             {cobrado > 0 && <span className="dc-flujo__neto" title="Pagado por link">Cobrado <b>S/ {cobrado.toLocaleString("es-PE")}</b></span>}
             {nuevoLink}
@@ -5035,9 +5156,16 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {egForm && (() => {
         const mets = [["efectivo", "Efectivo", DollarSign], ["tarjeta", "Tarjeta", CreditCard], ["transferencia", "Transferencia", Wallet], ["yape", "Yape", Zap]];
         return (
-        <Modal icon={<Wallet size={20} strokeWidth={1.75} />} titulo="Registrar egreso" sub="Gasto de la clínica que sale de caja" onClose={() => setEgForm(null)} maxW={520}
+        <Modal icon={<Wallet size={20} strokeWidth={1.75} />} titulo="Registrar egreso" sub={egForm.sede != null ? `Gasto que sale de la caja de ${nombreSedeEn(sedes, egForm.sede)}` : "Gasto que sale de la caja de una sede"} onClose={() => setEgForm(null)} maxW={520}
           footer={<><Btn small kind="ghost" onClick={() => setEgForm(null)}>Cancelar</Btn><Btn small kind="red" onClick={guardarEgreso}><Check size={15} strokeWidth={1.75} /> Registrar egreso</Btn></>}>
           <Field label="Concepto" value={egForm.concepto} onChange={(v) => setEgForm({ ...egForm, concepto: v })} placeholder="Ej. Compra de guantes y mascarillas" />
+          {/* Sin caja elegida (vista «Todas») el gasto se asigna a una sede: sale de su gaveta. */}
+          {sedeCaja == null && sedesCaja.length > 1 && (
+            <div style={{ marginTop: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Sede</label>
+              <Select value={egForm.sede ?? ""} placeholder="Elige la sede del gasto" onChange={(v) => setEgForm({ ...egForm, sede: v })} options={sedesCaja.map((x) => ({ value: x.id, label: x.nombre }))} />
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
             <div>
               <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Categoría</label>
@@ -5064,6 +5192,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         <Modal icon={<Zap size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Nuevo link de pago" sub="Vista previa: todavía no se puede cobrar con estos links" onClose={() => setLinkForm(null)} maxW={520}
           footer={<><Btn small kind="ghost" onClick={() => setLinkForm(null)}>Cancelar</Btn><Btn small onClick={crearLink}><Zap size={15} strokeWidth={1.75} /> Generar link</Btn></>}>
           <Field label="Paciente" value={linkForm.paciente} onChange={(v) => setLinkForm({ ...linkForm, paciente: v })} placeholder="Nombre del paciente" />
+          {sedeCaja == null && sedesCaja.length > 1 && (
+            <div style={{ marginTop: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Sede que cobra</label>
+              <Select value={linkForm.sede ?? ""} placeholder="Elige la sede" onChange={(v) => setLinkForm({ ...linkForm, sede: v })} options={sedesCaja.map((x) => ({ value: x.id, label: x.nombre }))} />
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginTop: 14 }}>
             <Field label="Concepto" value={linkForm.concepto} onChange={(v) => setLinkForm({ ...linkForm, concepto: v })} placeholder="Ej. Abono de ortodoncia" />
             <Field label="Monto (S/)" value={linkForm.monto} onChange={(v) => setLinkForm({ ...linkForm, monto: v.replace(/[^\d.]/g, "") })} placeholder="0.00" />
@@ -5083,23 +5217,60 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
    la relación de pagos del paciente; permite check-in y cobro del saldo. ---- */
 function Tickets({ citas, setCitas, fichas = {}, notify }) {
   const [detalle, setDetalle] = useState(null); // cita para el modal de detalle
-  const [pago, setPago] = useState(null); // { monto, nombre }
-  const idPorNombre = useMemo(() => Object.fromEntries(PACIENTES_INIT.map((p) => [p.nombre, p.id])), []);
-  const datosPago = (nombre) => {
-    const ficha = fichas[idPorNombre[nombre]];
-    if (!ficha) return { pagos: [], saldo: 0, total: 0, pagado: 0 };
-    const trat = ficha.tratamiento || [];
-    const total = trat.reduce((s, f) => s + f.costo, 0);
-    const pagado = trat.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0);
-    return { pagos: ficha.pagos || [], saldo: total - pagado, total, pagado };
+  const [pago, setPago] = useState(null); // { monto, nombre, pid, cita }
+  const demoDb = useContext(DatosDemoCtx) || {};
+  const pacs = demoDb.pacientes || PACIENTES_INIT;
+  const idPorNombre = useMemo(() => Object.fromEntries(pacs.map((p) => [p.nombre, p.id])), [pacs]);
+  // Con sesión, la sede de la cita se traduce al UUID real con la lista de /sedes.
+  const [sedesApi, setSedesApi] = useState([]);
+  useEffect(() => { if (auth.token) api.sedes.listar().then((r) => setSedesApi(r || [])).catch(() => {}); }, []);
+  // CAJA-14: la cuenta del ticket es la de la sede de la cita (la misma que ve Caja en esa
+  // sede): lo hecho o cobrado en otra sede del paciente se cobra en su propia caja.
+  const datosPago = (c) => {
+    const pid = c.pacienteId ?? idPorNombre[c.paciente];
+    const pac = pacs.find((p) => String(p.id) === String(pid)) || null;
+    const ficha = fichaDeSede(fichas[pid], pac, (sd) => c.sede == null || mismaSede(sd, c.sede));
+    if (!ficha) return { pid, pac, pagos: [], saldo: 0, total: 0, pagado: 0 };
+    const cta = M.cuentaPaciente(ficha);
+    return { pid, pac, pagos: ficha.pagos || [], saldo: cta.saldoPlan, total: cta.total, pagado: cta.pagado };
+  };
+  // Se cobra en la caja de la sede de la cita y solo con esa caja abierta.
+  const cobrar = (c, monto) => {
+    const dp = datosPago(c);
+    const abrir = () => setPago({ monto, nombre: c.paciente, pid: dp.pid, cita: c });
+    const cerrada = () => notify(`Abre la caja de ${nombreSedeEn(sedesApi, c.sede)} antes de cobrar.`);
+    if (auth.token) {
+      const uuid = uuidSede(sedesApi, c.sede);
+      if (!uuid) { notify("La cita no tiene sede: no se sabe en qué caja cobrar."); return; }
+      api.cajaApertura.get(uuid, fmt(hoy)).then((r) => (r?.abierta ? abrir() : cerrada())).catch(() => notify("No se pudo verificar la caja de la sede."));
+      return;
+    }
+    if (!aperturaDemo(c.sede)?.abierta) { cerrada(); return; }
+    abrir();
+  };
+  // Demostración: el cobro queda en la ficha con la sede de la cita; si cubre el saldo de esa
+  // sede, salda sus ítems (igual que Caja).
+  const registrarPago = (res) => {
+    const c = pago.cita;
+    const cobrado = res?.montoCobrado != null ? Number(res.montoCobrado) : pago.monto;
+    if (!auth.token && pago.pid != null && demoDb.updFicha) {
+      const pac = pacs.find((p) => String(p.id) === String(pago.pid)) || null;
+      const ids = new Set((fichas[pago.pid]?.tratamiento || []).filter((f) => f.estado !== "atendida" && f.estado !== "anulado" && mismaSede(sedeDeRegistro(f, pac), c.sede)).map((f) => f.id));
+      const met = { tarjeta: "Tarjeta", yape: "Yape", plin: "Plin", efectivo: "Efectivo", transferencia: "Transferencia", mixto: "Pago mixto" }[res?.metodo] || "Cobro";
+      demoDb.updFicha(pago.pid, (cur) => ({ ...cur,
+        tratamiento: (cur.tratamiento || []).map((f) => (!res?.parcial && ids.has(f.id) ? { ...f, estado: "atendida", atendidaEn: f.atendidaEn || fmt(hoy) } : f)),
+        pagos: [...(cur.pagos || []), { fecha: fmt(hoy), sede: c.sede, concepto: res?.parcial ? "Abono en recepción" : "Cobro de saldo en recepción", monto: cobrado, metodo: met, moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null }] }));
+    }
+    setPago(null);
+    notify(`Pago de ${pago.nombre} aprobado en ${nombreSedeEn(sedesApi, c.sede)}. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta de demostración (no se envía a SUNAT)."}`);
   };
   const ordenadas = [...citas].sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
   const checkin = (c) => { setCitas((cs) => cs.map((x) => x.id === c.id ? { ...x, llegada: !x.llegada } : x)); notify(c.llegada ? `Llegada anulada de ${c.paciente}.` : `${c.paciente} marcó llegada.`); };
 
   const pill = (bg, fg, ic, t) => <span style={{ fontSize: 12, fontWeight: 500, color: fg, background: bg, padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 5 }}>{ic}{t}</span>;
   const enSala = ordenadas.filter((c) => c.llegada).length;
-  const porCobrar = ordenadas.filter((c) => datosPago(c.paciente).saldo > 0);
-  const saldoTotal = porCobrar.reduce((s, c) => s + datosPago(c.paciente).saldo, 0);
+  const porCobrar = ordenadas.filter((c) => datosPago(c).saldo > 0);
+  const saldoTotal = porCobrar.reduce((s, c) => s + datosPago(c).saldo, 0);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 12 }}>
       <Card style={{ padding: 16, background: "linear-gradient(120deg, rgba(254,243,199,0.7), rgba(254,243,199,0.3))", border: "1px solid rgba(253,230,138,0.8)" }}>
@@ -5119,11 +5290,11 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
         { key: "medico", label: "Odontólogo", w: "minmax(124px,1.1fr)", a: "left", get: (c) => (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre || "—", cell: (c) => { const m = MEDICOS.find((x) => x.id === c.medicoId); return <span style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "inline-flex", alignItems: "center", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: m?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m?.nombre || "—"}</span></span>; } },
         { key: "llegada", label: "Llegada", w: "minmax(100px,0.8fr)", a: "center", get: (c) => c.llegada ? "En sala" : "Por llegar", cell: (c) => c.llegada ? pill("var(--dc-ok-soft)", "var(--dc-ok-700)", <CheckCircle2 size={13} strokeWidth={1.75} />, "En sala") : pill("var(--dc-warn-soft)", "var(--dc-warn-600)", <Clock size={12} strokeWidth={1.75} />, "Por llegar") },
         { key: "estado", label: "Estado", w: "minmax(100px,0.8fr)", a: "center", get: (c) => estadoCita(c), cell: (c) => <EstadoPill entidad="cita" estado={estadoCita(c)} /> },
-        { key: "saldo", label: "Saldo", w: "minmax(88px,0.7fr)", a: "right", get: (c) => datosPago(c.paciente).saldo, cell: (c) => { const s = datosPago(c.paciente).saldo; return <span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, color: s > 0 ? RED : "var(--dc-ok-700)" }}>S/ {s.toFixed(0)}</span>; } },
-        { key: "acc", label: "Acciones", w: "minmax(150px,1.1fr)", a: "center", noFilter: true, noSort: true, cell: (c) => { const dp = datosPago(c.paciente); return <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", gap: 7, flexWrap: "wrap", justifyContent: "center" }}><Btn small kind="ghost" onClick={() => checkin(c)}><UserCheck size={14} strokeWidth={1.75} /> {c.llegada ? "Anular" : "Llegada"}</Btn>{dp.saldo > 0 && <Btn small kind="red" onClick={() => setPago({ monto: dp.saldo, nombre: c.paciente })}><CreditCard size={14} strokeWidth={1.75} /> Cobrar</Btn>}</span>; } },
+        { key: "saldo", label: "Saldo", w: "minmax(88px,0.7fr)", a: "right", get: (c) => datosPago(c).saldo, cell: (c) => { const s = datosPago(c).saldo; return <span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, color: s > 0 ? RED : "var(--dc-ok-700)" }}>S/ {s.toFixed(0)}</span>; } },
+        { key: "acc", label: "Acciones", w: "minmax(150px,1.1fr)", a: "center", noFilter: true, noSort: true, cell: (c) => { const dp = datosPago(c); return <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", gap: 7, flexWrap: "wrap", justifyContent: "center" }}><Btn small kind="ghost" onClick={() => checkin(c)}><UserCheck size={14} strokeWidth={1.75} /> {c.llegada ? "Anular" : "Llegada"}</Btn>{dp.saldo > 0 && <Btn small kind="red" onClick={() => cobrar(c, dp.saldo)}><CreditCard size={14} strokeWidth={1.75} /> Cobrar</Btn>}</span>; } },
       ]} />
-      {detalle && (() => { const dp = datosPago(detalle.paciente); const med = MEDICOS.find((m) => m.id === detalle.medicoId); return (
-        <Modal icon={<Ticket size={20} strokeWidth={1.75} />} titulo={`Ticket #${String(detalle.id).padStart(3, "0")} – ${detalle.paciente}`} sub={`${detalle.hora} – ${detalle.motivo}${med ? ` – ${med.nombre}` : ""}`} onClose={() => setDetalle(null)} maxW={560} footer={dp.saldo > 0 ? <Btn kind="red" onClick={() => { setPago({ monto: dp.saldo, nombre: detalle.paciente }); setDetalle(null); }}><CreditCard size={15} strokeWidth={1.75} /> Cobrar S/ {dp.saldo.toFixed(0)}</Btn> : <Btn kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
+      {detalle && (() => { const dp = datosPago(detalle); const med = MEDICOS.find((m) => m.id === detalle.medicoId); return (
+        <Modal icon={<Ticket size={20} strokeWidth={1.75} />} titulo={`Ticket #${String(detalle.id).padStart(3, "0")} – ${detalle.paciente}`} sub={`${detalle.hora} – ${detalle.motivo}${med ? ` – ${med.nombre}` : ""}`} onClose={() => setDetalle(null)} maxW={560} footer={dp.saldo > 0 ? <Btn kind="red" onClick={() => { cobrar(detalle, dp.saldo); setDetalle(null); }}><CreditCard size={15} strokeWidth={1.75} /> Cobrar S/ {dp.saldo.toFixed(0)}</Btn> : <Btn kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 18 }}>
             {[["Total", dp.total, NAVY], ["Pagado", dp.pagado, "var(--dc-ok-700)"], ["Saldo", dp.saldo, dp.saldo > 0 ? RED : "var(--dc-ok-700)"]].map(([l, v, col]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "12px 14px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 18, fontWeight: 600, color: col, fontFamily: DISPLAY_FONT, marginTop: 2 }}>S/ {M.sol2(v)}</div></div>)}
           </div>
@@ -5136,7 +5307,7 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
           ))}
         </Modal>
       ); })()}
-      {pago && <ModalCobro monto={pago.monto} onClose={() => setPago(null)} onAprobado={() => { setPago(null); notify(`Pago de ${pago.nombre} aprobado. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Boleta de demostración (no se envía a SUNAT)."}`); }} />}
+      {pago && <ModalCobro monto={pago.monto} pacienteId={auth.token ? pago.pid : null} sedeId={uuidSede(sedesApi, pago.cita.sede)} paciente={pago.nombre} concepto="Cobro en recepción" onClose={() => setPago(null)} onAprobado={registrarPago} notify={notify} />}
     </div>
   );
 }
@@ -9219,7 +9390,10 @@ const emisorBoletaListo = () => {
   const nombre = (e.nombre || "").trim();
   return !!nombre && nombre !== "CLÍNICA" && validarRucSunat(e.ruc);
 };
-const getEmisor = () => {
+/* `sede`: la de la caja que cobra. Su serie (Integraciones › Facturación electrónica, una
+   por sede) manda sobre la serie general, así cada sede lleva su propio correlativo
+   (dc_boleta_seq_<serie>) y la boleta coincide con Comprobantes SUNAT (CAJA-18). */
+const getEmisor = (sede = null) => {
   const vacio = { nombre: "", ruc: "", dir: "", tel: "", serie: "B001" };
   let ls = {};
   try { ls = JSON.parse(localStorage.getItem("dc_emisor") || "{}") || {}; } catch { ls = {}; }
@@ -9235,7 +9409,7 @@ const getEmisor = () => {
     ruc,
     dir: clinic.dir || ls.dir || mb.dir || "",
     tel: clinic.tel || ls.tel || mb.tel || "",
-    serie: String(ls.serie || clinic.serie || mb.serie || "B001").toUpperCase().slice(0, 4),
+    serie: String(serieSede(sede) || ls.serie || clinic.serie || mb.serie || "B001").toUpperCase().slice(0, 4),
   };
 };
 const peekBoletaLocal = (serie = "B001") => String((Number(localStorage.getItem("dc_boleta_seq_" + serie) || "0") || 0) + 1).padStart(8, "0");
@@ -9275,7 +9449,7 @@ function BoletaView({ boleta, onClose }) {
   // Emisor fiscal (razón social y RUC) y datos del establecimiento que emite: la sede
   // activa. Mismos datos que el membrete del resto de documentos (util/membrete.js).
   const DI = useDatosImpresion();
-  const EMI = getEmisor();
+  const EMI = getEmisor(boleta.sede ?? null);
   const EMISOR = {
     ...EMI,
     nombre: EMI.nombre && EMI.nombre !== "CLÍNICA" ? EMI.nombre : (DI.empresa.razonSocial || DI.empresa.nombre || "CLÍNICA"),
@@ -9496,7 +9670,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
   const [verBoleta, setVerBoleta] = useState(false);
   const [resultado, setResultado] = useState(null);
   const closeRef = useRef(null);
-  const [boletaNum] = useState(() => peekBoletaLocal(getEmisor().serie));
+  const [boletaNum] = useState(() => peekBoletaLocal(getEmisor(sedeId).serie));
   const [msg, setMsg] = useState("");
   const [sandbox, setSandbox] = useState(false);
   const saldoMax = Number(monto) || 0;
@@ -9559,7 +9733,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
     let concept = conceptoFull;
     if (m === "transferencia") { if (ref.trim()) concept += ` – Op. ${ref.trim()}`; if (banco) concept += ` – ${banco}`; }
     if (moneda === "USD") concept += ` – US$ ${net.toFixed(2)} (TC ${TC_USD})`;
-    if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor().serie); aprobado({ metodo: m, referencia: ref, banco, montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
+    if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor(sedeId).serie); aprobado({ metodo: m, referencia: ref, banco, montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
     api.pagos.registrar({ pacienteId, sedeId, concepto: concept, monto: netPen, metodo: m, descuento: aPen(Number(desc) || 0), ...monCampos }, { headers: { "Idempotency-Key": idempotencyKey } })
       .then((r) => {
         if (r?.comprobanteNumero == null || r?.comprobanteNumero === "") {
@@ -9680,7 +9854,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
     if (!real) {
       setTimeout(() => {
         liberar();
-        const loc = nextBoletaLocal(getEmisor().serie);
+        const loc = nextBoletaLocal(getEmisor(sedeId).serie);
         aprobado({ metodo: "mixto", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, mixto: { efectivo: efPen, [mixOtroMetodo]: otPen }, vuelto: aPen(vueltoUi), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero });
       }, 700);
       return;
@@ -9716,14 +9890,14 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
       });
   };
   const volver = () => { setMetodo(null); setRef(""); setBanco(""); setFoto(null); setRecibidoEfectivo(""); setMixEf(""); setMixOtro(""); setPaso("elegir"); };
-  const serieBoleta = resultado?.comprobanteSerie || getEmisor().serie;
+  const serieBoleta = resultado?.comprobanteSerie || getEmisor(sedeId).serie;
   const numeroBoleta = resultado?.comprobanteNumero != null ? fmtComprobante(resultado.comprobanteNumero) : (real ? null : boletaNum);
   const abrirBoletaAprobada = () => {
     if (!emisorBoletaListo()) { notify("Completa la razón social y un RUC válido en Configuración → Datos de facturación."); return; }
     if (real && numeroBoleta == null) { notify("El servidor no devolvió número de comprobante."); return; }
     setVerBoleta(true);
   };
-  const boletaObj = { serie: serieBoleta, numero: numeroBoleta, cliente: paciente || "Cliente", dni: dni || "", direccion: "", fecha: fmt(hoy), total: netPen, concepto, metodo, ref, items: (!parcial && items && items.length) ? items : undefined };
+  const boletaObj = { serie: serieBoleta, numero: numeroBoleta, sede: sedeId, cliente: paciente || "Cliente", dni: dni || "", direccion: "", fecha: fmt(hoy), total: netPen, concepto, metodo, ref, items: (!parcial && items && items.length) ? items : undefined };
   const chip = (active) => ({ fontSize: 12, fontWeight: 500, padding: "5px 11px", borderRadius: "var(--dc-r-full)", cursor: "pointer", border: active ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: active ? (tint(DS.c.primary, 0.078)) : "#fff", color: active ? DS.c.primary : "var(--dc-ink-400)" });
   const inp2 = { padding: "7px 10px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", boxSizing: "border-box" };
 
@@ -9968,7 +10142,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
               const liberar = () => { postingRef.current = false; setPosting(false); };
               let concept = `${prevConcepto} – Vuelto ${sym} ${vuelto.toFixed(2)}`;
               if (moneda === "USD") concept += ` – US$ ${net.toFixed(2)} (TC ${TC_USD})`;
-              if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor().serie); aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
+              if (!real) { setTimeout(() => { liberar(); const loc = nextBoletaLocal(getEmisor(sedeId).serie); aprobado({ metodo: "efectivo", montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, vuelto: aPen(vuelto), comprobanteSerie: loc.serie, comprobanteNumero: loc.numero }); }, 700); return; }
               api.pagos.registrar({ pacienteId, sedeId, concepto: concept, monto: netPen, metodo: "efectivo", descuento: aPen(Number(desc) || 0), ...monCampos }, { headers: { "Idempotency-Key": idempotencyKey } })
                 .then((r) => {
                   if (r?.comprobanteNumero == null || r?.comprobanteNumero === "") { liberar(); fallo("El servidor no asignó número de comprobante."); return; }
