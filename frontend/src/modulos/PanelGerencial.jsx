@@ -852,7 +852,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),
       ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${(Number(pg.monto)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })),
     ].sort((a, b) => String(a.hora).localeCompare(String(b.hora))));
-    setInventarioValorizado(M.inventarioValorizado(demoDb?.inventario || []));
+    setInventarioValorizado(M.inventarioValorizado((demoDb?.inventario || []).filter((it) => it.sede == null || enSede([it.sede]))));
     setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false && enSede([x.sede])).length);
     setNSedes(verSedes ? verSedes.length : 2);
   }, [demoDb, citasProp, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps

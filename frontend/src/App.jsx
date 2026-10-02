@@ -6632,15 +6632,26 @@ function Consentimientos({ pacientes: pacProp, notify }) {
 }
 
 /* ---- Inventario de insumos (paridad con Doctocliq) ---- */
+// Cada sede tiene su almacén: el mismo insumo existe en las dos con su propio stock y
+// consumo (Surco atiende menos y repone por su lado). consumirInsumos descuenta solo
+// del almacén de la sede donde se atendió.
 const INVENTARIO_INIT = [
-  { id: 1, nombre: "Guantes de nitrilo (caja)", cat: "Bioseguridad", stock: 24, min: 10, unidad: "cajas", dia: 1.5, precio: 35 },
-  { id: 2, nombre: "Anestesia lidocaína 2%", cat: "Anestesia", stock: 8, min: 15, unidad: "cartuchos", dia: 4, precio: 3 },
-  { id: 3, nombre: "Agujas dentales cortas", cat: "Instrumental", stock: 60, min: 20, unidad: "unid", dia: 6, precio: 1.2 },
-  { id: 4, nombre: "Resina compuesta A2", cat: "Restauración", stock: 5, min: 6, unidad: "jeringas", dia: 0.6, precio: 45 },
-  { id: 5, nombre: "Algodón en rollos", cat: "Consumibles", stock: 40, min: 15, unidad: "paq", dia: 2, precio: 8 },
-  { id: 6, nombre: "Fresas de diamante", cat: "Instrumental", stock: 0, min: 10, unidad: "unid", dia: 1.2, precio: 12 },
-  { id: 7, nombre: "Ácido grabador 37%", cat: "Restauración", stock: 12, min: 5, unidad: "jeringas", dia: 0.4, precio: 18 },
-  { id: 8, nombre: "Barbijos quirúrgicos", cat: "Bioseguridad", stock: 30, min: 20, unidad: "cajas", dia: 2, precio: 22 },
+  { id: 1, sede: 1, nombre: "Guantes de nitrilo (caja)", cat: "Bioseguridad", stock: 24, min: 10, unidad: "cajas", dia: 1.5, precio: 35 },
+  { id: 2, sede: 1, nombre: "Anestesia lidocaína 2%", cat: "Anestesia", stock: 8, min: 15, unidad: "cartuchos", dia: 4, precio: 3 },
+  { id: 3, sede: 1, nombre: "Agujas dentales cortas", cat: "Instrumental", stock: 60, min: 20, unidad: "unid", dia: 6, precio: 1.2 },
+  { id: 4, sede: 1, nombre: "Resina compuesta A2", cat: "Restauración", stock: 5, min: 6, unidad: "jeringas", dia: 0.6, precio: 45 },
+  { id: 5, sede: 1, nombre: "Algodón en rollos", cat: "Consumibles", stock: 40, min: 15, unidad: "paq", dia: 2, precio: 8 },
+  { id: 6, sede: 1, nombre: "Fresas de diamante", cat: "Instrumental", stock: 0, min: 10, unidad: "unid", dia: 1.2, precio: 12 },
+  { id: 7, sede: 1, nombre: "Ácido grabador 37%", cat: "Restauración", stock: 12, min: 5, unidad: "jeringas", dia: 0.4, precio: 18 },
+  { id: 8, sede: 1, nombre: "Barbijos quirúrgicos", cat: "Bioseguridad", stock: 30, min: 20, unidad: "cajas", dia: 2, precio: 22 },
+  { id: 9, sede: 2, nombre: "Guantes de nitrilo (caja)", cat: "Bioseguridad", stock: 9, min: 10, unidad: "cajas", dia: 1.2, precio: 35 },
+  { id: 10, sede: 2, nombre: "Anestesia lidocaína 2%", cat: "Anestesia", stock: 22, min: 15, unidad: "cartuchos", dia: 3, precio: 3 },
+  { id: 11, sede: 2, nombre: "Agujas dentales cortas", cat: "Instrumental", stock: 34, min: 20, unidad: "unid", dia: 4, precio: 1.2 },
+  { id: 12, sede: 2, nombre: "Resina compuesta A2", cat: "Restauración", stock: 7, min: 6, unidad: "jeringas", dia: 0.5, precio: 45 },
+  { id: 13, sede: 2, nombre: "Algodón en rollos", cat: "Consumibles", stock: 18, min: 15, unidad: "paq", dia: 1.5, precio: 8 },
+  { id: 14, sede: 2, nombre: "Fresas de diamante", cat: "Instrumental", stock: 14, min: 10, unidad: "unid", dia: 1, precio: 12 },
+  { id: 15, sede: 2, nombre: "Ácido grabador 37%", cat: "Restauración", stock: 3, min: 5, unidad: "jeringas", dia: 0.3, precio: 18 },
+  { id: 16, sede: 2, nombre: "Barbijos quirúrgicos", cat: "Bioseguridad", stock: 26, min: 20, unidad: "cajas", dia: 1.6, precio: 22 },
 ];
 /* ---- Configuración de la clínica: sedes, doctores, servicios y horarios (CRUD real) ---- */
 
@@ -6849,22 +6860,29 @@ function serviciosConPrecioSafe(items) {
   return (items || []).filter((s) => s.activo !== false && (Number(s.monto) || 0) > 0);
 }
 
+// Cada orden se pide para el almacén de una sede y suma a su stock al recibirse
+// (las fresas en camino son las que se agotaron en San Isidro).
 const COMPRAS_DEMO = [
-  { id: 1, fecha: fmt(hoy), proveedor: "DentalStock Perú", items: "Guantes nitrilo x5 cajas – Anestesia x2", total: 340, estado: "recibida" },
-  { id: 2, fecha: addDays(-2), proveedor: "3M ESPE", items: "Resina Filtek x3 – Adhesivo x2", total: 520, estado: "recibida" },
-  { id: 3, fecha: addDays(-1), proveedor: "Distribuidora Odonto", items: "Fresas de diamante x1 kit", total: 180, estado: "en_camino" },
+  { id: 1, sede: 1, fecha: fmt(hoy), proveedor: "DentalStock Perú", items: "Guantes nitrilo x5 cajas – Anestesia x2", total: 340, estado: "recibida" },
+  { id: 2, sede: 2, fecha: addDays(-2), proveedor: "3M ESPE", items: "Resina Filtek x3 – Adhesivo x2", total: 520, estado: "recibida" },
+  { id: 3, sede: 1, fecha: addDays(-1), proveedor: "Distribuidora Odonto", items: "Fresas de diamante x1 kit", total: 180, estado: "en_camino" },
 ];
+// Directorio de la clínica (un proveedor no es de una sede): lo que se le compró sale de
+// las órdenes de las sedes que se ven.
 const PROVEEDORES_DEMO = [
   { id: 1, nombre: "DentalStock Perú", contacto: "Ventas – 987 654 321", categoria: "Consumibles", compras: 12, total: 4820 },
   { id: 2, nombre: "3M ESPE", contacto: "distribuidor@3m.pe", categoria: "Resinas / adhesivos", compras: 8, total: 6140 },
   { id: 3, nombre: "Distribuidora Odonto", contacto: "922 110 044", categoria: "Instrumental", compras: 5, total: 2380 },
   { id: 4, nombre: "Laboratorio Dental Lima", contacto: "labdentallima@mail.com", categoria: "Prótesis / laboratorio", compras: 9, total: 5300 },
 ];
+// Cada movimiento sale del almacén de la sede donde se atendió (la de la cita del paciente;
+// los cuatro son de San Isidro). Diego Castro se atiende con el Dr. Ramos: la Dra. Quispe
+// solo atiende en Surco y él no.
 const CONSUMO_DEMO = [
-  { id: 1, fecha: fmt(hoy), insumoId: 1, insumo: "Guantes de nitrilo (caja)", cant: 1, unidad: "cajas", paciente: "Rosa Linares", medico: "Dra. Carla Mendoza" },
-  { id: 2, fecha: fmt(hoy), insumoId: 2, insumo: "Anestesia lidocaína 2%", cant: 2, unidad: "cartuchos", paciente: "Pedro Gómez", medico: "Dra. Carla Mendoza" },
-  { id: 3, fecha: addDays(-1), insumoId: 4, insumo: "Resina compuesta A2", cant: 1, unidad: "jeringas", paciente: "Elena Ríos", medico: "Dr. Luis Paredes" },
-  { id: 4, fecha: addDays(-1), insumoId: 5, insumo: "Algodón en rollos", cant: 1, unidad: "paq", paciente: "Diego Castro", medico: "Dra. Ana Quispe" },
+  { id: 1, sede: 1, fecha: fmt(hoy), insumoId: 1, insumo: "Guantes de nitrilo (caja)", cant: 1, unidad: "cajas", paciente: "Rosa Linares", medico: "Dra. Carla Mendoza" },
+  { id: 2, sede: 1, fecha: fmt(hoy), insumoId: 2, insumo: "Anestesia lidocaína 2%", cant: 2, unidad: "cartuchos", paciente: "Pedro Gómez", medico: "Dra. Carla Mendoza" },
+  { id: 3, sede: 1, fecha: addDays(-1), insumoId: 4, insumo: "Resina compuesta A2", cant: 1, unidad: "jeringas", paciente: "Elena Ríos", medico: "Dr. Luis Paredes" },
+  { id: 4, sede: 1, fecha: addDays(-1), insumoId: 5, insumo: "Algodón en rollos", cant: 1, unidad: "paq", paciente: "Diego Castro", medico: "Dr. Jorge Ramos" },
 ];
 
 function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can, tabInicial = "productos", onTab }) {
@@ -6875,27 +6893,62 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
   // Cada pestaña es un submódulo del menú lateral (Inventario → Productos, Compras…).
   const [tab, setTabLocal] = useState(tabInicial);   // productos | compras | consumo | proveedores
   const setTab = (t) => (onTab ? onTab(t) : setTabLocal(t));
-  const mapInv = (i) => ({ id: i.id, nombre: i.nombre, cat: i.categoria || "", unidad: i.unidad || "unid", stock: Number(i.stock) || 0, min: Number(i.stockMinimo) || 0, precio: Number(i.costoUnitario) || 0, dia: 1, lote: i.lote || "", fechaVencimiento: i.fechaVencimiento || "" });
+  // Cada sede tiene su almacén: se ve el de las sedes elegidas arriba (con varias, una
+  // columna Sede dice de cuál es cada fila). Lo nuevo se registra en UNA sede del usuario.
+  const sedeCx = useSede();
+  const verSedes = sedeCx.ids || sedeCx.mias || SEDE_IDS;
+  const claveSedes = verSedes.map(String).join(",");
+  const variasSedes = verSedes.length > 1;
+  const deSede = (x) => sedeCx.enSede(x);   // sin sede (dato viejo del servidor): se muestra
+  const misVisibles = verSedes.filter((s) => sedeCx.esMia(s));
+  const sedesAlta = misVisibles.length ? misVisibles : verSedes;
+  const sedePorDefecto = sedesAlta.find((s) => mismaSede(s, sedeCx.activa)) ?? sedesAlta[0] ?? null;
+  // Con sesión se piden solo esas sedes (null = todas las del usuario, las decide el servidor).
+  const sedesApi = sedeCx.sede === "all" && sedeCx.global ? null : verSedes.map((x) => sedeApiUuid(x));
+  const unirY = (l) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} y ${l[l.length - 1]}` : l[0] || "");
+  const nomSede = (s) => (s == null || s === "" ? "Sin sede" : cortaSede(s));
+  const mapInv = (i) => ({ id: i.id, sede: i.sedeId ?? i.sede_id ?? i.sede ?? null, nombre: i.nombre, cat: i.categoria || "", unidad: i.unidad || "unid", stock: Number(i.stock) || 0, min: Number(i.stockMinimo) || 0, precio: Number(i.costoUnitario) || 0, dia: 1, lote: i.lote || "", fechaVencimiento: i.fechaVencimiento || "" });
   const [remoto, setRemoto] = useState(null);
-  const recargar = () => { if (conectado) api.inventario.listar().then((r) => setRemoto((r || []).map(mapInv))).catch(() => notify("No se pudo cargar el inventario del servidor.")); };
-  useEffect(() => { recargar(); }, []); // eslint-disable-line
-  const items = conectado ? (remoto || []) : itemsProp;
-  const [form, setForm] = useState(null); // {id?, nombre, cat, stock, min, unidad, lote?, fechaVencimiento?}
+  const recargar = () => { if (conectado) api.inventario.listar(sedesApi).then((r) => setRemoto((r || []).map(mapInv))).catch(() => notify("No se pudo cargar el inventario del servidor.")); };
+  useEffect(() => { recargar(); }, [claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Inventario guardado antes de separar almacenes: sus insumos pasan a la sede principal y,
+  // si ninguna sede tenía almacén propio, las demás reciben el suyo de ejemplo. Así el stock
+  // de San Isidro deja de descontarse por lo que se atiende en Surco.
+  useEffect(() => {
+    if (conectado || !setItems || !(itemsProp || []).some((x) => x.sede == null)) return;
+    setItems((its) => {
+      if (!its.some((x) => x.sede == null)) return its;
+      const principal = SEDE_IDS[0];
+      const fijos = its.map((x) => (x.sede == null ? { ...x, sede: principal } : x));
+      if (its.some((x) => x.sede != null)) return fijos;
+      let id = Math.max(0, ...fijos.map((x) => Number(x.id) || 0));
+      return [...fijos, ...INVENTARIO_INIT.filter((s) => !mismaSede(s.sede, principal)).map((s) => ({ ...s, id: ++id }))];
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Lo que se ve (también con sesión, por si el servidor aún no filtra). Para escribir se usa
+  // setItems sobre la lista completa: las otras sedes no se tocan.
+  const items = useMemo(() => (conectado ? (remoto || []) : (itemsProp || [])).filter((it) => deSede(it.sede)), [conectado, remoto, itemsProp, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [form, setForm] = useState(null); // {id?, sede, nombre, cat, stock, min, unidad, lote?, fechaVencimiento?}
 
   // ── Ordenes de compra ──
   // Antes "Nueva compra" y "Generar orden de compra" solo mostraban un aviso y la
   // lista era COMPRAS_DEMO: la clinica sabia que le faltaban guantes pero no tenia
   // forma de saber si ya los habia pedido.
   const [ordenes, setOrdenes] = useState(null);
-  const [nuevaOC, setNuevaOC] = useState(null);   // { proveedor, nota, lineas: [{inventarioId, nombre, cantidad, costoUnitario}] }
+  const [nuevaOC, setNuevaOC] = useState(null);   // { sede, auto?, proveedor, nota, lineas: [{inventarioId, nombre, cantidad, costoUnitario}] }
   const [ocBusy, setOcBusy] = useState(false);
-  const recargarOC = () => { if (conectado) api.ordenesCompra.listar().then(setOrdenes).catch(() => {}); };
+  const recargarOC = () => { if (conectado) api.ordenesCompra.listar(sedesApi).then(setOrdenes).catch(() => {}); };
+  // Solo las órdenes de las sedes que se ven: «Total comprado» y «Por recibir» son de esas sedes.
+  const ordenesVis = useMemo(() => (ordenes || []).filter((x) => deSede(x.orden?.sedeId ?? x.orden?.sede)), [ordenes, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const comprasDemo = useMemo(() => COMPRAS_DEMO.filter((o) => deSede(o.sede)), [claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Consumo de las sedes que se ven (cada movimiento es del almacén donde se atendió).
+  const movsVis = useMemo(() => (conectado ? [] : CONSUMO_DEMO.filter((m) => deSede(m.sede))), [conectado, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
   // Proveedores REALES: se agregan de las ordenes que se les han hecho, en vez de
   // los cuatro de ejemplo que se mostraban incluso con la clinica ya operando.
   // Las anuladas no cuentan: no se le compro nada.
   const proveedoresReales = useMemo(() => {
     const m = new Map();
-    for (const x of (ordenes || [])) {
+    for (const x of ordenesVis) {
       const o = x.orden;
       if (o.estado === "anulada") continue;
       const k = (o.proveedor || "").trim(); if (!k) continue;
@@ -6906,21 +6959,21 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
       m.set(k, a);
     }
     return [...m.values()].map((x) => ({ ...x, categoria: x.ultima ? `última compra ${fechaLegible(x.ultima)}` : "—" }));
-  }, [ordenes]);
+  }, [ordenesVis]);
   // INV-02: en la demostración también se agregan desde las órdenes de Compras, así el
   // «Total comprado» es la suma de las órdenes. El laboratorio no es proveedor de
   // insumos: sus trabajos viven en Laboratorio.
   const proveedoresDemo = useMemo(() => {
     const m = new Map();
-    for (const o of COMPRAS_DEMO) {
+    for (const o of comprasDemo) {
       if (o.estado === "anulada") continue;
       const base = PROVEEDORES_DEMO.find((x) => x.nombre === o.proveedor) || {};
       const a = m.get(o.proveedor) || { id: o.proveedor, nombre: o.proveedor, contacto: base.contacto || "—", categoria: base.categoria || "—", compras: 0, total: 0 };
       a.compras++; a.total += Number(o.total) || 0; m.set(o.proveedor, a);
     }
     return [...m.values()];
-  }, []);
-  useEffect(() => { if (tab === "compras" || tab === "proveedores") recargarOC(); }, [tab, conectado]); // eslint-disable-line
+  }, [comprasDemo]);
+  useEffect(() => { if (tab === "compras" || tab === "proveedores") recargarOC(); }, [tab, conectado, claveSedes]); // eslint-disable-line
 
   const accionOC = (id, accion, ok) => {
     setOcBusy(true);
@@ -6932,22 +6985,37 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
 
   const guardarOC = () => {
     const v = nuevaOC;
+    if (v.sede == null) { notify("Elige la sede que recibe la compra."); return; }
     if (!v.proveedor.trim()) { notify("Indica el proveedor."); return; }
     const lineas = v.lineas.filter((l) => Number(l.cantidad) > 0);
     if (!lineas.length) { notify("Añade al menos un insumo con cantidad."); return; }
     setOcBusy(true);
-    api.ordenesCompra.crear({ proveedor: v.proveedor.trim(), nota: v.nota || null,
+    // La orden es de la sede que la recibe: al marcarla recibida sube el stock de ESE almacén.
+    api.ordenesCompra.crear({ sedeId: sedeApiUuid(v.sede), proveedor: v.proveedor.trim(), nota: v.nota || null,
       lineas: lineas.map((l) => ({ inventarioId: l.inventarioId, nombre: l.nombre, cantidad: Number(l.cantidad), costoUnitario: Number(l.costoUnitario) || 0 })) })
-      .then(() => { notify("Orden de compra creada."); setNuevaOC(null); recargarOC(); })
+      // Desde Insumos se lleva a Órdenes de compra para verla (al cambiar de pestaña se recarga).
+      .then(() => { notify(`Orden de compra creada para ${nombreSede(v.sede)}.`); setNuevaOC(null); if (tab === "compras") recargarOC(); else setTab("compras"); })
       .catch((e) => notify(e?.message || "No se pudo crear la orden."))
       .finally(() => setOcBusy(false));
   };
 
-  /** Abre la orden ya rellenada con lo que hace falta reponer. */
-  const ocDesdeUrgentes = (lista) => setNuevaOC({
-    proveedor: "", nota: "Reposición automática por stock bajo / cobertura < 2 semanas",
-    lineas: lista.map((i) => ({ inventarioId: i.id, nombre: i.nombre, cantidad: Math.max(1, pedir(i)), costoUnitario: i.precio || 0 })),
-  });
+  // Una orden llega al almacén de UNA sede: se arma con lo que le falta a esa sede.
+  const urgentesDe = (sd) => requieren.filter((i) => i.sede == null || mismaSede(i.sede, sd));
+  const lineasDe = (lista) => lista.map((i) => ({ inventarioId: i.id, nombre: i.nombre, cantidad: Math.max(1, pedir(i)), costoUnitario: i.precio || 0 }));
+  /** Abre la orden ya rellenada con lo que hace falta reponer: en la sede activa si le
+      falta algo; si no, en la primera de las que se ven que lo necesite. */
+  const ocDesdeUrgentes = () => {
+    const sd = [sedePorDefecto, ...sedesAlta].find((s) => s != null && urgentesDe(s).length) ?? sedePorDefecto;
+    setNuevaOC({ sede: sd, auto: true, proveedor: "", nota: "Reposición automática por stock bajo / cobertura < 2 semanas", lineas: lineasDe(urgentesDe(sd)) });
+  };
+  // Demostración: resume la reposición sugerida, una orden por sede.
+  const ocDemoTexto = () => {
+    const partes = sedesAlta.map((s) => [s, urgentesDe(s)]).filter(([, l]) => l.length);
+    const uds = (l) => l.reduce((a, i) => a + pedir(i), 0);
+    if (partes.length > 1) return `Una orden por sede: ${partes.map(([s, l]) => `${cortaSede(s)}, ${uds(l)} unidades de ${l.length} insumos`).join("; ")}. (Demo)`;
+    const [s, l] = partes[0] || [sedePorDefecto, requieren];
+    return `Orden de compra para ${cortaSede(s)}: ${uds(l)} unidades de ${l.length} insumos. (Demo)`;
+  };
   const estado = (i) => estadoStock(i);
   const cobertura = (i) => coberturaDias(i);
   const pedir = (i) => sugeridoPedir(i);
@@ -6958,7 +7026,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
   const bajosN = items.filter((i) => estado(i) === "bajo").length;
   const valorTotal = items.reduce((s, i) => s + i.stock * (i.precio || 0), 0);
   const covMinHoy = items.length ? Math.min(...items.map((i) => { const d = cobertura(i); return d >= 999 ? Infinity : d; }).filter((d) => d !== Infinity), Infinity) : Infinity;
-  const covMinInsumo = (() => { let best = null; for (const i of items) { const d = cobertura(i); if (d >= 999) continue; if (!best || d < best.d) best = { d, nombre: i.nombre }; } return best; })();
+  const covMinInsumo = (() => { let best = null; for (const i of items) { const d = cobertura(i); if (d >= 999) continue; if (!best || d < best.d) best = { d, nombre: variasSedes && i.sede != null ? `${i.nombre} (${cortaSede(i.sede)})` : i.nombre }; } return best; })();
   const diasVenc = (f) => {
     if (!f) return null;
     const t = new Date(f + "T00:00:00").getTime();
@@ -6970,7 +7038,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
     const d = diasVenc(i.fechaVencimiento);
     return d !== null && d <= 60;
   });
-  const nuevo = () => setForm({ nombre: "", cat: "Consumibles", stock: 0, min: 5, unidad: "unid", dia: 1, precio: 0, lote: "", fechaVencimiento: "" });
+  // El insumo nuevo entra al almacén de la sede activa (o de la elegida entre las que se ven).
+  const nuevo = () => setForm({ sede: sedePorDefecto, nombre: "", cat: "Consumibles", stock: 0, min: 5, unidad: "unid", dia: 1, precio: 0, lote: "", fechaVencimiento: "" });
   const editar = (it) => setForm({ ...it, lote: it.lote || "", fechaVencimiento: it.fechaVencimiento || "" });
   const guardar = async () => {
     if (!form.nombre.trim()) { notify("Indica el nombre del insumo."); return; }
@@ -6984,6 +7053,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         costoUnitario: Number(form.precio) || 0,
         lote: form.lote ? form.lote.trim() : null,
         fechaVencimiento: form.fechaVencimiento ? form.fechaVencimiento.trim() : null,
+        // Almacén de la sede (al editar se conserva el suyo; sin dato no se manda para no borrarlo).
+        ...(form.sede != null ? { sedeId: sedeApiUuid(form.sede) } : {}),
       };
       try {
         if (form.id) await api.inventario.actualizar(form.id, payload);
@@ -7005,9 +7076,11 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
       lote: form.lote ? form.lote.trim() : "",
       fechaVencimiento: form.fechaVencimiento ? form.fechaVencimiento.trim() : "",
     };
+    // Siempre sobre la lista completa (todas las sedes): solo cambia o se suma este insumo.
+    const sedeIns = clean.sede ?? sedePorDefecto;
     if (form.id) setItems((it) => it.map((x) => x.id === form.id ? clean : x));
-    else setItems((it) => [...it, { ...clean, id: Math.max(0, ...it.map((x) => x.id)) + 1 }]);
-    notify(form.id ? "Insumo actualizado." : `${form.nombre} agregado al inventario.`);
+    else setItems((it) => [...it, { ...clean, sede: sedeIns, id: Math.max(0, ...it.map((x) => Number(x.id) || 0)) + 1 }]);
+    notify(form.id ? "Insumo actualizado." : `${form.nombre} agregado al almacén de ${cortaSede(sedeIns)}.`);
     setForm(null);
   };
   const eliminar = () => {
@@ -7015,6 +7088,26 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
     if (conectado) { api.inventario.borrar(form.id).then(recargar).catch(() => notify("No se pudo eliminar el insumo.")); setForm(null); return; }
     setItems((it) => it.filter((x) => x.id !== form.id)); setForm(null);
   };
+  // Sede de cada fila en las tablas: solo con más de una sede a la vista.
+  const chipSede = (s) => (s == null || s === ""
+    ? <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Sin sede</span>
+    : <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}><MapPin size={13} strokeWidth={2} color={colorDe(nombreSede(s))} style={{ flexShrink: 0 }} />{cortaSede(s)}</span>);
+  const colSede = variasSedes ? [{ key: "sede", label: "Sede", w: "minmax(110px,0.7fr)", a: "left", get: (r) => nomSede(r.sede), cell: (r) => chipSede(r.sede) }] : [];
+  // Rótulo de la franja: de qué sede (o sedes) son las cifras de abajo.
+  const rotuloSede = (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "rgba(255,255,255,.72)", marginBottom: 2 }}>
+      <MapPin size={12} strokeWidth={2.2} /> {sedeCx.sede === "all" && sedeCx.global ? "Todas las sedes" : variasSedes ? unirY(verSedes.map(cortaSede)) : nombreSede(verSedes[0])}
+    </span>
+  );
+  // Sede donde se registra: botones si el usuario puede elegir entre varias; si no, solo se informa.
+  const selectorSede = (valor, onElegir, titulo, lblSty) => (
+    <div style={{ display: "grid", gap: 6 }}>
+      <span style={lblSty || { fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", letterSpacing: .2 }}>{titulo}</span>
+      {onElegir && sedesAlta.length > 1
+        ? <div className="dc-fe__seg" role="radiogroup" aria-label={titulo} style={{ display: "flex" }}>{sedesAlta.map((s) => { const on = mismaSede(s, valor); return <button key={String(s)} type="button" role="radio" aria-checked={on} className={on ? "is-on" : ""} onClick={() => onElegir(s)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}><MapPin size={13} strokeWidth={2} /> {cortaSede(s)}</button>; })}</div>
+        : <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 500, color: NAVY }}><MapPin size={15} strokeWidth={1.9} color={DS.c.primary} /> {valor == null ? "Sin sede asignada" : nombreSede(valor)}</span>}
+    </div>
+  );
   const acBtn = { width: 30, height: 30, borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", cursor: "pointer", color: NAVY, display: "grid", placeItems: "center", flexShrink: 0 };
   const badge = (e) => e === "ok"
     ? <span className="dc-pill is-ok"><i /> En stock</span>
@@ -7027,12 +7120,12 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
       {tab === "compras" && puedeGestionar && (() => {
         // Conectado: ordenes REALES. En demostracion se conserva el ejemplo de siempre.
         const filas = conectado
-          ? (ordenes || []).map((x) => ({
-              id: x.orden.id, fecha: (x.orden.creadoEn || "").slice(0, 10), proveedor: x.orden.proveedor,
-              items: x.lineas.map((l) => `${l.nombre} x${Number(l.cantidad)}`).join(" – ") || "sin líneas",
+          ? ordenesVis.map((x) => ({
+              id: x.orden.id, sede: x.orden.sedeId ?? x.orden.sede ?? null, fecha: (x.orden.creadoEn || "").slice(0, 10), proveedor: x.orden.proveedor,
+              items: (x.lineas || []).map((l) => `${l.nombre} x${Number(l.cantidad)}`).join(" – ") || "sin líneas",
               total: Number(x.orden.total) || 0, estado: x.orden.estado,
             }))
-          : COMPRAS_DEMO;
+          : comprasDemo;
         const EST_OC = {
           borrador: { l: "Borrador", c: "var(--dc-ink-400)", bg: "var(--dc-bg-alt)" },
           enviada:  { l: "Enviada",  c: "var(--dc-warn-600)", bg: "var(--dc-warn-soft)" },
@@ -7048,8 +7141,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         <>
         <section className="dc-esp-hero dc-inv-hero">
           <div className="dc-esp-hero__txt">
+            {rotuloSede}
             <div className="dc-esp-hero__num"><b>{filas.length}</b><span>{filas.length === 1 ? "orden de compra" : "órdenes de compra"}</span></div>
-            <p>El stock sube al marcar la orden como recibida</p>
+            <p>El stock de la sede que pidió sube al marcar la orden como recibida</p>
           </div>
           <div className="dc-esp-hero__cifras">
             <div><b>S/ {totalOC.toLocaleString("es-PE")}</b><span>Total comprado</span></div>
@@ -7057,19 +7151,21 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             <div><b>{recOC}</b><span>Recibidas</span></div>
           </div>
           <span />
-          <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => conectado ? setNuevaOC({ proveedor: "", nota: "", lineas: [] }) : notify("Disponible al iniciar sesión.")}><Plus size={14} strokeWidth={2} /> Nueva compra</button></div>
+          <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => conectado ? setNuevaOC({ sede: sedePorDefecto, proveedor: "", nota: "", lineas: [] }) : notify("Disponible al iniciar sesión.")}><Plus size={14} strokeWidth={2} /> Nueva compra</button></div>
         </section>
         <Card className="dc-env">
           <div className="dc-env__cab"><h3>Órdenes de compra</h3></div>
-          {filas.length === 0 && <Vacio icon={<Send size={22} strokeWidth={1.75} />} titulo="Sin órdenes" sub="Todavía no has registrado ninguna orden de compra." />}
-          {filas.length > 0 && <ListaFiltrable rows={filas} sub="órdenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="compras" vistas={[{ id: "lista", label: "Lista", icon: List }]} tabla={{ minWidth: 720, cols: [
+          {filas.length === 0 && <Vacio icon={<Send size={22} strokeWidth={1.75} />} titulo="Sin órdenes" sub={variasSedes ? "Todavía no has registrado ninguna orden de compra." : `${nombreSede(verSedes[0])} todavía no tiene órdenes de compra.`} />}
+          {filas.length > 0 && <ListaFiltrable rows={filas} sub="órdenes" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="compras" vistas={[{ id: "lista", label: "Lista", icon: List }]} tabla={{ minWidth: variasSedes ? 830 : 720, cols: [
             { key: "prov", label: "Proveedor", w: "minmax(160px,1fr)", cell: (c) => <span className="dc-tp__strong">{c.proveedor}</span> },
+            ...(variasSedes ? [{ key: "sede", label: "Sede", w: "110px", cell: (c) => chipSede(c.sede) }] : []),
             { key: "items", label: "Productos", w: "minmax(200px,1.6fr)", get: (c) => c.items || "—" },
             { key: "fecha", label: "Fecha", w: "120px", cell: (c) => <span className="dc-tp__sub">{c.fecha ? fechaLegible(c.fecha) : "—"}</span> },
             { key: "estado", label: "Estado", w: "120px", a: "center", cell: (c) => <span className="dc-pill" style={{ "--c": OC_COL[c.estado] || "#8A9CA1" }}><i /> {(EST_OC[c.estado] || EST_OC.borrador).l}</span> },
             { key: "total", label: "Total", w: "110px", a: "right", cell: (c) => <span className="dc-tp__num">S/ {M.sol2(Number(c.total))}</span> },
           ] }} cols={[
             { key: "proveedor", label: "Proveedor", get: (c) => c.proveedor || "" },
+            ...(variasSedes ? [{ key: "sede", label: "Sede", get: (c) => nomSede(c.sede) }] : []),
             { key: "items", label: "Productos", get: (c) => c.items || "" },
             { key: "fecha", label: "Fecha", get: (c) => c.fecha || "" },
             { key: "estado", label: "Estado", get: (c) => (EST_OC[c.estado] || EST_OC.borrador).l },
@@ -7079,7 +7175,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           {listaOC.map((c) => { const e = EST_OC[c.estado] || EST_OC.borrador; const col = OC_COL[c.estado] || "#8A9CA1"; return (
             <div key={c.id} className="dc-oc" style={{ "--c": col }}>
               <span className="dc-serv-ico" style={{ "--c": col, width: 40, height: 40, borderRadius: 12 }}><Package size={18} strokeWidth={1.8} /></span>
-              <div className="dc-oc__txt"><b>{c.proveedor}</b><span>{c.items}</span></div>
+              <div className="dc-oc__txt"><b>{c.proveedor}</b><span>{variasSedes && <><MapPin size={11} strokeWidth={2.2} style={{ verticalAlign: "-1px" }} /> {nomSede(c.sede)} · </>}{c.items}</span></div>
               <span className="dc-oc__fecha">{c.fecha ? fechaLegible(c.fecha) : ""}</span>
               <span className="dc-pill" style={{ "--c": col }}><i /> {e.l}</span>
               <span className="dc-oc__total">S/ {M.sol2(Number(c.total))}</span>
@@ -7099,9 +7195,10 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         ); })()}
       {tab === "consumo" && (
         <>
-        {(() => { const movs = conectado ? [] : CONSUMO_DEMO; const porInsumo = {}; movs.forEach((m) => { porInsumo[m.insumo] = (porInsumo[m.insumo] || 0) + m.cant; }); const top = Object.entries(porInsumo).sort((x, y) => y[1] - x[1])[0]; const hoyN = movs.filter((m) => m.fecha === fmt(hoy)).length; return (
+        {(() => { const movs = movsVis; const porInsumo = {}; movs.forEach((m) => { porInsumo[m.insumo] = (porInsumo[m.insumo] || 0) + m.cant; }); const top = Object.entries(porInsumo).sort((x, y) => y[1] - x[1])[0]; const hoyN = movs.filter((m) => m.fecha === fmt(hoy)).length; return (
           <section className="dc-esp-hero dc-inv-hero">
             <div className="dc-esp-hero__txt">
+              {rotuloSede}
               <div className="dc-esp-hero__num"><b>{movs.length}</b><span>{movs.length === 1 ? "movimiento de consumo" : "movimientos de consumo"}</span></div>
               <p>Insumos usados en cada atención</p>
             </div>
@@ -7112,8 +7209,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             </div>
           </section>
         ); })()}
-        <DataTable titulo="Consumo de insumos" sub="movimientos" minWidth={820} rows={conectado ? [] : CONSUMO_DEMO} empty={<Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo={conectado ? "Registro de consumo no disponible" : "Sin consumo"} sub={conectado ? "El sistema ajusta el stock pero todavía no guarda un movimiento por cada uso, así que no hay nada que listar aquí. Se verá cuando se registren los movimientos de inventario." : "El uso de insumos por atención aparecerá aquí."} />} cols={[
+        <DataTable titulo="Consumo de insumos" sub="movimientos" minWidth={variasSedes ? 930 : 820} rows={movsVis} empty={<Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo={conectado ? "Registro de consumo no disponible" : "Sin consumo"} sub={conectado ? "El sistema ajusta el stock pero todavía no guarda un movimiento por cada uso, así que no hay nada que listar aquí. Se verá cuando se registren los movimientos de inventario." : variasSedes ? "El uso de insumos por atención aparecerá aquí." : `El uso de insumos en las atenciones de ${nombreSede(verSedes[0])} aparecerá aquí.`} />} cols={[
           { key: "fecha", label: "Fecha", w: "minmax(120px,0.8fr)", a: "left", get: (c) => c.fecha, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(c.fecha)}</span> },
+          ...colSede,
           { key: "insumo", label: "Insumo", w: "minmax(160px,1.3fr)", a: "left", get: (c) => c.insumo, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 500, color: NAVY, fontSize: 13 }}><span style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: (tint(DS.c.primary, 0.078)), color: DS.c.primary, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={15} strokeWidth={1.75} /></span>{c.insumo}</span> },
           { key: "cant", label: "Cantidad", w: "110px", a: "right", get: (c) => c.cant, cell: (c) => <span className="dc-pill" style={{ "--c": "#D0563F" }}>−{c.cant} {c.unidad}</span> },
           { key: "paciente", label: "Paciente", w: "minmax(140px,1fr)", a: "left", get: (c) => c.paciente, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 28, height: 28, fontSize: 11, background: `linear-gradient(135deg, ${tint(colorDe(c.paciente), 0.2)}, ${tint(colorDe(c.paciente), 0.08)})`, color: colorDe(c.paciente) }}>{iniciales(c.paciente)}</span><span style={{ fontSize: 13, color: "var(--dc-ink-800, #243E45)", fontWeight: 500 }}>{c.paciente}</span></span> },
@@ -7126,8 +7224,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         {(() => { const provs = conectado ? proveedoresReales : proveedoresDemo; const tot = provs.reduce((x, p) => x + (Number(p.total) || 0), 0); const comp = provs.reduce((x, p) => x + (Number(p.compras) || 0), 0); const top = [...provs].sort((x, y) => (y.total || 0) - (x.total || 0))[0]; return (
           <section className="dc-esp-hero dc-inv-hero">
             <div className="dc-esp-hero__txt">
+              {rotuloSede}
               <div className="dc-esp-hero__num"><b>{provs.length}</b><span>proveedores</span></div>
-              <p>La lista se arma sola con tus órdenes de compra</p>
+              <p>La lista se arma sola con las órdenes de compra de {variasSedes ? "estas sedes" : "la sede"}</p>
             </div>
             <div className="dc-esp-hero__cifras">
               <div><b>S/ {tot.toLocaleString("es-PE")}</b><span>Total comprado</span></div>
@@ -7149,23 +7248,29 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
       {(() => { const totalPedir = requieren.reduce((s, i) => s + pedir(i), 0); return (
         <section className="dc-esp-hero dc-inv-hero">
           <div className="dc-esp-hero__txt">
+            {rotuloSede}
             <div className="dc-esp-hero__num"><b>{requieren.length}</b><span>{requieren.length === 1 ? "insumo requiere compra" : "insumos requieren compra"}</span></div>
             <p>{agotadosN} agotado{agotadosN === 1 ? "" : "s"} y {bajosN} bajo mínimo{requieren.length ? `, reposición sugerida de ${totalPedir} unidades` : ""}</p>
           </div>
           <div className="dc-esp-hero__cifras">
-            {puedeGestionar && <div><b>S/ {valorTotal.toLocaleString("es-PE")}</b><span>Valor en stock</span></div>}
+            {/* Redondeado como el «Inventario valorizado» del Panel gerencial: la misma cifra en los dos. */}
+            {puedeGestionar && <div><b>S/ {Math.round(valorTotal).toLocaleString("es-PE")}</b><span>Valor en stock</span></div>}
             <div title={covMinInsumo ? covMinInsumo.nombre : undefined}><b>{covMinHoy === Infinity ? "—" : covMinHoy <= 0 ? "Hoy" : `${covMinHoy} d`}</b><span>{covMinInsumo ? `Se acaba primero: ${covMinInsumo.nombre}` : "Cobertura mínima"}</span></div>
             <div><b>{vencenPronto.length}</b><span>Vencen pronto</span></div>
           </div>
           <span />
           <div className="dc-hero-acc">
-            {puedeGestionar && requieren.length > 0 && <button type="button" className="dc-esp-hero__btn" onClick={() => conectado ? (ocDesdeUrgentes(requieren), setTab("compras")) : notify(`Orden de compra: ${totalPedir} unidades de ${requieren.length} insumos. (Demo)`)}><Send size={14} strokeWidth={1.9} /> Generar orden de compra</button>}
+            {/* La orden se abre aquí mismo (cambiar de pestaña remonta el módulo y la perdía);
+                al crearla se pasa a Órdenes de compra. */}
+            {puedeGestionar && requieren.length > 0 && <button type="button" className="dc-esp-hero__btn" onClick={() => conectado ? ocDesdeUrgentes() : notify(ocDemoTexto())}><Send size={14} strokeWidth={1.9} /> Generar orden de compra</button>}
             {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo insumo</button>}
           </div>
         </section>
       ); })()}
-      <DataTable titulo="Insumos" sub="insumos" minWidth={1040} rows={items} defaultSort={{ key: "estado", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub="Agrega tu primer insumo para controlar stock y cobertura." />} cols={[
+      <DataTable titulo="Insumos" sub="insumos" minWidth={variasSedes ? 1150 : 1040} rows={items} defaultSort={{ key: "estado", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub={variasSedes ? "Agrega tu primer insumo para controlar stock y cobertura." : `${nombreSede(verSedes[0])} aún no tiene insumos. Agrégalos para controlar su stock y cobertura.`} />} cols={[
         { key: "insumo", label: "Insumo", w: "minmax(180px,1.5fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div></div></div>; } },
+        // Con «Todas las sedes» el mismo insumo sale una vez por almacén: la sede dice cuál es.
+        ...colSede,
         { key: "cat", label: "Categoría", w: "minmax(110px,0.8fr)", a: "left", get: (it) => it.cat || "—" },
         ...(items.some((it) => it.lote) ? [{ key: "lote", label: "Lote", w: "90px", a: "left", get: (it) => it.lote || "", cell: (it) => <span style={{ fontSize: 13, color: it.lote ? "var(--dc-ink-700)" : "var(--dc-ink-400)" }}>{it.lote || "—"}</span> }] : []),
         ...(items.some((it) => it.fechaVencimiento) ? [{ key: "vence", label: "Vence", w: "112px", a: "left", get: (it) => it.fechaVencimiento || "", cell: (it) => {
@@ -7189,7 +7294,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         ...(puedeGestionar ? [{ key: "acc", label: "Ajustar", w: "120px", a: "center", noFilter: true, noSort: true, sticky: false, fijo: true, cell: (it) => <span className="dc-inv__step" onClick={(e) => e.stopPropagation()}><button type="button" aria-label={`Usar 1 de ${it.nombre}`} title="Usar una unidad" onClick={() => ajustar(it.id, -1)}><Minus size={14} strokeWidth={2} /></button><b>{it.stock}</b><button type="button" aria-label={`Ingresar 1 de ${it.nombre}`} title="Ingresar una unidad" onClick={() => ajustar(it.id, 1)}><Plus size={14} strokeWidth={2} /></button></span> }] : []),
       ]} />
       </>)}
-      {form && <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar insumo" : "Nuevo insumo"} sub={form.id ? "Actualiza los datos del insumo" : "Agrega un insumo al inventario"} onClose={() => setForm(null)} size="corto" maxW={560}
+      {form && <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar insumo" : "Nuevo insumo"} sub={form.id ? `Almacén de ${nomSede(form.sede)}` : "Agrega un insumo al almacén de una sede"} onClose={() => setForm(null)} size="corto" maxW={560}
         footer={<>{form.id && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar" : "Crear"}</Btn></>}>
         {(() => { const st = Number(form.stock) || 0, mn = Number(form.min) || 0; const e = st === 0 ? "agotado" : st <= mn ? "bajo" : "ok"; return (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 14px", marginBottom: 16 }}>
@@ -7198,6 +7303,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           </div>
         ); })()}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          {/* Un insumo es del almacén de una sede: se elige al crearlo y luego no se mueve
+              (el stock está físicamente allí). */}
+          <div style={{ gridColumn: "1 / -1" }}>{selectorSede(form.sede, form.id ? null : (s) => setForm((f) => ({ ...f, sede: s })), "Sede (almacén)")}</div>
           <div style={{ gridColumn: "1 / -1" }}><Field label="Insumo" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Guantes de nitrilo (caja)" /></div>
           <Field label="Categoría" value={form.cat} onChange={(v) => setForm({ ...form, cat: v })} placeholder="Consumibles" />
           <Field label="Unidad de medida" value={form.unidad} onChange={(v) => setForm({ ...form, unidad: v })} placeholder="cajas, unid, cartuchos…" />
@@ -7217,28 +7325,36 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
       </Modal>}
       {nuevaOC && (() => {
         const set = (k, v) => setNuevaOC((o) => ({ ...o, [k]: v }));
-        const setL = (i, k, v) => setNuevaOC((o) => ({ ...o, lineas: o.lineas.map((l, j) => j === i ? { ...l, [k]: v } : l) }));
-        const quitar = (i) => setNuevaOC((o) => ({ ...o, lineas: o.lineas.filter((_, j) => j !== i) }));
-        const anadir = (id) => { const it = items.find((x) => String(x.id) === String(id)); if (!it) return;
+        // Si se tocan las líneas la orden deja de ser automática: cambiar de sede ya no las rehace.
+        const setL = (i, k, v) => setNuevaOC((o) => ({ ...o, auto: false, lineas: o.lineas.map((l, j) => j === i ? { ...l, [k]: v } : l) }));
+        const quitar = (i) => setNuevaOC((o) => ({ ...o, auto: false, lineas: o.lineas.filter((_, j) => j !== i) }));
+        // Solo insumos del almacén que recibe la orden.
+        const delAlmacen = (sd) => items.filter((it) => it.sede == null || mismaSede(it.sede, sd));
+        const almacenOC = delAlmacen(nuevaOC.sede);
+        // Al cambiar de sede, la orden automática se rehace con lo que le falta a esa sede;
+        // una manual conserva solo los insumos que también son de ese almacén.
+        const cambiarSede = (sd) => setNuevaOC((o) => ({ ...o, sede: sd, lineas: o.auto ? lineasDe(urgentesDe(sd)) : o.lineas.filter((l) => delAlmacen(sd).some((it) => String(it.id) === String(l.inventarioId))) }));
+        const anadir = (id) => { const it = almacenOC.find((x) => String(x.id) === String(id)); if (!it) return;
           setNuevaOC((o) => o.lineas.some((l) => String(l.inventarioId) === String(it.id)) ? o
-            : ({ ...o, lineas: [...o.lineas, { inventarioId: it.id, nombre: it.nombre, cantidad: pedir(it) || 1, costoUnitario: it.precio || 0 }] })); };
+            : ({ ...o, auto: false, lineas: [...o.lineas, { inventarioId: it.id, nombre: it.nombre, cantidad: pedir(it) || 1, costoUnitario: it.precio || 0 }] })); };
         const total = nuevaOC.lineas.reduce((sm, l) => sm + (Number(l.cantidad) || 0) * (Number(l.costoUnitario) || 0), 0);
         const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
         return (
-        <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo="Nueva orden de compra" sub="Se suma al stock cuando la marques como recibida" maxW={620}
+        <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo="Nueva orden de compra" sub={`Se suma al stock de ${nomSede(nuevaOC.sede)} cuando la marques como recibida`} maxW={620}
           onClose={() => setNuevaOC(null)}
           footer={<><Btn small kind="ghost" onClick={() => setNuevaOC(null)}>Cancelar</Btn>
                    <Btn small onClick={guardarOC} disabled={ocBusy}><Check size={15} strokeWidth={1.75} /> {ocBusy ? "Guardando…" : "Crear orden"}</Btn></>}>
           <div style={{ display: "grid", gap: 12 }}>
+            {selectorSede(nuevaOC.sede, cambiarSede, "Sede que recibe la compra", { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" })}
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Proveedor *
               <input className="dc-premium-inp" value={nuevaOC.proveedor} onChange={(e) => set("proveedor", e.target.value)} placeholder="Ej. DentalStock Perú" style={{ ...inp, marginTop: 5 }} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Nota (opcional)
-              <input className="dc-premium-inp" value={nuevaOC.nota || ""} onChange={(e) => set("nota", e.target.value)} placeholder="Ej. urgente, entregar en Surco" style={{ ...inp, marginTop: 5 }} /></label>
+              <input className="dc-premium-inp" value={nuevaOC.nota || ""} onChange={(e) => set("nota", e.target.value)} placeholder="Ej. urgente, entregar antes del viernes" style={{ ...inp, marginTop: 5 }} /></label>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 6 }}>Insumos</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 6 }}>Insumos de {nomSede(nuevaOC.sede)}</div>
               <Select value="" onChange={anadir} placeholder="+ Añadir insumo del inventario"
                 options={[{ value: "", label: "+ Añadir insumo del inventario" },
-                          ...items.map((it) => ({ value: String(it.id), label: it.nombre, sub: `stock ${it.stock} ${it.unidad}` }))]} />
+                          ...almacenOC.map((it) => ({ value: String(it.id), label: it.nombre, sub: `stock ${it.stock} ${it.unidad}` }))]} />
             </div>
             {nuevaOC.lineas.length === 0
               ? <div style={{ fontSize: 13, color: "var(--dc-ink-400)", fontStyle: "italic", padding: "6px 0" }}>Aún no has añadido ningún insumo.</div>
