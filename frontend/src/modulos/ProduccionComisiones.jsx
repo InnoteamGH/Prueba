@@ -9,8 +9,10 @@ import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden } from "..
 
 /* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
    mismas cifras que usan Metas y el Resumen del mes), para que el módulo no salga en cero. */
-function datosDemo() {
-  const porMedico = MEDICOS.map((m) => {
+function datosDemo(sedes = null) {
+  // Solo los odontólogos que atienden en las sedes que ve el usuario (admin de sede).
+  const meds = sedes ? MEDICOS.filter((m) => (m.sedes || [m.sede]).some((x) => sedes.map(Number).includes(Number(x)))) : MEDICOS;
+  const porMedico = meds.map((m) => {
     const produccion = m.prodDemo || 0;
     const porcentaje = m.comision ?? 0; // REP-01: el % de la ficha del doctor
     return {
@@ -752,7 +754,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   );
 }
 
-export default function ProduccionComisiones({ citas = [], can, tab = "resumen" }) {
+export default function ProduccionComisiones({ citas = [], can, tab = "resumen", sedes = null }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [ficha, setFicha] = useState(null);
@@ -763,7 +765,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
 
   const cargar = useCallback(() => {
     setErr(null);
-    if (!auth.token) { setData(datosDemo()); return; }
+    if (!auth.token) { setData(datosDemo(sedes)); return; }
     api.comisiones()
       .then((r) => setData(r))
       .catch((e) => setErr(e?.message || "No se pudo cargar comisiones"));

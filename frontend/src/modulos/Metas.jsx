@@ -4,7 +4,8 @@ import { Check, Target, TrendingUp, Trophy } from "lucide-react";
 import api, { auth } from "../api/client";
 import {Card, ESPECIALIDADES, MEDICOS, Vacio, colorDe, iniciales, tint} from "../comun";
 
-export default function Metas({ notify = () => {}, can }) {
+export default function Metas({ notify = () => {}, can, sedes = null }) {
+  const deMisSedes = (m) => !sedes || !(m.sedes || m.sede != null) || (m.sedes || [m.sede]).some((x) => sedes.map(String).includes(String(x)));
   const conectado = !!auth.token;
   const puedeEditar = can ? can("metas", "editar") : true;
   const [meds, setMeds] = useState([]);
@@ -16,7 +17,7 @@ export default function Metas({ notify = () => {}, can }) {
   const cargar = () => {
     if (!conectado) {
       // Demo: odontólogos de ejemplo con su producción del mes.
-      const list = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: ESPECIALIDADES.find((e) => e.id === m.esp)?.nombre, metaMensual: m.meta, prodMes: m.prodDemo, citasMes: m.citasDemo, porcentajeComision: m.comision ?? null }));
+      const list = MEDICOS.filter(deMisSedes).map((m) => ({ id: m.id, nombre: m.nombre, especialidad: ESPECIALIDADES.find((e) => e.id === m.esp)?.nombre, metaMensual: m.meta, prodMes: m.prodDemo, citasMes: m.citasDemo, porcentajeComision: m.comision ?? null }));
       setMeds(list);
       const d = {};
       list.forEach((m) => { d[m.id] = String(m.metaMensual); });
@@ -27,7 +28,7 @@ export default function Metas({ notify = () => {}, can }) {
     setError(null);
     api.catalogo.medicos()
       .then((rows) => {
-        const list = (rows || []).filter((m) => m.activo !== false);
+        const list = (rows || []).filter((m) => m.activo !== false && deMisSedes(m));
         setMeds(list);
         const d = {};
         list.forEach((m) => { d[m.id] = m.metaMensual != null ? String(m.metaMensual) : ""; });

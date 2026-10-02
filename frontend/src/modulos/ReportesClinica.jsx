@@ -38,13 +38,16 @@ const REPORTES = [
   { id: "caja", label: "Ingresos y egresos", icon: Wallet2, sub: "Lo cobrado por medio de pago, los egresos y el neto" },
 ];
 
-export default function ReportesClinica() {
+export default function ReportesClinica({ pacientes: pacProp = null, citas: citasProp = null, sedes = null }) {
   const db = useContext(DatosDemoCtx) || {};
   const [rep, setRep] = useState("procedimientos");
   const [per, setPer] = useState("mes");
   const r = rango(per);
   const hoy = M.hoyISO();
-  const fichas = db.fichas || {}, pacientes = db.pacientes || [], citas = db.citas || [], egresos = db.egresos || [];
+  const pacientes = pacProp || db.pacientes || [], citas = citasProp || db.citas || [];
+  // Solo las fichas de los pacientes visibles y los egresos de las sedes del usuario.
+  const fichas = Object.fromEntries(Object.entries(db.fichas || {}).filter(([pid]) => pacientes.some((p) => String(p.id) === String(pid))));
+  const egresos = (db.egresos || []).filter((e) => !sedes || e.sede == null || sedes.map(String).includes(String(e.sede)));
   const nomP = (id) => (pacientes.find((p) => String(p.id) === String(id)) || {}).nombre || `Paciente ${id}`;
   const usaPeriodo = rep !== "saldo" && rep !== "recuperar";
 

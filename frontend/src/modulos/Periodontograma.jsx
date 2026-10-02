@@ -442,7 +442,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
             {soloLectura ? "Solo lectura" : !conectado ? "Demostración" : guardado?.tipo === "guardando" ? "Guardando…" : guardado?.tipo === "error" ? "Sin guardar" : guardado?.hora ? `Guardado ${guardado.hora}` : "Al día"}
           </span>
           <div className="pgc-docs">
-            <button type="button" className="pgc-docbtn" onClick={abrirProforma} disabled={!m.sitios} title={m.sitios ? "Tratamiento sugerido por el sondaje, para pasarlo al presupuesto del paciente" : "Registra el sondaje primero"}><FileText size={15} strokeWidth={2} /> Tratamiento sugerido</button>
+            {!soloLectura && <button type="button" className="pgc-docbtn" onClick={abrirProforma} disabled={!m.sitios} title={m.sitios ? "Tratamiento sugerido por el sondaje, para pasarlo al presupuesto del paciente" : "Registra el sondaje primero"}><FileText size={15} strokeWidth={2} /> Tratamiento sugerido</button>}
             <button type="button" className="pgc-docbtn is-sec" onClick={informe} disabled={!m.sitios} title="Informe periodontal en PDF"><Printer size={15} strokeWidth={2} /> Informe</button>
           </div>
           {!soloLectura && <>

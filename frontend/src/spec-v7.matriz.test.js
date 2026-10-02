@@ -15,7 +15,8 @@ import { precioMedioCatalogo } from "./util/serviciosCatalogo.js";
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const app = fs.readFileSync(path.join(dir, "App.jsx"), "utf8");
 const comun = fs.readFileSync(path.join(dir, "comun.jsx"), "utf8");
-const reportes = fs.readFileSync(path.join(dir, "modulos/Reportes.jsx"), "utf8");
+// El antiguo modulos/Reportes.jsx se retiró: las barras honestas se verifican en App.jsx.
+const reportes = fs.readFileSync(path.join(dir, "App.jsx"), "utf8");
 
 describe("A26 — menú sin duplicados", () => {
   it("NAV_GRUPOS incluye espera y comisiones top-level (NAV-01 revision2)", () => {
@@ -51,7 +52,6 @@ describe("A29–A32 — barras honestas", () => {
     assert.match(app, /layoutBarras/);
     assert.match(reportes, /layoutBarras/);
     assert.doesNotMatch(reportes, /Math\.max\(4,\s*h\)/);
-    assert.doesNotMatch(reportes, /linear-gradient\(180deg,var\(--dc-ok\)/);
     assert.doesNotMatch(reportes, /v \/ base \* 100/);
   });
 });

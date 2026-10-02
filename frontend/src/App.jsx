@@ -14,11 +14,12 @@ const WhatsAppInbox = React.lazy(() => import("./modulos/WhatsAppInbox"));
 const PanelGerencial = React.lazy(() => import("./modulos/PanelGerencial"));
 const Metas = React.lazy(() => import("./modulos/Metas"));
 const ReportesClinica = React.lazy(() => import("./modulos/ReportesClinica"));
+import OdontogramaFotos from "./modulos/OdontogramaFotos";
 const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
-import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, desgloseIgv, conIgv } from "./compartido/catalogo";
+import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
 import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
@@ -510,7 +511,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   // M-05: «Cobrado hoy» es lo mismo que la cabecera de Caja (pagos de hoy), no la
   // producción de las citas atendidas. El médico ve su producción.
   const ingresos = esMed ? produccionDia : !conectado
-    ? M.cobradoEnFecha(dbDash?.fichas || {}, { fecha: hoyIso, sede: sedeActiva }).total
+    ? M.cobradoEnFecha(Object.fromEntries(Object.entries(dbDash?.fichas || {}).filter(([pid]) => pacientes.some((p) => String(p.id) === String(pid)))), { fecha: hoyIso, sede: sedeActiva }).total
     : (pagosHistFalló ? null : (pagosHist == null ? null : cobradoHoyCaja));
   const cobrosHoyRows = !esMed && conectado && pagosHistOk
     ? pagosSede.filter((p) => (p.fecha || "").toString().slice(0, 10) === hoyIso)
@@ -628,10 +629,12 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   const deudores = conectado
     ? ((cajaDeuda && cajaDeuda.porCobrar) || []).filter((r) => Number(r.saldo) > 0).map((r) => ({ n: r.paciente || "—", v: Number(r.saldo) || 0 }))
     : carteraDemo.conVencido.map((f) => ({ n: f.p.nombre, v: f.vencido }));
-  const liqs = conectado ? [] : (dbDash?.liquidaciones || []);
+  // Solo lo de los pacientes visibles (sus sedes): el admin de sede no ve avisos de otra sede.
+  const deVisible = (pid, nom) => pacientes.some((p) => String(p.id) === String(pid) || (nom && p.nombre === nom));
+  const liqs = conectado ? [] : (dbDash?.liquidaciones || []).filter((l) => deVisible(l.pid));
   const liqObs = liqs.filter((l) => l.estado === "observado"), liqBorr = liqs.filter((l) => l.estado === "borrador");
-  const labAtr = conectado ? [] : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso));
-  const docsPend = conectado ? [] : (dbDash?.documentos || []).filter((d) => d.estado === "pendiente" || d.estado === "enviado");
+  const labAtr = conectado ? [] : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso) && deVisible(c.pacienteId, c.paciente));
+  const docsPend = conectado ? [] : (dbDash?.documentos || []).filter((d) => (d.estado === "pendiente" || d.estado === "enviado") && deVisible(d.pacienteId));
   const nomPac = (id) => (pacientesAll.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
   const verCaja = esAdmin || esGer || esAdmSede;
   const nombres = (arr, k = "paciente") => arr.slice(0, 3).map((x) => x[k]).join(", ") + (arr.length > 3 ? ` y ${arr.length - 3} más` : "");
@@ -2048,7 +2051,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // cuenta y Archivos son los mismos componentes que antes eran módulos sueltos, con el
   // paciente fijo: un solo estado por paciente (ODO-01, FIC-03, FIC-05).
   const slotsFicha = {
-    odontograma: (pid) => <Odontograma key={`odo-${pid}`} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeActiva={sedeActiva} />,
+    // Historia clínica: fotos de cada fase (solo lectura); se trabaja en el módulo Odontograma.
+    odontograma: (pid) => <OdontogramaFotos key={`odof-${pid}`} pacienteId={pid} ficha={fichas[pid]} onAbrir={() => window.dispatchEvent(new CustomEvent("dc-ir", { detail: { vista: "odontograma", pacienteId: pid } }))} />,
     plan: (pid) => <Tratamientos key={`plan-${pid}`} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
     archivos: (pid, sub) => <ArchivosPaciente key={`arch-${pid}`} pid={pid} sub={sub} pacientes={pacientes} notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} onIrLaboratorio={() => onIr("laboratorio")} />,
   };
@@ -5012,10 +5016,12 @@ function MiProduccion({ usuario, citas }) {
     if (conectado) api.miProduccion().then(setReal).catch(() => setReal({ fallo: true }));
   }, []); // eslint-disable-line
 
-  const miId = 1; // demo: doctor logueado = Dra. Mendoza
-  const misCitas = citas.filter((c) => c.medicoId === miId);
-  const precio = (c) => ESPECIALIDADES.find((x) => x.id === c.esp)?.precio || 100;
+  // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1).
   const miMed = MEDICOS.find((m) => m.nombre === usuario.nombre) || MEDICOS[0];
+  const miId = miMed.id;
+  const misCitas = citas.filter((c) => String(c.medicoId) === String(miId));
+  // Precio del catálogo de servicios en la sede de la cita (mismo que cobra Caja).
+  const precio = (c) => precioCita(leerCatalogo(), c.esp, c.sede) ?? (ESPECIALIDADES.find((x) => x.id === c.esp)?.precio || 100);
   // La meta la fija gerencia (endpoint /medicos/{id}/meta). Conectado se lee de ahi;
   // si nadie la fijo llega null y la tarjeta lo dice, en vez del 12000 que habia aqui.
   const meta = real && real.esMedico ? (Number(real.meta) || null) : (miMed.meta || null);
@@ -6945,7 +6951,8 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
   // Laboratorio) y el Inicio: una sola lista en el contexto de datos.
   const dbLab = useContext(DatosDemoCtx);
   const [casosRem, setCasosRem] = useState([]);
-  const casos = conectado ? casosRem : (dbLab?.labCasos || []);
+  // Solo los casos de los pacientes que ve el usuario (sus sedes).
+  const casos = conectado ? casosRem : (dbLab?.labCasos || []).filter((c) => !pacientes.length || pacientes.some((p) => String(p.id) === String(c.pacienteId) || p.nombre === c.paciente));
   const setCasos = conectado ? setCasosRem : (dbLab?.setLabCasos || (() => {}));
   const [filtroLab, setFiltroLab] = useState("todos");
   const bE = { enviado: "solicitado", en_proceso: "en_proceso", recibido: "listo", entregado: "entregado" };
@@ -7350,7 +7357,7 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
   // Liquidaciones ligadas al paciente por ID; el total sale del cargo real de su ficha (plan).
   // SEG-01: una sola lista de liquidaciones (contexto) que también lee el Inicio.
   const dbSeg = useContext(DatosDemoCtx);
-  const liq = dbSeg?.liquidaciones || [];
+  const liq = (dbSeg?.liquidaciones || []).filter((l) => !pacientes.length || pacientes.some((p) => String(p.id) === String(l.pid)));
   const setLiq = dbSeg?.setLiquidaciones || (() => {});
   const mapEstadoSeg = (be) => ({ por_enviar: "borrador", enviado: "enviado", en_revision: "aprobado", pagado: "pagado", observado: "observado" }[be] || "enviado");
   const [remoto, setRemoto] = useState(null);
@@ -8406,11 +8413,13 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [crearMenu]); // eslint-disable-line react-hooks/exhaustive-deps
   const hayQueCrear = ACCIONES_CREAR.some(([, , , t]) => mods.includes(t) && can(t, "crear"));
-  // Si el módulo abierto deja de estar permitido (rol/permiso o plan), redirige al primero disponible.
+  // Si el rol no tiene el módulo, redirige al primero disponible. Si solo lo bloquea el
+  // plan, se queda y muestra el aviso «disponible en el plan X» (antes saltaba a otra
+  // pantalla, p. ej. Permisos por rol llevaba al Panel gerencial).
   useEffect(() => {
     if (!mods.length) return;
     const mod = modDeVista(vista);
-    if (!mods.includes(mod) || !modAllowed(mod)) {
+    if (!mods.includes(mod)) {
       const dest = mods.find((m) => modAllowed(m)) || mods[0];
       if (dest) setVista(dest);
     }
@@ -8475,6 +8484,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Filtrado por sede: "all" = todas las sedes del usuario; si no, la sede activa.
   const cf = useMemo(() => { const ids = sede === "all" ? misSedes : [sede]; return citas.filter((c) => ids.includes(c.sede)); }, [citas, sede]);
   const pf = useMemo(() => { const ids = sede === "all" ? misSedes : [sede]; return pacientes.filter((p) => sedesDe(p).some((s) => ids.includes(s))); }, [pacientes, sede]);
+  // Sedes que mira el usuario ahora (todas las suyas o la elegida arriba): filtra reportes y catálogos.
+  const idsSede = useMemo(() => (sede === "all" ? misSedes : [sede]), [sede, misSedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Geolocalización: detecta la sede más cercana y la propone como "sede activa" para
   // registrar (cita, examen, tratamiento). Siempre editable: el usuario puede estar
@@ -8634,12 +8645,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "gerencial": return <Gerencial citas={cf} sede={sede} />;
       // Reportes (spec §3): una página con pestañas. Metas y comisiones se editan en
       // Configuración › Doctores; aquí solo se ve el avance (NAV-07).
-      case "metas": return <React.Suspense fallback={null}><Metas notify={notify} can={can} /></React.Suspense>;
+      case "metas": return <React.Suspense fallback={null}><Metas notify={notify} can={can} sedes={idsSede} /></React.Suspense>;
       // Cada reporte es su propia entrada del menú (grupo Reportes, junto al Panel gerencial).
-      case "reportes": case "comisiones": return <Reportes key="produccion" citas={cf} can={can} />;
-      case "reportes_aus": return <Reportes key="ausencias" citas={cf} can={can} tab="ausencias" />;
-      case "reportes_ocs": return <React.Suspense fallback={null}><OcupacionSillones /></React.Suspense>;
-      case "reportes_mas": return <React.Suspense fallback={null}><ReportesClinica /></React.Suspense>;
+      case "reportes": case "comisiones": return <Reportes key="produccion" citas={cf} can={can} sedes={idsSede} />;
+      case "reportes_aus": return <Reportes key="ausencias" citas={cf} can={can} tab="ausencias" sedes={idsSede} />;
+      case "reportes_ocs": return <React.Suspense fallback={null}><OcupacionSillones sedes={idsSede} /></React.Suspense>;
+      case "reportes_mas": return <React.Suspense fallback={null}><ReportesClinica pacientes={pf} citas={cf} sedes={idsSede} /></React.Suspense>;
       // Un solo catálogo de servicios (NAV-06): Operación › Servicios y precios.
       case "servicios": return <Servicios notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
@@ -8699,7 +8710,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "caja": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "miproduccion": return <MiProduccion usuario={usuario} citas={citas} />;
       case "integraciones": return <Integraciones notify={notify} />;
-      case "config": return <Configuracion notify={notify} rol={rol} can={can} />;
+      case "config": return <Configuracion notify={notify} rol={rol} can={can} misSedes={misSedes} />;
       // Usuarios y permisos (NAV-08): usuarios, permisos por rol y auditoría en pestañas.
       case "usuarios": case "permisos": case "auditoria": {
         const opc = [{ id: "usuarios", label: "Usuarios", icon: UserCog }, mods.includes("permisos") && { id: "permisos", label: "Permisos por rol", icon: Shield, locked: !modAllowed("permisos") }, mods.includes("auditoria") && { id: "auditoria", label: "Auditoría y accesos", icon: ShieldCheck, locked: !modAllowed("auditoria") }].filter(Boolean);

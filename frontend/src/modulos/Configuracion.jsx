@@ -43,9 +43,9 @@ function OnboardingWizard({ onClose, onDone = () => {}, notify = () => {} }) {
   const [busy, setBusy] = useState(false);
   const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", color: NAVY, boxSizing: "border-box", background: "var(--dc-white)" };
   const cargar = () => {
-    api.sedes.listar().then((r) => setSedes(r || [])).catch(() => {});
+    api.sedes.listar().then((r) => setSedes((r || []).filter((x) => sedeVisible(x.id)))).catch(() => {});
     api.catalogo.especialidades().then((r) => setEsps(r || [])).catch(() => {});
-    api.catalogo.medicos().then((r) => setMeds(r || [])).catch(() => {});
+    api.catalogo.medicos().then((r) => setMeds((r || []).filter(medVisible))).catch(() => {});
   };
   useEffect(() => { cargar(); }, []); // eslint-disable-line
   useEffect(() => { if (medHor) api.disponibilidad.listar(medHor).then((r) => setDisp(r || [])).catch(() => setDisp([])); else setDisp([]); }, [medHor]);
@@ -180,7 +180,11 @@ function WizList({ items, icon, vacio }) {
   );
 }
 
-function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "puesta" }) {
+function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "puesta", misSedes = null }) {
+  // Administrador de sede: solo ve y configura sus sedes (sus sillones, doctores y horarios).
+  const limitarSede = rol === "admin_sede" && Array.isArray(misSedes) && misSedes.length > 0;
+  const sedeVisible = (id) => !limitarSede || misSedes.map(String).includes(String(id));
+  const medVisible = (m) => !limitarSede || !(m.sedes || m.sede != null) || (m.sedes || [m.sede]).some(sedeVisible);
   const conectado = !!auth.token;
   const fiscalReadOnly = rol === "admin_sede" || (can ? !can("config", "editar") : false);
   const [tab, setTab] = useState(seccionInicial);
@@ -194,7 +198,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   // para que la agenda y el modal de agendado usen exactamente lo que se configura aquí.
   const demoDb = useContext(DatosDemoCtx);
   const [silRemoto, setSilRemoto] = useState([]);
-  const sillones = conectado ? silRemoto : (demoDb?.sillones || SILLONES_DEMO).map(normSillon);
+  const sillones = (conectado ? silRemoto : (demoDb?.sillones || SILLONES_DEMO).map(normSillon)).filter((x) => sedeVisible(x.sede ?? x.sedeId));
   const [citasHoySil, setCitasHoySil] = useState([]);
   useEffect(() => { if (conectado && tab === "sillones") api.citas.listar(fmt(new Date())).then((r) => setCitasHoySil(r || [])).catch(() => setCitasHoySil([])); }, [tab]); // eslint-disable-line
   const cargarSillones = () => { if (conectado) api.sillones.listar().then((r) => setSilRemoto((r || []).map(normSillon))).catch(() => setSilRemoto([])); };
@@ -289,15 +293,15 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   const delBilletera = (i) => setClinica((c) => ({ ...c, billeteras: c.billeteras.filter((_, j) => j !== i) }));
   const cargar = () => {
     if (!conectado) {
-      setSedes(SEDES.map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "" }; }));
+      setSedes(SEDES.filter((s) => sedeVisible(s.id)).map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "" }; }));
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, precioBase: e.precio })));
-      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: true, porcentajeComision: m.comision ?? null, metaMensual: m.meta })));
+      setMeds(MEDICOS.filter(medVisible).map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: true, porcentajeComision: m.comision ?? null, metaMensual: m.meta })));
       setGoLive({
         listoParaOperar: true, total: 4, completados: 4, obligatoriosPendientes: 0,
         items: [
-          { clave: "sedes", titulo: "Sedes", ok: true, obligatorio: true, detalle: `${SEDES.length} sede(s) de demostración` },
+          { clave: "sedes", titulo: "Sedes", ok: true, obligatorio: true, detalle: `${SEDES.filter((x) => sedeVisible(x.id)).length} sede(s) de demostración` },
           { clave: "servicios", titulo: "Servicios", ok: true, obligatorio: true, detalle: `${ESPECIALIDADES.length} servicio(s) de demostración` },
-          { clave: "doctores", titulo: "Doctores", ok: true, obligatorio: true, detalle: `${MEDICOS.length} odontólogo(s) de demostración` },
+          { clave: "doctores", titulo: "Doctores", ok: true, obligatorio: true, detalle: `${MEDICOS.filter(medVisible).length} odontólogo(s) de demostración` },
           { clave: "horario", titulo: "Horarios", ok: true, obligatorio: false, detalle: "Horario de demostración" },
         ],
       });
@@ -529,7 +533,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
           </section>
 
           <section className="dc-cfg__panel">
-            {cab("Sedes", "Cada sede tiene su propia dirección, teléfono, caja y agenda.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
+            {cab("Sedes", "Cada sede tiene su propia dirección, teléfono, caja y agenda.", !limitarSede && <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
             <div className="dc-emp__sedes">
               {sedes.map((sd, k) => (
                 <button key={sd.id} type="button" className="dc-emp__sede" style={{ "--c": SEDE_COL[k % SEDE_COL.length] }} onClick={() => setEdit({ tipo: "sede", item: { ...sd } })}>
@@ -538,7 +542,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                   <i className="dc-cfg__edit"><Pencil size={13} strokeWidth={2} /></i>
                 </button>
               ))}
-              <button type="button" className="dc-emp__sede is-nueva" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={18} strokeWidth={2.2} /><b>Agregar otra sede</b></button>
+              {!limitarSede && <button type="button" className="dc-emp__sede is-nueva" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={18} strokeWidth={2.2} /><b>Agregar otra sede</b></button>}
             </div>
           </section>
 
@@ -719,7 +723,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
 
       {tab === "sedes" && (
         <section className="dc-cfg__panel">
-          {cab("Sedes", "Locales de atención de la clínica.", <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
+          {cab("Sedes", "Locales de atención de la clínica.", !limitarSede && <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
           {sedes.length === 0 ? <p className="dc-cfg__nada">Sin sedes aún.</p> : (
             <div className="dc-cfg__docs">
               {sedes.map((sd, k) => { const col = ["#0E9199", "#D97706", "#6D4FD1", "#2F6FDE"][k % 4]; return (

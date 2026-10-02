@@ -14,7 +14,8 @@ const app = readFileSync(join(root, "App.jsx"), "utf8");
 const comun = readFileSync(join(root, "comun.jsx"), "utf8");
 const uiCss = readFileSync(join(root, "ui/ui.css"), "utf8");
 const kpi = readFileSync(join(root, "ui/TarjetaKPI.jsx"), "utf8");
-const reportes = readFileSync(join(root, "modulos/Reportes.jsx"), "utf8");
+// Reportes.jsx y Comisiones.jsx se retiraron (código muerto): Producción y comisiones vive en ProduccionComisiones.jsx.
+const reportes = readFileSync(join(root, "modulos/ProduccionComisiones.jsx"), "utf8");
 
 describe("SPEC v8 A23 jerarquía", () => {
   // Un solo h1 por pantalla: el nombre del módulo en la cabecera de la app.
@@ -30,7 +31,7 @@ describe("SPEC v8 A23 jerarquía", () => {
     // Caja abre con su cabecera de color: estado, cifras del día y pasos del proceso
     // (el h1 sigue en la cabecera de la app).
     assert.match(app, /className="dc-cj4__franja"[\s\S]*?Cobrado hoy[\s\S]*?Por cobrar/);
-    assert.match(reportes, /titulo="Producción y comisiones"/);
+    assert.match(reportes, /Producción y comisi/);
   });
 });
 

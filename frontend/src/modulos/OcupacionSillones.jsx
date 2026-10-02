@@ -12,7 +12,7 @@ const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const INACTIVAS = ["cancelada", "no_show", "reprogramada", "cerrada_sistema"];
 const tono = (p) => p == null ? "is-na" : p === 0 ? "is-cero" : p >= 85 ? "is-full" : p >= 60 ? "is-alta" : p >= 30 ? "is-media" : "is-baja";
 
-export function useOcupacionSillones(off = 0) {
+export function useOcupacionSillones(off = 0, sedesVisibles = null) {
   const conectado = !!auth.token;
   const demoDb = useContext(DatosDemoCtx);
   const reglas = useReglasAgenda();
@@ -27,7 +27,7 @@ export function useOcupacionSillones(off = 0) {
   }, [conectado, dias]);
   const citas = conectado ? remotas : (demoDb?.citas || []);
   const hor = conectado ? horario : (demoDb?.horarioClinica || horario);
-  const sillones = (reglas.sillones || []).filter((s) => s.activo !== false);
+  const sillones = (reglas.sillones || []).filter((s) => s.activo !== false && (!sedesVisibles || sedesVisibles.map(String).includes(String(s.sede))));
 
   const datos = useMemo(() => {
     const capDia = (sede, fecha) => {
@@ -52,9 +52,9 @@ export function useOcupacionSillones(off = 0) {
   return { conectado, sillones, dias, datos };
 }
 
-export default function OcupacionSillones() {
+export default function OcupacionSillones({ sedes: sedesVer = null }) {
   const [off, setOff] = useState(0);
-  const { conectado, sillones, dias, datos } = useOcupacionSillones(off);
+  const { conectado, sillones, dias, datos } = useOcupacionSillones(off, sedesVer);
   const conPct = datos.filas.filter((f) => f.pct != null);
   const masLibre = [...conPct].sort((a, b) => a.pct - b.pct)[0];
   const diaLleno = [...datos.porDia].filter((d) => d.pct != null).sort((a, b) => b.pct - a.pct)[0];
@@ -149,8 +149,8 @@ export default function OcupacionSillones() {
 }
 
 /* Tarjeta compacta para el Panel gerencial: solo el dato y el enlace al detalle en la Agenda. */
-export function ResumenOcupacion({ onVer, variante }) {
-  const { sillones, datos } = useOcupacionSillones(0);
+export function ResumenOcupacion({ onVer, variante, sedes = null }) {
+  const { sillones, datos } = useOcupacionSillones(0, sedes);
   if (!sillones.length) return null;
   const libres = Math.round((datos.cap - datos.min) / 60);
   if (variante === "hoy") return (
