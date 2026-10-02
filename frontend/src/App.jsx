@@ -4314,7 +4314,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     // Ítems para la boleta: los tratamientos que se saldan (solo en cobro total).
     const sedePago = sedeCaja;
     const pac = pacDe(pago.pid);
-    const pagoNuevo = { fecha: fmt(hoy), sede: sedePago, monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null };
+    // Guarda el comprobante emitido (serie y número) para volver a mostrar el mismo, no el siguiente.
+    const pagoNuevo = { fecha: fmt(hoy), sede: sedePago, monto: cobrado, metodo: metodoLabel[met] || "Cobro", moneda: res?.moneda || "PEN", montoOriginal: res?.moneda === "USD" ? Number(res.montoOriginal) || null : null, ...(res?.comprobanteSerie ? { comprobanteSerie: res.comprobanteSerie, comprobanteNumero: res.comprobanteNumero } : {}) };
     if (pago.faseIds && !esParcial) {
       const ids = new Set(pago.faseIds);
       updFicha(pago.pid, (cur) => ({ ...cur, tratamiento: (cur.tratamiento || []).map((f) => (ids.has(f.id) ? { ...f, estado: "atendida", atendidaEn: f.atendidaEn || fmt(hoy) } : f)), pagos: [...(cur.pagos || []), { ...pagoNuevo, concepto: "Tratamiento terminado", items: pago.items }] }));
@@ -9759,7 +9760,9 @@ function BoletaView({ boleta, onClose }) {
   const ref = useRef(null);
   // Emisor fiscal (razón social y RUC) y datos del establecimiento que emite: la sede
   // activa. Mismos datos que el membrete del resto de documentos (util/membrete.js).
-  const DI = useDatosImpresion();
+  const DIactiva = useDatosImpresion();
+  // Dirección y teléfono de la sede que cobró (no de la sede activa del menú).
+  const DI = !auth.token && boleta.sede != null ? datosDemo(numSede(boleta.sede)) : DIactiva;
   const EMI = getEmisor(boleta.sede ?? null);
   const EMISOR = {
     ...EMI,
