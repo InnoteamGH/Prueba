@@ -152,7 +152,7 @@ export const accionesRol = (rol, mod) => {
     return ["ver", "crear", "editar"];
   }
   if (rol === "recepcion") {
-    if (mod === "facturacion") return ["ver", "crear"];      // cobros; sin egresos ni aprobar
+    if (mod === "facturacion") return ["ver", "crear"];      // abre caja, cobra y registra egresos; anular es de aprobar
     if (mod === "dashboard") return ["ver"];
     return ["ver", "crear", "editar"];
   }
