@@ -13,7 +13,7 @@ import { abrirDocumento, datosImpresion } from "./util/membrete";
 import { estadoInfo, ESTADOS } from "./compartido/estados.js";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import {AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2, Download, FileSpreadsheet, FileText} from "lucide-react";
+import {Printer, AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2, Download, FileSpreadsheet, FileText} from "lucide-react";
 
 export const NAVY = "var(--dc-navy)", RED = "var(--dc-red)", BG = "var(--dc-bg)", INK = "var(--dc-ink-alt)", TEAL = "var(--dc-teal)", WARM = "var(--dc-warn-700)";
 
@@ -1826,6 +1826,17 @@ export function EnCabecera({ children }) {
 // Menú "⋯" para las acciones secundarias de una fila: deja visible solo la acción
 // principal y evita filas con cuatro botones en línea.
 // opciones: [{ label, onClick, peligro }]
+/* Botón de imprimir / descargar PDF: el mismo en recetas, boleta, presupuesto, historia
+   clínica y odontograma. `solido` para la acción principal de una barra. */
+export function BotonPDF({ onClick, children = "Imprimir", solido = false, chico = false, title = "Abre el documento con membrete para imprimir o guardar como PDF", className = "", ...rest }) {
+  return (
+    <button type="button" onClick={onClick} title={title} className={`dc-btn-pdf${solido ? " is-solido" : ""}${chico ? " is-chico" : ""}${className ? ` ${className}` : ""}`} {...rest}>
+      <span className="dc-btn-pdf__ico" aria-hidden="true"><Printer size={chico ? 12 : 14} strokeWidth={2.1} /></span>
+      <span className="dc-btn-pdf__txt">{children}</span>
+      <em className="dc-btn-pdf__tag" aria-hidden="true">PDF</em>
+    </button>
+  );
+}
 export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
   // La lista va en position:fixed: dentro de una tabla con scroll horizontal una
   // lista absoluta quedaba recortada por el contenedor.

@@ -61,7 +61,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto } from "./compartido/presupuestoDoc";
 import { cruceAlergias } from "./compartido/alergias";
-import {SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {BotonPDF, SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -3155,10 +3155,10 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               {pacienteFijo && <span className="dc-odo-foto"><b>Foto del odontograma</b><small>Inicial, evolución y alta. Para marcar o presupuestar, ábrelo en su módulo.</small></span>}
               {pacienteFijo && <Btn small onClick={() => window.dispatchEvent(new CustomEvent("dc-ir", { detail: { vista: "odontograma", pacienteId } }))}><Smile size={14} strokeWidth={1.75} /> Abrir en Odontograma</Btn>}
               {vistaOdo === "anatomico" && pacienteId && <>
-                {!pacienteFijo && <Btn small onClick={imprimirPresupuestoOdo} title="Presupuesto del paciente (las mismas partidas y precios de Plan y cuenta)"><FileText size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
-                <Btn small kind="ghost" onClick={() => { anatomicoRef.current?.abrirDocumento?.("resumen"); }} title="Resumen clínico del odontograma"><Printer size={14} strokeWidth={1.75} /> Resumen de hallazgos</Btn>
+                {!pacienteFijo && <BotonPDF solido onClick={imprimirPresupuestoOdo} title="Presupuesto del paciente (las mismas partidas y precios de Plan y cuenta)">Presupuesto</BotonPDF>}
+                <BotonPDF onClick={() => { anatomicoRef.current?.abrirDocumento?.("resumen"); }} title="Resumen clínico del odontograma">Resumen de hallazgos</BotonPDF>
               </>}
-              {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Presupuesto del paciente para imprimir"><Printer size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
+              {vistaOdo !== "anatomico" && <BotonPDF onClick={abrirPlanInv} title="Presupuesto del paciente para imprimir">Presupuesto</BotonPDF>}
               <label className="dc-odo-bar__zoom" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: 999, padding: "4px 12px", marginLeft: "auto" }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>Zoom</span>
                 <input type="range" min="50" max="130" value={zoom} onChange={(e) => setZoom(Number(e.target.value))}
@@ -3612,7 +3612,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && <Btn small kind="ghost" onClick={() => { const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? [] : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)"><FileText size={15} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}<Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && <BotonPDF chico onClick={() => { const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? [] : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}<Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -6855,7 +6855,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                   {(r.items || []).map((it, k) => <li key={k}><span className="dc-rx2__rx">℞</span><div><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div></li>)}
                 </ul>
                 {r.indic && <p className="dc-rx2__indic"><Info size={13} strokeWidth={2} /> {r.indic}</p>}
-                <footer className="dc-rx2__pie"><button type="button" className="dc-mini-btn" onClick={() => imprimirReceta(r)}><Printer size={13} strokeWidth={2} /> Imprimir / PDF</button></footer>
+                <footer className="dc-rx2__pie"><BotonPDF chico onClick={() => imprimirReceta(r)}>Imprimir receta</BotonPDF></footer>
               </article>
             );
             if (vista === "lista") return (
@@ -10257,7 +10257,7 @@ function BoletaView({ boleta, onClose }) {
   const cell = { padding: "6px 8px", fontSize: 12, color: "var(--dc-ink-900)", borderBottom: "1px solid var(--dc-line)" };
   return (
     <Modal icon={<FileText size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={TIT} sub={`${serie}-${boleta.numero}`} onClose={onClose} maxW={480}
-      footer={<><Btn small kind="ghost" onClick={onClose}>Cerrar</Btn><Btn small onClick={imprimir}><Upload size={15} strokeWidth={1.75} /> Imprimir / PDF</Btn></>}>
+      footer={<><Btn small kind="ghost" onClick={onClose}>Cerrar</Btn><BotonPDF solido onClick={imprimir}>Imprimir boleta</BotonPDF></>}>
       <div ref={ref}>
         <div style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 18, background: "#fff", color: "var(--dc-ink-900)", fontFamily: "Arial, Helvetica, sans-serif" }}>
           <div style={{ textAlign: "center", borderBottom: "2px solid var(--dc-ink-900)", paddingBottom: 10, marginBottom: 10 }}>

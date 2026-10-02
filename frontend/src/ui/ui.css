@@ -1795,7 +1795,7 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .fm-top__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .fm-top__chips span { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
 .fm-top__chips span.is-ok { background: rgba(110,231,168,.2); color: #C8F7DD; }
-.fm .fm-top button:not([aria-label="Cerrar expediente"]) { background: #fff !important; color: var(--dc-brand-600) !important; border: 0 !important; border-radius: 999px !important; font-weight: 700 !important; font-size: 13px !important; padding: 8px 14px !important; box-shadow: 0 8px 18px -10px rgba(0,0,0,.45) !important; }
+.fm .fm-top button:not([aria-label="Cerrar expediente"]):not(.dc-btn-pdf) { background: #fff !important; color: var(--dc-brand-600) !important; border: 0 !important; border-radius: 999px !important; font-weight: 700 !important; font-size: 13px !important; padding: 8px 14px !important; box-shadow: 0 8px 18px -10px rgba(0,0,0,.45) !important; }
 .fm .fm-top button[aria-label="Cerrar expediente"] { width: 38px !important; height: 38px !important; min-width: 38px !important; min-height: 38px !important; border-radius: 999px !important; background: rgba(255,255,255,.14) !important; color: #fff !important; border: 0 !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
 .fm .fm-top button[aria-label="Cerrar expediente"] svg { color: #fff !important; }
 /* Alergia en la cabecera: coral sólido */
@@ -1891,7 +1891,7 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .fm-top__nom { color: var(--dc-ink-900) !important; font-size: 21px !important; }
 .fm-top__chips span { color: #1F4A52 !important; background: #fff !important; box-shadow: inset 0 0 0 1px #D6E8E8 !important; }
 .fm-top__chips span.is-ok { background: #E3F7EC !important; color: #15803D !important; box-shadow: inset 0 0 0 1px #BFE9D1 !important; }
-.fm .fm-top button:not([aria-label="Cerrar expediente"]) { background: linear-gradient(118deg, #0B6C78, #14A3A8) !important; color: #fff !important; }
+.fm .fm-top button:not([aria-label="Cerrar expediente"]):not(.dc-btn-pdf) { background: linear-gradient(118deg, #0B6C78, #14A3A8) !important; color: #fff !important; }
 .fm .fm-top button[aria-label="Cerrar expediente"] { background: #fff !important; color: var(--dc-ink-700) !important; box-shadow: inset 0 0 0 1px #D6E8E8 !important; }
 .fm .fm-top button[aria-label="Cerrar expediente"] svg { color: var(--dc-ink-700) !important; }
 /* Rail con fondo suave y activo en píldora clara con barra */
@@ -3210,7 +3210,7 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
   .fm .fm-top__chips { display: flex !important; margin-top: 6px; }
   .fm .fm-id__contacto { grid-column: 1 / -1; display: flex; gap: 8px; }
   .fm .fm-top > div:last-child { display: flex; flex-wrap: wrap; gap: 8px !important; }
-  .fm .fm-top > div:last-child > button:not([aria-label="Cerrar expediente"]) { flex: 1 1 auto; justify-content: center; padding: 8px 12px !important; font-size: 12px !important; }
+  .fm .fm-top > div:last-child > button:not([aria-label="Cerrar expediente"]):not(.dc-btn-pdf) { flex: 1 1 auto; justify-content: center; padding: 8px 12px !important; font-size: 12px !important; }
   .fm .fm-top button[aria-label="Cerrar expediente"] { position: absolute; top: 14px; right: 14px; }
   .fm .fm-reg__head { display: grid; grid-template-columns: 42px minmax(0, 1fr); }
   .fm .fm-reg__exp { grid-column: 1 / -1; justify-content: center; }
@@ -5485,3 +5485,23 @@ button, input, select, textarea { font-family: inherit; }
 .dc-ocs__nav--hero .is-otra { display: inline-grid; line-height: 1.1; padding: 4px 12px; height: auto; min-height: 30px; text-align: center; }
 .dc-ocs__nav--hero .is-otra small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }
 .dc-rx2__pie { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--dc-line); margin-top: 6px; }
+
+/* ── Botón Imprimir / PDF (BotonPDF) ── */
+.dc-btn-pdf { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 9px; height: 38px; padding: 0 8px 0 5px; border-radius: 999px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F2FAFA 100%); border: 1px solid rgba(14,145,153,.28); color: var(--dc-navy, #0F2A33);
+  font-size: 13px; font-weight: 600; letter-spacing: .01em; white-space: nowrap;
+  box-shadow: 0 1px 1px rgba(16,24,40,.04), 0 6px 14px -8px rgba(14,145,153,.45); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.dc-btn-pdf:hover { transform: translateY(-1px); border-color: rgba(14,145,153,.5); box-shadow: 0 2px 4px rgba(16,24,40,.06), 0 10px 22px -10px rgba(14,145,153,.6); }
+.dc-btn-pdf:active { transform: translateY(0); }
+.dc-btn-pdf:focus-visible { outline: 2px solid #0E9199; outline-offset: 2px; }
+.dc-btn-pdf__ico { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #14A7AF 0%, #0B6F75 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 6px -2px rgba(11,111,117,.6); }
+.dc-btn-pdf__tag { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 3px 7px; border-radius: 999px; color: #0B6F75; background: rgba(14,145,153,.12); }
+.dc-btn-pdf.is-solido { background: linear-gradient(135deg, #0F2A33 0%, #164651 100%); border-color: transparent; color: #fff; box-shadow: 0 8px 20px -10px rgba(15,42,51,.7); }
+.dc-btn-pdf.is-solido .dc-btn-pdf__ico { background: linear-gradient(135deg, #2CC5CC 0%, #0E9199 100%); }
+.dc-btn-pdf.is-solido .dc-btn-pdf__tag { color: #9FE7EA; background: rgba(255,255,255,.12); }
+.dc-btn-pdf.is-chico { height: 32px; gap: 7px; font-size: 12px; padding: 0 6px 0 4px; }
+.dc-btn-pdf.is-chico .dc-btn-pdf__ico { width: 24px; height: 24px; }
+.dc-btn-pdf.is-chico .dc-btn-pdf__tag { font-size: 9px; padding: 2px 6px; }
+@media (max-width: 560px) { .dc-btn-pdf__tag { display: none; } }
+@media print { .dc-btn-pdf { display: none !important; } }

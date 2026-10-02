@@ -4,7 +4,7 @@ import { estadoLabel } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -374,7 +374,7 @@ function Odontograma({ pacienteId, notify, onGenerado, fechaNacimiento, hallazgo
           <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
             {DENTICIONES_ODO.map(([k, l]) => <button key={k} onClick={() => setDenticion(k)} style={seg(denticionApi(denticion) === k)}>{l}</button>)}
           </div>
-          <button type="button" onClick={abrirPlanInv} title="Plan de inversión imprimible" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${NAVY}`, background: "var(--dc-white)", color: NAVY, fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Printer size={15} strokeWidth={1.75} /> Plan de inversión</button>
+          <BotonPDF onClick={abrirPlanInv} title="Plan de inversión imprimible">Plan de inversión</BotonPDF>
           {editable && <button onClick={generarPlan} title="Crea las fases del plan de tratamiento a partir de los hallazgos" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 13px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${TEAL}`, background: "var(--dc-white)", color: TEAL, fontSize: 13, fontWeight: 500, cursor: "pointer" }}><ClipboardList size={15} strokeWidth={1.75} /> Generar plan</button>}
         </div>
       </div>
@@ -776,7 +776,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
                   </div>
                 )}
               </div>
-              <button onClick={() => printReceta(r)} title="Imprimir" style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: `1.5px solid ${LINE}`, borderRadius: "var(--dc-r-sm)", padding: "6px 10px", cursor: "pointer", color: NAVY, fontSize: 12, fontWeight: 500 }}><Printer size={14} strokeWidth={1.75} /> Imprimir</button>
+              <BotonPDF chico onClick={() => printReceta(r)}>Imprimir</BotonPDF>
               {r.id && conectado && <button type="button" className="dc-icon-btn" aria-label="Eliminar" onClick={() => api.recetas.borrar(r.id).then(() => { notify("Receta eliminada."); onChange && onChange(); }).catch(() => notify("No se pudo eliminar."))} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: RED, display: "grid", placeItems: "center" }}><Trash2 size={16} strokeWidth={1.75} /></button>}
             </div>
           );
@@ -1611,7 +1611,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     );
     return (
       <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} titulo={`Atención del ${fmtFecha(a.fecha)}`} sub={[p.nombre, meds.map(rotuloMedico).join(", ")].filter(Boolean).join(" – ")} onClose={() => setAtVer(null)}
-        footer={<><button type="button" className="dc-btn dc-btn--secundario" onClick={() => setAtVer(null)}>Cerrar</button><button type="button" className="dc-btn fm-at__imp" onClick={() => imprimirAtencion(a)}><Printer size={14} strokeWidth={2} /> Imprimir atención</button></>}>
+        footer={<><button type="button" className="dc-btn dc-btn--secundario" onClick={() => setAtVer(null)}>Cerrar</button><BotonPDF solido onClick={() => imprimirAtencion(a)}>Imprimir atención</BotonPDF></>}>
         <div className="fm-at">
           <div className="fm-at__res">
             <div><small>Motivo / diagnóstico</small><b>{resumenAtencion(a)}</b></div>
@@ -1761,7 +1761,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {onAgendar && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
             {onCobrar && debe && rol !== "medico" && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
-            {puedeEscribirClinico && <button onClick={() => { anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }} style={btn("ghost")}><Printer size={15} strokeWidth={1.75} /> Imprimir HC</button>}
+            {puedeEscribirClinico && <BotonPDF onClick={() => { anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }}>Historia clínica</BotonPDF>}
             {pagina ? null : <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>}
           </div>
         </div>

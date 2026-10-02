@@ -1,3 +1,4 @@
+import { BotonPDF } from "../comun";
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import api, { auth } from "../api/client";
 import confDefault from "../util/planInversionConf.js";
@@ -232,13 +233,13 @@ export default function PlanInversionDocumento({
       <div className="plan-inv-scroll" ref={scrollRef} role="dialog" aria-label="Plan de inversión">
         <div className="plan-inv-toolbar plan-inv-no-print">
           {pacienteId && <button type="button" onClick={registrarPlan} style={btnGhost}>Registrar en API</button>}
-          <button type="button" onClick={() => {
+          <BotonPDF solido onClick={() => {
             if (mostrarOdo && !anexoLive) {
               setAviso("Falta el anexo del odontograma de este paciente. Ábrelo desde la vista Anatómico e inténtalo de nuevo.");
               return;
             }
             window.print();
-          }} style={btnPrimary}>Imprimir / PDF</button>
+}}>Imprimir plan</BotonPDF>
           <button type="button" onClick={onClose} style={btnGhost}>Cerrar</button>
         </div>
 
