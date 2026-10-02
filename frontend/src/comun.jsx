@@ -1591,15 +1591,15 @@ export function ThOrden({ st, k, children, className = "", a = "left" }) {
     </span>
   );
 }
-/* Barra de las listas: cuántos hay, un buscador y «Ordenar por». Reemplaza la fila de
+/* Barra de las listas: cuántos hay y un buscador. Reemplaza la fila de
    pastillas por columna, que repetía la tabla y no se entendía. En modo tabla el orden
    lo hacen los encabezados y aquí queda sólo el buscador. */
 export function FiltroCabecera({ st, total, filtradas, sub = "registros", className = "", extra = null, modoTabla = false, exportar = null }) {
-  const { cols, sortCol, sortDir, setSortCol, setSortDir, q, setQ } = st;
-  const ordenables = cols.filter((c) => !c.noSort && (c.sortVal || c.get));
+  const { cols, q, setQ } = st;
+  // Sin «Ordenar»: las tarjetas van siempre en orden alfabético (ListaFiltrable) y en la
+  // vista Tabla se ordena con los encabezados.
   const buscable = !modoTabla && total > 6 && cols.some((c) => !c.noFilter && c.get);
-  const verOrden = !modoTabla && ordenables.length > 0 && total > 3;
-  if (!buscable && !verOrden && !extra && !exportar) return null;
+  if (!buscable && !extra && !exportar) return null;
   return (
     <div className={`dc-fcab ${className}`}>
       <span className="dc-fcab__cant"><b>{filtradas}</b> {sub}{q.trim() ? ` de ${total}` : ""}</span>
@@ -1610,15 +1610,6 @@ export function FiltroCabecera({ st, total, filtradas, sub = "registros", classN
             onKeyDown={(e) => { if (e.key === "Escape" && q) { e.preventDefault(); setQ(""); } }} />
           {q && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setQ("")}><X size={13} strokeWidth={2.2} /></button>}
         </label>
-      )}
-      {verOrden && (
-        <div className="dc-fcab__orden">
-          <span>Ordenar</span>
-          <Select small width={170} ariaLabel="Ordenar por" value={sortCol || ""} onChange={(v) => setSortCol(v || null)}
-            options={[{ value: "", label: "Sin orden" }, ...ordenables.map((c) => ({ value: c.key, label: c.label }))]} />
-          {sortCol && <button type="button" className="dc-fcab__dir" onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")} aria-label={sortDir === "asc" ? "Ascendente" : "Descendente"} title={sortDir === "asc" ? "Ascendente" : "Descendente"}>
-            {sortDir === "asc" ? <ChevronUp size={14} strokeWidth={2.2} /> : <ChevronDown size={14} strokeWidth={2.2} />}</button>}
-        </div>
       )}
       {(extra || exportar) && <div className="dc-fcab__extra">{extra}{exportar && <BotonExportar {...exportar} sub={sub} />}</div>}
     </div>
@@ -1715,8 +1706,10 @@ export function TablaPremium({ cols, rows, onRowClick, minWidth = 640, st = null
   );
 }
 
-export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", tabla = null, modoTabla = false, exportTitulo = "", children }) {
-  const { lista, st } = useFiltroTabla(rows, cols, defaultSort);
+export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", extra = null, vistas = null, vistaClave = "", tabla = null, modoTabla = false, exportTitulo = "", alfabetico = true, children }) {
+  // Orden alfabético por el nombre (paciente, doctor, proveedor…) en tarjetas y tabla.
+  const colNombre = !alfabetico ? null : cols.find((c) => c.get && /paciente|nombre|doctor|m[eé]dico|odont[oó]logo|proveedor|insumo|servicio|t[ií]tulo/i.test(`${c.key} ${c.label || ""}`)) || null;
+  const { lista, st } = useFiltroTabla(rows, cols, colNombre ? { key: colNombre.key, dir: "asc" } : defaultSort);
   // Con `tabla` la lista ofrece también la vista Tabla, con el diseño común del portal.
   const opciones = tabla
     ? (() => { const base = (vistas || [{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]).filter((v) => v.id !== "tabla"); const t = { id: "tabla", label: "Tabla", icon: Table2 }; return tabla.primero ? [t, ...base] : [...base, t]; })()
@@ -1724,6 +1717,8 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
   const [vista, setVista] = useVista(vistaClave || "x", opciones || []);
   vistas = opciones;
   const enTabla = modoTabla || (tabla && vista === "tabla");
+  // Tarjetas: siempre alfabético (en la tabla, el encabezado puede reordenar).
+  const listaAlfa = useMemo(() => (enTabla || !colNombre ? lista : [...lista].sort((a, b) => String(colNombre.get(a) ?? "").localeCompare(String(colNombre.get(b) ?? ""), "es", { sensitivity: "base", numeric: true }))), [lista, enTabla, colNombre]);
   return (
     <div className={`dc-lf ${className}`}>
       <FiltroCabecera st={st} total={(rows || []).length} filtradas={lista.length} sub={sub} modoTabla={enTabla}
@@ -1733,7 +1728,7 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
         ? <Vacio icon={<Search size={22} strokeWidth={1.75} />} titulo="Sin resultados" sub="Nada coincide con la búsqueda." />
         : (tabla && vista === "tabla")
           ? <TablaPremium cols={tabla.cols} rows={lista} onRowClick={tabla.onRowClick} minWidth={tabla.minWidth} st={st} />
-          : children(lista, vista, st)}
+          : children(listaAlfa, vista, st)}
     </div>
   );
 }

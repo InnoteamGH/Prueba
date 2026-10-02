@@ -126,7 +126,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       {filasF.length === 0 ? (
         <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : filas.length ? "Ninguna cita con estos filtros" : "Sin citas en el rango"} sub={filas.length ? "Cambia el doctor o el estado." : "Cambia las fechas para ver otro periodo."} /></Card>
       ) : (
-        <ListaFiltrable rows={filasF} sub="citas" vistaClave="citas_consolidado"
+        <ListaFiltrable rows={filasF} sub="citas" vistaClave="citas_consolidado" alfabetico={false}
           exportTitulo={`Consolidado de citas${rol === "medico" && usuario?.nombre ? ` · ${usuario.nombre}` : ""}${docSel !== "todos" ? ` · ${docSel}` : ""}${estSel !== "todos" ? ` · ${{ programadas: "Programadas", atendidas: "Atendidas", no_show: "No asistió", canceladas: "Canceladas" }[estSel]}` : ""}${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`}
           vistas={[{ id: "dia", label: "Por día", icon: CalendarDays }]}
           tabla={{ primero: true, minWidth: 860, onRowClick: onAbrirCita, cols: [

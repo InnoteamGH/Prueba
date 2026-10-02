@@ -1074,7 +1074,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           { key: "estado", label: "Estado", get: (c) => EST_LABEL[estadoCita(c)] || c.estado || "" },
         ];
         return (
-        <ListaFiltrable rows={rows} cols={FCOLS} sub="citas" className="dc-agt__lf">{(lista) => { const dias = [];
+        <ListaFiltrable rows={rows} cols={FCOLS} sub="citas" className="dc-agt__lf" alfabetico={false}>{(lista) => { const dias = [];
         lista.forEach((c) => { const k = iso(c._d); let g = dias.find((x) => x.k === k); if (!g) { g = { k, d: c._d, items: [] }; dias.push(g); } g.items.push(c); });
         return (
         <div className="dc-agt">
