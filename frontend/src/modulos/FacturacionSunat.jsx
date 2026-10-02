@@ -183,7 +183,9 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
           ...(filtro === "atender" ? [{ key: "mensaje", label: "Qué dijo SUNAT", w: "minmax(220px,1.6fr)", a: "left", get: (c) => c.mensaje || "", cell: (c) => <span className="dc-fe__msg">{c.mensaje}</span> }] : []),
           { key: "acc", label: "", w: "116px", a: "right", noFilter: true, noSort: true, sticky: true, cell: (c) => (
             <span className="dc-fe__acc">
-              <button type="button" title="Ver comprobante" aria-label={`Ver ${c.id}`} onClick={(e) => { e.stopPropagation(); abrirBoleta({ ...(c.pago || {}), paciente: c.cliente, comprobanteSerie: c.serie, comprobanteNumero: c.numero, fecha: c.fecha, monto: Math.abs(c.total), moneda: c.moneda, concepto: c.concepto, metodo: c.metodo, tipo: c.tipo, docTipo: c.docTipo, docNum: c.docNum, refComprobante: c.ref }); }}><FileText size={14} strokeWidth={2} /></button>
+              {/* abrirBoleta recibe el cobro como en Caja: monto en soles y, si fue en dólares,
+                  montoOriginal (US$) y su TC; así la boleta es la misma que la del cobro. */}
+              <button type="button" title="Ver comprobante" aria-label={`Ver ${c.id}`} onClick={(e) => { e.stopPropagation(); abrirBoleta({ ...(c.pago || {}), paciente: c.cliente, comprobanteSerie: c.serie, comprobanteNumero: c.numero, fecha: c.fecha, ...(c.moneda === "USD" ? { monto: Number(c.pago?.monto) || null, montoOriginal: Math.abs(c.total), tipoCambio: c.tipoCambio ?? c.pago?.tipoCambio ?? null } : { monto: Math.abs(c.total) }), moneda: c.moneda, concepto: c.concepto, metodo: c.metodo, tipo: c.tipo, docTipo: c.docTipo, docNum: c.docNum, refComprobante: c.ref }); }}><FileText size={14} strokeWidth={2} /></button>
               {(c.estado === "rechazado" || c.estado === "observado" || c.estado === "pendiente")
                 ? puedeEmitir && <button type="button" title="Reenviar a SUNAT" aria-label={`Reenviar ${c.id}`} onClick={(e) => { e.stopPropagation(); reenviar(c); }}><RefreshCw size={14} strokeWidth={2} /></button>
                 : null}
