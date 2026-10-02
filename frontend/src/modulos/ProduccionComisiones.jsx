@@ -876,21 +876,33 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen" 
                 <div className="dc-kpi__sub">Sobre producción facturada</div>
               </div>
             </button>
-            <button type="button" className="dc-kpi" onClick={() => abrir({
-              t: "Odontólogos con producción",
-              s: "Quién facturó en el periodo",
-              cifra: `${odontoCon} de ${odontoTot}`,
-              cols: [["Odontólogo"], ["Producción", "n"]],
-              filas: porMedico.map((m) => [m.nombre, moneyFmt(m.produccion)]),
-              tono: "cian",
-            })}>
-              <span className="dc-kpi__icon" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">+</span>
-              <div className="dc-kpi__body">
-                <div className="dc-kpi__label">Odontólogos con producción</div>
-                <div className="dc-kpi__value">{odontoCon} de {odontoTot}</div>
-                <div className="dc-kpi__sub">{odontoTot - odontoCon > 0 ? `${odontoTot - odontoCon} sin actividad` : "Todos con actividad"}</div>
-              </div>
-            </button>
+            {/* Avance contra la meta de cada odontólogo (la meta se edita en Metas y comisiones). */}
+            {(() => {
+              const hoyD = new Date();
+              const ritmoM = (hoyD.getDate() / new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0).getDate()) * 100;
+              const conMeta = porMedico.map((m) => { const md = MEDICOS.find((x) => String(x.id) === String(m.id) || x.nombre === m.nombre); const meta = Number(m.meta ?? md?.meta) || 0; return { ...m, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
+              const alRitmo = conMeta.filter((m) => m.pct >= ritmoM).length;
+              const metaTot = conMeta.reduce((a, m) => a + m.meta, 0);
+              return (
+                <button type="button" className="dc-kpi" onClick={() => abrir({
+                  t: "Cumplimiento de metas",
+                  s: `Ritmo esperado a hoy: ${Math.round(ritmoM)}% de la meta`,
+                  cifra: `${alRitmo} de ${conMeta.length}`,
+                  como: "Producción del odontólogo ÷ su meta mensual. Está al ritmo si su avance es igual o mayor al porcentaje del mes que ya pasó.",
+                  cols: [["Odontólogo"], ["Producción", "n"], ["Meta", "n"], ["Avance", "n"]],
+                  filas: conMeta.map((m) => [m.nombre, moneyFmt(m.produccion), moneyFmt(m.meta), `${Math.round(m.pct)}%`]),
+                  vacio: "Sin metas definidas: se fijan en Metas y comisiones.",
+                  tono: "cian",
+                })}>
+                  <span className="dc-kpi__icon" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">◎</span>
+                  <div className="dc-kpi__body">
+                    <div className="dc-kpi__label">Al ritmo de su meta</div>
+                    <div className="dc-kpi__value">{alRitmo} de {conMeta.length}</div>
+                    <div className="dc-kpi__sub">{metaTot ? `${Math.round((totalProd / metaTot) * 100)}% de la meta del equipo` : "Sin metas definidas"}</div>
+                  </div>
+                </button>
+              );
+            })()}
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Pendiente de liquidar",
               s: "Comisión ganada − pagos al odontólogo",

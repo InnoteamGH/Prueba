@@ -816,9 +816,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado");
     const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha));
     const alertasDemo = [
-      cart.conVencido.length && { titulo: `${cart.conVencido.length} paciente(s) con saldo vencido`, detalle: cart.conVencido.map((f) => f.p.nombre).slice(0, 3).join(", "), monto: cart.vencido },
-      liqObs.length && { titulo: `${liqObs.length} liquidación(es) de seguro observada(s)`, detalle: liqObs.map((l) => `${l.aseg} (${nomP(l.pid)})`).join(", "), cantidad: liqObs.length },
-      labAtr.length && { titulo: `${labAtr.length} caso(s) de laboratorio atrasado(s)`, detalle: labAtr.map((c) => c.trabajo).join(", "), cantidad: labAtr.length },
+      cart.conVencido.length && { titulo: cart.conVencido.length === 1 ? "1 paciente con saldo vencido" : `${cart.conVencido.length} pacientes con saldo vencido`, detalle: cart.conVencido.map((f) => f.p.nombre).slice(0, 3).join(", "), monto: cart.vencido },
+      liqObs.length && { titulo: liqObs.length === 1 ? "1 liquidación de seguro observada" : `${liqObs.length} liquidaciones de seguro observadas`, detalle: liqObs.map((l) => `${l.aseg} (${nomP(l.pid)})`).join(", "), cantidad: liqObs.length },
+      labAtr.length && { titulo: labAtr.length === 1 ? "1 trabajo de laboratorio atrasado" : `${labAtr.length} trabajos de laboratorio atrasados`, detalle: labAtr.map((c) => c.trabajo).join(", "), cantidad: labAtr.length },
     ].filter(Boolean);
     setInd({
       deudaPorAntiguedad: { hasta30: aging[0], de31a60: aging[1], de61a90: aging[2], masDe90: aging[3] },
@@ -1023,62 +1023,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
           </button>
         </div>} />
 
-      <section className="dc-kpis" aria-label="Indicadores">
 
-        <div className="dc-kpi clic" role="button" tabIndex={0}
-          onClick={() => abrir({
-            t: "Producción del día",
-            s: "Trabajo facturado hoy",
-            cifra: moneyFmt(prodDia),
-            sub: "Producción no es cobro.",
-            como: "Misma lógica que la producción del mes, acotada a hoy.",
-            cols: [["Paciente"], ["Estado"]],
-            filas: citasHoy.filter((c) => c.estado === "atendida").map((c) => [c.paciente || c.pacienteNombre || "—", "Atendida"]),
-            vacio: "Aún no hay citas atendidas hoy.",
-            fuente: "Citas de hoy en estado atendida.",
-            tono: "ok",
-          })}>
-          <span className="dc-kpi__icon" style={{ background: "var(--dc-ok-100)", color: "var(--dc-ok-700)" }} aria-hidden="true">$</span>
-          <div className="dc-kpi__body">
-            <div className="dc-kpi__label">Producción del día</div>
-            <div className="dc-kpi__value">{moneyFmt(prodDia)}</div>
-            <div className="dc-kpi__sub">{citasHoy.filter((c) => c.estado === "atendida").length} facturadas – {pluralEs(citasHoy.length, "cita", "citas")} en agenda</div>
-          </div>
-        </div>
-
-        <div className="dc-kpi clic" role="button" tabIndex={0}
-          onClick={() => abrir({
-            t: "Pacientes atendidos hoy",
-            s: "Personas distintas, no citas",
-            cifra: String(atendidos),
-            sub: "Un paciente con dos citas el mismo día cuenta una sola vez.",
-            como: "Citas de hoy en estado atendida, contando pacientes distintos.",
-            cols: [["Paciente"], ["Citas"]],
-            filas: (() => {
-              const map = new Map();
-              citasHoy.filter((c) => c.estado === "atendida").forEach((c) => {
-                const k = String(c.pacienteId ?? c.paciente ?? "");
-                map.set(k, (map.get(k) || 0) + 1);
-              });
-              return [...map.entries()].map(([k, n]) => {
-                const c = citasHoy.find((x) => String(x.pacienteId ?? x.paciente) === k);
-                return [c?.paciente || c?.pacienteNombre || k, String(n)];
-              });
-            })(),
-            vacio: "Nadie atendido aún hoy.",
-            tono: "cian",
-          })}>
-          <span className="dc-kpi__icon" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">✓</span>
-          <div className="dc-kpi__body">
-            <div className="dc-kpi__label">Pacientes atendidos hoy</div>
-            <div className="dc-kpi__value">{atendidos}</div>
-            <div className="dc-kpi__sub">{pluralEs(citasHoy.length, "cita", "citas")} en agenda – {enSillon} en sillón</div>
-          </div>
-        </div>
-        <ResumenOcupacion onVer={() => { window.location.hash = "#/agenda_consolidado"; }} />
-      </section>
-
-      {/* Caja | Actividad */}
+      {/* Caja | Hoy en la clínica */}
       <div className="dc-grid g-2a">
         <section className="dc-card">
           <div className="dc-card__head">
@@ -1120,39 +1066,93 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
             Pasa el ratón para leer cualquier momento del día.</p>
         </section>
 
-        <section className="dc-card">
+        {/* Hoy en la clínica: lo del día que mira un gerente (producción, pacientes,
+            sillones y cómo va la agenda). Reemplaza al registro de eventos, que es
+            operativo y vive en Auditoría. */}
+        <section className="dc-card dc-hoy">
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
-            <h2>Actividad de hoy</h2>
-            <span className="dc-card__meta">{Array.isArray(actividad) ? `${actividad.length} eventos` : "—"}</span>
-            <button type="button" className="dc-info" aria-label="Detalle de actividad"
-              onClick={() => abrir({
-                t: "Actividad de hoy",
-                s: "Registro corrido del día",
-                cifra: String(actividad?.length ?? 0),
-                parte: "eventos",
-                sub: "Accesos, citas, cobros, stock, caja.",
-                como: "Se reúne lo que ya registra cada módulo en un solo listado del día.",
-                cols: [["Hora"], ["Tipo"], ["Detalle"]],
-                filas: (actividad || []).map((e) => [e.hora || "—", e.tipo || "—", e.detalle || e.actor || "—"]),
-                vacio: "Todavía no hay eventos registrados para hoy.",
-                falta: !actividad?.length ? "Si el listado sale vacío, el registro unificado aún no tiene movimientos para esta fecha." : undefined,
-                tono: "ok",
-              })}>i</button>
+            <h2>Hoy en la clínica</h2>
+            <span className="dc-card__meta">{pluralEs(citasHoy.length, "cita", "citas")} en agenda</span>
+            <button type="button" className="dc-hoy__ver" onClick={() => { window.location.hash = "#/agenda"; }}>Ver agenda</button>
           </div>
           <div className="dc-card__body">
-            <div className="log">
-              {!actividad?.length && (
-                <div className="dc-vacio-mod">Sin eventos aún hoy. Los cobros, citas y movimientos de caja aparecerán aquí.</div>
-              )}
-              {(actividad || []).map((e, i) => (
-                <div className="lg" key={i}>
-                  <span className="t">{e.hora || "—"}</span>
-                  <span className="k" style={{ color: "var(--dc-accent-cyan)" }}>{e.tipo || "Evento"}</span>
-                  <span className="d">{e.detalle || e.actor || "—"}</span>
-                </div>
-              ))}
+            <div className="dc-hoy__kpis">
+
+        <div className="dc-hoy__t" role="button" tabIndex={0}
+          onClick={() => abrir({
+            t: "Producción del día",
+            s: "Trabajo facturado hoy",
+            cifra: moneyFmt(prodDia),
+            sub: "Producción no es cobro.",
+            como: "Misma lógica que la producción del mes, acotada a hoy.",
+            cols: [["Paciente"], ["Estado"]],
+            filas: citasHoy.filter((c) => c.estado === "atendida").map((c) => [c.paciente || c.pacienteNombre || "—", "Atendida"]),
+            vacio: "Aún no hay citas atendidas hoy.",
+            fuente: "Citas de hoy en estado atendida.",
+            tono: "ok",
+          })}>
+          <span className="dc-hoy__ico" style={{ background: "var(--dc-ok-100)", color: "var(--dc-ok-700)" }} aria-hidden="true">$</span>
+          <div className="dc-hoy__tb">
+            <div className="dc-hoy__tl">Producción del día</div>
+            <div className="dc-hoy__tv">{moneyFmt(prodDia)}</div>
+            <div className="dc-hoy__ts">{citasHoy.filter((c) => c.estado === "atendida").length} de {pluralEs(citasHoy.length, "cita", "citas")} atendidas</div>
+          </div>
+        </div>
+
+        <div className="dc-hoy__t" role="button" tabIndex={0}
+          onClick={() => abrir({
+            t: "Pacientes atendidos hoy",
+            s: "Personas distintas, no citas",
+            cifra: String(atendidos),
+            sub: "Un paciente con dos citas el mismo día cuenta una sola vez.",
+            como: "Citas de hoy en estado atendida, contando pacientes distintos.",
+            cols: [["Paciente"], ["Citas"]],
+            filas: (() => {
+              const map = new Map();
+              citasHoy.filter((c) => c.estado === "atendida").forEach((c) => {
+                const k = String(c.pacienteId ?? c.paciente ?? "");
+                map.set(k, (map.get(k) || 0) + 1);
+              });
+              return [...map.entries()].map(([k, n]) => {
+                const c = citasHoy.find((x) => String(x.pacienteId ?? x.paciente) === k);
+                return [c?.paciente || c?.pacienteNombre || k, String(n)];
+              });
+            })(),
+            vacio: "Nadie atendido aún hoy.",
+            tono: "cian",
+          })}>
+          <span className="dc-hoy__ico" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">✓</span>
+          <div className="dc-hoy__tb">
+            <div className="dc-hoy__tl">Pacientes atendidos hoy</div>
+            <div className="dc-hoy__tv">{atendidos}</div>
+            <div className="dc-hoy__ts">{enSillon} en sillón ahora</div>
+          </div>
+        </div>
+        <ResumenOcupacion variante="hoy" onVer={() => { window.location.hash = "#/reportes_ocs"; }} />
             </div>
+            {(() => {
+              const est = [
+                ["Atendidas", citasHoy.filter((c) => c.estado === "atendida").length, "var(--dc-ok-700)"],
+                ["En sillón", enSillon, "var(--dc-accent-cyan)"],
+                ["Por atender", citasHoy.filter((c) => ["pendiente", "confirmada", "reprogramada"].includes(c.estado)).length, "#6D4FD1"],
+                ["No asistieron", citasHoy.filter((c) => c.estado === "no_show").length, "var(--dc-danger-700)"],
+                ["Canceladas", citasHoy.filter((c) => c.estado === "cancelada").length, "var(--dc-warn-600)"],
+              ];
+              const tot = citasHoy.length || 1;
+              return (
+                <div className="dc-hoy__est">
+                  <p className="dc-rotulo">Cómo va la agenda de hoy</p>
+                  {est.map(([l, n, col]) => (
+                    <div key={l} className={`dc-hoy__fila${n ? "" : " is-cero"}`}>
+                      <span>{l}</span>
+                      <i><u style={{ width: `${(n / tot) * 100}%`, background: col }} /></i>
+                      <b>{n}</b>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </section>
       </div>
@@ -1183,7 +1183,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
               {alertas.map((a, i) => {
                 const riesgo = /vencid|caja|cerrar|saldo/i.test(String(a.titulo || a.tipo || ""));
                 return (
-                  <div className="dc-accion" key={i} role="button" tabIndex={0}
+                  <div className="dc-pgacc" key={i} role="button" tabIndex={0}
                     onClick={() => abrir({
                       t: a.titulo || a.tipo || "Asunto",
                       s: a.detalle || a.mensaje || "",
@@ -1195,7 +1195,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
                       tono: riesgo ? "riesgo" : "aviso",
                     })}>
                     <span className="rail" style={{ background: riesgo ? "var(--dc-danger-700)" : "var(--dc-warn-600)" }} />
-                    <div className="dc-accion__txt">
+                    <div className="dc-pgacc__txt">
                       <h3>{a.titulo || a.tipo || "Asunto"}</h3>
                       <p>{a.detalle || a.mensaje || ""}</p>
                     </div>
@@ -1239,7 +1239,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
       </section>
 
       {/* Especialidad | Planes */}
-      <div className="dc-grid g-2b g-alto-libre">
+      <div className="dc-grid g-2b">
         <section className="dc-card">
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g2)" }} />
@@ -1299,6 +1299,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
               })}>i</button>
           </div>
           <div className="dc-card__body">
+            <div className="dc-acep">
+              <div><b>{propuesto ? Math.round((aceptado / propuesto) * 100) : 0}%</b><span>de lo propuesto ya fue aceptado</span></div>
+              <div><b>{moneyFmt(pendiente)}</b><span>esperan respuesta: llamar para cerrar</span></div>
+            </div>
             <p className="dc-rotulo">Reparto de lo propuesto – 100% = {moneyFmt(propuesto)}</p>
             <StackSegs
               items={[
@@ -1363,7 +1367,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
               (más vendido / menos vendido) solo.
             </div>
           ) : (
-            <div className="dc-split" style={{ gridTemplateColumns: "1fr 380px" }}>
+            <div className="dc-split dc-split--trat" style={{ gridTemplateColumns: "minmax(0, 1.15fr) minmax(0, 1fr)" }}>
               <div className="dc-barras">
                 {tratSorted.map((t, i) => (
                   <BarraFila key={t.servicioId || t.nombre || i}

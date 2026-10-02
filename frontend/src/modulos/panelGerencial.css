@@ -205,17 +205,16 @@
   text-align:right;white-space:nowrap}
 .dc-pg .dc-leyenda .fila.cero .nm, .dc-pg .dc-leyenda .fila.cero .im, .dc-pg .dc-leyenda .fila.cero .pc{color:var(--dc-ink-400)}
 /* ── avisos accionables, compactos ── */
-.dc-pg .dc-accion{display:flex;gap:var(--dc-sp-3);align-items:center;padding:10px 0;
+.dc-pg .dc-pgacc{display:flex;gap:var(--dc-sp-3);align-items:center;padding:12px 10px;border-radius:10px;cursor:pointer;
   border-bottom:1px solid var(--dc-line);transition:background .16s}
-.dc-pg .dc-accion:first-child{padding-top:0}
-.dc-pg .dc-accion:last-child{border-bottom:none;padding-bottom:0}
-.dc-pg .dc-accion:hover{background:var(--dc-bg-alt)}
+.dc-pg .dc-pgacc:last-child{border-bottom:none}
+.dc-pg .dc-pgacc:hover{background:var(--dc-bg-alt)}
 .dc-pg .rail{width:3px;align-self:stretch;border-radius:2px;flex:none;min-height:32px}
-.dc-pg .dc-accion__txt{min-width:0;flex:1;max-width:78%}
-.dc-pg .dc-accion h3{font-size:var(--dc-fs-sm);line-height:var(--dc-lh-sm);font-weight:var(--dc-fw-semibold);
+.dc-pg .dc-pgacc__txt{min-width:0;flex:1;max-width:78%}
+.dc-pg .dc-pgacc h3{font-size:var(--dc-fs-sm);line-height:var(--dc-lh-sm);font-weight:var(--dc-fw-semibold);
   font-family:var(--dc-font)}
-.dc-pg .dc-accion p{margin:2px 0 0;font-size:var(--dc-fs-xs);line-height:var(--dc-lh-xs);color:var(--dc-ink-500)}
-.dc-pg .dc-accion .dc-chip{min-width:74px;justify-content:center}
+.dc-pg .dc-pgacc p{margin:2px 0 0;font-size:var(--dc-fs-xs);line-height:var(--dc-lh-xs);color:var(--dc-ink-500)}
+.dc-pg .dc-pgacc .dc-chip{min-width:74px;justify-content:center}
 /* ── registro en vivo ── */
 .dc-pg .log{font-size:var(--dc-fs-sm);height:264px;overflow:hidden;position:relative}
 .dc-pg .lg{display:grid;grid-template-columns:46px 90px 1fr;gap:var(--dc-sp-3);padding:7px 0;
@@ -438,7 +437,7 @@
 /* lo que se puede pulsar lo dice al pasar por encima */
 .dc-pg .clic{cursor:pointer}
 .dc-pg .hb.clic:hover, .dc-pg .dc-leyenda .fila.clic:hover{background:var(--dc-bg-alt)}
-.dc-pg .dc-kpi.clic:hover, .dc-pg .dc-accion.clic:hover, .dc-pg .dc-table-row.clic:hover{background:var(--dc-bg-soft)}
+.dc-pg .dc-kpi.clic:hover, .dc-pg .dc-pgacc.clic:hover, .dc-pg .dc-table-row.clic:hover{background:var(--dc-bg-soft)}
 .dc-pg .dc-kpi.clic:hover{border-color:var(--dc-line-alt)}
 .dc-pg .dc-leyenda .fila.clic{border-radius:var(--dc-r-sm);transition:background .15s}
 .dc-pg canvas.clic{cursor:pointer}
@@ -587,3 +586,40 @@
 .dc-pg .dc-kpi__label { font-size: 12px; }
 .dc-pg .dc-kpi__value { font-size: 20px; }
 .dc-pg .dc-kpi__sub { font-size: 11.5px; margin-top: 1px; }
+/* ── Hoy en la clínica ── */
+.dc-pg .dc-hoy__ver{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--dc-brand-600);padding:4px 10px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--dc-line)}
+.dc-pg .dc-hoy__ver:hover{background:var(--dc-bg-alt)}
+.dc-pg .dc-hoy__kpis{display:grid;grid-template-columns:1fr;gap:10px}
+.dc-pg .dc-hoy__kpis .dc-kpi{margin:0;box-shadow:none;border:1px solid var(--dc-line);padding:12px 14px}
+.dc-pg .dc-hoy__kpis .dc-kpi__value{font-size:20px}
+.dc-pg .dc-hoy__est{margin-top:16px;display:grid;gap:8px}
+.dc-pg .dc-hoy__est .dc-rotulo{margin:0 0 2px}
+.dc-pg .dc-hoy__fila{display:grid;grid-template-columns:110px 1fr 28px;align-items:center;gap:10px;font-size:13px;color:var(--dc-ink-700)}
+.dc-pg .dc-hoy__fila i{height:8px;border-radius:999px;background:var(--dc-bg-alt);overflow:hidden;display:block}
+.dc-pg .dc-hoy__fila u{display:block;height:100%;border-radius:999px}
+.dc-pg .dc-hoy__fila b{text-align:right;font-variant-numeric:tabular-nums;color:var(--dc-ink-900)}
+.dc-pg .dc-hoy__fila.is-cero{color:var(--dc-ink-400)}
+.dc-pg .dc-hoy__fila.is-cero b{color:var(--dc-ink-400)}
+@media (min-width:1280px){.dc-pg .dc-hoy__kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* Aceptación de planes: dos cifras arriba para que la tarjeta pese igual que su vecina */
+.dc-pg .dc-acep{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.dc-pg .dc-acep>div{padding:14px 16px;border-radius:14px;background:var(--dc-bg-soft,#F4F9F9);border:1px solid var(--dc-line)}
+.dc-pg .dc-acep b{display:block;font:800 26px/1.1 var(--dc-font-title);color:var(--dc-navy);font-variant-numeric:tabular-nums}
+.dc-pg .dc-acep>div:first-child b{color:var(--dc-ok-700)}
+.dc-pg .dc-acep span{display:block;margin-top:4px;font-size:12.5px;color:var(--dc-ink-500)}
+/* Por tratamiento: columnas equilibradas y campaña más compacta */
+.dc-pg .dc-split--trat .camp__nom{font-size:15px;line-height:1.25}
+.dc-pg .dc-split--trat .camp__f{padding:10px 12px}
+.dc-pg .dc-split--trat .camp__cif{font-size:14px}
+.dc-pg .dc-split--trat .camp__acc{margin-top:14px;font-size:13px}
+/* Hoy en la clínica: tres cifras compactas, una por fila */
+.dc-pg .dc-hoy__kpis{display:grid;grid-template-columns:1fr !important;gap:8px}
+.dc-pg .dc-hoy__t{display:grid;grid-template-columns:36px minmax(0,1fr);align-items:center;gap:12px;padding:10px 14px;border-radius:14px;border:1px solid var(--dc-line);background:#fff;cursor:pointer;transition:background .15s}
+.dc-pg .dc-hoy__t:hover{background:var(--dc-bg-soft,#F4F9F9)}
+.dc-pg .dc-hoy__ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-weight:700}
+.dc-pg .dc-hoy__tb{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center}
+.dc-pg .dc-hoy__tl{font-size:13px;font-weight:600;color:var(--dc-ink-700)}
+.dc-pg .dc-hoy__ts{grid-column:1;font-size:11.5px;color:var(--dc-ink-500)}
+.dc-pg .dc-hoy__tv{grid-column:2;grid-row:1 / span 2;font:800 20px/1 var(--dc-font-title);color:var(--dc-navy);font-variant-numeric:tabular-nums}
+/* Tops más compactos */
+.dc-rm__rank li{padding:7px 10px;row-gap:5px}

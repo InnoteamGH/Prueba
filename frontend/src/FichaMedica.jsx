@@ -2259,7 +2259,16 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {tab === "odontograma" && subOdo === "odo" && slots?.odontograma && slots.odontograma(pacienteId)}
             {tab === "odontograma" && subOdo === "odo" && !slots?.odontograma && <div style={card}><Odontograma pacienteId={pacienteId} notify={notify} onGenerado={cargar} fechaNacimiento={p.fechaNacimiento} hallazgosSeed={arr(d?.odontograma)} soloLectura={!puedeEscribirClinico} pacienteNombre={p.nombre || p.nombres} pacienteDni={p.dni || ""} pacienteHc={p.numeroHistoria || p.nroHistoria || ""} sedeId={sedeId} /></div>}
 
-            {tab === "perio" && puedePerio && <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura={!puedeEscribirClinico} />}
+            {/* En el expediente el periodontograma es una foto del último sondaje (solo lectura);
+                para sondar o editar se abre su módulo con este paciente. */}
+            {tab === "perio" && puedePerio && <div className="fm-foto">
+              <div className="fm-foto__cab">
+                <Activity size={16} strokeWidth={2} />
+                <div><b>Último sondaje registrado</b><span>Vista de consulta. Para sondar o corregir, ábrelo en su módulo.</span></div>
+                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dc-ir", { detail: { vista: "perio", pacienteId } }))}>Abrir en Periodontograma</button>
+              </div>
+              <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura />
+            </div>}
 
             {tab === "recetas" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
 

@@ -13,6 +13,7 @@ const Recall = React.lazy(() => import("./modulos/Recall"));
 const WhatsAppInbox = React.lazy(() => import("./modulos/WhatsAppInbox"));
 const PanelGerencial = React.lazy(() => import("./modulos/PanelGerencial"));
 const Metas = React.lazy(() => import("./modulos/Metas"));
+const ReportesClinica = React.lazy(() => import("./modulos/ReportesClinica"));
 const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
@@ -8173,6 +8174,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [liquidaciones, setLiquidaciones] = usePersist("liquidaciones", LIQ_SEED);
   const [espera, setEspera] = usePersist("espera", ESPERA_INIT);   // lista de espera compartida (P1-3)
   const [pacienteActivo, setPacienteActivo] = useState(null); // paciente en atención (P1-1)
+  // Ir a un módulo con un paciente ya elegido (p. ej. «Abrir en Periodontograma» desde la ficha).
+  useEffect(() => {
+    const ir = (e) => { const d = e.detail || {}; if (d.pacienteId != null) setPacienteActivo(/^\d+$/.test(String(d.pacienteId)) ? Number(d.pacienteId) : d.pacienteId); if (d.vista) window.location.hash = `#/${d.vista}`; };
+    window.addEventListener("dc-ir", ir);
+    return () => window.removeEventListener("dc-ir", ir);
+  }, []);
   const [inventario, setInventario] = usePersist("inventario", INVENTARIO_INIT); // insumos (P2-1)
   // P2-1: al ejecutar/cobrar un procedimiento se descuentan los insumos usados.
   const consumirInsumos = (proc = "") => {
@@ -8524,6 +8531,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       { id: "reportes", label: "Producción y comisiones", icon: TrendingUp, match: ["comisiones"] },
       { id: "reportes_aus", label: "Ausentismo", icon: UserX, mod: "reportes" },
       { id: "reportes_ocs", label: "Ocupación de sillones", icon: Armchair, mod: "reportes" },
+      { id: "reportes_mas", label: "Más reportes", icon: ClipboardList, mod: "reportes" },
       { id: "metas", label: "Metas y comisiones", icon: Target },
       ...(rol === "medico" ? [{ id: "miproduccion", label: "Mi producción", icon: Wallet }] : []),
     ] },
@@ -8615,6 +8623,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "reportes": case "comisiones": return <Reportes key="produccion" citas={cf} can={can} />;
       case "reportes_aus": return <Reportes key="ausencias" citas={cf} can={can} tab="ausencias" />;
       case "reportes_ocs": return <React.Suspense fallback={null}><OcupacionSillones /></React.Suspense>;
+      case "reportes_mas": return <React.Suspense fallback={null}><ReportesClinica /></React.Suspense>;
       // Un solo catálogo de servicios (NAV-06): Operación › Servicios y precios.
       case "servicios": return <Servicios notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;

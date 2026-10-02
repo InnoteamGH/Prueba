@@ -128,30 +128,33 @@ export default function ResumenMes({ kd, acciones = null }) {
       </div>
       </div>
 
+      {/* Dos rankings con el mismo diseño: posición, nombre, barra y cifra. */}
       <div className="dc-rm__dos">
         <article className="dc-rm__card">
-          <div className="dc-rm__cab"><Users size={16} strokeWidth={2} /><h3>Producción del equipo vs. meta</h3><span>la línea marca el ritmo a hoy</span></div>
+          <div className="dc-rm__cab"><Users size={16} strokeWidth={2} /><h3>Top del equipo</h3><span>avance a su meta · la raya es el ritmo a hoy</span></div>
           {equipo.length === 0 ? <p className="dc-rm__vacio">Sin producción del equipo este mes.</p> : (
-            <ul className="dc-rm__eq">
-              {equipo.map((x) => { const pct = x.meta ? (x.prod / x.meta) * 100 : 0; const tono = !x.meta ? "sin" : pct >= ritmo ? "ok" : pct >= ritmo * 0.8 ? "cerca" : "bajo"; return (
+            <ol className="dc-rm__rank">
+              {equipo.map((x, i) => { const pct = x.meta ? (x.prod / x.meta) * 100 : 0; const tono = !x.meta ? "sin" : pct >= ritmo ? "ok" : pct >= ritmo * 0.8 ? "cerca" : "bajo"; return (
                 <li key={x.nombre} className={`is-${tono}`}>
-                  <div className="dc-rm__eqn"><b>{x.nombre}</b><small>{soles(x.prod)}{x.meta ? ` de ${soles(x.meta)}` : " · sin meta"}</small></div>
-                  <div className="dc-rm__eqbar"><i style={{ width: `${Math.min(100, pct)}%` }} /><span style={{ left: `${Math.min(100, ritmo)}%` }} /></div>
-                  <em>{x.meta ? `${Math.round(pct)}%` : "—"}</em>
+                  <span className={`dc-rm__pos p${i + 1}`}>{i + 1}</span>
+                  <div className="dc-rm__rn"><b>{x.nombre}</b><small>{soles(x.prod)}{x.meta ? ` de ${soles(x.meta)}` : " · sin meta"}</small></div>
+                  <em className="dc-rm__rv">{x.meta ? `${Math.round(pct)}%` : "—"}<small>{tono === "ok" ? "al día" : tono === "cerca" ? "cerca del ritmo" : tono === "bajo" ? "bajo el ritmo" : "sin meta"}</small></em>
+                  <div className="dc-rm__rbar"><i style={{ width: `${Math.min(100, pct)}%` }} />{x.meta > 0 && <span style={{ left: `${Math.min(100, ritmo)}%` }} title={`Ritmo esperado a hoy: ${Math.round(ritmo)}%`} />}</div>
                 </li>
               ); })}
-            </ul>
+            </ol>
           )}
         </article>
         <article className="dc-rm__card">
-          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>por importe facturado</span></div>
+          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>por importe facturado del mes</span></div>
           {d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
-            <ol className="dc-rm__top">
+            <ol className="dc-rm__rank is-trat">
               {d.top.map((t, i) => (
                 <li key={t.nombre}>
                   <span className={`dc-rm__pos p${i + 1}`}>{i + 1}</span>
-                  <div><b>{t.nombre}</b><div className="dc-rm__tbar"><i style={{ width: `${(t.importe / maxTop) * 100}%` }} /></div></div>
-                  <em>{soles(t.importe)}<small>{t.ventas} {t.ventas === 1 ? "venta" : "ventas"}</small></em>
+                  <div className="dc-rm__rn"><b>{t.nombre}</b><small>{t.ventas} {t.ventas === 1 ? "venta" : "ventas"} · ticket {soles(t.ventas ? t.importe / t.ventas : 0)}</small></div>
+                  <em className="dc-rm__rv">{soles(t.importe)}<small>{d.top.reduce((a, x) => a + x.importe, 0) ? `${Math.round((t.importe / d.top.reduce((a, x) => a + x.importe, 0)) * 100)}% del top` : ""}</small></em>
+                  <div className="dc-rm__rbar"><i style={{ width: `${(t.importe / maxTop) * 100}%` }} /></div>
                 </li>
               ))}
             </ol>
