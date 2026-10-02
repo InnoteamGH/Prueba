@@ -11,6 +11,7 @@ import { ArrowDownRight, ArrowUpRight, Target, Trophy, Users, Wallet } from "luc
 import api, { auth } from "../api/client";
 import { DatosDemoCtx, MEDICOS } from "../comun";
 import { salidasMes } from "../compartido/metricas";
+import { medicoEnSedes } from "../compartido/medicosSede";
 
 const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -32,7 +33,7 @@ export const avanceDemo = (d = new Date()) => {
   return Math.min(1, Math.max(0.12, (d.getDate() / dias) * 1.08));
 };
 
-export default function ResumenMes({ kd, acciones = null }) {
+export default function ResumenMes({ kd, acciones = null, sedes = null }) {
   const conectado = !!auth.token;
   const hoy = new Date();
   const desde = ymd(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
@@ -52,13 +53,18 @@ export default function ResumenMes({ kd, acciones = null }) {
     if (!conectado) {
       // Las cifras de ejemplo avanzan con el mes: el día 1 no puede llevar ya el 75 %.
       const f = avanceDemo(hoy);
-      const equipo = MEDICOS.map((m) => ({ nombre: m.nombre, prod: Math.round((m.prodDemo || 0) * f), meta: m.meta || 0 }));
+      // Doctores de las sedes que se ven, con lo que producen y su meta en esas sedes.
+      const equipo = MEDICOS.map((m) => ({ m, e: medicoEnSedes(m, sedes) })).filter((x) => x.e.sedes.length)
+        .map(({ m, e }) => ({ nombre: m.nombre, prod: Math.round(e.prod * f), meta: e.meta || 0 }));
       const facturado = equipo.reduce((a, x) => a + x.prod, 0);
-      const sal = salidasMes(db?.egresos || [], { mes: desde.slice(0, 7) });
+      const totalClinica = MEDICOS.reduce((a, m) => a + Math.round((m.prodDemo || 0) * f), 0);
+      const parte = totalClinica ? facturado / totalClinica : 1;
+      const sal = salidasMes((db?.egresos || []).filter((e) => !sedes || e.sede == null || sedes.map(String).includes(String(e.sede))), { mes: desde.slice(0, 7) });
       return {
         facturado, anterior: Math.round(facturado * 0.91), meta: equipo.reduce((a, x) => a + x.meta, 0), equipo,
         salidas: sal.pen, salidasUsd: sal.usd, salidasCat: sal.porCat,
-        top: DEMO_TOP.map((t) => ({ ...t, importe: Math.round(t.importe * f), ventas: Math.max(1, Math.round(t.ventas * f)) })),
+        // El top de ejemplo se escala a la parte de la clínica que se ve (sede elegida).
+        top: DEMO_TOP.map((t) => ({ ...t, importe: Math.round(t.importe * f * parte), ventas: Math.max(1, Math.round(t.ventas * f * parte)) })),
       };
     }
     const delMes = (egresos || []).filter((e) => String(e.fecha || "").slice(0, 10) >= desde);
@@ -75,7 +81,7 @@ export default function ResumenMes({ kd, acciones = null }) {
       salidasCat: Object.entries(cat).sort((a, b) => b[1] - a[1]),
       top: (top || []).map((t) => ({ nombre: t.nombre || "—", ventas: Number(t.numeroDeVentas) || 0, importe: Number(t.importeTotal) || 0 })).sort((a, b) => b.importe - a.importe).slice(0, 6),
     };
-  }, [conectado, kd, egresos, top, desde, db?.egresos]);
+  }, [conectado, kd, egresos, top, desde, db?.egresos, sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
   const ritmo = (hoy.getDate() / diasMes) * 100;

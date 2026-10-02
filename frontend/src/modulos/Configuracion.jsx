@@ -3,6 +3,7 @@ import React, { useState, useEffect, useContext } from "react";
 import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
 import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
+import { medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
 import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda} from "../comun";
 
@@ -295,7 +296,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     if (!conectado) {
       setSedes(SEDES.filter((s) => sedeVisible(s.id)).map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "" }; }));
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, precioBase: e.precio })));
-      setMeds(MEDICOS.filter(medVisible).map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: true, porcentajeComision: m.comision ?? null, metaMensual: m.meta })));
+      setMeds(MEDICOS.filter(medVisible).map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: true, porcentajeComision: m.comision ?? null, metaMensual: medicoEnSedes(m, limitarSede ? misSedes : null).meta, metasPorSede: sedesMed(m).filter(sedeVisible).map((s) => ({ sede: s, meta: metaSede(m, s) })) })));
       setGoLive({
         listoParaOperar: true, total: 4, completados: 4, obligatoriosPendientes: 0,
         items: [
@@ -354,10 +355,10 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     if (edit.tipo === "doctor" && !auth.token) {
       const m = MEDICOS.find((x) => x.id === it.id);
       const pct = it.porcentajeComision === "" || it.porcentajeComision == null ? null : Math.max(0, Math.min(100, Number(it.porcentajeComision)));
-      const meta = Number(it.metaMensual) > 0 ? Number(it.metaMensual) : null;
-      if (m) { Object.assign(m, { nombre: it.nombre || m.nombre, comision: pct, meta }); try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); o[m.id] = { comision: pct, meta }; localStorage.setItem("dc_data_v1_medicos_cfg", JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } }
-      setMeds((ms) => ms.map((x) => (x.id === it.id ? { ...x, ...it, porcentajeComision: pct, metaMensual: meta } : x)));
-      notify("Doctor guardado. Meta y comisión ya se ven en Reportes y Mi producción."); setEdit(null); return;
+      // La meta se fija por sede en Metas y comisiones; aquí solo el % base del doctor.
+      if (m) { Object.assign(m, { nombre: it.nombre || m.nombre, comision: pct }); try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); o[m.id] = { ...(o[m.id] || {}), comision: pct }; localStorage.setItem("dc_data_v1_medicos_cfg", JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ } }
+      setMeds((ms) => ms.map((x) => (x.id === it.id ? { ...x, ...it, porcentajeComision: pct } : x)));
+      notify("Doctor guardado."); setEdit(null); return;
     }
     if (edit.tipo === "sede" && !auth.token) {
       const id = it.id || Date.now();
@@ -379,20 +380,9 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     } else if (edit.tipo === "doctor") {
       const pctC = it.porcentajeComision === "" || it.porcentajeComision == null ? null : Math.max(0, Math.min(100, Number(it.porcentajeComision)));
       const payload = { nombre: it.nombre, especialidadId: it.especialidadId || null, cop: it.cop || null, activo: it.activo !== false, porcentajeComision: pctC };
-      const after = () => {
-        const meta = Number(it.metaMensual);
-        if (it.id && Number.isFinite(meta)) {
-          return api.catalogo.fijarMeta(it.id, meta > 0 ? meta : null).then(() => done("Doctor y meta guardados.")).catch(() => done("Doctor guardado (meta no se pudo fijar)."));
-        }
-        return done("Doctor guardado.");
-      };
+      // La meta se fija por sede en Metas y comisiones (PUT /medicos/{id}/metas/{sedeId}).
       (it.id ? api.catalogo.actualizarMedico(it.id, payload) : api.catalogo.crearMedico(payload))
-        .then((created) => {
-          if (!it.id && created?.id && Number(it.metaMensual) > 0) {
-            return api.catalogo.fijarMeta(created.id, Number(it.metaMensual)).then(() => done("Doctor y meta guardados."));
-          }
-          return after();
-        })
+        .then(() => done("Doctor guardado."))
         .catch(err);
     } else if (edit.tipo === "promo") {
       if (!it.titulo || !it.titulo.trim()) { notify("Ponle un título a la promoción."); return; }
@@ -857,8 +847,13 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Especialidad<Select value={it.especialidadId || ""} onChange={(v) => set("especialidadId", v)} placeholder="— Selecciona —" options={esps.map((e) => ({ value: e.id, label: e.nombre }))} /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>CMP/COP (opcional)<input className="dc-premium-inp" value={it.cop || ""} onChange={(e) => set("cop", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="COP 12345" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Usuario vinculado<input className="dc-premium-inp" value={it.usuarioId || it.usuario || ""} readOnly style={{ ...inp, marginTop: 5, background: "var(--dc-bg)" }} placeholder="Sin usuario vinculado" /></label>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Comisión %<input className="dc-premium-inp" type="number" value={it.porcentajeComision ?? ""} onChange={(e) => set("porcentajeComision", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 40" /></label>
-                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Meta mensual (S/)<input className="dc-premium-inp" type="number" value={it.metaMensual ?? ""} onChange={(e) => set("metaMensual", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 8000 – vacío = sin meta" /></label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Comisión base %<input className="dc-premium-inp" type="number" min="0" max="100" value={it.porcentajeComision ?? ""} onChange={(e) => set("porcentajeComision", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 40" /></label>
+                {/* Meta y % por sede: un solo lugar para editarlos (Metas y comisiones). */}
+                <div className="dc-cfg__metas">
+                  <div><b>Meta mensual por sede</b><span>Se fija sede por sede, con su propio % si hace falta.</span></div>
+                  {(it.metasPorSede || []).length > 0 && <ul>{it.metasPorSede.map((x) => <li key={x.sede}><span>{(SEDES.find((z) => String(z.id) === String(x.sede)) || {}).nombre || "Sede"}</span><b>{x.meta != null ? `S/ ${Number(x.meta).toLocaleString("es-PE")}` : "Sin meta"}</b></li>)}</ul>}
+                  <button type="button" onClick={() => { setEdit(null); window.location.hash = "#/metas"; }}><Target size={13} strokeWidth={2.2} /> Editar en Metas y comisiones</button>
+                </div>
                 <p style={{ margin: 0, fontSize: 12, color: "var(--dc-ink-500)" }}>Su sillón fijo, si lo tiene, se define en Configuración › Sillones.</p>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--dc-ink-700)", cursor: "pointer" }}><input type="checkbox" checked={it.activo !== false} onChange={(e) => set("activo", e.target.checked)} /> Activo (visible en agenda y WhatsApp)</label>
               </>}

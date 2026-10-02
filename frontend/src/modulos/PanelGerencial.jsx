@@ -15,7 +15,8 @@ import {
   metaEstado,
   moneyFmt,
 } from "./panelGerencialUtil";
-import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES } from "../comun";
+import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES, sedesDe } from "../comun";
+import { medicoEnSedes } from "../compartido/medicosSede";
 import { SILLONES_DEMO } from "../compartido/sillones";
 import * as M from "../compartido/metricas";
 import { labAtrasado } from "../compartido/estados";
@@ -760,7 +761,10 @@ function StackSegs({ items, total }) {
 }
 
 /* ── Panel principal ── */
-export default function PanelGerencial({ citas: citasProp = [], sede }) {
+export default function PanelGerencial({ citas: citasProp = [], sede, sedes = null }) {
+  // Sedes que se ven (filtro global o sedes del usuario): todo el panel se limita a ellas.
+  const verSedes = sedes && sedes.length ? sedes.map(String) : null;
+  const claveSedes = verSedes ? verSedes.join(",") : "todas";
   const conectado = !!auth.token;
   const [kd, setKd] = useState(null);
   const [ind, setInd] = useState(null);
@@ -786,15 +790,19 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
   // en vez de mostrar ceros junto al resumen del mes.
   const demoDb = useContext(DatosDemoCtx);
   const cargarDemo = useCallback(() => {
-    const citas = (demoDb?.citas || citasProp || []);
+    // citasProp ya llega filtrada por sede desde MainApp; pacientes, pagos y casos se limitan igual.
+    const enSede = (ids) => !verSedes || ids.some((x) => verSedes.includes(String(x)));
+    const citas = citasProp || [];
     const deHoy = citas.filter((c) => c.fecha === fecha);
-    const pacientes = demoDb?.pacientes || [];
+    const pacientes = (demoDb?.pacientes || []).filter((p) => enSede(sedesDe(p)));
     const fichas = demoDb?.fichas || {};
     const precio = (c) => (ESPECIALIDADES.find((e) => e.id === c.esp) || {}).precio || 80;
     const atendidasHoy = deHoy.filter((c) => c.estado === "atendida");
-    const pagosTodos = pacientes.flatMap((p) => ((fichas[p.id] || {}).pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, pacienteId: p.id })));
+    const pagosTodos = pacientes.flatMap((p) => ((fichas[p.id] || {}).pagos || []).filter((pg) => pg.sede == null || enSede([pg.sede])).map((pg) => ({ ...pg, paciente: p.nombre, pacienteId: p.id })));
     const fa = avanceDemo();
-    const ranking = MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: (ESPECIALIDADES.find((e) => e.id === m.esp) || {}).nombre || "", produccion: Math.round(m.prodDemo * fa), meta: m.meta, citas: Math.max(1, Math.round(m.citasDemo * fa)) }));
+    // Producción y meta de cada doctor en las sedes que se ven (compartido/medicosSede.js).
+    const ranking = MEDICOS.map((m) => ({ m, e: medicoEnSedes(m, verSedes) })).filter((x) => x.e.sedes.length)
+      .map(({ m, e }) => ({ id: m.id, nombre: m.nombre, especialidad: (ESPECIALIDADES.find((x) => x.id === m.esp) || {}).nombre || "", produccion: Math.round(e.prod * fa), meta: e.meta || 0, citas: Math.max(1, Math.round(e.citas * fa)) }));
     setCitasHoy(deHoy);
     setKd({
       ingresosMes: ranking.reduce((a, r) => a + r.produccion, 0), ingresosMesAnterior: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) / 0.91), hayMeta: true, metaMensualClinica: ranking.reduce((a, r) => a + r.meta, 0),
@@ -813,8 +821,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     const cart = M.cartera(fichas, pacientes);
     const aging = M.antiguedadDeuda(cart).map((t) => t.v);
     const nomP = (id) => (pacientes.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
-    const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado");
-    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha));
+    const dePac = (pid) => pacientes.some((p) => String(p.id) === String(pid));
+    const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado" && dePac(l.pid));
+    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha) && dePac(c.pid));
     const alertasDemo = [
       cart.conVencido.length && { titulo: cart.conVencido.length === 1 ? "1 paciente con saldo vencido" : `${cart.conVencido.length} pacientes con saldo vencido`, detalle: cart.conVencido.map((f) => f.p.nombre).slice(0, 3).join(", "), monto: cart.vencido },
       liqObs.length && { titulo: liqObs.length === 1 ? "1 liquidación de seguro observada" : `${liqObs.length} liquidaciones de seguro observadas`, detalle: liqObs.map((l) => `${l.aseg} (${nomP(l.pid)})`).join(", "), cantidad: liqObs.length },
@@ -839,15 +848,15 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
       ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${(Number(pg.monto)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })),
     ].sort((a, b) => String(a.hora).localeCompare(String(b.hora))));
     setInventarioValorizado(M.inventarioValorizado(demoDb?.inventario || []));
-    setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false).length);
-    setNSedes(2);
-  }, [demoDb, citasProp, fecha]);
+    setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false && enSede([x.sede])).length);
+    setNSedes(verSedes ? verSedes.length : 2);
+  }, [demoDb, citasProp, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recargar = useCallback(() => {
     if (!conectado) { cargarDemo(); return; }
-    api.gerencial().then(setKd).catch(() => setKd({ error: true }));
-    api.gerencialIndicadores().then(setInd).catch(() => setInd({ errorDeCarga: true }));
-    api.gerencialReportes().then(setRep).catch(() => setRep({ errorDeCarga: true }));
+    api.gerencial(verSedes).then(setKd).catch(() => setKd({ error: true }));
+    api.gerencialIndicadores(verSedes).then(setInd).catch(() => setInd({ errorDeCarga: true }));
+    api.gerencialReportes(verSedes).then(setRep).catch(() => setRep({ errorDeCarga: true }));
     api.pagos.listar().then((r) => setPagos(r || [])).catch(() => setPagos([]));
     api.citas.listar(fecha).then((r) => setCitasHoy(r || [])).catch(() => setCitasHoy([]));
     api.actividad(fecha).then((r) => setActividad(r || [])).catch(() => setActividad([]));
@@ -878,7 +887,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     api.sedes.listar().then((rows) => {
       setNSedes(Array.isArray(rows) ? rows.length : null);
     }).catch(() => setNSedes(null));
-  }, [conectado, fecha, citasProp, cargarDemo]);
+  }, [conectado, fecha, citasProp, cargarDemo, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { recargar(); }, [recargar]);
 
@@ -1000,7 +1009,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
     <div className="dc-pg">
 
       {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
-      <ResumenMes kd={kd} acciones={<div className="dc-head-acc" title={subHead}>
+      <ResumenMes kd={kd} sedes={verSedes} acciones={<div className="dc-head-acc" title={subHead}>
           <button type="button" className="dc-rm__ib" aria-label="Actualizar" title="Actualizar datos" onClick={recargar}><RefreshCw size={15} strokeWidth={2} /></button>
           <button type="button" className="dc-rm__ib" aria-label="Qué mide cada gráfico" title="Qué mide cada gráfico" onClick={() => abrir({
             t: "Qué mide cada gráfico",
@@ -1129,7 +1138,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede }) {
             <div className="dc-hoy__ts">{enSillon} en sillón ahora</div>
           </div>
         </div>
-        <ResumenOcupacion variante="hoy" onVer={() => { window.location.hash = "#/reportes_ocs"; }} />
+        <ResumenOcupacion variante="hoy" sedes={verSedes} onVer={() => { window.location.hash = "#/reportes_ocs"; }} />
             </div>
             {(() => {
               const est = [

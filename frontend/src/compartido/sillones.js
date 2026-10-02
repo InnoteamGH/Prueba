@@ -139,6 +139,8 @@ export function bloqueoQuePisa(bloqueos, { fecha, hora, duracionMin, medicoId, s
     if (!aplica) return false;
     if (b.medicoId != null && !mismo(b.medicoId, medicoId)) return false;
     if (b.sillon != null && (!mismo(b.sillon, sillon) || (b.sede != null && !mismo(b.sede, sede)))) return false;
+    // Toda la agenda o un doctor: el bloqueo vale solo en su sede (sin sede = todas).
+    if (b.sillon == null && b.sede != null && sede != null && !mismo(b.sede, sede)) return false;
     return aMin(b.horaInicio) < fin && ini < aMin(b.horaFin);
   }) || null;
 }

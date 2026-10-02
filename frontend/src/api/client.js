@@ -108,6 +108,13 @@ function avisarFallo(estado, path, mensaje) {
   for (const fn of oyentesFallo) { try { fn(ultimoFallo); } catch { /* un oyente roto no rompe la peticion */ } }
 }
 
+/** Query string con los parámetros que tienen valor; las listas van separadas por comas. */
+function conQuery(o) {
+  const q = Object.entries(o || {}).filter(([, v]) => v != null && v !== "" && !(Array.isArray(v) && !v.length))
+    .map(([k, v]) => `${k}=${encodeURIComponent(Array.isArray(v) ? v.join(",") : v)}`);
+  return q.length ? `?${q.join("&")}` : "";
+}
+
 async function request(method, path, body, extraHeaders) {
   const dedupeKey = method + " " + path;
   if (method === "GET" && inflightGet.has(dedupeKey)) {
@@ -288,6 +295,8 @@ export const api = {
     // La meta va por su propia ruta y su propio permiso ("metas"), no por
     // "config": quien fija metas es gerencia, que no administra la clinica.
     fijarMeta: (id, metaMensual) => request("PUT", `/medicos/${id}/meta`, { metaMensual }),
+    // Meta y % de comisión del doctor en una sede (requisitos-minimos.md, punto 42).
+    fijarMetaSede: (id, sedeId, body) => request("PUT", `/medicos/${id}/metas/${sedeId}`, body),
   },
   disponibilidad: {
     listar: (medicoId) => request("GET", `/disponibilidad${medicoId ? `?medicoId=${medicoId}` : ""}`),
@@ -417,7 +426,9 @@ export const api = {
   // ── Registro de clínica (signup) ──
   registro: (datos) => request("POST", "/auth/registro", datos),
   // ── Grupo A ──
-  comisiones: (desde, hasta) => request("GET", `/comisiones${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ""}`),
+  // sedes: ids que se ven (filtro global o sedes del usuario). El servidor debe filtrar
+  // igual aunque no llegue (requisitos-minimos.md, punto 40).
+  comisiones: (desde, hasta, sedes) => request("GET", `/comisiones${conQuery({ desde: desde && hasta ? desde : null, hasta: desde && hasta ? hasta : null, sedeIds: sedes })}`),
   /** Pagos de comisión al odontólogo (DEV-08). Distinto de liquidación de seguros. */
   comisionesPagos: {
     listar: () => request("GET", "/comisiones/pagos"),
@@ -425,11 +436,11 @@ export const api = {
   },
   // Numeros del medico en sesion. Devuelve { esMedico: false } si el usuario no atiende.
   miProduccion: () => request("GET", "/mi-produccion"),
-  gerencial: () => request("GET", "/gerencial/kpis"),
+  gerencial: (sedes) => request("GET", `/gerencial/kpis${conQuery({ sedeIds: sedes })}`),
   // Indicadores de gestion calculados sobre la base: conversion de presupuestos,
   // deuda por antiguedad, ocupacion de agenda y estado de la cartera.
-  gerencialIndicadores: () => request("GET", "/gerencial/indicadores"),
-  gerencialReportes: () => request("GET", "/gerencial/reportes"),
+  gerencialIndicadores: (sedes) => request("GET", `/gerencial/indicadores${conQuery({ sedeIds: sedes })}`),
+  gerencialReportes: (sedes) => request("GET", `/gerencial/reportes${conQuery({ sedeIds: sedes })}`),
   gerencialProduccion: (desde, hasta) => request("GET", `/gerencial/produccion${desde ? `?desde=${desde}&hasta=${hasta}` : ""}`),
   evolucionesPendientes: () => request("GET", "/alertas/evoluciones-pendientes"),
   caja: () => request("GET", "/caja"),

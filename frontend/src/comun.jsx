@@ -1386,6 +1386,27 @@ const MODAL_SIZE = { confirm: 420, corto: 560, largo: 720 };
    backend conectado cada módulo lee de la API y este contexto no se usa. */
 export const DatosDemoCtx = React.createContext(null);
 
+/* Sede que se ve en toda la app. La publica MainApp:
+   - sede: lo elegido en el menú ("all" o un id);
+   - ids: sedes que se ven ahora (la elegida, o todas las del usuario con "all");
+   - mias: todas las sedes del usuario; activa: una sede concreta para registrar;
+   - pacientes / citas: ya filtrados por ids (para mostrar; para validar, el total).
+   Sin proveedor (pruebas, portal del paciente) no limita nada. */
+export const SedeCtx = React.createContext(null);
+export function useSede() {
+  const c = React.useContext(SedeCtx);
+  const ver = c?.ids ? c.ids.map(String) : null;
+  const mias = c?.mias ? c.mias.map(String) : null;
+  return {
+    sede: c?.sede ?? "all", ids: c?.ids ?? null, mias: c?.mias ?? null, activa: c?.activa ?? null,
+    pacientes: c?.pacientes ?? null, citas: c?.citas ?? null,
+    /** ¿Alguna de estas sedes se ve con el filtro actual? (sin sede = sí) */
+    enSede: (x) => { const l = [].concat(x ?? []).filter((v) => v != null && v !== ""); return !ver || !l.length || l.some((v) => ver.includes(String(v))); },
+    /** ¿La sede es del usuario (aunque el filtro muestre otra)? */
+    esMia: (x) => x == null || !mias || mias.includes(String(x)),
+  };
+}
+
 /* Todos los modales llevan la cabecera de la marca; el `tone` sólo distingue los que
    avisan de algo (peligro, advertencia, éxito) en el ícono y en una línea de color. */
 function tonoModal(t) {

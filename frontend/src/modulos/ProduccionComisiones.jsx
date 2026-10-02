@@ -6,22 +6,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
 import api, { auth } from "../api/client";
 import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden } from "../comun";
+import { medicoEnSedes } from "../compartido/medicosSede";
 
 /* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
    mismas cifras que usan Metas y el Resumen del mes), para que el módulo no salga en cero. */
 function datosDemo(sedes = null) {
-  // Solo los odontólogos que atienden en las sedes que ve el usuario (admin de sede).
-  const meds = sedes ? MEDICOS.filter((m) => (m.sedes || [m.sede]).some((x) => sedes.map(Number).includes(Number(x)))) : MEDICOS;
-  const porMedico = meds.map((m) => {
-    const produccion = m.prodDemo || 0;
-    const porcentaje = m.comision ?? 0; // REP-01: el % de la ficha del doctor
-    return {
-      medicoId: m.id, nombre: m.nombre, atendidas: m.citasDemo || 0, produccion, porcentaje,
-      comision: Math.round(produccion * porcentaje / 100),
-      especialidad: (ESPECIALIDADES.find((e) => e.id === m.esp) || {}).nombre || "Odontólogo",
-      ticketCita: m.citasDemo ? produccion / m.citasDemo : 0,
-    };
-  });
+  // Solo los odontólogos que atienden en las sedes que se ven, con lo que producen ahí
+  // y el % y la meta de esas sedes (compartido/medicosSede.js).
+  const meds = MEDICOS.map((m) => ({ m, e: medicoEnSedes(m, sedes) })).filter((x) => x.e.sedes.length);
+  const porMedico = meds.map(({ m, e }) => ({
+    medicoId: m.id, nombre: m.nombre, atendidas: e.citas, produccion: e.prod, porcentaje: e.pct ?? 0,
+    comision: e.comision, meta: e.meta,
+    especialidad: (ESPECIALIDADES.find((x) => x.id === m.esp) || {}).nombre || "Odontólogo",
+    ticketCita: e.citas ? e.prod / e.citas : 0,
+  }));
   const totalProduccion = porMedico.reduce((a, m) => a + m.produccion, 0);
   const totalComision = porMedico.reduce((a, m) => a + m.comision, 0);
   const totalCitas = porMedico.reduce((a, m) => a + m.atendidas, 0);
@@ -766,10 +764,10 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen",
   const cargar = useCallback(() => {
     setErr(null);
     if (!auth.token) { setData(datosDemo(sedes)); return; }
-    api.comisiones()
+    api.comisiones(null, null, sedes)
       .then((r) => setData(r))
       .catch((e) => setErr(e?.message || "No se pudo cargar comisiones"));
-  }, []);
+  }, [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
 
   useEffect(() => { cargar(); }, [cargar]);
   useEffect(() => {
@@ -882,7 +880,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen",
             {(() => {
               const hoyD = new Date();
               const ritmoM = (hoyD.getDate() / new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0).getDate()) * 100;
-              const conMeta = porMedico.map((m) => { const md = MEDICOS.find((x) => String(x.id) === String(m.id) || x.nombre === m.nombre); const meta = Number(m.meta ?? md?.meta) || 0; return { ...m, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
+              const conMeta = porMedico.map((m) => { const md = MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const meta = Number(m.meta ?? (md ? medicoEnSedes(md, sedes).meta : 0)) || 0; return { ...m, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
               const alRitmo = conMeta.filter((m) => m.pct >= ritmoM).length;
               const metaTot = conMeta.reduce((a, m) => a + m.meta, 0);
               return (
