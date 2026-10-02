@@ -54,7 +54,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import { medicoEnSedes } from "./compartido/medicosSede";
-import {SedeCtx, useSede, mismaSede, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {SedeCtx, useSede, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -1893,12 +1893,15 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // La ficha solo se abre si el paciente está entre los visibles (sus sedes y el filtro de
   // arriba). El id llega también por enlace, marcador, «Ver ficha» de WhatsApp o dc-ir:
   // sin esto se abría la historia de un paciente de otra sede. Con sesión se espera al padrón.
-  const fmPermitido = fmId == null || (conectado && remoto == null) || lista.some((p) => String(p.id) === String(fmId));
+  // Mientras llega el padrón no se monta la ficha (se vería la historia antes de comprobar
+  // la sede); si el padrón falla, no se abre.
+  const esperandoPadron = conectado && fmId != null && remoto == null && !listaError;
+  const fmPermitido = fmId == null || (!esperandoPadron && lista.some((p) => String(p.id) === String(fmId)));
   useEffect(() => {
-    if (fmPermitido) return;
+    if (fmPermitido || esperandoPadron) return;
     notify("Ese paciente no se atiende en la sede elegida. Cambia la sede arriba si también es tuya.");
     cerrarFm();
-  }, [fmPermitido]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fmPermitido, esperandoPadron]); // eslint-disable-line react-hooks/exhaustive-deps
   // Una sola historia clínica: la Ficha médica, que es la que guarda en el servidor
   // (paciente.fichaClinica, /historia, /auditoria). La demostración abre la misma
   // pantalla con datos de ejemplo, así lo que se revisa es lo que se usará.
@@ -2141,9 +2144,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     odontograma: (pid) => <OdontogramaFotos key={`odof-${pid}`} pacienteId={pid} ficha={fichas[pid]} onAbrir={() => window.dispatchEvent(new CustomEvent("dc-ir", { detail: { vista: "odontograma", pacienteId: pid } }))} />,
     // sedeActiva: el precio del procedimiento es el de la sede donde se atiende, no el de la
     // primera sede del paciente (CLINICO-06 / CAJA-07).
-    plan: (pid) => <Tratamientos key={`plan-${pid}`} sedeActiva={sedeActiva} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
+    // Plan y cuenta cotiza con la sede de precio del paciente (menú › su única sede › activa).
+    plan: (pid) => <Tratamientos key={`plan-${pid}`} sedeActiva={sedeDePrecio(sedeCx, pacientes.find((x) => String(x.id) === String(pid)), sedeActiva)} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
     archivos: (pid, sub) => <ArchivosPaciente key={`arch-${pid}`} pid={pid} sub={sub} pacientes={pacientes} notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} onIrLaboratorio={() => onIr("laboratorio")} />,
   };
+  if (fmId && esperandoPadron) return <Card><div style={{ padding: 24, textAlign: "center", color: "var(--dc-ink-500)", fontSize: 14 }}>Cargando ficha…</div></Card>;
   if (fmId && fmPermitido) {
     return (
       <div className="dc-ficha-pagina">
@@ -2834,15 +2839,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   // es una sola de las del usuario; si no, la activa. MainApp nunca pasa "all" en sedeActiva,
   // por eso el filtro se lee de useSede(). Se devuelve el id 1/2 con el que el catálogo
   // guarda preciosSede (con sesión el filtro o el paciente pueden venir como UUID).
-  const sedePrecioOdo = (() => {
-    const mias = sedeCx.mias || SEDE_IDS;
-    const aMia = (x) => mias.find((m) => mismaSede(m, x));
-    if (sedeCx.sede != null && sedeCx.sede !== "all") return aMia(sedeCx.sede) ?? sedeCx.sede;
-    const delPac = [...new Set(sedesDe(paciente).map(aMia).filter((x) => x != null))];
-    if (delPac.length === 1) return delPac[0];
-    const act = sedeCx.activa ?? sedeActiva;
-    return aMia(act) ?? act;
-  })();
+  const sedePrecioOdo = sedeDePrecio(sedeCx, paciente, sedeActiva);
   const yaItem = (servId, pieza) => (fichas[pacienteId]?.tratamiento || []).some((f) => f.estado !== "anulado" && String(f.servicioId) === String(servId) && String(f.pieza) === String(pieza));
   const agregarItems = (lineas) => {
     const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l, i) => ({ id: Date.now() + i, servicioId: l.serv.id, pieza: Number(l.pieza), cara: l.cara || undefined, nombre: nombreItem(l.serv, l.pieza, l.cara), costo: precioServicio(l.serv, sedePrecioOdo), sede: sedePrecioOdo ?? undefined, estado: "pendiente", origen: "odontograma" }));
@@ -7890,7 +7887,7 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   // La sede del estudio es la que devuelve el servidor (sin una fija: todo salía «San Isidro»).
   const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: r.sedeId ?? r.sede ?? null, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).catch(() => {}); else setRxRem([]); };
   useEffect(() => { recargarRx(); }, [pid, conectado]); // eslint-disable-line
-  const paciente = pacientes.find((p) => p.id === pid) || { id: pid, nombre: "Selecciona un paciente" };
+  const paciente = pacientes.find((p) => String(p.id) === String(pid)) || { id: pid, nombre: "Selecciona un paciente" };
   const lista = conectado ? rxRem : (estudios[pid] || []);
   const listaVista = esFotos ? lista.filter((s) => s.tipo === "foto") : lista.filter((s) => s.tipo !== "foto");
   // «Registrar en»: las sedes del usuario donde se atiende el paciente (mismaSede: con sesión

@@ -9,7 +9,7 @@ import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import { SUP, INF, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, demoPerio } from "../util/periodontal";
 import { FASES_PERIO, abrirInformePerio, guardarPrecio, sugerirPlan, totalesPlan } from "../util/perioPlan";
-import { DatosDemoCtx, SEDE_IDS, mismaSede, nombreSede, sedesDe, useSede } from "../comun";
+import { DatosDemoCtx, SEDE_IDS, mismaSede, nombreSede, sedeDePrecio, sedeNum, sedesDe, useSede } from "../comun";
 import { leerCatalogo, servicioPorId, precioServicio } from "../compartido/catalogo";
 import "./periodontograma.css";
 
@@ -187,16 +187,8 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   // monta el módulo o, si no, la elegida arriba; con «Todas», la del paciente si es una sola
   // de las del usuario; si no, la activa. Antes era la primera sede del paciente o San Isidro.
   const sedeCx = useSede();
-  const sedePrecio = (() => {
-    if (sedeId != null && sedeId !== "all") return sedeId;
-    const mias = sedeCx.mias || SEDE_IDS;
-    const aMia = (x) => mias.find((s) => mismaSede(s, x));
-    if (sedeCx.sede != null && sedeCx.sede !== "all") return aMia(sedeCx.sede) ?? sedeCx.sede;
-    const delPac = [...new Set(sedesDe(paciente).map(aMia).filter((x) => x != null))];
-    if (delPac.length === 1) return delPac[0];
-    if (sedeCx.activa != null) return aMia(sedeCx.activa) ?? sedeCx.activa;
-    return delPac[0] ?? mias[0] ?? null;
-  })();
+  // Sede de precio: la que pasa el llamador; si no, la regla común (menú › paciente › activa).
+  const sedePrecio = sedeId != null && sedeId !== "all" ? sedeNum(sedeId) : sedeDePrecio(sedeCx, paciente);
 
   useEffect(() => {
     setDientes(null); setError(false); setHist({ u: [], r: [] });
@@ -321,10 +313,13 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   let hechos = 0; [...SUP, ...INF].forEach((n) => { if (!dientes[n].ausente) hechos += dientes[n].pd.filter((v) => v != null).length; });
   const dxTono = dx.estado === "periodontitis" ? "r" : dx.estado === "gingivitis" ? "a" : dx.estado === "salud" ? "o" : "n";
   const datosPac = { nombre: paciente?.nombre || pacienteNombre, dni: paciente?.dni || "", hc: paciente?.hc || paciente?.numeroHc || paciente?.nroHc || "" };
-  const abrirProforma = () => {
+  // Plan sugerido con el precio de la sede (catálogo, o el corregido a mano para esa sede).
+  // Lo usan la proforma y el informe, para que los dos den el mismo costo.
+  const planConPrecios = () => {
     const cat = leerCatalogo();
-    setPf({ plan: sugerirPlan(dientes, dx, sedePrecio).map((x) => { const sv = servicioPorId(cat, SERV_PERIO[x.cod]); return sv ? { ...x, precio: precioServicio(sv, sedePrecio), servicioId: sv.id } : x; }), desc: 0 });
+    return sugerirPlan(dientes, dx, sedePrecio).map((x) => { const sv = servicioPorId(cat, SERV_PERIO[x.cod]); return sv ? { ...x, precio: precioServicio(sv, sedePrecio), servicioId: sv.id } : x; });
   };
+  const abrirProforma = () => setPf({ plan: planConPrecios(), desc: 0 });
   const agregarAlPresupuesto = () => {
     const items = pf.plan.filter((x) => x.incluir).map((x, i) => ({ id: Date.now() + i, servicioId: x.servicioId || null, nombre: `${x.nombre}${x.cant > 1 ? ` ×${x.cant}` : ""}${x.det ? ` · ${x.det}` : ""}`, costo: Math.round(x.cant * x.precio * (1 - (pf.desc || 0) / 100)), sede: sedePrecio ?? undefined, estado: "pendiente", origen: "periodontograma" }));
     if (!items.length) return;
@@ -343,7 +338,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   const informe = () => emitir(abrirInformePerio({
     dientes, m, dx, paciente: datosPac, profesional: profesionalActual(),
     criticos: criticos.map((x) => ({ ...x, sitio: sitioCorto(x.n, x.i) })),
-    plan: pf ? pf.plan : sugerirPlan(dientes, dx),
+    plan: pf ? pf.plan : planConPrecios(),
   }));
   const setItem = (id, k, v) => setPf((c) => ({ ...c, plan: c.plan.map((x) => (x.id === id ? { ...x, [k]: v } : x)) }));
   const delta = (a, b, dec = 0) => {

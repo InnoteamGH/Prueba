@@ -1399,6 +1399,18 @@ export const SedeCtx = React.createContext(null);
 export const sedeNum = (x) => (x == null || x === "" ? null : /^\d+$/.test(String(x)) ? Number(x) : (String(x).endsWith("a2") ? 2 : 1));
 /** ¿Son la misma sede? Acepta id numérico de la demo o UUID del servidor. */
 export const mismaSede = (a, b) => a != null && b != null && (String(a) === String(b) || sedeNum(a) === sedeNum(b));
+/** Sede con la que se cotiza a un paciente: la elegida en el menú; con «Todas», la del
+    paciente si tiene una sola entre las del usuario; si no, la activa. Devuelve siempre
+    el id 1/2, que es la clave de preciosSede en el catálogo. cx = useSede(). */
+export function sedeDePrecio(cx, paciente, activa = null) {
+  const mias = cx?.mias || SEDE_IDS;
+  const aMia = (x) => mias.find((m) => mismaSede(m, x));
+  if (cx?.sede != null && cx.sede !== "all") return sedeNum(aMia(cx.sede) ?? cx.sede);
+  const delPac = [...new Set(sedesDe(paciente).map(aMia).filter((x) => x != null).map(sedeNum))];
+  if (delPac.length === 1) return delPac[0];
+  const act = cx?.activa ?? activa;
+  return act != null && act !== "all" ? sedeNum(aMia(act) ?? act) : (delPac[0] ?? sedeNum(mias[0]));
+}
 export function useSede() {
   const c = React.useContext(SedeCtx);
   const ver = c?.ids || null;
