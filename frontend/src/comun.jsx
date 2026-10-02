@@ -861,8 +861,35 @@ export function usePersist(key, init) {
     try { const s = localStorage.getItem(K); if (s) return JSON.parse(s); } catch (e) {}
     return typeof init === "function" ? init() : init;
   });
-  useEffect(() => { try { localStorage.setItem(K, JSON.stringify(v)); } catch (e) {} }, [K, v]);
+  // Si el navegador se queda sin espacio, se avisa (antes se perdía el cambio en silencio).
+  useEffect(() => { try { localStorage.setItem(K, JSON.stringify(v)); } catch (e) { try { window.dispatchEvent(new CustomEvent("dc-almacen-lleno", { detail: key })); } catch (e2) { /* sin ventana */ } } }, [K, v]);
   return [v, setV];
+}
+
+/** Lee una imagen y la devuelve reducida (lado mayor `max` px, JPEG). Una foto de celular
+    de 3–5 MB queda en ~200–400 KB: suficiente para verla y comparar, y cabe al guardarla. */
+export function comprimirImagen(file, max = 1600, calidad = 0.82) {
+  return new Promise((res, rej) => {
+    const rd = new FileReader();
+    rd.onerror = rej;
+    rd.onload = () => {
+      if (!/^image\/(jpeg|png|webp)/.test(file.type || "")) { res(rd.result); return; }
+      const img = new Image();
+      img.onerror = () => res(rd.result);
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const cv = document.createElement("canvas");
+        cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+        const cx = cv.getContext("2d");
+        cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height);
+        cx.drawImage(img, 0, 0, cv.width, cv.height);
+        const out = cv.toDataURL("image/jpeg", calidad);
+        res(out.length < rd.result.length ? out : rd.result);
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
 }
 
 export const CITAS_INIT = [

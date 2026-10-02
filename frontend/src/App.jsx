@@ -58,7 +58,8 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto } from "./compartido/presupuestoDoc";
-import {SedeCtx, useSede, useEmiteCobros, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import { cruceAlergias } from "./compartido/alergias";
+import {SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -1346,7 +1347,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     setFmTabCita(tab);
     // Solo pacientes visibles (sede): nunca la semilla completa, que incluye otras sedes.
     const pid = c?.pacienteId ?? (conectado ? null : (pacientes.find((x) => x.nombre === c?.paciente) || {}).id);
-    if (pid != null) { setFmId(pid); setFichaCita(c); return; }
+    // La ficha es una página (#/pacientes/<id>/<pestaña>): se navega a ella.
+    if (pid != null) { setFmId(pid); setFichaCita(c); irHash("pacientes", { pacienteId: pid, tab: tab || undefined }); return; }
     notify("Esta cita no tiene un paciente registrado todavía.");
   };
   const [agendar, setAgendar] = useState(false);
@@ -6355,10 +6357,16 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   const [form, setForm] = useState(null);
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
   const nuevo = () => setForm({ paciente: pacientes[0]?.nombre || "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
-  const setItem = (i, k, v) => setForm((f) => ({ ...f, items: f.items.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
+  const setItem = (i, k, v) => setForm((f) => ({ ...f, alerta: null, forzar: false, items: f.items.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
   const emitir = () => {
     const items = form.items.filter((x) => x.med.trim());
     if (!items.length) { notify("Agrega al menos un medicamento."); return; }
+    // Seguridad: mismo cruce con las alergias que la receta de la ficha. Con alerta, hay que
+    // confirmar a propósito (segundo clic) para emitir.
+    const pAl = pacientes.find((p) => p.nombre === form.paciente) || {};
+    const alergiasPac = [...(fichas?.[pAl.id]?.alergias || []), ...(pAl.alergias || [])];
+    const avisos = cruceAlergias(alergiasPac, items.map((x) => x.med));
+    if (avisos.length && !form.forzar) { setForm((f) => ({ ...f, alerta: avisos, forzar: true })); notify("Alergia detectada: revisa el aviso antes de emitir."); return; }
     if (conectado) {
       const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
       if (!pid) { notify("Selecciona un paciente válido."); return; }
@@ -6398,7 +6406,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
         <Card style={{ padding: 20 }}>
           <div style={{ fontWeight: 600, color: NAVY, marginBottom: 14, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}><FileText size={16} strokeWidth={1.75} color={DS.c.primary} /> Nueva receta</div>
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br />
-            <div style={{ maxWidth: 320 }}><Select value={form.paciente} onChange={(v) => setForm({ ...form, paciente: v })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></div>
+            <div style={{ maxWidth: 320 }}><Select value={form.paciente} onChange={(v) => setForm({ ...form, paciente: v, alerta: null, forzar: false })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></div>
           </label>
           <div style={{ margin: "16px 0 8px", fontSize: 13, fontWeight: 500, color: NAVY }}>Medicamentos</div>
           <div style={{ display: "grid", gap: 8 }}>
@@ -6414,7 +6422,9 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
           </div>
           <button onClick={() => setForm((f) => ({ ...f, items: [...f.items, { med: "", dosis: "", frec: "", dur: "" }] }))} style={{ marginTop: 8, background: "none", border: "none", color: DS.c.primary, fontWeight: 500, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={14} strokeWidth={1.75} /> Agregar medicamento</button>
           <div style={{ marginTop: 14 }}><label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Indicaciones<br /><textarea className="dc-premium-inp" value={form.indic} onChange={(e) => setForm({ ...form, indic: e.target.value })} rows={2} placeholder="Tomar después de las comidas, no manejar..." style={{ ...inp, marginTop: 4, resize: "vertical" }} /></label></div>
-          <div style={{ marginTop: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={emitir}><Check size={15} strokeWidth={1.75} /> Firmar y emitir</Btn></div>
+          {(() => { const pA = pacientes.find((p) => p.nombre === form.paciente) || {}; const al = [...(fichas?.[pA.id]?.alergias || []), ...(pA.alergias || [])]; return al.length ? <div className="fm-aviso-edad is-mal" style={{ marginTop: 12 }}><AlertTriangle size={15} strokeWidth={2} /><span><b>Alergias del paciente:</b> {[...new Set(al)].join(", ")}. Se validan al emitir.</span></div> : null; })()}
+          {form.alerta?.length > 0 && <div className="fm-aviso-edad is-mal" style={{ marginTop: 10 }}><AlertTriangle size={15} strokeWidth={2} /><span><b>Alergia detectada:</b> {form.alerta.join("; ")}. Cambia el medicamento o pulsa «Emitir de todos modos» si lo indicas a sabiendas.</span></div>}
+          <div style={{ marginTop: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small kind={form.alerta?.length ? "red" : undefined} onClick={emitir}><Check size={15} strokeWidth={1.75} /> {form.alerta?.length ? "Emitir de todos modos" : "Firmar y emitir"}</Btn></div>
         </Card>
       )}
       <div style={{ display: "grid", gap: 12 }}>
@@ -8438,11 +8448,11 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
     const f = e.target.files && e.target.files[0]; if (!f) return;
     if (!f.type.startsWith("image/")) { notify("Selecciona una imagen (JPG o PNG)."); e.target.value = ""; return; }
     if (f.size > 8 * 1024 * 1024) { notify("La imagen supera 8 MB. Usa una más liviana."); e.target.value = ""; return; }
-    const rd = new FileReader();
-    rd.onload = () => setSubiendo(esFotos
-      ? { url: rd.result, tipo: "foto", vista: "intraoral_frontal", momento: "antes", nota: "", nombre: f.name }
-      : { url: rd.result, tipo: /pano/i.test(f.name) ? "panoramica" : /bite|aleta/i.test(f.name) ? "bitewing" : "periapical", piezas: "", nota: "", nombre: f.name });
-    rd.readAsDataURL(f);
+    // Se reduce antes de guardar: una foto de celular sin reducir llenaba el almacenamiento.
+    comprimirImagen(f).then((url) => setSubiendo(esFotos
+      ? { url, tipo: "foto", vista: "intraoral_frontal", momento: "antes", nota: "", nombre: f.name }
+      : { url, tipo: /pano/i.test(f.name) ? "panoramica" : /bite|aleta/i.test(f.name) ? "bitewing" : "periapical", piezas: "", nota: "", nombre: f.name }))
+      .catch(() => notify("No se pudo leer la imagen."));
     e.target.value = "";
   };
   const [borrarRx, setBorrarRx] = useState(null);
@@ -9206,6 +9216,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Sede concreta donde se registran las cosas nuevas (nunca "all").
   const sedeActiva = sede === "all" ? (sedeDetectada ?? misSedes[0] ?? 1) : sede;
   const sedeActivaRef = useRef(sedeActiva); sedeActivaRef.current = sedeActiva;
+  // Aviso si el navegador no pudo guardar (sin espacio): el último cambio no quedó guardado.
+  useEffect(() => {
+    const f = () => notify("No hay espacio en este navegador para guardar el último cambio. Borra fotos o archivos de prueba y vuelve a intentarlo.");
+    window.addEventListener("dc-almacen-lleno", f);
+    return () => window.removeEventListener("dc-almacen-lleno", f);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Contexto de sede para los módulos que no reciben props (modal de agendar, WhatsApp, etc.).
   // Doctores que atienden en las sedes que se ven (Agenda, Consolidado, asignar cupos).
   const medicosSede = useMemo(() => MEDICOS.filter((m) => { const ss = sedesDe(m).map(String); return !ss.length || idsSede.map(String).some((x) => ss.includes(x)); }), [idsSede]);

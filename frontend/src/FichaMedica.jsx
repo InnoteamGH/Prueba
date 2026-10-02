@@ -4,7 +4,7 @@ import { estadoLabel } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -1245,7 +1245,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   };
 
   const recargarRx = () => { if (conectado && pacienteId) api.radiografias.porPaciente(pacienteId).then((x) => setRx(x || [])).catch(() => { }); };
-  const leerArchivo = (file) => new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(file); });
+  // Las imágenes se reducen antes de guardarlas (una foto de celular llenaba el almacenamiento).
+  const leerArchivo = (file) => (/^image\//.test(file?.type || "") ? comprimirImagen(file) : new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(file); }));
   const crearArchivo = (url, tipo, nota) => api.radiografias.crear({ pacienteId, tipo: tipo || "Documento", fecha: hoy, url, nota: nota || null });
   const guardarEvolucion = async () => {
     if (!evo.diagnostico.trim() && !evo.detalle.trim()) { notify("Escribe el diagnóstico o la evolución."); return; }
