@@ -535,6 +535,7 @@ function Ortodoncia({ pacienteId, notify }) {
 const ITEM_VACIO = () => ({ medicamento: "", presentacion: "", dosis: "", frecuencia: "", duracion: "" });
 function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
   const demoDb = useContext(DatosDemoCtx);
+  const sedeRx = useSede();   // médico de la sesión: firma la receta en la demo
   const conectado = !!auth.token;
   const [items, setItems] = useState([ITEM_VACIO()]);
   const [indicaciones, setIndicaciones] = useState("");
@@ -644,7 +645,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
     }
     if (!auth.token) {
       // Demostración: la receta queda en la historia del paciente (y en el módulo Recetas).
-      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, recetas: [{ fecha: new Date().toISOString().slice(0, 10), items: body.items, indicaciones: body.indicaciones, texto: validos.map((x) => [x.medicamento, x.presentacion, x.dosis].filter(Boolean).join(" ")).join("; ") }, ...(cur.recetas || [])] }));
+      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, recetas: [{ fecha: new Date().toISOString().slice(0, 10), medico: sedeRx.rol === "medico" ? (sedeRx.nombre || "") : "", sede: sedeRx.activa ?? undefined, items: body.items, indicaciones: body.indicaciones, texto: validos.map((x) => [x.medicamento, x.presentacion, x.dosis].filter(Boolean).join(" ")).join("; ") }, ...(cur.recetas || [])] }));
       notify(alertas.length ? "Receta emitida (alerta de alergia registrada)." : "Receta emitida.");
       limpiar(); setAlergiaPend(null); onChange && onChange();
       return;
@@ -670,10 +671,10 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
     const filas = its.map((x) => `<div class="rx-item"><b>${esc(x.medicamento)}</b>${x.presentacion ? " — " + esc(x.presentacion) : ""}<div class="muted">${esc([x.dosis && ("Dosis: " + x.dosis), x.frecuencia && ("Frecuencia: " + x.frecuencia), x.duracion && ("Duración: " + x.duracion)].filter(Boolean).join("  –  "))}</div></div>`).join("");
     const edad = edadDe(paciente?.fechaNacimiento);
     imprimir("Receta médica", `
-      <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha || "")}</div></div>
+      <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha ? String(r.fecha).slice(0, 10).split("-").reverse().join("/") : "")}</div></div>
       <h2>Rp/</h2>${filas || '<div class="muted">—</div>'}
       ${r.indicaciones ? `<h2>Indicaciones</h2><div class="box">${esc(r.indicaciones)}</div>` : ""}
-      <div class="firma"><div>${esc(r.medico && r.medico !== "—" ? r.medico : "Firma y sello del profesional")}</div></div>`, notify);
+      <div class="firma"><div>${esc(r.medico && r.medico !== "—" ? r.medico : "Firma y sello del profesional")}${(() => { const m = MEDICOS.find((x) => x.nombre === r.medico); return m?.cop ? ` · COP ${esc(m.cop)}` : ""; })()}</div></div>`, notify);
   };
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
   return (
@@ -1060,16 +1061,20 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         const total = trat.reduce((a, t) => a + (Number(t.costo) || 0), 0);
         const pagado = (fc.pagos || []).reduce((a, g) => a + (Number(g.monto) || 0), 0);
         const medNom = (id) => (MEDICOS.find((m) => m.id === id) || {}).nombre || "";
-        const historia = (fc.historia || []).map((h, i) => ({ id: `demo-h${i}`, medico: medNom(1), diagnostico: h.diagnostico || h.titulo, ...h }));
-        const recetas = (fc.recetas || []).map((r2, i) => ({ id: `demo-r${i}`, medico: medNom(1), indicaciones: r2.indicaciones || r2.texto, ...r2 }));
+        const historia = (fc.historia || []).map((h, i) => ({ id: `demo-h${i}`, diagnostico: h.diagnostico || h.titulo, ...h, medico: h.medico || medNom(h.medicoId) || "" }));
+        // Cada receta con el médico que la emitió (antes todas salían de la Dra. del id 1).
+        const recetas = (fc.recetas || []).map((r2, i) => ({ id: `demo-r${i}`, indicaciones: r2.indicaciones || r2.texto, ...r2, medico: r2.medico || "" }));
         // La historia es compartida entre sedes: cada atención lleva el rótulo de su sede.
         const citas = ((demoDb && demoDb.citas) || CITAS_INIT).filter((c) => c.paciente === pac.nombre || String(c.pacienteId) === String(pac.id)).map((c) => ({ ...c, medico: c.medico || medNom(c.medicoId), sedeNombre: c.sedeNombre || (c.sede != null && nombreSede(c.sede) !== "—" ? nombreSede(c.sede) : "") }));
         const paciente = { ...pac, fechaNacimiento: pac.fechaNacimiento || pac.nacimiento || "", alergias: fc.alergias || [], antecedentes: fc.antecedentes || [] };
         setD({ paciente, resumen: { saldo: total - pagado, total, pagado, planTotal: total, invertido: pagado }, tratamientos: trat, pagos: fc.pagos || [], recetas, historia, citas });
         setFil({ nombre: pac.nombre || "", dni: pac.dni || "", telefono: pac.telefono || "", email: pac.email || "", fechaNacimiento: paciente.fechaNacimiento, genero: pac.genero || "", distrito: pac.distrito || "", aseguradora: pac.aseguradora && pac.aseguradora !== "Ninguno" ? pac.aseguradora : "",
           apoderadoNombre: pac.apoderadoNombre || "", apoderadoParentesco: pac.apoderadoParentesco || "", apoderadoDni: pac.apoderadoDni || "", apoderadoTelefono: pac.apoderadoTelefono || "" });
-        setFc((cur) => cur || { motivoConsulta: fc.historia?.[0]?.titulo ? `Control posterior a ${String(fc.historia[0].titulo).toLowerCase()}` : "", filiacion: { direccion: pac.distrito ? `Av. Principal 123, ${pac.distrito}` : "", ocupacion: "", estadoCivil: "", grupoSanguineo: "", contactoEmergencia: "", telefonoEmergencia: "" } });
+        // Lo guardado manda; el motivo de consulta empieza vacío (no se inventa a partir de la última nota).
+        setFc((cur) => cur || fc.fichaClinica || { motivoConsulta: "", filiacion: { direccion: pac.distrito ? `Av. Principal 123, ${pac.distrito}` : "", ocupacion: "", estadoCivil: "", grupoSanguineo: "", contactoEmergencia: "", telefonoEmergencia: "" } });
         setMedicos(MEDICOS.map((m) => ({ id: String(m.id), nombre: m.nombre, sedes: sedesDe(m) })));
+        // El doctor de la sesión queda elegido en «Atendido por» (evita atribuir la atención a otro).
+        { const yo = MEDICOS.find((m) => sedeCx?.nombre && m.nombre === sedeCx.nombre); if (yo) setEvoMedico((v) => v || String(yo.id)); }
         setConsentimientos((cur) => cur.length ? cur : [
           { id: "demo-c1", tipo: "Consentimiento general de atención", firmado: true, fechaFirma: pac.ultima || "", firmanteNombre: pac.apoderadoNombre || pac.nombre },
           ...(trat.some((t) => t.estado !== "completada") ? [{ id: "demo-c2", tipo: `Consentimiento para ${String(trat.find((t) => t.estado !== "completada").nombre).toLowerCase()}`, firmado: false }] : []),
@@ -1211,11 +1216,20 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     // que el servidor ya guarda como JSON, así no hace falta tocar el esquema del paciente.
     const nextFc = { ...(fc || {}), filiacion: { ...((fc || {}).filiacion || {}) } };
     anotar("editar", "Modificó la filiación", "Datos personales y de contacto");
-    if (!conectado) { setD((cur) => ({ ...cur, paciente: { ...cur.paciente, ...payload } })); setFc(nextFc); notify("Filiación guardada."); return; }
+    if (!conectado) { setD((cur) => ({ ...cur, paciente: { ...cur.paciente, ...payload } })); setFc(nextFc); guardarDemo({ ...payload, fichaClinica: nextFc }); notify("Filiación guardada."); return; }
     api.pacientes.actualizar(pacienteId, { ...payload, fichaClinica: JSON.stringify(nextFc) }).then(() => { notify("Filiación guardada."); cargar(); }).catch(() => notify("No se pudo guardar."));
   };
+  // Demo: lo clínico (alergias, antecedentes, ficha) va a la ficha del paciente y los datos
+  // personales al padrón, para que sigan ahí al volver (antes solo cambiaba la pantalla).
+  const guardarDemo = (patch) => {
+    if (!demoDb) return;
+    const clin = {}, pers = {};
+    Object.entries(patch || {}).forEach(([k, v]) => { (["alergias", "antecedentes", "fichaClinica"].includes(k) ? clin : pers)[k] = v; });
+    if (Object.keys(clin).length && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...(cur || {}), ...clin }));
+    if (Object.keys(pers).length && demoDb.setPacientes) demoDb.setPacientes((ps) => ps.map((x) => (String(x.id) === String(pacienteId) ? { ...x, ...pers } : x)));
+  };
   const savePac = (patch) => {
-    if (!conectado) { setD((cur) => ({ ...cur, paciente: { ...cur.paciente, ...patch } })); return Promise.resolve(); }
+    if (!conectado) { setD((cur) => ({ ...cur, paciente: { ...cur.paciente, ...patch } })); guardarDemo(patch); return Promise.resolve(); }
     return api.pacientes.actualizar(pacienteId, patch).then(cargar).catch(() => notify("No se pudo guardar."));
   };
   const addTag = () => { const t = tagIn.trim(); if (!t) return; const cur = arr(p.tags); if (!cur.includes(t)) savePac({ tags: [...cur, t] }); setTagIn(""); };
@@ -1226,7 +1240,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     if (!puedeEscribirClinico) return;
     const cur = arr(p.antecedentes); const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c];
     anotar("editar", "Modificó los antecedentes", `${cur.includes(c) ? "Quitó" : "Agregó"} «${c}»`);
-    if (!conectado) { setD((x) => ({ ...x, paciente: { ...x.paciente, antecedentes: next } })); return; }
+    if (!conectado) { setD((x) => ({ ...x, paciente: { ...x.paciente, antecedentes: next } })); guardarDemo({ antecedentes: next }); return; }
     api.pacientes.actualizar(pacienteId, { antecedentes: next }).then(cargar).catch(() => notify("No se pudo actualizar."));
   };
 
@@ -1234,6 +1248,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const saveFc = (next) => {
     if (!puedeEscribirClinico) return;
     if (conectado) api.pacientes.actualizar(pacienteId, { fichaClinica: JSON.stringify(next) }).catch(() => notify("No se pudo guardar la ficha."));
+    else guardarDemo({ fichaClinica: next });
   };
   const setFcField = (k, v) => { if (!puedeEscribirClinico) return; setFc((cur) => ({ ...(cur || {}), [k]: v })); };
   const blurFc = (k, v) => { if (!puedeEscribirClinico) return; const next = { ...(fc || {}), [k]: v }; setFc(next); saveFc(next); };
@@ -1259,7 +1274,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       // Queda en la historia del sistema (no sólo en esta ventana): al reabrir la ficha sigue ahí.
       if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, historia: [{ fecha: hoy, hora: ahora.toTimeString().slice(0, 5), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medico: med ? med.nombre : "", sede: sedeCx.activa ?? undefined }, ...(cur.historia || [])] }));
       anotar("crear", "Registró una evolución", evo.diagnostico || evo.detalle);
-      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify("Evolución registrada y firmada.");
+      // El anexo (foto o radiografía) va a Archivos del paciente, igual que con servidor.
+      if (evoFile && demoDb && demoDb.updFicha) {
+        try {
+          const url = await leerArchivo(evoFile);
+          demoDb.updFicha(pacienteId, (cur) => ({ ...cur, imagenes: [{ id: Date.now(), tipo: "foto", vista: "intraoral_frontal", momento: "control", fecha: hoy, sede: sedeCx.activa ?? undefined, url, nota: "Anexo de evolución" + (evo.diagnostico ? " – " + evo.diagnostico : "") }, ...((cur && cur.imagenes) || [])] }));
+        } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); }
+      }
+      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify(evoFile ? "Evolución registrada y firmada, con su anexo en Archivos." : "Evolución registrada y firmada.");
       return;
     }
     try {

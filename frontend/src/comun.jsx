@@ -1457,7 +1457,7 @@ export function useSede() {
     sede: c?.sede ?? "all", ids: c?.ids ?? null, mias: c?.mias ?? null, activa: c?.activa ?? null,
     pacientes: c?.pacientes ?? null, citas: c?.citas ?? null,
     /** true = el usuario es de toda la clínica (sedes "all"); false = solo algunas sedes. */
-    global: c ? c.global !== false : true, rol: c?.rol ?? null,
+    global: c ? c.global !== false : true, rol: c?.rol ?? null, nombre: c?.nombre ?? null,
     /** ¿Alguna de estas sedes se ve con el filtro actual? (sin sede = sí) */
     enSede: (x) => { const l = [].concat(x ?? []).filter((v) => v != null && v !== ""); return !ver || !l.length || l.some((v) => ver.some((w) => mismaSede(v, w))); },
     /** ¿La sede es del usuario (aunque el filtro muestre otra)? */

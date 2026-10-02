@@ -5483,3 +5483,4 @@ button, input, select, textarea { font-family: inherit; }
 /* Ocupación: el botón central muestra la semana elegida y vuelve a la actual */
 .dc-ocs__nav--hero .is-otra { display: inline-grid; line-height: 1.1; padding: 4px 12px; height: auto; min-height: 30px; text-align: center; }
 .dc-ocs__nav--hero .is-otra small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }
+.dc-rx2__pie { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--dc-line); margin-top: 6px; }

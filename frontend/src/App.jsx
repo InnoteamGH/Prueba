@@ -6345,7 +6345,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       if (!p) return;
       let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; }
       const items = its.length ? its.map((x) => ({ med: [x.medicamento || x.med, x.presentacion, x.dosis].filter(Boolean).join(" "), detalle: [x.frecuencia, x.duracion, x.detalle].filter(Boolean).join(" – ") })) : [{ med: r.texto || "", detalle: "" }];
-      out.push({ id: pid + "-" + i, paciente: p.nombre, fecha: r.fecha, items, indic: r.indicaciones || "", firmada: true });
+      out.push({ id: pid + "-" + i, paciente: p.nombre, dni: p.dni || "", fecha: r.fecha, items, indic: r.indicaciones || "", firmada: true, medico: r.medico || "", sede: r.sede });
     }));
     return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   }, [fichas, pacProp]);
@@ -6354,6 +6354,21 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto]); // eslint-disable-line
   // GET /recetas trae las de toda la organización: se muestran solo las de pacientes visibles.
   const recetas = conectado ? recetasRem.filter((r) => pacientes.some((p) => String(p.id) === String(r.pacienteId))) : recetasDemo;
+  // Receta para imprimir o guardar en PDF, con el membrete de la sede y la firma con COP.
+  const imprimirReceta = (r) => {
+    const esc2 = (x) => String(x ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const med = MEDICOS.find((m) => m.nombre === r.medico);
+    const ok = abrirDocumento({
+      titulo: "Receta médica", tituloVentana: `Receta - ${r.paciente}`, sub: `Fecha: ${fechaLegible(r.fecha)}`,
+      datos: !conectado && r.sede != null ? datosDemo(numSede(r.sede)) : undefined,
+      css: `.rx-m{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:12px;margin:6px 0 14px}.rx-i{padding:8px 0;border-bottom:1px solid #E4DED5;font-size:13px}.rx-i small{display:block;color:#6b635a}.rx-f{margin-top:50px;text-align:center;font-size:12px}.rx-f div{display:inline-block;border-top:1px solid #1B1614;padding-top:6px;min-width:260px}`,
+      cuerpo: `<div class="rx-m"><span><b>Paciente:</b> ${esc2(r.paciente)}</span>${r.dni ? `<span><b>DNI:</b> ${esc2(r.dni)}</span>` : ""}<span><b>Fecha:</b> ${esc2(fechaLegible(r.fecha))}</span></div><h3>Rp/</h3>`
+        + (r.items || []).map((it) => `<div class="rx-i"><b>${esc2(it.med)}</b>${it.detalle ? `<small>${esc2(it.detalle)}</small>` : ""}</div>`).join("")
+        + (r.indic ? `<h3>Indicaciones</h3><p>${esc2(r.indic)}</p>` : "")
+        + `<div class="rx-f"><div>${esc2(r.medico || "Firma y sello del profesional")}${med?.cop ? ` · COP ${esc2(med.cop)}` : ""}</div></div>`,
+    });
+    if (!ok) notify("Permite ventanas emergentes para imprimir la receta.");
+  };
   const [form, setForm] = useState(null);
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
   const nuevo = () => setForm({ paciente: pacientes[0]?.nombre || "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
@@ -6381,7 +6396,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     const pid = pacientes.find((p) => p.nombre === form.paciente)?.id;
     if (!pid) { notify("Selecciona un paciente válido."); return; }
     const texto = items.map((x) => `${x.med}${x.dosis ? " " + x.dosis : ""}${x.frec ? " " + x.frec : ""}${x.dur ? " por " + x.dur : ""}`).join("; ");
-    if (updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), sede: sedeCx.activa ?? undefined, texto, indicaciones: form.indic || "", items: JSON.stringify(items.map((x) => ({ medicamento: x.med, dosis: x.dosis, frecuencia: x.frec, duracion: x.dur }))) }, ...(cur.recetas || [])] }));
+    if (updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), sede: sedeCx.activa ?? undefined, medico: sedeCx.rol === "medico" ? (sedeCx.nombre || "") : "", texto, indicaciones: form.indic || "", items: JSON.stringify(items.map((x) => ({ medicamento: x.med, dosis: x.dosis, frecuencia: x.frec, duracion: x.dur }))) }, ...(cur.recetas || [])] }));
     notify("Receta emitida y firmada. Queda en la ficha del paciente y se envía por WhatsApp/correo.");
     setForm(null);
   };
@@ -6456,6 +6471,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                   {(r.items || []).map((it, k) => <li key={k}><span className="dc-rx2__rx">℞</span><div><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div></li>)}
                 </ul>
                 {r.indic && <p className="dc-rx2__indic"><Info size={13} strokeWidth={2} /> {r.indic}</p>}
+                <footer className="dc-rx2__pie"><button type="button" className="dc-mini-btn" onClick={() => imprimirReceta(r)}><Printer size={13} strokeWidth={2} /> Imprimir / PDF</button></footer>
               </article>
             );
             if (vista === "lista") return (
@@ -6467,6 +6483,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                     <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div>
                     <span className="dc-rx2__n">{(r.items || []).length} {(r.items || []).length === 1 ? "medicamento" : "medicamentos"}</span>
                     <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
+                    <button type="button" className="dc-mini-btn" aria-label={`Imprimir receta de ${r.paciente}`} title="Imprimir / PDF" onClick={() => imprimirReceta(r)}><Printer size={13} strokeWidth={2} /></button>
                   </div>
                 ))}
               </div>
@@ -9225,7 +9242,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Contexto de sede para los módulos que no reciben props (modal de agendar, WhatsApp, etc.).
   // Doctores que atienden en las sedes que se ven (Agenda, Consolidado, asignar cupos).
   const medicosSede = useMemo(() => MEDICOS.filter((m) => { const ss = sedesDe(m).map(String); return !ss.length || idsSede.map(String).some((x) => ss.includes(x)); }), [idsSede]);
-  const sedeCtx = useMemo(() => ({ sede, ids: idsSede, mias: misSedes, activa: sedeActiva, pacientes: pf, citas: cf, global: usuario.sedes === "all", rol }), [sede, idsSede, misSedes.join(","), sedeActiva, pf, cf, usuario.sedes, rol]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sedeCtx = useMemo(() => ({ sede, ids: idsSede, mias: misSedes, activa: sedeActiva, pacientes: pf, citas: cf, global: usuario.sedes === "all", rol, nombre: usuario.nombre }), [sede, idsSede, misSedes.join(","), sedeActiva, pf, cf, usuario.sedes, rol, usuario.nombre]); // eslint-disable-line react-hooks/exhaustive-deps
   // Membrete de los documentos: la empresa es una sola; dirección, teléfonos y horario
   // son los de la sede desde donde se emite (la activa). Ver util/membrete.js.
   useEffect(() => {
