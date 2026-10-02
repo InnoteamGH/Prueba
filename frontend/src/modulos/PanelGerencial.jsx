@@ -5,6 +5,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Info, RefreshCw, BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
 import api, { auth } from "../api/client";
+import { sedeApiUuid } from "../routing";
 import {
   curvaCajaAcumulada,
   diaDelMesRitmo,
@@ -872,8 +873,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       .then((r) => setTratResumen(r || []))
       .catch(() => setTratResumen([]));
     api.pacientes.resumen().then((r) => setPacResumen(r || [])).catch(() => setPacResumen([]));
-    api.inventario.listar().then((rows) => {
-      const list = Array.isArray(rows) ? rows : [];
+    api.inventario.listar(verSedes ? verSedes.map(sedeApiUuid) : null).then((rows) => {
+      // Solo el almacén de las sedes que se ven.
+      const list = (Array.isArray(rows) ? rows : []).filter((it) => deSede({ sedeId: it.sedeId ?? it.sede }));
       let total = 0;
       let ok = false;
       for (const it of list) {

@@ -3603,8 +3603,9 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
   const asignar = (p) => {
     if (onAsignar) { onAsignar(p); return; }
     const sedeP = sedeDeEntrada(p) ?? activa;
-    const med = MEDICOS.find((m) => m.nombre === p.medico && sedesDe(m).some((x) => mismaSede(x, sedeP)));
     const espId = ESPECIALIDADES.find((x) => x.nombre === p.e)?.id;
+    // El preferido solo si atiende en esa sede y hace ese servicio.
+    const med = MEDICOS.find((m) => m.nombre === p.medico && (!espId || espsDe(m).includes(espId)) && sedesDe(m).some((x) => mismaSede(x, sedeP)));
     setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), _esperaId: p.id });
   };
   const nuevoEspera = () => { setBusca(""); setAbrePac(false); setNuevoEsp({ pacienteId: null, n: "", tel: "", dni: "", e: "Odontología general", medico: "Cualquiera", pref: "Indiferente", urg: "media", esNuevo: false, sede: (SEDES.find((x) => mismaSede(x.id, activa)) || {}).id ?? activa }); };
@@ -5324,7 +5325,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   const [real, setReal] = useState(null);
   const [detK, setDetK] = useState(null);
   useEffect(() => {
-    if (conectado) api.miProduccion(sedes).then(setReal).catch(() => setReal({ fallo: true }));
+    if (conectado) api.miProduccion(sedes ? sedes.map(sedeApiUuid) : null).then(setReal).catch(() => setReal({ fallo: true }));
   }, [sedes && sedes.join(",")]); // eslint-disable-line
 
   // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1).
@@ -8862,7 +8863,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     if (/endodon|extrac|cirug|implante|corona/i.test(proc)) kit.push("Anestesia lidocaína 2%", "Agujas dentales cortas");
     if (/obtura|resina|reconstr/i.test(proc)) kit.push("Resina compuesta A2", "Ácido grabador 37%");
     const sd = sedeConsumo ?? sedeActivaRef.current;
-    setInventario((its) => its.map((x) => (x.sede == null || mismaSede(x.sede, sd)) && kit.some((k) => x.nombre === k || x.nombre.includes(k)) ? { ...x, stock: Math.max(0, x.stock - 1) } : x));
+    setInventario((its) => its.map((x) => mismaSede(x.sede ?? SEDE_IDS[0], sd) && kit.some((k) => x.nombre === k || x.nombre.includes(k)) ? { ...x, stock: Math.max(0, x.stock - 1) } : x));
   };
   const [staff, setStaff] = usePersist("staff", STAFF_INIT);
   // Permisos por ROL a nivel de acción (defaults editables): { rol: { modId: [acciones] } }.
