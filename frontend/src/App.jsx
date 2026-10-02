@@ -8237,10 +8237,6 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [liquidaciones, setLiquidaciones] = usePersist("liquidaciones", LIQ_SEED);
   const [espera, setEspera] = usePersist("espera", ESPERA_INIT);   // lista de espera compartida (P1-3)
   const [pacienteActivo, setPacienteActivo] = useState(null); // paciente en atención (P1-1)
-  // Si cambia la sede y el paciente en atención ya no está entre los visibles, se suelta.
-  useEffect(() => {
-    if (pacienteActivo != null && !auth.token && !pf.some((p) => String(p.id) === String(pacienteActivo))) setPacienteActivo(null);
-  }, [pf]); // eslint-disable-line react-hooks/exhaustive-deps
   // Ir a un módulo con un paciente ya elegido (p. ej. «Abrir en Periodontograma» desde la ficha).
   useEffect(() => {
     const ir = (e) => { const d = e.detail || {}; if (d.pacienteId != null) setPacienteActivo(/^\d+$/.test(String(d.pacienteId)) ? Number(d.pacienteId) : d.pacienteId); if (d.vista) window.location.hash = `#/${d.vista}`; };
@@ -8531,6 +8527,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Filtrado por sede: "all" = todas las sedes del usuario; si no, la sede activa.
   const cf = useMemo(() => { const ids = (sede === "all" ? misSedes : [sede]).map(String); return citas.filter((c) => ids.includes(String(c.sede))); }, [citas, sede, misSedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const pf = useMemo(() => { const ids = (sede === "all" ? misSedes : [sede]).map(String); return pacientes.filter((p) => sedesDe(p).some((s) => ids.includes(String(s)))); }, [pacientes, sede, misSedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Si cambia la sede y el paciente en atención ya no está entre los visibles, se suelta.
+  useEffect(() => {
+    if (pacienteActivo != null && !auth.token && !pf.some((p) => String(p.id) === String(pacienteActivo))) setPacienteActivo(null);
+  }, [pf]); // eslint-disable-line react-hooks/exhaustive-deps
   // Si cambian las sedes del usuario (refresco de sesión) y la elegida ya no es suya, se vuelve a las suyas.
   useEffect(() => {
     if (sede !== "all" && !misSedes.map(String).includes(String(sede))) setSede(multisede ? "all" : (misSedes[0] ?? "all"));
