@@ -1751,7 +1751,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {onAgendar && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
-            {onCobrar && debe && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
+            {onCobrar && debe && rol !== "medico" && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
             {puedeEscribirClinico && <button onClick={() => { anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }} style={btn("ghost")}><Printer size={15} strokeWidth={1.75} /> Imprimir HC</button>}
             {pagina ? null : <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>}
           </div>
@@ -2349,7 +2349,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {tab === "cuenta" && !slots?.plan && (
               <>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: -4 }}>
-                  {onCobrar && debe && (
+                  {onCobrar && debe && rol !== "medico" && (
                     <button onClick={() => onCobrar(p)} style={btn()} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Cobrar</button>
                   )}
                 </div>

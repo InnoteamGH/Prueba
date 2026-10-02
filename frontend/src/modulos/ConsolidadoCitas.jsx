@@ -44,7 +44,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       .finally(() => setCargando(false));
   }, [conectado, rango.desde, rango.hasta, sedesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const miId = esMedico && !conectado ? (medicos.find((m) => m.nombre === usuario?.nombre) || medicos[0] || {}).id : null;
+  const miId = esMedico && !conectado ? (medicos.find((m) => m.nombre === usuario?.nombre) || { id: "__ninguno" }).id : null;   // sin coincidencia no muestra las de otro doctor
   const nomMed = (c) => c.medico || (medicos.find((m) => m.id === c.medicoId) || {}).nombre || "Sin asignar";
   const filas = useMemo(() => {
     const base = (conectado ? (remotas || []) : citas.filter((c) => c.fecha >= rango.desde && c.fecha <= rango.hasta && (miId == null || c.medicoId === miId)))
@@ -115,6 +115,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
         <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : "Sin citas en el rango"} sub="Cambia las fechas para ver otro periodo." /></Card>
       ) : (
         <ListaFiltrable rows={filas} sub="citas" vistaClave="citas_consolidado"
+          exportTitulo={`Consolidado de citas${rol === "medico" && usuario?.nombre ? ` · ${usuario.nombre}` : ""}${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`}
           vistas={[{ id: "dia", label: "Por día", icon: CalendarDays }]}
           tabla={{ primero: true, minWidth: 860, onRowClick: onAbrirCita, cols: [
             { key: "f", label: "Fecha", w: "120px", cell: (c) => <span className="dc-tp__num">{fechaLegible(c.fecha)}</span> },
@@ -123,7 +124,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
             { key: "m", label: "Motivo", w: "minmax(150px,1.1fr)", get: (c) => c.motivo || "—" },
             ...(esMedico ? [] : [{ key: "d", label: "Doctor", w: "minmax(150px,1fr)", get: (c) => c.medico }]),
             { key: "s", label: "Sede", w: "130px", get: (c) => c.sedeNombre },
-            { key: "e", label: "Estado", w: "130px", a: "center", cell: (c) => badge(c.estado) },
+            { key: "e", label: "Estado", w: "130px", a: "center", cell: (c) => badge(estadoCita(c)) },
           ] }}
           cols={[
             { key: "fecha", label: "Fecha", get: (c) => c.fecha },
@@ -153,7 +154,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
                             <span className="dc-cons__hora">{vista === "doctor" ? <><b>{c.hora}</b><small>{fechaLegible(c.fecha)}</small></> : <b>{c.hora}</b>}</span>
                             <span className="dc-cons__dot" style={{ background: colorDe(c.paciente) }} />
                             <div><b>{c.paciente}</b><small>{c.motivo || "Consulta"}{vista !== "doctor" && !esMedico ? ` · ${c.medico}` : ""}</small></div>
-                            {badge(c.estado)}
+                            {badge(estadoCita(c))}
                           </li>
                         ))}
                       </ul>
