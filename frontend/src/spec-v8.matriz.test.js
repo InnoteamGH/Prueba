@@ -91,7 +91,8 @@ describe("SPEC v8 A33 KPI plano", () => {
 describe("SPEC v8 INV-01 cobertura nombra insumo", () => {
   it("KPI cobertura incluye nombre", () => {
     assert.match(app, /covMinInsumo/);
-    assert.match(app, /~\$\{covMinHoy\} d – \$\{covMinInsumo\.nombre\}/);
+    // La cifra dice qué insumo se acaba primero (pedido de la clínica: antes «~0 d» no se entendía).
+    assert.match(app, /Se acaba primero: \$\{covMinInsumo\.nombre\}/);
   });
 });
 
