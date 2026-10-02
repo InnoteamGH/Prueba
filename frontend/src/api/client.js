@@ -435,7 +435,7 @@ export const api = {
     registrar: (body) => request("POST", "/comisiones/pagos", body),
   },
   // Numeros del medico en sesion. Devuelve { esMedico: false } si el usuario no atiende.
-  miProduccion: () => request("GET", "/mi-produccion"),
+  miProduccion: (sedes) => request("GET", `/mi-produccion${conQuery({ sedeIds: sedes })}`),
   gerencial: (sedes) => request("GET", `/gerencial/kpis${conQuery({ sedeIds: sedes })}`),
   // Indicadores de gestion calculados sobre la base: conversion de presupuestos,
   // deuda por antiguedad, ocupacion de agenda y estado de la cartera.

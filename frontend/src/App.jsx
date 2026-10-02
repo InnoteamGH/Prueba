@@ -1129,28 +1129,29 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
         </div>
       )}
       {turno && (() => {
-        const meds = (reglas?.medicos || []);
+        // Solo doctores que atienden en la sede del sillón.
+        const meds = (reglas?.medicos || []).filter((m) => { const ss = sedesDe(m); return !ss.length || ss.some((x) => mismaSede(x, turno.s.sede)); });
         const delDia = (reglas?.asignaciones || []).filter((a) => a.fecha === turno.fecha && String(a.sede) === String(turno.s.sede) && String(a.sillon) === String(turno.s.numero)).sort((a, b) => a.desde.localeCompare(b.desde));
         const nom = (id) => (meds.find((m) => String(m.id) === String(id)) || {}).nombre || "Doctor";
         const choca = delDia.find((a) => a.desde < turno.hasta && turno.desde < a.hasta);
         const ajenas = citas.filter((c) => c.fecha === turno.fecha && String(c.sede) === String(turno.s.sede) && sillonDe(c) === turno.s.numero && ACTIVA(c) && turno.medicoId && String(c.medicoId) !== String(turno.medicoId) && c.hora >= turno.desde && c.hora < turno.hasta);
-        const tsDoc = turno.medicoId ? turnosDoc(turno.medicoId, turno.fecha) : [];
+        const tsDoc = turno.medicoId ? turnosDelDia(reglas?.disp || [], turno.medicoId, turno.fecha, turno.s.sede) : [];
         const atiende = !turno.medicoId || !conHorario(turno.medicoId) || tsDoc.some((t) => String(t.horaInicio).slice(0, 5) <= turno.desde && turno.hasta <= String(t.horaFin).slice(0, 5) && (t.sede == null || String(t.sede) === String(turno.s.sede)));
         const RANGOS = [["manana", "Mañana", "08:00", "13:00"], ["tarde", "Tarde", "14:00", "19:00"], ["dia", "Todo el día", "08:00", "20:00"]];
         const guardarT = () => {
           if (!turno.medicoId) return;
           if (turno.hasta <= turno.desde) return;
-          if (choca) return;
+          if (choca || !atiende) return;
           onAsignar({ sede: turno.s.sede, sillon: turno.s.numero, fecha: turno.fecha, desde: turno.desde, hasta: turno.hasta, medicoId: turno.medicoId });
           setTurno({ ...turno, medicoId: "" });
         };
         return (
           <Modal icon={<Armchair size={20} strokeWidth={1.75} />} titulo={`Turnos de ${turno.s.nombre}`} sub={`${fechaLegible(turno.fecha)} · ${nombreSedeCal(String(turno.s.sede))}`} size="corto" onClose={() => setTurno(null)}
-            footer={<><Btn small kind="ghost" onClick={() => setTurno(null)}>Cerrar</Btn><Btn small onClick={guardarT} disabled={!turno.medicoId || !!choca || turno.hasta <= turno.desde}><Check size={14} strokeWidth={2} /> Asignar</Btn></>}>
+            footer={<><Btn small kind="ghost" onClick={() => setTurno(null)}>Cerrar</Btn><Btn small onClick={guardarT} disabled={!turno.medicoId || !!choca || !atiende || turno.hasta <= turno.desde}><Check size={14} strokeWidth={2} /> Asignar</Btn></>}>
             <div style={{ display: "grid", gap: 12 }}>
               <p className="dc-cal__tnota">Durante el turno el sillón queda reservado para ese doctor, aunque normalmente sea flexible o de otro doctor. Fuera del turno vuelve a su uso habitual ({etiquetaUso(turno.s, reglas || {}).txt.toLowerCase()}).</p>
               {delDia.length > 0 && <div className="dc-cal__tlista">{delDia.map((a) => <div key={a.id}><Armchair size={14} strokeWidth={2} /><b>{nom(a.medicoId)}</b><span>{a.desde}–{a.hasta}</span>{onQuitarAsignacion && <button type="button" aria-label={`Quitar turno de ${nom(a.medicoId)}`} onClick={() => onQuitarAsignacion(a.id)}><X size={13} strokeWidth={2.2} /></button>}</div>)}</div>}
-              <label className="dc-fe__lbl">Doctor<Select value={turno.medicoId} onChange={(v) => setTurno({ ...turno, medicoId: v })} placeholder="— Selecciona —" options={meds.map((m) => { const ts = turnosDoc(m.id, turno.fecha); return { value: m.id, label: m.nombre, sub: conHorario(m.id) ? (ts.length ? `Atiende ${txtTurnos(ts)}` : "No atiende ese día") : "Sin horario configurado" }; })} /></label>
+              <label className="dc-fe__lbl">Doctor<Select value={turno.medicoId} onChange={(v) => setTurno({ ...turno, medicoId: v })} placeholder="— Selecciona —" options={meds.map((m) => { const ts = turnosDelDia(reglas?.disp || [], m.id, turno.fecha, turno.s.sede); return { value: m.id, label: m.nombre, sub: conHorario(m.id) ? (ts.length ? `Atiende ${txtTurnos(ts)}` : "No atiende ese día") : "Sin horario configurado" }; })} /></label>
               <div className="dc-fe__seg" role="radiogroup" aria-label="Turno">{RANGOS.map(([k, l, d, h]) => <button key={k} type="button" className={turno.rango === k ? "is-on" : ""} onClick={() => setTurno({ ...turno, rango: k, desde: d, hasta: h })}>{l}</button>)}</div>
               <div className="dc-fe__duo">
                 <label className="dc-fe__lbl">Desde<input className="dc-premium-inp" type="time" value={turno.desde} onChange={(e) => setTurno({ ...turno, rango: "", desde: e.target.value })} /></label>
@@ -1158,7 +1159,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
               </div>
               {(choca || !atiende || ajenas.length > 0) && <div className="dc-agm__val">
                 {choca && <p className="is-err"><Lock size={13} strokeWidth={2.2} /> Se cruza con el turno de {nom(choca.medicoId)} ({choca.desde}–{choca.hasta}).</p>}
-                {!atiende && <p className="is-avi"><Info size={13} strokeWidth={2.2} /> {nom(turno.medicoId)} no atiende en esta sede todo ese rango ({tsDoc.length ? txtTurnos(tsDoc) : "no atiende ese día"}).</p>}
+                {!atiende && <p className="is-err"><Info size={13} strokeWidth={2.2} /> {nom(turno.medicoId)} no atiende en esta sede todo ese rango ({tsDoc.length ? txtTurnos(tsDoc) : "no atiende ese día"}).</p>}
                 {ajenas.length > 0 && <p className="is-avi"><Info size={13} strokeWidth={2.2} /> Hay {ajenas.length} {ajenas.length === 1 ? "cita" : "citas"} de otro doctor en este sillón en ese rango; se mantienen, pero conviene moverlas.</p>}
               </div>}
             </div>
@@ -5050,8 +5051,8 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   const [real, setReal] = useState(null);
   const [detK, setDetK] = useState(null);
   useEffect(() => {
-    if (conectado) api.miProduccion().then(setReal).catch(() => setReal({ fallo: true }));
-  }, []); // eslint-disable-line
+    if (conectado) api.miProduccion(sedes).then(setReal).catch(() => setReal({ fallo: true }));
+  }, [sedes && sedes.join(",")]); // eslint-disable-line
 
   // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1).
   const miMed = MEDICOS.find((m) => m.nombre === usuario.nombre) || MEDICOS[0];
