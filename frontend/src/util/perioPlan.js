@@ -22,14 +22,16 @@ export const FASES_PERIO = { 1: "Fase inicial (causal)", 2: "Reevaluación", 3: 
 const QN = { 1: "Q1 sup. der.", 2: "Q2 sup. izq.", 3: "Q3 inf. izq.", 4: "Q4 inf. der." };
 const sext = (n) => { const q = Math.floor(n / 10), d = n % 10; return q === 1 ? (d >= 4 ? "18–14" : "13–23") : q === 2 ? (d >= 4 ? "24–28" : "13–23") : q === 3 ? (d >= 4 ? "38–34" : "33–43") : (d >= 4 ? "44–48" : "33–43"); };
 
-/* Precios editados por la clínica: se recuerdan para la próxima proforma. */
+/* Precios editados por la clínica: se recuerdan para la próxima proforma. Cada sede cobra
+   distinto, así que se guardan por sede: un precio corregido en Surco no se propone en San Isidro. */
 const CLAVE_PRECIOS = "dc_perio_precios";
-export function preciosGuardados() { try { return JSON.parse(localStorage.getItem(CLAVE_PRECIOS) || "{}") || {}; } catch { return {}; } }
-export function guardarPrecio(cod, precio) { const p = preciosGuardados(); p[cod] = precio; try { localStorage.setItem(CLAVE_PRECIOS, JSON.stringify(p)); } catch { /* sin espacio */ } }
+const clavePrecios = (sede) => (sede != null && sede !== "" && sede !== "all" ? `${CLAVE_PRECIOS}_${sede}` : CLAVE_PRECIOS);
+export function preciosGuardados(sede = null) { try { return JSON.parse(localStorage.getItem(clavePrecios(sede)) || "{}") || {}; } catch { return {}; } }
+export function guardarPrecio(cod, precio, sede = null) { const p = preciosGuardados(sede); p[cod] = precio; try { localStorage.setItem(clavePrecios(sede), JSON.stringify(p)); } catch { /* sin espacio */ } }
 
-/** Partidas sugeridas según el sondaje y la orientación diagnóstica. */
-export function sugerirPlan(dientes, dx) {
-  const pr = preciosGuardados(), it = [];
+/** Partidas sugeridas según el sondaje y la orientación diagnóstica (precios de esa sede). */
+export function sugerirPlan(dientes, dx, sede = null) {
+  const pr = preciosGuardados(sede), it = [];
   const add = (c, cant, det, extra = {}) => {
     if (cant > 0) it.push({ id: c, cod: c, nombre: CATALOGO_PERIO[c].nombre, precio: pr[c] ?? CATALOGO_PERIO[c].precio, cant, det, fase: CATALOGO_PERIO[c].fase, incluir: true, ...extra });
   };

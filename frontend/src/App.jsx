@@ -1773,8 +1773,12 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const puedeGestionar = can ? can("pacientes", "crear") : true;
   // Modo conectado (JWT presente): los datos vienen del backend real; si no, demo.
   const conectado = !!auth.token;
+  const sedeCx = useSede();
+  // Sedes que el usuario gestiona (las de su cuenta, no solo las del filtro de arriba).
+  const esMiaPac = (s) => misSedes.some((m) => mismaSede(m, s));
   const sedeInt = (uuid) => (uuid && String(uuid).endsWith("a2")) ? 2 : 1;
-  const mapPac = (p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", sede: sedeInt(p.sedeRegistroId), sedes: [sedeInt(p.sedeRegistroId)], ultima: p.ultimaVisita || null, nacimiento: p.fechaNacimiento || "", creadoEn: p.creadoEn || null, alergias: p.alergias || [], genero: p.genero || "", distrito: p.distrito || "", aseguradora: p.aseguradora || "", comentario: p.comentario || "", tags: Array.isArray(p.tags) ? p.tags : [], marketing: p.marketing === true, canal: p.canal || null,
+  // sedeRegistroId se conserva: con él se filtra el padrón por la sede elegida arriba.
+  const mapPac = (p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", sede: sedeInt(p.sedeRegistroId), sedes: [sedeInt(p.sedeRegistroId)], sedeRegistroId: p.sedeRegistroId || null, ultima: p.ultimaVisita || null, nacimiento: p.fechaNacimiento || "", creadoEn: p.creadoEn || null, alergias: p.alergias || [], genero: p.genero || "", distrito: p.distrito || "", aseguradora: p.aseguradora || "", comentario: p.comentario || "", tags: Array.isArray(p.tags) ? p.tags : [], marketing: p.marketing === true, canal: p.canal || null,
     // El backend los devuelve (PacienteController 56-59) y aqui se descartaban: al editar
     // un menor quedaban vacios en el formulario y al guardar se borraba su apoderado.
     apoderadoNombre: p.apoderadoNombre || "", apoderadoParentesco: p.apoderadoParentesco || "",
@@ -1814,10 +1818,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // En conectado, la última visita y la próxima cita vienen ya resueltas del backend
   // (GET /pacientes/resumen-citas). Antes se pedía `citas.listar("all")`, que traía TODO
   // el histórico de citas de la clínica al navegador para derivar solo esos dos datos.
-  // En demo se calculan sobre las citas vivas de la Agenda (contexto), no sobre la semilla.
+  // En demo se calculan sobre las citas vivas de la Agenda (contexto), no sobre la semilla,
+  // y solo las de las sedes que se ven: la próxima cita de otra sede no es de este directorio.
   const dbPac = useContext(DatosDemoCtx);
   const [citasSrcRem, setCitasSrc] = useState([]);
-  const citasSrc = conectado ? citasSrcRem : (dbPac?.citas || CITAS_INIT);
+  const citasSrc = conectado ? citasSrcRem : (sedeCx.citas || dbPac?.citas || CITAS_INIT);
   const [resumenCitas, setResumenCitas] = useState(null);   // { pacienteId: {ultimaVisita, proximaFecha, proximaHora} }
   useEffect(() => {
     recargar();
@@ -1827,10 +1832,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   }, []); // eslint-disable-line
   const listaBase = conectado ? (remoto || []) : pacientes;
   const lista = useMemo(() => {
-    // Conectado: el padrón viene de GET /pacientes (org completa). Filtrar por sedeInt
-    // demo escondía fichas Surco y dejaba KPI 23 ≠ 34.
-    if (conectado) return listaBase;
-    return listaBase.filter((p) => sedesDe(p).some((s) => sedeIds.includes(s)));
+    // Conectado: GET /pacientes trae la org completa; se limita a las sedes que se ven con
+    // la sede de registro (mismaSede acepta UUID o id 1/2). Sin sede registrada se muestra.
+    // KPIs, segmentos y campañas salen de esta lista, así que tampoco mezclan sedes.
+    if (conectado) return listaBase.filter((p) => !p.sedeRegistroId || sedeIds.some((s) => mismaSede(p.sedeRegistroId, s)));
+    return listaBase.filter((p) => sedesDe(p).some((s) => sedeIds.some((v) => mismaSede(s, v))));
   }, [listaBase, sedeIds, conectado]);
   const hoyISO = fmt(hoy);
   // Última visita real (cita atendida más reciente) por paciente.
@@ -1884,6 +1890,15 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     }
   }, [fmId]); // eslint-disable-line
   const cerrarFm = () => { setFmId(null); setFmTab(null); irHash("pacientes"); };
+  // La ficha solo se abre si el paciente está entre los visibles (sus sedes y el filtro de
+  // arriba). El id llega también por enlace, marcador, «Ver ficha» de WhatsApp o dc-ir:
+  // sin esto se abría la historia de un paciente de otra sede. Con sesión se espera al padrón.
+  const fmPermitido = fmId == null || (conectado && remoto == null) || lista.some((p) => String(p.id) === String(fmId));
+  useEffect(() => {
+    if (fmPermitido) return;
+    notify("Ese paciente no se atiende en la sede elegida. Cambia la sede arriba si también es tuya.");
+    cerrarFm();
+  }, [fmPermitido]); // eslint-disable-line react-hooks/exhaustive-deps
   // Una sola historia clínica: la Ficha médica, que es la que guarda en el servidor
   // (paciente.fichaClinica, /historia, /auditoria). La demostración abre la misma
   // pantalla con datos de ejemplo, así lo que se revisa es lo que se usará.
@@ -1893,9 +1908,12 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const abrirOdontograma = (p) => abrirFicha(p, "odontograma");
   const [form, setForm] = useState(null); // datos + segmentación de marketing
   const [camp, setCamp] = useState(null); // compositor de campaña de marketing
-  const nuevo = () => { setFormErr({}); setForm({ nombre: "", dni: "", telefono: "", email: "", nacimiento: "", genero: "", distrito: "", canal: "Recomendación", aseguradora: "Ninguno", marketing: false, sedes: [1], tags: [], comentario: "", tarea: "", apoderadoNombre: "", apoderadoParentesco: "", apoderadoDni: "", apoderadoTelefono: "" }); };
+  // Un paciente nuevo queda en la sede donde se trabaja (la del filtro o la activa), no en
+  // San Isidro fijo: si no, desaparecía del propio directorio del admin de Surco al guardarlo.
+  const sedeAlta = misSedes.find((m) => mismaSede(m, sedeActiva)) ?? misSedes[0] ?? sedeActiva;
+  const nuevo = () => { setFormErr({}); setForm({ nombre: "", dni: "", telefono: "", email: "", nacimiento: "", genero: "", distrito: "", canal: "Recomendación", aseguradora: "Ninguno", marketing: false, sedes: [sedeAlta], tags: [], comentario: "", tarea: "", apoderadoNombre: "", apoderadoParentesco: "", apoderadoDni: "", apoderadoTelefono: "" }); };
   const [formErr, setFormErr] = useState({});
-  const editar = (p) => setForm({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", nacimiento: p.nacimiento || "", genero: p.genero || "", distrito: p.distrito || "", canal: p.canal || "Recomendación", aseguradora: p.aseguradora || "Ninguno", marketing: p.marketing === true, sedes: normSedes(p.sedes ?? p.sede ?? [1]), tags: p.tags || [], comentario: p.comentario || "", tarea: p.tarea || "", apoderadoNombre: p.apoderadoNombre || "", apoderadoParentesco: p.apoderadoParentesco || "", apoderadoDni: p.apoderadoDni || "", apoderadoTelefono: p.apoderadoTelefono || "" });
+  const editar = (p) => setForm({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", nacimiento: p.nacimiento || "", genero: p.genero || "", distrito: p.distrito || "", canal: p.canal || "Recomendación", aseguradora: p.aseguradora || "Ninguno", marketing: p.marketing === true, sedes: normSedes(p.sedes ?? p.sede ?? [sedeAlta]), sedeRegistroId: p.sedeRegistroId ?? null, tags: p.tags || [], comentario: p.comentario || "", tarea: p.tarea || "", apoderadoNombre: p.apoderadoNombre || "", apoderadoParentesco: p.apoderadoParentesco || "", apoderadoDni: p.apoderadoDni || "", apoderadoTelefono: p.apoderadoTelefono || "" });
   const toggleTag = (t) => setForm((f) => { const a = f.tags || []; return { ...f, tags: a.includes(t) ? a.filter((x) => x !== t) : [...a, t] }; });
   useEffect(() => { if (crearIntent) { nuevo(); onIntentDone(); } }, [crearIntent]); // eslint-disable-line
   // BUG-105: Helper para actualizar campo y limpiar su error específico
@@ -1909,7 +1927,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   };
   // Autocompletar DNI vía RENIEC (backend real + fallback demo) — helper compartido
   const autoDNI = async () => { const r = await reniecLookup(form.dni); if (r.ok) setForm((f) => ({ ...f, nombre: r.nombre })); notify(r.msg); };
-  const toggleSede = (id) => setForm((f) => { const a = normSedes(f.sedes); return { ...f, sedes: a.includes(id) ? a.filter((x) => x !== id) : [...a, id].sort() }; });
+  // Solo se marcan o desmarcan las sedes del usuario; las demás del paciente se conservan.
+  const toggleSede = (id) => { if (!esMiaPac(id)) return; setForm((f) => { const a = normSedes(f.sedes); return { ...f, sedes: a.some((x) => mismaSede(x, id)) ? a.filter((x) => !mismaSede(x, id)) : [...a, id].sort() }; }); };
   const guardar = async () => {
     const v = validarFormPaciente(form, hoyISO);
     if (!v.ok) { setFormErr(v.errors); notify(v.errors[v.first] || "Revisa los campos marcados."); return; }
@@ -1917,7 +1936,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     if (conectado) {
       const sedesForm = normSedes(form.sedes);
       if (!sedesForm.length) { notify("Selecciona al menos una sede."); return; }
-      const payload = { nombre: form.nombre.trim(), dni: form.dni.trim(), telefono: (form.telefono || "").replace(/\D/g, "").replace(/^51/, "").slice(-9) || null, email: (form.email || "").trim() || null, fechaNacimiento: form.nacimiento || null, genero: form.genero || null, distrito: form.distrito || null, canal: form.canal || null, aseguradora: form.aseguradora || null, marketing: !!form.marketing, comentario: form.comentario || null, tags: form.tags || [], sedeRegistroId: sedeApiUuid(sedesForm[0]),
+      // Al editar se conserva la sede de registro si sigue marcada; al crear, la activa si
+      // está marcada o la primera del usuario.
+      const sedeReg = (form.sedeRegistroId && sedesForm.find((s) => mismaSede(s, form.sedeRegistroId)) != null ? form.sedeRegistroId : null)
+        ?? sedesForm.find((s) => mismaSede(s, sedeAlta)) ?? sedesForm.find(esMiaPac) ?? sedesForm[0];
+      const payload = { nombre: form.nombre.trim(), dni: form.dni.trim(), telefono: (form.telefono || "").replace(/\D/g, "").replace(/^51/, "").slice(-9) || null, email: (form.email || "").trim() || null, fechaNacimiento: form.nacimiento || null, genero: form.genero || null, distrito: form.distrito || null, canal: form.canal || null, aseguradora: form.aseguradora || null, marketing: !!form.marketing, comentario: form.comentario || null, tags: form.tags || [], sedeRegistroId: sedeApiUuid(sedeReg),
         // Se manda "" y no null para poder BORRAR el apoderado (el backend ignora los nulos).
         apoderadoNombre: form.apoderadoNombre || "", apoderadoParentesco: form.apoderadoParentesco || "",
         apoderadoDni: form.apoderadoDni || "", apoderadoTelefono: form.apoderadoTelefono || "" };
@@ -1932,7 +1955,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       }
       return;
     }
-    const sedes = form.sedes.length ? form.sedes : [1];
+    const sedes = normSedes(form.sedes).length ? normSedes(form.sedes) : [sedeAlta];
     const d = { nombre: form.nombre, dni: form.dni, telefono: form.telefono, email: form.email, nacimiento: form.nacimiento, genero: form.genero, distrito: form.distrito, canal: form.canal, aseguradora: form.aseguradora, marketing: form.marketing, sedes, tags: form.tags || [], comentario: form.comentario || "", tarea: form.tarea || "", apoderadoNombre: form.apoderadoNombre || "", apoderadoParentesco: form.apoderadoParentesco || "", apoderadoDni: form.apoderadoDni || "", apoderadoTelefono: form.apoderadoTelefono || "" };
     if (form.id) setPacientes((ps) => ps.map((p) => p.id === form.id ? { ...p, ...d } : p));
     else setPacientes((ps) => [...ps, { id: Math.max(0, ...ps.map((p) => p.id)) + 1, ...d, ultima: null, creadoEn: new Date().toISOString() }]);
@@ -1945,15 +1968,32 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       api.pacientes.eliminar(form.id).then(() => { notify(`${form.nombre} archivado.`); setForm(null); recargar(); }).catch(() => notify("No se pudo archivar el paciente."));
       return;
     }
-    setPacientes((ps) => ps.filter((p) => p.id !== form.id)); setForm(null);
+    const orig = pacientes.find((x) => x.id === form.id) || form;
+    if (borrarDemo(orig)) setForm(null);
+  };
+  /* Demostración. Un paciente que también se atiende en sedes que el usuario no gestiona no
+     se borra de la clínica: solo deja de figurar en las sedes del usuario y las otras
+     conservan su ficha. Se borra del todo solo si todas sus sedes son del usuario.
+     Devuelve true si se hizo algo (para cerrar el formulario). */
+  const borrarDemo = (p) => {
+    const todas = sedesDe(p);
+    const ajenas = todas.filter((x) => !esMiaPac(x));
+    const mias = todas.filter(esMiaPac);
+    const nombres = (l) => l.map(nombreSede).join(" y ");
+    if (todas.length && !mias.length) { notify(`${p.nombre} no se atiende en tus sedes.`); return false; }
+    if (ajenas.length) {
+      if (!confirm(`${p.nombre} también se atiende en ${nombres(ajenas)}, que no gestionas. ¿Quitarlo solo de ${nombres(mias)}? Su historia clínica se conserva.`)) return false;
+      setPacientes((ps) => ps.map((x) => (x.id === p.id ? { ...x, sedes: ajenas, sede: ajenas[0] } : x)));
+      notify(`${p.nombre} ya no figura en ${nombres(mias)}; sigue en ${nombres(ajenas)}.`);
+      return true;
+    }
+    if (!confirm(todas.length > 1 ? `¿Eliminar permanentemente a ${p.nombre}? Se atiende en ${nombres(todas)} y desaparecerá de todas.` : `¿Eliminar permanentemente a ${p.nombre}?`)) return false;
+    setPacientes((ps) => ps.filter((x) => x.id !== p.id));
+    notify(`${p.nombre} eliminado.`);
+    return true;
   };
   const eliminarPaciente = async (p) => {
-    if (!conectado) {
-      if (!confirm(`¿Eliminar permanentemente a ${p.nombre}?`)) return;
-      setPacientes((ps) => ps.filter((x) => x.id !== p.id));
-      notify(`${p.nombre} eliminado.`);
-      return;
-    }
+    if (!conectado) { borrarDemo(p); return; }
     try {
       const r = await api.pacientes.tieneHistoria(p.id);
       const tieneHistoria = r?.tieneHistoria || false;
@@ -2062,6 +2102,10 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     ); } },
     { key: "dni", label: "DNI", w: "92px", a: "left", get: (p) => p.dni || "", cell: (p) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.dni || "—"}</span> },
     { key: "telefono", label: "Teléfono", w: "112px", a: "left", get: (p) => p.telefono || "", cell: (p) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{fmtTelDir(p.telefono) || "—"}</span> },
+    // Con más de una sede a la vista (admin general o usuario multisede en «Todas») se ve en
+    // qué sede se atiende cada paciente; con el filtro en una sede la columna sobra.
+    ...(sedeIds.length > 1 ? [{ key: "sede", label: "Sede", w: "minmax(104px,0.7fr)", a: "left", get: (p) => (conectado ? nombreSede(p.sedeRegistroId) : etiquetaSedes(sedesDe(p))),
+      cell: (p) => { const t = conectado ? cortaSede(p.sedeRegistroId) : sedesDe(p).map(cortaSede).join(" · "); return <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t}>{t || "—"}</span>; } }] : []),
     { key: "ultima", label: "Última cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => ultimaDe(p) || "", cell: (p) => { const u = ultimaDe(p); if (!u) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Sin visitas</span>; const m = mesesSinVenir(p); const c = m >= 6 ? "var(--dc-warn-600)" : m >= 3 ? "var(--dc-ink-400)" : "var(--dc-ok-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 size={13} strokeWidth={1.75} color={c} style={{ flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: c, fontWeight: 500 }}>{relFecha(u, false)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(u)}</div></div></div>; } },
     { key: "proxima", label: "Próxima cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => proxima(p)?.fecha || "zzz", cell: (p) => { const px = proxima(p); if (!px) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar size={12} strokeWidth={1.75} /> Sin agendar</span>; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: DS.c.primary, flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: DS.c.primary, fontWeight: 500 }}>{relFecha(px.fecha, true)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(px.fecha)} – {(px.hora || "").slice(0, 5)}</div></div></div>; } },
     // "Tarea" no existe en el backend: con sesión salía "—" en todas las filas.
@@ -2095,17 +2139,19 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const slotsFicha = {
     // Historia clínica: fotos de cada fase (solo lectura); se trabaja en el módulo Odontograma.
     odontograma: (pid) => <OdontogramaFotos key={`odof-${pid}`} pacienteId={pid} ficha={fichas[pid]} onAbrir={() => window.dispatchEvent(new CustomEvent("dc-ir", { detail: { vista: "odontograma", pacienteId: pid } }))} />,
-    plan: (pid) => <Tratamientos key={`plan-${pid}`} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
+    // sedeActiva: el precio del procedimiento es el de la sede donde se atiende, no el de la
+    // primera sede del paciente (CLINICO-06 / CAJA-07).
+    plan: (pid) => <Tratamientos key={`plan-${pid}`} sedeActiva={sedeActiva} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
     archivos: (pid, sub) => <ArchivosPaciente key={`arch-${pid}`} pid={pid} sub={sub} pacientes={pacientes} notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} onIrLaboratorio={() => onIr("laboratorio")} />,
   };
-  if (fmId) {
+  if (fmId && fmPermitido) {
     return (
       <div className="dc-ficha-pagina">
         <button type="button" className="dc-volver" onClick={cerrarFm}><ChevronRight size={15} strokeWidth={2} style={{ transform: "rotate(180deg)" }} /> Pacientes</button>
         <React.Suspense fallback={<Card style={{ padding: 24 }}>Cargando ficha…</Card>}>
           <FichaMedica pagina slots={slotsFicha} pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
-            pacienteDemo={conectado ? null : pacientes.find((x) => String(x.id) === String(fmId))}
-            sedeId={sedeApiUuid(sedeIds?.[0] ?? 1)}
+            pacienteDemo={conectado ? null : lista.find((x) => String(x.id) === String(fmId))}
+            sedeId={sedeApiUuid(sedeActiva)}
             initialTab={fmTab}
             onTabChange={(t) => { setFmTab(t); irHash("pacientes", { pacienteId: fmId, tab: t }); }}
             onAgendar={(pac) => onAgendarPaciente?.(pac)}
@@ -2136,11 +2182,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
       </section>
       <DataTable titulo="Directorio de pacientes" sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
-      {fmId && (
+      {fmId && fmPermitido && (
         <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
           <FichaMedica pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
-            pacienteDemo={conectado ? null : pacientes.find((x) => String(x.id) === String(fmId))}
-            sedeId={sedeApiUuid(sedeIds?.[0] ?? 1)}
+            pacienteDemo={conectado ? null : lista.find((x) => String(x.id) === String(fmId))}
+            sedeId={sedeApiUuid(sedeActiva)}
             initialTab={fmTab}
             onAgendar={(pac) => { cerrarFm(); onAgendarPaciente?.(pac); }}
             onCobrar={(pac) => { cerrarFm(); onCobrarPaciente?.(pac); }} />
@@ -2276,11 +2322,17 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         <div className="dc-msec" style={secTit}><MessageSquare size={14} strokeWidth={1.75} /> Nota / comentario</div>
         <textarea className="dc-premium-inp" value={form.comentario} onChange={(e) => setForm({ ...form, comentario: e.target.value })} rows={2} placeholder="Ej. Prefiere horarios de mañana; requiere premedicación…" style={{ width: "100%", padding: "11px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }} />
         <div className="dc-msec" style={secTit}><MapPin size={14} strokeWidth={1.75} /> Sedes donde se atiende</div>
+        {/* Solo se ofrecen las sedes del usuario (en demo y con sesión). Las otras sedes del
+            paciente se muestran bloqueadas: las gestiona su propia sede y no se pueden quitar. */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {(conectado ? SEDES.filter((s) => sedeIds.includes(s.id)) : SEDES).map((s) => { const on = normSedes(form.sedes).includes(s.id); return (
-            <button key={s.id} type="button" onClick={() => toggleSede(s.id)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 13px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${NAVY}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-bg)" : "#fff", color: on ? NAVY : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{on ? <CheckCircle2 size={15} strokeWidth={1.75} color={NAVY} /> : <MapPin size={15} strokeWidth={1.75} />} {s.nombre}</button>
+          {SEDES.filter((s) => esMiaPac(s.id)).map((s) => { const on = normSedes(form.sedes).some((x) => mismaSede(x, s.id)); return (
+            <button key={s.id} type="button" aria-pressed={on} onClick={() => toggleSede(s.id)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 13px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${NAVY}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-bg)" : "#fff", color: on ? NAVY : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{on ? <CheckCircle2 size={15} strokeWidth={1.75} color={NAVY} /> : <MapPin size={15} strokeWidth={1.75} />} {s.nombre}</button>
           ); })}
+          {normSedes(form.sedes).filter((x) => !esMiaPac(x)).map((x) => (
+            <span key={`ajena-${x}`} title="La gestiona esa sede: desde aquí no se puede quitar" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px dashed var(--dc-line)", background: "var(--dc-bg)", color: "var(--dc-ink-500)", fontSize: 13, fontWeight: 500 }}><Lock size={14} strokeWidth={1.75} /> {nombreSede(x)}</span>
+          ))}
         </div>
+        {!form.id && misSedes.length < 2 && <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 6 }}>Queda registrado en {nombreSede(sedeAlta)}, tu sede.</div>}
         </Modal>
         );
       })()}
@@ -2532,7 +2584,9 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     sedeRegistroId: p.sedeRegistroId || null,
     sedeNombre: p.sedeNombre || null,
   })))).catch(() => {}); }, []); // eslint-disable-line
-  const pacientes = conectado ? (pacRemoto || []) : pacProp;
+  // Con sesión el padrón llega completo: se limita a las sedes que se ven (como pf en demo).
+  const sedeCx = useSede();
+  const pacientes = useMemo(() => (conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sede)) : pacProp), [conectado, pacRemoto, pacProp, sedeCx.ids]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pacienteId, setPacienteId] = useState(pacienteFijo || pacienteActivo || (auth.token ? null : pacProp[0]?.id) || null);
   const [fmTab, setFmTab] = useState(null); // overlay ficha sin salir del módulo Odontograma
   const [fmOpen, setFmOpen] = useState(false);
@@ -2546,12 +2600,15 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     window.setTimeout(() => setFmShield(false), 220);
   };
   useEffect(() => { if (pacienteActivo) setPacienteId(pacienteActivo); }, [pacienteActivo]);
+  // Si cambia la sede de arriba y el paciente elegido ya no está entre los visibles, se suelta
+  // y se cierra su ficha superpuesta: seguir marcando su odontograma era trabajar en otra sede.
+  // NEW-59: con sesión no se siembra el primer paciente; se pide elegir.
   useEffect(() => {
-    if (!conectado || !pacRemoto) return;
-    if (!pacRemoto.length) { setPacienteId(null); return; }
-    // NEW-59: no sembrar con el primer paciente remoto; pedir elección explícita.
-    if (pacienteId && !pacRemoto.some((p) => p.id === pacienteId)) setPacienteId(null);
-  }, [pacRemoto]); // eslint-disable-line
+    if (pacienteFijo != null || pacienteId == null || (conectado && !pacRemoto)) return;
+    if (pacientes.some((p) => String(p.id) === String(pacienteId))) return;
+    setPacienteId(conectado ? null : (pacProp[0]?.id ?? null));
+    setFmOpen(false);
+  }, [pacientes]); // eslint-disable-line react-hooks/exhaustive-deps
   const edadPac = calcEdad((pacientes.find((x) => x.id === pacienteId) || {}).nacimiento);
   const esPed = edadPac != null && edadPac < EDAD_PEDIATRICA;
   const CP = colorPediatrico((pacientes.find((x) => x.id === pacienteId) || {}).genero);
@@ -2584,7 +2641,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     setAnexoPlan(anexo);
     setShowPlanInv(true);
   };
-  const sedeIdPlan = sedeApiUuid(sedeActiva != null && sedeActiva !== "all" ? sedeActiva : 1);
+  // Membrete del plan y de la ficha: la sede activa (nunca una sede fija por defecto).
+  const sedeIdPlan = sedeApiUuid(sedeActiva != null && sedeActiva !== "all" ? sedeActiva : sedeCx.activa);
   const [zoom, setZoom] = useState(100);              // % del tamaño (clásico + anatómico)
   const [pincel, setPincel] = useState("caries");
   /** Borra lo marcado en la fase que se esta viendo. Las otras dos no se tocan:
@@ -2642,12 +2700,14 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   useEffect(() => { recargarOd(); }, [pacienteId, conectado, fase]); // eslint-disable-line
 
   const paciente = pacientes.find((p) => p.id === pacienteId) || { id: pacienteId, nombre: "Selecciona un paciente" };
+  // «Sede» del documento = donde se atiende (la activa, la misma del membrete). La sede de
+  // registro del paciente queda solo de respaldo: antes salía Surco en un membrete de San Isidro.
   const sedeLabelOdo = (() => {
+    const fromActiva = nombreSede(sedeActiva);
+    if (fromActiva && fromActiva !== "—") return fromActiva;
     const fromPac = nombreSede(paciente.sede ?? paciente.sedeRegistroId);
     if (fromPac && fromPac !== "—") return fromPac;
-    if (paciente.sedeNombre) return paciente.sedeNombre;
-    const fromActiva = nombreSede(sedeActiva);
-    return fromActiva !== "—" ? fromActiva : "";
+    return paciente.sedeNombre || "";
   })();
   // Fuente única: la ficha central (demo) o el backend (conectado).
   const estados = conectado ? odRemoto.estados : (fichas[pacienteId]?.odontograma || {});
@@ -2770,11 +2830,22 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   // P0-2: del hallazgo al plan de tratamiento (misma ficha).
   // ODO-02 / ODO-03: del hallazgo al presupuesto único, solo con servicios del catálogo.
   const catalogoOdo = (demoDbOdo?.catalogo || CATALOGO_SEED);
-  // Precio de la sede donde se atiende: la elegida arriba o, con «Todas», la del paciente.
-  const sedePrecioOdo = sedeActiva !== "all" && sedeActiva != null ? Number(sedeActiva) : (sedesDe(pacientes.find((p) => String(p.id) === String(pacienteId)) || {})[0] || 1);
+  // Precio de la sede donde se atiende: la elegida arriba; con «Todas», la del paciente si
+  // es una sola de las del usuario; si no, la activa. MainApp nunca pasa "all" en sedeActiva,
+  // por eso el filtro se lee de useSede(). Se devuelve el id 1/2 con el que el catálogo
+  // guarda preciosSede (con sesión el filtro o el paciente pueden venir como UUID).
+  const sedePrecioOdo = (() => {
+    const mias = sedeCx.mias || SEDE_IDS;
+    const aMia = (x) => mias.find((m) => mismaSede(m, x));
+    if (sedeCx.sede != null && sedeCx.sede !== "all") return aMia(sedeCx.sede) ?? sedeCx.sede;
+    const delPac = [...new Set(sedesDe(paciente).map(aMia).filter((x) => x != null))];
+    if (delPac.length === 1) return delPac[0];
+    const act = sedeCx.activa ?? sedeActiva;
+    return aMia(act) ?? act;
+  })();
   const yaItem = (servId, pieza) => (fichas[pacienteId]?.tratamiento || []).some((f) => f.estado !== "anulado" && String(f.servicioId) === String(servId) && String(f.pieza) === String(pieza));
   const agregarItems = (lineas) => {
-    const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l, i) => ({ id: Date.now() + i, servicioId: l.serv.id, pieza: Number(l.pieza), cara: l.cara || undefined, nombre: nombreItem(l.serv, l.pieza, l.cara), costo: precioServicio(l.serv, sedePrecioOdo), estado: "pendiente", origen: "odontograma" }));
+    const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l, i) => ({ id: Date.now() + i, servicioId: l.serv.id, pieza: Number(l.pieza), cara: l.cara || undefined, nombre: nombreItem(l.serv, l.pieza, l.cara), costo: precioServicio(l.serv, sedePrecioOdo), sede: sedePrecioOdo ?? undefined, estado: "pendiente", origen: "odontograma" }));
     if (!nuevos.length) { notify && notify("Los hallazgos por hacer ya están en el presupuesto."); return; }
     updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: [...(cur.tratamiento || []), ...nuevos] }));
     notify && notify(`${nuevos.length === 1 ? "Se agregó 1 ítem" : `Se agregaron ${nuevos.length} ítems`} al presupuesto (Plan y cuenta).`);
@@ -3185,6 +3256,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
       <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
         <FichaMedica
           pacienteId={pacienteId}
+          pacienteDemo={conectado ? null : pacientes.find((p) => String(p.id) === String(pacienteId)) || null}
           onClose={cerrarFichaOdo}
           notify={notify}
           can={can}
@@ -5979,16 +6051,19 @@ function Auditoria() {
 /* ---- Recetas médicas con firma electrónica (paridad con Doctocliq) ---- */
 function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   const conectado = !!auth.token;
+  const sedeCx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
-  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); }, []); // eslint-disable-line
-  const pacientes = conectado ? (pacRemoto || []) : pacProp;
+  // sedeRegistroId se guarda para limitar el selector y la lista a las sedes que se ven.
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, sedeRegistroId: p.sedeRegistroId || null })))).catch(() => {}); }, []); // eslint-disable-line
+  const pacientes = conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sedeRegistroId)) : pacProp;
   const nombrePac = (id) => (pacRemoto || []).find((p) => p.id === id)?.nombre || "—";
   // Demostración: las recetas salen de la historia de cada paciente (la misma fuente que
-  // la ficha), así una receta emitida en la ficha aparece aquí y viceversa.
+  // la ficha), así una receta emitida en la ficha aparece aquí y viceversa. Solo las de
+  // pacientes visibles: la semilla completa (PACIENTES_INIT) mostraba recetas de otra sede.
   const recetasDemo = useMemo(() => {
     const out = [];
     Object.entries(fichas || FICHA_CLINICA).forEach(([pid, f]) => (f.recetas || []).forEach((r, i) => {
-      const p = (pacProp || []).find((x) => String(x.id) === String(pid)) || PACIENTES_INIT.find((x) => x.id === Number(pid));
+      const p = (pacProp || []).find((x) => String(x.id) === String(pid));
       if (!p) return;
       let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; }
       const items = its.length ? its.map((x) => ({ med: [x.medicamento || x.med, x.presentacion, x.dosis].filter(Boolean).join(" "), detalle: [x.frecuencia, x.duracion, x.detalle].filter(Boolean).join(" – ") })) : [{ med: r.texto || "", detalle: "" }];
@@ -5997,9 +6072,10 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   }, [fichas, pacProp]);
   const [recetasRem, setRecetasRem] = useState([]);
-  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; } return { id: r.id, paciente: nombrePac(r.pacienteId), fecha: r.fecha, indic: r.indicaciones || "", firmada: true, items: Array.isArray(its) ? its : [] }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
+  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; } return { id: r.id, pacienteId: r.pacienteId, paciente: nombrePac(r.pacienteId), fecha: r.fecha, indic: r.indicaciones || "", firmada: true, items: Array.isArray(its) ? its : [] }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
   useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto]); // eslint-disable-line
-  const recetas = conectado ? recetasRem : recetasDemo;
+  // GET /recetas trae las de toda la organización: se muestran solo las de pacientes visibles.
+  const recetas = conectado ? recetasRem.filter((r) => pacientes.some((p) => String(p.id) === String(r.pacienteId))) : recetasDemo;
   const [form, setForm] = useState(null);
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
   const nuevo = () => setForm({ paciente: pacientes[0]?.nombre || "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
@@ -6011,15 +6087,17 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
       if (!pid) { notify("Selecciona un paciente válido."); return; }
       const itemsBk = items.map((x) => ({ med: `${x.med}${x.dosis ? " " + x.dosis : ""}`, detalle: [x.frec, x.dur].filter(Boolean).join(" – ") }));
-      api.recetas.crear({ pacienteId: pid, fecha: fmt(hoy), indicaciones: form.indic, items: JSON.stringify(itemsBk) })
+      api.recetas.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), fecha: fmt(hoy), indicaciones: form.indic, items: JSON.stringify(itemsBk) })
         .then(() => { notify("Receta emitida y firmada. Queda en la ficha del paciente."); recargarRecetas(); setForm(null); })
         .catch(() => notify("No se pudo emitir la receta."));
       return;
     }
     // Queda en la historia clínica del paciente (visible en su ficha).
-    const pid = (pacientes.find((p) => p.nombre === form.paciente) || PACIENTES_INIT.find((p) => p.nombre === form.paciente))?.id;
+    // Solo pacientes visibles: la receta no puede ir a la ficha de un paciente de otra sede.
+    const pid = pacientes.find((p) => p.nombre === form.paciente)?.id;
+    if (!pid) { notify("Selecciona un paciente válido."); return; }
     const texto = items.map((x) => `${x.med}${x.dosis ? " " + x.dosis : ""}${x.frec ? " " + x.frec : ""}${x.dur ? " por " + x.dur : ""}`).join("; ");
-    if (pid && updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), texto, indicaciones: form.indic || "", items: JSON.stringify(items.map((x) => ({ medicamento: x.med, dosis: x.dosis, frecuencia: x.frec, duracion: x.dur }))) }, ...(cur.recetas || [])] }));
+    if (updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), sede: sedeCx.activa ?? undefined, texto, indicaciones: form.indic || "", items: JSON.stringify(items.map((x) => ({ medicamento: x.med, dosis: x.dosis, frecuencia: x.frec, duracion: x.dur }))) }, ...(cur.recetas || [])] }));
     notify("Receta emitida y firmada. Queda en la ficha del paciente y se envía por WhatsApp/correo.");
     setForm(null);
   };
@@ -6185,28 +6263,32 @@ function FirmaModal({ doc, onClose, onConfirm, esMenor = false, firmante, setFir
 }
 function Consentimientos({ pacientes: pacProp, notify }) {
   const conectado = !!auth.token;
+  const sedeCx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
   // Se traen tambien nacimiento y apoderado: hacen falta para saber si el paciente es
-  // menor y, en ese caso, quien puede firmar por el.
+  // menor y, en ese caso, quien puede firmar por el. La sede de registro, para el filtro.
   useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({
-    id: p.id, nombre: p.nombre, nacimiento: p.fechaNacimiento,
+    id: p.id, nombre: p.nombre, nacimiento: p.fechaNacimiento, sedeRegistroId: p.sedeRegistroId || null,
     apoderadoNombre: p.apoderadoNombre, apoderadoParentesco: p.apoderadoParentesco, apoderadoDni: p.apoderadoDni,
   })))).catch(() => {}); }, []); // eslint-disable-line
-  const pacientes = conectado ? (pacRemoto || []) : pacProp;
+  const pacientes = conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sedeRegistroId)) : pacProp;
   const nombrePac = (id) => (pacRemoto || []).find((p) => p.id === id)?.nombre || "—";
   const [docsDemo, setDocsDemo] = useState([
-    { id: 1, paciente: "Rosa Linares", tipo: "Endodoncia", fecha: addDays(-3), estado: "firmado" },
-    { id: 2, paciente: "María Chávez", tipo: "Exodoncia (extracción)", fecha: addDays(-1), estado: "pendiente" },
-    { id: 3, paciente: "Elena Ríos", tipo: "Ortodoncia", fecha: addDays(-5), estado: "firmado" },
+    { id: 1, pacienteId: 1, paciente: "Rosa Linares", tipo: "Endodoncia", fecha: addDays(-3), estado: "firmado" },
+    { id: 2, pacienteId: 3, paciente: "María Chávez", tipo: "Exodoncia (extracción)", fecha: addDays(-1), estado: "pendiente" },
+    { id: 3, pacienteId: 5, paciente: "Elena Ríos", tipo: "Ortodoncia", fecha: addDays(-5), estado: "firmado" },
     // Menor: al firmarlo se pide quien responde por el. Sin un caso asi, la regla
     // del apoderado no se podia ver en modo demostracion.
-    { id: 4, paciente: "Mateo Ríos", tipo: "Odontopediatría (sellantes)", fecha: fmt(hoy), estado: "pendiente" },
+    { id: 4, pacienteId: 25, paciente: "Mateo Ríos", tipo: "Odontopediatría (sellantes)", fecha: fmt(hoy), estado: "pendiente" },
   ]);
   const [docsRem, setDocsRem] = useState([]);
-  const recargarDocs = () => { if (conectado) api.consentimientos.listar().then((rows) => setDocsRem((rows || []).map((c) => ({ id: c.id, paciente: nombrePac(c.pacienteId), tipo: c.tipo || c.titulo || "Consentimiento", fecha: (c.fechaFirma || c.creadoEn || "").slice(0, 10), estado: c.firmado ? "firmado" : "pendiente", contenido: c.contenido, firmaUrl: c.firmaUrl,
+  const recargarDocs = () => { if (conectado) api.consentimientos.listar().then((rows) => setDocsRem((rows || []).map((c) => ({ id: c.id, pacienteId: c.pacienteId, paciente: nombrePac(c.pacienteId), tipo: c.tipo || c.titulo || "Consentimiento", fecha: (c.fechaFirma || c.creadoEn || "").slice(0, 10), estado: c.firmado ? "firmado" : "pendiente", contenido: c.contenido, firmaUrl: c.firmaUrl,
     firmanteNombre: c.firmanteNombre, firmanteDni: c.firmanteDni, firmanteRelacion: c.firmanteRelacion })))).catch(() => {}); };
   useEffect(() => { recargarDocs(); }, [conectado, pacRemoto]); // eslint-disable-line
-  const docs = conectado ? docsRem : docsDemo;
+  // Solo documentos de pacientes visibles (lista, KPIs y % firmados). Se filtra al mostrar;
+  // setDocs sigue escribiendo sobre la lista completa.
+  const esVisible = (d) => pacientes.some((p) => (d.pacienteId != null ? String(p.id) === String(d.pacienteId) : p.nombre === d.paciente));
+  const docs = (conectado ? docsRem : docsDemo).filter(esVisible);
   const setDocs = setDocsDemo;
   const [form, setForm] = useState(null);
   const [firmaDoc, setFirmaDoc] = useState(null);
@@ -6225,12 +6307,14 @@ function Consentimientos({ pacientes: pacProp, notify }) {
     if (conectado) {
       const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
       if (!pid) { notify("Selecciona un paciente válido."); return; }
-      api.consentimientos.crear({ pacienteId: pid, tipo: form.tipo, titulo: form.tipo })
+      api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo })
         .then(() => { notify("Consentimiento enviado al paciente para firma en línea."); recargarDocs(); setForm(null); })
         .catch(() => notify("No se pudo enviar el consentimiento."));
       return;
     }
-    setDocs((d) => [{ id: Date.now(), paciente: form.paciente, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...d]); notify("Consentimiento enviado al paciente para firma en línea."); setForm(null);
+    const pac = pacientes.find((p) => p.nombre === form.paciente);
+    if (!pac) { notify("Selecciona un paciente válido."); return; }
+    setDocs((d) => [{ id: Date.now(), pacienteId: pac.id, paciente: pac.nombre, sede: sedeCx.activa ?? undefined, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...d]); notify("Consentimiento enviado al paciente para firma en línea."); setForm(null);
   };
   const confirmarFirma = () => {
     // Un menor no consiente por si mismo: sin quien firme, no se archiva.
@@ -7249,15 +7333,18 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
 /* ---- Periodontograma: pantalla del módulo (el sondaje vive en modulos/Periodontograma) ---- */
 function Periodontograma({ pacientes: pacProp, notify, can, pacienteActivo = null, pacienteFijo = null }) {
   const conectado = !!auth.token;
+  const sedeCx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
-  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni, fechaNacimiento: p.fechaNacimiento })))).catch(() => {}); }, []); // eslint-disable-line
-  const pacientes = conectado ? (pacRemoto || []) : pacProp;
+  // La sede de registro viaja como `sede`: la proforma la usa para el precio (sedesDe).
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni, fechaNacimiento: p.fechaNacimiento, sede: p.sedeRegistroId || null, sedeRegistroId: p.sedeRegistroId || null })))).catch(() => {}); }, []); // eslint-disable-line
+  const pacientes = useMemo(() => (conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sedeRegistroId)) : pacProp), [conectado, pacRemoto, pacProp, sedeCx.ids]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pid, setPid] = useState(pacienteFijo || pacienteActivo || (auth.token ? null : (pacProp[0]?.id || null)));
+  // Al cambiar la sede de arriba, el paciente que ya no se ve se suelta: su sondaje seguía
+  // abierto y editable. Con sesión se pide elegir de nuevo (no se siembra el primero).
   useEffect(() => {
-    if (!conectado || !pacRemoto) return;
-    if (!pacRemoto.length) { setPid(null); return; }
-    if (pid && !pacRemoto.some((p) => p.id === pid)) setPid(null);
-  }, [pacRemoto]); // eslint-disable-line
+    if (pacienteFijo != null || pid == null || (conectado && !pacRemoto)) return;
+    if (!pacientes.some((p) => String(p.id) === String(pid))) setPid(conectado ? null : (pacProp[0]?.id ?? null));
+  }, [pacientes]); // eslint-disable-line react-hooks/exhaustive-deps
   const paciente = pacientes.find((p) => p.id === pid) || null;
   const soloLectura = conectado && can ? !can("perio", "editar") : false;
   return (
@@ -7542,8 +7629,12 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
   const db = useContext(DatosDemoCtx);
   const docsAll = db?.documentos || [];
   const setDocs = db?.setDocumentos || (() => {});
-  const pacDe = (id) => pacientes.find((p) => String(p.id) === String(id)) || PACIENTES_INIT.find((p) => String(p.id) === String(id)) || null;
-  const docs = docsAll.filter((d) => (pacienteFijo == null || String(d.pacienteId) === String(pacienteFijo)) && (!soloPendientes || d.estado === "pendiente"));
+  // Solo pacientes visibles (sus sedes y el filtro de arriba): la semilla completa
+  // (PACIENTES_INIT) dejaba ver y firmar documentos de pacientes de otra sede.
+  const sedeCx = useSede();
+  const visibles = sedeCx.pacientes || pacientes;
+  const pacDe = (id) => pacientes.find((p) => String(p.id) === String(id)) || visibles.find((p) => String(p.id) === String(id)) || null;
+  const docs = docsAll.filter((d) => (pacienteFijo == null ? visibles.some((p) => String(p.id) === String(d.pacienteId)) : String(d.pacienteId) === String(pacienteFijo)) && (!soloPendientes || d.estado === "pendiente"));
   const [form, setForm] = useState(null);
   const [firmaDoc, setFirmaDoc] = useState(null);
   const [firmante, setFirmante] = useState({ nombre: "", dni: "", relacion: "" });
@@ -7560,7 +7651,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
   const enviar = () => {
     const pid = pacienteFijo ?? form.pacienteId;
     if (!pid) { notify("Elige el paciente."); return; }
-    setDocs((xs) => [{ id: `${form.clase[0]}${Date.now()}`, clase: form.clase, pacienteId: pid, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...xs]);
+    setDocs((xs) => [{ id: `${form.clase[0]}${Date.now()}`, clase: form.clase, pacienteId: pid, sede: sedeCx.activa ?? undefined, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...xs]);
     notify(form.clase === "consentimiento" ? "Consentimiento enviado al paciente para firma en línea." : "Formulario enviado al paciente."); setForm(null);
   };
   const nPend = docs.filter((d) => !hecho(d)).length;
@@ -7639,19 +7730,24 @@ function ArchivosPaciente({ pid, sub = null, pacientes = [], notify, can, sedeAc
 }
 function Formularios({ pacientes: pacProp, notify }) {
   const conectado = !!auth.token;
+  const sedeCx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
-  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); }, []); // eslint-disable-line
-  const pacientes = conectado ? (pacRemoto || []) : pacProp;
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, sedeRegistroId: p.sedeRegistroId || null })))).catch(() => {}); }, []); // eslint-disable-line
+  const pacientes = conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sedeRegistroId)) : pacProp;
   const [docsDemo, setDocsDemo] = useState([
-    { id: 1, paciente: "Rosa Linares", tipo: "Anamnesis / historia médica", estado: "completado", fecha: addDays(-2) },
-    { id: 2, paciente: "Carlos Ruiz", tipo: "Ficha de admisión", estado: "pendiente", fecha: addDays(-1) },
-    { id: 3, paciente: "Lucía Vega", tipo: "Declaración de salud", estado: "completado", fecha: addDays(-4) },
+    { id: 1, pacienteId: 1, paciente: "Rosa Linares", tipo: "Anamnesis / historia médica", estado: "completado", fecha: addDays(-2) },
+    { id: 2, pacienteId: 4, paciente: "Carlos Ruiz", tipo: "Ficha de admisión", estado: "pendiente", fecha: addDays(-1) },
+    { id: 3, pacienteId: 7, paciente: "Lucía Vega", tipo: "Declaración de salud", estado: "completado", fecha: addDays(-4) },
   ]);
   const [docsRem, setDocsRem] = useState([]);
-  const recargarEnvios = () => { if (conectado) api.formularios.envios().then((rows) => setDocsRem((rows || []).map((e) => ({ id: e.id, paciente: e.paciente || "—", tipo: e.tipo, estado: e.estado, fecha: (e.enviadoEn || "").slice(0, 10), respuestas: e.respuestas || null })))).catch(() => {}); };
+  const recargarEnvios = () => { if (conectado) api.formularios.envios().then((rows) => setDocsRem((rows || []).map((e) => ({ id: e.id, pacienteId: e.pacienteId ?? null, paciente: e.paciente || "—", tipo: e.tipo, estado: e.estado, fecha: (e.enviadoEn || "").slice(0, 10), respuestas: e.respuestas || null })))).catch(() => {}); };
   const [verResp, setVerResp] = useState(null); // envío cuyas respuestas se están viendo
   useEffect(() => { recargarEnvios(); }, [conectado]); // eslint-disable-line
-  const docs = conectado ? docsRem : docsDemo;
+  // Solo envíos de pacientes visibles (tabla y KPIs): GET /formularios/envios es de toda la
+  // organización. Por id si viene; si no, por nombre. Se filtra al mostrar, no al guardar.
+  // Con sesión se espera al padrón antes de decidir.
+  const esVisible = (d) => (conectado && !pacRemoto) ? false : pacientes.some((p) => (d.pacienteId != null ? String(p.id) === String(d.pacienteId) : p.nombre === d.paciente));
+  const docs = (conectado ? docsRem : docsDemo).filter(esVisible);
   const setDocs = setDocsDemo;
   const [form, setForm] = useState(null);
   const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box", cursor: "pointer" };
@@ -7659,12 +7755,14 @@ function Formularios({ pacientes: pacProp, notify }) {
     if (conectado) {
       const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
       if (!pid) { notify("Selecciona un paciente válido."); return; }
-      api.formularios.enviar({ pacienteId: pid, tipo: form.tipo, canal: "whatsapp" })
+      api.formularios.enviar({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, canal: "whatsapp" })
         .then(() => { notify("Formulario enviado al paciente por WhatsApp."); recargarEnvios(); setForm(null); })
         .catch(() => notify("No se pudo enviar el formulario."));
       return;
     }
-    setDocs((d) => [{ id: Date.now(), paciente: form.paciente, tipo: form.tipo, estado: "pendiente", fecha: fmt(hoy) }, ...d]); notify("Formulario enviado al paciente por WhatsApp."); setForm(null);
+    const pac = pacientes.find((p) => p.nombre === form.paciente);
+    if (!pac) { notify("Selecciona un paciente válido."); return; }
+    setDocs((d) => [{ id: Date.now(), pacienteId: pac.id, paciente: pac.nombre, sede: sedeCx.activa ?? undefined, tipo: form.tipo, estado: "pendiente", fecha: fmt(hoy) }, ...d]); notify("Formulario enviado al paciente por WhatsApp."); setForm(null);
   };
   const kpis = [["Completados", docs.filter((d) => d.estado === "completado").length, "var(--dc-ok-700)", <CheckCircle2 size={18} strokeWidth={1.75} />], ["Pendientes", docs.filter((d) => d.estado === "pendiente").length, "var(--dc-warn-600)", <Clock size={18} strokeWidth={1.75} />], ["Total", docs.length, NAVY, <ClipboardList size={18} strokeWidth={1.75} />]];
   return (
@@ -7749,15 +7847,20 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   const puedeBorrarRx = can ? can("radiografias", "eliminar") : true;
   const conectado = !!auth.token;
   const esFotos = !!soloFotos;
+  const sedeCx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
-  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre })))).catch(() => {}); }, []); // eslint-disable-line
-  const pacientes = conectado ? (pacRemoto || []) : pacProp;
-  const [pid, setPid] = useState(auth.token ? null : (pacProp[0]?.id || null));
+  // La sede de registro viaja como `sede`: de ahí salen las opciones de «Registrar en».
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, sede: p.sedeRegistroId || null, sedeRegistroId: p.sedeRegistroId || null })))).catch(() => {}); }, []); // eslint-disable-line
+  const pacientes = useMemo(() => (conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sedeRegistroId)) : pacProp), [conectado, pacRemoto, pacProp, sedeCx.ids]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Dentro de la ficha manda el paciente de la ficha: antes se abrían (y se subían) las
+  // radiografías del primer paciente de la lista, y con sesión se subían sin paciente.
+  const [pid, setPid] = useState(pacienteFijo ?? (auth.token ? null : (pacProp[0]?.id || null)));
+  useEffect(() => { if (pacienteFijo != null) setPid(pacienteFijo); }, [pacienteFijo]);
+  // Al cambiar la sede de arriba, el paciente que ya no se ve se suelta (con sesión se pide elegir).
   useEffect(() => {
-    if (!conectado || !pacRemoto) return;
-    if (!pacRemoto.length) { setPid(null); return; }
-    if (pid && !pacRemoto.some((p) => p.id === pid)) setPid(null);
-  }, [pacRemoto]); // eslint-disable-line
+    if (pacienteFijo != null || pid == null || (conectado && !pacRemoto)) return;
+    if (!pacientes.some((p) => String(p.id) === String(pid))) setPid(conectado ? null : (pacProp[0]?.id ?? null));
+  }, [pacientes]); // eslint-disable-line react-hooks/exhaustive-deps
   const [visor, setVisor] = useState(null); // estudio abierto en el visor modal
   const [ajuste, setAjuste] = useState({ brillo: 100, contraste: 100, negativo: false, zoom: 1 });
   // Demostración: las imágenes viven en la historia de cada paciente (fichas[pid].imagenes)
@@ -7784,15 +7887,19 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
     Object.keys(nx).forEach((k) => { if (nx[k] !== estudios[k]) demoDb.updFicha(Number(k) || k, (cur) => ({ ...cur, imagenes: nx[k] })); });
   };
   const [rxRem, setRxRem] = useState([]);
-  const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: 1, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).catch(() => {}); else setRxRem([]); };
+  // La sede del estudio es la que devuelve el servidor (sin una fija: todo salía «San Isidro»).
+  const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: r.sedeId ?? r.sede ?? null, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).catch(() => {}); else setRxRem([]); };
   useEffect(() => { recargarRx(); }, [pid, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => p.id === pid) || { id: pid, nombre: "Selecciona un paciente" };
   const lista = conectado ? rxRem : (estudios[pid] || []);
   const listaVista = esFotos ? lista.filter((s) => s.tipo === "foto") : lista.filter((s) => s.tipo !== "foto");
-  const sedesPac = sedesDe(paciente).filter((s) => misSedes.includes(s));
+  // «Registrar en»: las sedes del usuario donde se atiende el paciente (mismaSede: con sesión
+  // la del paciente llega como UUID); sin coincidencia, todas las del usuario.
+  const sedesPac = misSedes.filter((m) => sedesDe(paciente).some((s) => mismaSede(m, s)));
   const opcionesSede = sedesPac.length ? sedesPac : misSedes;
-  const [sedeReg, setSedeReg] = useState(opcionesSede.includes(sedeActiva) ? sedeActiva : opcionesSede[0]);
-  useEffect(() => { setSedeReg(opcionesSede.includes(sedeActiva) ? sedeActiva : opcionesSede[0]); }, [pid, sedeActiva]); // eslint-disable-line
+  const sedeRegDe = () => opcionesSede.find((o) => mismaSede(o, sedeActiva)) ?? opcionesSede[0];
+  const [sedeReg, setSedeReg] = useState(sedeRegDe);
+  useEffect(() => { setSedeReg(sedeRegDe()); }, [pid, sedeActiva, sedesPac.join(",")]); // eslint-disable-line
   const fileRef = useRef(null);
   const [subiendo, setSubiendo] = useState(null); // { url, tipo, nota, nombre, piezas, vista, momento }
   const onFile = (e) => {
@@ -7823,7 +7930,8 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
     const s = subiendo;
     if (!esFotos && RX_PIEZAS.has(s.tipo) && !String(s.piezas || "").trim()) { notify("Indica la pieza o piezas de la radiografía (ej. 26 o 16, 46)."); return; }
     const extra = esFotos ? { vista: s.vista, momento: s.momento } : { piezas: s.piezas || "" };
-    if (conectado) { api.radiografias.crear({ pacienteId: pid, tipo: s.tipo, fecha: fmt(hoy), url: s.url, nota: s.nota, ...extra }).then(() => { notify(esFotos ? "Foto guardada en el expediente." : "Radiografía guardada en el expediente."); recargarRx(); }).catch(() => notify("Error al subir la imagen.")); setSubiendo(null); return; }
+    if (!pid) { notify("Elige un paciente primero."); return; }
+    if (conectado) { api.radiografias.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeReg), tipo: s.tipo, fecha: fmt(hoy), url: s.url, nota: s.nota, ...extra }).then(() => { notify(esFotos ? "Foto guardada en el expediente." : "Radiografía guardada en el expediente."); recargarRx(); }).catch(() => notify("Error al subir la imagen.")); setSubiendo(null); return; }
     setEstudios((e) => ({ ...e, [pid]: [{ id: Date.now(), tipo: s.tipo, fecha: fmt(hoy), sede: sedeReg, url: s.url, nota: s.nota, ...extra }, ...(e[pid] || [])] }));
     notify(`${esFotos ? "Foto" : "Radiografía"} guardada en el expediente en ${nombreSede(sedeReg)}.`);
     setSubiendo(null);

@@ -6,9 +6,10 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Keyboard, Printer, Redo2, Undo2, X } from "lucide-react";
 import api, { auth } from "../api/client";
+import { sedeApiUuid } from "../routing";
 import { SUP, INF, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, demoPerio } from "../util/periodontal";
 import { FASES_PERIO, abrirInformePerio, guardarPrecio, sugerirPlan, totalesPlan } from "../util/perioPlan";
-import { DatosDemoCtx, sedesDe } from "../comun";
+import { DatosDemoCtx, SEDE_IDS, mismaSede, nombreSede, sedesDe, useSede } from "../comun";
 import { leerCatalogo, servicioPorId, precioServicio } from "../compartido/catalogo";
 import "./periodontograma.css";
 
@@ -147,7 +148,7 @@ function profesionalActual() {
   } catch { return ""; }
 }
 
-export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = "", paciente = null, notify = () => {}, soloLectura = false }) {
+export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = "", paciente = null, notify = () => {}, soloLectura = false, sedeId = null }) {
   const conectado = !!auth.token;
   const [dientes, setDientes] = useState(null);
   const [previo, setPrevio] = useState(null);
@@ -182,6 +183,20 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   // Proforma: plan sugerido por el sondaje, editable antes de emitirla.
   const [pf, setPf] = useState(null); // { plan, desc }
   const demoDb = useContext(DatosDemoCtx);
+  // Sede de precio de la proforma (lo que después se cobra en Caja): la indicada por quien
+  // monta el módulo o, si no, la elegida arriba; con «Todas», la del paciente si es una sola
+  // de las del usuario; si no, la activa. Antes era la primera sede del paciente o San Isidro.
+  const sedeCx = useSede();
+  const sedePrecio = (() => {
+    if (sedeId != null && sedeId !== "all") return sedeId;
+    const mias = sedeCx.mias || SEDE_IDS;
+    const aMia = (x) => mias.find((s) => mismaSede(s, x));
+    if (sedeCx.sede != null && sedeCx.sede !== "all") return aMia(sedeCx.sede) ?? sedeCx.sede;
+    const delPac = [...new Set(sedesDe(paciente).map(aMia).filter((x) => x != null))];
+    if (delPac.length === 1) return delPac[0];
+    if (sedeCx.activa != null) return aMia(sedeCx.activa) ?? sedeCx.activa;
+    return delPac[0] ?? mias[0] ?? null;
+  })();
 
   useEffect(() => {
     setDientes(null); setError(false); setHist({ u: [], r: [] });
@@ -308,10 +323,10 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   const datosPac = { nombre: paciente?.nombre || pacienteNombre, dni: paciente?.dni || "", hc: paciente?.hc || paciente?.numeroHc || paciente?.nroHc || "" };
   const abrirProforma = () => {
     const cat = leerCatalogo();
-    setPf({ plan: sugerirPlan(dientes, dx).map((x) => { const sv = servicioPorId(cat, SERV_PERIO[x.cod]); return sv ? { ...x, precio: precioServicio(sv, sedesDe(paciente)[0] || 1), servicioId: sv.id } : x; }), desc: 0 });
+    setPf({ plan: sugerirPlan(dientes, dx, sedePrecio).map((x) => { const sv = servicioPorId(cat, SERV_PERIO[x.cod]); return sv ? { ...x, precio: precioServicio(sv, sedePrecio), servicioId: sv.id } : x; }), desc: 0 });
   };
   const agregarAlPresupuesto = () => {
-    const items = pf.plan.filter((x) => x.incluir).map((x, i) => ({ id: Date.now() + i, servicioId: x.servicioId || null, nombre: `${x.nombre}${x.cant > 1 ? ` ×${x.cant}` : ""}${x.det ? ` · ${x.det}` : ""}`, costo: Math.round(x.cant * x.precio * (1 - (pf.desc || 0) / 100)), estado: "pendiente", origen: "periodontograma" }));
+    const items = pf.plan.filter((x) => x.incluir).map((x, i) => ({ id: Date.now() + i, servicioId: x.servicioId || null, nombre: `${x.nombre}${x.cant > 1 ? ` ×${x.cant}` : ""}${x.det ? ` · ${x.det}` : ""}`, costo: Math.round(x.cant * x.precio * (1 - (pf.desc || 0) / 100)), sede: sedePrecio ?? undefined, estado: "pendiente", origen: "periodontograma" }));
     if (!items.length) return;
     if (!conectado) {
       if (!demoDb?.updFicha) { notify("No se pudo agregar al presupuesto."); return; }
@@ -320,7 +335,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
     }
     api.tratamientos.porPaciente(pacienteId)
       .then((planes) => planes?.[0]?.plan?.id || api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento" }).then((pl) => pl.id))
-      .then((planId) => Promise.all(items.map((it) => api.tratamientos.agregarFase(planId, { nombre: it.nombre, costo: it.costo, ...(it.servicioId ? { servicioId: it.servicioId } : {}) }))))
+      .then((planId) => Promise.all(items.map((it) => api.tratamientos.agregarFase(planId, { nombre: it.nombre, costo: it.costo, sedeId: sedeApiUuid(sedePrecio), ...(it.servicioId ? { servicioId: it.servicioId } : {}) }))))
       .then(() => { notify("Partidas agregadas al presupuesto del paciente."); setPf(null); })
       .catch(() => notify("No se pudo agregar al presupuesto."));
   };
@@ -550,7 +565,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
           <div className="pgc-pf-fondo" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) setPf(null); }}>
             <div className="pgc-pf" role="dialog" aria-modal="true" aria-label="Tratamiento periodontal sugerido">
               <header className="pgc-pf__cab">
-                <div><b>Tratamiento periodontal sugerido</b><small>{datosPac.nombre || "Paciente"} · {dx.titulo}</small></div>
+                <div><b>Tratamiento periodontal sugerido</b><small>{datosPac.nombre || "Paciente"} · {dx.titulo}{sedePrecio != null && nombreSede(sedePrecio) !== "—" ? ` · Precios de ${nombreSede(sedePrecio)}` : ""}</small></div>
                 <button type="button" className="pgc-ib" onClick={() => setPf(null)} aria-label="Cerrar"><X size={16} strokeWidth={2} /></button>
               </header>
               <p className="pgc-pf__ayuda">Sugerido por el sondaje. Marca lo que incluyes y ajusta cantidades o precios; al confirmar pasa al presupuesto único del paciente (Plan y cuenta), desde donde se imprime y se cobra.</p>
@@ -566,7 +581,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
                           <label className="pgc-pf__chk"><input type="checkbox" checked={x.incluir} onChange={(e) => setItem(x.id, "incluir", e.target.checked)} />
                             <span><b>{x.nombre}</b>{x.det && <small>{x.det}</small>}{x.cond && <small className="is-cond">{x.cond}</small>}</span></label>
                           <label className="pgc-pf__num"><span>Cant.</span><input type="number" min="1" max="32" value={x.cant} onChange={(e) => setItem(x.id, "cant", Math.max(1, Number(e.target.value) || 1))} /></label>
-                          <label className="pgc-pf__num is-precio"><span>Precio S/</span><input type="number" min="0" step="10" value={x.precio} onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setItem(x.id, "precio", v); guardarPrecio(x.cod, v); }} /></label>
+                          <label className="pgc-pf__num is-precio"><span>Precio S/</span><input type="number" min="0" step="10" value={x.precio} onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setItem(x.id, "precio", v); guardarPrecio(x.cod, v, sedePrecio); }} /></label>
                           <em>{sol(x.cant * x.precio)}</em>
                         </div>
                       ))}
