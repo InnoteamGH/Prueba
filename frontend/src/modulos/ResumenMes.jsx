@@ -9,7 +9,7 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, Target, Trophy, Users, Wallet } from "lucide-react";
 import api, { auth } from "../api/client";
-import { DatosDemoCtx, MEDICOS } from "../comun";
+import { DatosDemoCtx, MEDICOS, mismaSede } from "../comun";
 import { salidasMes } from "../compartido/metricas";
 import { medicoEnSedes } from "../compartido/medicosSede";
 
@@ -59,7 +59,8 @@ export default function ResumenMes({ kd, acciones = null, sedes = null }) {
       const facturado = equipo.reduce((a, x) => a + x.prod, 0);
       const totalClinica = MEDICOS.reduce((a, m) => a + Math.round((m.prodDemo || 0) * f), 0);
       const parte = totalClinica ? facturado / totalClinica : 1;
-      const sal = salidasMes((db?.egresos || []).filter((e) => !sedes || e.sede == null || sedes.map(String).includes(String(e.sede))), { mes: desde.slice(0, 7) });
+      // Con una sede elegida solo cuentan sus egresos (un egreso sin sede no es de ninguna).
+      const sal = salidasMes((db?.egresos || []).filter((e) => !sedes || sedes.some((v) => mismaSede(v, e.sede))), { mes: desde.slice(0, 7) });
       return {
         facturado, anterior: Math.round(facturado * 0.91), meta: equipo.reduce((a, x) => a + x.meta, 0), equipo,
         salidas: sal.pen, salidasUsd: sal.usd, salidasCat: sal.porCat,
@@ -67,7 +68,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null }) {
         top: DEMO_TOP.map((t) => ({ ...t, importe: Math.round(t.importe * f * parte), ventas: Math.max(1, Math.round(t.ventas * f * parte)) })),
       };
     }
-    const delMes = (egresos || []).filter((e) => String(e.fecha || "").slice(0, 10) >= desde);
+    const delMes = (egresos || []).filter((e) => String(e.fecha || "").slice(0, 10) >= desde && (!sedes || e.sedeId == null || sedes.some((v) => mismaSede(v, e.sedeId))));
     const pen = delMes.filter((e) => (e.moneda || "PEN") !== "USD");
     const cat = {};
     pen.forEach((e) => { const k = e.categoria || "Otros"; cat[k] = (cat[k] || 0) + (Number(e.monto) || 0); });

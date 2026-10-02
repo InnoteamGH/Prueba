@@ -4,7 +4,7 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Armchair, ChevronLeft, ChevronRight, Clock, Info, Send } from "lucide-react";
 import api, { auth } from "../api/client";
-import { DatosDemoCtx, ESPECIALIDADES, MEDICOS, fmt, horarioDeSede, jornadaClinica, nombreSede, toMin } from "../comun";
+import { DatosDemoCtx, ESPECIALIDADES, MEDICOS, fmt, horarioDeSede, jornadaClinica, mismaSede, nombreSede, toMin } from "../comun";
 import { useReglasAgenda } from "../compartido/useReglasAgenda";
 import { etiquetaUso } from "../compartido/sillones";
 
@@ -26,11 +26,11 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
   }, [conectado, dias]);
   const citas = conectado ? remotas : (demoDb?.citas || []);
   const hor = conectado ? horario : (demoDb?.horarioClinica || horario);
-  const sillones = (reglas.sillones || []).filter((s) => s.activo !== false && (!sedesVisibles || sedesVisibles.map(String).includes(String(s.sede))));
+  const sillones = (reglas.sillones || []).filter((s) => s.activo !== false && (!sedesVisibles || sedesVisibles.some((v) => mismaSede(v, s.sede))));
 
   const datos = useMemo(() => {
     const capDia = (sede, fecha) => {
-      const j = jornadaClinica(horarioDeSede(hor.horario || {}, typeof sede === "number" ? sede : null), hor.feriados || [], fecha);
+      const j = jornadaClinica(horarioDeSede(hor.horario || {}, sede), hor.feriados || [], fecha);
       if (!j.abierta) return 0;
       return Math.max(0, toMin(j.cierra || "19:00") - toMin(j.abre || "09:00"));
     };
@@ -68,7 +68,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
   const { conectado, sillones, dias, datos } = useOcupacionSillones(off, sedesVer);
   const conPct = datos.filas.filter((f) => f.pct != null);
   const sedes = [...new Set(sillones.map((s) => String(s.sede)))];
-  const nomSede = (id) => (conectado ? "" : nombreSede(Number(id))) || "Sede";
+  const nomSede = (id) => { const n = nombreSede(/^\d+$/.test(String(id)) ? Number(id) : id); return n && n !== "—" ? n : "Sede"; };
   const corta = (id) => nomSede(id).replace(/^Sede\s+/i, "");
   const masLibre = [...conPct].sort((a, b) => a.pct - b.pct)[0];
   const diaLleno = [...datos.porDia].filter((d) => d.pct != null).sort((a, b) => b.pct - a.pct)[0];

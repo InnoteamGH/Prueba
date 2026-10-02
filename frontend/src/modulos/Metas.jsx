@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Check, Info, MapPin, Minus, Plus, RotateCcw, Target, TrendingUp } from "lucide-react";
 import api, { auth } from "../api/client";
-import { Card, ESPECIALIDADES, MEDICOS, SEDE_IDS, Vacio, colorDe, iniciales, nombreSede, tint, useSede } from "../comun";
+import { Card, ESPECIALIDADES, MEDICOS, SEDE_IDS, Vacio, colorDe, iniciales, mismaSede, nombreSede, tint, useSede } from "../comun";
 import { comisionSede, guardarMetaSedeDemo, metaSede, sedesMed } from "../compartido/medicosSede";
 
 const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
@@ -43,7 +43,9 @@ function Porcentaje({ value, onChange, disabled, label }) {
 
 export default function Metas({ notify = () => {}, can, sedes = null }) {
   const conectado = !!auth.token;
-  const { esMia } = useSede();
+  const { esMia, mias, sede: sedeSel } = useSede();
+  // Meta global (doctor sin sede, con API): solo quien ve toda la clínica y sin filtro de sede.
+  const esGlobal = sedeSel === "all" && (!mias || mias.length >= SEDE_IDS.length);
   const puedeEditar = can ? can("metas", "editar") : true;
   const verSedes = useMemo(() => (sedes && sedes.length ? sedes.map(String) : null), [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [meds, setMeds] = useState([]);
@@ -86,10 +88,11 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
   const grupos = useMemo(() => {
     const todas = [...new Set(meds.flatMap((m) => m.sedesIds))];
     const orden = [...SEDE_IDS.map(String), ...todas].filter((s, i, a) => a.indexOf(s) === i && todas.includes(s));
-    return orden.filter((s) => s === "todas" || !verSedes || verSedes.includes(s))
+    // "todas" = doctores sin sede (con API): su meta es global, solo para quien ve toda la clínica.
+    return orden.filter((s) => (s === "todas" ? esGlobal : !verSedes || verSedes.some((v) => mismaSede(v, s))))
       .map((s) => ({ sede: s, meds: meds.filter((m) => m.sedesIds.includes(s)) }))
       .filter((g) => g.meds.length);
-  }, [meds, verSedes]);
+  }, [meds, verSedes, esGlobal]);
   const nomSede = (s) => (s === "todas" ? "Todas las sedes" : nombres[s] || nombreSede(Number(s)) || "Sede");
 
   const val = (key, campo) => { const v = draft[key]?.[campo]; return v === "" || v == null ? null : Number(v); };

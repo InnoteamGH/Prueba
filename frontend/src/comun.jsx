@@ -1393,17 +1393,22 @@ export const DatosDemoCtx = React.createContext(null);
    - pacientes / citas: ya filtrados por ids (para mostrar; para validar, el total).
    Sin proveedor (pruebas, portal del paciente) no limita nada. */
 export const SedeCtx = React.createContext(null);
+/** Id de sede comparable: en la demo 1/2; con API llega un UUID que el resto del frontend
+    ya traduce a 1/2 al iniciar sesión (sedeInt en App.jsx). Misma regla aquí. */
+export const sedeNum = (x) => (x == null || x === "" ? null : /^\d+$/.test(String(x)) ? Number(x) : (String(x).endsWith("a2") ? 2 : 1));
+/** ¿Son la misma sede? Acepta id numérico de la demo o UUID del servidor. */
+export const mismaSede = (a, b) => a != null && b != null && (String(a) === String(b) || sedeNum(a) === sedeNum(b));
 export function useSede() {
   const c = React.useContext(SedeCtx);
-  const ver = c?.ids ? c.ids.map(String) : null;
-  const mias = c?.mias ? c.mias.map(String) : null;
+  const ver = c?.ids || null;
+  const mias = c?.mias || null;
   return {
     sede: c?.sede ?? "all", ids: c?.ids ?? null, mias: c?.mias ?? null, activa: c?.activa ?? null,
     pacientes: c?.pacientes ?? null, citas: c?.citas ?? null,
     /** ¿Alguna de estas sedes se ve con el filtro actual? (sin sede = sí) */
-    enSede: (x) => { const l = [].concat(x ?? []).filter((v) => v != null && v !== ""); return !ver || !l.length || l.some((v) => ver.includes(String(v))); },
+    enSede: (x) => { const l = [].concat(x ?? []).filter((v) => v != null && v !== ""); return !ver || !l.length || l.some((v) => ver.some((w) => mismaSede(v, w))); },
     /** ¿La sede es del usuario (aunque el filtro muestre otra)? */
-    esMia: (x) => x == null || !mias || mias.includes(String(x)),
+    esMia: (x) => x == null || !mias || mias.some((w) => mismaSede(x, w)),
   };
 }
 

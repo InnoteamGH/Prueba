@@ -15,7 +15,8 @@ import {
   metaEstado,
   moneyFmt,
 } from "./panelGerencialUtil";
-import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES, sedesDe } from "../comun";
+import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES, sedesDe, mismaSede } from "../comun";
+import { leerCatalogo, precioCita } from "../compartido/catalogo";
 import { medicoEnSedes } from "../compartido/medicosSede";
 import { SILLONES_DEMO } from "../compartido/sillones";
 import * as M from "../compartido/metricas";
@@ -791,18 +792,22 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const demoDb = useContext(DatosDemoCtx);
   const cargarDemo = useCallback(() => {
     // citasProp ya llega filtrada por sede desde MainApp; pacientes, pagos y casos se limitan igual.
-    const enSede = (ids) => !verSedes || ids.some((x) => verSedes.includes(String(x)));
+    const enSede = (ids) => !verSedes || ids.some((x) => verSedes.some((v) => mismaSede(v, x)));
     const citas = citasProp || [];
     const deHoy = citas.filter((c) => c.fecha === fecha);
     const pacientes = (demoDb?.pacientes || []).filter((p) => enSede(sedesDe(p)));
     const fichas = demoDb?.fichas || {};
-    const precio = (c) => (ESPECIALIDADES.find((e) => e.id === c.esp) || {}).precio || 80;
+    // Precio del catálogo en la sede de la cita (el mismo que cobra Caja).
+    const precio = (c) => precioCita(demoDb?.catalogo || leerCatalogo(), c.esp, c.sede) ?? ((ESPECIALIDADES.find((e) => e.id === c.esp) || {}).precio || 0);
     const atendidasHoy = deHoy.filter((c) => c.estado === "atendida");
-    const pagosTodos = pacientes.flatMap((p) => ((fichas[p.id] || {}).pagos || []).filter((pg) => pg.sede == null || enSede([pg.sede])).map((pg) => ({ ...pg, paciente: p.nombre, pacienteId: p.id })));
+    const pagosTodos = pacientes.flatMap((p) => ((fichas[p.id] || {}).pagos || []).filter((pg) => enSede([pg.sede ?? sedesDe(p)[0]])).map((pg) => ({ ...pg, paciente: p.nombre, pacienteId: p.id })));
     const fa = avanceDemo();
     // Producción y meta de cada doctor en las sedes que se ven (compartido/medicosSede.js).
     const ranking = MEDICOS.map((m) => ({ m, e: medicoEnSedes(m, verSedes) })).filter((x) => x.e.sedes.length)
       .map(({ m, e }) => ({ id: m.id, nombre: m.nombre, especialidad: (ESPECIALIDADES.find((x) => x.id === m.esp) || {}).nombre || "", produccion: Math.round(e.prod * fa), meta: e.meta || 0, citas: Math.max(1, Math.round(e.citas * fa)) }));
+    // Parte de la clínica que se ve (sede elegida): escala las cifras de ejemplo que no salen de datos.
+    const prodTodas = MEDICOS.reduce((a, m) => a + (Number(m.prodDemo) || 0), 0);
+    const parte = prodTodas ? Math.min(1, ranking.reduce((a, r) => a + r.produccion, 0) / (prodTodas * (fa || 1))) : 1;
     setCitasHoy(deHoy);
     setKd({
       ingresosMes: ranking.reduce((a, r) => a + r.produccion, 0), ingresosMesAnterior: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) / 0.91), hayMeta: true, metaMensualClinica: ranking.reduce((a, r) => a + r.meta, 0),
@@ -823,7 +828,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     const nomP = (id) => (pacientes.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
     const dePac = (pid) => pacientes.some((p) => String(p.id) === String(pid));
     const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado" && dePac(l.pid));
-    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha) && dePac(c.pid));
+    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha) && dePac(c.pacienteId ?? c.pid));
     const alertasDemo = [
       cart.conVencido.length && { titulo: cart.conVencido.length === 1 ? "1 paciente con saldo vencido" : `${cart.conVencido.length} pacientes con saldo vencido`, detalle: cart.conVencido.map((f) => f.p.nombre).slice(0, 3).join(", "), monto: cart.vencido },
       liqObs.length && { titulo: liqObs.length === 1 ? "1 liquidación de seguro observada" : `${liqObs.length} liquidaciones de seguro observadas`, detalle: liqObs.map((l) => `${l.aseg} (${nomP(l.pid)})`).join(", "), cantidad: liqObs.length },
@@ -831,18 +836,18 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     ].filter(Boolean);
     setInd({
       deudaPorAntiguedad: { hasta30: aging[0], de31a60: aging[1], de61a90: aging[2], masDe90: aging[3] },
-      conversionPlanes: { aceptado: Math.round(18400 * fa), pendiente: Math.round(6200 * fa), rechazado: Math.round(2100 * fa) },
+      conversionPlanes: { aceptado: Math.round(18400 * fa * parte), pendiente: Math.round(6200 * fa * parte), rechazado: Math.round(2100 * fa * parte) },
       // Reparte la producción del mes (la misma del resumen) entre especialidades.
       porEspecialidad: [["Ortodoncia", 0.271], ["Endodoncia", 0.239], ["Odontología general", 0.218], ["Rehabilitación", 0.174], ["Periodoncia", 0.057], ["Odontopediatría", 0.041]].map(([nombre, k]) => ({ nombre, produccion: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) * k) })),
       cartera: { nuevos: M.nuevos30(pacientes, citas).length, vencido: cart.vencido },
       alertas: alertasDemo,
     });
-    setRep({ funnel: { conversaciones: 46, agendadas: 19 } });
+    setRep({ funnel: { conversaciones: Math.round(46 * parte), agendadas: Math.round(19 * parte) } });
     setPagos(pagosTodos);
     setTratResumen([
       // GER-03: servicios del catálogo único (Odontología general), mismos importes que el Top del mes.
       ["Curación con resina", 44, 5280], ["Limpieza y profilaxis", 42, 3360], ["Reconstrucción estética", 14, 2520], ["Consulta / evaluación", 30, 1500],
-    ].map(([nombre, n, imp]) => ({ nombre, numeroDeVentas: Math.max(1, Math.round(n * fa)), importeTotal: Math.round(imp * fa) })));
+    ].map(([nombre, n, imp]) => ({ nombre, numeroDeVentas: Math.max(1, Math.round(n * fa * parte)), importeTotal: Math.round(imp * fa * parte) })));
     setActividad([
       ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),
       ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${(Number(pg.monto)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })),
@@ -857,8 +862,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     api.gerencial(verSedes).then(setKd).catch(() => setKd({ error: true }));
     api.gerencialIndicadores(verSedes).then(setInd).catch(() => setInd({ errorDeCarga: true }));
     api.gerencialReportes(verSedes).then(setRep).catch(() => setRep({ errorDeCarga: true }));
-    api.pagos.listar().then((r) => setPagos(r || [])).catch(() => setPagos([]));
-    api.citas.listar(fecha).then((r) => setCitasHoy(r || [])).catch(() => setCitasHoy([]));
+    const deSede = (x) => !verSedes || x?.sedeId == null || verSedes.some((v) => mismaSede(v, x.sedeId));
+    api.pagos.listar().then((r) => setPagos((r || []).filter(deSede))).catch(() => setPagos([]));
+    api.citas.listar(fecha).then((r) => setCitasHoy((r || []).filter(deSede))).catch(() => setCitasHoy([]));
     api.actividad(fecha).then((r) => setActividad(r || [])).catch(() => setActividad([]));
     const d = new Date();
     const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -882,10 +888,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       setInventarioValorizado(ok ? total : null);
     }).catch(() => setInventarioValorizado(null));
     api.sillones.listar().then((rows) => {
-      setNSillones(Array.isArray(rows) ? rows.length : null);
+      setNSillones(Array.isArray(rows) ? rows.filter((x) => deSede({ sedeId: x.sedeId ?? x.sede })).length : null);
     }).catch(() => setNSillones(null));
     api.sedes.listar().then((rows) => {
-      setNSedes(Array.isArray(rows) ? rows.length : null);
+      setNSedes(verSedes ? verSedes.length : Array.isArray(rows) ? rows.length : null);
     }).catch(() => setNSedes(null));
   }, [conectado, fecha, citasProp, cargarDemo, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
 
