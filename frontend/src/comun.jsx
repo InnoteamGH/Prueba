@@ -1610,7 +1610,7 @@ export function PersonaCelda({ nombre, sub, size = 34 }) {
    tarjetas con la etiqueta de cada dato), pensada para la vista "Tabla" de las listas.
    cols: [{ key, label, w, a:"left"|"center"|"right", get, cell }] */
 export function TablaPremium({ cols, rows, onRowClick, minWidth = 640, st = null }) {
-  const COL = cols.map((c) => c.w || "minmax(0,1fr)").join(" ");
+  const COL = cols.map((c) => anchoElastico(c, c.w || "minmax(0,1fr)")).join(" ");
   const al = (c) => (c.a === "right" ? "end" : c.a === "center" ? "center" : "start");
   return (
     <div className="dc-table-wrap dc-tp">
@@ -1658,6 +1658,14 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
   );
 }
 
+/* Columnas equilibradas: un ancho fijo («120px») pasa a ser su mínimo y también
+   reparte el espacio sobrante en proporción a ese ancho. Así no queda una columna de
+   texto enorme y las cifras apretadas a la derecha. Las fijas (acciones) no cambian. */
+export function anchoElastico(c, w) {
+  if (!w || c.sticky || c.noSort && c.key === "acc" || c.fijo) return w;
+  const m = /^(\d+)px$/.exec(String(w).trim());
+  return m ? `minmax(${m[1]}px, ${(Number(m[1]) / 100).toFixed(2)}fr)` : w;
+}
 export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true, exportar = true, exportTitulo = "" }) {
   // Columnas con `soloExport` no se pintan: van solo en el Excel/PDF (p. ej. base e IGV).
   const cols = colsTodas.filter((c) => !c.soloExport);
@@ -1674,7 +1682,7 @@ export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empt
   ) : null;
   const [visible, setVisible] = useState(pageSize);
   useEffect(() => { setVisible(pageSize); }, [rows, pageSize, colFilters, sortCol, sortDir, q]);
-  const COL = cols.map((c) => c.w).join(" ");
+  const COL = cols.map((c) => anchoElastico(c, c.w)).join(" ");
   const mostradas = lista.slice(0, visible);
   const hayMas = lista.length > visible;
   // Columna fija a la derecha (acciones): fondo opaco y sombra para que, al hacer

@@ -82,13 +82,13 @@
 /* ---- Lista de chats ---- */
 .dc-inbox-list { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--dc-line); background: var(--dc-surface); }
 .dc-inbox-list > div:first-child { padding: 12px 12px !important; }
-.dc-inbox-list input { font-size: 13.5px !important; border-radius: 999px !important; border: 1px solid transparent !important; background: var(--dc-bg-alt) !important; padding: 9px 12px 9px 34px !important; }
+.dc-inbox-list input { font-size: 14px !important; border-radius: 999px !important; border: 1px solid transparent !important; background: var(--dc-bg-alt) !important; padding: 9px 12px 9px 34px !important; }
 .dc-inbox-list input:focus { background: #fff !important; border-color: var(--dc-brand-100) !important; }
 .wa-item { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: center; width: 100%; padding: 9px 12px; border-bottom: 1px solid var(--dc-line); transition: background .12s; }
 .wa-item:hover { background: var(--dc-bg-soft2); }
 .wa-item.is-on { background: var(--dc-brand-050); box-shadow: inset 3px 0 0 var(--dc-primary-alt); }
 .wa-item:focus-visible { box-shadow: var(--dc-focus); }
-.wa-item__nom { font-size: 14.5px; font-weight: 600; color: var(--dc-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-item__nom { font-size: 15px; font-weight: 600; color: var(--dc-ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-av { width: 42px; height: 42px; border-radius: 999px; flex-shrink: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--dc-brand-600); background: linear-gradient(135deg, #E3F6F6, #C9ECEC); }
 .wa-av--sm { width: 38px; height: 38px; font-size: 13px; }
 
@@ -115,7 +115,7 @@
 .wa-fecha { display: flex; justify-content: center; margin: 12px 0 8px; position: sticky; top: 4px; z-index: 2; }
 .wa-fecha span { background: #fff; color: var(--dc-ink-500); font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.1); text-transform: capitalize; }
 .wa-sis { display: flex; justify-content: center; margin: 8px 0; }
-.wa-sis span { background: #FFF5C4; color: #6B5A12; font-size: 12.5px; padding: 6px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.08); text-align: center; max-width: 80%; }
+.wa-sis span { background: #FFF5C4; color: #6B5A12; font-size: 12px; padding: 6px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.08); text-align: center; max-width: 80%; }
 
 .wa-fila { display: flex; margin-top: 2px; }
 .wa-fila--primero { margin-top: 10px; }
@@ -136,7 +136,7 @@
 .wa-b--cola.wa-b--in::before { left: -8px; background: #fff; clip-path: polygon(100% 0, 0 0, 100% 100%); }
 .wa-b--cola.wa-b--out::before { right: -8px; background: #D9FDD3; clip-path: polygon(0 0, 100% 0, 0 100%); }
 .wa-b--cola.wa-b--ia::before { background: #E4F4F3; }
-.wa-b__autor { display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--dc-brand-600); margin-bottom: 2px; }
+.wa-b__autor { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--dc-brand-600); margin-bottom: 2px; }
 .wa-b__autor--rec { color: #1F8A4C; }
 /* La hora deja su hueco al final del texto, como en WhatsApp. */
 .wa-b__txt::after { content: ""; display: inline-block; width: 78px; }
@@ -157,7 +157,7 @@
 .wa-chip:hover { border-color: var(--dc-brand-100); color: var(--dc-brand-600); background: var(--dc-brand-050); }
 .wa-chip:focus-visible { box-shadow: var(--dc-focus); }
 .wa-compositor { display: flex; align-items: center; gap: 8px; }
-.wa-input { flex: 1; min-width: 0; min-height: 42px !important; border: 0; outline: 0; border-radius: 10px; background: #fff; padding: 10px 14px; font: inherit; font-size: 14.5px; color: var(--dc-ink-900); }
+.wa-input { flex: 1; min-width: 0; min-height: 42px !important; border: 0; outline: 0; border-radius: 10px; background: #fff; padding: 10px 14px; font: inherit; font-size: 15px; color: var(--dc-ink-900); }
 .wa-input::placeholder { color: #8696A0; }
 .wa-enviar { width: 42px; height: 42px; min-width: 42px; border-radius: 999px; border: 0; display: grid; place-items: center; cursor: pointer; color: #fff; background: var(--dc-primary-alt); }
 .wa-enviar:disabled { background: #C5CFD3; cursor: default; }
@@ -202,25 +202,25 @@
 /* Hora del último mensaje y contador de no leídos, como en WhatsApp. */
 .wa-item__hora { font-size: 12px; color: #667781; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .wa-item__hora.is-nuevo { color: #1FA855; font-weight: 600; }
-.wa-item__nuevos { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #25D366; color: #fff; font-size: 11.5px; font-weight: 700; display: grid; place-items: center; }
+.wa-item__nuevos { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #25D366; color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
 .wa-item__cuerpo { flex: 1; min-width: 0; display: grid; gap: 3px; }
 .wa-item__fila { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .wa-item__fila .wa-item__nom { flex: 1; min-width: 0; }
 .wa-item__prev { flex: 1; min-width: 0; font-size: 13px; color: #667781; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-item__prev.is-nuevo { color: var(--dc-ink-900); font-weight: 500; }
-.wa-item__modo { flex-shrink: 0; font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--dc-ok-100); color: var(--dc-ok-700); }
+.wa-item__modo { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--dc-ok-100); color: var(--dc-ok-700); }
 .wa-item__modo.is-rec { background: var(--dc-warn-100); color: var(--dc-warn-700); }
 .wa-item__hora { flex-shrink: 0; margin-left: auto; }
 /* Filtros de la lista en una sola fila. */
 .dc-inbox-list > div:first-child > div:last-child { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; gap: 4px !important; }
 .dc-inbox-list > div:first-child > div:last-child::-webkit-scrollbar { display: none; }
-.dc-inbox-list > div:first-child > div:last-child > button { padding: 4px 8px !important; font-size: 11.5px !important; white-space: nowrap; flex-shrink: 0; }
+.dc-inbox-list > div:first-child > div:last-child > button { padding: 4px 8px !important; font-size: 12px !important; white-space: nowrap; flex-shrink: 0; }
 
 /* Sin barra superior: la bandeja ocupa toda la altura. */
 @media (min-width: 768px) { .dc-inbox.wa { height: calc(calc(100dvh / var(--dc-z, 1)) - 36px); } }
 .wa-lista__tit { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wa-lista__tit > span:first-child { font-family: var(--dc-font-title); font-size: 15px; font-weight: 700; color: var(--dc-ink-900); letter-spacing: -.01em; }
-.wa-canal { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: #E3F7EC; color: #15803D; }
+.wa-canal { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: #E3F7EC; color: #15803D; }
 .wa-canal i { width: 6px; height: 6px; border-radius: 999px; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); }
 .wa-canal.is-ambar { background: #FEF4DC; color: #946009; }
 .wa-canal.is-rojo { background: #FDECEA; color: #B23A2B; }
@@ -231,12 +231,12 @@
 .wa-lista__btn:focus-visible { box-shadow: var(--dc-focus); }
 .wa-filtro__n { font-size: 11px; font-weight: 700; opacity: .75; font-variant-numeric: tabular-nums; }
 .wa-avisos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.wa-aviso { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+.wa-aviso { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .wa-aviso.is-aviso { background: #FEF4DC; color: #946009; }
 .wa-aviso.is-ok { background: #E3F7EC; color: #15803D; }
 .wa-aviso.is-error { background: #FDECEA; color: #B23A2B; }
 .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { gap: 4px !important; flex-wrap: nowrap !important; }
-.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 8px !important; font-size: 11.5px !important; gap: 4px !important; white-space: nowrap; }
+.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 8px !important; font-size: 12px !important; gap: 4px !important; white-space: nowrap; }
 .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; } .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 7px !important; flex-shrink: 0; }
 /* Avatares con el color de cada contacto (como en la agenda y pacientes). */
 .wa-av { --av: #0E8C95; color: var(--av); background: linear-gradient(135deg, color-mix(in srgb, var(--av) 22%, #fff), color-mix(in srgb, var(--av) 8%, #fff)); font-family: var(--dc-font-title); font-weight: 750; }
@@ -246,13 +246,13 @@
 .wa-pago { align-self: center; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px auto; padding: 10px 14px; border-radius: 12px; background: #fff; border: 1px solid #E4E7EC; box-shadow: 0 1px 2px rgba(16,24,40,.06); max-width: 92%; }
 .wa-pago__t { display: grid; gap: 1px; }
 .wa-pago__t b { font-size: 13px; color: #0B1220; }
-.wa-pago__t small { font-size: 11.5px; color: #667085; }
+.wa-pago__t small { font-size: 12px; color: #667085; }
 .wa-pago__est { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #FEF3C7; color: #B45309; }
 .wa-pago.is-pagado .wa-pago__est { background: #DCFCE7; color: #15803D; }
-.wa-pago button { border: 1px solid #0D7D86; color: #0D7D86; background: #fff; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.wa-pago button { border: 1px solid #0D7D86; color: #0D7D86; background: #fff; border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
 /* WSP-01: contexto del paciente en el hilo */
-.wa-ctx { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 7px 16px; background: #F0FAFA; border-bottom: 1px solid #D5EEEE; font-size: 12.5px; color: #475467; }
+.wa-ctx { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 7px 16px; background: #F0FAFA; border-bottom: 1px solid #D5EEEE; font-size: 12px; color: #475467; }
 .wa-ctx b { color: #0B1220; font-weight: 600; }
 .wa-ctx b.is-debe { color: #B45309; }
-.wa-ctx__ficha { border: 0; background: none; padding: 0; color: #0D7D86; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.wa-ctx__ficha { border: 0; background: none; padding: 0; color: #0D7D86; font-weight: 700; font-size: 12px; cursor: pointer; }
 .wa-ctx__ficha:hover { text-decoration: underline; }

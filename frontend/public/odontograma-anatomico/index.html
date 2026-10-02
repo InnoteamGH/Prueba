@@ -16,6 +16,10 @@
     if (/[?&]bridge=1(?:&|$)/.test(location.search || "")) {
       document.documentElement.setAttribute("data-bridge", "1");
     }
+    // Solo lectura (expediente clínico): foto de cada fase, sin herramientas ni presupuesto.
+    if (/[?&]ro=1(?:&|$)/.test(location.search || "")) {
+      document.documentElement.setAttribute("data-ro", "1");
+    }
     // Dentro de la app el paciente y las pestañas del expediente ya están en la
     // pantalla que lo contiene: no se repiten aquí.
     if (q.get("expediente") === "0") {
@@ -28,6 +32,10 @@
 html[data-sin-expediente] .exp{display:none!important}
 /* Dentro de la app cada cambio se sincroniza solo: el botón Guardar de la maqueta sobra. */
 html[data-bridge] #b-guardar{display:none!important}
+html[data-ro] .modo,html[data-ro] .pista,html[data-ro] .ppto,html[data-ro] .pie,html[data-ro] section[style*="grid-area:herr"],html[data-ro] #b-limpiar{display:none!important}
+html[data-ro] #odo,html[data-ro] #lupa{pointer-events:none}
+html[data-ro] .abajo{grid-template-columns:340px minmax(0,1fr)!important;grid-template-areas:"foco hall"!important}
+@media (max-width:940px){html[data-ro] .abajo{grid-template-columns:1fr!important;grid-template-areas:"foco" "hall"!important}}
 html[data-bridge] .exp-quien{visibility:hidden}
 html[data-bridge][data-paciente-ready] .exp-quien{visibility:visible}
 html[data-theme="dark"]{background:#0A0F16;color-scheme:dark}

@@ -1046,7 +1046,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                 {g.items.map((c) => { const col = colorDe(c); const ec = ESTC[estadoCita(c)] || "#8FA3A7"; const cancel = c.estado === "cancelada"; return (
                   <button type="button" key={c.id} className={`dc-agt__fila${cancel ? " is-cancel" : ""}`} style={{ "--e": ec, "--d": col }} onClick={() => onCita && onCita(c)}>
                     <span className="dc-agt__hora">{c.hora}</span>
-                    <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 11.5, background: `linear-gradient(135deg, ${tint(ec, 0.22)}, ${tint(ec, 0.08)})`, color: ec }}>{iniciales(c.paciente)}</span>
+                    <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 12, background: `linear-gradient(135deg, ${tint(ec, 0.22)}, ${tint(ec, 0.08)})`, color: ec }}>{iniciales(c.paciente)}</span>
                     <span className="dc-agt__pac"><b>{c.paciente}</b>{c.motivo && <small>{c.motivo}</small>}</span>
                     <span className="dc-agt__doc"><i />{c.medico || "—"}</span>
                     <span className="dc-agt__est">{EST_LABEL[estadoCita(c)] || c.estado}</span>
@@ -1420,7 +1420,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     { key: "paciente", label: "Paciente", get: (c) => c.paciente, w: "minmax(150px,1.4fr)", a: "left",
       cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 11, minWidth: 0 }}>
-          <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : tint(colorDe(c.paciente), 0.14), color: pasada ? "var(--dc-ink-400)" : colorDe(c.paciente), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12.5, flexShrink: 0, boxShadow: pasada ? "none" : `inset 0 0 0 1.5px ${tint(colorDe(c.paciente), 0.25)}` }}>{iniciales(c.paciente)}</div>
+          <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : tint(colorDe(c.paciente), 0.14), color: pasada ? "var(--dc-ink-400)" : colorDe(c.paciente), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0, boxShadow: pasada ? "none" : `inset 0 0 0 1.5px ${tint(colorDe(c.paciente), 0.25)}` }}>{iniciales(c.paciente)}</div>
           <div style={{ minWidth: 0 }}>
             <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{c.paciente}{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
             {c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> Agendada por IA</span>}
@@ -2856,8 +2856,10 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               )}
               {pacienteId && !pacienteFijo && <Btn small kind="ghost" onClick={() => { setFmTab("historia"); setFmOpen(true); }}><FileText size={14} strokeWidth={1.75} /> Ficha del paciente</Btn>}
               {/* Documentos a la vista: en la anatómica los emite el propio odontograma (mismo membrete). */}
+              {pacienteFijo && <span className="dc-odo-foto"><b>Foto del odontograma</b><small>Inicial, evolución y alta. Para marcar o presupuestar, ábrelo en su módulo.</small></span>}
+              {pacienteFijo && <Btn small onClick={() => window.dispatchEvent(new CustomEvent("dc-ir", { detail: { vista: "odontograma", pacienteId } }))}><Smile size={14} strokeWidth={1.75} /> Abrir en Odontograma</Btn>}
               {vistaOdo === "anatomico" && pacienteId && <>
-                <Btn small onClick={() => { anatomicoRef.current?.abrirDocumento?.("plan"); }} title="Presupuesto del paciente para imprimir o guardar en PDF"><FileText size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>
+                {!pacienteFijo && <Btn small onClick={() => { anatomicoRef.current?.abrirDocumento?.("plan"); }} title="Presupuesto del paciente para imprimir o guardar en PDF"><FileText size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
                 <Btn small kind="ghost" onClick={() => { anatomicoRef.current?.abrirDocumento?.("resumen"); }} title="Resumen clínico del odontograma"><Printer size={14} strokeWidth={1.75} /> Resumen de hallazgos</Btn>
               </>}
               {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Presupuesto del paciente para imprimir"><Printer size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
@@ -2916,7 +2918,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               denticion={denticionApi(denticion)}
               zoom={zoom}
               notify={notify}
-              editable={conectado}
+              editable={conectado && !pacienteFijo}
+              soloLectura={!!pacienteFijo}
               conExpediente={false}
               onFaseChange={(f) => { if (f && f !== fase) setFase(f); }}
               onNavTab={(tab) => {
@@ -3259,7 +3262,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 14.5, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -3286,12 +3289,19 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
               { key: "pieza", label: "Pieza", w: "64px", a: "center", cell: (f) => <span className="dc-tp__sub">{piezaDeFase(f)}</span> },
               { key: "cara", label: "Cara", w: "60px", a: "center", cell: (f) => <span className="dc-tp__sub">{caraDeFase(f)}</span> },
               { key: "costo", label: "Costo", w: "96px", a: "right", cell: (f) => <span className="dc-tp__num">S/ {M.sol2(f.costo)}</span> },
-              { key: "estado", label: "Estado", w: "minmax(240px,1.4fr)", a: "right", cell: (f) => f.estado === "atendida" ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : (
+              // Estado y acción por separado: el estado siempre en la misma columna y una sola
+              // acción principal a la derecha; lo secundario va en el menú ⋯.
+              { key: "estado", label: "Estado", w: "minmax(200px,1fr)", a: "left", cell: (f) => <EstadoPill entidad="procedimiento" estado={f.estado === "atendida" ? "atendida" : f.estado} /> },
+              { key: "acc", label: "", w: "190px", a: "right", noSort: true, cell: (f) => f.estado === "atendida" ? null : (
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
-                  {f.estado !== "terminada" && puedeTerminar && <button type="button" className="dc-accion dc-accion--fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={13} strokeWidth={2} style={{ marginRight: 4 }} />Terminar</button>}
-                  {f.estado === "terminada" && <EstadoPill entidad="procedimiento" estado="terminada" />}
-                  {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
-                  {f.estado !== "terminada" && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[{ label: "Anular procedimiento", peligro: true, onClick: () => quitarFase(f) }]} />}</> : (f.estado !== "terminada" && !puedeTerminar) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : null}
+                  {f.estado !== "terminada" && puedeTerminar
+                    ? <button type="button" className="dc-tr__btn is-fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={14} strokeWidth={2} /> Terminar</button>
+                    : puedeCobrar && <button type="button" className="dc-tr__btn is-cob" onClick={() => cobrarFase(f)}><DollarSign size={14} strokeWidth={2} /> Cobrar</button>}
+                  {(puedeCobrar || puedeTerminar) && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[
+                    ...(f.estado !== "terminada" && puedeTerminar && puedeCobrar ? [{ label: "Cobrar por adelantado", onClick: () => cobrarFase(f) }] : []),
+                    { label: "Ver detalle", onClick: () => setDetF(f) },
+                    ...(f.estado !== "terminada" ? [{ label: "Anular procedimiento", peligro: true, onClick: () => quitarFase(f) }] : []),
+                  ]} />}
                 </div>) },
             ] }} cols={[
               { key: "proc", label: "Procedimiento", get: (f) => nombreFaseLimpio(f) },
@@ -3476,7 +3486,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
                   {lista.map((p) => { const col = colorDe(p.n); const sug = ordenada[0] && p.id === ordenada[0].id; return (
                     <article key={p.id} className={`dc-esp-card${sug ? " is-sug" : ""}`}>
                       <div className="dc-esp-card__top">
-                        <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12.5, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(p.n)}</span>
+                        <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(p.n)}</span>
                         <div className="dc-esp-card__nom"><b>{p.n}</b><span><Phone size={11} strokeWidth={1.75} /> {p.tel}</span></div>
                         {sug && <span className="dc-esp-card__sug"><Sparkles size={11} strokeWidth={2} /> Siguiente</span>}
                       </div>
@@ -3592,6 +3602,7 @@ const DENOMS_USD = [100, 50, 20, 10, 5, 1];
 const DENOMS = [[200, "b"], [100, "b"], [50, "b"], [20, "b"], [10, "b"], [5, "m"], [2, "m"], [1, "m"], [0.5, "m"], [0.2, "m"], [0.1, "m"]];
 
 function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null, abrirEgreso = false, onEgresoAbierto = () => {} }) {
+  const [verApertura, setVerApertura] = useState(false);   // apertura de caja plegada hasta que se pide
   // Autorización granular: si llega `can` se usa la matriz; si no, se cae al rol.
   const puedeEgresos = can ? can("facturacion", "aprobar") : rol !== "recepcion" && rol !== "gerencia";
   // Bug #26 re-test: Gerencia debe VER la pestaña Ingresos/egresos (solo lectura), aunque no pueda crear egresos
@@ -4231,9 +4242,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </div>
           )}
           {puedeAbrirCaja ? (
-            <section className="dc-ap3" aria-label="Abrir caja">
-              <div className="dc-ap3__tit"><span><KeyRound size={18} strokeWidth={2} /></span><div><b>Abrir caja</b><small>{fechaLegible(fmt(hoy))} · necesitas abrirla para cobrar</small></div></div>
-              <div className="dc-ap3__campos">
+            <section className={`dc-ap3${verApertura ? " is-abierta" : " is-compacta"}`} aria-label="Abrir caja">
+              <div className="dc-ap3__tit"><span><KeyRound size={18} strokeWidth={2} /></span><div><b>{verApertura ? "Abrir caja" : "La caja está cerrada"}</b><small>{fechaLegible(fmt(hoy))} · {verApertura ? "indica el fondo con el que empiezas" : "ábrela para empezar a cobrar"}</small></div>
+                {!verApertura && <button type="button" className="dc-ap2__cta" onClick={() => setVerApertura(true)}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>}
+                {verApertura && <button type="button" className="dc-ap3__x" onClick={() => setVerApertura(false)}>Cancelar</button>}
+              </div>
+              {verApertura && <div className="dc-ap3__campos">
                 {sedeRequierePick && (
                   <label className="dc-ap3__campo"><span>Sede</span>
                     <Select small width={180} ariaLabel="Sede para abrir caja" value={cajaSedePick || ""} placeholder="Elegir sede" onChange={(v) => setCajaSedePick(v)} options={sedesOpc.map((x) => ({ value: x.id, label: x.nombre }))} />
@@ -4242,8 +4256,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <label className="dc-ap3__campo"><span>Fondo inicial</span><span className="dc-ap3__monto"><i>S/</i><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo"><span>Fondo en dólares</span><span className="dc-ap3__monto"><i>US$</i><input inputMode="decimal" aria-label="Fondo inicial en dólares (US$)" value={aperturaForm.fondoUsd} onChange={(e) => setAperturaForm({ ...aperturaForm, fondoUsd: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo is-nota"><span>Nota (opcional)</span><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Ej. turno mañana" /></label>
-                <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado} title={sedeRequierePick && !cajaSedePick ? "Elige la sede" : undefined}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>
-              </div>
+                <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado} title={sedeRequierePick && !cajaSedePick ? "Elige la sede" : undefined}><KeyRound size={16} strokeWidth={2} /> Confirmar apertura</button>
+              </div>}
             </section>
           ) : (
             <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>La caja de hoy aún no se abre. Tu rol puede ver los saldos, pero no abrir caja ni cobrar.</span></div>
@@ -4317,7 +4331,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <button type="button" role="radio" aria-checked={filtroCob === "todos"} className={filtroCob === "todos" ? "is-on" : ""} onClick={() => setFiltroCob("todos")}>Todos ({porCobrar.length})</button>
             </div>
           </div>
-          {!cajaAbierta && !conectado && <div className="fm-aviso-edad is-info dc-cob__cerrada"><KeyRound size={15} strokeWidth={2} /><span><b>Abre la caja para cobrar.</b> Al pulsar «Cobrar» te llevamos a la apertura.</span>{puedeAbrirCaja && <button type="button" onClick={() => { setTab("hoy"); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { /* */ } }}>Abrir caja</button>}</div>}
+          {/* La caja cerrada ya se ve arriba («La caja está cerrada»): sin aviso repetido aquí. */}
           {conectado && cajaError ? <Vacio icon={<AlertTriangle size={24} strokeWidth={1.75} />} titulo="Error al cargar saldos" sub="Reintenta o contacta soporte. No hay saldos reales que mostrar." /> : !porCobrar.length ? <Vacio icon={<CheckCircle2 size={24} strokeWidth={1.75} />} titulo="Todo cobrado" sub="No hay saldos pendientes en esta sede." /> : (
             <ListaFiltrable rows={filtroCob === "listos" && porCobrar.some((x) => x.porCobrar > 0) ? porCobrar.filter((x) => x.porCobrar > 0) : porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} vistaClave="cobros" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
               { key: "p", label: "Paciente", w: "minmax(150px,1.2fr)", cell: (x) => <PersonaCelda nombre={x.p.nombre} /> },
@@ -4335,14 +4349,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             ]}>{(lista) => (
               <div className="dc-cob__filas">
                 {lista.map((x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; const col = colorDe(x.p.nombre); const pc = pct >= 75 ? "#16A36A" : pct >= 40 ? "#0E9199" : "#D97706"; return (
-                  <div key={x.p.id} className="dc-cob__fila">
+                  <div key={x.p.id} className="dc-cob__fila dc-cob__fila--v2">
                     <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(x.p.nombre)}</span>
-                    <div className="dc-cob__quien"><b>{x.p.nombre}{x.porCobrar > 0 && <em className="dc-cob__listo" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>Listo para cobrar · S/ {M.sol2(x.porCobrar)}</em>}</b><span><MapPin size={11} strokeWidth={2} /> {x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} <i /> {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span></div>
-                    <div className="dc-cob__avance" title={`Cobrado S/ ${x.pagado} de S/ ${x.total}`}>
-                      <span className="dc-cob__anillo" style={{ "--p": pct, "--c": pc }}><b>{pct}%</b></span>
-                      <div><small>Cobrado</small><span>S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</span></div>
-                    </div>
-                    <div className="dc-cob__saldo"><small>Saldo del plan</small><b>S/ {M.sol2(x.saldo)}</b></div>
+                    <div className="dc-cob__quien"><b>{x.p.nombre}</b><span>{x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} · {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span></div>
+                    <div className="dc-cob__ahora" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}><small>Por cobrar ahora</small><b className={x.porCobrar > 0 ? "is-si" : ""}>{x.porCobrar > 0 ? `S/ ${M.sol2(x.porCobrar)}` : "—"}</b></div>
+                    <div className="dc-cob__plan"><small>Saldo del plan</small><b>S/ {M.sol2(x.saldo)}</b><i title={`Cobrado S/ ${x.pagado} de S/ ${x.total}`}><u style={{ width: `${pct}%`, background: pc }} /></i><em>{pct}% cobrado</em></div>
                     <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={!cajaAbierta ? "Abre la caja para cobrar" : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono"} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button>
                   </div>
                 ); })}
@@ -4851,7 +4862,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               return (
               <article key={l.id} className={`dc-ticket${pagado ? " is-pagado" : ""}`}>
                 <div className="dc-ticket__top">
-                  <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12.5, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(l.paciente)}</span>
+                  <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(l.paciente)}</span>
                   <div className="dc-ticket__quien"><b>{l.paciente}</b><span>{l.concepto || "Pago de tratamiento"}</span></div>
                   <span className={`dc-pill ${pagado ? "is-ok" : "is-warn"}`}>{pagado ? <><CheckCircle2 size={12} strokeWidth={2} /> Pagado</> : <><Clock size={12} strokeWidth={2} /> Pendiente</>}</span>
                 </div>
@@ -5229,7 +5240,9 @@ function Integraciones({ notify }) {
         <span />
       </section>
       {/* La conexión con SUNAT es tarea de TI: proveedor, credenciales, IGV y series. */}
+      <div className="dc-int__sec"><h3>Facturación electrónica</h3><span>Proveedor, credenciales y series de cada sede</span></div>
       <ConexionSunat notify={notify} />
+      <div className="dc-int__sec"><h3>Catálogo de integraciones</h3><span>Pagos, mensajería e IA y captación de pacientes. Toca una para ver cómo se conecta.</span></div>
       <div className="dc-us__roles" role="tablist" aria-label="Categoría">
         <button type="button" role="tab" aria-selected={catSel === "todas"} className={catSel === "todas" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setCatSel("todas")}><Plug size={13} strokeWidth={2} /> Todas <i>{its.length}</i></button>
         {cats.map((c) => { const CI = c.ic; return <button key={c.cat} type="button" role="tab" aria-selected={catSel === c.cat} className={catSel === c.cat ? "is-on" : ""} style={{ "--c": c.c }} onClick={() => setCatSel(c.cat)}><CI size={13} strokeWidth={2} /> {c.cat} <i>{c.items.length}</i></button>; })}
@@ -5732,7 +5745,7 @@ function Plataforma({ notify }) {
           { key: "mrr", label: "MRR", w: "100px", a: "right", get: (c) => String(c.mrr), sortVal: (c) => Number(c.mrr) || 0, cell: (c) => <span className="dc-tp__num">S/ {c.mrr}</span> },
           { key: "estado", label: "Estado", w: "120px", a: "center", get: (c) => (ESTADO_CLINICA[c.estado] || {}).l || "", cell: (c) => { const E = ESTADO_CLINICA[c.estado]; return <span style={{ fontSize: 12, fontWeight: 600, color: E.fg, background: E.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{E.l}</span>; } },
           { key: "acc", label: "Acciones", w: "130px", a: "right", noSort: true, noFilter: true, cell: (c) => (
-            <button type="button" aria-label="Activar o desactivar" onClick={() => toggle(c)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, color: c.estado === "suspendida" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>
+            <button type="button" aria-label="Activar o desactivar" onClick={() => toggle(c)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6, color: c.estado === "suspendida" ? "var(--dc-ok-700)" : "var(--dc-warn-600)" }}>
               <Power size={14} strokeWidth={1.75} /> {c.estado === "suspendida" ? "Reactivar" : "Suspender"}
             </button>
           ) },
@@ -6226,10 +6239,10 @@ function Consentimientos({ pacientes: pacProp, notify }) {
               const ok = abrirDocumento({
                 titulo: d.tipo, tituloVentana: `${d.tipo} - ${d.paciente}`,
                 sub: `Consentimiento informado · ${d.estado}`,
-                css: `.cs-meta{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:11.5px;margin:6px 0 14px}
-                  .cs-box{border:1px solid #D9D3CA;border-radius:6px;padding:14px 16px;font-size:12.5px;line-height:1.7;white-space:pre-wrap}
-                  .cs-firma{margin-top:26px;border-top:1px solid #D9D3CA;padding-top:12px}.cs-l{font-size:10.5px;color:#7d746a;margin-bottom:6px}
-                  .cs-firma img{max-width:260px;border:1px solid #D9D3CA;border-radius:6px}.cs-rep{font-size:11.5px;margin-top:8px}`,
+                css: `.cs-meta{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:12px;margin:6px 0 14px}
+                  .cs-box{border:1px solid #D9D3CA;border-radius:6px;padding:14px 16px;font-size:12px;line-height:1.7;white-space:pre-wrap}
+                  .cs-firma{margin-top:26px;border-top:1px solid #D9D3CA;padding-top:12px}.cs-l{font-size:11px;color:#7d746a;margin-bottom:6px}
+                  .cs-firma img{max-width:260px;border:1px solid #D9D3CA;border-radius:6px}.cs-rep{font-size:12px;margin-top:8px}`,
                 cuerpo: `<div class="cs-meta"><span><b>Paciente:</b> ${esc(d.paciente)}</span><span><b>Fecha:</b> ${esc(d.fecha)}</span><span><b>Estado:</b> ${esc(d.estado)}</span></div>`
                   + `<div class="cs-box">${d.contenido ? esc(d.contenido) : "El paciente firmó y aceptó este consentimiento informado de forma electrónica."}</div>${firma}`,
               });
@@ -6476,7 +6489,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
           </div>
           {sedesLista.length > 1 && <>
             <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--dc-ink-500)", margin: "20px 0 4px" }}>Precio por sede</div>
-            <div style={{ fontSize: 12.5, color: "var(--dc-ink-500)", marginBottom: 10 }}>Precio con IGV. Déjalo vacío para cobrar el precio base. Las citas, presupuestos y cobros de cada sede usan este precio.</div>
+            <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginBottom: 10 }}>Precio con IGV. Déjalo vacío para cobrar el precio base. Las citas, presupuestos y cobros de cada sede usan este precio.</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               {sedesLista.map((sd) => <Field key={sd.id} label={`${sd.nombre} con IGV (S/)${Number(form.preciosSede?.[sd.id]) > 0 ? ` · sin IGV ${M.sol2(desgloseIgv(form.preciosSede[sd.id]).base)}` : ""}`} value={String(form.preciosSede?.[sd.id] ?? "")} onChange={(v) => setForm({ ...form, preciosSede: { ...(form.preciosSede || {}), [sd.id]: v.replace(/[^\d.]/g, "") } })} placeholder={form.monto ? `${form.monto} (base)` : "precio base"} />)}
             </div>
@@ -6678,6 +6691,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
     : <span className="dc-pill" style={{ "--c": "#C0392B" }}><i /> Agotado</span>;
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      {/* Secciones del inventario: el menú tiene una sola entrada y aquí se elige. */}
+      {puedeGestionar && <Pestanas etiqueta="Inventario" valor={tab} onChange={setTab} opciones={[{ id: "productos", label: "Insumos", icon: Package }, { id: "compras", label: "Órdenes de compra", icon: Send }, { id: "consumo", label: "Consumo por paciente", icon: Activity }, { id: "proveedores", label: "Proveedores", icon: Users }]} />}
       {tab === "compras" && puedeGestionar && (() => {
         // Conectado: ordenes REALES. En demostracion se conserva el ejemplo de siempre.
         const filas = conectado
@@ -6770,7 +6785,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           { key: "fecha", label: "Fecha", w: "minmax(120px,0.8fr)", a: "left", get: (c) => c.fecha, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(c.fecha)}</span> },
           { key: "insumo", label: "Insumo", w: "minmax(160px,1.3fr)", a: "left", get: (c) => c.insumo, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 500, color: NAVY, fontSize: 13 }}><span style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: (tint(DS.c.primary, 0.078)), color: DS.c.primary, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={15} strokeWidth={1.75} /></span>{c.insumo}</span> },
           { key: "cant", label: "Cantidad", w: "110px", a: "right", get: (c) => c.cant, cell: (c) => <span className="dc-pill" style={{ "--c": "#D0563F" }}>−{c.cant} {c.unidad}</span> },
-          { key: "paciente", label: "Paciente", w: "minmax(140px,1fr)", a: "left", get: (c) => c.paciente, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 28, height: 28, fontSize: 10.5, background: `linear-gradient(135deg, ${tint(colorDe(c.paciente), 0.2)}, ${tint(colorDe(c.paciente), 0.08)})`, color: colorDe(c.paciente) }}>{iniciales(c.paciente)}</span><span style={{ fontSize: 13, color: "var(--dc-ink-800, #243E45)", fontWeight: 500 }}>{c.paciente}</span></span> },
+          { key: "paciente", label: "Paciente", w: "minmax(140px,1fr)", a: "left", get: (c) => c.paciente, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 28, height: 28, fontSize: 11, background: `linear-gradient(135deg, ${tint(colorDe(c.paciente), 0.2)}, ${tint(colorDe(c.paciente), 0.08)})`, color: colorDe(c.paciente) }}>{iniciales(c.paciente)}</span><span style={{ fontSize: 13, color: "var(--dc-ink-800, #243E45)", fontWeight: 500 }}>{c.paciente}</span></span> },
           { key: "medico", label: "Odontólogo", w: "minmax(140px,1fr)", a: "left", get: (c) => c.medico, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{c.medico}</span> },
         ]} />
         </>
@@ -6808,7 +6823,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           </div>
           <div className="dc-esp-hero__cifras">
             {puedeGestionar && <div><b>S/ {valorTotal.toLocaleString("es-PE")}</b><span>Valor en stock</span></div>}
-            <div title={covMinHoy === Infinity ? undefined : (covMinInsumo ? `~${covMinHoy} d – ${covMinInsumo.nombre}` : `~${covMinHoy} d`)}><b>{covMinHoy === Infinity ? "—" : `~${covMinHoy} d`}</b><span>Cobertura mínima</span></div>
+            <div title={covMinInsumo ? covMinInsumo.nombre : undefined}><b>{covMinHoy === Infinity ? "—" : covMinHoy <= 0 ? "Hoy" : `${covMinHoy} d`}</b><span>{covMinInsumo ? `Se acaba primero: ${covMinInsumo.nombre}` : "Cobertura mínima"}</span></div>
             <div><b>{vencenPronto.length}</b><span>Vencen pronto</span></div>
           </div>
           <span />
@@ -6836,10 +6851,11 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         } }] : []),
         { key: "stock", label: "Stock", w: "minmax(140px,1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{it.unidad}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto" }}>mín {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div> : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
         // INV-01: una sola columna de urgencia (Estado) con los días de cobertura como subtítulo.
-        { key: "estado", label: "Estado", w: "minmax(130px,0.9fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); return <span style={{ display: "inline-grid", justifyItems: "center", gap: 2 }}>{badge(estado(it))}{d < 999 && <small style={{ fontSize: 11.5, color: "var(--dc-ink-500)" }}>{d <= 0 ? "se acaba hoy" : `~${Math.round(d)} d de cobertura`}</small>}</span>; } },
+        { key: "estado", label: "Estado", w: "minmax(130px,0.9fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); return <span style={{ display: "inline-grid", justifyItems: "center", gap: 2 }}>{badge(estado(it))}{d < 999 && <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{d <= 0 ? "se acaba hoy" : `~${Math.round(d)} d de cobertura`}</small>}</span>; } },
         { key: "pedir", label: "Sugerido", w: "minmax(130px,0.9fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}>+{q} {it.unidad}</span>; } },
         // Ajustar o editar el stock es gestion: quien solo consulta no lo ve.
-        ...(puedeGestionar ? [{ key: "acc", label: "Acciones", w: "136px", a: "center", noFilter: true, noSort: true, cell: (it) => <div style={{ display: "flex", gap: 6, justifyContent: "center" }} onClick={(e) => e.stopPropagation()}><button type="button" className="dc-icon-btn" aria-label="Restar" onClick={() => ajustar(it.id, -1)} title="Restar" style={acBtn}><Minus size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label="Sumar" onClick={() => ajustar(it.id, 1)} title="Sumar" style={acBtn}><Plus size={15} strokeWidth={1.75} /></button><button type="button" className="dc-icon-btn" aria-label="Editar" onClick={() => editar(it)} title="Editar" style={acBtn}><Pencil size={15} strokeWidth={1.75} /></button></div> }] : []),
+        // Ajuste rápido de stock (usar / ingresar una unidad); editar es tocar la fila.
+        ...(puedeGestionar ? [{ key: "acc", label: "Ajustar", w: "120px", a: "center", noFilter: true, noSort: true, sticky: false, fijo: true, cell: (it) => <span className="dc-inv__step" onClick={(e) => e.stopPropagation()}><button type="button" aria-label={`Usar 1 de ${it.nombre}`} title="Usar una unidad" onClick={() => ajustar(it.id, -1)}><Minus size={14} strokeWidth={2} /></button><b>{it.stock}</b><button type="button" aria-label={`Ingresar 1 de ${it.nombre}`} title="Ingresar una unidad" onClick={() => ajustar(it.id, 1)}><Plus size={14} strokeWidth={2} /></button></span> }] : []),
       ]} />
       </>)}
       {form && <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar insumo" : "Nuevo insumo"} sub={form.id ? "Actualiza los datos del insumo" : "Agrega un insumo al inventario"} onClose={() => setForm(null)} size="corto" maxW={560}
@@ -9079,7 +9095,7 @@ function BoletaView({ boleta, onClose }) {
           <div style={{ textAlign: "center", borderBottom: "2px solid var(--dc-ink-900)", paddingBottom: 10, marginBottom: 10 }}>
             {DI.empresa.logo && <img src={DI.empresa.logo} alt={DI.empresa.nombre} style={{ height: 40, maxWidth: 200, objectFit: "contain", display: "block", margin: "0 auto 6px" }} />}
             <div style={{ fontSize: 14, fontWeight: 500 }}>{EMISOR.nombre}</div>
-            {DI.sede.nombre && <div style={{ fontSize: 11.5, color: "var(--dc-ink-700)", marginTop: 2 }}>Establecimiento: {DI.sede.nombre}</div>}
+            {DI.sede.nombre && <div style={{ fontSize: 12, color: "var(--dc-ink-700)", marginTop: 2 }}>Establecimiento: {DI.sede.nombre}</div>}
             <div style={{ fontSize: 12, color: "var(--dc-ink-700)", marginTop: 2 }}>{EMISOR.dir}</div>
             <div style={{ fontSize: 12, color: "var(--dc-ink-700)" }}>Teléfono: {EMISOR.tel}</div>
             <div style={{ fontSize: 12, fontWeight: 500, marginTop: 3 }}>RUC: {EMISOR.ruc}</div>
@@ -9501,7 +9517,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", ema
       <div className="dc-cobro" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 460, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.3)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
         <div className="dc-cobro__head" style={{ background: "radial-gradient(55% 150% at 100% 0%, rgba(125,240,215,.3) 0%, transparent 60%), linear-gradient(118deg, #0C4553 0%, #0B6C78 45%, #0E9199 82%, #22AFAA 100%)", padding: "18px 22px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 12.5, opacity: .85, fontWeight: 600 }}>{paciente ? `Cobrar a ${paciente}` : "Cobrar"}{auth.token ? "" : " · demostración"}</div>
+            <div style={{ fontSize: 12, opacity: .85, fontWeight: 600 }}>{paciente ? `Cobrar a ${paciente}` : "Cobrar"}{auth.token ? "" : " · demostración"}</div>
             <div style={{ fontSize: 21, fontWeight: 600, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{sym} {aUi(netPen).toFixed(2)}</div>
             {parcial && <div style={{ fontSize: 12, opacity: .9 }}>Abono – saldo {sym} {aUi(saldoMax).toFixed(2)}</div>}
             {moneda === "USD" && <div style={{ fontSize: 12, opacity: .85 }}>≈ S/ {M.sol2(Number(netPen))} – TC {TC_USD}</div>}
@@ -10605,7 +10621,7 @@ function AwgSuscripciones({ notify }) {
         { key: "estado", label: "Estado", w: "160px", a: "center", get: (c) => (ESTADO_CLINICA[c.estado] || {}).l || "", cell: (c) => <Select small width={140} ariaLabel="Estado de la clínica" value={c.estado} onChange={(v) => cambiarEstado(c.id, v)} options={["activa", "trial", "suspendida"].map((e) => ({ value: e, label: ESTADO_CLINICA[e].l }))} /> },
         { key: "mrr", label: "MRR", w: "100px", a: "right", get: (c) => String(c.mrr), sortVal: (c) => Number(c.mrr) || 0, cell: (c) => <span className="dc-tp__num">S/ {c.mrr}</span> },
         { key: "ultimo", label: "Última actividad", w: "minmax(120px,1fr)", a: "left", get: (c) => c.ultimo || "" },
-        { key: "acc", label: "Acciones", w: "120px", a: "right", noSort: true, noFilter: true, cell: (c) => <button type="button" onClick={() => notify(`Factura de ${c.nombre} generada.`)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6 }}><FileText size={14} strokeWidth={1.75} /> Facturar</button> },
+        { key: "acc", label: "Acciones", w: "120px", a: "right", noSort: true, noFilter: true, cell: (c) => <button type="button" onClick={() => notify(`Factura de ${c.nombre} generada.`)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}><FileText size={14} strokeWidth={1.75} /> Facturar</button> },
       ]} />
     </div>
   );
@@ -10635,10 +10651,10 @@ function AwgUsuariosGlobales({ notify }) {
         { key: "nombre", label: "Usuario", w: "minmax(180px,1.3fr)", a: "left", get: (u) => u.nombre, cell: (u) => <PersonaCelda nombre={u.nombre} /> },
         { key: "email", label: "Correo", w: "minmax(180px,1.3fr)", a: "left", get: (u) => u.email || "—" },
         { key: "tenant", label: "Tenant", w: "minmax(140px,1fr)", a: "left", get: (u) => u.tenant || "" },
-        { key: "rol", label: "Rol", w: "190px", a: "center", get: (u) => (ROLES[u.rol] || {}).label || "", cell: (u) => { const R = ROLES[u.rol]; return <span style={{ whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 600, color: R.color, background: tint(R.color, 0.078), padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{R.label}</span>; } },
+        { key: "rol", label: "Rol", w: "190px", a: "center", get: (u) => (ROLES[u.rol] || {}).label || "", cell: (u) => { const R = ROLES[u.rol]; return <span style={{ whiteSpace: "nowrap", fontSize: 12, fontWeight: 600, color: R.color, background: tint(R.color, 0.078), padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{R.label}</span>; } },
         { key: "estado", label: "Estado", w: "120px", a: "center", get: (u) => (u.estado === "activo" ? "Activo" : "Bloqueado"), cell: (u) => (u.estado === "activo" ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Activo</span> : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>Bloqueado</span>) },
         { key: "ultimo", label: "Último acceso", w: "minmax(120px,1fr)", a: "left", get: (u) => u.ultimo || "" },
-        { key: "acc", label: "Acciones", w: "140px", a: "right", noSort: true, noFilter: true, cell: (u) => <button type="button" aria-label="Activar o desactivar" onClick={() => toggle(u)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6, color: u.estado === "activo" ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}><Power size={14} strokeWidth={1.75} /> {u.estado === "activo" ? "Bloquear" : "Desbloquear"}</button> },
+        { key: "acc", label: "Acciones", w: "140px", a: "right", noSort: true, noFilter: true, cell: (u) => <button type="button" aria-label="Activar o desactivar" onClick={() => toggle(u)} className="dc-btn dc-btn--secundario" style={{ minHeight: 32, padding: "0 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6, color: u.estado === "activo" ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}><Power size={14} strokeWidth={1.75} /> {u.estado === "activo" ? "Bloquear" : "Desbloquear"}</button> },
       ]} />
     </div>
   );
@@ -11058,7 +11074,7 @@ export default function App() {
         .dw-card{position:relative;border-radius:var(--dc-r-lg);background:var(--dc-surface);border:1px solid var(--dc-line);box-shadow:var(--dc-sh-1);overflow:hidden;transition:border-color .15s, box-shadow .15s}
         .dw-card:hover{border-color:var(--dc-ink-200)}
         .dw-card:active{cursor:grabbing}
-        .dc-th::placeholder{color:var(--dc-ink-500);text-transform:uppercase;font-weight:700;letter-spacing:.6px;font-size:10.5px}
+        .dc-th::placeholder{color:var(--dc-ink-500);text-transform:uppercase;font-weight:700;letter-spacing:.6px;font-size:11px}
         .dc-side nav::-webkit-scrollbar{width:6px}
         .dc-side nav::-webkit-scrollbar-thumb{background:var(--dc-bg);border-radius:9px}
         .dc-side nav::-webkit-scrollbar-track{background:transparent}

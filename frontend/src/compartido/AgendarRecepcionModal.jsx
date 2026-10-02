@@ -340,7 +340,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     </div>
   );
   return (
-    <Modal icon={<Calendar size={20} strokeWidth={1.75} />} titulo="Agendar cita" sub="Registra la cita del paciente" onClose={onClose} maxW={masDatos ? 760 : 460}
+    <Modal icon={<Calendar size={20} strokeWidth={1.75} />} titulo="Agendar cita" sub="Registra la cita del paciente" onClose={onClose} maxW={masDatos ? 820 : 540}
       footer={<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
         <button onClick={() => setMasDatos((v) => !v)} style={{ background: "none", border: "none", color: T, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>{masDatos ? "‹ Menos datos" : "Más datos ›"}</button>
         <Btn small onClick={guardar} disabled={guardando || !!avisoHorario || evaluacion.errores.length > 0}><Check size={15} strokeWidth={1.75} /> Agendar</Btn>
@@ -363,8 +363,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       <div style={{ display: "grid", gridTemplateColumns: masDatos ? "1fr 1fr" : "1fr", gap: 20 }}>
         <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
           <div>
-            <span style={lbl}>Paciente{req}</span>
-            <div style={{ position: "relative" }}>
+            <div className="dc-agm__paso"><i>1</i>Paciente{req}</div>
+            {!nuevo && <div style={{ position: "relative" }}>
               <div onClick={() => setAbrePac((v) => !v)} style={{ ...inp, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", color: pacSel ? NAVY : "var(--dc-ink-400)", borderColor: abrePac ? T : "var(--dc-line)" }}>
                 <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pacSel ? `${pacSel.nombre}${pacSel.dni ? ` – ${pacSel.dni}` : ""}` : "Buscar paciente…"}</span>
                 <ChevronRight size={16} strokeWidth={1.75} style={{ transform: `rotate(${tint(abrePac ? -90 : 90, 0.871)}g)`, color: "var(--dc-ink-400)", flexShrink: 0 }} />
@@ -375,19 +375,20 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
                   {pacF.length === 0 && <div style={{ padding: "8px 14px", fontSize: 13, color: "var(--dc-ink-400)" }}>Sin coincidencias.</div>}
                   {pacF.map((p) => <button key={p.id} onClick={() => { setF({ ...f, pacienteId: p.id }); setAbrePac(false); setBusca(""); }} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: p.id === f.pacienteId ? "var(--dc-bg)" : "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{p.nombre}{p.dni ? <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> – {p.dni}</span> : null}</button>)}
                 </div>
-                <button onClick={() => setNuevo({ nombre: busca, dni: "" })} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
+                <button onClick={() => { setNuevo({ nombre: busca, dni: "" }); setAbrePac(false); }} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
               </div>}
-            </div>
-            {nuevo && <div style={{ marginTop: 8, background: "var(--dc-bg-soft2)", border: "1px dashed var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12, display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: NAVY }}>Nuevo paciente</div>
+            </div>}
+            {nuevo && <div className="dc-agm__nuevo">
+              <div className="dc-agm__nuevo-cab"><span><Plus size={14} strokeWidth={2.2} /></span><b>Nuevo paciente</b><button type="button" onClick={() => setNuevo(null)}>Elegir uno existente</button></div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input className="dc-premium-inp" value={nuevo.dni} onChange={(e) => setNuevo({ ...nuevo, dni: e.target.value.replace(/[^\d]/g, "").slice(0, 8) })} placeholder="DNI" style={{ ...inp, padding: "8px 11px", flex: 1, minWidth: 0 }} />
                 <BtnReniec dni={nuevo.dni} onNombre={(n) => setNuevo((x) => ({ ...x, nombre: n }))} notify={notify} />
               </div>
               <input className="dc-premium-inp" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} placeholder="Nombre completo" style={{ ...inp, padding: "8px 11px" }} />
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crearNuevo}>Crear y usar</Btn></div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crearNuevo}><Check size={14} strokeWidth={2} /> Crear y usar</Btn></div>
             </div>}
           </div>
+          <div className="dc-agm__paso"><i>2</i>Servicio y doctor</div>
           <label><span style={lbl}>Servicio{req}</span>
             <Select value={f.especialidadId} onChange={(v) => { setDurAuto(true); setSillonAuto(true); setF({ ...f, especialidadId: v, medicoId: f.medicoId && v && meds.find((m) => String(m.id) === String(f.medicoId) && String(m.especialidadId) !== String(v)) ? "" : f.medicoId }); }} placeholder="Cualquiera"
                     placeholder="Elegir servicio" options={[...esps.map((e) => ({ value: e.id, label: e.nombre, sub: e.duracionMin ? `${e.duracionMin} min` : undefined }))]} />
@@ -403,6 +404,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               : turnosHoy.length ? <span>{fechaLegible(f.fecha)} atiende {turnosHoy.map((t, i) => <b key={i}>{String(t.horaInicio).slice(0, 5)}–{String(t.horaFin).slice(0, 5)}{t.sede != null || t.sedeId != null ? ` (${nomSede(t.sede ?? t.sedeId).replace(/^Sede\s+/, "") || "sede"})` : ""}</b>).reduce((a, b) => [a, " y ", b])}</span>
               : <span>No atiende el {fechaLegible(f.fecha)}. Elige otra fecha u otro doctor.</span>}
           </div>}
+          <div className="dc-agm__paso"><i>3</i>Cuándo y dónde</div>
           <label><span style={lbl}>Sede / consultorio{req}</span>
             <Select value={f.sedeId} onChange={(v) => { setSillonAuto(true); setF({ ...f, sedeId: v, sillon: "" }); }} placeholder="Seleccionar sede"
                     options={seds.map((s) => ({ value: s.id, label: s.nombre }))} />
@@ -427,6 +429,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             </div>
             {pasada && <div style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>Fecha pasada</div>}
           </div>
+          <div className="dc-agm__paso"><i>4</i>Detalles</div>
           <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
             <label><span style={lbl}>Duración{durAuto && durServicio && Number(f.duracionMin) === durServicio && <em className="dc-agm__auto">según {espObj.nombre.toLowerCase()}</em>}</span>

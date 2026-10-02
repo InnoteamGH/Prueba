@@ -66,9 +66,9 @@ const sol = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFra
 const hoyLargo = () => new Date().toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" });
 
 const CSS_PERIO = `
-.ficha{display:flex;gap:24px;border:1px solid #D9D3CA;border-left:3px solid #1B1614;padding:8px 12px;background:#F4F1EA;font-size:11.5px;margin:4px 0 12px}
+.ficha{display:flex;gap:24px;border:1px solid #D9D3CA;border-left:3px solid #1B1614;padding:8px 12px;background:#F4F1EA;font-size:12px;margin:4px 0 12px}
 .ficha>div{flex:1;min-width:0} .ficha p{margin:2px 0}
-h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;margin:16px 0 6px;border-bottom:1.5px solid #D9D3CA;padding-bottom:4px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;margin:16px 0 6px;border-bottom:1.5px solid #D9D3CA;padding-bottom:4px}
 .dx{border:1px solid #D9D3CA;border-radius:6px;padding:9px 12px;font-size:12px;line-height:1.55}
 .dx b{font-size:13px}
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid #D9D3CA;border-radius:6px;overflow:hidden;margin-top:8px}
@@ -81,9 +81,9 @@ h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;margin:16px 0 
 .tot{margin-left:auto;width:280px;margin-top:10px;font-size:12px}
 .tot div{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #EFEBE3}
 .tot .big{font-size:15px;font-weight:800;border-bottom:2px solid #1B1614}
-.cond{font-size:10.5px;line-height:1.55;color:#3d3833;margin-top:14px}
+.cond{font-size:11px;line-height:1.55;color:#3d3833;margin-top:14px}
 .cond p{margin:3px 0}
-.firmas{display:flex;gap:40px;margin-top:54px}.firmas div{flex:1;border-top:1px solid #1B1614;padding-top:6px;text-align:center;font-size:10.5px}
+.firmas{display:flex;gap:40px;margin-top:54px}.firmas div{flex:1;border-top:1px solid #1B1614;padding-top:6px;text-align:center;font-size:11px}
 .nota{font-size:10px;color:#7d746a;margin-top:10px}`;
 
 function fichaHTML(pac, prof) {

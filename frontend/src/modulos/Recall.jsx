@@ -231,7 +231,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
                   <figure key={r.id || i} className={`dc-sat__com is-${tono}`}>
                     <blockquote>{r.comentario}</blockquote>
                     <figcaption>
-                      <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 11.5, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente || "P")}</span>
+                      <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente || "P")}</span>
                       <div><b>{r.paciente || "Paciente"}</b>{/* SAT-02: en encuestas solo la escala 0–10. */}{r.nps != null ? <span className="dc-sat__nps">{r.nps}/10</span> : r.medico ? <span>{r.medico}</span> : null}</div>
                       {r.nps != null && <span className="dc-sat__nps">{r.nps}<small>/10</small></span>}
                     </figcaption>
@@ -316,7 +316,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
 
       <Card style={{ overflow: "hidden" }}>
         <div className="dc-rec__cola-cab" style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14.5, fontWeight: 700, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}>Pacientes por volver {cola.some((c) => c.estado === "por_contactar") && <span className="dc-rec__pend">{cola.filter((c) => c.estado === "por_contactar").length} por contactar</span>}</h3><div style={{ fontSize: 12.5, color: "var(--dc-ink-500)", marginTop: 2 }}>Sin control hace más de 6 meses. El recall les propone una cita automáticamente.</div></div>
+          <div><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}>Pacientes por volver {cola.some((c) => c.estado === "por_contactar") && <span className="dc-rec__pend">{cola.filter((c) => c.estado === "por_contactar").length} por contactar</span>}</h3><div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 2 }}>Sin control hace más de 6 meses. El recall les propone una cita automáticamente.</div></div>
           {puedeEnviar && cola.some((c) => c.estado === "por_contactar") && <Btn small onClick={enviarTodos}><Send size={14} strokeWidth={1.75} /> Enviar a todos</Btn>}
         </div>
         {cola.length > 0 && (

@@ -137,7 +137,7 @@ export default function Metas({ notify = () => {}, can }) {
                 <label className="dc-mtx__inp"><span>S/</span><input type="number" min="0" step="100" disabled={!puedeEditar} value={draft[m.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [m.id]: e.target.value }))} placeholder="Sin meta" aria-label={`Meta mensual de ${m.nombre}`} /></label>
                 <label className="dc-mtx__inp is-pct"><input type="number" min="0" max="100" step="1" disabled={!puedeEditar} value={draftCom[m.id] ?? ""} onChange={(e) => setDraftCom((d) => ({ ...d, [m.id]: e.target.value }))} placeholder="—" aria-label={`Comisión de ${m.nombre} en %`} /><span>%</span></label>
                 <span className="dc-mtx__calc">{met && pc != null ? <><b>{soles(met * pc / 100)}</b><small>{pc}% de {soles(met)}</small></> : <small>Define meta y %</small>}</span>
-                <span className="dc-mtx__acc">{puedeEditar && <button type="button" className={`dc-meta__btn${cambio ? " is-on" : ""}`} disabled={saving === m.id || !cambio} onClick={() => guardar(m)}><Check size={14} strokeWidth={2.2} /> {saving === m.id ? "…" : "Guardar"}</button>}</span>
+                <span className="dc-mtx__acc">{saving === m.id ? <em className="dc-mtx__tag">Guardando…</em> : cambio ? <em className="dc-mtx__tag is-cambio">Editado</em> : null}</span>
               </div>
             );
           })}

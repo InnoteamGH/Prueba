@@ -75,7 +75,7 @@ html,body{background:transparent!important;font-family:var(--ui)!important}
 .tarjeta{border:0!important;box-shadow:none!important;border-radius:0!important;background:transparent!important}
 .tarjeta > header{background:transparent!important;border-bottom:1px solid #EEF4F4!important;padding:4px 2px 12px!important}
 .et,.grupo>span,.rot-et,.cuad-rot,.lupa-et{text-transform:none!important;letter-spacing:0!important}
-.cuad-rot{font-size:12.5px!important;font-weight:650!important;fill:#7C9499!important}
+.cuad-rot{font-size:12px!important;font-weight:650!important;fill:#7C9499!important}
 .pieza .num,.pieza .sig,.lupa-sig,.norma,.exp-sub b,.grupo>i,kbd{font-family:var(--ui)!important;letter-spacing:0!important;font-variant-numeric:tabular-nums}
 .pieza .num{font-size:12px!important;font-weight:650!important;fill:#7C9499!important}
 .pieza.sel .num{fill:#0B6C78!important;font-weight:800!important}
@@ -113,6 +113,8 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   editable = true,
   onNavTab,
   conExpediente = true,
+  /** Expediente clínico: foto de la fase, sin herramientas ni presupuesto. */
+  soloLectura = false,
   onFaseChange,
   demoEstados = null,
   /** Demostración: dibujo guardado en la ficha (formato del iframe) y aviso de cambios. */
@@ -143,8 +145,9 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     if (pacienteSede) q.set("sede", String(pacienteSede));
     q.set("theme", "light");
     if (!conExpediente) q.set("expediente", "0");
+    if (soloLectura) q.set("ro", "1");
     return `${import.meta.env.BASE_URL}odontograma-anatomico/index.html?${q.toString()}`;
-  }, [pacienteId, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, conExpediente]);
+  }, [pacienteId, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, conExpediente, soloLectura]);
 
   useEffect(() => {
     setFrameReady(false);

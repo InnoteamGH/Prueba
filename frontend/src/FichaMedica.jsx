@@ -118,12 +118,12 @@ const CSS_FICHA_DOC = `
   h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#1B1614;border-bottom:1.5px solid #D9D3CA;padding-bottom:5px;margin:20px 0 9px}
   .muted{color:#7d746a} .row{display:flex;gap:24px;flex-wrap:wrap;margin:3px 0}
   .row b{color:#1B1614} table{width:100%;border-collapse:collapse;margin-top:6px}
-  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #D9D3CA;font-size:11.5px;vertical-align:top}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #D9D3CA;font-size:12px;vertical-align:top}
   th{background:#F4F1EA;color:#1B1614;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
   .box{border:1px solid #D9D3CA;border-radius:6px;padding:9px 11px;margin:6px 0;white-space:pre-wrap}
-  .rx-item{border-bottom:1px dashed #D9D3CA;padding:8px 0} .rx-item b{font-size:13.5px}
+  .rx-item{border-bottom:1px dashed #D9D3CA;padding:8px 0} .rx-item b{font-size:14px}
   .firma{margin-top:52px;text-align:center;width:280px;margin-left:auto} .firma div{border-top:1px solid #1B1614;padding-top:6px}
-  .pill{display:inline-block;background:#F4F1EA;border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0;font-size:11.5px}`;
+  .pill{display:inline-block;background:#F4F1EA;border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0;font-size:12px}`;
 function imprimir(titulo, inner, notify) {
   const ok = abrirDocumento({ titulo, cuerpo: inner, css: CSS_FICHA_DOC });
   if (!ok) notify && notify("Permite las ventanas emergentes para imprimir.");
@@ -2251,7 +2251,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 {subOdoOpc.map(([k2, l]) => <button key={k2} type="button" role="tab" aria-selected={subOdo === k2} className={subOdo === k2 ? "is-on" : ""} onClick={() => setSubOdo(k2)}>{l}</button>)}
               </div>
             )}
-            {tab === "odontograma" && subOdo === "odo" && puedeOrto && !tieneOrto && !subExtra.orto && puedeEscribirClinico && (
+            {tab === "odontograma" && subOdo === "odo" && !slots?.odontograma && puedeOrto && !tieneOrto && !subExtra.orto && puedeEscribirClinico && (
               <div className="fm-sub-iniciar">
                 {puedeOrto && !tieneOrto && !subExtra.orto && <button type="button" onClick={() => { setSubExtra((x) => ({ ...x, orto: true })); setSubOdo("orto"); }}><Braces size={13} strokeWidth={2} /> Iniciar ortodoncia</button>}
               </div>
@@ -2412,7 +2412,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
                 <span style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Nota de evolución</span>
                 <button onClick={() => setTab("historia")} title="Las evoluciones se registran en Historia clínica"
-                  style={{ background: "none", border: "none", cursor: "pointer", color: TEAL, fontSize: 12.5, fontWeight: 600 }}>
+                  style={{ background: "none", border: "none", cursor: "pointer", color: TEAL, fontSize: 12, fontWeight: 600 }}>
                   Ver historia →
                 </button>
               </div>

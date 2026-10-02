@@ -257,11 +257,13 @@ export function ConexionSunat({ notify = () => {} }) {
         </div>
         <div className="dc-fe__eacc"><button type="button" className="dc-fe__btn is-pri" onClick={() => setEditCfg({ ...cfg, token: "" })}><KeyRound size={15} strokeWidth={2} /> {conectadoProv ? "Configurar" : "Conectar proveedor"}</button></div>
       </div>
+      <details className="dc-fe__como"><summary>¿Cómo viaja un comprobante hasta SUNAT?</summary>
       <ol className="dc-fe__flujo" aria-label="Cómo viaja un comprobante">
         {[[Wallet, "Cobro en caja", "Boleta o factura, soles o dólares"], [Receipt, "Comprobante", "Serie de la sede y correlativo"], [KeyRound, "Firma y envío", "Lo firma y envía el proveedor"], [FileCheck2, "Respuesta SUNAT", "Aceptado, observado o rechazado"], [Smartphone, "Al paciente", "PDF por WhatsApp o correo"]].map(([I, t, d], i) => (
           <li key={t}><span><I size={16} strokeWidth={2} /></span><div><b>{i + 1}. {t}</b><small>{d}</small></div>{i < 4 && <ArrowRight size={14} strokeWidth={2} className="dc-fe__flecha" aria-hidden="true" />}</li>
         ))}
       </ol>
+      </details>
       {editCfg && (
         <Modal icon={<Link2 size={20} strokeWidth={1.75} />} titulo="Conexión con SUNAT" sub="Proveedor OSE/PSE, ambiente, IGV y series" onClose={() => setEditCfg(null)} maxW={640}
           footer={<><Btn small kind="ghost" onClick={probar} disabled={probando || !editCfg.proveedor}><PlugZap size={14} strokeWidth={2} /> {probando ? "Probando…" : "Probar conexión"}</Btn><Btn small onClick={guardarCfg}><CheckCircle2 size={14} strokeWidth={2} /> Guardar</Btn></>}>

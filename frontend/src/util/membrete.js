@@ -165,7 +165,7 @@ body{font:12px/1.45 -apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#1B16
 .mbr-nom{font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
 .mbr-baj{font-size:9.4px;letter-spacing:.16em;text-transform:uppercase;color:#7d746a}
 .mbr-datos{margin-left:auto;text-align:right;font-size:9.4px;line-height:1.55;color:#5d564f}
-.mbr-datos b{display:block;font-size:11.5px;letter-spacing:.06em;color:#1B1614;margin-bottom:2px}
+.mbr-datos b{display:block;font-size:12px;letter-spacing:.06em;color:#1B1614;margin-bottom:2px}
 .doc-h1{text-align:center;font-size:17px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin:14px 0 3px}
 .doc-sub{text-align:center;font-size:10px;color:#5d564f;margin:0 0 12px}
 .doc-pie{position:absolute;left:14mm;right:14mm;bottom:9mm;display:flex;justify-content:space-between;gap:12px;
