@@ -26,12 +26,13 @@ export const ESTADOS = {
     reprogramada: ["Reprogramada", "neutro"],
     cerrada_sistema: ["Cerrada por sistema", "neutro"],
   },
-  // Propuesto → Aprobado → En curso → Terminado (por cobrar) → Pagado · (Anulado)
-  // En los datos: pendiente = aprobado en el plan, terminada = hecho sin pagar,
-  // atendida = pagado.
+  // Propuesto → Por realizar → En curso → Terminado (por cobrar) → Pagado · (Anulado)
+  // En los datos: pendiente = en el plan, por hacer; terminada = hecho sin pagar,
+  // atendida = pagado. «Por realizar» y no «Aprobado»: pasar un hallazgo al presupuesto
+  // no significa que el paciente lo haya aceptado.
   procedimiento: {
     propuesto: ["Propuesto", "neutro"],
-    pendiente: ["Aprobado", "info"],
+    pendiente: ["Por realizar", "info"],
     en_curso: ["En curso", "acento"],
     terminada: ["Terminado · por cobrar", "aviso"],
     atendida: ["Pagado", "ok"],

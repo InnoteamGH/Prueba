@@ -896,7 +896,7 @@ function registroDemo(pac) {
     { id: "dm1", ts: hace(0, 9, 12), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "Consulta del día", origen: "Sede San Isidro · Chrome en Windows" },
     { id: "dm2", ts: hace(0, 8, 47), usuario: "Lucía Ramírez", rol: "Recepción", tipo: "acceso", accion: "Abrió la historia clínica", detalle: `Confirmó la cita de ${nom}`, origen: "Sede San Isidro · Chrome en Windows" },
     { id: "dm3", ts: hace(3, 17, 5), usuario: "Roberto Díaz", rol: "Administrador", tipo: "imprimir", accion: "Imprimió la historia clínica", detalle: "Copia solicitada por el paciente", origen: "Sede San Isidro · Edge en Windows" },
-    { id: "dm4", ts: hace(12, 11, 30), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "editar", accion: "Modificó la anamnesis", detalle: "Antecedentes: agregó «Bruxismo»", origen: "Sede San Isidro · Safari en iPad" },
+    { id: "dm4", ts: hace(12, 11, 30), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "editar", accion: "Modificó la anamnesis", detalle: arr(pac?.antecedentes).length ? `Antecedentes: agregó «${arr(pac.antecedentes)[0]}»` : "Actualizó el motivo de consulta", origen: "Sede San Isidro · Safari en iPad" },
     { id: "dm5", ts: hace(12, 11, 2), usuario: "Dra. Carla Mendoza", rol: "Odontóloga", tipo: "acceso", accion: "Abrió la historia clínica", detalle: "", origen: "Sede San Isidro · Safari en iPad" },
   ];
 }
@@ -1740,7 +1740,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div className="fm-top__nom">{p.nombre || "Ficha médica"}</div>
               <div className="fm-top__chips">
                 {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null].filter(Boolean).map((t) => <span key={t}>{t}</span>)}
-                {!errorFicha && <span className={debe ? "is-debe" : "is-ok"}>{money(montoSaldoUi)} {saldoAFavor > 0.005 ? "a favor" : debe ? "por pagar" : "al día"}</span>}
+                {!errorFicha && <span className={debe ? "is-debe" : "is-ok"}>{money(montoSaldoUi)} {saldoAFavor > 0.005 ? "a favor" : debe ? "saldo del plan" : "al día"}</span>}
                 {!errorFicha && Number(r.saldoOtras) > 0.5 && <span title="Saldo de tratamientos hechos en otra sede: se cobra allá" style={{ fontSize: 12, color: MUTED }}>+ {money(r.saldoOtras)} en otra sede</span>}
                 {!errorFicha && arr(p.alergias).map((a) => <ChipAlergia key={a}>⚠ {a}</ChipAlergia>)}
                 {!errorFicha && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias</span>}
@@ -2434,7 +2434,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 10 }}>Presupuesto</div>
               {arr(d?.tratamientos).length === 0
                 ? <div style={{ fontSize: 13, color: MUTED }}>Sin plan de tratamiento todavía.</div>
-                : <div style={{ display: "grid", gap: 7 }}>
+                : <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 7 }}>
                     {arr(d?.tratamientos).slice(0, 6).map((t, i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                         <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", flexShrink: 0, border: `2px solid ${t.estado === "completada" ? GREEN : ACCENT}`, background: t.estado === "completada" ? GREEN : "transparent" }} />

@@ -1902,6 +1902,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     }
   }, [fmId]); // eslint-disable-line
   const cerrarFm = () => { setFmId(null); setFmTab(null); irHash("pacientes"); };
+  // Radiografías y Fotos abren con el último paciente cuya ficha se miró.
+  useEffect(() => { if (fmId != null) try { sessionStorage.setItem("dc_ultimo_paciente", String(fmId)); } catch { /* sin almacenamiento */ } }, [fmId]);
   // La ficha solo se abre si el paciente está entre los visibles (sus sedes y el filtro de
   // arriba). El id llega también por enlace, marcador, «Ver ficha» de WhatsApp o dc-ir:
   // sin esto se abría la historia de un paciente de otra sede. Con sesión se espera al padrón.
@@ -2105,11 +2107,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const canalCol = { "Recomendación": "#16A36A", "Instagram": "#E0487A", "Facebook": "#2F6FDE", "Google": "#F2A93B", "TikTok": "#1F3A40", "Volante": "#D97706", "Pasó por el local": "#0E9199", "Convenio empresa": "#6D4FD1", "Sin registrar": "#B7C8CB" };
   const segmentos = [
     { k: "cumple", label: "Cumpleaños este mes", sub: "Saludo con descuento", n: cumpleMes, color: "#E0487A", icon: <Sparkles size={16} strokeWidth={1.75} />,
-      plantilla: "¡Feliz cumpleaños, {nombre}! 🎉 En Sonríe+ queremos celebrar contigo: este mes tienes 20% de descuento en tu limpieza dental. Escríbenos para agendar." },
+      plantilla: "¡Feliz cumpleaños, {nombre}! 🎉 Queremos celebrar contigo: este mes tienes 20% de descuento en tu limpieza dental. Escríbenos para agendar." },
     { k: "react", label: "Para reactivar", sub: "Más de 6 meses sin venir", n: reactivar, color: "#D97706", icon: <BellRing size={16} strokeWidth={1.75} />,
-      plantilla: "Hola {nombre}, ¡te extrañamos en Sonríe+! Hace más de 6 meses de tu última visita. Reserva tu control con 15% de descuento este mes. Tu sonrisa lo agradecerá 😁" },
+      plantilla: "Hola {nombre}, ¡te extrañamos! Hace más de 6 meses de tu última visita. Reserva tu control con 15% de descuento este mes. Tu sonrisa lo agradecerá 😁" },
     { k: "opt", label: "Aceptan campañas", sub: "Dieron su consentimiento", n: optIn, color: "#0E9199", icon: <Megaphone size={16} strokeWidth={1.75} />,
-      plantilla: "Hola {nombre}, en Sonríe+ tenemos una promoción especial para ti este mes. Escríbenos y agenda tu cita con beneficios exclusivos. ¡Te esperamos!" },
+      plantilla: "Hola {nombre}, tenemos una promoción especial para ti este mes. Escríbenos y agenda tu cita con beneficios exclusivos. ¡Te esperamos!" },
   ];
   const segmentoPac = (k) => lista.filter((p) => p.telefono && String(p.telefono).trim() && (
     k === "cumple" ? (p.nacimiento && new Date(p.nacimiento + "T00:00:00").getMonth() === hoy.getMonth())
@@ -3412,6 +3414,8 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   // El doctor marca la fase como terminada: el cobro queda generado solo en Caja
   // (bloque «Tratamientos terminados por cobrar»), sin que recepción lo digite.
   const terminarFase = (f) => {
+    // Terminar manda el cobro a Caja y descuenta insumos: un clic suelto no debe hacerlo.
+    if (!window.confirm(`¿Marcar «${f.nombre}»${f.pieza ? ` (pieza ${f.pieza})` : ""} como terminado?\nSu cobro de S/ ${M.sol2(f.costo)} pasará a Caja.`)) return;
     const cuando = new Date().toISOString();
     if (conectado) {
       api.tratamientos.actualizarFase(f.id, { estado: "terminada", terminadaEn: cuando })
@@ -8439,7 +8443,14 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   const pacientes = useMemo(() => (conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sedeRegistroId)) : pacProp), [conectado, pacRemoto, pacProp, sedeCx.ids]); // eslint-disable-line react-hooks/exhaustive-deps
   // Dentro de la ficha manda el paciente de la ficha: antes se abrían (y se subían) las
   // radiografías del primer paciente de la lista, y con sesión se subían sin paciente.
-  const [pid, setPid] = useState(pacienteFijo ?? (auth.token ? null : (pacProp[0]?.id || null)));
+  // Abre con el paciente cuya ficha se miró por última vez (el que se está atendiendo), no
+  // con el primero de la lista.
+  const [pid, setPid] = useState(() => {
+    if (pacienteFijo != null) return pacienteFijo;
+    let ult = null; try { ult = sessionStorage.getItem("dc_ultimo_paciente"); } catch { /* sin almacenamiento */ }
+    if (auth.token) return ult || null;
+    return (ult && pacProp.find((p) => String(p.id) === ult)?.id) ?? (pacProp[0]?.id || null);
+  });
   useEffect(() => { if (pacienteFijo != null) setPid(pacienteFijo); }, [pacienteFijo]);
   // Al cambiar la sede de arriba, el paciente que ya no se ve se suelta (con sesión se pide elegir).
   useEffect(() => {
@@ -9097,6 +9108,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   }, [vista]);
   // Autorización granular por acción para el usuario en sesión.
   const can = useMemo(() => (mod, acc = "ver") => puede(effPerms, mod, acc), [effPerms]);
+  // Nombre de la clínica del menú lateral: el mismo de Configuración › Datos de la clínica
+  // que sale en los documentos impresos (antes el menú decía una marca y la boleta otra).
+  const marcaClinica = useDatosImpresion()?.empresa?.nombre || "";
   const refreshMe = () => {
     if (!auth.token) return Promise.resolve();
     return api.me().then((r) => {
@@ -9326,7 +9340,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       ...(rol === "medico" ? [{ id: "miproduccion", label: "Mi producción", icon: Wallet }] : []),
     ] },
     { grupo: "Agenda", items: [
-      { id: "agenda", label: "Agenda", icon: Calendar, match: ["agenda_cal", "agenda_consolidado"] },
+      { id: "agenda", label: "Agenda", icon: Calendar, match: ["agenda_cal"] },
+      // Recepción y doctores lo usan a diario: con entrada propia y no solo desde Agenda › Lista.
+      { id: "agenda_consolidado", label: "Consolidado de citas", icon: CalendarCheck },
       { id: "espera", label: "Lista de espera", icon: Bell },
       ...(rol === "medico" ? [{ id: "disponibilidad", label: "Mi disponibilidad", icon: Clock }] : []),
     ] },
@@ -9506,7 +9522,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         <div className="dc-sb__brand">
           <button type="button" className="dc-sb__logo" aria-label={colap ? "Expandir menú" : "Contraer menú"} title={colap ? "Expandir menú" : "Contraer menú"} onClick={() => setColap((c) => !c)}>
             <span className="dc-sb__mark"><Smile size={18} strokeWidth={2} color="#fff" /></span>
-            {!colap && <span className="dc-sb__name"><span>Dento <b>Check</b></span><small>Sonríe+{!auth.token && <em className="dc-sb__demo" title="Datos de ejemplo. Los cambios se guardan solo en este navegador.">Demo</em>}</small></span>}
+            {!colap && <span className="dc-sb__name"><span>Dento <b>Check</b></span><small>{marcaClinica}{!auth.token && <em className="dc-sb__demo" title="Datos de ejemplo. Los cambios se guardan solo en este navegador.">Demo</em>}</small></span>}
           </button>
           {rol !== "superadmin" && hayQueCrear && (
             <button ref={crearBtnRef} type="button" className="dc-sb__mas" aria-label="Crear" title={rol === "medico" ? "Crear: cita, evolución, receta" : "Crear: cita, paciente, cobro, egreso"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 8, left: Math.max(8, r.left - (colap ? 0 : 180)) })); }}><Plus size={16} strokeWidth={2.25} /></button>
