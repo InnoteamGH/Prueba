@@ -370,7 +370,7 @@ function Gerencial({ citas, sede, sedes }) {
 
 /* ---- Pendientes de hoy: bandeja de tareas accionables para todos los roles ---- */
 
-function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {}, onIr = () => {}, horarioClinica = { horario: {}, feriados: [] }, sedeActiva = "all" }) {
+function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, notify = () => {}, onIr = () => {}, horarioClinica = { horario: {}, feriados: [] }, sedeActiva = "all" }) {
   const enviarConfMañana = () => {
     if (!(!!auth.token)) { notify("Disponible al iniciar sesión."); return; }
     api.citas.enviarConfirmaciones(addDays(1)).then((r) => notify(`Confirmaciones enviadas: ${r.enviados}/${r.total} citas de mañana por WhatsApp.`)).catch(() => notify("No se pudo enviar las confirmaciones."));
@@ -438,7 +438,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
     }
   };
   useEffect(() => { cargarDash(); }, []); // eslint-disable-line
-  const citas = conectado ? (remC || []) : citasProp;
+  // Con sesión las citas llegan de todas las sedes: se dejan solo las de la sede elegida.
+  const sedeCxD = useSede();
+  const citas = conectado ? (remC || []).filter((c) => sedeCxD.enSede(c.sede)) : citasProp;
   const pacientesAllRaw = conectado ? (remP || []) : pacProp;
   // NEW-47: enriquecer ultima visita con la cita más reciente del rango cargado.
   const pacientesAll = useMemo(() => {
@@ -455,14 +457,16 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
     });
   }, [conectado, remP, remC, pacientesAllRaw]);
   // BUG-111 / NEW-37: Filtrar pacientes por sede activa (campo sede conservado).
-  const pacientes = sedeActiva === "all" ? pacientesAll : pacientesAll.filter((p) => sedesDe(p).includes(Number(sedeActiva)));
+  const pacientes = sedeActiva === "all" ? pacientesAll : pacientesAll.filter((p) => sedesDe(p).map(String).includes(String(sedeActiva)) || String(p.sedeRegistroId) === String(sedeActiva));
   // NEW-29/30: resolver UUID de sede como Caja (lista real), no solo a1/a2 hardcode.
   const [sedesDash, setSedesDash] = useState([]);
   useEffect(() => { if (conectado) api.sedes.listar().then((s) => setSedesDash(s || [])).catch(() => {}); }, []); // eslint-disable-line
   // NEW-38: médico solo ve sus citas también en el gráfico (no abrir el filtro con `conectado`).
   const normMedNom = (s) => String(s || "").replace(/^(?:\s*(?:dr\(a\)\.?|dra\.?|dr\.?)\s*)+/i, "").trim().toLowerCase();
+  // El doctor de la sesión (estaba fijo en el id 1: todos los doctores veían a la Dra. Mendoza).
+  const miMedDash = MEDICOS.find((m) => m.nombre === usuario?.nombre);
   const citasMed = !esMed ? citas : (!conectado
-    ? citas.filter((c) => c.medicoId === 1)
+    ? citas.filter((c) => miMedDash && c.medicoId === miMedDash.id)
     : citas.filter((c) => {
         const yo = normMedNom(auth.sesion?.nombre);
         if (!yo) return true;
@@ -479,8 +483,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, notify = () => {
   // Con sesión manda el valor que envía el backend (precio base de la especialidad).
   // Antes se buscaba en ESPECIALIDADES, la constante de demostración con ids 1..5,
   // mientras c.esp es un UUID: no casaba nunca y todas las citas valían 100 soles.
+  // Demo: precio del catálogo en la sede de la cita (el mismo que cobra Caja).
   const precio = (c) => (c.valor != null ? Number(c.valor) || 0
-    : conectado ? 0 : (ESPECIALIDADES.find((e) => e.id === c.esp)?.precio || 100));
+    : conectado ? 0 : (precioCita(dbDash?.catalogo || leerCatalogo(), c.esp, c.sede) ?? ESPECIALIDADES.find((e) => e.id === c.esp)?.precio ?? 0));
   const produccionDia = ch.filter((c) => c.estado === "atendida" || c.estado === "en_atencion").reduce((s, c) => s + precio(c), 0);
   // NEW-29/30: filtrar pagos como Caja (sede activa del selector).
   const pagosEnSedeActiva = (lista) => {
@@ -7090,7 +7095,7 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
 }
 
 /* ---- Mi plan y facturación (membresía del SaaS) ---- */
-function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
+function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = true }) {
   const actual = PLANES.find((p) => p.id === plan) || PLANES[1];
   const totalMods = (id) => new Set(PLAN_MODULOS[id]).size;
   const [confirmP, setConfirmP] = useState(null);
@@ -7195,7 +7200,8 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can }) {
               <ul>{p.incluye.slice(0, 3).map((f, i) => <li key={i}><Check size={13} strokeWidth={2.6} /> {f}</li>)}</ul>
               {esActual
                 ? <span className="dc-plan__cta is-actual"><CheckCircle2 size={14} strokeWidth={2.2} /> Tu plan actual</span>
-                : <button type="button" className={`dc-plan__cta${sube ? " is-sube" : ""}`} onClick={() => setConfirmP(p)}>{sube ? "Mejorar a " : "Cambiar a "}{p.nombre}</button>}
+                : puedeCambiar ? <button type="button" className={`dc-plan__cta${sube ? " is-sube" : ""}`} onClick={() => setConfirmP(p)}>{sube ? "Mejorar a " : "Cambiar a "}{p.nombre}</button>
+                : <span className="dc-plan__cta is-actual" title="El plan lo cambia la administración general de la clínica.">Lo cambia la administración general</span>}
             </article>
           ); })}
         </div>
@@ -8231,6 +8237,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const [liquidaciones, setLiquidaciones] = usePersist("liquidaciones", LIQ_SEED);
   const [espera, setEspera] = usePersist("espera", ESPERA_INIT);   // lista de espera compartida (P1-3)
   const [pacienteActivo, setPacienteActivo] = useState(null); // paciente en atención (P1-1)
+  // Si cambia la sede y el paciente en atención ya no está entre los visibles, se suelta.
+  useEffect(() => {
+    if (pacienteActivo != null && !auth.token && !pf.some((p) => String(p.id) === String(pacienteActivo))) setPacienteActivo(null);
+  }, [pf]); // eslint-disable-line react-hooks/exhaustive-deps
   // Ir a un módulo con un paciente ya elegido (p. ej. «Abrir en Periodontograma» desde la ficha).
   useEffect(() => {
     const ir = (e) => { const d = e.detail || {}; if (d.pacienteId != null) setPacienteActivo(/^\d+$/.test(String(d.pacienteId)) ? Number(d.pacienteId) : d.pacienteId); if (d.vista) window.location.hash = `#/${d.vista}`; };
@@ -8548,6 +8558,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Sede concreta donde se registran las cosas nuevas (nunca "all").
   const sedeActiva = sede === "all" ? (sedeDetectada ?? misSedes[0] ?? 1) : sede;
   // Contexto de sede para los módulos que no reciben props (modal de agendar, WhatsApp, etc.).
+  // Doctores que atienden en las sedes que se ven (Agenda, Consolidado, asignar cupos).
+  const medicosSede = useMemo(() => MEDICOS.filter((m) => { const ss = sedesDe(m).map(String); return !ss.length || idsSede.map(String).some((x) => ss.includes(x)); }), [idsSede]);
   const sedeCtx = useMemo(() => ({ sede, ids: idsSede, mias: misSedes, activa: sedeActiva, pacientes: pf, citas: cf }), [sede, idsSede, misSedes.join(","), sedeActiva, pf, cf]); // eslint-disable-line react-hooks/exhaustive-deps
   // Membrete de los documentos: la empresa es una sola; dirección, teléfonos y horario
   // son los de la sede desde donde se emite (la activa). Ver util/membrete.js.
@@ -8567,7 +8579,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     return () => { vivo = false; };
   }, [sedeActiva, sedesOrg]); // eslint-disable-line
 
-  const onAgendarIA = () => { if (auth.token) { notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}. Aparecerá en la Agenda.`); return; } setCitas((cs) => [...cs, { id: Date.now(), paciente: "Nuevo (vía IA)", dni: "00000000", medicoId: 1, esp: 1, sede: sedeActiva, fecha: fmt(hoy), hora: "16:30", motivo: "Agendado por agente IA", estado: "confirmada", llegada: false }]); notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}.`); };
+  const onAgendarIA = () => { if (auth.token) { notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}. Aparecerá en la Agenda.`); return; } const medIA = MEDICOS.find((m) => sedesDe(m).map(String).includes(String(sedeActiva)) && espsDe(m).includes(1)) || MEDICOS.find((m) => sedesDe(m).map(String).includes(String(sedeActiva))) || MEDICOS[0]; setCitas((cs) => [...cs, { id: Date.now(), paciente: "Nuevo (vía IA)", dni: "00000000", medicoId: medIA.id, esp: medIA.esp, sede: sedeActiva, fecha: fmt(hoy), hora: "16:30", motivo: "Agendado por agente IA", estado: "confirmada", llegada: false }]); notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}.`); };
 
   // P1-1: iniciar atención → abre el espacio clínico del paciente de esa cita.
   const atenderCita = (cita) => {
@@ -8696,7 +8708,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "reportes_mas": return <React.Suspense fallback={null}><ReportesClinica pacientes={pf} citas={cf} sedes={idsSede} /></React.Suspense>;
       // Un solo catálogo de servicios (NAV-06): Operación › Servicios y precios.
       case "servicios": return <Servicios notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} />;
-      case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
+      case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} usuario={usuario} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
       case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
       // NAV-04: Agenda es un destino con selector de vista. Día = lista operativa;
       // Semana/Mes/Por doctor/Por sillón = calendario; Lista = rango + exportar.
@@ -8705,7 +8717,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         const irAg = (x) => { if (x === "dia") setVista("agenda"); else if (x === "lista") setVista("agenda_consolidado"); else { setAgModo(x); setVista("agenda_cal"); } };
         return (<div style={{ display: "grid", gap: 14 }}>
           <Pestanas etiqueta="Vista de la agenda" valor={vAg} onChange={irAg} opciones={[{ id: "dia", label: "Día", icon: List }, { id: "semana", label: "Semana", icon: Columns3 }, { id: "mes", label: "Mes", icon: Calendar }, { id: "doctores", label: "Por doctor", icon: Stethoscope }, { id: "sillon", label: "Por sillón", icon: Armchair }, { id: "lista", label: "Lista", icon: Table2 }]} />
-          {vista === "agenda" ? <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} /> : vista === "agenda_consolidado" ? <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={MEDICOS} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense> : <Agenda key={`agenda-cal-${agModo}`} vistaInicial="calendario" calModo={agModo} citas={cf} setCitas={setCitas} medicos={MEDICOS} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />}
+          {vista === "agenda" ? <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={medicosSede} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} /> : vista === "agenda_consolidado" ? <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={medicosSede} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense> : <Agenda key={`agenda-cal-${agModo}`} vistaInicial="calendario" calModo={agModo} citas={cf} setCitas={setCitas} medicos={medicosSede} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />}
         </div>);
       }
       case "disponibilidad": return <Disponibilidad notify={notify} usuario={usuario} citas={citas} setCitas={setCitas} horarioClinica={horarioClinica} />;
@@ -8722,7 +8734,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "consentimientos": return <Consentimientos pacientes={pf} notify={notify} />;
       case "formularios": return <Formularios pacientes={pf} notify={notify} />;
       case "pacientes": return <PacientesView consumirInsumos={consumirInsumos} sedeActiva={sedeActiva} misSedes={misSedes} onIr={setVista} pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
-        onAgendarPaciente={(pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta" }); setVista("agenda"); }}
+        onAgendarPaciente={(pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta", sedeId: sedeActiva }); setVista("agenda"); }}
         onCobrarPaciente={(pac) => { setCobroDesdeFicha({ pid: pac.id, nombre: pac.nombre }); setVista("caja"); }} />;
       case "inventario": return <Inventario key="inv-productos" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_compras": return <Inventario key="inv-compras" tabInicial="compras" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
@@ -8740,7 +8752,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         </div>);
       }
       case "seguros": return <Seguros notify={notify} pacientes={pf} fichas={fichas} />;
-      case "plan": return <Plan notify={notify} plan={plan} setPlan={setPlan} esSuper={esSuper} can={can} />;
+      // Cambiar el plan es de toda la clínica: solo quien ve todas las sedes y puede editarlo.
+      case "plan": return <Plan notify={notify} plan={plan} setPlan={setPlan} esSuper={esSuper} can={can} puedeCambiar={esSuper || (usuario.sedes === "all" && (!can || can("plan", "editar")))} />;
       case "espera": return <Espera notify={notify} esp={espera} setEsp={setEspera} />;
       case "tickets": return <Tickets citas={cf} setCitas={setCitas} fichas={fichas} notify={notify} />;
       case "facturacion": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
