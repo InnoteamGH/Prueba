@@ -122,20 +122,25 @@ Cada bloque dice qué llama el frontend y qué espera. **Negrita = campo o pará
 - **Apertura:**
   - `GET /caja/apertura?sedeId=&fecha=`.
   - `POST /caja/apertura` → `{ sedeId, fondo, `**`fondoUsd`**`, nota, fecha, destinosActivos }`.
-  - Una apertura por sede y por día.
+  - **Cada apertura es una sesión con su `id`.** Se puede cerrar y volver a abrir el mismo día: el arqueo de la segunda sesión cuenta solo lo cobrado y gastado después de abrirla.
 - **Caja del día:** `GET /caja?`**`sedeIds=`** → `porCobrar[]`, terminados, cobros de hoy, `montoHoy` y `montoPorCobrar`, solo de esas sedes y con `sedeId` en cada fila.
+  - En `boletasHoy[]`, además: **`tipoCambio`, `dni` (o `pacienteDni`), `direccion`, `usuarioNombre`, `aperturaId`, `creadoEn`, `hora`**. Con eso la boleta sale con DNI, cajera y, si fue en dólares, el TC y el equivalente en soles.
 - **Cobro:**
   - `POST /pagos` → `{ pacienteId, sedeId, concepto, monto, metodo, descuento, faseIds?, `**`moneda: "PEN"|"USD"`**`, `**`montoOriginal`**`, `**`tipoCambio`**` }`, con el encabezado `Idempotency-Key`.
-  - El servidor exige que la caja de esa sede esté abierta.
+  - `monto` va siempre en soles; `montoOriginal` es lo cobrado en la moneda elegida. El servidor debe guardar los tres campos y **asociar el pago a la apertura abierta (`aperturaId`)**.
+  - El servidor exige que la caja de esa sede esté abierta y que el monto no supere el saldo.
+  - `GET /pagos/historial` devuelve también `moneda`, `montoOriginal`, `tipoCambio`, `dni` y `usuarioNombre`.
 - **Egresos:**
-  - `POST /egresos` → `{ fecha, `**`sedeId`**`, concepto, categoria, monto, metodo, `**`moneda`**` }`.
-  - `GET /egresos?`**`sedeIds=`**.
-  - `PUT /egresos/{id}` para reclasificar la categoría.
-  - Categorías que usa el frontend: Insumos, Laboratorio, Alquiler, Servicios (luz/agua), Planilla, Marketing, Equipos, Otros.
+  - `POST /egresos` → `{ fecha, `**`sedeId`**`, concepto, categoria, monto, metodo, `**`moneda`**`, `**`tipoCambio`**` (si es USD), `**`aperturaId`**` }`.
+  - Métodos: efectivo, tarjeta, transferencia, yape y **plin**.
+  - Categorías: Insumos, Laboratorio, Alquiler, Servicios (luz/agua), Planilla, Marketing, Equipos, **Movilidad**, **Caja chica**, Otros.
+  - `GET /egresos?`**`sedeIds=`** devuelve `tipoCambio`, `aperturaId` y `creadoEn`.
+  - **Permisos:** registrar un egreso = `facturacion:crear` (recepción y administrador de sede), con la caja de la sede abierta y nunca el administrador general con varias sedes. Anular (`DELETE /egresos/{id}`) o reclasificar (`PUT /egresos/{id}`) = `facturacion:aprobar`.
 - **Cierre:**
-  - `GET /pagos/cierre?fecha=&`**`sedeIds=`** devuelve los totales por método y moneda.
-  - `POST /caja/apertura/{id}/cerrar` → `{ efectivoContado, efectivoEsperado, `**`efectivoContadoUsd`**`, `**`efectivoEsperadoUsd`**`, justificacion }`.
-- **Historial:** `GET /caja/apertura/historial` con la sede.
+  - `GET /pagos/cierre?fecha=&`**`sedeIds=`**`&`**`aperturaId=`** devuelve los totales por método y moneda **solo de esa sesión**; en cada movimiento, `aperturaId` o `creadoEn`, `hora`, `moneda`, `montoOriginal` y `tipoCambio`.
+  - `POST /caja/apertura/{id}/cerrar` → `{ efectivoContado, efectivoEsperado, `**`efectivoContadoUsd`**`, `**`efectivoEsperadoUsd`**`, `**`diferenciaUsd`**`, justificacion, `**`observaciones`**` }`.
+  - El frontend no deja cerrar sin contar la gaveta en dólares (si hubo fondo o movimiento en US$) y exige justificación si no cuadra en soles **o en dólares**. El servidor debe aplicar la misma regla.
+- **Historial:** `GET /caja/apertura/historial` con la sede, y en cada jornada **`fondoUsd`, `efectivoEsperadoUsd`, `efectivoContadoUsd`, `diferenciaUsd`, `justificacion` y `observaciones`**.
 - **Tipo de cambio:** `GET/PUT /tipo-cambio`.
 
 **Consolidado de citas** (recepción y doctor)
@@ -190,7 +195,7 @@ Con sesión iniciada, el frontend traduce el UUID de sede a 1 o 2, que es la reg
 |---|---|---|
 | Administrador general | Todas las sedes, con el filtro del menú | Configuración, usuarios, precios base, metas y plan. **No abre caja ni cobra si hay varias sedes**: supervisa. |
 | Administrador de sede | Solo su sede | Caja (abrir, cobrar, egresos, cierre), agenda, pacientes, precios y horario de su sede, metas de su sede |
-| Recepción | Solo su sede | Agenda, pacientes (apertura de historia), recordatorios, WhatsApp, caja (abrir, cobrar, cierre), consolidado |
+| Recepción | Solo su sede | Agenda, pacientes (apertura de historia; no elimina), recordatorios, WhatsApp, caja (abrir, cobrar, registrar egresos, cierre), consolidado |
 | Doctor | Sus sedes y sus citas | Historia clínica, odontograma, presupuesto, evolución, radiografía y foto, receta, terminar tratamientos, consolidado de sus citas |
 | Gerencia | Su sede o todas | Reportes y panel (solo lectura; puede fijar metas) |
 
@@ -221,9 +226,10 @@ Marcar ✅ o ❌ y anotar el detalle.
 | R10 | WhatsApp: abrir un chat, responder y agendar desde el chat | El mensaje sale; la cita se crea en la sede A |
 | R11 | Caja › Abrir caja con fondo en soles y en dólares | Caja abierta de la sede A, con la hora |
 | R12 | Cobrar en soles a un paciente con un tratamiento terminado | Baja «Por cobrar», sube «Cobrado hoy» y se emite el comprobante (serie de la sede A) |
-| R13 | Cobrar en dólares (si aplica) | Se registra en USD con el tipo de cambio; en soles cuenta como el equivalente |
-| R14 | Registrar un egreso en cada categoría, uno en dólares | Aparecen en Ingresos y egresos de A con su categoría y moneda; se puede reclasificar |
-| R15 | Cerrar caja: contar el efectivo en soles y en dólares | Muestra esperado vs contado y la diferencia; pide justificación si hay diferencia; queda en Historial |
+| R13 | Cobrar en dólares; cambiar el TC antes de confirmar | El monto se recalcula con el TC nuevo y no deja cobrar más que el saldo. La boleta sale en US$ con el TC y el equivalente en soles, igual desde el cobro y desde «Comprobantes de hoy». «Cobrado hoy» dice «S/ X (incluye US$ Y)» |
+| R14 | Registrar un egreso en cada categoría, uno en dólares con su TC | Aparecen en Ingresos y egresos de A con su categoría, moneda y equivalente en soles; restan del «Neto del día». Recepción no puede anularlos (el administrador de sede sí) |
+| R15 | Cerrar caja: contar el efectivo en soles y en dólares | No deja cerrar sin contar los dólares. Muestra esperado vs contado por moneda; pide justificación si no cuadra en soles o en dólares; el Historial guarda ambas monedas, la justificación y las observaciones |
+| R15b | Volver a abrir la caja el mismo día y cobrar | El esperado de la nueva sesión cuenta solo lo cobrado desde que se reabrió |
 | R16 | Consolidado de citas: día, semana y mes, filtro por doctor o estado, y exportar | Totales correctos, solo de A; el Excel coincide con la pantalla |
 | R17 | Escribir en la URL la ficha de un paciente que es solo de la sede B | No se abre («no se atiende en la sede elegida») |
 
