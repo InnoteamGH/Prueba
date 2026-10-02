@@ -1835,9 +1835,13 @@ export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
   useEffect(() => {
     if (!pos) return undefined;
     const cerrar = () => setPos(null);
+    // Se cierra si el botón se movió (la lista quedaría lejos de su fila), no por el
+    // resto de un desplazamiento suave que todavía llega justo después de abrir.
+    const y0 = btnRef.current?.getBoundingClientRect().top ?? 0;
+    const alDesplazar = () => { const y = btnRef.current?.getBoundingClientRect().top ?? 0; if (Math.abs(y - y0) > 4) cerrar(); };
     window.addEventListener("resize", cerrar);
-    document.addEventListener("scroll", cerrar, true);
-    return () => { window.removeEventListener("resize", cerrar); document.removeEventListener("scroll", cerrar, true); };
+    document.addEventListener("scroll", alDesplazar, true);
+    return () => { window.removeEventListener("resize", cerrar); document.removeEventListener("scroll", alDesplazar, true); };
   }, [pos]);
   if (!lista.length) return null;
   const abrir = () => {

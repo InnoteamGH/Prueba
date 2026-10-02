@@ -9,6 +9,8 @@ import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 import { AgendarRecepcionModal, CamposPacienteRapido, PAC_RAPIDO_VACIO, celular9, registrarPacienteRapido, validarPacienteRapido } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
 import { proximaCita, cuentaPaciente } from "../compartido/metricas";
+import { fichaDeSede, sedeEnLista } from "../compartido/cajaSede";
+import { datosImpresion } from "../util/membrete";
 import "./whatsappInbox.css";
 
 function respuestaAgente(texto, ctx) {
@@ -37,7 +39,7 @@ function respuestaAgente(texto, ctx) {
   if (/(d[oó]nde|direcci[oó]n|ubicad|sede|horario|abren)/.test(t))
     return { texto: "Tenemos 📍 San Isidro (Av. Conquistadores 145) y 📍 Surco (Av. Caminos del Inca 890). Atendemos L-S de 8:00 a 18:00. ¿A cuál vienes?", tools: ["consultar_sedes"] };
   if (/(hola|buenas|buenos|qué tal|hey)/.test(t))
-    return { texto: "¡Hola! 👋 Bienvenido a Clínica Dental Sonríe+. Soy el asistente virtual. Puedo agendar tu cita, darte precios o resolver dudas. ¿En qué te ayudo?", tools: [] };
+    return { texto: `¡Hola! 👋 Bienvenido a ${nombreClinica()}. Soy el asistente virtual. Puedo agendar tu cita, darte precios o resolver dudas. ¿En qué te ayudo?`, tools: [] };
   return { texto: "Mmm, déjame ayudarte mejor 😊 Puedo agendarte una cita, darte precios, horarios o cómo llegar. ¿Qué te gustaría hacer? Si lo prefieres, también te derivo con el área de atención.", tools: [] };
 }
 
@@ -48,10 +50,12 @@ function respuestaAgente(texto, ctx) {
 // a las 12:36 quedaba debajo de mensajes «posteriores».
 const haceDias = (n, hm) => { const d = new Date(); d.setDate(d.getDate() - n); const [h, m] = hm.split(":").map(Number); d.setHours(h, m, 0, 0); return d.toISOString(); };
 const haceMin = (n) => new Date(Date.now() - n * 60000).toISOString();
+// El asistente saluda con el nombre de la clínica de Configuración (el mismo de los documentos).
+const nombreClinica = () => datosImpresion()?.empresa?.nombre || "la clínica";
 const CHATS_INIT = [
   { id: 1, nombre: "Rosa Linares", tel: "+51 987 654 321", modo: "ia", noLeidos: 0, actualizado: haceMin(18), msgs: [
     { de: "paciente", txt: "Hola buenas tardes", ts: haceMin(21) },
-    { de: "ia", txt: "¡Hola! 👋 Bienvenida a Sonríe+. Soy el asistente virtual. ¿En qué te ayudo hoy?", ts: haceMin(21) },
+    { de: "ia", txt: `¡Hola! 👋 Bienvenida a ${nombreClinica()}. Soy el asistente virtual. ¿En qué te ayudo hoy?`, ts: haceMin(21) },
     { de: "paciente", txt: "Quiero una cita para limpieza", ts: haceMin(18) },
     { de: "ia", txt: "¡Con gusto! Una limpieza cuesta S/ 80. Tengo cupo mañana 09:00 con la Dra. Carla Mendoza en San Isidro. ¿Te lo reservo? 😊", ts: haceMin(18), tools: ["consultar_precio","ver_disponibilidad"] },
   ] },
@@ -75,7 +79,7 @@ function WhatsAppInbox({ notify = () => {} }) {
   const conectado = !!auth.token;
   // Sede: la cita y el paciente nuevo se registran en la sede activa; la ficha, la próxima
   // cita y el saldo solo se muestran si el paciente es de las sedes que se ven.
-  const { activa, pacientes: pacVisibles, citas: citasVisibles } = useSede();
+  const { activa, ids: sedesWa, pacientes: pacVisibles, citas: citasVisibles } = useSede();
   const [chats, setChats] = useState(conectado ? [] : CHATS_INIT);
   const [agendar, setAgendar] = useState(null);   // base del modal de agendado: { canal, motivo, sedeId, pacienteId | telefono }
   // «Agendar cita» abre siempre el modal de recepción (demo y con sesión): con el paciente
@@ -621,7 +625,7 @@ function WhatsAppInbox({ notify = () => {} }) {
           {(() => { const pac = pacDeChat(chat); if (!pac) return null;
             // De otra sede: se identifica, pero sin ficha, citas ni saldo (son datos de esa sede).
             if (!pacVisible(pac)) return <div className="wa-ctx"><span>Paciente de otra sede: su ficha, citas y saldo los ve esa sede.</span></div>;
-            const prox = proximaCita(pac, citasVisibles || dbWa?.citas || []); const cta = cuentaPaciente((dbWa?.fichas || {})[pac.id]); return (
+            const prox = proximaCita(pac, citasVisibles || dbWa?.citas || []); const cta = cuentaPaciente(fichaDeSede((dbWa?.fichas || {})[pac.id], pac, (x) => sedeEnLista(x, sedesWa))); return (
             <div className="wa-ctx">
               <button type="button" className="wa-ctx__ficha" onClick={() => { window.location.hash = `#/pacientes/${pac.id}`; }}>Ver ficha de {pac.nombre.split(" ")[0]}</button>
               <span>Próxima cita: <b>{prox ? `${prox.fecha === fmt(hoy) ? "hoy" : new Date(prox.fecha + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })} ${prox.hora || ""}` : "sin agendar"}</b></span>
