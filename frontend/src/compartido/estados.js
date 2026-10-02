@@ -97,6 +97,31 @@ export function estadoCita(c) {
   return c.estado || "pendiente";
 }
 
+// Citas que ya no ocupan agenda. Lo demás (pendiente → atendida) cuenta como cita activa.
+export const CITA_INACTIVA = ["cancelada", "no_show", "reprogramada", "cerrada_sistema"];
+
+/** Una sola regla para contar citas en cabeceras y descargas: las activas y, aparte,
+    las canceladas, las que no asistieron y las reprogramadas. Así la cabecera, el menú
+    Descargar y el resumen del día dan el mismo número. */
+export function conteoCitas(citas) {
+  const n = { activas: 0, cancelada: 0, no_show: 0, reprogramada: 0, cerrada_sistema: 0 };
+  (citas || []).forEach((c) => { if (CITA_INACTIVA.includes(c?.estado)) n[c.estado]++; else n.activas++; });
+  return n;
+}
+
+/** «10 citas · 1 cancelada · 2 no asistieron». `sufijo` va pegado a las activas (« hoy»). */
+export function textoConteo(citas, sufijo = "") {
+  const n = conteoCitas(citas);
+  const pl = (k, uno, muchos) => `${k} ${k === 1 ? uno : muchos}`;
+  return [
+    `${pl(n.activas, "cita", "citas")}${sufijo}`,
+    n.cancelada && pl(n.cancelada, "cancelada", "canceladas"),
+    n.no_show && `${n.no_show} ${n.no_show === 1 ? "no asistió" : "no asistieron"}`,
+    n.reprogramada && pl(n.reprogramada, "reprogramada", "reprogramadas"),
+    n.cerrada_sistema && pl(n.cerrada_sistema, "cerrada por sistema", "cerradas por sistema"),
+  ].filter(Boolean).join(" · ");
+}
+
 // Un caso de laboratorio solo está atrasado si sigue fuera (Enviado / En proceso)
 // y ya pasó la fecha de entrega comprometida.
 export function labAtrasado(caso, hoyISO) {

@@ -17,12 +17,12 @@ const ReportesClinica = React.lazy(() => import("./modulos/ReportesClinica"));
 import OdontogramaFotos from "./modulos/OdontogramaFotos";
 const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
-import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia } from "./compartido/sillones";
+import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia, yaPaso } from "./compartido/sillones";
 import { useReglasAgenda } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
-import { estadoCita, estadoInfo, labAtrasado } from "./compartido/estados";
+import { estadoCita, estadoInfo, labAtrasado, textoConteo } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
 import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, sedeEnLista, sedePrincipal, uuidSede } from "./compartido/cajaSede";
@@ -803,7 +803,9 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const hoyD = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
   const hoyISO = iso(hoyD);
   const lun = (() => { const d = new Date(hoyD); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow + off * 7); return d; })();
-  const semana = [...Array(6)].map((_, i) => { const d = new Date(lun); d.setDate(lun.getDate() + i); return d; });
+  // Los 7 días: el domingo también (atenuado si la clínica cierra), para que sus citas se
+  // vean aquí igual que en el Mes y en el Consolidado.
+  const semana = [...Array(7)].map((_, i) => { const d = new Date(lun); d.setDate(lun.getDate() + i); return d; });
   const diaSel = (() => { const d = new Date(hoyD); d.setDate(d.getDate() + diaOff); return d; })();
   const HORAS = [...Array(14)].map((_, i) => 8 + i); // 08:00 – 21:00
   const NOM = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -885,7 +887,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const irHoy = () => { setMesOff(0); setOff(0); setDiaOff(0); };
   const enHoy = modo === "mes" ? mesOff === 0 : modo === "semana" ? off === 0 : diaOff === 0;
   const titulo = modo === "mes" ? `${MES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
-    : (modo === "semana") ? `${semana[0].getDate()} ${MESc[semana[0].getMonth()]} – ${semana[5].getDate()} ${MESc[semana[5].getMonth()]} ${semana[5].getFullYear()}`
+    : (modo === "semana") ? `${semana[0].getDate()} ${MESc[semana[0].getMonth()]} – ${semana[6].getDate()} ${MESc[semana[6].getMonth()]} ${semana[6].getFullYear()}`
     : `${NOML[(diaSel.getDay() + 6) % 7]} ${diaSel.getDate()} ${MESc[diaSel.getMonth()]} ${diaSel.getFullYear()}`;
 
   // Columnas de la grilla horaria según el modo
@@ -906,7 +908,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     : modo === "doctores" ? { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, medicoId: colDef.medKey, ...(sedeCal != null ? { sede: sedeCal } : {}) }
     : { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, ...(sedeCal != null ? { sede: sedeCal } : {}) };
   const gcols = `52px repeat(${columnas.length},minmax(0,1fr))`;
-  const minW = modo === "dia" ? 420 : modo === "sillon" ? Math.max(620, columnas.length * 140) : modo === "doctores" ? Math.max(620, columnas.length * 170) : 820;
+  const minW = modo === "dia" ? 420 : modo === "sillon" ? Math.max(620, columnas.length * 140) : modo === "doctores" ? Math.max(620, columnas.length * 170) : 900;
 
   // Que citas hacen falta para lo que se esta mirando. El padre las pide al backend
   // en vez de traerse el historico entero: se manda un mes de margen a cada lado para
@@ -926,8 +928,12 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     else if (modo === "semana" || modo === "tabla") ds = semana.map(iso);
     else ds = [iso(diaSel)];
     const set = new Set(ds);
-    return citas.filter((c) => set.has(c.fecha) && visible(c)).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
+    // Por sillón con varias sedes se ve una sede: se cuenta y se descarga solo esa.
+    const deSede = (c) => !(modo === "sillon" && sedesSil.length > 1) || String(c.sede) === sedeSilEf;
+    return citas.filter((c) => set.has(c.fecha) && visible(c) && deSede(c)).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
   })();
+  // Una sola regla para la cabecera y la descarga: citas activas y, aparte, canceladas y demás.
+  const conteoRango = textoConteo(rangoCitas);
   const COLS_CAL = [
     { key: "fecha", label: "Fecha", w: 12 }, { key: "hora", label: "Hora", w: 8 },
     { key: "paciente", label: "Paciente", w: 26 }, { key: "medico", label: "Doctor", w: 24 }, { key: "estado", label: "Estado", w: 14 },
@@ -937,7 +943,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     const filas = rangoCitas.map((c) => ({ fecha: c.fecha, hora: c.hora, paciente: c.paciente, medico: c.medico || "—", estado: EST_LABEL[estadoCita(c)] || c.estado }));
     if (!filas.length) return;
     if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${modo}_${iso(hoyD)}.xlsx`, hoja: "Agenda", titulo: `Agenda — ${titulo}`, columnas: COLS_CAL, filas });
-    else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: `${filas.length} cita(s)`, columnas: COLS_CAL, filas });
+    else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: conteoRango, columnas: COLS_CAL, filas });
   };
 
   const Bloque = ({ c }) => { const col = colorDe(c); const cancel = c.estado === "cancelada"; const arrastrable = !!onReagendar && !cancel; const horaLbl = (modo === "dia" || modo === "sillon") ? `${c.hora}–${finCita(c)}` : c.hora;
@@ -988,7 +994,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
             {dlOpen && (<>
               <div onClick={() => setDlOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
               <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 41, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", boxShadow: "0 18px 40px -18px rgba(16,24,40,.4)", overflow: "hidden", minWidth: 220 }}>
-                <div style={{ padding: "8px 12px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".05em", borderBottom: "1px solid var(--dc-bg)" }}>{modo === "mes" ? "Mes visible" : (modo === "semana" || modo === "tabla") ? "Semana visible" : "Día visible"} – {rangoCitas.length} cita(s)</div>
+                <div style={{ padding: "8px 12px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".05em", borderBottom: "1px solid var(--dc-bg)" }}>{modo === "mes" ? "Mes visible" : (modo === "semana" || modo === "tabla") ? "Semana visible" : "Día visible"} – {conteoRango}</div>
                 <button onClick={() => descargarRango("excel")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 13px", border: "none", background: "#fff", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><FileSpreadsheet size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /> Excel (.xlsx)</button>
                 <button onClick={() => descargarRango("pdf")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 13px", border: "none", borderTop: "1px solid var(--dc-bg)", background: "#fff", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><FileText size={16} strokeWidth={1.75} color="var(--dc-red)" /> PDF</button>
               </div>
@@ -1012,9 +1018,11 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
 
       {(() => {
         const porSede = modo === "sillon" && sedesSil.length > 1;
-        const rc = rangoCitas.filter((c) => ACTIVA(c) && (!porSede || String(c.sede) === sedeSilEf));
-        const conf = rc.filter((c) => c.estado === "confirmada" || c.estado === "atendida" || c.estado === "en_atencion").length;
-        const pend = rc.filter((c) => c.estado === "pendiente").length;
+        const rc = rangoCitas.filter(ACTIVA);
+        // Confirmadas por atender (con o sin llegada) aparte de las ya atendidas.
+        const cntE = (...es) => rc.filter((c) => es.includes(estadoCita(c))).length;
+        const conf = cntE("confirmada", "en_sala"), pend = cntE("pendiente"), enAt = cntE("en_atencion"), atend = cntE("atendida");
+        const inactivas = conteoRango.split(" · ").slice(1);
         const diaISO = iso(diaSel);
         const delDia = citas.filter((c) => c.fecha === diaISO && ACTIVA(c) && visible(c));
         // Ocupación del día: minutos agendados en los sillones de la sede sobre las horas que abre.
@@ -1025,9 +1033,11 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
         const ocup = horasAbierto && sils.length ? Math.min(100, Math.round(minAg / (horasAbierto * 60 * sils.length) * 100)) : null;
         return (
           <div className="dc-cal__res">
-            <span><b>{rc.length}</b> {rc.length === 1 ? "cita" : "citas"} {modo === "mes" ? "en el mes" : (modo === "semana" || modo === "tabla") ? "en la semana" : "en el día"}</span>
-            <span className="is-ok"><i />{conf} confirmadas</span>
+            <span><b>{rc.length}</b> {rc.length === 1 ? "cita" : "citas"} {modo === "mes" ? "en el mes" : (modo === "semana" || modo === "tabla") ? "en la semana" : "en el día"}{inactivas.length > 0 && <small style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>· {inactivas.join(" · ")}</small>}</span>
             <span className="is-pend"><i />{pend} por confirmar</span>
+            <span className="is-ok"><i />{conf} {conf === 1 ? "confirmada" : "confirmadas"} por atender</span>
+            {enAt > 0 && <span><i style={{ background: "#6D4FD1" }} />{enAt} en atención</span>}
+            <span><i style={{ background: "#15803D" }} />{atend} {atend === 1 ? "atendida" : "atendidas"}</span>
             {(modo === "dia" || modo === "sillon" || modo === "doctores") && ocup != null && <span className="is-ocup" title="Minutos agendados sobre la capacidad de los sillones en el horario de atención">
               Ocupación de sillones{porSede ? ` · ${nombreSedeCal(sedeSilEf).replace(/^Sede\s+/, "")}` : ""} <em><u style={{ width: `${ocup}%` }} /></em> <b>{ocup}%</b>
             </span>}
@@ -1043,7 +1053,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
             {mesGrid.map((d, i) => { const dISO = iso(d); const cs = citasDe(dISO).sort((a, b) => (a.hora || "").localeCompare(b.hora || "")); const otroMes = d.getMonth() !== mesRef.getMonth(); const esHoy = dISO === hoyISO; return (
               <div key={i} onClick={() => { setModo("dia"); setDiaOff(Math.round((d - hoyD) / 86400000)); }} className="dc-rise" style={{ minHeight: 110, borderRadius: "var(--dc-r-lg)", border: `1px solid ${esHoy ? tint(DS.c.primary, 0.502) : "rgba(228,231,236,0.6)"}`, background: esHoy ? "rgba(255,255,255,0.9)" : otroMes ? "rgba(245,247,250,0.5)" : "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)", padding: "10px 12px", cursor: "pointer", opacity: otroMes ? 0.7 : 1, display: "flex", flexDirection: "column", gap: 5, transition: "all .2s", boxShadow: esHoy ? `0 8px 24px -10px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)` : "none" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = tint(DS.c.primary, 0.376); e.currentTarget.style.boxShadow = `0 10px 24px -12px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)`; e.currentTarget.style.transform = "translateY(-2px)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = esHoy ? tint(DS.c.primary, 0.502) : "rgba(228,231,236,0.6)"; e.currentTarget.style.boxShadow = esHoy ? `0 8px 24px -10px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)` : "none"; e.currentTarget.style.transform = "none"; }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: esHoy ? DS.c.primary : NAVY, textAlign: "right", fontVariantNumeric: "tabular-nums", opacity: otroMes ? 0.5 : 1 }}>{d.getDate()}</div>
-                {cs.slice(0, 4).map((c) => { const col = colorDe(c); return <div key={c.id} style={{ fontSize: 12, fontWeight: 500, color: NAVY, background: `linear-gradient(135deg, ${tint(col, 0.125)}, ${tint(col, 0.02)})`, border: `1px solid ${tint(col, 0.251)}`, borderLeft: `3px solid ${col}`, borderRadius: "var(--dc-r-sm)", padding: "3px 7px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 5, backdropFilter: "blur(4px)" }}><span style={{ fontWeight: 500, color: col }}>{c.hora}</span> <span>{c.paciente}</span></div>; })}
+                {cs.slice(0, 4).map((c) => { const col = colorDe(c); return <div key={c.id} role="button" tabIndex={0} title={`${c.hora} – ${c.paciente} – ${EST_LABEL[estadoCita(c)] || c.estado}`} onClick={(e) => { e.stopPropagation(); onCita && onCita(c); }} onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onCita && onCita(c); } }} style={{ cursor: "pointer", textDecoration: c.estado === "cancelada" ? "line-through" : "none", fontSize: 12, fontWeight: 500, color: NAVY, background: `linear-gradient(135deg, ${tint(col, 0.125)}, ${tint(col, 0.02)})`, border: `1px solid ${tint(col, 0.251)}`, borderLeft: `3px solid ${col}`, borderRadius: "var(--dc-r-sm)", padding: "3px 7px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 5, backdropFilter: "blur(4px)" }}><span style={{ fontWeight: 500, color: col }}>{c.hora}</span> <span>{c.paciente}</span></div>; })}
                 {cs.length > 4 && <div style={{ fontSize: 12, fontWeight: 500, color: DS.c.primary, background: tint(DS.c.primary, 0.071), padding: "2px 7px", borderRadius: "var(--dc-r-full)", alignSelf: "flex-start", marginTop: 2 }}>+{cs.length - 4} más</div>}
               </div>
             ); })}
@@ -1118,7 +1128,8 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                 {columnas.map((col, i) => { const cs = celda(col, h); const overKey = col.key + "-" + h; const isOver = over === overKey; const cerr = fueraHorario(col.date, h); const blk = bloqueoEnCelda(col.date, h, col);
                   const fueraServ = modo === "sillon" && col.silObj && col.silObj.activo === false;
                   const noAt = modo === "doctores" && col.medKey !== "sin" && !cerr && noAtiende(col.medKey, col.dISO, h);
-                  const libre = cs.length === 0 && !blk && !cerr && !fueraServ && !noAt && !!onNuevo;
+                  // Una hora que ya empezó no se ofrece para agendar (la cita quedaría en el pasado).
+                  const libre = cs.length === 0 && !blk && !cerr && !fueraServ && !noAt && !!onNuevo && !yaPaso(col.dISO, `${String(h).padStart(2, "0")}:00`, ahora);
                   const esAhora = col.dISO === hoyISO && h === nowH;
                   const malo = isOver && overOk && !overOk.ok;
                   return (
@@ -1254,7 +1265,7 @@ function CancelarCitaModal({ cita, onClose, onConfirm }) {
           <Select value={motivo} onChange={setMotivo} options={MOTIVOS.map((m) => ({ value: m, label: m }))} />
         </div>
         <div><label style={lblSty}>Nota (opcional)</label><input className="dc-premium-inp" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Detalle…" style={{ ...selSty, cursor: "text", fontWeight: 400 }} /></div>
-        <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>Si hay pacientes en lista de espera, se ofrecerá el cupo liberado.</div>
+        {!yaPaso(cita.fecha, cita.hora) && <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>Si hay pacientes en lista de espera, se ofrecerá el cupo liberado.</div>}
       </div>
     </Modal>
   );
@@ -1277,15 +1288,21 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const [asignarBase, setAsignarBase] = useState(null); // prefill del modal REAL de agendado al asignar desde espera (conectado)
   const [espKey, setEspKey] = useState(0);              // fuerza recarga de la lista de espera tras asignar
   const [reprog, setReprog] = useState(null);           // reprogramar una cita sin arrastrar: { id, paciente, fecha, hora }
+  const [reprogDia, setReprogDia] = useState(null);     // con sesión: citas del día destino, para validar cruces
   const [dlOpen, setDlOpen] = useState(false);          // menú de descarga (Excel / PDF)
   const [cancelCita, setCancelCita] = useState(null);   // cita a cancelar (con motivo)
+  // Un solo aviso: la cancelación y, si la cita todavía no pasó, qué pasó con el cupo
+  // (antes el aviso del cupo tapaba al de la cancelación).
   const cancelarConMotivo = (c, motivo) => {
-    if (conectado) { api.citas.cambiarEstado(c.id, "cancelada", motivo).then(() => { notify(`Cita de ${c.paciente} cancelada.`); recargar(); recargarAll(); }).catch(() => notify("Error al cancelar.")); }
-    else { setCitas((cs) => cs.map((x) => x.id === c.id ? { ...x, estado: "cancelada" } : x)); notify(`Cita de ${c.paciente} cancelada.`); }
-    ofrecerCupo && ofrecerCupo(c);
+    const cupo = () => (ofrecerCupo ? ofrecerCupo(c) || "" : "");
+    if (conectado) { api.citas.cambiarEstado(c.id, "cancelada", motivo).then(() => { notify(`Cita de ${c.paciente} cancelada.${cupo()}`); recargar(); recargarAll(); }).catch(() => notify("Error al cancelar.")); }
+    else { setCitas((cs) => cs.map((x) => x.id === c.id ? { ...x, estado: "cancelada" } : x)); notify(`Cita de ${c.paciente} cancelada.${cupo()}`); }
     setCancelCita(null);
   };
-  const recargar = () => { if (conectado) api.citas.listar(fmt(hoy)).then((r) => setRemoto((r || []).map(mapCita))).catch(() => notify("No se pudieron cargar las citas.")); };
+  // Día que muestra la vista Día (hoy por defecto; se navega a otros días para confirmar o cancelar).
+  const [diaVer, setDiaVer] = useState(() => fmt(hoy));
+  const diaVerRef = useRef(diaVer); diaVerRef.current = diaVer;   // al cambiar rápido de día, solo vale la respuesta del último
+  const recargar = () => { if (!conectado) return; const dia = diaVer; api.citas.listar(dia).then((r) => { if (dia === diaVerRef.current) setRemoto((r || []).map(mapCita)); }).catch(() => notify("No se pudieron cargar las citas.")); };
   // El calendario pedia fecha=all: TODO el historico de la clinica al navegador, y
   // creciendo sin techo. Ahora pide solo el rango que esta mirando (el propio
   // CalendarioAgenda lo informa al navegar de mes o de semana) con un mes de margen
@@ -1326,7 +1343,15 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     medicos: (reglasAg.medicos || []).filter((m) => sedeCx.enSede(sedesDe(m))),
   }), [reglasAg, (sedeCx.ids || []).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const citasTodas = conectado ? (remotoAll || []) : (demoDb?.citas || citasProp);
-  useEffect(() => { recargar(); recargarSaldos(); recargarBloqueos(); if (conectado) { api.clinica.get().then((r) => setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] })).catch(() => {}); api.espera.listar().then((r) => setEsperaResumen(r || [])).catch(() => {}); } }, []); // eslint-disable-line
+  useEffect(() => { recargar(); }, [diaVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reprogramar con sesión: se traen las citas del día destino para validar cruces aquí mismo.
+  useEffect(() => {
+    if (!conectado || !reprog?.fecha) { setReprogDia(null); return; }
+    let vivo = true;
+    api.citas.listar(reprog.fecha).then((r) => { if (vivo) setReprogDia((r || []).map(mapCita)); }).catch(() => { if (vivo) setReprogDia(null); });
+    return () => { vivo = false; };
+  }, [reprog?.fecha]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { recargarSaldos(); recargarBloqueos(); if (conectado) { api.clinica.get().then((r) => setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] })).catch(() => {}); api.espera.listar().then((r) => setEsperaResumen(r || [])).catch(() => {}); } }, []); // eslint-disable-line
   useEffect(() => {
     if (!agendarDesdeFicha) return;
     setAgendar(agendarDesdeFicha);
@@ -1360,19 +1385,35 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // no comparar UUID de la API con id de demostración (dejaba el calendario vacío).
   const miId = rol === "medico" && !conectado ? (medicos.find((m) => m.nombre === usuario?.nombre) || {}).id : null;
   const esCitaActivaHoy = (c) => !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(c.estado);
-  const todasHoy = citas.filter((c) => c.fecha === fmt(hoy) && (miId == null || c.medicoId === miId));
+  const hoyISO = fmt(hoy);
+  const esHoyVer = diaVer === hoyISO;
+  const todasHoy = citas.filter((c) => c.fecha === diaVer && (miId == null || c.medicoId === miId));   // las del día que se ve
   const citasHoyActivas = todasHoy.filter(esCitaActivaHoy);
   const esPresenteHoy = (c) => !!(c.llegada || c.estado === "en_atencion" || c.estado === "atendida");
   const presentesHoy = citasHoyActivas.filter(esPresenteHoy);
   const porLlegarHoy = citasHoyActivas.filter((c) => !esPresenteHoy(c));
   const nom = (id) => medicos.find((m) => m.id === id)?.nombre || "—";
-  const set = (id, estado, msg) => { if (conectado) { api.citas.cambiarEstado(id, estado).then(() => { msg && notify(msg); recargar(); }).catch(() => notify("Error al cambiar el estado.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, estado } : c)); msg && notify(msg); };
-  const checkIn = (id) => { if (conectado) { api.citas.checkin(id).then(() => { notify("Check-in registrado."); recargar(); }).catch(() => notify("Error en el check-in.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, llegada: true, estado: c.estado === "pendiente" ? "confirmada" : c.estado } : c)); notify("Check-in registrado."); };
+  const set = (id, estado, msg) => { if (conectado) { api.citas.cambiarEstado(id, estado).then(() => { msg && notify(msg); recargar(); recargarAll(); }).catch(() => notify("Error al cambiar el estado.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, estado } : c)); msg && notify(msg); };
+  const checkIn = (id) => { if (conectado) { api.citas.checkin(id).then(() => { notify("Check-in registrado."); recargar(); recargarAll(); }).catch(() => notify("Error en el check-in.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, llegada: true, estado: c.estado === "pendiente" ? "confirmada" : c.estado } : c)); notify("Check-in registrado."); };
+  // Todas las citas que este componente conoce (día, calendario o demo), para buscar una por id.
+  const citasConocidas = () => (conectado ? [...(remoto || []), ...(remotoAll || [])] : citasProp);
+  const buscarCita = (id) => citasConocidas().find((x) => String(x.id) === String(id));
+  // Un sillón atiende a un paciente a la vez. Antes «Pasar a sillón» dejaba a dos pacientes
+  // «En atención» con la misma doctora en el mismo sillón: ahora se impide si el sillón
+  // sigue ocupado y se avisa si el doctor ya atiende a otro paciente en otro sillón.
+  const pasarAtencion = (c, msg, despues) => {
+    const otros = citasConocidas().filter((x) => String(x.id) !== String(c.id) && x.fecha === c.fecha && x.estado === "en_atencion");
+    const enSillon = c.sillon != null && otros.find((x) => String(x.sillon) === String(c.sillon) && (x.sede == null || c.sede == null || mismaSede(x.sede, c.sede)));
+    if (enSillon) { notify(`${nombreSillon(c) || "El sillón"} sigue ocupado: ${enSillon.paciente} está en atención${enSillon.medicoId != null ? ` con ${enSillon.medico && enSillon.medico !== "—" ? enSillon.medico : nom(enSillon.medicoId)}` : ""}. Finaliza esa atención antes de pasar a ${c.paciente}.`); return; }
+    const mismoDoc = otros.find((x) => String(x.medicoId) === String(c.medicoId));
+    set(c.id, "en_atencion", (msg || `${c.paciente} pasa al sillón.`) + (mismoDoc ? ` Ojo: ${mismoDoc.medico && mismoDoc.medico !== "—" ? mismoDoc.medico : nom(mismoDoc.medicoId)} también tiene en atención a ${mismoDoc.paciente}${mismoDoc.sillon ? ` (${nombreSillon(mismoDoc)})` : ""}.` : ""));
+    despues && despues();
+  };
   // Reprogramar (drag en el calendario): cambia fecha/hora (y sillón o doctor si aplica).
   // Antes se movía sin mirar nada; ahora pasa por las mismas reglas que agendar:
   // horario del doctor, cruce con sus otras citas, sillón permitido y libre, bloqueos.
-  const validarMovida = (c, patch) => {
-    const ctx = { ...reglasAg, citas: citasTodas, bloqueos: bloqueosEf };
+  const validarMovida = (c, patch, citasCtx = citasTodas) => {
+    const ctx = { ...reglasAg, citas: citasCtx, bloqueos: bloqueosEf };
     let nueva = { ...c, ...patch, medicoId: patch.medicoId != null && patch.medicoId !== "sin" ? (typeof c.medicoId === "number" ? Number(patch.medicoId) : patch.medicoId) : c.medicoId };
     let ev = evaluarCita(ctx, nueva);
     let nuevoSillon = null;
@@ -1384,21 +1425,25 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     }
     return { ...ev, patch: nuevoSillon != null ? { ...patch, sillon: nuevoSillon } : patch, nuevoSillon, medicoId: nueva.medicoId };
   };
-  const reagendarCita = (id, patch0) => {
-    const c0 = (conectado ? (remotoAll || []) : citasProp).find((x) => String(x.id) === String(id));
-    if (patch0.medicoId === "sin") { notify("Elige la columna de un doctor."); return; }
+  // Devuelve false si no pasa las reglas (el modal Reprogramar queda abierto); onOk se
+  // llama cuando la cita ya quedó guardada.
+  const reagendarCita = (id, patch0, { onOk, citasCtx } = {}) => {
+    const c0 = buscarCita(id);
+    if (patch0.medicoId === "sin") { notify("Elige la columna de un doctor."); return false; }
     let patch = patch0;
     let extra = "";
     if (c0) {
-      const r = validarMovida(c0, patch0);
-      if (r.errores.length) { notify(`No se movió: ${r.errores[0]}`); return; }
+      const r = validarMovida(c0, patch0, citasCtx || citasTodas);
+      if (r.errores.length) { notify(`No se movió: ${r.errores[0]}`); return false; }
       patch = { ...r.patch, ...(patch0.medicoId != null ? { medicoId: r.medicoId } : {}) };
       if (r.nuevoSillon != null) extra = ` Pasa al sillón ${r.nuevoSillon}.`;
       if (r.avisos.length) extra += ` ${r.avisos[0]}`;
     }
-    if (conectado) { api.put(`/citas/${id}`, patch).then(() => { notify("Cita reprogramada."); recargar(); recargarAll(); }).catch(() => notify("Error al reprogramar.")); return; }
+    if (conectado) { api.put(`/citas/${id}`, patch).then(() => { notify("Cita reprogramada."); recargar(); recargarAll(); onOk && onOk(); }).catch((e) => notify(`No se pudo reprogramar${e?.message ? `: ${e.message}` : "."}`)); return true; }
     setCitas((cs) => cs.map((c) => c.id === id ? { ...c, ...patch, ...(patch.medicoId != null ? { medico: undefined } : {}) } : c));
     notify(`Cita reprogramada a ${patch.hora}${patch.fecha ? " – " + fechaLegible(patch.fecha) : ""}`.replace(/\.?$/, ".") + extra);
+    onOk && onOk();
+    return true;
   };
   const stats = [["Citas hoy", citasHoyActivas.length, NAVY], ["Presentes", presentesHoy.length, "var(--dc-ok-700)"], ["Por llegar", porLlegarHoy.length, "var(--dc-warn-600)"]];
   // Amarre espera → citas: "Asignar" abre un modal para elegir doctor, fecha y hora.
@@ -1462,6 +1507,43 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const avance = todasHoy.length ? Math.round((atend / todasHoy.length) * 100) : 0;
   const EST = { pendiente: { c: "var(--dc-ink-500)", l: "Pendiente" }, confirmada: { c: DS.c.primary, l: "Confirmada" }, en_sala: { c: "var(--dc-purple)", l: "En sala" }, en_atencion: { c: "var(--dc-warn-600)", l: "En atención" }, atendida: { c: "var(--dc-ok-700)", l: "Atendida" }, cancelada: { c: "var(--dc-red)", l: "Cancelada" }, no_show: { c: "var(--dc-warn-600)", l: "No asistió" }, reprogramada: { c: "var(--dc-purple)", l: "Reprogramada" }, cerrada_sistema: { c: "var(--dc-ink-400)", l: "Cerrada por sistema" } };
   const nombreSillon = (c) => { if (!c.sillon) return ""; const x = (reglasAg.sillones || []).find((y) => String(y.sede) === String(c.sede) && String(y.numero) === String(c.sillon)); return x ? x.nombre : `Sillón ${c.sillon}`; };
+  /* Acciones de una cita según su estado, su día y quién mira. Las usan la fila de la vista
+     Día y el panel que se abre al hacer clic en una cita del calendario: una sola lógica.
+     principal: el botón visible; opciones: el resto (menú ⋯ o botones del panel). */
+  const accionesCita = (c) => {
+    const est = estadoCita(c);
+    const esHoy = c.fecha === hoyISO, futura = c.fecha > hoyISO;
+    const abierta = !["cancelada", "atendida", "no_show", "reprogramada", "cerrada_sistema"].includes(c.estado);
+    const A = (label, onClick, color, extra = {}) => ({ label, onClick, color, ...extra });
+    const confirmar = () => set(c.id, "confirmada", `Cita de ${c.paciente} confirmada.`);
+    const llegada = () => checkIn(c.id);
+    let principal = null;
+    if (rol === "medico") {
+      // Flujo del doctor: Confirmar (futura) → Marcar llegada (hoy) → Iniciar → Finalizar → Evolución.
+      if (est === "pendiente" && futura) principal = A("Confirmar", confirmar, DS.c.primary);
+      else if ((est === "pendiente" || est === "confirmada") && esHoy) principal = A("Marcar llegada", llegada, "var(--dc-ok-700)");
+      else if (est === "en_sala") principal = A("Iniciar", () => pasarAtencion(c, `Atención de ${c.paciente} iniciada.`, () => onAtender && onAtender(c)), DS.c.primary);
+      else if (est === "en_atencion") principal = A("Finalizar", () => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); abrirFichaCita(c, "historia"); }, "var(--dc-ok-700)");
+      else if (est === "atendida") principal = A("Evolución", () => abrirFichaCita(c, "historia"), DS.c.primary, { subtle: true });
+    } else if (puedeOperarAgenda) {
+      // AGE-04: flujo lineal con verbo explícito según el estado de la cita.
+      if (est === "pendiente" && c.fecha >= hoyISO) principal = A("Confirmar", confirmar, DS.c.primary);
+      else if (est === "confirmada" && esHoy) principal = A("Marcar llegada", llegada, "var(--dc-ok-700)");
+      else if (est === "en_sala") principal = A("Pasar a sillón", () => pasarAtencion(c), "var(--dc-warn-600)");
+      else if (est === "en_atencion") principal = A("Finalizar y cobrar", () => { set(c.id, "atendida", `Atención de ${c.paciente} finalizada. Cóbrala en Caja.`); window.location.hash = "#/caja"; }, "var(--dc-ok-700)");
+    }
+    if (!principal && rol !== "medico" && !supervisaAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0) principal = A(`Cobrar S/ ${saldos[c.pacienteId].toFixed(0)}`, () => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede }), DS.c.primary);
+    const opciones = puedeOperarAgenda && abierta ? [
+      // Llegó sin haber confirmado: se marca la llegada sin pasar antes por «Confirmar».
+      esHoy && !c.llegada && (est === "pendiente" || est === "confirmada") && principal?.label !== "Marcar llegada" && { label: "Marcar llegada", onClick: llegada },
+      est !== "en_atencion" && { label: "Reprogramar", onClick: () => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora }) },
+      // «No asistió» solo para hoy o días pasados: una cita futura todavía puede llegar.
+      !c.llegada && est !== "en_atencion" && c.fecha <= hoyISO && { label: "Marcar no asistió", onClick: () => set(c.id, "no_show", `${c.paciente}: marcada como no asistió.`) },
+      { label: "Cancelar cita", peligro: true, onClick: () => setCancelCita(c) },
+    ].filter(Boolean) : [];
+    return { principal, opciones };
+  };
+  const [citaVer, setCitaVer] = useState(null);   // id de la cita abierta en el panel (clic en el calendario)
   const COLS_AGENDA = [
     { key: "hora", label: "Hora", get: (c) => c.hora, w: "74px", a: "center",
       cell: (c) => { const e = EST[c.estado] || EST.pendiente; const esProx = proxima && c.id === proxima.id; const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
@@ -1499,39 +1581,24 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     // Una acción principal visible según el estado de la cita; el resto en el menú ⋯.
     { key: "acc", label: "Acciones", w: "196px", a: "right", noFilter: true, noSort: true, sticky: true,
       cell: (c) => {
-        const abierta = c.estado !== "cancelada" && c.estado !== "atendida" && c.estado !== "no_show";
-        const principal =
-          rol === "medico" && c.estado === "confirmada" && c.llegada ? <ActionBtn onClick={() => { set(c.id, "en_atencion"); onAtender && onAtender(c); }} color={DS.c.primary}>Iniciar</ActionBtn>
-          : rol === "medico" && c.estado === "en_atencion" ? <ActionBtn onClick={() => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); abrirFichaCita(c, "historia"); }} color="var(--dc-ok-700)">Finalizar</ActionBtn>
-          : rol === "medico" && c.estado === "atendida" ? <ActionBtn subtle onClick={() => abrirFichaCita(c, "historia")} color={DS.c.primary}>Evolución</ActionBtn>
-          // AGE-04: flujo lineal con verbo explícito según el estado de la cita.
-          : rol !== "medico" && puedeOperarAgenda && estadoCita(c) === "pendiente" && c.fecha >= fmt(hoy) ? <ActionBtn onClick={() => set(c.id, "confirmada", `Cita de ${c.paciente} confirmada.`)} color={DS.c.primary}>Confirmar</ActionBtn>
-          : rol !== "medico" && puedeOperarAgenda && estadoCita(c) === "confirmada" && c.fecha === fmt(hoy) ? <ActionBtn onClick={() => checkIn(c.id)} color="var(--dc-ok-700)">Marcar llegada</ActionBtn>
-          : rol !== "medico" && puedeOperarAgenda && estadoCita(c) === "en_sala" ? <ActionBtn onClick={() => set(c.id, "en_atencion", `${c.paciente} pasa al sillón.`)} color="var(--dc-warn-600)">Pasar a sillón</ActionBtn>
-          : rol !== "medico" && puedeOperarAgenda && estadoCita(c) === "en_atencion" ? <ActionBtn onClick={() => { set(c.id, "atendida", `Atención de ${c.paciente} finalizada. Cóbrala en Caja.`); window.location.hash = "#/caja"; }} color="var(--dc-ok-700)">Finalizar y cobrar</ActionBtn>
-          : rol !== "medico" && !supervisaAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0 ? <ActionBtn onClick={() => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede })} color={DS.c.primary}>Cobrar S/ {saldos[c.pacienteId].toFixed(0)}</ActionBtn>
-          : null;
-        const opciones = puedeOperarAgenda && abierta ? [
-          rol === "medico" && c.estado === "pendiente" && { label: "Confirmar cita", onClick: () => set(c.id, "confirmada", `Cita de ${c.paciente} confirmada.`) },
-          rol === "medico" && !c.llegada && c.fecha === fmt(hoy) && { label: "Marcar llegada", onClick: () => checkIn(c.id) },
-          { label: "Reprogramar", onClick: () => setReprog({ id: c.id, paciente: c.paciente, fecha: c.fecha, hora: c.hora }) },
-          !c.llegada && { label: "Marcar no asistió", onClick: () => set(c.id, "no_show", `${c.paciente}: marcada como no asistió.`) },
-          { label: "Cancelar cita", peligro: true, onClick: () => setCancelCita(c) },
-        ] : [];
+        const { principal, opciones } = accionesCita(c);
         return (
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center", width: "100%" }} onClick={(e) => e.stopPropagation()}>
-            {principal}
+            {principal && <ActionBtn onClick={principal.onClick} color={principal.color} subtle={principal.subtle}>{principal.label}</ActionBtn>}
             <MenuAcciones opciones={opciones} />
           </div>
         );
       } },
   ];
   const lista = [...todasHoy].sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
-  const fechaRaw = new Date(fmt(hoy) + "T00:00:00").toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
+  const fechaRaw = new Date(diaVer + "T00:00:00").toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", ...(diaVer.slice(0, 4) !== hoyISO.slice(0, 4) ? { year: "numeric" } : {}) });
   const fechaLarga = fechaRaw.charAt(0).toUpperCase() + fechaRaw.slice(1);
   const ahora = new Date(); const ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
   const activa = (c) => c.estado !== "atendida" && c.estado !== "cancelada";
-  const proxima = lista.filter(activa).find((c) => toMin(c.hora) >= ahoraMin) || lista.filter(activa)[0];
+  // «Próxima» solo tiene sentido hoy.
+  const proxima = !esHoyVer ? null : lista.filter(activa).find((c) => toMin(c.hora) >= ahoraMin) || lista.filter(activa)[0];
+  // Navegación de la vista Día: anterior / siguiente / hoy / elegir fecha.
+  const moverDia = (n) => { const d = new Date(diaVer + "T00:00:00"); d.setDate(d.getDate() + n); setDiaVer(fmt(d)); };
   const nCitas = useCountUp(citasHoyActivas.length), nPres = useCountUp(stats[1][1]), nLleg = useCountUp(stats[2][1]), nAv = useCountUp(avance);
   const kpis = [["Citas hoy", nCitas, NAVY, <Calendar size={16} strokeWidth={1.75} />], ["Presentes", nPres, "var(--dc-ok-700)", <CheckCircle2 size={16} strokeWidth={1.75} />], ["Por llegar", nLleg, "var(--dc-warn-600)", <Clock size={16} strokeWidth={1.75} />], ["Avance", nAv + "%", DS.c.primary, <TrendingUp size={16} strokeWidth={1.75} />]];
   const comp = [
@@ -1558,9 +1625,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const descargar = (tipo) => {
     setDlOpen(false);
     const filas = filasExport();
-    if (!filas.length) { notify("No hay citas para descargar hoy."); return; }
-    if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${fmt(hoy)}.xlsx`, hoja: `Agenda ${fmt(hoy)}`, titulo: `Agenda del día — ${fechaLarga}`, columnas: COLS_EXPORT, filas }).catch(() => notify("No se pudo generar el Excel."));
-    else { const ok = exportarPDF({ titulo: `Agenda del día — ${fechaLarga}`, subtitulo: pluralEs(filas.length, "cita", "citas"), columnas: COLS_EXPORT, filas }); if (!ok) notify("Permite las ventanas emergentes para generar el PDF."); }
+    if (!filas.length) { notify("No hay citas para descargar ese día."); return; }
+    if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${diaVer}.xlsx`, hoja: `Agenda ${diaVer}`, titulo: `Agenda del día — ${fechaLarga}`, columnas: COLS_EXPORT, filas }).catch(() => notify("No se pudo generar el Excel."));
+    else { const ok = exportarPDF({ titulo: `Agenda del día — ${fechaLarga}`, subtitulo: textoConteo(todasHoy), columnas: COLS_EXPORT, filas }); if (!ok) notify("Permite las ventanas emergentes para generar el PDF."); }
   };
   return (
     <div style={{ display: "grid", gap: 18 }}>
@@ -1571,8 +1638,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           {/* Action Icons (el calendario trae su propio botón Descargar) */}
           {/* GLO-04: se exporta desde la barra de la tabla (lo filtrado). */}
           {/* AGE-05 / GLO-10: acciones secundarias con texto, en el menú ⋯. */}
-          {puedeAgendar && <MenuAcciones etiqueta="Más acciones de la agenda" opciones={[{ label: "Bloquear horario", onClick: () => setBloqForm({ tipo: "dia", fecha: fmt(hoy), diaSemana: String(hoy.getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" }) }, { label: "Pantalla de sala de espera", onClick: () => setTv(true) }]} />}
-          {puedeAgendar && <Btn onClick={() => setAgendar(true)}><Plus size={16} strokeWidth={1.75} /> Agendar cita</Btn>}
+          {puedeAgendar && <MenuAcciones etiqueta="Más acciones de la agenda" opciones={[{ label: "Bloquear horario", onClick: () => setBloqForm({ tipo: "dia", fecha: vista !== "calendario" && diaVer > hoyISO ? diaVer : hoyISO, diaSemana: String(new Date((vista !== "calendario" && diaVer > hoyISO ? diaVer : hoyISO) + "T00:00:00").getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" }) }, { label: "Pantalla de sala de espera", onClick: () => setTv(true) }]} />}
+          {/* Mirando un día futuro en la vista Día, la cita nueva propone ese día. */}
+          {puedeAgendar && <Btn onClick={() => setAgendar(vista !== "calendario" && diaVer > hoyISO ? { fecha: diaVer } : true)}><Plus size={16} strokeWidth={1.75} /> Agendar cita</Btn>}
         </div>
       </div></EnCabecera>
       {agendar && <AgendarRecepcionModal rol={rol} base={typeof agendar === "object" ? agendar : undefined} onClose={() => setAgendar(false)} onCreada={() => { setAgendar(false); recargar(); recargarAll(); }} notify={notify} />}
@@ -1639,12 +1707,22 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           <section className="dc-ag-hero">
             <div className="dc-ag-hero__dia">
               <h2>{fechaLarga}</h2>
-              <p>{pluralEs(todasHoy.length, "cita", "citas")} hoy</p>
+              {/* Misma regla que la cifra «Citas»: activas y, aparte, canceladas y demás. */}
+              <p>{textoConteo(todasHoy, esHoyVer ? " hoy" : "")}</p>
+              {/* Otros días: para confirmar, reprogramar o cancelar citas futuras desde la lista. */}
+              {(() => { const nb = { height: 28, minWidth: 28, display: "inline-grid", placeItems: "center", padding: "0 8px", borderRadius: 8, border: "1px solid rgba(255,255,255,.32)", background: "rgba(255,255,255,.12)", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }; return (
+                <div className="dc-ag-dianav" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+                  <button type="button" aria-label="Día anterior" title="Día anterior" onClick={() => moverDia(-1)} style={nb}><ChevronRight size={15} strokeWidth={2} style={{ transform: "rotate(180deg)" }} /></button>
+                  <button type="button" onClick={() => setDiaVer(hoyISO)} aria-pressed={esHoyVer} style={{ ...nb, background: esHoyVer ? "#fff" : nb.background, color: esHoyVer ? "#0C6B75" : "#fff" }}>Hoy</button>
+                  <button type="button" aria-label="Día siguiente" title="Día siguiente" onClick={() => moverDia(1)} style={nb}><ChevronRight size={15} strokeWidth={2} /></button>
+                  <input type="date" aria-label="Ir a la fecha" value={diaVer} onChange={(e) => e.target.value && setDiaVer(e.target.value)} style={{ ...nb, cursor: "text", fontWeight: 500, colorScheme: "dark" }} />
+                </div>
+              ); })()}
             </div>
             <div className="dc-ag-hero__cifras">
-              {/* AGE-01: M-01 (citas activas), M-02 (en clínica) y M-03 (por confirmar). */}
+              {/* AGE-01: M-01 (citas activas), M-02 (en clínica) y M-03 (por confirmar). Otro día: confirmadas. */}
               <div><b>{nCitas}</b><span>Citas</span></div>
-              <div><b>{cnt("en_sala") + cnt("en_atencion")}</b><span>En clínica</span></div>
+              {esHoyVer ? <div><b>{cnt("en_sala") + cnt("en_atencion")}</b><span>En clínica</span></div> : <div><b>{cnt("confirmada") + cnt("en_sala")}</b><span>Confirmadas</span></div>}
               <div><b>{cnt("pendiente")}</b><span>Por confirmar</span></div>
             </div>
             {/* AGE-02: la próxima cita ya se marca en su fila de la tabla. */}
@@ -1665,12 +1743,14 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
 
       {/* Lista o Calendario según el toggle */}
       {vista !== "calendario" ? (<>
-      <DataTable titulo="Citas de hoy" sub="citas" minWidth={980} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
+      {/* El contador de la tabla cuenta filas (también las canceladas): «en la lista», para
+          no chocar con «4 citas hoy · 2 canceladas» de la cabecera. */}
+      <DataTable titulo={esHoyVer ? "Citas de hoy" : `Citas del ${fechaLegible(diaVer)}`} sub="en la lista" minWidth={980} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
         rowClassName={(c) => `dc-ag-fila${proxima && c.id === proxima.id && c.estado !== "atendida" ? " is-prox" : ""}${c.estado === "cancelada" || c.estado === "atendida" ? " is-pasada" : ""}`}
         onRowClick={(c) => abrirFichaCita(c)}
-        empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub="Tu agenda para hoy está libre." />}
+        empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub={esHoyVer ? "Tu agenda para hoy está libre." : "No hay citas para ese día."} />}
         cols={COLS_AGENDA} />
-      </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => abrirFichaCita(c)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
+      </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => setCitaVer(c.id)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
         onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
         onQuitarAsignacion={puedeAgendar ? (id) => { if (conectado) { api.sillones.quitarAsignacion(id).then(() => notify("Turno quitado.")).catch(() => notify("No se pudo quitar.")); return; } demoDb?.setAsignaciones((xs) => (xs || []).filter((x) => x.id !== id)); notify("Turno quitado."); } : null} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
 
@@ -1678,6 +1758,34 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       {tv && <SalaTV onClose={() => setTv(false)} sede={sedeActiva} citasDemo={citasProp.filter((c) => String(c.sede) === String(sedeActiva) && c.fecha === fmt(hoy))} />}
       {pago && <ModalCobro monto={pago.monto} pacienteId={pago.pid} sedeId={pago.sedeId} paciente={pago.nombre} concepto="Cobro en Agenda" onClose={() => setPago(null)} onAprobado={(res) => { setPago(null); notify(`Cobrado S/ ${M.sol2((res?.montoCobrado ?? pago.monto))} de ${pago.nombre}. ${auth.token ? "Comprobante registrado (todavía no se envía a SUNAT)." : "Comprobante de demostración (sin envío a SUNAT)."}`); recargar(); recargarSaldos(); }} />}
       {cancelCita && <CancelarCitaModal cita={cancelCita} onClose={() => setCancelCita(null)} onConfirm={(motivo) => cancelarConMotivo(cancelCita, motivo)} />}
+      {/* Panel de la cita (clic en el calendario): sus datos y las mismas acciones que la fila. */}
+      {citaVer != null && (() => {
+        const c = buscarCita(citaVer);
+        if (!c) return null;
+        const { principal, opciones } = accionesCita(c);
+        const cerrarY = (fn) => () => { setCitaVer(null); fn(); };
+        const t = toMin(c.hora) + (Number(c.duracionMin) || 30);
+        const fin = `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+        const fila = (k, v) => <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0,1fr)", gap: 10, fontSize: 13, alignItems: "baseline" }}><span style={{ color: "var(--dc-ink-500)" }}>{k}</span><span style={{ color: NAVY, fontWeight: 500, overflowWrap: "anywhere" }}>{v || "—"}</span></div>;
+        return (
+          <Modal icon={<Calendar size={20} strokeWidth={1.75} />} titulo={c.paciente} sub={`${fechaLegible(c.fecha)} · ${c.hora}–${fin}`} size="corto" onClose={() => setCitaVer(null)}
+            footer={<div className="dc-cita-panel__acc" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", width: "100%" }}>
+              <Btn small kind="ghost" onClick={cerrarY(() => abrirFichaCita(c))}><FileText size={14} strokeWidth={1.75} /> Abrir historia clínica</Btn>
+              {opciones.map((o) => <Btn key={o.label} small kind={o.peligro ? "red" : "ghost"} onClick={cerrarY(o.onClick)}>{o.label}</Btn>)}
+              {principal && <Btn small onClick={cerrarY(principal.onClick)}>{principal.label}</Btn>}
+            </div>}>
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}><EstadoPill entidad="cita" estado={estadoCita(c)} />{c.fecha === hoyISO && <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Hoy</span>}</div>
+              {fila("DNI", c.dni)}
+              {fila("Doctor", c.medico && c.medico !== "—" ? c.medico : nom(c.medicoId))}
+              {fila("Sede", c.sedeNombre && c.sedeNombre !== "—" ? c.sedeNombre : nombreSede(c.sede))}
+              {fila("Sillón", nombreSillon(c))}
+              {fila("Motivo", c.motivo)}
+              {fila("Duración", `${Number(c.duracionMin) || 30} min`)}
+            </div>
+          </Modal>
+        );
+      })()}
       {bloqForm && (() => {
         const selSty = { width: "100%", padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, fontWeight: 500, cursor: "pointer", boxSizing: "border-box" };
         const lblSty = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
@@ -1727,25 +1835,37 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       {reprog && (() => {
         const selSty = { width: "100%", padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, fontWeight: 500, cursor: "pointer", boxSizing: "border-box" };
         const lblSty = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
+        // Las mismas reglas que al agendar (fecha pasada, horario del doctor, cruces, sillón),
+        // a la vista mientras se elige; si algo falla, el modal queda abierto con el motivo.
+        const c0 = buscarCita(reprog.id);
+        const patch = { fecha: reprog.fecha, hora: (reprog.hora || "").slice(0, 5) };
+        const citasCtx = conectado && reprogDia ? reprogDia : citasTodas;
+        const ev = c0 && patch.fecha && patch.hora ? validarMovida(c0, patch, citasCtx) : { errores: [], avisos: [], nuevoSillon: null };
+        const sinCambio = c0 && patch.fecha === c0.fecha && patch.hora === String(c0.hora || "").slice(0, 5);
         const guardar = () => {
-          if (!reprog.fecha || !reprog.hora) { notify("Elige fecha y hora."); return; }
-          reagendarCita(reprog.id, { fecha: reprog.fecha, hora: reprog.hora.length === 5 ? reprog.hora : reprog.hora.slice(0, 5) });
-          setReprog(null);
+          if (!patch.fecha || !patch.hora) { notify("Elige fecha y hora."); return; }
+          if (ev.errores.length) { notify(ev.errores[0]); return; }
+          reagendarCita(reprog.id, patch, { citasCtx, onOk: () => setReprog(null) });
         };
         return (
         <Modal icon={<Repeat size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Reprogramar cita" sub={reprog.paciente} onClose={() => setReprog(null)} maxW={460}
-          footer={<><Btn small kind="ghost" onClick={() => setReprog(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> Guardar cambio</Btn></>}>
+          footer={<><Btn small kind="ghost" onClick={() => setReprog(null)}>Cancelar</Btn><Btn small onClick={guardar} disabled={!patch.fecha || !patch.hora || ev.errores.length > 0 || sinCambio}><Check size={15} strokeWidth={1.75} /> Guardar cambio</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
               <label style={lblSty}>Nueva fecha</label>
-              <input className="dc-premium-inp" type="date" value={reprog.fecha} onChange={(e) => setReprog({ ...reprog, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} />
+              <input className="dc-premium-inp" type="date" min={hoyISO} value={reprog.fecha} onChange={(e) => setReprog({ ...reprog, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} />
             </div>
             <div>
               <label style={lblSty}>Nueva hora</label>
               <input className="dc-premium-inp" type="time" value={reprog.hora} onChange={(e) => setReprog({ ...reprog, hora: e.target.value })} style={{ ...selSty, cursor: "text" }} />
             </div>
           </div>
-          <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 12 }}>Se valida que el horario no choque con otra cita del mismo doctor.</div>
+          {(ev.errores.length > 0 || ev.avisos.length > 0 || ev.nuevoSillon != null) && <div className="dc-agm__val" style={{ marginTop: 12 }}>
+            {ev.errores.map((m, i) => <p key={"e" + i} className="is-err" role="alert"><Lock size={13} strokeWidth={2.2} /> {m}</p>)}
+            {!ev.errores.length && ev.nuevoSillon != null && <p className="is-avi"><Armchair size={13} strokeWidth={2.2} /> Pasa al sillón {ev.nuevoSillon}: el actual está ocupado a esa hora.</p>}
+            {ev.avisos.map((m, i) => <p key={"a" + i} className="is-avi"><Info size={13} strokeWidth={2.2} /> {m}</p>)}
+          </div>}
+          <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 12 }}>Se valida que no sea una hora pasada, que el doctor atienda y que el horario no choque con otra cita ni con el sillón.</div>
         </Modal>
         );
       })()}
@@ -9261,7 +9381,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     return () => { vivo = false; };
   }, [sedeActiva, sedesOrg]); // eslint-disable-line
 
-  const onAgendarIA = () => { if (auth.token) { notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}. Aparecerá en la Agenda.`); return; } const medIA = MEDICOS.find((m) => sedesDe(m).map(String).includes(String(sedeActiva)) && espsDe(m).includes(1)) || MEDICOS.find((m) => sedesDe(m).map(String).includes(String(sedeActiva))) || MEDICOS[0]; setCitas((cs) => [...cs, { id: Date.now(), paciente: "Nuevo (vía IA)", dni: "00000000", medicoId: medIA.id, esp: medIA.esp, sede: sedeActiva, fecha: fmt(hoy), hora: "16:30", motivo: "Agendado por agente IA", estado: "confirmada", llegada: false }]); notify(`El agente IA agendó una cita en ${nombreSede(sedeActiva)}.`); };
+  // WhatsApp › «Agendar cita» abre el modal de agendado con el paciente del chat (antes, en
+  // la demostración, creaba una cita «Nuevo (vía IA)» sin paciente ni sillón).
 
   // P1-1: iniciar atención → abre el espacio clínico del paciente de esa cita.
   const atenderCita = (cita) => {
@@ -9271,13 +9392,18 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     notify(`Atención iniciada con ${cita.paciente}.`);
   };
   // P1-3: al cancelar una cita, ofrece el cupo al primer paciente compatible de la lista de espera.
+  // Devuelve el texto que se suma al aviso de la cancelación (un solo aviso, no dos).
   const ofrecerCupo = (cita) => {
+    // Un cupo que ya pasó (o que ya empezó) no le sirve a nadie: no se ofrece.
+    if (yaPaso(cita.fecha, cita.hora)) return "";
+    // Con sesión, la lista de espera es la del servidor: aquí no se ofrece con datos de ejemplo.
+    if (auth.token) return " El cupo quedó libre: revisa la lista de espera.";
     const espNom = ESPECIALIDADES.find((e) => e.id === cita.esp)?.nombre;
     // Solo a quien espera en la sede de la cita cancelada y con un doctor que atiende ahí.
     const medAtiendeAhi = (nom) => nom === "Cualquiera" || !nom || MEDICOS.some((m) => m.nombre === nom && sedesDe(m).some((x) => mismaSede(x, cita.sede)));
     const target = espera.find((x) => !x.ofrecido.some((o) => o.includes("hoy")) && (x.sede == null || mismaSede(x.sede, cita.sede)) && medAtiendeAhi(x.medico) && (x.e === espNom || x.e === "Odontología general" || x.medico === "Cualquiera"));
-    if (target) { setEspera((es) => es.map((x) => x.id === target.id ? { ...x, ofrecido: [...x.ofrecido, `Cupo ${cita.hora} ofrecido hoy`] } : x)); notify(`Cupo liberado ofrecido a ${target.n} (lista de espera) por WhatsApp.`); }
-    else notify("Cupo liberado. No hay pacientes compatibles en la lista de espera.");
+    if (target) { setEspera((es) => es.map((x) => x.id === target.id ? { ...x, ofrecido: [...x.ofrecido, `Cupo ${cita.hora} ofrecido hoy`] } : x)); return ` Cupo ofrecido a ${target.n} (lista de espera) por WhatsApp.`; }
+    return " Cupo liberado: no hay pacientes compatibles en la lista de espera.";
   };
 
   // NAV-01 (Excel 08/09/2026 + revision2): Lista de espera y Comisiones top-level si hay permiso.
@@ -9393,7 +9519,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       // Un solo catálogo de servicios (NAV-06): Operación › Servicios y precios.
       case "servicios": return <Servicios notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} />;
       case "dashboard": return <Dashboard citas={cf} pacientes={pf} rol={rol} usuario={usuario} notify={notify} onIr={setVista} horarioClinica={horarioClinica} sedeActiva={sede} />;
-      case "whatsapp": return <WhatsAppInbox onAgendar={onAgendarIA} notify={notify} />;
+      case "whatsapp": return <WhatsAppInbox notify={notify} />;
       // NAV-04: Agenda es un destino con selector de vista. Día = lista operativa;
       // Semana/Mes/Por doctor/Por sillón = calendario; Lista = rango + exportar.
       case "agenda": case "agenda_cal": case "agenda_consolidado": {

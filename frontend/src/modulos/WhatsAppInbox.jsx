@@ -4,9 +4,9 @@ import React, { useContext, useState, useEffect, useRef } from "react";
 import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
-import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, nombreSede, puede, tint, useSede} from "../comun";
+import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, nombreSede, puede, tint, useSede} from "../comun";
 import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
-import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";
+import { AgendarRecepcionModal, CamposPacienteRapido, PAC_RAPIDO_VACIO, celular9, registrarPacienteRapido, validarPacienteRapido } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
 import { proximaCita, cuentaPaciente } from "../compartido/metricas";
 import "./whatsappInbox.css";
@@ -41,40 +41,52 @@ function respuestaAgente(texto, ctx) {
   return { texto: "Mmm, déjame ayudarte mejor 😊 Puedo agendarte una cita, darte precios, horarios o cómo llegar. ¿Qué te gustaría hacer? Si lo prefieres, también te derivo con el área de atención.", tools: [] };
 }
 
-// Fechas de la demostración relativas a hoy: un chat de hoy, uno de ayer, uno de
-// esta semana y uno más antiguo, para que la lista muestre los cuatro formatos.
+// Fechas de la demostración relativas a ahora: un chat de hace unos minutos, uno de ayer,
+// uno de esta semana y uno más antiguo, para que la lista muestre los cuatro formatos.
+// Cada mensaje lleva su marca de tiempo (ts): la hora se muestra en 24 h y el hilo se
+// ordena por ella. Antes el chat de «hoy» traía horas fijas (14:03) y un mensaje enviado
+// a las 12:36 quedaba debajo de mensajes «posteriores».
 const haceDias = (n, hm) => { const d = new Date(); d.setDate(d.getDate() - n); const [h, m] = hm.split(":").map(Number); d.setHours(h, m, 0, 0); return d.toISOString(); };
+const haceMin = (n) => new Date(Date.now() - n * 60000).toISOString();
 const CHATS_INIT = [
-  { id: 1, nombre: "Rosa Linares", tel: "+51 987 654 321", modo: "ia", noLeidos: 0, actualizado: haceDias(0, "14:03"), msgs: [
-    { de: "paciente", txt: "Hola buenas tardes", t: "14:02" },
-    { de: "ia", txt: "¡Hola! 👋 Bienvenida a Sonríe+. Soy el asistente virtual. ¿En qué te ayudo hoy?", t: "14:02" },
-    { de: "paciente", txt: "Quiero una cita para limpieza", t: "14:03" },
-    { de: "ia", txt: "¡Con gusto! Una limpieza cuesta S/ 80. Tengo cupo mañana 09:00 con la Dra. Carla Mendoza en San Isidro. ¿Te lo reservo? 😊", t: "14:03", tools: ["consultar_precio","ver_disponibilidad"] },
+  { id: 1, nombre: "Rosa Linares", tel: "+51 987 654 321", modo: "ia", noLeidos: 0, actualizado: haceMin(18), msgs: [
+    { de: "paciente", txt: "Hola buenas tardes", ts: haceMin(21) },
+    { de: "ia", txt: "¡Hola! 👋 Bienvenida a Sonríe+. Soy el asistente virtual. ¿En qué te ayudo hoy?", ts: haceMin(21) },
+    { de: "paciente", txt: "Quiero una cita para limpieza", ts: haceMin(18) },
+    { de: "ia", txt: "¡Con gusto! Una limpieza cuesta S/ 80. Tengo cupo mañana 09:00 con la Dra. Carla Mendoza en San Isidro. ¿Te lo reservo? 😊", ts: haceMin(18), tools: ["consultar_precio","ver_disponibilidad"] },
   ] },
   { id: 2, nombre: "Jorge Núñez", tel: "+51 912 887 445", modo: "ia", noLeidos: 2, actualizado: haceDias(1, "13:50"), msgs: [
-    { de: "paciente", txt: "cuánto cuestan los brackets?", t: "13:45" },
-    { de: "ia", txt: "Una consulta de Ortodoncia cuesta S/ 150. Ahí el especialista evalúa tu caso y te da el plan. ¿Te agendo? 😊", t: "13:45", tools: ["consultar_precio"] },
-    { de: "paciente", txt: "sí porfa para el sábado", t: "13:50" },
+    { de: "paciente", txt: "cuánto cuestan los brackets?", ts: haceDias(1, "13:45") },
+    { de: "ia", txt: "Una consulta de Ortodoncia cuesta S/ 150. Ahí el especialista evalúa tu caso y te da el plan. ¿Te agendo? 😊", ts: haceDias(1, "13:45"), tools: ["consultar_precio"] },
+    { de: "paciente", txt: "sí porfa para el sábado", ts: haceDias(1, "13:50") },
   ] },
   { id: 3, nombre: "Ana Beltrán", tel: "+51 998 112 334", modo: "humano", noLeidos: 1, actualizado: haceDias(3, "12:30"), msgs: [
-    { de: "paciente", txt: "Estoy muy molesta, esperé 1 hora y no me atendieron", t: "12:30" },
-    { de: "ia", txt: "Uy, lamento muchísimo la espera, de verdad no debió pasar 🙏 Ya estoy coordinando con el área de atención al paciente para resolverlo; te escriben enseguida por aquí.", t: "12:30", tools: ["derivar_area"] },
-    { de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", t: "12:30" },
+    { de: "paciente", txt: "Estoy muy molesta, esperé 1 hora y no me atendieron", ts: haceDias(3, "12:30") },
+    { de: "ia", txt: "Uy, lamento muchísimo la espera, de verdad no debió pasar 🙏 Ya estoy coordinando con el área de atención al paciente para resolverlo; te escriben enseguida por aquí.", ts: haceDias(3, "12:30"), tools: ["derivar_area"] },
+    { de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", ts: haceDias(3, "12:30") },
   ] },
   { id: 4, nombre: "Luis Palacios", tel: "+51 945 330 218", modo: "ia", noLeidos: 0, actualizado: haceDias(12, "10:15"), msgs: [
-    { de: "paciente", txt: "¿Atienden los domingos?", t: "10:14" },
-    { de: "ia", txt: "Atendemos de lunes a sábado de 8:00 a. m. a 6:00 p. m. 🕗 ¿Te busco un horario?", t: "10:15" },
+    { de: "paciente", txt: "¿Atienden los domingos?", ts: haceDias(12, "10:14") },
+    { de: "ia", txt: "Atendemos de lunes a sábado de 08:00 a 18:00 🕗 ¿Te busco un horario?", ts: haceDias(12, "10:15") },
   ] },
 ];
 
-function WhatsAppInbox({ onAgendar, notify = () => {} }) {
+function WhatsAppInbox({ notify = () => {} }) {
   const conectado = !!auth.token;
   // Sede: la cita y el paciente nuevo se registran en la sede activa; la ficha, la próxima
   // cita y el saldo solo se muestran si el paciente es de las sedes que se ven.
   const { activa, pacientes: pacVisibles, citas: citasVisibles } = useSede();
   const [chats, setChats] = useState(conectado ? [] : CHATS_INIT);
-  const [agendar, setAgendar] = useState(null);   // {canal, motivo, sedeId} para abrir el modal
-  const abrirAgendar = (motivo) => { if (conectado) setAgendar({ canal: "whatsapp", motivo: motivo || "", sedeId: sedeApiUuid(activa) }); else onAgendar?.(); };
+  const [agendar, setAgendar] = useState(null);   // base del modal de agendado: { canal, motivo, sedeId, pacienteId | telefono }
+  // «Agendar cita» abre siempre el modal de recepción (demo y con sesión): con el paciente
+  // del chat ya elegido o, si el contacto aún no es paciente, con su celular en el alta rápida.
+  const abrirAgendar = (motivo = "", pid = null) => {
+    const c = chat;
+    const pacD = !conectado ? pacDeChat(c) : null;
+    const pacienteId = pid ?? (conectado ? (c?.pacienteId || (c?.pacientes?.length === 1 ? c.pacientes[0].id : null)) : pacD?.id) ?? null;
+    setAgendar({ canal: "whatsapp", motivo, sedeId: conectado ? sedeApiUuid(activa) : activa,
+      ...(pacienteId != null ? { pacienteId } : { telefono: c?.tel || "", pacienteNombre: c && c.nombre && c.nombre !== c.tel ? c.nombre : "" }) });
+  };
   const [activo, setActivo] = useState(conectado ? null : 1);
   const [input, setInput] = useState("");
   const [ctx, setCtx] = useState({});
@@ -207,7 +219,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   useEffect(() => { const t = setTimeout(() => scrollBottom(false), 40); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [activo]);
   // Al llegar un mensaje nuevo: baja solo si ya estabas abajo (como WhatsApp).
   useEffect(() => { if (atBottom) scrollBottom(false); /* eslint-disable-next-line */ }, [chat?.msgs.length]);
-  const ahora = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+  // Horas siempre en 24 h («14:03»): antes se mezclaban con «12:36 p. m.».
+  const hora24 = (d) => { const x = d instanceof Date ? d : new Date(d); return isNaN(x) ? "" : `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
+  const ahoraTs = () => new Date().toISOString();
   // Hora en la lista de chats, como WhatsApp: hoy → hora; ayer → "Ayer"; en los
   // últimos 7 días → día de la semana; antes → fecha corta.
   const cuandoLista = (iso) => {
@@ -221,12 +235,12 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     if (dif < 7) { const w = d.toLocaleDateString("es-PE", { weekday: "long" }); return w.charAt(0).toUpperCase() + w.slice(1); }
     return d.toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "2-digit" });
   };
-  const hhmm = (iso) => { try { return new Date(iso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
-  const fechaDe = (iso) => { try { return new Date(iso).toISOString().slice(0, 10); } catch { return null; } };
+  // Día local (Lima) del mensaje: toISOString() daba el día UTC y de noche cambiaba de fecha.
+  const fechaDe = (iso) => { const d = new Date(iso); return isNaN(d) ? null : fmt(d); };
   const diaLabel = (f) => {
     if (!f) return "";
-    const hoy = new Date().toISOString().slice(0, 10);
-    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const hoy = fmt(new Date());
+    const ayer = fmt(new Date(Date.now() - 86400000));
     if (f === hoy) return "Hoy"; if (f === ayer) return "Ayer";
     try { return new Date(f + "T12:00:00").toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" }); } catch { return f; }
   };
@@ -243,7 +257,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   const cargarMensajes = (id) => {
     if (!conectado || !id) return;
     api.conversaciones.mensajes(id)
-      .then((ms) => setChats((cs) => cs.map((c) => c.id === id ? { ...c, msgs: (ms || []).map((m) => ({ de: m.emisor, txt: m.texto, t: hhmm(m.creadoEn), fecha: fechaDe(m.creadoEn), tools: m.toolsUsadas, estado: m.estado })) } : c)))
+      .then((ms) => setChats((cs) => cs.map((c) => c.id === id ? { ...c, msgs: (ms || []).map((m) => ({ de: m.emisor, txt: m.texto, ts: m.creadoEn, tools: m.toolsUsadas, estado: m.estado })) } : c)))
       .catch(() => {}); // WA-10: 404/errores aislados — no tumbar la bandeja
   };
   // Refresca la lista SIN perder los mensajes ya cargados (merge por id) — antes
@@ -306,18 +320,28 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
       .then(() => { setChats((cs) => cs.filter((c) => c.id !== id)); if (activo === id) setActivo(null); notify("Conversación eliminada."); })
       .catch(() => notify("No se pudo eliminar la conversación."));
   };
-  // Registrar el contacto de WhatsApp como paciente (teléfono precargado + RENIEC).
+  // Registrar el contacto de WhatsApp como paciente: el alta rápida de Agendar (DNI con
+  // RENIEC, nombre, celular precargado, nacimiento y apoderado si es menor). En la
+  // demostración también registra (antes solo decía «hazlo desde Pacientes»).
   const [nuevoPac, setNuevoPac] = useState(null);
-  const abrirRegistro = () => setNuevoPac({ nombre: chat && chat.nombre && chat.nombre !== chat.tel ? chat.nombre : "", dni: "", telefono: chat ? chat.tel : "" });
-  const guardarPaciente = (agendarDespues) => {
-    if (!nuevoPac.nombre.trim()) { notify("Ingresa el nombre del paciente."); return; }
-    const tel = (nuevoPac.telefono || "").replace(/\D/g, "").replace(/^51/, "").slice(-9);
-    if (tel && tel.length !== 9) { notify("Celular: 9 dígitos (ej. 999888777)."); return; }
-    if (conectado) {
-      api.pacientes.crear({ nombre: nuevoPac.nombre, dni: nuevoPac.dni || null, telefono: tel || null, sedeRegistroId: sedeApiUuid(activa) })
-        .then(() => { notify(`${nuevoPac.nombre} registrado como paciente.`); setNuevoPac(null); cargarConversaciones(); if (agendarDespues) abrirAgendar(`Cita para ${nuevoPac.nombre} (desde WhatsApp)`); })
-        .catch((e) => notify("No se pudo registrar: " + ((e && e.message) || "")));
-    } else { notify("En demo, registra pacientes desde el módulo Pacientes."); setNuevoPac(null); if (agendarDespues) abrirAgendar("Registrado desde WhatsApp"); }
+  const [nuevoPacErr, setNuevoPacErr] = useState({});
+  const abrirRegistro = () => { setNuevoPacErr({}); setNuevoPac({ ...PAC_RAPIDO_VACIO, nombre: chat && chat.nombre && chat.nombre !== chat.tel ? chat.nombre : "", telefono: chat ? celular9(chat.tel) : "" }); };
+  const setCampoPac = (parcial) => { setNuevoPac((f) => ({ ...f, ...parcial })); setNuevoPacErr((e) => { const x = { ...e }; Object.keys(parcial).forEach((k) => delete x[k]); return x; }); };
+  // Demostración: un DNI que ya tiene ficha se liga al chat en vez de duplicar al paciente.
+  const dniYaRegistrado = !conectado && nuevoPac && /^\d{8}$/.test(nuevoPac.dni || "") ? (dbWa?.pacientes || []).find((p) => String(p.dni || "") === nuevoPac.dni) || null : null;
+  const ligarAFicha = (p) => { setChats((cs) => cs.map((c) => (c.id === activo ? { ...c, pacienteId: p.id } : c))); setNuevoPac(null); notify(`Chat ligado a la ficha de ${p.nombre}.`); };
+  const guardarPaciente = async (agendarDespues) => {
+    const v = validarPacienteRapido(nuevoPac);
+    if (!v.ok) { setNuevoPacErr(v.errors); notify(v.errors[v.first]); return; }
+    if (dniYaRegistrado) { notify(`Ese DNI ya es de ${dniYaRegistrado.nombre}: usa su ficha.`); return; }
+    try {
+      const p = await registrarPacienteRapido(nuevoPac, { demoDb: dbWa, sede: activa });
+      if (!conectado) setChats((cs) => cs.map((c) => (c.id === activo ? { ...c, pacienteId: p.id } : c)));
+      notify(`${p.nombre} registrado como paciente.`);
+      setNuevoPac(null);
+      if (conectado) cargarConversaciones();
+      if (agendarDespues) abrirAgendar("", p.id);
+    } catch (e) { notify("No se pudo registrar: " + ((e && e.message) || "error del servidor")); }
   };
 
   const recibir = (txt) => {
@@ -328,16 +352,17 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
       return;
     }
     // Solo sin backend: simula un mensaje del paciente y la respuesta IA en el cliente.
-    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: new Date().toISOString(), msgs: [...c.msgs, { de: "paciente", txt, t: ahora() }] } : c));
+    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: ahoraTs(), msgs: [...c.msgs, { de: "paciente", txt, ts: ahoraTs() }] } : c));
     if (chat.modo === "humano") return;
     setTimeout(() => {
       const r = respuestaAgente(txt, { ...ctx, precio: (id) => precioCita(dbWa?.catalogo || CATALOGO_SEED, id, activa), sedeNombre: nombreSede(activa) });
       setChats((cs) => cs.map((c) => {
         if (c.id !== activo) return c;
-        const add = [{ de: "ia", txt: r.texto, t: ahora(), tools: r.tools }];
-        if (r.escalar) add.push({ de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", t: ahora() });
-        if (r.linkPago) add.push({ de: "pago", id: `LP-${Date.now()}`, monto: 50, proveedor: (pasarelaActiva() || { n: "—" }).n, estado: "pendiente", t: ahora() });
-        return { ...c, modo: r.escalar ? "humano" : c.modo, msgs: [...c.msgs, ...add] };
+        const ts = ahoraTs();
+        const add = [{ de: "ia", txt: r.texto, ts, tools: r.tools }];
+        if (r.escalar) add.push({ de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", ts });
+        if (r.linkPago) add.push({ de: "pago", id: `LP-${Date.now()}`, monto: 50, proveedor: (pasarelaActiva() || { n: "—" }).n, estado: "pendiente", ts });
+        return { ...c, actualizado: ts, modo: r.escalar ? "humano" : c.modo, msgs: [...c.msgs, ...add] };
       }));
       setCtx({ proponiendo: !!r.propone });
       if (r.agenda) abrirAgendar("Agendado desde WhatsApp");
@@ -345,20 +370,20 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     }, 650);
   };
   const marcarPagado = (idLink) => {
-    setChats((cs) => cs.map((c) => c.id !== activo ? c : { ...c, msgs: [...c.msgs.map((m) => m.id === idLink ? { ...m, estado: "pagado" } : m), { de: "ia", txt: "Recibimos tu pago ✅ Tu cita quedó agendada. Te recuerdo 48 h y 2 h antes. ¿Algo más?", t: ahora(), tools: ["agendar_cita", "enviar_confirmacion"] }] }));
+    setChats((cs) => cs.map((c) => c.id !== activo ? c : { ...c, msgs: [...c.msgs.map((m) => m.id === idLink ? { ...m, estado: "pagado" } : m), { de: "ia", txt: "Recibimos tu pago ✅ Tu cita quedó agendada. Te recuerdo 48 h y 2 h antes. ¿Algo más?", ts: ahoraTs(), tools: ["agendar_cita", "enviar_confirmacion"] }] }));
     abrirAgendar("Agendado desde WhatsApp (pago recibido)");
   };
   const enviarHumano = () => {
     if (!input.trim()) return;
     const txt = input; setInput("");
     if (conectado) {
-      setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: new Date().toISOString(), msgs: [...c.msgs, { de: "agente", txt, t: ahora(), fecha: fechaDe(new Date().toISOString()) }] } : c));
+      setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: ahoraTs(), msgs: [...c.msgs, { de: "agente", txt, ts: ahoraTs() }] } : c));
       api.conversaciones.enviar(activo, { emisor: "agente", texto: txt })
         .then(() => cargarMensajes(activo))
         .catch(() => notify("No se pudo enviar el mensaje."));
       return;
     }
-    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: new Date().toISOString(), msgs: [...c.msgs, { de: "agente", txt, t: ahora() }] } : c));
+    setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: ahoraTs(), msgs: [...c.msgs, { de: "agente", txt, ts: ahoraTs() }] } : c));
   };
   const tomar = () => {
     if (conectado) {
@@ -392,7 +417,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
           {primero && m.de === "agente" && <div className="wa-b__autor wa-b__autor--rec"><UserCheck size={12} strokeWidth={2} /> Recepción</div>}
           <span className="wa-b__txt">{m.txt}</span>
           {m.tools?.length > 0 && <div className="wa-b__tools">{m.tools.map((tl, k) => <span key={k}><Zap size={10} strokeWidth={2} /> {tl}()</span>)}</div>}
-          <span className="wa-b__meta">{m.t}{sale && ticks(m.estado)}</span>
+          <span className="wa-b__meta">{m.ts ? hora24(m.ts) : m.t}{sale && ticks(m.estado)}</span>
         </div>
       </div>
     );
@@ -406,17 +431,21 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     if (estado === "enviado") return <Check size={13} strokeWidth={1.75} style={{ color: "var(--dc-ink-400)" }} />;
     return null;
   };
-  // Renderiza los mensajes con separadores de fecha (Hoy / Ayer / fecha).
-  const hilo = (msgs) => {
+  // Renderiza los mensajes en orden cronológico (por su marca de tiempo; a igual hora, en
+  // el orden en que llegaron) con separadores de fecha (Hoy / Ayer / fecha).
+  const hilo = (msgsRaw) => {
+    const tsDe = (m) => { const t = m.ts ? Date.parse(m.ts) : NaN; return isNaN(t) ? null : t; };
+    const msgs = msgsRaw.map((m, i) => ({ m, i })).sort((a, b) => { const ta = tsDe(a.m), tb = tsDe(b.m); return ta != null && tb != null && ta !== tb ? ta - tb : a.i - b.i; }).map((x) => x.m);
     let ultima = null;
     return msgs.map((m, i) => {
-      const sep = m.fecha && m.fecha !== ultima;
-      if (m.fecha) ultima = m.fecha;
+      const dia = m.ts ? fechaDe(m.ts) : m.fecha;
+      const sep = dia && dia !== ultima;
+      if (dia) ultima = dia;
       const prev = msgs[i - 1];
       const primero = sep || !prev || prev.de !== m.de || prev.de === "sistema";
       return (
         <React.Fragment key={i}>
-          {sep && <div className="wa-fecha"><span>{m.fecha}</span></div>}
+          {sep && <div className="wa-fecha"><span>{diaLabel(dia)}</span></div>}
           {burbuja(m, i, primero)}
         </React.Fragment>
       );
@@ -579,7 +608,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             <button type="button" className="wa-volver" aria-label="Volver a los chats" onClick={() => setEnHilo(false)}><ArrowLeft size={18} strokeWidth={2} /></button>
             <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` – ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
-              {conectado && <Btn small onClick={() => abrirAgendar("Solicitud por WhatsApp")}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
+              <Btn small onClick={() => abrirAgendar()}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>
               {/* Un solo botón: oculta el panel del contacto y, al pulsarlo otra vez, lo muestra. */}
               {(() => { const abierto = window.innerWidth > PANEL_FIJO ? !ocultarInfo : verInfo; return (
                 <button type="button" className="wa-info" aria-label={abierto ? "Ocultar datos del contacto" : "Mostrar datos del contacto"} title={abierto ? "Ocultar datos del contacto" : "Mostrar datos del contacto"} aria-expanded={abierto} onClick={alternarInfo}>
@@ -660,15 +689,17 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
               </div>
             )}
             <div style={{ display: "grid", gap: 10, marginTop: 4 }}>
-              <button onClick={() => abrirAgendar("Solicitud por WhatsApp")} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 16px", borderRadius: "var(--dc-r-md)", border: "none", background: DS.c.primary, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", boxShadow: "0 2px 6px " + tint(DS.c.primary, 0.376), transition: "transform .1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "none"} onMouseLeave={e => e.currentTarget.style.transform = "none"}><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>
-              {!chat.esPaciente && <Btn small kind="ghost" full onClick={abrirRegistro}><UserPlus size={15} strokeWidth={1.75} /> Registrar como paciente</Btn>}
+              <button onClick={() => abrirAgendar()} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 16px", borderRadius: "var(--dc-r-md)", border: "none", background: DS.c.primary, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", boxShadow: "0 2px 6px " + tint(DS.c.primary, 0.376), transition: "transform .1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "none"} onMouseLeave={e => e.currentTarget.style.transform = "none"}><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>
+              {/* Solo para contactos que aún no son pacientes (en la demo se reconoce por celular o nombre). */}
+              {!(conectado ? chat.esPaciente : pacDeChat(chat)) && <Btn small kind="ghost" full onClick={abrirRegistro}><UserPlus size={15} strokeWidth={1.75} /> Registrar como paciente</Btn>}
               <button onClick={() => eliminarChat(chat.id)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", padding: "10px 16px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-fee)", background: "var(--dc-white)", color: RED, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background .15s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--dc-danger-soft)"} onMouseLeave={e => e.currentTarget.style.background = "var(--dc-white)"}><Trash2 size={14} strokeWidth={1.75} /> Eliminar chat</button>
             </div>
           </div>
         </div>
         </>)}
       </Card>
-      {agendar && <AgendarRecepcionModal base={agendar} onClose={() => setAgendar(null)} onCreada={() => { setAgendar(null); notify("Cita agendada desde WhatsApp."); }} notify={notify} />}
+      {/* El propio modal avisa «Cita agendada para …»; aquí solo se cierra. */}
+      {agendar && <AgendarRecepcionModal base={agendar} onClose={() => setAgendar(null)} onCreada={() => { setAgendar(null); if (conectado) cargarConversaciones(); }} notify={notify} />}
       {/* Ficha 360 del paciente */}
       {ficha360 && (() => { const p = ficha360.paciente || {}; const EST = { confirmada: ["var(--dc-info-soft)", "var(--dc-info-ink)"], atendida: ["var(--dc-ok-soft)", "var(--dc-ok-700)"], pendiente: ["var(--dc-warn-soft)", "var(--dc-warn-600)"], cancelada: ["var(--dc-fee2)", "var(--dc-danger-700)"], no_show: ["var(--dc-fee2)", "var(--dc-danger-700)"], en_atencion: ["var(--dc-bg)", "var(--dc-accent-cyan)"] }; return (
         <Modal icon={<User size={20} strokeWidth={1.75} />} titulo={p.nombre || "Paciente"} sub={`DNI ${p.dni || "—"} – ${p.telefono || ""}`} onClose={() => setFicha360(null)} maxW={620}
@@ -862,19 +893,9 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
       })()}
 
       {nuevoPac && (
-        <Modal icon={<UserPlus size={20} strokeWidth={1.75} />} titulo="Registrar como paciente" sub="Crea la ficha del contacto de WhatsApp. El teléfono viene precargado." onClose={() => setNuevoPac(null)} maxW={480}
+        <Modal icon={<UserPlus size={20} strokeWidth={1.75} />} titulo="Registrar como paciente" sub="Crea la ficha del contacto de WhatsApp. El celular viene precargado." onClose={() => setNuevoPac(null)} maxW={520}
           footer={<><Btn small kind="ghost" onClick={() => setNuevoPac(null)}>Cancelar</Btn><Btn small kind="ghost" onClick={() => guardarPaciente(true)}><Calendar size={15} strokeWidth={1.75} /> Registrar y agendar</Btn><Btn small onClick={() => guardarPaciente(false)}><Check size={15} strokeWidth={1.75} /> Registrar</Btn></>}>
-          <div style={{ display: "grid", gap: 14 }}>
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>DNI</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input className="dc-premium-inp" value={nuevoPac.dni} onChange={(e) => setNuevoPac((f) => ({ ...f, dni: e.target.value.replace(/\D/g, "").slice(0, 8) }))} placeholder="8 dígitos" style={{ flex: 1, padding: "11px 14px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", color: NAVY, boxSizing: "border-box" }} />
-                <BtnReniec dni={nuevoPac.dni} onNombre={(nom) => setNuevoPac((f) => ({ ...f, nombre: nom }))} notify={notify} />
-              </div>
-            </div>
-            <Field label="Nombre completo" value={nuevoPac.nombre} onChange={(v) => setNuevoPac((f) => ({ ...f, nombre: v }))} placeholder="Nombre del paciente" />
-            <Field label="Teléfono" value={nuevoPac.telefono} onChange={(v) => setNuevoPac((f) => ({ ...f, telefono: v }))} placeholder="51987654321" icon={<Phone size={15} strokeWidth={1.75} />} />
-          </div>
+          <CamposPacienteRapido v={nuevoPac} set={setCampoPac} err={nuevoPacErr} notify={notify} existente={dniYaRegistrado} onUsarExistente={dniYaRegistrado ? () => ligarAFicha(dniYaRegistrado) : undefined} />
         </Modal>
       )}
     </div>
