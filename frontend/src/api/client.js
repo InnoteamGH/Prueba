@@ -502,7 +502,8 @@ export const api = {
   },
   // ── Grupo B (módulos operativos/clínicos) ──
   inventario: {
-    listar: () => request("GET", "/inventario"),
+    // sedes: UUID de las sedes que se ven (cada sede tiene su almacén); sin sedes = todas las del usuario.
+    listar: (sedes) => request("GET", `/inventario${conQuery({ sedeIds: sedes })}`),
     crear: (i) => request("POST", "/inventario", i),
     actualizar: (id, i) => request("PUT", `/inventario/${id}`, i),
     borrar: (id) => request("DELETE", `/inventario/${id}`),
@@ -535,7 +536,7 @@ export const api = {
   // Ordenes de compra a proveedor. El stock solo se toca al RECIBIR la orden:
   // hasta que la caja no llega, ese material no esta en la clinica.
   ordenesCompra: {
-    listar: () => request("GET", "/ordenes-compra"),
+    listar: (sedes) => request("GET", `/ordenes-compra${conQuery({ sedeIds: sedes })}`),
     crear: (o) => request("POST", "/ordenes-compra", o),
     enviar: (id) => request("PATCH", `/ordenes-compra/${id}/enviar`),
     recibir: (id) => request("PATCH", `/ordenes-compra/${id}/recibir`),
