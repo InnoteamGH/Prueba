@@ -101,7 +101,11 @@ Cada bloque dice qué llama el frontend y qué espera. **Negrita = campo o pará
 - **Validar al crear o mover una cita:**
   - que el doctor atienda en esa sede y a esa hora;
   - que el sillón sea de esa sede;
-  - que no haya cruces del doctor ni del paciente, también en la otra sede.
+  - que no haya cruces del doctor ni del paciente, también en la otra sede;
+  - **que la fecha y hora no hayan pasado** (hora de Lima): `POST /citas` y `PUT /citas/{id}` responden **422** con un mensaje legible;
+  - al pasar una cita a `en_atencion`, que no haya otra `en_atencion` en el mismo `sedeId` + `sillon`.
+- **Alta rápida desde Agendar:** el frontend crea el paciente (`POST /pacientes`, con `fechaNacimiento`, `telefono` y, si es menor, `apoderadoNombre`, `apoderadoParentesco`, `apoderadoDni`, `apoderadoTelefono`) y enseguida la cita. Si la cita falla, la ficha queda creada; lo ideal es un endpoint que haga las dos cosas en una transacción.
+- **Cancelar:** `PATCH /citas/{id}/estado?estado=cancelada&motivo=` ofrece el cupo a la lista de espera **solo si la cita es futura** y devuelve, por ejemplo, **`cupoOfrecidoA`** (nombre). Con sesión, el frontend ya no inventa a quién se ofreció: muestra lo que diga el servidor.
 
 **Recordatorios** (dependen de tener WhatsApp conectado)
 - `GET /automatizaciones`.
@@ -115,8 +119,10 @@ Cada bloque dice qué llama el frontend y qué espera. **Negrita = campo o pará
 - `GET /conversaciones`.
 - `GET/POST /conversaciones/{id}/mensajes`.
 - `PATCH /conversaciones/{id}/modo?modo=ia|humano`.
-- Agendar desde el chat usa el mismo `POST /citas`, con la sede activa del usuario.
-- La tarjeta del paciente no muestra datos de pacientes de otra sede. Para eso el backend debe devolver `pacienteId` y la sede en cada conversación.
+- «Agendar cita» desde el chat abre el mismo modal de la agenda (`POST /citas`, canal `whatsapp`), con el paciente del chat ya elegido o, si no es paciente, con el alta rápida precargada con nombre y celular.
+- `GET /conversaciones` debe devolver **`pacienteId`** (o `esPaciente`) y la **sede** de cada conversación: con eso se precarga el paciente, se oculta «Registrar como paciente» y no se ven datos de otra sede.
+- Falta un endpoint para ligar un chat a una ficha existente, por ejemplo **`PATCH /conversaciones/{id}` con `pacienteId`**.
+- `GET /conversaciones/{id}/mensajes`: **`creadoEn` en ISO con zona horaria**, para ordenar y mostrar la hora en 24 h.
 
 **Caja (recepción o administrador de sede)**
 - **Apertura:**
@@ -219,11 +225,16 @@ Marcar ✅ o ❌ y anotar el detalle.
 | R3 | Agenda › Agendar cita a ese paciente (servicio, doctor, fecha, hora) | Solo ofrece la sede A y sus doctores. Muestra el precio de la sede A. La cita aparece en Día y en Semana |
 | R4 | Agendar a un paciente nuevo desde el mismo modal | Se registra el paciente en la sede A y la cita queda creada |
 | R5 | Intentar agendar al doctor fuera de su horario o en un sillón ocupado | Bloquea con un mensaje claro |
-| R6 | Confirmar, marcar llegada, reprogramar (arrastrando en el calendario) y cancelar con motivo | Cada cambio de estado se refleja; al cancelar ofrece el cupo a la lista de espera de la sede A |
+| R6 | Confirmar, marcar llegada, reprogramar (arrastrando en el calendario) y cancelar con motivo | Cada cambio de estado se refleja; al cancelar una cita futura ofrece el cupo a la lista de espera de la sede A (una cita que ya pasó no) |
+| R6b | Vista Día: ir a mañana con ‹ › o el selector de fecha; confirmar y cancelar una cita de mañana. En Semana/Mes, tocar una cita | Las acciones funcionan para días futuros; el clic en una cita abre su panel con acciones y «Abrir historia clínica» |
+| R6c | Intentar agendar o reprogramar en una fecha u hora que ya pasó | No deja: mensaje claro y botón deshabilitado |
+| R6d | Agendar › «Agregar nuevo paciente» con DNI incompleto, sin celular o sin nacimiento | No deja crearlo; con datos válidos se crea recién al confirmar la cita. Un DNI que ya existe ofrece «Usar su ficha» |
+| R6e | Vista Semana | Muestra los 7 días (incluido el domingo); la cabecera y «Descargar» dan la misma cifra («N citas · M canceladas») |
 | R7 | Vistas Semana / Mes / Por doctor / Por sillón | Solo sillones, doctores y citas de A |
 | R8 | Recordatorios: apagar uno y volver a entrar | Solo ese queda apagado; los demás siguen igual |
 | R9 | Recordatorios: pendientes por reactivar e historial | Solo pacientes de A |
-| R10 | WhatsApp: abrir un chat, responder y agendar desde el chat | El mensaje sale; la cita se crea en la sede A |
+| R10 | WhatsApp: abrir un chat, responder y agendar desde el chat | El mensaje sale; «Agendar cita» abre el modal con el paciente del chat; la cita se crea en la sede A |
+| R10b | WhatsApp: chat de un número que no es paciente › «Registrar como paciente» | Abre el alta con nombre y celular precargados; en chats de pacientes ese botón no aparece |
 | R11 | Caja › Abrir caja con fondo en soles y en dólares | Caja abierta de la sede A, con la hora |
 | R12 | Cobrar en soles a un paciente con un tratamiento terminado | Baja «Por cobrar», sube «Cobrado hoy» y se emite el comprobante (serie de la sede A) |
 | R13 | Cobrar en dólares; cambiar el TC antes de confirmar | El monto se recalcula con el TC nuevo y no deja cobrar más que el saldo. La boleta sale en US$ con el TC y el equivalente en soles, igual desde el cobro y desde «Comprobantes de hoy». «Cobrado hoy» dice «S/ X (incluye US$ Y)» |
@@ -237,7 +248,7 @@ Marcar ✅ o ❌ y anotar el detalle.
 | # | Prueba | Resultado esperado |
 |---|---|---|
 | D1 | Entrar con el usuario del doctor; Agenda | Solo sus citas; puede elegir la sede A, la B o ambas en el menú |
-| D2 | Iniciar la atención de una cita de hoy | Abre la historia clínica del paciente |
+| D2 | Agenda del doctor: la acción principal sigue el orden Confirmar (futura) → Marcar llegada (hoy) → Iniciar → Finalizar → Evolución | «Iniciar» abre la atención; «Finalizar» y «Evolución» abren la historia clínica. No deja iniciar si el sillón ya tiene a otro paciente en atención |
 | D3 | Historia clínica: datos, alergias, antecedentes y pestañas | Carga todo, sin errores |
 | D4 | Odontograma › fase inicial: marcar hallazgos y guardar | Al volver a entrar se ve exactamente lo guardado (sin dibujos de ejemplo) |
 | D5 | Pasar a las fases evolución y alta, y guardar | En la ficha, «Evolución visual» muestra las 3 fotos por fase y la tabla de hallazgos |
@@ -262,4 +273,55 @@ Marcar ✅ o ❌ y anotar el detalle.
 
 ## 6. Resultado del QA en la demostración (antes de producción)
 
-Se probó en la demostración (sin backend) con Playwright, con los perfiles de recepción y de doctor. Los resultados están en la sección 6.1.
+Se recorrieron en la demostración (sin backend), con Playwright y zona horaria de Lima, los flujos que se van a probar en producción, con los perfiles de **recepción** (sede San Isidro) y de **doctora** (dos sedes). Todo lo que se encontró quedó corregido en este ZIP. Lo que depende del servidor está en la sección 3.
+
+Pruebas automáticas: `npm test` → 130 pruebas, 127 pasan. Las 3 que fallan ya fallaban antes y no tocan estos flujos.
+
+### 6.1 Recepción
+
+| Flujo | Qué se encontró | Estado |
+|---|---|---|
+| Agenda | El menú «⋯» de cada fila salía corrido y el clic caía en **otro paciente** (también en Pacientes) | ✅ Corregido |
+| Agenda | Se podía agendar y reprogramar en fechas u horas pasadas | ✅ Bloqueado, con mensaje |
+| Agenda | No había forma de confirmar o cancelar citas de días futuros | ✅ Día navegable (‹ Hoy › y fecha) y panel de la cita desde el calendario |
+| Agenda | La semana no mostraba el domingo; tres cifras distintas para la misma semana | ✅ 7 días y una sola cuenta («N citas · M canceladas») |
+| Agenda | Alta rápida de paciente sin validar (DNI «123», sin celular) y creada aunque no se agende | ✅ Valida igual que Pacientes y se crea al confirmar la cita |
+| Agenda | Esc en un desplegable cerraba todo el modal | ✅ Corregido |
+| Agenda | Cancelar una cita pasada ofrecía su cupo; motivo del choque escondido; dos pacientes a la vez en un sillón | ✅ Corregidos |
+| Apertura de historia | DNI duplicado aceptado; recepción podía borrar pacientes con historia; la ficha no se abría al crear | ✅ Corregidos (el servidor debe validar el DNI también, punto 3.1) |
+| Apertura de historia | El saldo de un mismo paciente no coincidía entre pantallas (S/ 800 vs S/ 450) | ✅ Misma cifra por sede en todas; aviso «+ S/ X en otra sede» |
+| Recordatorios | El historial de envíos no tenía acceso; los interruptores no se guardaban; «Recordar» creaba una cita inventada | ✅ Pestaña «Historial de envíos»; ajustes guardados; solo envía el mensaje |
+| WhatsApp | «Agendar cita» creaba una cita basura en lugar de abrir el modal | ✅ Abre el modal con el paciente del chat (o el alta precargada) |
+| WhatsApp | «Registrar como paciente» aparecía para pacientes; horas en dos formatos y desordenadas | ✅ Corregidos |
+| Caja | La boleta de un cobro en dólares decía US$ 150 cuando se cobró US$ 40 | ✅ Boleta en US$ con TC y equivalente en soles, igual en todas las vistas |
+| Caja | Cambiar el TC después de elegir dólares cobraba más que el saldo | ✅ Recalcula y no deja pasar el saldo |
+| Caja | El cierre aceptaba no contar los dólares; el historial no guardaba US$ ni observaciones | ✅ Conteo y justificación por moneda; historial completo |
+| Caja | Reabrir la caja el mismo día contaba dos veces los cobros | ✅ Cada apertura es una sesión (el servidor debe soportarlo, punto 3.1) |
+| Caja | Egresos: recepción no podía desde Caja pero sí desde «+»; dólares fuera del neto; «Cobrado hoy» contaba dos veces | ✅ Regla única; neto y cifras en ambas monedas; Plin, Movilidad y Caja chica |
+| Caja | Boleta sin DNI e importes que no sumaban | ✅ Corregido |
+| Consolidado | Los KPIs no seguían los filtros; filtros escondidos; no estaba en el menú | ✅ Filtros de doctor y estado visibles, KPIs al día, entrada en el menú |
+
+### 6.2 Doctor
+
+| Flujo | Qué se encontró | Estado |
+|---|---|---|
+| Odontograma evolutivo | Evolución y alta aparecían vacías al volver y se sobrescribían; mirar una fase creaba una toma vacía | ✅ Cada fase conserva lo suyo; abre en la fase más reciente con marcas |
+| Presupuesto | El plan impreso usaba otras tarifas que Plan y cuenta | ✅ Un solo presupuesto imprimible con los precios de la sede |
+| Presupuesto | Ítems recién presupuestados decían «Aprobado» | ✅ «Por realizar» |
+| Fotos y radiografías | Las fotos llenaban el almacenamiento sin aviso | ✅ Se reducen al subir y avisa si no hay espacio |
+| Fotos y radiografías | El módulo abría con el primer paciente de la lista | ✅ Abre con el paciente que se está atendiendo |
+| Agenda | «Finalizar» y «Evolución» no abrían la ficha; el doctor no veía «Marcar llegada» | ✅ Abren la historia clínica; acción principal según el estado |
+| Historia clínica | En la demo no se guardaban alergias, antecedentes ni la ficha clínica | ✅ Se guardan (con sesión ya lo hacía el servidor) |
+| Evolución | «Atendido por» no venía con la doctora de la sesión; el anexo se perdía | ✅ Corregidos |
+| Receta | Las recetas del módulo no validaban alergias; la impresa no llevaba COP; no se podía imprimir desde el módulo | ✅ Corregidos |
+| Tratamiento terminado | «Terminar» sin confirmación; el médico veía botones de cobro | ✅ Pide confirmar; el cobro queda para recepción en Caja |
+| Consolidado | El estado no coincidía con la agenda | ✅ Mismo estado en pantalla y en el Excel |
+| Varios | Montos cortados en el Resumen de la ficha; marca distinta en el menú y en los documentos | ✅ Corregidos |
+
+### 6.3 Lo que solo se puede comprobar con el backend
+
+- Que el servidor **filtre por sede** cada listado (prueba S5 de la sección 5).
+- DNI único entre sedes, borrado de pacientes con historia, citas en el pasado y sillón ocupado (validaciones del servidor).
+- Sesiones de caja (`aperturaId`), campos en dólares del cierre y de la boleta.
+- WhatsApp: `pacienteId` en cada conversación y la hora de los mensajes con zona horaria.
+- Persistencia real de imágenes (URL permanente) y del odontograma por fase.
