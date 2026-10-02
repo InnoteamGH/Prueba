@@ -238,8 +238,9 @@ export const api = {
   citas: {
     // El backend ya aceptaba desde+hasta; solo faltaba pedirselo. Sin rango, el
     // calendario pedia fecha=all y se traia TODO el historico de la clinica.
-    listar: (fecha, desde, hasta) => request("GET",
-      desde && hasta ? `/citas?desde=${desde}&hasta=${hasta}` : `/citas${fecha ? `?fecha=${fecha}` : ""}`),
+    // sedeIds (opcional): solo las citas de esas sedes (filtro de sede del menú).
+    listar: (fecha, desde, hasta, sedeIds) => request("GET",
+      desde && hasta ? `/citas${conQuery({ desde, hasta, sedeIds })}` : `/citas${conQuery({ fecha, sedeIds })}`),
     crear: (c) => request("POST", "/citas", c),
     actualizar: (id, c) => request("PUT", `/citas/${id}`, c),
     cambiarEstado: (id, estado, motivo) => request("PATCH", `/citas/${id}/estado?estado=${estado}${motivo ? `&motivo=${encodeURIComponent(motivo)}` : ""}`),
@@ -405,7 +406,7 @@ export const api = {
     eliminar: (id) => request("DELETE", `/egresos/${id}`),
   },
   espera: {
-    listar: () => request("GET", "/espera"),
+    listar: (sedeIds) => request("GET", `/espera${conQuery({ sedeIds })}`),
     crear: (e) => request("POST", "/espera", e),
     resolver: (id) => request("DELETE", `/espera/${id}`),
   },
@@ -487,8 +488,8 @@ export const api = {
   automatizaciones: {
     listar: () => request("GET", "/automatizaciones"),
     actualizar: (clave, cfg) => request("PUT", `/automatizaciones/${clave}`, cfg),
-    historial: () => request("GET", "/automatizaciones/historial"),
-    recallPendientes: () => request("GET", "/automatizaciones/recall-pendientes"),
+    historial: (sedeIds) => request("GET", `/automatizaciones/historial${conQuery({ sedeIds })}`),
+    recallPendientes: (sedeIds) => request("GET", `/automatizaciones/recall-pendientes${conQuery({ sedeIds })}`),
     enviarRecall: (pacienteId) => request("POST", `/automatizaciones/recall/${pacienteId}`),
     probar: (clave, telefono) => request("POST", `/automatizaciones/${clave}/probar`, { telefono }),
     probarHsm: (clave, telefono) => request("POST", `/automatizaciones/${clave}/probar-hsm`, { telefono }),
@@ -582,7 +583,7 @@ export const api = {
     borrar: (id) => request("DELETE", `/ortodoncia/${id}`),
   },
   resenas: {
-    listar: () => request("GET", "/resenas"),
+    listar: (sedeIds) => request("GET", `/resenas${conQuery({ sedeIds })}`),
     crear: (r) => request("POST", "/resenas", r),
     marcar: (id, respondida) => request("PATCH", `/resenas/${id}`, { respondida }),
   },

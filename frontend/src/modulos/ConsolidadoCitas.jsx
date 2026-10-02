@@ -1,13 +1,15 @@
 /* Consolidado de citas: todas las citas de un rango, por estado, por doctor y por día.
  *
- * Recepción ve toda la clínica (sedes a su cargo); el doctor solo sus citas.
- * Conectado: GET /citas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (el backend ya restringe por rol).
- * Demo: usa las citas en memoria de la agenda.
+ * Recepción ve las sedes a su cargo (o la elegida en el menú); el doctor solo sus citas.
+ * Conectado: GET /citas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&sedeIds=… (el backend restringe por rol;
+ * además se filtra aquí por si aún no aplica la sede).
+ * Demo: usa las citas en memoria de la agenda (ya filtradas por sede).
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarRange, CheckCircle2, Clock, Download, UserX, XCircle, Users, CalendarDays, Stethoscope, TrendingUp } from "lucide-react";
 import api from "../api/client";
-import { ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, exportarExcel, colorDe } from "../comun";
+import { sedeApiUuid } from "../routing";
+import { ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, exportarExcel, colorDe, useSede } from "../comun";
 import { estadoCita } from "../compartido/estados";
 
 const PROGRAMADA = ["pendiente", "confirmada", "en_sala", "en_atencion"];
@@ -17,6 +19,9 @@ const ymd = (d) => fmt(d);
 
 export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuario, conectado, notify = () => {}, onAbrirCita }) {
   const esMedico = rol === "medico";
+  // Sedes que se ven con el filtro del menú: KPIs, tabla y Excel cuentan solo esas.
+  const { sede, ids: sedesVer, enSede, global } = useSede();
+  const sedesKey = (sedesVer || []).join(",");
   const [preset, setPreset] = useState("semana");
   const [rango, setRango] = useState(() => ({ desde: ymd(lunes(hoy)), hasta: ymd(addDaysD(lunes(hoy), 6)) }));
   const [remotas, setRemotas] = useState(null);
@@ -33,19 +38,20 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
   useEffect(() => {
     if (!conectado) return;
     setCargando(true);
-    api.citas.listar(null, rango.desde, rango.hasta)
+    api.citas.listar(null, rango.desde, rango.hasta, sedesVer ? sedesVer.map(sedeApiUuid).filter(Boolean) : null)
       .then((r) => setRemotas((r || []).map((c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || "Sin asignar", sede: c.sedeId, sedeNombre: c.sede || "", fecha: (c.fecha || "").slice(0, 10), hora: (c.hora || "").slice(0, 5), motivo: c.motivo || "", estado: c.estado }))))
       .catch(() => { setRemotas([]); notify("No se pudieron cargar las citas del rango."); })
       .finally(() => setCargando(false));
-  }, [conectado, rango.desde, rango.hasta]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, rango.desde, rango.hasta, sedesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const miId = esMedico && !conectado ? (medicos.find((m) => m.nombre === usuario?.nombre) || medicos[0] || {}).id : null;
   const nomMed = (c) => c.medico || (medicos.find((m) => m.id === c.medicoId) || {}).nombre || "Sin asignar";
   const filas = useMemo(() => {
-    const base = conectado ? (remotas || []) : citas.filter((c) => c.fecha >= rango.desde && c.fecha <= rango.hasta && (miId == null || c.medicoId === miId));
+    const base = (conectado ? (remotas || []) : citas.filter((c) => c.fecha >= rango.desde && c.fecha <= rango.hasta && (miId == null || c.medicoId === miId)))
+      .filter((c) => enSede(c.sede));
     return base.map((c) => ({ ...c, medico: nomMed(c), sedeNombre: c.sedeNombre || nombreSede(c.sede) || "" }))
       .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
-  }, [conectado, remotas, citas, rango.desde, rango.hasta, miId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, remotas, citas, rango.desde, rango.hasta, miId, sedesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const k = useMemo(() => {
     const cnt = (f) => filas.filter(f).length;
@@ -66,7 +72,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
 
   const badge = (e) => { const b = ESTADO_BADGE[e] || { l: e, bg: "var(--dc-bg)", fg: "var(--dc-ink-500)" }; return <span className="dc-pill" style={{ background: b.bg, color: b.fg }}>{b.l}</span>; };
   const exportar = () => exportarExcel({
-    nombreArchivo: `citas_${rango.desde}_${rango.hasta}.xlsx`, hoja: "Citas", titulo: `Consolidado de citas — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`,
+    nombreArchivo: `citas_${rango.desde}_${rango.hasta}.xlsx`, hoja: "Citas", titulo: `Consolidado de citas${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`,
     columnas: [{ key: "fecha", label: "Fecha", w: 12 }, { key: "hora", label: "Hora", w: 8 }, { key: "paciente", label: "Paciente", w: 26 }, { key: "medico", label: "Doctor", w: 24 }, { key: "motivo", label: "Motivo", w: 26 }, { key: "estadoL", label: "Estado", w: 14 }, { key: "sedeNombre", label: "Sede", w: 16 }],
     filas: filas.map((c) => ({ ...c, estadoL: (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado })),
   }).catch(() => notify("No se pudo generar el Excel."));
@@ -84,7 +90,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       <section className="dc-cons__hero">
         <div>
           <span className="dc-cons__ico"><CalendarRange size={22} strokeWidth={1.9} /></span>
-          <div><h2>Consolidado de citas</h2><p>{esMedico ? "Tus citas en el rango elegido" : "Todas las citas de la clínica en el rango elegido"}</p></div>
+          <div><h2>Consolidado de citas</h2><p>{esMedico ? "Tus citas en el rango elegido" : sede !== "all" ? `Citas de ${nombreSede(sede)} en el rango elegido` : global ? "Todas las citas de la clínica en el rango elegido" : "Citas de tus sedes en el rango elegido"}</p></div>
         </div>
         <div className="dc-cons__rango">
           <div className="dc-moneda-sel" role="radiogroup" aria-label="Rango">

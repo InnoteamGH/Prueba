@@ -2,14 +2,23 @@
 import React, { useContext, useState, useEffect } from "react";
 import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
-import {DatosDemoCtx, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, tint, PersonaCelda} from "../comun";
+import { sedeApiUuid } from "../routing";
+import {DatosDemoCtx, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, mismaSede, nombreSede, sedesDe, tint, useSede, PersonaCelda} from "../comun";
 import { porReactivar } from "../compartido/metricas";
+import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 
-function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "automatizaciones" }) {
+function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
   // Es una acción que sale de la clínica: quien solo consulta no la lanza.
   const puedeEnviar = can ? can("recall", "crear") : true;
   const conectado = !!auth.token;
+  // Sede: cola, historial y NPS son de las sedes que se ven con el filtro del menú.
+  const { sede: sedeFiltro, ids: sedesVer, enSede, global, activa } = useSede();
+  const sedeActiva = sedeActivaProp ?? activa;   // donde se registra la cita del recall
+  const sedesKey = (sedesVer || []).join(",");
+  const sedesQ = sedesVer ? sedesVer.map(sedeApiUuid).filter(Boolean) : null;
+  // Con API, una fila sin sede (el servidor aún no la manda) se deja ver.
+  const deSedeApi = (x) => enSede(x?.sedeId ?? x?.sedeRegistroId ?? null);
   // Icono + color por automatización (la lógica y las plantillas viven en el backend).
   const AUT_META = {
     confirmacion: { icon: CalendarCheck, color: DS.c.primary },
@@ -43,11 +52,12 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
   const cargar = () => {
     if (!conectado) return;
     api.automatizaciones.listar().then((r) => { if (r?.automatizaciones) setReglas(mapReglas(r.automatizaciones)); setResumen(r?.resumen || null); }).catch(() => {});
-    api.automatizaciones.historial().then((h) => setHistReal(h || [])).catch(() => setHistReal([]));
-    api.automatizaciones.recallPendientes().then((r) => setCola((r || []).map((x) => ({ id: x.id, nombre: x.nombre, ultima: x.ultimaVisita, telefono: x.telefono, estado: x.contactado ? "enviado" : "por_contactar" })))).catch(() => {});
-    api.resenas.listar().then((rs) => setResenasNps(rs || [])).catch(() => setResenasNps([]));
+    api.automatizaciones.historial(sedesQ).then((h) => setHistReal((h || []).filter(deSedeApi))).catch(() => setHistReal([]));
+    api.automatizaciones.recallPendientes(sedesQ).then((r) => setCola((r || []).filter(deSedeApi).map((x) => ({ id: x.id, nombre: x.nombre, ultima: x.ultimaVisita, telefono: x.telefono, estado: x.contactado ? "enviado" : "por_contactar" })))).catch(() => {});
+    api.resenas.listar(sedesQ).then((rs) => setResenasNps((rs || []).filter(deSedeApi))).catch(() => setResenasNps([]));
   };
-  useEffect(() => { cargar(); }, []); // eslint-disable-line
+  // Al cambiar la sede del menú se vuelve a pedir todo (cola, historial y reseñas).
+  useEffect(() => { cargar(); }, [sedesKey]); // eslint-disable-line
   // Cada interruptor es independiente. Se manda la regla completa (no solo `activo`) y,
   // al recargar, si el servidor devolvió apagadas otras reglas que nadie tocó, se
   // restauran: un PUT que reemplazaba toda la configuración apagaba las demás.
@@ -109,6 +119,13 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
   const dbRec = useContext(DatosDemoCtx);
   const [atendidosBajos, setAtendidosBajos] = useState([]);
   const [cola, setCola] = useState(() => conectado ? [] : porReactivar(pacientes, dbRec?.citas || []).map((p) => ({ ...p, estado: "por_contactar" })));
+  // La cola sigue al filtro de sede: al cambiar los pacientes visibles se recalcula y se
+  // conserva lo ya enviado (antes quedaba la lista de la sede anterior y «Enviar a todos»
+  // escribía a pacientes de otra sede).
+  useEffect(() => {
+    if (conectado) return;
+    setCola((prev) => porReactivar(pacientes, dbRec?.citas || []).map((p) => ({ ...p, estado: (prev.find((x) => x.id === p.id) || {}).estado || "por_contactar" })));
+  }, [pacientes]); // eslint-disable-line react-hooks/exhaustive-deps
   const enviar = (id) => {
     const p = cola.find((x) => x.id === id);
     setCola((c) => c.map((x) => x.id === id ? { ...x, estado: "enviado" } : x));
@@ -117,8 +134,11 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
       return;
     }
     if (p && setCitas) {
-      const med = MEDICOS.find((m) => espsDe(m).includes(1)) || MEDICOS[0];
-      setCitas((cs) => [...cs, { id: Date.now(), paciente: p.nombre, dni: p.dni || "—", medicoId: med.id, esp: 1, sede: (p.sede || sedeActiva), fecha: addDays(7), hora: "10:00", motivo: "Control de rutina (recall)", estado: "pendiente", llegada: false }]);
+      // La cita va a la sede que se está mirando si el paciente se atiende ahí; si no, a la
+      // suya. El doctor es uno de odontología general que trabaje en esa sede, con su precio.
+      const sede = sedesDe(p).some((x) => mismaSede(x, sedeActiva)) ? sedeActiva : (p.sede ?? sedesDe(p)[0] ?? sedeActiva);
+      const med = MEDICOS.find((m) => espsDe(m).includes(1) && sedesDe(m).some((x) => mismaSede(x, sede)));
+      if (med) setCitas((cs) => [...cs, { id: Date.now(), paciente: p.nombre, pacienteId: p.id, dni: p.dni || "—", medicoId: med.id, esp: 1, sede, precio: precioCita(dbRec?.catalogo || CATALOGO_SEED, 1, sede) ?? undefined, fecha: addDays(7), hora: "10:00", motivo: "Control de rutina (recall)", estado: "pendiente", llegada: false }]);
     }
     notify(`Recordatorio enviado a ${p?.nombre || "paciente"}.`);
   };
@@ -169,7 +189,11 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
     { paciente: "Lucía Vega", nps: 9, calificacion: 5, comentario: "La endodoncia me daba miedo y fue muy tranquila. Gracias, Dra. Quispe." },
   ];
   const ESTADO_ENVIO = { entregado: { l: "Entregado", bg: "var(--dc-line)", fg: "var(--dc-ink-700)", ic: Check }, leido: { l: "Leído", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)", ic: CheckCircle2 }, respondido: { l: "Respondió", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)", ic: MessageSquare }, error: { l: "No enviado", bg: "var(--dc-fee2)", fg: "var(--dc-danger-700)", ic: AlertTriangle } };
-  const histView = (histReal && histReal.length ? histReal : (conectado ? [] : HIST_ENVIOS));
+  // Demostración: los envíos y respuestas de ejemplo se cruzan con los pacientes visibles
+  // (filtro de sede); el NPS de una sede no mezcla comentarios de otra.
+  const deMisPacientes = (h) => !pacientes || pacientes.some((p) => p.nombre === h.paciente || (h.pacienteId != null && String(p.id) === String(h.pacienteId)));
+  const histView = (histReal && histReal.length ? histReal : (conectado ? [] : HIST_ENVIOS.filter(deMisPacientes)));
+  const tituloNps = sedeFiltro !== "all" ? `NPS de ${nombreSede(sedeFiltro)}` : global ? "NPS de la clínica" : "NPS de tus sedes";
   // RCL-01 / M-14: el banner cuenta los mensajes del mes que lista el Historial (misma fuente).
   const mesEnv = (() => {
     const mes = fmt(hoy).slice(0, 7);
@@ -180,7 +204,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       {subtab === "satisfaccion" ? (() => {
-        const fuenteResenas = (resenasNps && resenasNps.length) ? resenasNps : (conectado ? [] : RESENAS_DEMO);
+        const fuenteResenas = (resenasNps && resenasNps.length) ? resenasNps : (conectado ? [] : RESENAS_DEMO.filter(deMisPacientes));
         const rs = fuenteResenas.filter((r) => r.nps != null);
         const n = rs.length;
         const prom = rs.filter((r) => r.nps >= 9).length, det = rs.filter((r) => r.nps <= 6).length, pas = n - prom - det;
@@ -194,7 +218,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva = 1, can, tab = "autom
         <>
           <section className="dc-sat-hero">
             <div className="dc-sat-hero__nps">
-              <span className="dc-sat-hero__eti">NPS de la clínica</span>
+              <span className="dc-sat-hero__eti">{tituloNps}</span>
               <b>{n ? (nps > 0 ? `+${nps}` : `${nps}`) : "—"}</b>
               <span>{n ? `${n} ${n === 1 ? "respuesta" : "respuestas"} a la encuesta` : "Aún sin respuestas"}</span>
             </div>

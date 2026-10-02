@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useMemo, useContext } from "react";
 import { AlertCircle, AlertTriangle, BellRing, CalendarCheck, Check, ChevronRight, Clock, Lock, MapPin, Repeat, Send, Trash2, X } from "lucide-react";
 import api, { auth } from "../api/client";
+import { sedeApiUuid } from "../routing";
 import { DISP_DEMO } from "../compartido/sillones";
-import {DatosDemoCtx, Pestanas, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, nombreSede, puede, toMin, tint} from "../comun";
+import {DatosDemoCtx, Pestanas, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, mismaSede, nombreSede, puede, sedesDe, toMin, tint, useSede} from "../comun";
 
 function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica = { horario: {}, feriados: [] } }) {
   // Los días y las horas los pone el horario de la clínica, no este módulo: es lo que
@@ -55,6 +56,26 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   const miMedId = (MEDICOS.find((m) => m.nombre === usuario?.nombre) || {}).id ?? null;
   const misBloquesDemo = (demoDb?.dispMedicos || DISP_DEMO).filter((d) => d.medicoId === miMedId);
   const [jornadaCargada, setJornadaCargada] = useState(null);
+  // Cada turno es de una sede (mañana en una, tarde en otra). Al guardar se conserva la sede
+  // de cada turno; un día que se abre de nuevo va a la sede elegida aquí (si atiende en varias).
+  const { activa, enSede, esMia } = useSede();
+  const sedesDoc = (() => { const m = MEDICOS.find((x) => x.id === miMedId); const ss = m ? sedesDe(m) : []; return ss.length ? ss : MIS_SEDES.filter((x) => x != null); })();
+  const [sedeNueva, setSedeNueva] = useState(() => sedesDoc.find((x) => mismaSede(x, activa)) ?? sedesDoc[0] ?? null);
+  const [filasMias, setFilasMias] = useState([]);   // con sesión: los turnos guardados (con su sede)
+  /** Mueve los bordes de la jornada sin perder la sede de cada turno: el que empezaba con la
+      jornada anterior empieza con la nueva, el que terminaba con ella termina con la nueva,
+      y todo se recorta al nuevo rango. */
+  const ajustarBloques = (bloques) => {
+    const ant = jornadaCargada || jornada;
+    return bloques.map((b) => {
+      let ini = String(b.horaInicio).slice(0, 5), fin = String(b.horaFin).slice(0, 5);
+      if (ini === ant.ini) ini = jornada.ini;
+      if (fin === ant.fin) fin = jornada.fin;
+      if (ini < jornada.ini) ini = jornada.ini;
+      if (fin > jornada.fin) fin = jornada.fin;
+      return { ...b, horaInicio: ini, horaFin: fin };
+    }).filter((b) => b.horaInicio < b.horaFin);
+  };
   useEffect(() => {
     if (conectado || miMedId == null || !misBloquesDemo.length) return;
     setDiasAtiende(DOW_SEMANA.map((d) => misBloquesDemo.some((b) => Number(b.diaSemana) === d)));
@@ -66,11 +87,16 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
     if (!conectado) return;
     api.disponibilidad.listar().then((rows) => {
       if (!Array.isArray(rows) || !rows.length) return;
+      // Solo si son los turnos de un único doctor (los suyos) sirven para conservar la sede al guardar.
+      setFilasMias(new Set(rows.map((d) => String(d.medicoId ?? ""))).size <= 1 ? rows : []);
+      const r0j = rows.map((d) => String(d.horaInicio || "").slice(0, 5)).filter(Boolean).sort()[0];
+      const rfj = rows.map((d) => String(d.horaFin || "").slice(0, 5)).filter(Boolean).sort().slice(-1)[0];
+      if (r0j && rfj) setJornadaCargada({ ini: r0j, fin: rfj });
       const dias = [false, false, false, false, false, false];
       rows.forEach((d) => { const idx = (Number(d.diaSemana) || 0) - 1; if (idx >= 0 && idx < 6) dias[idx] = true; });
       setDiasAtiende(dias);
-      const r0 = rows[0];
-      if (r0?.horaInicio && r0?.horaFin) setJornada({ ini: String(r0.horaInicio).slice(0, 5), fin: String(r0.horaFin).slice(0, 5) });
+      // La jornada va de la primera entrada a la última salida (antes se tomaba solo el primer turno).
+      if (r0j && rfj) setJornada({ ini: r0j, fin: rfj });
     }).catch(() => {});
   }, []); // eslint-disable-line
   const guardarDisp = async () => {
@@ -86,8 +112,11 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
         DOW_SEMANA.forEach((dow, i) => {
           if (!diasAtiende[i]) return;
           const delDia = mios.filter((d) => Number(d.diaSemana) === dow);
-          if (delDia.length && !cambioJornada) nuevos.push(...delDia);
-          else nuevos.push({ id: `d${miMedId}-${dow}-${Date.now()}`, medicoId: miMedId, sede: null, diaSemana: dow, horaInicio: jornada.ini, horaFin: jornada.fin });
+          if (delDia.length && !cambioJornada) { nuevos.push(...delDia); return; }
+          // Nunca un turno sin sede: el día conserva la suya o toma la elegida para días nuevos.
+          const aj = delDia.length ? ajustarBloques(delDia) : [];
+          if (aj.length) nuevos.push(...aj);
+          else nuevos.push({ id: `d${miMedId}-${dow}-${Date.now()}`, medicoId: miMedId, sede: delDia[0]?.sede ?? sedeNueva, diaSemana: dow, horaInicio: jornada.ini, horaFin: jornada.fin });
         });
         return [...otros, ...nuevos];
       });
@@ -95,7 +124,16 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
       notify("Disponibilidad guardada. La agenda ya no te cita fuera de estos días y horas.");
       return;
     }
-    const dias = diasAtiende.map((on, idx) => on ? { diaSemana: idx + 1, horaInicio: jornada.ini, horaFin: jornada.fin } : null).filter(Boolean);
+    // Cada día manda sus turnos con la sede de cada uno (sedeId); un día nuevo, la sede elegida.
+    const dias = [];
+    diasAtiende.forEach((on, idx) => {
+      if (!on) return;
+      const delDia = filasMias.filter((d) => Number(d.diaSemana) === idx + 1);
+      const aj = delDia.length ? ajustarBloques(delDia) : [];
+      const sedeDia = delDia[0]?.sedeId ?? delDia[0]?.sede ?? sedeApiUuid(sedeNueva);
+      (aj.length ? aj : [{ horaInicio: jornada.ini, horaFin: jornada.fin, sedeId: sedeDia }])
+        .forEach((b) => dias.push({ diaSemana: idx + 1, horaInicio: b.horaInicio, horaFin: b.horaFin, sedeId: b.sedeId ?? b.sede ?? sedeDia }));
+    });
     setGuardandoDisp(true);
     try {
       await api.disponibilidad.guardarMi({ dias });
@@ -151,15 +189,19 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   const miMedico = MEDICOS.find((m) => m.nombre === usuario?.nombre) || MEDICOS[0];
   const miId = miMedico.id;
   const espNombre = ESPECIALIDADES.find((e) => e.id === miMedico.esp)?.nombre || "tu especialidad";
-  // Colegas que pueden cubrir una cita = otros médicos que tengan LA ESPECIALIDAD DE ESA CITA.
-  const colegasDeCita = (cita) => cita ? MEDICOS.filter((m) => m.id !== miId && espsDe(m).includes(cita.esp)) : [];
+  // Colegas que pueden cubrir una cita = otros médicos que tengan LA ESPECIALIDAD DE ESA CITA
+  // y trabajen en LA SEDE de la cita (si no, la cita quedaría con un doctor que no atiende ahí).
+  const atiendeEnSede = (m, sede) => sede == null || sedesDe(m).some((x) => mismaSede(x, sede));
+  const colegasDeCita = (cita) => cita ? MEDICOS.filter((m) => m.id !== miId && espsDe(m).includes(cita.esp) && atiendeEnSede(m, cita.sede)) : [];
   const espDeCita = (cita) => ESPECIALIDADES.find((e) => e.id === cita?.esp)?.nombre || "esa especialidad";
   const limiteEdicion = addDays(ANTICIP);            // solo se puede editar desde esta fecha (ISO comparable)
   const editableFecha = (f) => f >= limiteEdicion;
   // Cita del médico en una franja (en CUALQUIER sede → da visibilidad cruzada).
   const citaEn = (fecha, hora) => citas.find((c) => c.medicoId === miId && c.fecha === fecha && c.hora >= hora && c.hora < nextH(hora) && c.estado !== "cancelada");
   // Citas comprometidas dentro de la ventana de 1 semana (no se pueden cancelar; solo sustituir).
-  const comprometidas = citas.filter((c) => c.medicoId === miId && c.fecha >= fmt(hoy) && !editableFecha(c.fecha) && c.estado !== "cancelada" && c.estado !== "atendida").sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+  // La rejilla muestra las citas del doctor en todas sus sedes (para no cruzarse); la lista de
+  // sustituciones sigue el filtro de sede del menú.
+  const comprometidas = citas.filter((c) => c.medicoId === miId && enSede(c.sede) && c.fecha >= fmt(hoy) && !editableFecha(c.fecha) && c.estado !== "cancelada" && c.estado !== "atendida").sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
   const diasComprometidos = [...new Set(comprometidas.map((c) => c.fecha))];
   const citasDia = (fecha) => comprometidas.filter((c) => c.fecha === fecha);
 
@@ -181,6 +223,8 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
     const vistos = new Set(), out = [];
     for (const c of citas) {
       if (c.medicoId === miId || c.fecha < fmt(hoy) || c.estado === "cancelada" || c.estado === "atendida") continue;
+      // Solo citas de una sede donde este doctor atiende (y que el usuario puede ver).
+      if (!atiendeEnSede(miMedico, c.sede) || !esMia(c.sede)) continue;
       if (!espsDe(miMedico).includes(c.esp) || vistos.has(c.esp)) continue;
       const otro = MEDICOS.find((m) => m.id === c.medicoId);
       if (!otro || !espsDe(otro).includes(c.esp)) continue;
@@ -197,8 +241,8 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   const [sustDia, setSustDia] = useState(null);                 // fecha para "sustituir día completo"
   const [diaDest, setDiaDest] = useState({});                   // { citaId: medicoId } por cita del día
   const [alertaViaje, setAlertaViaje] = useState(null);         // conflicto de viaje al aceptar
-  const recibidas = solicitudes.filter((s) => s.tipo === "recibida");
-  const enviadas = solicitudes.filter((s) => s.tipo === "enviada");
+  const recibidas = solicitudes.filter((s) => s.tipo === "recibida" && enSede(s.sede));
+  const enviadas = solicitudes.filter((s) => s.tipo === "enviada" && enSede(s.sede));
   const pendientesRecibidas = recibidas.filter((s) => s.estado === "pendiente").length;
   const yaPedida = (citaId) => enviadas.find((e) => e.citaId === citaId);
 
@@ -343,6 +387,8 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
           <label style={{ fontSize: 13, color: "var(--dc-ink-700)", fontWeight: 500, display: "flex", alignItems: "center", gap: 7 }}>Atiendo de
             <TimeSelect value={jornada.ini} onChange={(v) => setJornada((j) => ({ ...j, ini: v }))} /> a
             <TimeSelect value={jornada.fin} onChange={(v) => setJornada((j) => ({ ...j, fin: v }))} /></label>
+          {sedesDoc.length > 1 && <label style={{ fontSize: 13, color: "var(--dc-ink-700)", fontWeight: 500, display: "flex", alignItems: "center", gap: 7 }} title="Los días que ya atiendes conservan la sede de cada turno">Días nuevos en
+            <Select small value={sedeNueva} onChange={setSedeNueva} options={sedesDoc.map((x) => ({ value: x, label: nombreSede(x) }))} /></label>}
           <label style={{ fontSize: 13, color: "var(--dc-ink-700)", fontWeight: 500, display: "flex", alignItems: "center", gap: 7 }}>Motivo:
             <input className="dc-premium-inp" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Cirugía, permiso..." style={{ ...inputT, width: 140 }} /></label>
         </div>
