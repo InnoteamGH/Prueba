@@ -54,7 +54,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import { medicoEnSedes } from "./compartido/medicosSede";
-import {SedeCtx, useSede, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {SedeCtx, useSede, mismaSede, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -8249,11 +8249,14 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   }, []);
   const [inventario, setInventario] = usePersist("inventario", INVENTARIO_INIT); // insumos (P2-1)
   // P2-1: al ejecutar/cobrar un procedimiento se descuentan los insumos usados.
-  const consumirInsumos = (proc = "") => {
+  // Descuenta el kit del procedimiento del stock de LA SEDE donde se atendió (cada sede
+  // tiene su propio almacén). Sin sede, la activa.
+  const consumirInsumos = (proc = "", sedeConsumo = null) => {
     const kit = ["Guantes de nitrilo (caja)", "Algodón en rollos", "Barbijos quirúrgicos"];
     if (/endodon|extrac|cirug|implante|corona/i.test(proc)) kit.push("Anestesia lidocaína 2%", "Agujas dentales cortas");
     if (/obtura|resina|reconstr/i.test(proc)) kit.push("Resina compuesta A2", "Ácido grabador 37%");
-    setInventario((its) => its.map((x) => kit.some((k) => x.nombre === k || x.nombre.includes(k)) ? { ...x, stock: Math.max(0, x.stock - 1) } : x));
+    const sd = sedeConsumo ?? sedeActivaRef.current;
+    setInventario((its) => its.map((x) => (x.sede == null || mismaSede(x.sede, sd)) && kit.some((k) => x.nombre === k || x.nombre.includes(k)) ? { ...x, stock: Math.max(0, x.stock - 1) } : x));
   };
   const [staff, setStaff] = usePersist("staff", STAFF_INIT);
   // Permisos por ROL a nivel de acción (defaults editables): { rol: { modId: [acciones] } }.
@@ -8557,6 +8560,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   };
   // Sede concreta donde se registran las cosas nuevas (nunca "all").
   const sedeActiva = sede === "all" ? (sedeDetectada ?? misSedes[0] ?? 1) : sede;
+  const sedeActivaRef = useRef(sedeActiva); sedeActivaRef.current = sedeActiva;
   // Contexto de sede para los módulos que no reciben props (modal de agendar, WhatsApp, etc.).
   // Doctores que atienden en las sedes que se ven (Agenda, Consolidado, asignar cupos).
   const medicosSede = useMemo(() => MEDICOS.filter((m) => { const ss = sedesDe(m).map(String); return !ss.length || idsSede.map(String).some((x) => ss.includes(x)); }), [idsSede]);
@@ -8591,7 +8595,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // P1-3: al cancelar una cita, ofrece el cupo al primer paciente compatible de la lista de espera.
   const ofrecerCupo = (cita) => {
     const espNom = ESPECIALIDADES.find((e) => e.id === cita.esp)?.nombre;
-    const target = espera.find((x) => !x.ofrecido.some((o) => o.includes("hoy")) && (x.e === espNom || x.e === "Odontología general" || x.medico === "Cualquiera"));
+    // Solo a quien espera en la sede de la cita cancelada y con un doctor que atiende ahí.
+    const medAtiendeAhi = (nom) => nom === "Cualquiera" || !nom || MEDICOS.some((m) => m.nombre === nom && sedesDe(m).some((x) => mismaSede(x, cita.sede)));
+    const target = espera.find((x) => !x.ofrecido.some((o) => o.includes("hoy")) && (x.sede == null || mismaSede(x.sede, cita.sede)) && medAtiendeAhi(x.medico) && (x.e === espNom || x.e === "Odontología general" || x.medico === "Cualquiera"));
     if (target) { setEspera((es) => es.map((x) => x.id === target.id ? { ...x, ofrecido: [...x.ofrecido, `Cupo ${cita.hora} ofrecido hoy`] } : x)); notify(`Cupo liberado ofrecido a ${target.n} (lista de espera) por WhatsApp.`); }
     else notify("Cupo liberado. No hay pacientes compatibles en la lista de espera.");
   };
@@ -8754,7 +8760,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "seguros": return <Seguros notify={notify} pacientes={pf} fichas={fichas} />;
       // Cambiar el plan es de toda la clínica: solo quien ve todas las sedes y puede editarlo.
       case "plan": return <Plan notify={notify} plan={plan} setPlan={setPlan} esSuper={esSuper} can={can} puedeCambiar={esSuper || (usuario.sedes === "all" && (!can || can("plan", "editar")))} />;
-      case "espera": return <Espera notify={notify} esp={espera} setEsp={setEspera} />;
+      // La lista se filtra por sede dentro de Espera (useSede) para no perder las entradas de otras sedes al guardar.
+      case "espera": return <Espera notify={notify} esp={espera} setEsp={setEspera} pacientes={pf} setPacientes={setPacientes} />;
       case "tickets": return <Tickets citas={cf} setCitas={setCitas} fichas={fichas} notify={notify} />;
       case "facturacion": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_apertura": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
