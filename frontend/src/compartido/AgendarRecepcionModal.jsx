@@ -3,12 +3,12 @@
    para que el módulo de WhatsApp pueda cargarse en su propio chunk. */
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { Calendar, Check, ChevronRight, Clock, MessageSquare, Phone, Plus, Search, User, AlertTriangle, Armchair, Info, Lock, Star } from "lucide-react";
-import { estadoSillones, evaluarCita, sugerirSillon, turnosDelDia, sillonesDeSede, etiquetaUso } from "./sillones";
+import { estadoSillones, evaluarCita, sugerirSillon, turnosDelDia, sillonesDeSede, etiquetaUso, yaPaso, motivoPasado } from "./sillones";
 import { useReglasAgenda } from "./useReglasAgenda";
 import { CATALOGO_SEED, precioCita, precioServicio } from "./catalogo";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
-import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, espsDe, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, mismaSede, sedeNum, sedesDe, toMin, tint, useSede} from "../comun";
+import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, calcEdad, espsDe, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, mismaSede, sedeNum, sedesDe, toMin, tint, useSede, validarFormPaciente} from "../comun";
 
 /* ---- RENIEC: autocompletar nombres desde el DNI (solo datos reales del backend) ---- */
 export async function reniecLookup(dni) {
@@ -30,6 +30,83 @@ export function BtnReniec({ dni, onNombre, notify }) {
   const [loading, setLoading] = useState(false);
   const run = async () => { setLoading(true); const r = await reniecLookup(dni); setLoading(false); if (r.ok) onNombre(r.nombre); notify(r.msg); };
   return <button type="button" onClick={run} disabled={loading} title="Traer nombres desde RENIEC" style={{ whiteSpace: "nowrap", background: (tint(DS.c.primary, 0.078)), color: DS.c.primary, border: "1.5px solid " + tint("var(--dc-accent-cyan)", 0.2), borderRadius: "var(--dc-r-md)", padding: "0 12px", fontSize: 13, fontWeight: 500, cursor: loading ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: loading ? 0.6 : 1 }}><Search size={14} strokeWidth={1.75} /> {loading ? "Consultando…" : "Autocompletar"}</button>;
+}
+
+/* ---- Alta rápida de paciente (desde Agendar cita y desde WhatsApp) ----
+   Pide lo mínimo para que la ficha sirva: nombre, DNI, celular (los recordatorios salen
+   por WhatsApp) y fecha de nacimiento; si es menor de edad, su apoderado. Valida con la
+   misma regla que el formulario de Pacientes (validarFormPaciente). */
+export const PAC_RAPIDO_VACIO = { nombre: "", dni: "", telefono: "", nacimiento: "", apoderadoNombre: "", apoderadoParentesco: "", apoderadoDni: "", apoderadoTelefono: "" };
+// Mismo listado cerrado que el formulario de Pacientes.
+const PARENTESCOS_RAP = ["Madre", "Padre", "Abuelo/a", "Tutor legal", "Hermano/a mayor", "Tío/a", "Otro"];
+/** Celular de 9 dígitos sin el +51 (como lo guarda Pacientes). */
+export const celular9 = (t) => String(t || "").replace(/\D/g, "").replace(/^51(?=\d{9}$)/, "").slice(-9);
+
+export function validarPacienteRapido(d) {
+  const v = validarFormPaciente({ ...d, telefono: celular9(d.telefono) }, fmt(hoy));
+  const e = { ...v.errors };
+  // Aquí el celular es obligatorio: sin él no le llegan los recordatorios.
+  const tel = String(d.telefono || "").replace(/\D/g, "");
+  if (!tel) e.telefono = "El celular es obligatorio: por ahí salen los recordatorios.";
+  else if (celular9(tel).length !== 9 || !/^\d{9}$|^51\d{9}$/.test(tel)) e.telefono = "Celular: 9 dígitos (ej. 999888777).";
+  // Mismo orden que los campos en pantalla: el primer error es el primero que se ve.
+  const errors = {};
+  ["dni", "nombre", "telefono", "nacimiento", "apoderadoNombre", "apoderadoParentesco", "apoderadoDni", "apoderadoTelefono"].forEach((k) => { if (e[k]) errors[k] = e[k]; });
+  const keys = Object.keys(errors);
+  return { ok: keys.length === 0, errors, first: keys[0] || null };
+}
+
+/** Registra al paciente (demo o servidor) en la sede indicada y lo devuelve con su id. */
+export async function registrarPacienteRapido(d, { demoDb, sede }) {
+  const nombre = d.nombre.trim(), dni = d.dni.trim(), telefono = celular9(d.telefono);
+  const apod = { apoderadoNombre: (d.apoderadoNombre || "").trim(), apoderadoParentesco: d.apoderadoParentesco || "", apoderadoDni: (d.apoderadoDni || "").trim(), apoderadoTelefono: d.apoderadoTelefono ? celular9(d.apoderadoTelefono) : "" };
+  if (!auth.token && demoDb) {
+    const id = Math.max(0, ...(demoDb.pacientes || []).map((p) => Number(p.id) || 0)) + 1;
+    const sid = sedeNum(sede);
+    const p = { id, nombre, dni, telefono, email: "", nacimiento: d.nacimiento, sede: sid, sedes: sid != null ? [sid] : [], ultima: null, creadoEn: new Date().toISOString(), ...apod };
+    demoDb.setPacientes((ps) => [...ps, p]);
+    return p;
+  }
+  const r = await api.pacientes.crear({ nombre, dni, telefono, fechaNacimiento: d.nacimiento, sedeRegistroId: sedeApiUuid(sede), ...apod });
+  return { ...(r || {}), id: r?.id, nombre: r?.nombre || nombre, dni: r?.dni || dni };
+}
+
+/** Campos del alta rápida. `set(parcial)` actualiza y limpia el error de ese campo. */
+export function CamposPacienteRapido({ v, set, err = {}, notify, existente = null, onUsarExistente }) {
+  const inpR = (bad) => ({ width: "100%", padding: "8px 11px", borderRadius: "var(--dc-r-md)", border: `1.5px solid ${bad ? "var(--dc-red)" : "var(--dc-line)"}`, fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box", minWidth: 0 });
+  const lblR = { fontSize: 12, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 4 };
+  const msg = (k) => err[k] ? <small role="alert" style={{ display: "block", color: "var(--dc-red)", fontSize: 12, marginTop: 3 }}>{err[k]}</small> : null;
+  const edad = v.nacimiento ? calcEdad(v.nacimiento) : null;
+  const menor = edad != null && edad < 18;
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input className="dc-premium-inp" value={v.dni} inputMode="numeric" aria-label="DNI" aria-invalid={!!err.dni} onChange={(e) => set({ dni: e.target.value.replace(/[^\d]/g, "").slice(0, 8) })} placeholder="DNI (8 dígitos)" style={{ ...inpR(err.dni), flex: 1 }} />
+          <BtnReniec dni={v.dni} onNombre={(n) => set({ nombre: n })} notify={notify} />
+        </div>
+        {msg("dni")}
+        {existente && <div style={{ marginTop: 6, fontSize: 12, color: "var(--dc-warn-ink)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-md)", padding: "6px 9px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span>Ese DNI ya es de <b>{existente.nombre}</b>.</span>
+          {onUsarExistente && <button type="button" onClick={onUsarExistente} style={{ background: "none", border: "none", padding: 0, color: DS.c.primary, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>Usar su ficha</button>}
+        </div>}
+      </div>
+      <div><input className="dc-premium-inp" value={v.nombre} aria-label="Nombre completo" aria-invalid={!!err.nombre} onChange={(e) => set({ nombre: e.target.value })} placeholder="Nombre completo" style={inpR(err.nombre)} />{msg("nombre")}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
+        <label><span style={lblR}>Celular</span><input className="dc-premium-inp" value={v.telefono} inputMode="tel" aria-invalid={!!err.telefono} onChange={(e) => set({ telefono: e.target.value.replace(/[^\d+\s]/g, "").slice(0, 16) })} placeholder="9 dígitos" style={inpR(err.telefono)} />{msg("telefono")}</label>
+        <label><span style={lblR}>Fecha de nacimiento</span><input className="dc-premium-inp" type="date" max={fmt(hoy)} value={v.nacimiento} aria-invalid={!!err.nacimiento} onChange={(e) => set({ nacimiento: e.target.value })} style={inpR(err.nacimiento)} />{msg("nacimiento")}</label>
+      </div>
+      {menor && <div style={{ display: "grid", gap: 8, padding: 10, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg-soft, #F7FAFB)", border: "1px solid var(--dc-line)" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-700)" }}>Menor de edad ({edad} años): datos del apoderado</span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
+          <div><input className="dc-premium-inp" value={v.apoderadoNombre} aria-label="Nombre del apoderado" onChange={(e) => set({ apoderadoNombre: e.target.value })} placeholder="Nombre del apoderado" style={inpR(err.apoderadoNombre)} />{msg("apoderadoNombre")}</div>
+          <div><Select value={v.apoderadoParentesco} onChange={(x) => set({ apoderadoParentesco: x })} placeholder="Parentesco" options={PARENTESCOS_RAP.map((p) => ({ value: p, label: p }))} />{msg("apoderadoParentesco")}</div>
+          <div><input className="dc-premium-inp" value={v.apoderadoDni} inputMode="numeric" aria-label="DNI del apoderado" onChange={(e) => set({ apoderadoDni: e.target.value.replace(/[^\d]/g, "").slice(0, 8) })} placeholder="DNI del apoderado" style={inpR(err.apoderadoDni)} />{msg("apoderadoDni")}</div>
+          <div><input className="dc-premium-inp" value={v.apoderadoTelefono} inputMode="tel" aria-label="Celular del apoderado" onChange={(e) => set({ apoderadoTelefono: e.target.value.replace(/[^\d+\s]/g, "").slice(0, 16) })} placeholder="Celular del apoderado" style={inpR(err.apoderadoTelefono)} />{msg("apoderadoTelefono")}</div>
+        </div>
+      </div>}
+    </div>
+  );
 }
 
 function citaFueraDeHorario(fecha, hora, duracionMin, horario, feriados, sedeIdNum) {
@@ -68,7 +145,11 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const sedePermitida = (id) => !sedesVer || sedesVer.some((w) => mismaSede(id, w));
   const [pac, setPac] = useState([]); const [meds, setMeds] = useState([]); const [esps, setEsps] = useState([]); const [seds, setSeds] = useState([]);
   const [pacTodos, setPacTodos] = useState([]);   // todas las sedes: solo para hallar un DNI exacto y no duplicar fichas
-  const [nuevo, setNuevo] = useState(null);         // alta rápida de paciente
+  const [nuevo, setNuevo] = useState(null);         // alta rápida de paciente (formulario abierto)
+  const [nuevoErr, setNuevoErr] = useState({});
+  // Paciente nuevo ya validado: se registra recién al agendar. Si se cierra el modal sin
+  // agendar no queda una ficha a medias (antes se creaba al pulsar «Crear y usar»).
+  const [pacNuevo, setPacNuevo] = useState(null);
   const ligadoRef = useRef(false);                  // el nombre que trae la lista de espera se liga una sola vez
   const [horarioClinica, setHorarioClinica] = useState({ horario: {}, feriados: [] });
   const [avisoHorario, setAvisoHorario] = useState(null);
@@ -95,13 +176,15 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       const pid = base?.pacienteId;
       const extra = pid != null && pid !== "" && !visibles.some((p) => String(p.id) === String(pid)) ? todos.filter((p) => String(p.id) === String(pid)) : [];
       setPacTodos(todos.map(mapPac)); setPac([...visibles, ...extra].map(mapPac));
-      // Desde la lista de espera llega solo el nombre: se liga a su ficha si existe; si no, se propone registrarlo.
-      if (ligadoRef.current || !base?.pacienteNombre || base?.pacienteId) return;
+      // Desde la lista de espera llega solo el nombre y desde WhatsApp el celular: se liga a
+      // su ficha si existe; si no, se abre el alta rápida con lo que ya se sabe.
+      if (ligadoRef.current || base?.pacienteId || (!base?.pacienteNombre && !base?.telefono)) return;
       ligadoRef.current = true;
-      const nom = String(base.pacienteNombre).trim().toLowerCase();
-      const hit = visibles.find((p) => String(p.nombre || "").trim().toLowerCase() === nom);
+      const nom = String(base.pacienteNombre || "").trim().toLowerCase();
+      const tel = celular9(base.telefono);
+      const hit = (tel && visibles.find((p) => celular9(p.telefono) === tel)) || (nom && visibles.find((p) => String(p.nombre || "").trim().toLowerCase() === nom));
       if (hit) setF((x) => (x.pacienteId ? x : { ...x, pacienteId: hit.id }));
-      else setNuevo((n) => n || { nombre: base.pacienteNombre, dni: "" });
+      else setNuevo((n) => n || { ...PAC_RAPIDO_VACIO, nombre: base.pacienteNombre || "", telefono: tel });
     };
     if (demo) { const todos = demoDb.pacientes || []; poner(todos, pacSede || todos); return Promise.resolve(); }
     return api.pacientes.listar().then((r) => { const todos = r || []; poner(todos, todos.filter((p) => { const ss = sedesPac(p); return !ss.length || ss.some(sedePermitida); })); }).catch(() => {});
@@ -294,56 +377,70 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   // Doctores que hacen el servicio y, de ellos, los que atienden en la sede elegida.
   const medsEsp = f.especialidadId ? meds.filter((m) => espsMed(m).includes(String(f.especialidadId))) : meds;
   const medsF = medsEsp.filter((m) => atiendeEn(m, f.sedeId));
-  const pasada = f.fecha < fmt(hoy);
+  // Fecha y hora pasadas bloquean el agendado (antes solo se pintaba «Fecha pasada»).
+  const msgPasada = f.fecha && f.hora && yaPaso(f.fecha, f.hora) ? motivoPasado(f.fecha, f.hora) : "";
+  const pasada = !!msgPasada;
   const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
   const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
   const req = <span style={{ color: "var(--dc-red)" }}> *</span>;
   const elegirPac = (p) => {
     if (!pac.some((x) => String(x.id) === String(p.id))) setPac((ps) => [...ps, p]);
-    setF((x) => ({ ...x, pacienteId: p.id })); setAbrePac(false); setBusca("");
+    setF((x) => ({ ...x, pacienteId: p.id })); setAbrePac(false); setBusca(""); setPacNuevo(null);
   };
-  const crearNuevo = () => {
-    if (!nuevo?.nombre?.trim()) { notify("Ingresa el nombre del paciente."); return; }
-    // Un DNI que ya existe (aunque sea de otra sede) usa esa ficha: no se duplica al paciente.
-    const dniN = (nuevo.dni || "").trim();
-    const ya = dniN ? pacTodos.find((p) => String(p.dni || "") === dniN) : null;
-    if (ya) { elegirPac(ya); setNuevo(null); notify(`Ese DNI ya es de ${ya.nombre}: se usa su ficha.`); return; }
-    // El paciente nuevo queda registrado en la sede de la cita.
-    const sedeAlta = f.sedeId || sedeActivaCtx;
-    if (demo) {
-      const id = Math.max(0, ...(demoDb.pacientes || []).map((p) => Number(p.id) || 0)) + 1;
-      const sid = sedeNum(sedeAlta);
-      demoDb.setPacientes((ps) => [...ps, { id, nombre: nuevo.nombre.trim(), dni: dniN, telefono: "", email: "", sede: sid, sedes: sid != null ? [sid] : [], ultima: null, creadoEn: new Date().toISOString() }]);
-      setPac((ps) => [...ps, { id, nombre: nuevo.nombre.trim(), dni: (nuevo.dni || "").trim() }]);
-      setF((x) => ({ ...x, pacienteId: id })); setNuevo(null); setAbrePac(false); setBusca(""); notify("Paciente creado.");
-      return;
-    }
-    api.pacientes.crear({ nombre: nuevo.nombre.trim(), dni: dniN, sedeRegistroId: sedeApiUuid(sedeAlta) }).then((p) => { cargarPac(); if (p?.id) setF((x) => ({ ...x, pacienteId: p.id })); setNuevo(null); setAbrePac(false); setBusca(""); notify("Paciente creado."); }).catch(() => notify("No se pudo crear el paciente."));
+  // DNI del alta rápida que ya tiene ficha (aunque sea de otra sede): se ofrece usarla.
+  const dniRepetido = nuevo && /^\d{8}$/.test(nuevo.dni || "") ? pacTodos.find((p) => String(p.dni || "") === nuevo.dni) || null : null;
+  const usarExistente = (ya) => { elegirPac(ya); setNuevo(null); setNuevoErr({}); notify(`Ese DNI ya es de ${ya.nombre}: se usa su ficha.`); };
+  /** Valida el alta rápida. Devuelve { datos } (se registra al agendar), { id } si el DNI
+      ya tenía ficha, o null si falta algo (los errores quedan junto a cada campo). */
+  const confirmarNuevo = () => {
+    const v = validarPacienteRapido(nuevo);
+    if (!v.ok) { setNuevoErr(v.errors); notify(v.errors[v.first]); return null; }
+    if (dniRepetido) { usarExistente(dniRepetido); return { id: dniRepetido.id, existente: true }; }
+    const datos = { ...nuevo, nombre: nuevo.nombre.trim() };
+    setPacNuevo(datos); setNuevo(null); setNuevoErr({}); setF((x) => ({ ...x, pacienteId: "" }));
+    return { datos };
   };
+  const setCampoNuevo = (parcial) => { setNuevo((n) => ({ ...n, ...parcial })); setNuevoErr((e) => { const x = { ...e }; Object.keys(parcial).forEach((k) => delete x[k]); return x; }); };
 
-  const ejecutarGuardado = async (forzarFueraDeHorario = false) => {
+  // pacRes: { id } de un paciente existente o { datos } del alta rápida (se registra aquí).
+  const ejecutarGuardado = async (forzarFueraDeHorario = false, pacRes = pacNuevo ? { datos: pacNuevo } : { id: f.pacienteId }) => {
     const sedeId = f.sedeId || seds[0]?.id;
     if (!sedeId) { notify("La sede es obligatoria."); return; }
     if (!sedePermitida(sedeId)) { notify("Esa sede no está entre las que atiendes. Elige una de tus sedes."); return; }
     if (!f.sillon) { notify("El sillón es obligatorio."); return; }
-    const mot = [f.motivo.trim(), (f.nota || "").trim()].filter(Boolean).join(" — ") || "Consulta";
+    // Sin motivo escrito, la cita lleva el nombre del servicio elegido (no «Consulta»).
+    const servicio = (esps.find((e) => String(e.id) === String(f.especialidadId)) || {}).nombre;
+    const mot = [f.motivo.trim() || servicio || "Consulta", (f.nota || "").trim()].filter(Boolean).join(" — ");
     setGuardando(true);
-    const cuerpo = { pacienteId: f.pacienteId, especialidadId: f.especialidadId || null, medicoId: f.medicoId, sedeId: sedeApiUuid(sedeId), hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: Number(f.sillon), motivo: mot, canalOrigen: f.canal, estado: "confirmada", ...(forzarFueraDeHorario ? { forzarFueraDeHorario: true } : {}) };
+    // Con sesión, el paciente nuevo se registra justo antes de crear la cita.
+    let pacId = pacRes.id;
+    if (!demo && pacRes.datos) {
+      try { pacId = (await registrarPacienteRapido(pacRes.datos, { demoDb, sede: sedeId })).id; }
+      catch (e) { setGuardando(false); notify(`No se pudo registrar al paciente: ${e?.message || "error del servidor"}.`); return; }
+      if (pacId == null) { setGuardando(false); notify("No se pudo registrar al paciente."); return; }
+      setPacNuevo(null); cargarPac(); setF((x) => ({ ...x, pacienteId: pacId }));
+    }
+    const cuerpo = { pacienteId: pacId, especialidadId: f.especialidadId || null, medicoId: f.medicoId, sedeId: sedeApiUuid(sedeId), hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: Number(f.sillon), motivo: mot, canalOrigen: f.canal, estado: "confirmada", ...(forzarFueraDeHorario ? { forzarFueraDeHorario: true } : {}) };
     const paso = f.repetir === "semanal" ? 7 : f.repetir === "quincenal" ? 14 : f.repetir === "mensual" ? 30 : 0;
     const n = f.repetir === "no" ? 1 : Math.max(1, Math.min(12, Number(f.veces) || 1));
     const fechas = []; for (let i = 0; i < n; i++) { const d = new Date(f.fecha + "T00:00:00"); d.setDate(d.getDate() + paso * i); fechas.push(fmt(d)); }
     let ok = 0, fail = 0, avisados = 0, avisarFail = 0, ultimoError = "";
     if (demo) {
-      const p = pac.find((x) => String(x.id) === String(f.pacienteId)) || {};
       const med = MEDICOS.find((m) => String(m.id) === String(f.medicoId)) || {};
       // Cada fecha (también las repetidas) pasa por las mismas reglas: doctor, sillón y bloqueos.
       const ocupado = (fch) => evaluarCita(ctxSede, citaBorrador({ fecha: fch })).errores.length > 0;
       const libres = fechas.filter((fch) => !ocupado(fch));
+      // El paciente nuevo se registra solo si de verdad queda alguna cita agendada.
+      if (!libres.length) { setGuardando(false); setAvisoHorario(null); notify(evaluarCita(ctxSede, citaBorrador()).errores[0] || "Ese horario no está disponible."); return; }
+      let p = pac.find((x) => String(x.id) === String(pacRes.id)) || {};
+      if (pacRes.datos) {
+        p = await registrarPacienteRapido(pacRes.datos, { demoDb, sede: sedeId });
+        setPac((ps) => [...ps, mapPac(p)]); setPacNuevo(null); setF((x) => ({ ...x, pacienteId: p.id }));
+      }
       const base0 = Date.now();
       const sedeN = sedeNum(sedeId);   // la cita guarda su sede y el precio de esa sede
       demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: sedeN, precio: precioCita(demoDb.catalogo || CATALOGO_SEED, Number(f.especialidadId) || med.esp || 1, sedeN) ?? undefined, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: "pendiente", llegada: false }))]);
       setGuardando(false); setAvisoHorario(null);
-      if (!libres.length) { notify(evaluarCita(ctxSede, citaBorrador()).errores[0] || "Ese horario no está disponible."); return; }
       // Un paciente que se atiende por primera vez en esta sede pasa a ser también de ella
       // (N:M): así aparece en Pacientes y en la agenda de esa sede.
       if (p.id != null && demoDb.setPacientes) demoDb.setPacientes((ps) => ps.map((x) => (String(x.id) !== String(p.id) || sedesDe(x).some((v) => mismaSede(v, sedeN)) ? x : { ...x, sedes: [...sedesDe(x), sedeN] })));
@@ -382,9 +479,13 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     ? precioCita(demoDb.catalogo || CATALOGO_SEED, f.especialidadId, sedeSel)
     : (() => { const e = esps.find((x) => String(x.id) === String(f.especialidadId)); return e && e.precioBase != null ? precioServicio({ precio: e.precioBase, preciosSede: e.preciosSede }, sedeSel) : null; })();
   const guardar = async () => {
+    // Paciente: uno existente, el nuevo ya validado o el formulario de alta todavía abierto.
+    let pacRes = pacNuevo ? { datos: pacNuevo } : f.pacienteId ? { id: f.pacienteId } : null;
+    if (nuevo) { const r = confirmarNuevo(); if (!r || r.existente) return; pacRes = r; }
+    if (msgPasada) { notify(msgPasada); return; }
     // AGE-09: el servicio es obligatorio (define duración, especialidad y doctores).
     if (!f.especialidadId) { notify("Elige el servicio: define la duración y qué doctores lo atienden."); return; }
-    if (!f.pacienteId || !f.medicoId) { notify("Selecciona paciente y doctor."); return; }
+    if (!pacRes || !f.medicoId) { notify("Selecciona paciente y doctor."); return; }
     if (!f.sedeId && !seds[0]?.id) { notify("Selecciona la sede."); return; }
     if (!f.sillon) { notify("Selecciona el sillón."); return; }
     if (evaluacion.errores.length) { notify(evaluacion.errores[0]); return; }
@@ -403,8 +504,12 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       notify(`Fuera del horario de la clínica: ${check.msg}`);
       return;
     }
-    await ejecutarGuardado(false);
+    await ejecutarGuardado(false, pacRes);
   };
+  // Por qué no se puede agendar todavía: se muestra junto al botón (antes el botón quedaba
+  // gris y el motivo estaba más abajo, en la sección del sillón).
+  const motivoBloqueo = avisoHorario ? "Fuera del horario: confirma arriba o cambia la hora."
+    : msgPasada || evaluacion.errores[0] || "";
 
   const canalBtns = (
     <div style={{ display: "flex", gap: 8 }}>
@@ -417,7 +522,10 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     <Modal icon={<Calendar size={20} strokeWidth={1.75} />} titulo="Agendar cita" sub="Registra la cita del paciente" onClose={onClose} maxW={masDatos ? 820 : 540}
       footer={<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
         <button onClick={() => setMasDatos((v) => !v)} style={{ background: "none", border: "none", color: T, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>{masDatos ? "‹ Menos datos" : "Más datos ›"}</button>
-        <Btn small onClick={guardar} disabled={guardando || !!avisoHorario || evaluacion.errores.length > 0}><Check size={15} strokeWidth={1.75} /> Agendar</Btn>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flex: 1, minWidth: 0 }}>
+          {motivoBloqueo && <span role="status" data-motivo-bloqueo style={{ display: "inline-flex", alignItems: "flex-start", gap: 6, fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", lineHeight: 1.35, textAlign: "right", maxWidth: 380 }}><Lock size={13} strokeWidth={2.2} style={{ flexShrink: 0, marginTop: 1 }} />{motivoBloqueo}</span>}
+          <Btn small onClick={guardar} disabled={guardando || !!avisoHorario || evaluacion.errores.length > 0 || pasada}><Check size={15} strokeWidth={1.75} /> Agendar</Btn>
+        </div>
       </div>}>
       {avisoHorario && (
         <div style={{ marginBottom: 14, padding: 14, borderRadius: "var(--dc-r-md)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)" }}>
@@ -438,7 +546,11 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
         <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
           <div>
             <div className="dc-agm__paso"><i>1</i>Paciente{req}</div>
-            {!nuevo && <div style={{ position: "relative" }}>
+            {!nuevo && pacNuevo && <div className="dc-agm__nuevo" data-pac-nuevo>
+              <div className="dc-agm__nuevo-cab"><span><Plus size={14} strokeWidth={2.2} /></span><b>{pacNuevo.nombre} – {pacNuevo.dni}</b><button type="button" onClick={() => { setNuevo(pacNuevo); setPacNuevo(null); }}>Editar</button></div>
+              <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Paciente nuevo · cel. {celular9(pacNuevo.telefono)} · se registra al agendar la cita. <button type="button" onClick={() => setPacNuevo(null)} style={{ background: "none", border: "none", padding: 0, color: T, fontWeight: 500, fontSize: 12, cursor: "pointer" }}>Elegir otro paciente</button></small>
+            </div>}
+            {!nuevo && !pacNuevo && <div style={{ position: "relative" }}>
               <div onClick={() => setAbrePac((v) => !v)} style={{ ...inp, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", color: pacSel ? NAVY : "var(--dc-ink-400)", borderColor: abrePac ? T : "var(--dc-line)" }}>
                 <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pacSel ? `${pacSel.nombre}${pacSel.dni ? ` – ${pacSel.dni}` : ""}` : "Buscar paciente…"}</span>
                 <ChevronRight size={16} strokeWidth={1.75} style={{ transform: `rotate(${tint(abrePac ? -90 : 90, 0.871)}g)`, color: "var(--dc-ink-400)", flexShrink: 0 }} />
@@ -450,17 +562,14 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
                   {pacOtraSede && <button type="button" onClick={() => elegirPac(pacOtraSede)} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{pacOtraSede.nombre}<span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> – {pacOtraSede.dni} · registrado en otra sede</span></button>}
                   {pacF.map((p) => <button key={p.id} onClick={() => { setF({ ...f, pacienteId: p.id }); setAbrePac(false); setBusca(""); }} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: p.id === f.pacienteId ? "var(--dc-bg)" : "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{p.nombre}{p.dni ? <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> – {p.dni}</span> : null}</button>)}
                 </div>
-                <button onClick={() => { setNuevo({ nombre: busca, dni: "" }); setAbrePac(false); }} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
+                <button onClick={() => { const b = busca.trim(); setNuevo({ ...PAC_RAPIDO_VACIO, ...(/^\d{8}$/.test(b) ? { dni: b } : { nombre: b }) }); setNuevoErr({}); setAbrePac(false); }} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
               </div>}
             </div>}
             {nuevo && <div className="dc-agm__nuevo">
-              <div className="dc-agm__nuevo-cab"><span><Plus size={14} strokeWidth={2.2} /></span><b>Nuevo paciente</b><button type="button" onClick={() => setNuevo(null)}>Elegir uno existente</button></div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input className="dc-premium-inp" value={nuevo.dni} onChange={(e) => setNuevo({ ...nuevo, dni: e.target.value.replace(/[^\d]/g, "").slice(0, 8) })} placeholder="DNI" style={{ ...inp, padding: "8px 11px", flex: 1, minWidth: 0 }} />
-                <BtnReniec dni={nuevo.dni} onNombre={(n) => setNuevo((x) => ({ ...x, nombre: n }))} notify={notify} />
-              </div>
-              <input className="dc-premium-inp" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} placeholder="Nombre completo" style={{ ...inp, padding: "8px 11px" }} />
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crearNuevo}><Check size={14} strokeWidth={2} /> Crear y usar</Btn></div>
+              <div className="dc-agm__nuevo-cab"><span><Plus size={14} strokeWidth={2.2} /></span><b>Nuevo paciente</b><button type="button" onClick={() => { setNuevo(null); setNuevoErr({}); }}>Elegir uno existente</button></div>
+              <CamposPacienteRapido v={nuevo} set={setCampoNuevo} err={nuevoErr} notify={notify} existente={dniRepetido} onUsarExistente={() => usarExistente(dniRepetido)} />
+              <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>La ficha se crea al agendar la cita; si cierras sin agendar, no se registra.</small>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => { setNuevo(null); setNuevoErr({}); }}>Cancelar</Btn><Btn small onClick={confirmarNuevo}><Check size={14} strokeWidth={2} /> Usar estos datos</Btn></div>
             </div>}
           </div>
           {/* La sede va primero: define qué doctores atienden, sus sillones y el precio. */}
@@ -502,12 +611,12 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             <div style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, marginBottom: 6 }}>
               {fechaLegible(f.fecha)} – {f.hora}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, border: `1.5px solid ${pasada ? "var(--dc-red)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
               <Clock size={16} strokeWidth={1.75} color={pasada ? "var(--dc-red)" : "var(--dc-ink-400)"} style={{ flexShrink: 0 }} />
-              <input className="dc-premium-inp" type="date" value={f.fecha} onChange={(e) => { setHoraAuto(true); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
-              <input className="dc-premium-inp" type="time" value={f.hora} onChange={(e) => { setHoraAuto(false); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
+              <input className="dc-premium-inp" type="date" min={fmt(hoy)} aria-label="Fecha de la cita" value={f.fecha} onChange={(e) => { setHoraAuto(true); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
+              <input className="dc-premium-inp" type="time" aria-label="Hora de la cita" value={f.hora} onChange={(e) => { setHoraAuto(false); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
             </div>
-            {pasada && <div style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>Fecha pasada</div>}
+            {pasada && <div role="alert" style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>{msgPasada}</div>}
           </div>
           <div className="dc-agm__paso"><i>4</i>Detalles</div>
           <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>
@@ -530,9 +639,10 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               ); })}
             </div>
           </div>
-          {(evaluacion.errores.length > 0 || evaluacion.avisos.length > 0) && (
+          {(evaluacion.errores.some((m) => m !== msgPasada) || evaluacion.avisos.length > 0) && (
             <div className="dc-agm__val">
-              {evaluacion.errores.map((m, i) => <p key={"e" + i} className="is-err"><Lock size={13} strokeWidth={2.2} /> {m}</p>)}
+              {/* La fecha pasada ya se avisa junto a la fecha y al botón. */}
+              {evaluacion.errores.filter((m) => m !== msgPasada).map((m, i) => <p key={"e" + i} className="is-err"><Lock size={13} strokeWidth={2.2} /> {m}</p>)}
               {evaluacion.avisos.map((m, i) => <p key={"a" + i} className="is-avi"><Info size={13} strokeWidth={2.2} /> {m}</p>)}
             </div>
           )}

@@ -12,7 +12,8 @@
    1. el doctor atiende ese día y a esa hora (su horario, si lo tiene configurado),
    2. el doctor no tiene otra cita que se cruce,
    3. el sillón está activo, acepta a ese doctor / especialidad y está libre,
-   4. no cae en un bloqueo de agenda. */
+   4. no cae en un bloqueo de agenda,
+   5. no empieza antes de ahora (no se agenda ni se reprograma al pasado). */
 
 export const USOS_SILLON = [
   { v: "flexible", l: "Flexible", d: "Lo usa el doctor que esté libre." },
@@ -51,6 +52,21 @@ const mismo = (a, b) => a != null && b != null && String(a) === String(b);
 const sedeDe = (c) => c.sede ?? c.sedeId;
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const diaDe = (fecha) => new Date(`${fecha}T00:00:00`).getDay();
+
+/** ¿La cita empezaría antes de ahora? Se compara con la hora del navegador (Lima) al
+    minuto: a las 10:40 todavía se puede dejar una cita a las 10:40, no a las 10:30. */
+export function yaPaso(fecha, hora, ahora = new Date()) {
+  if (!fecha) return false;
+  const ini = new Date(`${fecha}T${String(hora || "00:00").slice(0, 5)}:00`);
+  if (isNaN(ini)) return false;
+  return ini.getTime() < Math.floor(ahora.getTime() / 60000) * 60000;
+}
+/** Texto del bloqueo por fecha u hora pasada, dicho como lo leería recepción. */
+export function motivoPasado(fecha, hora, ahora = new Date()) {
+  const hoyL = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+  if (fecha < hoyL) { const [, m, d] = String(fecha).split("-"); return `El ${d}/${m} ya pasó: elige una fecha desde hoy.`; }
+  return `Las ${String(hora).slice(0, 5)} de hoy ya pasaron (son las ${aHora(ahora.getHours() * 60 + ahora.getMinutes())}): elige una hora más tarde.`;
+}
 
 /** Normaliza un sillón venga de la demostración o del servidor. */
 export const normSillon = (r) => ({
@@ -188,6 +204,8 @@ export function evaluarCita(ctx, cita) {
   const med = medicos.find((m) => mismo(m.id, cita.medicoId));
   const nombre = med ? med.nombre : "El doctor";
   if (!cita.fecha || !cita.hora) return { errores, avisos };
+  // Lo primero: una cita no se deja ni se mueve a una fecha u hora que ya pasó.
+  if (yaPaso(cita.fecha, cita.hora, ctx.ahora)) errores.push(motivoPasado(cita.fecha, cita.hora, ctx.ahora || new Date()));
   const at = medicoAtiende(disp, { ...cita, sede: sedeDe(cita) }, nombre);
   if (!at.ok) errores.push(at.motivo);
   const xs = cruces(citas, { ...cita, excluirId: cita.id });
