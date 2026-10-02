@@ -16,6 +16,7 @@ import {
   labelCaraAnatomica,
 } from "./util/odontogramaCatalogo";
 import { ChipAlergia } from "./ui";
+import { fichaDeSede, sedeEnLista } from "./compartido/cajaSede";
 import { puedeEscribirClinico as puedeEscribirClinicoDe } from "./util/clinicoWrite";
 import { formatearFDI } from "./util/formatearFDI";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
@@ -885,6 +886,9 @@ function registroDesdeFicha(d, rx, consent) {
 }
 /** Accesos de ejemplo para la demostración (lo que el servidor devolverá con sesión). */
 function registroDemo(pac) {
+  // Un paciente dado de alta en esta demostración no tiene pasado: su registro empieza vacío
+  // (antes mostraba accesos de semanas atrás inventados para la semilla).
+  if (pac?.creadoEn) return [{ id: "dm0", ts: pac.creadoEn, usuario: "Recepción", rol: "Recepción", tipo: "crear", accion: "Abrió la historia clínica", detalle: "Alta del paciente", origen: "Esta sesión" }];
   const base = new Date(); base.setMinutes(0, 0, 0);
   const hace = (dias, h, m) => { const x = new Date(base); x.setDate(x.getDate() - dias); x.setHours(h, m); return x.toISOString(); };
   const nom = pac?.nombre || "el paciente";
@@ -1058,8 +1062,12 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       const fc = (demoDb && demoDb.fichas && demoDb.fichas[pacienteId]) || FICHA_CLINICA[pacienteId] || {};
       if (pac) {
         const trat = (fc.tratamiento || []).map((t) => ({ ...t, estado: t.estado === "atendida" ? "completada" : t.estado }));
-        const total = trat.reduce((a, t) => a + (Number(t.costo) || 0), 0);
-        const pagado = (fc.pagos || []).reduce((a, g) => a + (Number(g.monto) || 0), 0);
+        // El saldo de la cabecera es el de las sedes a la vista, igual que Plan y cuenta, Caja
+        // y el directorio; lo pendiente en otra sede se avisa aparte.
+        const cta = M.cuentaPaciente(fichaDeSede(fc, pac, (x) => sedeEnLista(x, sedeCx.ids)));
+        const ctaTodas = M.cuentaPaciente(fc);
+        const total = cta.total, pagado = cta.pagado;
+        const saldoOtras = Math.max(0, ctaTodas.saldoPlan - cta.saldoPlan);
         const medNom = (id) => (MEDICOS.find((m) => m.id === id) || {}).nombre || "";
         const historia = (fc.historia || []).map((h, i) => ({ id: `demo-h${i}`, diagnostico: h.diagnostico || h.titulo, ...h, medico: h.medico || medNom(h.medicoId) || "" }));
         // Cada receta con el médico que la emitió (antes todas salían de la Dra. del id 1).
@@ -1067,7 +1075,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         // La historia es compartida entre sedes: cada atención lleva el rótulo de su sede.
         const citas = ((demoDb && demoDb.citas) || CITAS_INIT).filter((c) => c.paciente === pac.nombre || String(c.pacienteId) === String(pac.id)).map((c) => ({ ...c, medico: c.medico || medNom(c.medicoId), sedeNombre: c.sedeNombre || (c.sede != null && nombreSede(c.sede) !== "—" ? nombreSede(c.sede) : "") }));
         const paciente = { ...pac, fechaNacimiento: pac.fechaNacimiento || pac.nacimiento || "", alergias: fc.alergias || [], antecedentes: fc.antecedentes || [] };
-        setD({ paciente, resumen: { saldo: total - pagado, total, pagado, planTotal: total, invertido: pagado }, tratamientos: trat, pagos: fc.pagos || [], recetas, historia, citas });
+        setD({ paciente, resumen: { saldo: total - pagado, total, pagado, planTotal: total, invertido: pagado, saldoOtras }, tratamientos: trat, pagos: fc.pagos || [], recetas, historia, citas });
         setFil({ nombre: pac.nombre || "", dni: pac.dni || "", telefono: pac.telefono || "", email: pac.email || "", fechaNacimiento: paciente.fechaNacimiento, genero: pac.genero || "", distrito: pac.distrito || "", aseguradora: pac.aseguradora && pac.aseguradora !== "Ninguno" ? pac.aseguradora : "",
           apoderadoNombre: pac.apoderadoNombre || "", apoderadoParentesco: pac.apoderadoParentesco || "", apoderadoDni: pac.apoderadoDni || "", apoderadoTelefono: pac.apoderadoTelefono || "" });
         // Lo guardado manda; el motivo de consulta empieza vacío (no se inventa a partir de la última nota).
@@ -1733,6 +1741,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div className="fm-top__chips">
                 {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null].filter(Boolean).map((t) => <span key={t}>{t}</span>)}
                 {!errorFicha && <span className={debe ? "is-debe" : "is-ok"}>{money(montoSaldoUi)} {saldoAFavor > 0.005 ? "a favor" : debe ? "por pagar" : "al día"}</span>}
+                {!errorFicha && Number(r.saldoOtras) > 0.5 && <span title="Saldo de tratamientos hechos en otra sede: se cobra allá" style={{ fontSize: 12, color: MUTED }}>+ {money(r.saldoOtras)} en otra sede</span>}
                 {!errorFicha && arr(p.alergias).map((a) => <ChipAlergia key={a}>⚠ {a}</ChipAlergia>)}
                 {!errorFicha && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias</span>}
                 {esPed && (p.apoderadoNombre ? <span>Apoderado: {p.apoderadoNombre}</span> : <span className="is-debe">Menor sin apoderado</span>)}

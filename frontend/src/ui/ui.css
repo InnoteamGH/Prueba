@@ -3699,7 +3699,7 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-cons__ico{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#12A5AE,#0B6A73);box-shadow:0 10px 22px -12px #0B6A73}
 .dc-cons__rango{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .dc-cons__rango label{display:grid;gap:3px;font-size:12px;font-weight:600;color:var(--dc-ink-500)}
-.dc-cons__rango input{height:38px;border:1px solid var(--dc-line);border-radius:10px;padding:0 10px;font:inherit;font-size:13px;color:var(--dc-navy);background:var(--dc-surface,#fff)}
+.dc-cons__rango input,.dc-cons__rango select{height:38px;border:1px solid var(--dc-line);border-radius:10px;padding:0 10px;font:inherit;font-size:13px;color:var(--dc-navy);background:var(--dc-surface,#fff)}
 .dc-cons__exp{height:38px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:10px;border:1px solid var(--dc-line);background:var(--dc-surface,#fff);color:var(--dc-navy);font:600 13px/1 var(--dc-font);cursor:pointer}
 .dc-cons__exp:disabled{opacity:.5;cursor:default}
 .dc-cons__kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
@@ -3740,7 +3740,7 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 @media (max-width:720px){
   .dc-cons__rango{width:100%}
   .dc-cons__rango label{flex:1}
-  .dc-cons__rango input{width:100%}
+  .dc-cons__rango input,.dc-cons__rango select{width:100%}
   .dc-cons__docs li{grid-template-columns:1fr 36px}
   .dc-cons__barra{grid-column:1/-1;grid-row:2}
   .dc-cons__grupos{grid-template-columns:1fr}
@@ -4901,7 +4901,8 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-cons__hero p { color: rgba(255,255,255,.78) !important; }
 .dc-cons__ico { background: rgba(255,255,255,.16) !important; box-shadow: none !important; }
 .dc-cons__rango label { color: rgba(255,255,255,.75) !important; }
-.dc-cons__rango input { background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.28) !important; color: #fff !important; color-scheme: dark; }
+.dc-cons__rango input, .dc-cons__rango select { background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.28) !important; color: #fff !important; color-scheme: dark; }
+.dc-cons__rango select option { color: var(--dc-navy); background: #fff; }
 .dc-cons__exp { background: #fff !important; border-color: #fff !important; color: #0B6C78 !important; }
 .dc-cons__hero .dc-moneda-sel { background: rgba(255,255,255,.12) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22) !important; }
 .dc-cons__hero .dc-moneda-sel button { color: rgba(255,255,255,.85) !important; }

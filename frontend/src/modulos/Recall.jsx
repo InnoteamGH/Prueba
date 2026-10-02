@@ -3,18 +3,16 @@ import React, { useContext, useState, useEffect } from "react";
 import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
-import {DatosDemoCtx, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, MEDICOS, Modal, NAVY, Vacio, addDays, colorDe, espsDe, fechaLegible, fmt, hoy, iniciales, mismaSede, nombreSede, sedesDe, tint, useSede, PersonaCelda} from "../comun";
+import {DatosDemoCtx, usePersist, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, Modal, NAVY, Vacio, addDays, colorDe, fechaLegible, fmt, hoy, iniciales, nombreSede, tint, useSede, PersonaCelda} from "../comun";
 import { porReactivar } from "../compartido/metricas";
-import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 
-function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null, can, tab = "automatizaciones" }) {
+function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
   // Es una acción que sale de la clínica: quien solo consulta no la lanza.
   const puedeEnviar = can ? can("recall", "crear") : true;
   const conectado = !!auth.token;
   // Sede: cola, historial y NPS son de las sedes que se ven con el filtro del menú.
   const { sede: sedeFiltro, ids: sedesVer, enSede, global, activa } = useSede();
-  const sedeActiva = sedeActivaProp ?? activa;   // donde se registra la cita del recall
   const sedesKey = (sedesVer || []).join(",");
   const sedesQ = sedesVer ? sedesVer.map(sedeApiUuid).filter(Boolean) : null;
   // Con API, una fila sin sede (el servidor aún no la manda) se deja ver.
@@ -40,7 +38,11 @@ function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null
   // Con sesión no se dan por activas hasta que el servidor lo confirme: si la carga
   // falla, decir que las cinco están "funcionando solas" hace que nadie revise por qué
   // los pacientes no reciben nada.
-  const [reglas, setReglas] = useState(() => auth.token ? DEFAULT_REGLAS.map((r) => ({ ...r, on: false })) : DEFAULT_REGLAS);
+  // Demostración: lo que se enciende, apaga o redacta se guarda en el navegador (antes
+  // volvía al estado de fábrica al cambiar de pantalla).
+  const [ajustesDemo, setAjustesDemo] = usePersist("recall_ajustes", {});
+  const ajustar = (clave, cambio) => { if (!auth.token) setAjustesDemo((a) => ({ ...a, [clave]: { ...(a[clave] || {}), ...cambio } })); };
+  const [reglas, setReglas] = useState(() => auth.token ? DEFAULT_REGLAS.map((r) => ({ ...r, on: false })) : DEFAULT_REGLAS.map((r) => ({ ...r, ...(ajustesDemo[r.clave] || {}) })));
   const [resumen, setResumen] = useState(null);
   const [histReal, setHistReal] = useState(null);
   const [resenasNps, setResenasNps] = useState(null);
@@ -69,7 +71,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null
     const antes = Object.fromEntries(reglas.map((x) => [x.clave, x.on]));
     setReglas((rs) => rs.map((x) => x.clave === clave ? { ...x, on: nuevo } : x));
     notify(nuevo ? `Automatización "${r.l}" activada.` : `Automatización "${r.l}" pausada.`);
-    if (!conectado) return;
+    if (!conectado) { ajustar(clave, { on: nuevo }); return; }
     const cuerpo = (x, activo) => ({ activo, plantilla: x.plantilla || "", hsmNombre: x.hsmNombre || "", hsmIdioma: x.hsmIdioma || "es" });
     setGuardandoClave(clave);
     api.automatizaciones.actualizar(clave, cuerpo(r, nuevo))
@@ -94,7 +96,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null
   const [probarTel, setProbarTel] = useState("");
   const abrirCfg = (r) => { setCfg(r); setCfgMsg(r.plantilla || ""); setCfgHsm(r.hsmNombre || ""); setProbarTel(""); };
   // Vista previa: reemplaza las variables con datos de ejemplo (como llegaría al paciente).
-  const previewMsg = (t) => (t || "").replace(/\{nombre\}/g, "María").replace(/\{fecha\}/g, addDays(2)).replace(/\{hora\}/g, "10:00").replace(/\{doctor\}/g, "Dra. Carla Mendoza").replace(/\{sede\}/g, "Sede San Isidro");
+  const previewMsg = (t) => (t || "").replace(/\{nombre\}/g, "María").replace(/\{fecha\}/g, addDays(2).split("-").reverse().join("/")).replace(/\{hora\}/g, "10:00").replace(/\{doctor\}/g, "Dra. Carla Mendoza").replace(/\{sede\}/g, "Sede San Isidro");
   const probarAhora = () => {
     if (!cfg) return;
     const tel = (probarTel || "").replace(/\D/g, "");
@@ -104,7 +106,7 @@ function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null
   };
   const guardarCfg = () => {
     if (conectado && cfg) api.automatizaciones.actualizar(cfg.clave, { plantilla: cfgMsg, hsmNombre: cfgHsm }).then(() => { notify(`"${cfg.l}" actualizado.`); cargar(); }).catch(() => notify("No se pudo guardar."));
-    else notify(`"${cfg?.l}" actualizado.`);
+    else { setReglas((rs) => rs.map((x) => (x.clave === cfg?.clave ? { ...x, plantilla: cfgMsg } : x))); ajustar(cfg?.clave, { plantilla: cfgMsg }); notify(`"${cfg?.l}" actualizado.`); }
     setCfg(null);
   };
   const probarHsm = () => {
@@ -133,14 +135,9 @@ function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null
       api.automatizaciones.enviarRecall(id).then(() => notify(`Recall enviado a ${p?.nombre || "paciente"} por WhatsApp. El agente agenda cuando responda.`)).catch(() => { notify("No se pudo enviar el recall."); cargar(); });
       return;
     }
-    if (p && setCitas) {
-      // La cita va a la sede que se está mirando si el paciente se atiende ahí; si no, a la
-      // suya. El doctor es uno de odontología general que trabaje en esa sede, con su precio.
-      const sede = sedesDe(p).some((x) => mismaSede(x, sedeActiva)) ? sedeActiva : (p.sede ?? sedesDe(p)[0] ?? sedeActiva);
-      const med = MEDICOS.find((m) => espsDe(m).includes(1) && sedesDe(m).some((x) => mismaSede(x, sede)));
-      if (med) setCitas((cs) => [...cs, { id: Date.now(), paciente: p.nombre, pacienteId: p.id, dni: p.dni || "—", medicoId: med.id, esp: 1, sede, precio: precioCita(dbRec?.catalogo || CATALOGO_SEED, 1, sede) ?? undefined, fecha: addDays(7), hora: "10:00", motivo: "Control de rutina (recall)", estado: "pendiente", llegada: false }]);
-    }
-    notify(`Recordatorio enviado a ${p?.nombre || "paciente"}.`);
+    // Igual que con el servidor: se manda el WhatsApp y el paciente elige el horario al
+    // responder. Antes la demostración creaba una cita firme a +7 días sin validar agenda.
+    notify(`Recall enviado a ${p?.nombre || "paciente"} por WhatsApp. La cita se agenda cuando responda.`);
   };
   const enviarTodos = () => {
     const pend = cola.filter((x) => x.estado === "por_contactar");
@@ -203,6 +200,13 @@ function Recall({ pacientes, notify, setCitas, sedeActiva: sedeActivaProp = null
   })();
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
+      {/* El historial de envíos solo existía como ruta suelta: sin esta barra no había cómo llegar. */}
+      {subtab !== "satisfaccion" && (
+        <div className="dc-us__roles" role="tablist" aria-label="Recordatorios">
+          <button type="button" role="tab" aria-selected={subtab !== "historial"} className={subtab !== "historial" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => { window.location.hash = "#/recall"; }}><Sparkles size={13} strokeWidth={2} /> Automatizaciones <i>{activas}/{reglas.length}</i></button>
+          <button type="button" role="tab" aria-selected={subtab === "historial"} className={subtab === "historial" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => { window.location.hash = "#/recall_hist"; }}><Send size={13} strokeWidth={2} /> Historial de envíos <i>{histView.length}</i></button>
+        </div>
+      )}
       {subtab === "satisfaccion" ? (() => {
         const fuenteResenas = (resenasNps && resenasNps.length) ? resenasNps : (conectado ? [] : RESENAS_DEMO.filter(deMisPacientes));
         const rs = fuenteResenas.filter((r) => r.nps != null);

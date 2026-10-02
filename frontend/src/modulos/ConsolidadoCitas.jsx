@@ -16,6 +16,7 @@ const PROGRAMADA = ["pendiente", "confirmada", "en_sala", "en_atencion"];
 const PERDIDA = ["cancelada", "reprogramada", "cerrada_sistema"];
 const lunes = (d) => { const x = new Date(d); const dia = (x.getDay() + 6) % 7; x.setDate(x.getDate() - dia); return x; };
 const ymd = (d) => fmt(d);
+const KPI_EST = { Programadas: "programadas", Atendidas: "atendidas", "No asistió": "no_show", Canceladas: "canceladas" };
 
 export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuario, conectado, notify = () => {}, onAbrirCita }) {
   const esMedico = rol === "medico";
@@ -53,28 +54,36 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
   }, [conectado, remotas, citas, rango.desde, rango.hasta, miId, sedesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Filtros visibles de doctor y estado: se aplican antes de los KPIs, así las cifras de
+  // arriba cuentan lo mismo que la tabla (antes el filtro vivía en la cabecera de columna).
+  const [docSel, setDocSel] = useState("todos");
+  const [estSel, setEstSel] = useState("todos");
+  const GRUPO_EST = { programadas: PROGRAMADA, atendidas: ["atendida"], no_show: ["no_show"], canceladas: PERDIDA };
+  const doctoresRango = useMemo(() => [...new Set(filas.map((c) => c.medico))].sort((a, b) => a.localeCompare(b)), [filas]);
+  const filasF = useMemo(() => filas.filter((c) => (docSel === "todos" || c.medico === docSel)
+    && (estSel === "todos" || (GRUPO_EST[estSel] || []).includes(estadoCita(c)) || (GRUPO_EST[estSel] || []).includes(c.estado))), [filas, docSel, estSel]); // eslint-disable-line react-hooks/exhaustive-deps
   const k = useMemo(() => {
-    const cnt = (f) => filas.filter(f).length;
+    const cnt = (f) => filasF.filter(f).length;
     const atendidas = cnt((c) => c.estado === "atendida");
     const noShow = cnt((c) => c.estado === "no_show");
     const perdidas = cnt((c) => PERDIDA.includes(c.estado));
     const programadas = cnt((c) => PROGRAMADA.includes(c.estado));
     const cerradas = atendidas + noShow;
-    return { total: filas.length, atendidas, noShow, perdidas, programadas, asistencia: cerradas ? Math.round((atendidas / cerradas) * 100) : null };
-  }, [filas]);
+    return { total: filasF.length, atendidas, noShow, perdidas, programadas, asistencia: cerradas ? Math.round((atendidas / cerradas) * 100) : null };
+  }, [filasF]);
 
   const porDoctor = useMemo(() => {
     const m = new Map();
-    filas.forEach((c) => { const key = c.medico; const x = m.get(key) || { medico: key, total: 0, atendidas: 0, noShow: 0, programadas: 0 }; x.total++; if (c.estado === "atendida") x.atendidas++; if (c.estado === "no_show") x.noShow++; if (PROGRAMADA.includes(c.estado)) x.programadas++; m.set(key, x); });
+    filasF.forEach((c) => { const key = c.medico; const x = m.get(key) || { medico: key, total: 0, atendidas: 0, noShow: 0, programadas: 0 }; x.total++; if (c.estado === "atendida") x.atendidas++; if (c.estado === "no_show") x.noShow++; if (PROGRAMADA.includes(c.estado)) x.programadas++; m.set(key, x); });
     return [...m.values()].sort((a, b) => b.total - a.total);
-  }, [filas]);
+  }, [filasF]);
   const maxDoc = Math.max(1, ...porDoctor.map((d) => d.total));
 
   const badge = (e) => { const b = ESTADO_BADGE[e] || { l: e, bg: "var(--dc-bg)", fg: "var(--dc-ink-500)" }; return <span className="dc-pill" style={{ background: b.bg, color: b.fg }}>{b.l}</span>; };
   const exportar = () => exportarExcel({
     nombreArchivo: `citas_${rango.desde}_${rango.hasta}.xlsx`, hoja: "Citas", titulo: `Consolidado de citas${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`,
     columnas: [{ key: "fecha", label: "Fecha", w: 12 }, { key: "hora", label: "Hora", w: 8 }, { key: "paciente", label: "Paciente", w: 26 }, { key: "medico", label: "Doctor", w: 24 }, { key: "motivo", label: "Motivo", w: 26 }, { key: "estadoL", label: "Estado", w: 14 }, { key: "sedeNombre", label: "Sede", w: 16 }],
-    filas: filas.map((c) => ({ ...c, estadoL: (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado })),
+    filas: filasF.map((c) => ({ ...c, estadoL: (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado })),
   }).catch(() => notify("No se pudo generar el Excel."));
 
   const KPIS = [
@@ -98,11 +107,14 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
           </div>
           <label><span>Desde</span><input type="date" value={rango.desde} max={rango.hasta} onChange={(e) => { setPreset("x"); setRango({ ...rango, desde: e.target.value }); }} /></label>
           <label><span>Hasta</span><input type="date" value={rango.hasta} min={rango.desde} onChange={(e) => { setPreset("x"); setRango({ ...rango, hasta: e.target.value }); }} /></label>
+          {!esMedico && doctoresRango.length > 1 && <label><span>Doctor</span><select value={docSel} onChange={(e) => setDocSel(e.target.value)}><option value="todos">Todos</option>{doctoresRango.map((d) => <option key={d} value={d}>{d}</option>)}</select></label>}
+          <label><span>Estado</span><select value={estSel} onChange={(e) => setEstSel(e.target.value)}><option value="todos">Todos</option><option value="programadas">Programadas</option><option value="atendidas">Atendidas</option><option value="no_show">No asistió</option><option value="canceladas">Canceladas</option></select></label>
           {/* GLO-04: se exporta desde la barra de la tabla (lo filtrado). */}
         </div>
         <dl className="dc-cons__cifras">
           {KPIS.map(([l, v, , c, s]) => (
-            <div key={l} style={{ "--c": c }} title={s}><dt>{l}</dt><dd>{cargando ? "…" : v}</dd></div>
+            <div key={l} style={{ "--c": c, cursor: "pointer", outline: estSel === KPI_EST[l] && l !== "Total" ? "2px solid var(--c)" : "none", borderRadius: 10 }} title={`${s} · clic para filtrar`} role="button" tabIndex={0}
+              onClick={() => setEstSel((x) => (l === "Total" || x === KPI_EST[l] ? "todos" : KPI_EST[l]))} onKeyDown={(e) => { if (e.key === "Enter") setEstSel((x) => (l === "Total" || x === KPI_EST[l] ? "todos" : KPI_EST[l])); }}><dt>{l}</dt><dd>{cargando ? "…" : v}</dd></div>
           ))}
         </dl>
       </section>
@@ -111,14 +123,14 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       {/* AGE-07: la vista Lista es solo filtros, conteo y tabla. Citas por doctor está en
           el Panel y la Ocupación de sillones en Reportes. */}
 
-      {filas.length === 0 ? (
-        <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : "Sin citas en el rango"} sub="Cambia las fechas para ver otro periodo." /></Card>
+      {filasF.length === 0 ? (
+        <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : filas.length ? "Ninguna cita con estos filtros" : "Sin citas en el rango"} sub={filas.length ? "Cambia el doctor o el estado." : "Cambia las fechas para ver otro periodo."} /></Card>
       ) : (
-        <ListaFiltrable rows={filas} sub="citas" vistaClave="citas_consolidado"
-          exportTitulo={`Consolidado de citas${rol === "medico" && usuario?.nombre ? ` · ${usuario.nombre}` : ""}${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`}
+        <ListaFiltrable rows={filasF} sub="citas" vistaClave="citas_consolidado"
+          exportTitulo={`Consolidado de citas${rol === "medico" && usuario?.nombre ? ` · ${usuario.nombre}` : ""}${docSel !== "todos" ? ` · ${docSel}` : ""}${estSel !== "todos" ? ` · ${{ programadas: "Programadas", atendidas: "Atendidas", no_show: "No asistió", canceladas: "Canceladas" }[estSel]}` : ""}${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`}
           vistas={[{ id: "dia", label: "Por día", icon: CalendarDays }]}
           tabla={{ primero: true, minWidth: 860, onRowClick: onAbrirCita, cols: [
-            { key: "f", label: "Fecha", w: "120px", cell: (c) => <span className="dc-tp__num">{fechaLegible(c.fecha)}</span> },
+            { key: "f", label: "Fecha", w: "120px", exportar: (c) => String(c.fecha || "").split("-").reverse().join("/"), cell: (c) => <span className="dc-tp__num">{fechaLegible(c.fecha)}</span> },
             { key: "h", label: "Hora", w: "70px", cell: (c) => <span className="dc-tp__num">{c.hora}</span> },
             { key: "p", label: "Paciente", w: "minmax(170px,1.2fr)", get: (c) => c.paciente, cell: (c) => <PersonaCelda nombre={c.paciente} /> },
             { key: "m", label: "Motivo", w: "minmax(150px,1.1fr)", get: (c) => c.motivo || "—" },

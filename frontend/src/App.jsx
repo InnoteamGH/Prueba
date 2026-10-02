@@ -1781,6 +1781,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // Dar de alta un paciente y lanzar campañas es trabajo de recepción y administración.
   // Gerencia entra aquí a consultar la cartera, no a escribir en ella.
   const puedeGestionar = can ? can("pacientes", "crear") : true;
+  // Borrar es otro permiso: recepción da de alta y edita, pero no elimina.
+  const puedeEliminar = can ? can("pacientes", "eliminar") : true;
   // Modo conectado (JWT presente): los datos vienen del backend real; si no, demo.
   const conectado = !!auth.token;
   const sedeCx = useSede();
@@ -1916,6 +1918,17 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // (paciente.fichaClinica, /historia, /auditoria). La demostración abre la misma
   // pantalla con datos de ejemplo, así lo que se revisa es lo que se usará.
   const abrirFicha = (p, tab = null) => { if (p?.id != null) { setFmTab(tab); setFmId(p.id); } };
+  // Saldo de las sedes a la vista (la misma cuenta que Plan y cuenta y Caja): lo hecho en
+  // otra sede se cobra allá y no se suma aquí.
+  const ctaSede = (p) => M.cuentaPaciente(fichaDeSede(fichas[p.id], p, (x) => sedeEnLista(x, sedeIds)));
+  // Alta = apertura de historia: cuando el paciente nuevo ya figura en el padrón se abre su ficha.
+  const abrirTrasAlta = useRef(null);
+  useEffect(() => {
+    const id = abrirTrasAlta.current;
+    if (id == null || !lista.some((p) => String(p.id) === String(id))) return;
+    abrirTrasAlta.current = null;
+    abrirFicha({ id }, "datos");
+  }, [lista]); // eslint-disable-line react-hooks/exhaustive-deps
   const abrirHistoria = (p) => abrirFicha(p, "historia");
   const verFicha = (p) => abrirFicha(p);
   const abrirOdontograma = (p) => abrirFicha(p, "odontograma");
@@ -1945,6 +1958,10 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const guardar = async () => {
     const v = validarFormPaciente(form, hoyISO);
     if (!v.ok) { setFormErr(v.errors); notify(v.errors[v.first] || "Revisa los campos marcados."); return; }
+    // Un DNI es una persona: si ya está en el padrón, se edita esa ficha en vez de abrir otra.
+    const dniN = String(form.dni || "").trim();
+    const dup = dniN && [...listaBase, ...(conectado ? [] : pacientes)].find((x) => x.id !== form.id && String(x.dni || "").trim() === dniN);
+    if (dup) { setFormErr({ dni: `Ya registrado: ${dup.nombre}` }); notify(`El DNI ${dniN} ya pertenece a ${dup.nombre}. Búscalo en el directorio.`); return; }
     setFormErr({});
     if (conectado) {
       const sedesForm = normSedes(form.sedes);
@@ -1958,8 +1975,9 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         apoderadoNombre: form.apoderadoNombre || "", apoderadoParentesco: form.apoderadoParentesco || "",
         apoderadoDni: form.apoderadoDni || "", apoderadoTelefono: form.apoderadoTelefono || "" };
       try {
-        if (form.id) await api.pacientes.actualizar(form.id, payload); else await api.pacientes.crear(payload);
-        notify(form.id ? "Paciente actualizado." : `${form.nombre} registrado.`);
+        if (form.id) await api.pacientes.actualizar(form.id, payload);
+        else { const r = await api.pacientes.crear(payload); if (r?.id != null) abrirTrasAlta.current = r.id; }
+        notify(form.id ? "Paciente actualizado." : `${form.nombre} registrado. Se abre su historia clínica.`);
         setForm(null); recargar();
       } catch (e) {
         const msg = e.message || "Error desconocido";
@@ -1971,8 +1989,9 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     const sedes = normSedes(form.sedes).length ? normSedes(form.sedes) : [sedeAlta];
     const d = { nombre: form.nombre, dni: form.dni, telefono: form.telefono, email: form.email, nacimiento: form.nacimiento, genero: form.genero, distrito: form.distrito, canal: form.canal, aseguradora: form.aseguradora, marketing: form.marketing, sedes, tags: form.tags || [], comentario: form.comentario || "", tarea: form.tarea || "", apoderadoNombre: form.apoderadoNombre || "", apoderadoParentesco: form.apoderadoParentesco || "", apoderadoDni: form.apoderadoDni || "", apoderadoTelefono: form.apoderadoTelefono || "" };
     if (form.id) setPacientes((ps) => ps.map((p) => p.id === form.id ? { ...p, ...d } : p));
-    else setPacientes((ps) => [...ps, { id: Math.max(0, ...ps.map((p) => p.id)) + 1, ...d, ultima: null, creadoEn: new Date().toISOString() }]);
-    notify(form.id ? "Paciente actualizado." : `${form.nombre} registrado con sus datos de marketing.`);
+    // El id sale del padrón completo (el de esta pantalla viene filtrado por sede).
+    else setPacientes((ps) => { const nid = Math.max(0, ...ps.map((p) => Number(p.id) || 0)) + 1; abrirTrasAlta.current = nid; return [...ps, { id: nid, ...d, ultima: null, creadoEn: new Date().toISOString() }]; });
+    notify(form.id ? "Paciente actualizado." : `${form.nombre} registrado. Se abre su historia clínica.`);
     setForm(null);
   };
   const eliminar = () => {
@@ -1989,6 +2008,12 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
      conservan su ficha. Se borra del todo solo si todas sus sedes son del usuario.
      Devuelve true si se hizo algo (para cerrar el formulario). */
   const borrarDemo = (p) => {
+    // Igual que el servidor (tieneHistoria): con citas o registros clínicos no se borra.
+    const f = (fichas || {})[p.id] || {};
+    const conHistoria = (citasSrc || []).some((c) => M.citaDePaciente(c, p))
+      || ["evoluciones", "historia", "tratamientos", "recetas", "imagenes"].some((k) => Array.isArray(f[k]) && f[k].length)
+      || Object.keys(f.odontograma || {}).length > 0;
+    if (conHistoria) { notify("Este paciente tiene citas o registros clínicos. No se puede eliminar; edita sus datos si cambió algo."); return false; }
     const todas = sedesDe(p);
     const ajenas = todas.filter((x) => !esMiaPac(x));
     const mias = todas.filter(esMiaPac);
@@ -2127,8 +2152,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // presupuesto de ejemplo que lleva cada ficha.
     // Con sesión: columna de deuda (saldo pendiente). Verde solo si está al día.
     // PAC-03: «Saldo» = monto por pagar del plan (en rojo si tiene vencido) o «—». Sin barra.
-    { key: "presupuesto", label: "Saldo", w: "minmax(110px,0.8fr)", a: "right", get: (p) => { if (conectado) { const q = saldos ? saldos[p.id] : null; return q ? Math.max(0, q.total - q.pagado) : 0; } return M.cuentaPaciente(fichas[p.id]).saldoPlan; },
-      cell: (p) => { let saldo, venc = 0; if (conectado) { const q = saldos ? saldos[p.id] : null; saldo = q ? Math.max(0, (Number(q.total) || 0) - (Number(q.pagado) || 0)) : 0; } else { const c = M.cuentaPaciente(fichas[p.id]); saldo = c.saldoPlan; venc = c.vencido; }
+    { key: "presupuesto", label: "Saldo", w: "minmax(110px,0.8fr)", a: "right", get: (p) => { if (conectado) { const q = saldos ? saldos[p.id] : null; return q ? Math.max(0, q.total - q.pagado) : 0; } return ctaSede(p).saldoPlan; },
+      cell: (p) => { let saldo, venc = 0; if (conectado) { const q = saldos ? saldos[p.id] : null; saldo = q ? Math.max(0, (Number(q.total) || 0) - (Number(q.pagado) || 0)) : 0; } else { const c = ctaSede(p); saldo = c.saldoPlan; venc = c.vencido; }
         return saldo > 0 ? <span title={venc > 0 ? `S/ ${venc.toLocaleString("es-PE")} vencido (más de ${M.UMBRAL_VENCIDO_DIAS} días)` : "Saldo del plan"} style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: venc > 0 ? "var(--dc-danger-700)" : "var(--dc-ink-900, #0B1220)" }}>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>; } },
     { key: "acc", label: "Acciones", w: "128px", a: "right", sticky: true, noFilter: true, noSort: true, cell: (p) => (
       <div className="dc-row-actions" style={{ display: "inline-flex", gap: 4, justifyContent: "flex-end", alignItems: "center", flexWrap: "nowrap" }} onClick={(e) => e.stopPropagation()}>
@@ -2141,7 +2166,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
           { label: "Historia clínica", onClick: () => abrirHistoria(p) },
           p.telefono && { label: "WhatsApp", onClick: () => { window.location.hash = "#/whatsapp"; } },
           { label: "Editar datos", onClick: () => editar(p) },
-          puedeGestionar && { label: "Eliminar paciente", peligro: true, onClick: () => eliminarPaciente(p) },
+          puedeEliminar && { label: "Eliminar paciente", peligro: true, onClick: () => eliminarPaciente(p) },
         ]} />
       </div>
     ) },
@@ -2240,7 +2265,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         const secTit = { fontSize: 12, fontWeight: 500, letterSpacing: ".06em", textTransform: "uppercase", color: TEAL, margin: "22px 0 12px", display: "flex", alignItems: "center", gap: 7 };
         return (
         <Modal icon={<Users size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar paciente" : "Nuevo paciente"} sub={form.id ? "Actualiza los datos del paciente" : "Registra un nuevo paciente y sus datos para marketing"} onClose={() => setForm(null)} size="largo" maxW={720}
-        footer={<>{form.id && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear paciente"}</Btn></>}>
+        footer={<>{form.id && puedeEliminar && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear paciente"}</Btn></>}>
         <div className="dc-msec" style={secTit}><User size={14} strokeWidth={1.75} /> Datos personales</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
@@ -5376,7 +5401,8 @@ function MiProduccion({ usuario, citas, sedes = null }) {
 
   const R = real && real.esMedico ? real : null;
   const prodHoy = R ? (Number(R.produccionHoy) || 0)
-    : misCitas.filter((c) => c.fecha === fmt(hoy) && (c.estado === "atendida" || c.estado === "en_atencion")).reduce((s, c) => s + precio(c), 0);
+    // Producción = lo atendido; una consulta en curso todavía no se cuenta.
+    : misCitas.filter((c) => c.fecha === fmt(hoy) && c.estado === "atendida").reduce((s, c) => s + precio(c), 0);
   const mesProd = R ? (Number(R.produccionMes) || 0) : enSedes.prod;
   // REP-02: sin histórico en la demostración no se inventa el mes anterior.
   const mesAnterior = R ? (Number(R.produccionMesAnterior) || 0) : 0;

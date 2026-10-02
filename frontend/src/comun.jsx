@@ -1485,7 +1485,8 @@ export const Modal = ({ icon, titulo, sub, onClose, children, footer, maxW, size
     if (first) first.focus();
     else if (root) root.focus();
     const onKey = (e) => {
-      if (e.key === "Escape") { e.stopPropagation(); onClose?.(); return; }
+      // Un desplegable abierto dentro del modal consume su Escape (preventDefault): solo se cierra él.
+      if (e.key === "Escape") { if (e.defaultPrevented) return; e.stopPropagation(); onClose?.(); return; }
       if (e.key !== "Tab" || !root) return;
       const list = focusables();
       if (!list.length) return;
@@ -1606,7 +1607,7 @@ export function FiltroCabecera({ st, total, filtradas, sub = "registros", classN
         <label className="dc-fcab__buscar">
           <Search size={14} strokeWidth={2} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${sub}…`} aria-label={`Buscar en ${sub}`}
-            onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} />
+            onKeyDown={(e) => { if (e.key === "Escape" && q) { e.preventDefault(); setQ(""); } }} />
           {q && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setQ("")}><X size={13} strokeWidth={2.2} /></button>}
         </label>
       )}
@@ -1755,7 +1756,7 @@ export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empt
   const cajaBuscar = conBuscar ? (
     <label className="dc-fcab__buscar dc-dt__buscar">
       <Search size={14} strokeWidth={2} />
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${sub || "la tabla"}…`} aria-label={`Buscar en ${sub || "la tabla"}`} onKeyDown={(e) => { if (e.key === "Escape") setQ(""); }} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${sub || "la tabla"}…`} aria-label={`Buscar en ${sub || "la tabla"}`} onKeyDown={(e) => { if (e.key === "Escape" && q) { e.preventDefault(); setQ(""); } }} />
       {q && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setQ("")}><X size={13} strokeWidth={2.2} /></button>}
     </label>
   ) : null;
@@ -1852,7 +1853,7 @@ export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
           desplazaba la lista fija y el clic caía sobre la fila de otro paciente. */}
       {pos && createPortal(<>
         <div onClick={(e) => { e.stopPropagation(); setPos(null); }} style={{ position: "fixed", inset: 0, zIndex: 190 }} />
-        <div className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") setPos(null); }}>
+        <div className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setPos(null); } }}>
           {lista.map((o) => (
             <button key={o.label} type="button" role="menuitem" className={`dc-menu__op${o.peligro ? " dc-menu__op--peligro" : ""}`} onClick={() => { setPos(null); o.onClick(); }}>{o.label}</button>
           ))}
