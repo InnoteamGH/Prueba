@@ -61,7 +61,7 @@ const CHATS_INIT = [
     { de: "ia", txt: "Uy, lamento muchísimo la espera, de verdad no debió pasar 🙏 Ya estoy coordinando con el área de atención al paciente para resolverlo; te escriben enseguida por aquí.", t: "12:30", tools: ["derivar_area"] },
     { de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", t: "12:30" },
   ] },
-  { id: 4, nombre: "Luis Paredes", tel: "+51 945 330 218", modo: "ia", noLeidos: 0, actualizado: haceDias(12, "10:15"), msgs: [
+  { id: 4, nombre: "Luis Palacios", tel: "+51 945 330 218", modo: "ia", noLeidos: 0, actualizado: haceDias(12, "10:15"), msgs: [
     { de: "paciente", txt: "¿Atienden los domingos?", t: "10:14" },
     { de: "ia", txt: "Atendemos de lunes a sábado de 8:00 a. m. a 6:00 p. m. 🕗 ¿Te busco un horario?", t: "10:15" },
   ] },
