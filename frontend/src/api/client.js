@@ -245,7 +245,7 @@ export const api = {
     cambiarEstado: (id, estado, motivo) => request("PATCH", `/citas/${id}/estado?estado=${estado}${motivo ? `&motivo=${encodeURIComponent(motivo)}` : ""}`),
     checkin: (id) => request("PATCH", `/citas/${id}/checkin`),
     comprobante: (id) => request("POST", `/citas/${id}/comprobante`),
-    enviarConfirmaciones: (fecha) => request("POST", `/citas/enviar-confirmaciones${fecha ? `?fecha=${fecha}` : ""}`),
+    enviarConfirmaciones: (fecha, sedes) => request("POST", `/citas/enviar-confirmaciones${conQuery({ fecha, sedeIds: sedes })}`),
   },
   pacientes: {
     listar: () => request("GET", "/pacientes"),
@@ -442,7 +442,7 @@ export const api = {
   gerencialIndicadores: (sedes) => request("GET", `/gerencial/indicadores${conQuery({ sedeIds: sedes })}`),
   gerencialReportes: (sedes) => request("GET", `/gerencial/reportes${conQuery({ sedeIds: sedes })}`),
   gerencialProduccion: (desde, hasta) => request("GET", `/gerencial/produccion${desde ? `?desde=${desde}&hasta=${hasta}` : ""}`),
-  evolucionesPendientes: () => request("GET", "/alertas/evoluciones-pendientes"),
+  evolucionesPendientes: (sedes) => request("GET", `/alertas/evoluciones-pendientes${conQuery({ sedeIds: sedes })}`),
   caja: () => request("GET", "/caja"),
   cajaApertura: {
     get: (sedeId, fecha) => request("GET", `/caja/apertura?sedeId=${encodeURIComponent(sedeId)}${fecha ? `&fecha=${fecha}` : ""}`),

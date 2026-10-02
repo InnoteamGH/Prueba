@@ -373,13 +373,17 @@ function Gerencial({ citas, sede, sedes }) {
 function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, notify = () => {}, onIr = () => {}, horarioClinica = { horario: {}, feriados: [] }, sedeActiva = "all" }) {
   const enviarConfMañana = () => {
     if (!(!!auth.token)) { notify("Disponible al iniciar sesión."); return; }
-    api.citas.enviarConfirmaciones(addDays(1)).then((r) => notify(`Confirmaciones enviadas: ${r.enviados}/${r.total} citas de mañana por WhatsApp.`)).catch(() => notify("No se pudo enviar las confirmaciones."));
+    // Solo las citas de mañana de la sede que se ve (el texto cuenta solo esas).
+    api.citas.enviarConfirmaciones(addDays(1), sedesApiDash()).then((r) => notify(`Confirmaciones enviadas: ${r.enviados}/${r.total} citas de mañana por WhatsApp.`)).catch(() => notify("No se pudo enviar las confirmaciones."));
   };
   const esMed = rol === "medico";
   const esRec = rol === "recepcion", esAdmin = rol === "admin", esTI = rol === "ti";
   const esGer = rol === "gerencia", esAdmSede = rol === "admin_sede";
   const conectado = !!auth.token;
   const dbDash = useContext(DatosDemoCtx);
+  // Sedes que se ven, como UUID para la API (null = todas las del usuario, las decide el servidor).
+  const sedeCtxDash = useSede();
+  const sedesApiDash = () => (sedeCtxDash.sede === "all" && sedeCtxDash.global ? null : (sedeCtxDash.ids || []).map((x) => sedeApiUuid(x)));
   const mapCD = (c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || null, especialidad: c.especialidad || null, esp: c.especialidadId, sede: c.sedeId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), motivo: c.motivo, estado: c.estado, llegada: !!c.llegada, valor: c.valor });
   const [remC, setRemC] = useState(null);
   const [cajaDeuda, setCajaDeuda] = useState(null);
@@ -434,7 +438,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
         const ult = (p.creadoEn || "").toString().slice(0, 10) || null;
         return { id: p.id, nombre: p.nombre, dni: p.dni || "", ultima: ult, sede: s, sedes: [s], sedeRegistroId: p.sedeRegistroId || null };
       }))).catch(() => {});
-      api.evolucionesPendientes().then(setPendEvo).catch(() => {});
+      api.evolucionesPendientes(sedesApiDash()).then(setPendEvo).catch(() => {});
     }
   };
   useEffect(() => { cargarDash(); }, []); // eslint-disable-line
