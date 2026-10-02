@@ -10,7 +10,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock, Cloud, FileCheck2, FileText, FileX2, KeyRound, Link2, PlugZap, Receipt, RefreshCw, Smartphone, Undo2, Wallet } from "lucide-react";
 import api, { auth } from "../api/client";
-import { BotonExportar, Btn, DataTable, MenuAcciones, Modal, Select, fmt, hoy, nombreSede } from "../comun";
+import { BotonExportar, Btn, DataTable, MenuAcciones, Modal, SEDES, Select, fmt, hoy, mismaSede, nombreSede } from "../comun";
 import { datosImpresion } from "../util/membrete";
 
 const CLAVE_CFG = "dc_data_v1_sunat_cfg";
@@ -44,10 +44,25 @@ const fechaCorta = (iso) => String(iso || "").slice(0, 10).split("-").reverse().
 
 const cfgDefecto = (sedes) => ({
   proveedor: "", ambiente: "pruebas", url: "", token: "", afectacion: "gravado", envioAuto: true, horaResumen: "23:00",
-  series: Object.fromEntries((sedes.length ? sedes : [{ id: 1 }, { id: 2 }]).map((s, i) => [String(s.id), { boleta: `B00${i + 1}`, factura: `F00${i + 1}`, ncBoleta: `BC0${i + 1}`, ncFactura: `FC0${i + 1}` }])),
+  series: Object.fromEntries((sedes.length ? sedes : SEDES).map((s, i) => [String(s.id), { boleta: `B00${i + 1}`, factura: `F00${i + 1}`, ncBoleta: `BC0${i + 1}`, ncFactura: `FC0${i + 1}` }])),
 });
 const leerCfg = (sedes) => ({ ...cfgDefecto(sedes), ...leer(CLAVE_CFG, {}) });
-const sedesPorDefecto = () => [{ id: 1, nombre: nombreSede(1) }, { id: 2, nombre: nombreSede(2) }];
+// Sin lista de sedes (demostración), las sedes de la clínica; nunca un par fijo.
+const sedesPorDefecto = () => SEDES.map((s) => ({ id: s.id, nombre: nombreSede(s.id) }));
+/** Series de una sede: la clave puede ser el id de la demo (1/2) o el UUID del servidor. */
+const seriesDe = (cfg, sede) => {
+  const series = (cfg && cfg.series) || {};
+  if (sede != null && series[String(sede)]) return series[String(sede)];
+  const k = sede == null ? null : Object.keys(series).find((x) => mismaSede(x, sede));
+  return (k && series[k]) || null;
+};
+/** Serie de la sede para el comprobante (boleta por defecto) según lo configurado en
+    Integraciones › Facturación electrónica; null si esa sede no tiene serie. */
+export function serieSede(sede, tipo = "boleta") {
+  if (sede == null || sede === "all") return null;
+  const x = seriesDe(leerCfg(sedesPorDefecto()), sede);
+  return (x && x[tipo]) || null;
+}
 
 /* Empresas de ejemplo: algunos pacientes piden factura a nombre de su empresa. */
 const EMPRESAS_DEMO = [
@@ -65,8 +80,9 @@ function simular(pagos, cfg, overrides) {
   const pasados = orden.map((p, i) => [p, i]).filter(([p]) => String(p.fecha).slice(0, 10) < hoyISO).map(([, i]) => i);
   const iObs = pasados[pasados.length - 2], iRech = pasados[pasados.length - 4], iUsd = pasados[pasados.length - 3];
   const lista = orden.map((p, i) => {
-    const sede = String(p.sede ?? 1);
-    const ser = cfg.series[sede] || cfg.series[Object.keys(cfg.series)[0]] || { boleta: "B001", factura: "F001" };
+    // La serie es la de la sede donde se cobró; un cobro sin sede usa la primera configurada.
+    const sede = p.sede ?? null;
+    const ser = seriesDe(cfg, sede) || cfg.series[Object.keys(cfg.series)[0]] || { boleta: "B001", factura: "F001" };
     const esFactura = i % 4 === 2;
     const empresa = EMPRESAS_DEMO[i % EMPRESAS_DEMO.length];
     const serie = esFactura ? ser.factura : ser.boleta;
@@ -96,9 +112,14 @@ function simular(pagos, cfg, overrides) {
 const EstadoChip = ({ e, msg }) => { const x = ESTADO[e] || ESTADO.pendiente; const I = x.ic; return <span className={`dc-fe__chip ${x.c}`} title={msg || x.l}><I size={12} strokeWidth={2.4} /> {x.l}</span>; };
 
 /* ───────────────────────── Caja › Facturación ───────────────────────── */
-export default function FacturacionSunat({ pagos = [], sedes = [], notify = () => {}, abrirBoleta = () => {}, onIntegraciones = null }) {
+/* pagos: los cobros de toda la clínica (con su sede) para numerar igual en cualquier filtro;
+   verSedes: sedes que se muestran (null = todas); consulta: { sedeIds } para el servidor. */
+export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = null, consulta = null, notify = () => {}, abrirBoleta = () => {}, onIntegraciones = null }) {
   const conectado = !!auth.token;
   const listaSedes = sedes.length ? sedes : sedesPorDefecto();
+  const seVe = (sd) => !verSedes || sd == null || sd === "" || verSedes.some((v) => mismaSede(sd, v));
+  const claveConsulta = JSON.stringify(consulta || {});
+  const claveVer = verSedes ? verSedes.map(String).join(",") : "*";
   const [cfg, setCfg] = useState(() => leerCfg(listaSedes));
   const [overrides, setOverrides] = useState(() => leer(CLAVE_EST, {}));
   const [remoto, setRemoto] = useState(null);
@@ -107,11 +128,13 @@ export default function FacturacionSunat({ pagos = [], sedes = [], notify = () =
   useEffect(() => { guardar(CLAVE_EST, overrides); }, [overrides]);
   useEffect(() => {
     if (!conectado) return;
-    Promise.all([api.sunat.config().catch(() => null), api.sunat.comprobantes().catch((e) => ({ error: e?.status || true }))])
+    Promise.all([api.sunat.config().catch(() => null), api.sunat.comprobantes(null, null, consulta || undefined).catch((e) => ({ error: e?.status || true }))])
       .then(([c, r]) => { if (c) setCfg((x) => ({ ...x, ...c })); setRemoto(r?.error ? { error: r.error } : { comprobantes: r?.comprobantes || r || [] }); });
-  }, [conectado]);
+  }, [conectado, claveConsulta]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const comprobantes = useMemo(() => conectado ? (remoto?.comprobantes || []) : simular(pagos, cfg, overrides), [conectado, remoto, pagos, cfg, overrides]);
+  // Primero se simulan (o llegan) todos; después se recortan a las sedes que se ven, con las
+  // notas de crédito incluidas (cada NC lleva la sede del comprobante que anula).
+  const comprobantes = useMemo(() => (conectado ? (remoto?.comprobantes || []) : simular(pagos, cfg, overrides)).filter((c) => seVe(c.sede ?? c.sedeId)), [conectado, remoto, pagos, cfg, overrides, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
   const cuenta = (e) => comprobantes.filter((c) => c.estado === e).length;
   const atender = comprobantes.filter((c) => c.estado === "observado" || c.estado === "rechazado");
   const FILTROS = [
@@ -136,7 +159,7 @@ export default function FacturacionSunat({ pagos = [], sedes = [], notify = () =
     const c = nc.c; const motivo = (nc.motivo || "").trim();
     if (!motivo) { notify("Indica el motivo de la nota de crédito."); return; }
     if (conectado) { api.sunat.notaCredito(c.id, { motivo, tipoMotivo: nc.tipo }).then(() => { notify("Nota de crédito emitida."); setNc(null); }).catch(() => notify("No se pudo emitir la nota de crédito.")); return; }
-    const ser = cfg.series[c.sede] || { ncBoleta: "BC01", ncFactura: "FC01" };
+    const ser = seriesDe(cfg, c.sede) || { ncBoleta: "BC01", ncFactura: "FC01" };
     const serie = c.tipo === "Factura" ? ser.ncFactura : ser.ncBoleta;
     const usados = Object.values(overrides).filter((o) => o.nc && o.nc.serie === serie).length;
     const id = `${serie}-${num8(usados + 1)}`;
@@ -221,10 +244,16 @@ export default function FacturacionSunat({ pagos = [], sedes = [], notify = () =
 }
 
 /* ─────────────────── Integraciones › Facturación electrónica (TI) ─────────────────── */
-export function ConexionSunat({ notify = () => {} }) {
+export function ConexionSunat({ notify = () => {}, sedes = null }) {
   const conectado = !!auth.token;
-  const listaSedes = sedesPorDefecto();
+  // CONFIG-18: las series son de las sedes reales de la clínica (con sesión, las de /sedes,
+  // con su UUID como clave), no un par fijo de la demostración.
+  const [sedesApi, setSedesApi] = useState(null);
+  useEffect(() => { if (conectado && !(sedes && sedes.length)) api.sedes.listar().then((r) => setSedesApi((r || []).map((x) => ({ id: x.id, nombre: x.nombre || nombreSede(x.id) })))).catch(() => {}); }, [conectado]); // eslint-disable-line react-hooks/exhaustive-deps
+  const listaSedes = sedes && sedes.length ? sedes : sedesApi && sedesApi.length ? sedesApi : sedesPorDefecto();
   const [cfg, setCfg] = useState(() => leerCfg(listaSedes));
+  // Al llegar las sedes del servidor, las que aún no tienen serie toman la sugerida.
+  useEffect(() => { setCfg((x) => ({ ...x, series: { ...cfgDefecto(listaSedes).series, ...(x.series || {}) } })); }, [listaSedes.map((s) => s.id).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editCfg, setEditCfg] = useState(null);
   const [probando, setProbando] = useState(false);
   useEffect(() => { if (conectado) api.sunat.config().then((c) => c && setCfg((x) => ({ ...x, ...c }))).catch(() => {}); }, [conectado]);
@@ -252,7 +281,7 @@ export function ConexionSunat({ notify = () => {} }) {
           <h3>{conectadoProv ? `Conectado con ${(PROVEEDORES.find((p) => p.id === cfg.proveedor) || {}).n || "el proveedor"} · ${cfg.ambiente === "produccion" ? "producción" : "pruebas"}` : "Sin proveedor conectado"}</h3>
           <p>{conectadoProv ? `Emisor ${emisor.razonSocial || emisor.nombre || ""}${emisor.ruc ? ` · RUC ${emisor.ruc}` : ""} · ${(AFECTACION.find((a) => a.v === cfg.afectacion) || {}).l} · resumen diario de boletas a las ${cfg.horaResumen}.` : "Mientras no se conecte, Caja emite boletas sin envío a SUNAT."}</p>
           <div className="dc-fe__series dc-fe__series--fila">
-            {listaSedes.map((s) => { const x = cfg.series[String(s.id)] || {}; return <div key={s.id}><b>{s.nombre}</b><span><i>Boleta</i>{x.boleta || "—"}</span><span><i>Factura</i>{x.factura || "—"}</span><span><i>NC</i>{x.ncBoleta || "—"}/{x.ncFactura || "—"}</span></div>; })}
+            {listaSedes.map((s) => { const x = seriesDe(cfg, s.id) || {}; return <div key={s.id}><b>{s.nombre}</b><span><i>Boleta</i>{x.boleta || "—"}</span><span><i>Factura</i>{x.factura || "—"}</span><span><i>NC</i>{x.ncBoleta || "—"}/{x.ncFactura || "—"}</span></div>; })}
           </div>
         </div>
         <div className="dc-fe__eacc"><button type="button" className="dc-fe__btn is-pri" onClick={() => setEditCfg({ ...cfg, token: "" })}><KeyRound size={15} strokeWidth={2} /> {conectadoProv ? "Configurar" : "Conectar proveedor"}</button></div>

@@ -398,7 +398,8 @@ export const api = {
     quitarAsignacion: (id) => request("DELETE", `/sillones/asignaciones/${id}`),
   },
   egresos: {
-    listar: () => request("GET", "/egresos"),
+    // q = { sedeIds }: egresos de esas sedes (el cuerpo de crear lleva sedeId).
+    listar: (q) => request("GET", `/egresos${conQuery(q)}`),
     crear: (e) => request("POST", "/egresos", e),
     // Reclasificar (categoría) o corregir un egreso. Body parcial: { categoria?, concepto?, monto?, moneda? }
     actualizar: (id, e) => request("PUT", `/egresos/${id}`, e),
@@ -411,9 +412,10 @@ export const api = {
   },
     pagos: {
     listar: (pacienteId) => request("GET", `/pagos${pacienteId ? `?pacienteId=${pacienteId}` : ""}`),
-    historial: () => request("GET", "/pagos/historial"),
+    historial: (q) => request("GET", `/pagos/historial${conQuery(q)}`),
     registrar: (p, opts) => request("POST", "/pagos", p, opts?.headers),
-    cierre: (fecha) => request("GET", `/pagos/cierre${fecha ? `?fecha=${fecha}` : ""}`),
+    // Cierre del día de la caja de una sede: q = { sedeIds }.
+    cierre: (fecha, q) => request("GET", `/pagos/cierre${conQuery({ fecha: fecha || null, ...(q || {}) })}`),
     anular: (id, body) => request("POST", `/pagos/${id}/anular`, body || {}),
     enviarWa: (id) => request("POST", `/pagos/${id}/enviar-wa`),
     // Niubiz: crear sesión de pago (paso A) y confirmar tras el checkout (paso B)
@@ -443,7 +445,8 @@ export const api = {
   gerencialReportes: (sedes) => request("GET", `/gerencial/reportes${conQuery({ sedeIds: sedes })}`),
   gerencialProduccion: (desde, hasta) => request("GET", `/gerencial/produccion${desde ? `?desde=${desde}&hasta=${hasta}` : ""}`),
   evolucionesPendientes: () => request("GET", "/alertas/evoluciones-pendientes"),
-  caja: () => request("GET", "/caja"),
+  // q = { sedeIds }: saldos, terminados y cobros de hoy de esas sedes (sin q, todas las del usuario).
+  caja: (q) => request("GET", `/caja${conQuery(q)}`),
   cajaApertura: {
     get: (sedeId, fecha) => request("GET", `/caja/apertura?sedeId=${encodeURIComponent(sedeId)}${fecha ? `&fecha=${fecha}` : ""}`),
     historial: (params = {}) => {
@@ -480,7 +483,7 @@ export const api = {
     config: () => request("GET", "/facturacion-electronica/config"),
     guardarConfig: (cfg) => request("PUT", "/facturacion-electronica/config", cfg),
     probar: (cfg) => request("POST", "/facturacion-electronica/probar", cfg),
-    comprobantes: (desde, hasta) => request("GET", `/facturacion-electronica/comprobantes${desde ? `?desde=${desde}&hasta=${hasta || desde}` : ""}`),
+    comprobantes: (desde, hasta, q) => request("GET", `/facturacion-electronica/comprobantes${conQuery({ desde: desde || null, hasta: desde ? (hasta || desde) : null, ...(q || {}) })}`),
     reenviar: (id) => request("POST", `/facturacion-electronica/comprobantes/${encodeURIComponent(id)}/reenviar`),
     notaCredito: (id, d) => request("POST", `/facturacion-electronica/comprobantes/${encodeURIComponent(id)}/nota-credito`, d),
   },

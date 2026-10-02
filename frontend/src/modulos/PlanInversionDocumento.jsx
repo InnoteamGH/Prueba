@@ -1,11 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import api from "../api/client";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
+import api, { auth } from "../api/client";
 import confDefault from "../util/planInversionConf.js";
 import { urlLogo, useDatosImpresion } from "../util/membrete";
-import { Select } from "../comun";
+import { DatosDemoCtx, Select, useSede } from "../comun";
+import { leerCatalogo } from "../compartido/catalogo";
+import { precioEnSede } from "../compartido/cajaSede";
 import {
   SUELTOS_PARTIDA,
   resolverLineas,
+  tarifaDesdeCatalogo,
   calcularTotales,
   rotuloPieza,
   necesitaSelectorMaxilar,
@@ -109,12 +112,28 @@ export default function PlanInversionDocumento({
 
   const servicioAdd = SUELTOS_PARTIDA.find((s) => s.cod === Number(codAdd));
 
+  // CAJA-16: los importes son los del catálogo vigente en la sede del documento (los mismos
+  // que el odontograma pasa a Plan y cuenta y que Caja cobra), no una tabla fija igual para
+  // todas las sedes. Si el servidor manda su tarifa por sede (conf.tarifa), manda esa.
+  const sx = useSede();
+  const dbDemo = useContext(DatosDemoCtx);
+  const [catApi, setCatApi] = useState(null);
+  useEffect(() => {
+    if (!auth.token || !api.catalogo?.especialidades) return;
+    api.catalogo.especialidades()
+      .then((r) => setCatApi((r || []).map((e) => ({ id: e.id, nombre: e.nombre, precio: Number(e.precioBase) || 0, preciosSede: e.preciosSede || {}, hallazgos: e.hallazgos || [], activo: e.activo !== false }))))
+      .catch(() => {});
+  }, []);
+  const catalogo = auth.token ? (catApi || []) : (dbDemo?.catalogo || leerCatalogo());
+  const sedePrecio = sedeId ?? sx.activa;
+  const tarifaSede = useMemo(() => conf.tarifa || tarifaDesdeCatalogo(catalogo, (s) => precioEnSede(s, sedePrecio)), [conf.tarifa, catalogo, sedePrecio]);
+
   const { lineas, descartes, totales } = useMemo(() => {
     const sueltos = sueltosUI.map((s) => [s.pz, s.cod, s.max]);
-    const { lineas: L, descartes: D } = resolverLineas(hallazgos, sueltos);
+    const { lineas: L, descartes: D } = resolverLineas(hallazgos, sueltos, tarifaSede);
     const totales = calcularTotales(L, doc.descuento || { activo: false });
     return { lineas: L, descartes: D, totales };
-  }, [hallazgos, sueltosUI, doc.descuento]);
+  }, [hallazgos, sueltosUI, doc.descuento, tarifaSede]);
 
   const hojasPlan = useMemo(() => partirLineasEnHojas(lineas), [lineas]);
   const mostrarOdo = doc.mostrarOdontograma !== false;
