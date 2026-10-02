@@ -57,6 +57,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import { medicoEnSedes } from "./compartido/medicosSede";
+import { imprimirPresupuesto } from "./compartido/presupuestoDoc";
 import {SedeCtx, useSede, useEmiteCobros, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
@@ -2639,6 +2640,22 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   // Solo existe la vista anatómica; la clásica se retiró de la interfaz.
   const vistaOdo = "anatomico";
   const [showPlanInv, setShowPlanInv] = useState(false);
+  // Presupuesto impreso = Plan y cuenta (mismas partidas y precio de la sede), no la tarifa del dibujo.
+  const imprimirPresupuestoOdo = async () => {
+    if (!pacienteId) { notify("Elige un paciente primero."); return; }
+    const pac = pacientes.find((x) => String(x.id) === String(pacienteId)) || {};
+    let items = fichas[pacienteId]?.tratamiento || [], pagos = fichas[pacienteId]?.pagos || [];
+    if (conectado) {
+      try {
+        const planes = await api.tratamientos.porPaciente(pacienteId);
+        items = (planes || []).flatMap((pl) => (pl.fases || []).map((f) => ({ nombre: f.nombre || f.descripcion, costo: Number(f.costo) || 0, estado: f.estado, pieza: f.pieza })));
+        pagos = await api.pagos.listar(pacienteId).catch(() => []);
+      } catch { notify("No se pudo leer el plan del paciente."); return; }
+    }
+    if (!items.filter((f) => f.estado !== "anulado").length) { notify("El plan está vacío: pasa los hallazgos al presupuesto primero."); return; }
+    const ok = imprimirPresupuesto({ paciente: pac, items, pagos, sede: conectado ? null : sedePrecioOdo });
+    if (!ok) notify("Permite ventanas emergentes para ver el presupuesto.");
+  };
   const [anexoPlan, setAnexoPlan] = useState(null);
   const anatomicoRef = useRef(null);
   const abrirPlanInv = async () => {
@@ -2987,7 +3004,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               {pacienteFijo && <span className="dc-odo-foto"><b>Foto del odontograma</b><small>Inicial, evolución y alta. Para marcar o presupuestar, ábrelo en su módulo.</small></span>}
               {pacienteFijo && <Btn small onClick={() => window.dispatchEvent(new CustomEvent("dc-ir", { detail: { vista: "odontograma", pacienteId } }))}><Smile size={14} strokeWidth={1.75} /> Abrir en Odontograma</Btn>}
               {vistaOdo === "anatomico" && pacienteId && <>
-                {!pacienteFijo && <Btn small onClick={() => { anatomicoRef.current?.abrirDocumento?.("plan"); }} title="Presupuesto del paciente para imprimir o guardar en PDF"><FileText size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
+                {!pacienteFijo && <Btn small onClick={imprimirPresupuestoOdo} title="Presupuesto del paciente (las mismas partidas y precios de Plan y cuenta)"><FileText size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
                 <Btn small kind="ghost" onClick={() => { anatomicoRef.current?.abrirDocumento?.("resumen"); }} title="Resumen clínico del odontograma"><Printer size={14} strokeWidth={1.75} /> Resumen de hallazgos</Btn>
               </>}
               {vistaOdo !== "anatomico" && <Btn small kind="ghost" onClick={abrirPlanInv} title="Presupuesto del paciente para imprimir"><Printer size={14} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}
@@ -3442,7 +3459,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && <Btn small kind="ghost" onClick={() => { const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? [] : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)"><FileText size={15} strokeWidth={1.75} /> Imprimir presupuesto</Btn>}<Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
