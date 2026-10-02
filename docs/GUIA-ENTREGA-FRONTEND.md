@@ -17,7 +17,7 @@ El detalle completo de cada endpoint y campo está en `requisitos-minimos.md`, q
 |---|---|
 | `frontend.zip` | La carpeta `frontend/` completa (código fuente, `package.json`, `package-lock.json`, `public/`, `vercel.json`). No incluye `node_modules` ni compilados. |
 | `GUIA-ENTREGA-FRONTEND.md` | Este documento. |
-| `requisitos-minimos.md` | La lista de cambios de backend, punto por punto (del 1 al 46). |
+| `requisitos-minimos.md` | La lista de cambios de backend, punto por punto (del 1 al 54; los 47 a 54 salen del QA de recepción y doctor). |
 
 El backend (Spring Boot) no se toca desde este repositorio. Todo lo que el backend tiene que cambiar está descrito en la sección 3 y en `requisitos-minimos.md`.
 
@@ -37,7 +37,7 @@ cd frontend
 npm ci                      # instala exactamente las versiones del package-lock.json
 echo "VITE_API_URL=https://<backend>/api" > .env.production
 npm run build               # genera dist/
-npm test                    # 116 pasan; fallan 3 que ya fallaban antes (ver 2.4)
+npm test                    # 127 de 130 pasan; fallan 3 que ya fallaban antes (ver 2.4)
 ```
 Publicar `dist/` como hoy. Si se usa Vercel, `vercel.json` ya trae la redirección de la SPA. La app navega por `#/ruta`, así que no hace falta configurar rutas en el servidor.
 
@@ -48,7 +48,7 @@ Publicar `dist/` como hoy. Si se usa Vercel, `vercel.json` ya trae la redirecci�
 - **Navegador:** la app se probó en Chrome y Edge, en escritorio (1440 px) y en celular (390 px).
 
 ### 2.4 Pruebas automáticas
-`npm test` da 116 pruebas que pasan y 3 que fallan. Las 3 fallaban antes de este trabajo y no dependen de él:
+`npm test` da 130 pruebas: 127 pasan y 3 fallan. Las 3 fallaban antes de este trabajo y no dependen de él:
 - una exige `w: "148px"` en Pacientes;
 - otra busca una migración en `supabase/migrations`;
 - otra busca la imagen `odontograma.png` en el pie del PDF.
