@@ -1,13 +1,14 @@
 /* Modal de agendado desde recepción + botón de consulta RENIEC.
    Lo usan App.jsx (Agenda, Espera) y el inbox de WhatsApp, así que vive aparte
    para que el módulo de WhatsApp pueda cargarse en su propio chunk. */
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { Calendar, Check, ChevronRight, Clock, MessageSquare, Phone, Plus, Search, User, AlertTriangle, Armchair, Info, Lock, Star } from "lucide-react";
 import { estadoSillones, evaluarCita, sugerirSillon, turnosDelDia, sillonesDeSede, etiquetaUso } from "./sillones";
 import { useReglasAgenda } from "./useReglasAgenda";
 import { CATALOGO_SEED, precioCita, precioServicio } from "./catalogo";
 import api, { auth } from "../api/client";
-import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, toMin, tint} from "../comun";
+import { sedeApiUuid } from "../routing";
+import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, espsDe, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, mismaSede, sedeNum, sedesDe, toMin, tint, useSede} from "../comun";
 
 /* ---- RENIEC: autocompletar nombres desde el DNI (solo datos reales del backend) ---- */
 export async function reniecLookup(dni) {
@@ -60,36 +61,68 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const rol = rolProp || auth.sesion?.rol || "";
   const puedeForzar = rol === "admin" || rol === "gerencia";
   const bloqueadoForzar = rol === "recepcion" || rol === "admin_sede";
+  // Sede: la cita se registra en una de las sedes que el usuario ve ahora (filtro del menú).
+  // Por defecto la de la cita de origen o la sede activa, nunca la primera de la lista:
+  // así el admin de Surco no deja citas en San Isidro sin darse cuenta.
+  const { ids: sedesVer, activa: sedeActivaCtx, pacientes: pacSede } = useSede();
+  const sedePermitida = (id) => !sedesVer || sedesVer.some((w) => mismaSede(id, w));
   const [pac, setPac] = useState([]); const [meds, setMeds] = useState([]); const [esps, setEsps] = useState([]); const [seds, setSeds] = useState([]);
+  const [pacTodos, setPacTodos] = useState([]);   // todas las sedes: solo para hallar un DNI exacto y no duplicar fichas
+  const [nuevo, setNuevo] = useState(null);         // alta rápida de paciente
+  const ligadoRef = useRef(false);                  // el nombre que trae la lista de espera se liga una sola vez
   const [horarioClinica, setHorarioClinica] = useState({ horario: {}, feriados: [] });
   const [avisoHorario, setAvisoHorario] = useState(null);
-  const [f, setF] = useState({ pacienteId: base?.pacienteId || "", especialidadId: "", medicoId: base?.medicoId || "", sedeId: base?.sedeId || "", fecha: base?.fecha || addDays(1), hora: base?.hora || "10:00", duracionMin: 30, sillon: base?.sillon != null ? String(base.sillon) : "", repetir: "no", veces: 4, avisar: false, motivo: base?.motivo || "", nota: "", canal: base?.canal || "llamada" });
+  const [f, setF] = useState({ pacienteId: base?.pacienteId || "", especialidadId: base?.especialidadId || "", medicoId: base?.medicoId || "", sedeId: base?.sedeId || sedeActivaCtx || "", fecha: base?.fecha || addDays(1), hora: base?.hora || "10:00", duracionMin: 30, sillon: base?.sillon != null ? String(base.sillon) : "", repetir: "no", veces: 4, avisar: false, motivo: base?.motivo || "", nota: "", canal: base?.canal || "llamada" });
+  // La sede elegida se ajusta a la lista permitida (id de la demo o UUID del servidor):
+  // si la de origen no es del usuario, pasa a su sede activa o a la primera que ve.
+  const fijarSede = (list) => setF((x) => {
+    const de = (v) => (v == null || v === "" ? null : (list.find((s) => mismaSede(s.id, v)) || {}).id ?? null);
+    const sid = de(x.sedeId) ?? de(sedeActivaCtx) ?? list[0]?.id ?? "";
+    return String(sid) === String(x.sedeId) ? x : { ...x, sedeId: sid, sillon: "" };
+  });
   // Demostración: sin servidor se usan los pacientes, doctores, sedes y la agenda del
   // propio sistema, y la cita se guarda en la agenda compartida (antes el modal quedaba
   // vacío y no se podía agendar a nadie).
   const demoDb = useContext(DatosDemoCtx);
   const demo = !auth.token && !!demoDb;
+  const mapPac = (p) => ({ id: p.id, nombre: p.nombre, dni: p.dni });
+  // Sedes de un paciente: las de la demo o, con API, la sede donde se registró.
+  const sedesPac = (p) => (demo ? sedesDe(p) : [].concat(p.sedeIds ?? p.sedeRegistroId ?? []));
   const cargarPac = () => {
-    if (demo) { setPac((demoDb.pacientes || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni }))); return Promise.resolve(); }
-    return api.pacientes.listar().then((r) => setPac((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni })))).catch(() => {});
+    // El buscador lista solo pacientes de las sedes que se ven; el total sirve para no duplicar un DNI.
+    const poner = (todos, visibles) => {
+      // El paciente que trae la cita de origen (ficha, WhatsApp) siempre está en la lista.
+      const pid = base?.pacienteId;
+      const extra = pid != null && pid !== "" && !visibles.some((p) => String(p.id) === String(pid)) ? todos.filter((p) => String(p.id) === String(pid)) : [];
+      setPacTodos(todos.map(mapPac)); setPac([...visibles, ...extra].map(mapPac));
+      // Desde la lista de espera llega solo el nombre: se liga a su ficha si existe; si no, se propone registrarlo.
+      if (ligadoRef.current || !base?.pacienteNombre || base?.pacienteId) return;
+      ligadoRef.current = true;
+      const nom = String(base.pacienteNombre).trim().toLowerCase();
+      const hit = visibles.find((p) => String(p.nombre || "").trim().toLowerCase() === nom);
+      if (hit) setF((x) => (x.pacienteId ? x : { ...x, pacienteId: hit.id }));
+      else setNuevo((n) => n || { nombre: base.pacienteNombre, dni: "" });
+    };
+    if (demo) { const todos = demoDb.pacientes || []; poner(todos, pacSede || todos); return Promise.resolve(); }
+    return api.pacientes.listar().then((r) => { const todos = r || []; poner(todos, todos.filter((p) => { const ss = sedesPac(p); return !ss.length || ss.some(sedePermitida); })); }).catch(() => {});
   };
   useEffect(() => {
     if (demo) {
       cargarPac();
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, duracionMin: e.duracionMin })));
-      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp })));
-      setSeds(SEDES.map((x) => ({ id: x.id, nombre: x.nombre })));
-      if (!base?.sedeId) setF((x) => (x.sedeId ? x : { ...x, sedeId: SEDES[0].id }));
+      setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, esps: espsDe(m), sedes: sedesDe(m) })));
+      const list = SEDES.filter((x) => sedePermitida(x.id)).map((x) => ({ id: x.id, nombre: x.nombre }));
+      setSeds(list); fijarSede(list);
       if (demoDb.horarioClinica) setHorarioClinica({ horario: demoDb.horarioClinica.horario || {}, feriados: demoDb.horarioClinica.feriados || [] });
       return;
     }
     cargarPac();
     api.catalogo.especialidades().then((r) => setEsps(r || [])).catch(() => {});
-    api.catalogo.medicos().then((r) => setMeds(r || [])).catch(() => {});
+    // Sedes del doctor tal como las da el API (lista de ids u objetos, o una sola sedeId).
+    api.catalogo.medicos().then((r) => setMeds((r || []).map((m) => ({ ...m, sedes: (m.sedes || m.sedeIds || (m.sedeId != null ? [m.sedeId] : [])).map((x) => x?.id ?? x) })))).catch(() => {});
     api.sedes.listar().then((r) => {
-      const list = r || [];
-      setSeds(list);
-      if (!base?.sedeId && list[0]?.id) setF((x) => (x.sedeId ? x : { ...x, sedeId: list[0].id }));
+      const list = (r || []).filter((x) => sedePermitida(x.id));
+      setSeds(list); fijarSede(list);
     }).catch(() => {});
     api.clinica.get().then((r) => setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] })).catch(() => {});
   }, []); // eslint-disable-line
@@ -108,17 +141,29 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   })();
   const ctxSede = { ...ctxReglas, sillones: sillonesSede };
   const medSel = (ctxReglas.medicos || []).find((m) => String(m.id) === String(f.medicoId));
+  // Sedes donde atiende un doctor: las de su ficha o, si no las trae, las de su horario.
+  const sedesMed = (m) => {
+    const fijas = (m?.sedes || []).filter((x) => x != null && x !== "");
+    if (fijas.length) return fijas;
+    return [...new Set((ctxReglas.disp || []).filter((d) => String(d.medicoId) === String(m?.id)).map((d) => d.sede ?? d.sedeId).filter((x) => x != null))];
+  };
+  /** ¿El doctor atiende en esa sede? Sin dato de sede no se restringe. */
+  const atiendeEn = (m, sid) => { if (!m || sid == null || sid === "") return true; const ss = sedesMed(m); return !ss.length || ss.some((x) => mismaSede(x, sid)); };
+  // Especialidades del doctor: la principal y las demás que tenga (p. ej. general y periodoncia).
+  const espsMed = (m) => [m.especialidadId, m.esp, ...(m.esps || [])].filter((x) => x != null).map(String);
   const citaBorrador = (extra = {}) => ({ medicoId: f.medicoId, esp: f.especialidadId || (medSel ? (medSel.esp ?? medSel.especialidadId) : null), sede: f.sedeId, fecha: f.fecha, hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: f.sillon ? Number(f.sillon) : null, pacienteId: f.pacienteId || null, ...extra });
   const [masDatos, setMasDatos] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [abrePac, setAbrePac] = useState(false);
   const [busca, setBusca] = useState("");
-  const [nuevo, setNuevo] = useState(null);
   const [horaAuto, setHoraAuto] = useState(!base?.hora);
   // DC-51: primera hora libre al abrir / cambiar fecha.
   useEffect(() => {
     if (!horaAuto || !f.fecha) return;
     const ocupadas = new Set();
+    // Con doctor elegido cuenta cualquier cita suya (no puede estar en dos sedes a la vez);
+    // sin doctor, solo las de la sede elegida: una cita en otra sede no ocupa estos sillones.
+    const deLaSede = (c) => !!f.medicoId || !f.sedeId || (c.sedeId ?? c.sede) == null || mismaSede(c.sedeId ?? c.sede, f.sedeId);
     const apply = () => {
       // Primera hora libre DENTRO del horario de la clínica y, si es hoy, no pasada
       // (antes proponía las 06:00 y luego el propio modal rechazaba guardar).
@@ -135,6 +180,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       (demoDb?.citas || []).forEach((c) => {
         if (c.fecha !== f.fecha) return;
         if (f.medicoId && c.medicoId && String(c.medicoId) !== String(f.medicoId)) return;
+        if (!deLaSede(c)) return;
         if (["cancelada", "no_show", "reprogramada"].includes(c.estado)) return;
         ocupadas.add(String(c.hora || "").slice(0, 5));
       });
@@ -143,6 +189,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     api.citas.listar(f.fecha).then((rows) => {
       (rows || []).forEach((c) => {
         if (f.medicoId && c.medicoId && String(c.medicoId) !== String(f.medicoId)) return;
+        if (!deLaSede(c)) return;
         if (["cancelada", "no_show", "reprogramada"].includes(c.estado)) return;
         const h = String(c.hora || "").slice(0, 5);
         if (h) ocupadas.add(h);
@@ -160,9 +207,11 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     if (!sedesT.length) return;
     const ini = toMin(f.hora || "00:00"), fin = ini + (Number(f.duracionMin) || 30);
     const cubre = ts.find((t) => toMin(String(t.horaInicio).slice(0, 5)) <= ini && fin <= toMin(String(t.horaFin).slice(0, 5)) && sedeT(t) != null);
-    const objetivo = cubre ? String(sedeT(cubre)) : (sedesT.includes(String(f.sedeId)) ? null : sedesT[0]);
-    if (!objetivo || objetivo === String(f.sedeId)) return;
-    const destino = seds.find((x) => String(x.id) === objetivo);
+    const objetivo = cubre ? String(sedeT(cubre)) : (sedesT.some((x) => mismaSede(x, f.sedeId)) ? null : sedesT[0]);
+    if (!objetivo || mismaSede(objetivo, f.sedeId)) return;
+    // Solo se cambia a una sede que el usuario ve (seds ya viene filtrada). Si el doctor
+    // está en otra, la validación avisa que no atiende aquí a esa hora.
+    const destino = seds.find((x) => mismaSede(x.id, objetivo));
     if (destino) { setSillonAuto(true); setF((x) => ({ ...x, sedeId: destino.id, sillon: "" })); }
   }, [f.medicoId, f.fecha, f.hora, f.duracionMin, seds.length, reglas.listo]); // eslint-disable-line
   // Sillón: se propone el del doctor o de su especialidad; si no, uno flexible libre.
@@ -186,7 +235,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const [huecos, setHuecos] = useState(null);       // null | "buscando" | [{...}]
   const buscarHuecos = async () => {
     setHuecos("buscando");
-    const candidatos = f.medicoId ? meds.filter((m) => String(m.id) === String(f.medicoId)) : medsF;
+    // Sin doctor: los de la especialidad que atienden en alguna de las sedes que ve el usuario.
+    const candidatos = f.medicoId ? meds.filter((m) => String(m.id) === String(f.medicoId)) : medsEsp.filter((m) => { const ss = sedesMed(m); return !ss.length || ss.some(sedePermitida); });
     const desdeD = new Date(fmt(hoy) + "T00:00:00");
     const dias = [...Array(14)].map((_, i) => { const d = new Date(desdeD); d.setDate(d.getDate() + i); return fmt(d); });
     let citasRango = demo ? (demoDb.citas || []) : [];
@@ -202,6 +252,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
         const bloques = conH ? ts : [{ horaInicio: "08:00", horaFin: "20:00", sede: f.sedeId || seds[0]?.id }];
         for (const t of bloques) {
           const sedeT = t.sede ?? t.sedeId ?? f.sedeId ?? seds[0]?.id;
+          // Solo huecos en sedes del usuario y donde el doctor trabaja.
+          if (!seds.some((x) => mismaSede(x.id, sedeT)) || !atiendeEn(m, sedeT)) continue;
           const sils = sillonesDeSede(reglas.sillones, sedeT);
           const ctxT = { ...ctxReglas, citas: citasRango, sillones: sils.length ? sils : sillonesSede };
           let hallado = null;
@@ -224,41 +276,59 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   };
   const usarHueco = (h) => {
     setHoraAuto(false); setSillonAuto(false);
-    setF((x) => ({ ...x, medicoId: h.medicoId, sedeId: h.sede, fecha: h.fecha, hora: h.hora, sillon: String(h.sillon) }));
+    const sedeL = (seds.find((x) => mismaSede(x.id, h.sede)) || {}).id ?? h.sede;
+    setF((x) => ({ ...x, medicoId: h.medicoId, sedeId: sedeL, fecha: h.fecha, hora: h.hora, sillon: String(h.sillon) }));
     setHuecos(null);
   };
   const evaluacion = f.medicoId && f.sedeId ? evaluarCita(ctxSede, citaBorrador()) : { errores: [], avisos: [] };
   const estSil = f.medicoId && f.sedeId ? estadoSillones(ctxSede, citaBorrador()) : sillonesSede.map((x) => ({ s: x, estado: x.activo ? "libre" : "no", regla: {} }));
   const turnosHoy = f.medicoId ? turnosDelDia(ctxReglas.disp, f.medicoId, f.fecha) : [];
   const tieneHorario = f.medicoId && (ctxReglas.disp || []).some((d) => String(d.medicoId) === String(f.medicoId));
-  const nomSede = (id) => (seds.find((x) => String(x.id) === String(id)) || {}).nombre || "";
+  // Nombre de una sede que el usuario ve; las demás salen como «otra sede».
+  const nomSede = (id) => (seds.find((x) => mismaSede(x.id, id)) || {}).nombre || "otra sede";
   const T = DS.c.primary;
   const pacSel = pac.find((p) => p.id === f.pacienteId);
   const pacF = (busca.trim() ? pac.filter((p) => (p.nombre || "").toLowerCase().includes(busca.toLowerCase()) || String(p.dni || "").includes(busca.trim())) : pac).slice(0, 6);
-  const medsF = f.especialidadId ? meds.filter((m) => m.especialidadId === f.especialidadId) : meds;
+  // DNI exacto de un paciente de otra sede: se ofrece su ficha para no registrarlo dos veces.
+  const pacOtraSede = /^\d{8}$/.test(busca.trim()) && !pacF.length ? pacTodos.find((p) => String(p.dni || "") === busca.trim()) || null : null;
+  // Doctores que hacen el servicio y, de ellos, los que atienden en la sede elegida.
+  const medsEsp = f.especialidadId ? meds.filter((m) => espsMed(m).includes(String(f.especialidadId))) : meds;
+  const medsF = medsEsp.filter((m) => atiendeEn(m, f.sedeId));
   const pasada = f.fecha < fmt(hoy);
   const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
   const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
   const req = <span style={{ color: "var(--dc-red)" }}> *</span>;
+  const elegirPac = (p) => {
+    if (!pac.some((x) => String(x.id) === String(p.id))) setPac((ps) => [...ps, p]);
+    setF((x) => ({ ...x, pacienteId: p.id })); setAbrePac(false); setBusca("");
+  };
   const crearNuevo = () => {
     if (!nuevo?.nombre?.trim()) { notify("Ingresa el nombre del paciente."); return; }
+    // Un DNI que ya existe (aunque sea de otra sede) usa esa ficha: no se duplica al paciente.
+    const dniN = (nuevo.dni || "").trim();
+    const ya = dniN ? pacTodos.find((p) => String(p.dni || "") === dniN) : null;
+    if (ya) { elegirPac(ya); setNuevo(null); notify(`Ese DNI ya es de ${ya.nombre}: se usa su ficha.`); return; }
+    // El paciente nuevo queda registrado en la sede de la cita.
+    const sedeAlta = f.sedeId || sedeActivaCtx;
     if (demo) {
       const id = Math.max(0, ...(demoDb.pacientes || []).map((p) => Number(p.id) || 0)) + 1;
-      demoDb.setPacientes((ps) => [...ps, { id, nombre: nuevo.nombre.trim(), dni: (nuevo.dni || "").trim(), telefono: "", email: "", sede: Number(f.sedeId) || 1, sedes: [Number(f.sedeId) || 1], ultima: null, creadoEn: new Date().toISOString() }]);
+      const sid = sedeNum(sedeAlta);
+      demoDb.setPacientes((ps) => [...ps, { id, nombre: nuevo.nombre.trim(), dni: dniN, telefono: "", email: "", sede: sid, sedes: sid != null ? [sid] : [], ultima: null, creadoEn: new Date().toISOString() }]);
       setPac((ps) => [...ps, { id, nombre: nuevo.nombre.trim(), dni: (nuevo.dni || "").trim() }]);
       setF((x) => ({ ...x, pacienteId: id })); setNuevo(null); setAbrePac(false); setBusca(""); notify("Paciente creado.");
       return;
     }
-    api.pacientes.crear({ nombre: nuevo.nombre.trim(), dni: (nuevo.dni || "").trim() }).then((p) => { cargarPac(); if (p?.id) setF((x) => ({ ...x, pacienteId: p.id })); setNuevo(null); setAbrePac(false); setBusca(""); notify("Paciente creado."); }).catch(() => notify("No se pudo crear el paciente."));
+    api.pacientes.crear({ nombre: nuevo.nombre.trim(), dni: dniN, sedeRegistroId: sedeApiUuid(sedeAlta) }).then((p) => { cargarPac(); if (p?.id) setF((x) => ({ ...x, pacienteId: p.id })); setNuevo(null); setAbrePac(false); setBusca(""); notify("Paciente creado."); }).catch(() => notify("No se pudo crear el paciente."));
   };
 
   const ejecutarGuardado = async (forzarFueraDeHorario = false) => {
     const sedeId = f.sedeId || seds[0]?.id;
     if (!sedeId) { notify("La sede es obligatoria."); return; }
+    if (!sedePermitida(sedeId)) { notify("Esa sede no está entre las que atiendes. Elige una de tus sedes."); return; }
     if (!f.sillon) { notify("El sillón es obligatorio."); return; }
     const mot = [f.motivo.trim(), (f.nota || "").trim()].filter(Boolean).join(" — ") || "Consulta";
     setGuardando(true);
-    const cuerpo = { pacienteId: f.pacienteId, especialidadId: f.especialidadId || null, medicoId: f.medicoId, sedeId, hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: Number(f.sillon), motivo: mot, canalOrigen: f.canal, estado: "confirmada", ...(forzarFueraDeHorario ? { forzarFueraDeHorario: true } : {}) };
+    const cuerpo = { pacienteId: f.pacienteId, especialidadId: f.especialidadId || null, medicoId: f.medicoId, sedeId: sedeApiUuid(sedeId), hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: Number(f.sillon), motivo: mot, canalOrigen: f.canal, estado: "confirmada", ...(forzarFueraDeHorario ? { forzarFueraDeHorario: true } : {}) };
     const paso = f.repetir === "semanal" ? 7 : f.repetir === "quincenal" ? 14 : f.repetir === "mensual" ? 30 : 0;
     const n = f.repetir === "no" ? 1 : Math.max(1, Math.min(12, Number(f.veces) || 1));
     const fechas = []; for (let i = 0; i < n; i++) { const d = new Date(f.fecha + "T00:00:00"); d.setDate(d.getDate() + paso * i); fechas.push(fmt(d)); }
@@ -270,9 +340,13 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       const ocupado = (fch) => evaluarCita(ctxSede, citaBorrador({ fecha: fch })).errores.length > 0;
       const libres = fechas.filter((fch) => !ocupado(fch));
       const base0 = Date.now();
-      demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: Number(sedeId) || 1, precio: precioCita(demoDb.catalogo || CATALOGO_SEED, Number(f.especialidadId) || med.esp || 1, Number(sedeId) || 1) ?? undefined, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: "pendiente", llegada: false }))]);
+      const sedeN = sedeNum(sedeId);   // la cita guarda su sede y el precio de esa sede
+      demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: sedeN, precio: precioCita(demoDb.catalogo || CATALOGO_SEED, Number(f.especialidadId) || med.esp || 1, sedeN) ?? undefined, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: "pendiente", llegada: false }))]);
       setGuardando(false); setAvisoHorario(null);
       if (!libres.length) { notify(evaluarCita(ctxSede, citaBorrador()).errores[0] || "Ese horario no está disponible."); return; }
+      // Un paciente que se atiende por primera vez en esta sede pasa a ser también de ella
+      // (N:M): así aparece en Pacientes y en la agenda de esa sede.
+      if (p.id != null && demoDb.setPacientes) demoDb.setPacientes((ps) => ps.map((x) => (String(x.id) !== String(p.id) || sedesDe(x).some((v) => mismaSede(v, sedeN)) ? x : { ...x, sedes: [...sedesDe(x), sedeN] })));
       notify(fechas.length > 1 ? `${libres.length} cita(s) agendada(s)${fechas.length - libres.length ? `, ${fechas.length - libres.length} ocupadas` : ""}.` : `Cita agendada para ${p.nombre} el ${fechaLegible(f.fecha)} a las ${f.hora}.`);
       onCreada();
       return;
@@ -303,7 +377,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
 
   // Cada sede cobra su propio precio por el mismo servicio (catálogo › precio por sede).
   const sedeSel = f.sedeId || seds[0]?.id;
-  const nombreSedeSel = (seds.find((x) => String(x.id) === String(sedeSel)) || {}).nombre || "esta sede";
+  const nombreSedeSel = (seds.find((x) => mismaSede(x.id, sedeSel)) || {}).nombre || "esta sede";
   const precioSede = !f.especialidadId ? null : demo
     ? precioCita(demoDb.catalogo || CATALOGO_SEED, f.especialidadId, sedeSel)
     : (() => { const e = esps.find((x) => String(x.id) === String(f.especialidadId)); return e && e.precioBase != null ? precioServicio({ precio: e.precioBase, preciosSede: e.preciosSede }, sedeSel) : null; })();
@@ -372,7 +446,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               {abrePac && <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "var(--dc-white)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", boxShadow: "0 18px 40px -18px rgba(16,24,40,.4)", zIndex: 30, overflow: "hidden" }}>
                 <div style={{ padding: 8 }}><input className="dc-premium-inp" autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar paciente" style={{ ...inp, padding: "8px 11px" }} /></div>
                 <div style={{ maxHeight: 190, overflowY: "auto" }}>
-                  {pacF.length === 0 && <div style={{ padding: "8px 14px", fontSize: 13, color: "var(--dc-ink-400)" }}>Sin coincidencias.</div>}
+                  {pacF.length === 0 && !pacOtraSede && <div style={{ padding: "8px 14px", fontSize: 13, color: "var(--dc-ink-400)" }}>Sin coincidencias.</div>}
+                  {pacOtraSede && <button type="button" onClick={() => elegirPac(pacOtraSede)} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{pacOtraSede.nombre}<span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> – {pacOtraSede.dni} · registrado en otra sede</span></button>}
                   {pacF.map((p) => <button key={p.id} onClick={() => { setF({ ...f, pacienteId: p.id }); setAbrePac(false); setBusca(""); }} style={{ width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: p.id === f.pacienteId ? "var(--dc-bg)" : "var(--dc-white)", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }}>{p.nombre}{p.dni ? <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}> – {p.dni}</span> : null}</button>)}
                 </div>
                 <button onClick={() => { setNuevo({ nombre: busca, dni: "" }); setAbrePac(false); }} style={{ width: "100%", padding: "10px 14px", border: "none", borderTop: "1px solid var(--dc-line)", background: "var(--dc-white)", cursor: "pointer", color: T, fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={1.75} /> Agregar nuevo paciente</button>
@@ -388,9 +463,14 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crearNuevo}><Check size={14} strokeWidth={2} /> Crear y usar</Btn></div>
             </div>}
           </div>
-          <div className="dc-agm__paso"><i>2</i>Servicio y doctor</div>
+          {/* La sede va primero: define qué doctores atienden, sus sillones y el precio. */}
+          <div className="dc-agm__paso"><i>2</i>Sede, servicio y doctor</div>
+          <label><span style={lbl}>Sede{req}</span>
+            <Select value={f.sedeId} disabled={seds.length < 2} onChange={(v) => { setSillonAuto(true); setHoraAuto(true); const m = meds.find((x) => String(x.id) === String(f.medicoId)); setF({ ...f, sedeId: v, sillon: "", medicoId: f.medicoId && !atiendeEn(m, v) ? "" : f.medicoId }); }} placeholder="Seleccionar sede"
+                    options={seds.map((s) => ({ value: s.id, label: s.nombre }))} />
+          </label>
           <label><span style={lbl}>Servicio{req}</span>
-            <Select value={f.especialidadId} onChange={(v) => { setDurAuto(true); setSillonAuto(true); setF({ ...f, especialidadId: v, medicoId: f.medicoId && v && meds.find((m) => String(m.id) === String(f.medicoId) && String(m.especialidadId) !== String(v)) ? "" : f.medicoId }); }} placeholder="Cualquiera"
+            <Select value={f.especialidadId} onChange={(v) => { setDurAuto(true); setSillonAuto(true); setF({ ...f, especialidadId: v, medicoId: f.medicoId && v && meds.find((m) => String(m.id) === String(f.medicoId) && !espsMed(m).includes(String(v))) ? "" : f.medicoId }); }}
                     placeholder="Elegir servicio" options={[...esps.map((e) => ({ value: e.id, label: e.nombre, sub: e.duracionMin ? `${e.duracionMin} min` : undefined }))]} />
             {precioSede != null && <small className="dc-agm__precio">Precio en {nombreSedeSel}: <b>S/ {Number(precioSede).toFixed(2)}</b></small>}
           </label>
@@ -398,24 +478,24 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             <Select value={f.medicoId} onChange={(v) => { setSillonAuto(true); setHoraAuto(true); setF({ ...f, medicoId: v }); }} placeholder="Seleccionar"
                     options={medsF.map((m) => { const ts = turnosDelDia(ctxReglas.disp, m.id, f.fecha, f.sedeId || null); const conH = (ctxReglas.disp || []).some((d) => String(d.medicoId) === String(m.id)); return { value: m.id, label: m.nombre, sub: !conH ? "Sin horario configurado" : ts.length ? `Atiende ${ts.map((t) => `${String(t.horaInicio).slice(0, 5)}–${String(t.horaFin).slice(0, 5)}`).join(" · ")}` : "No atiende ese día en esta sede" }; })} />
           </label>
+          {f.especialidadId && f.sedeId && !medsF.length && <div className="dc-agm__turno is-no">
+            <Info size={13} strokeWidth={2} />
+            <span>Ningún doctor de {(espObj?.nombre || "este servicio").toLowerCase()} atiende en {nombreSedeSel}.{seds.length > 1 ? " Prueba con otra sede." : ""}</span>
+          </div>}
           {f.medicoId && <div className={`dc-agm__turno${tieneHorario && !turnosHoy.length ? " is-no" : ""}`}>
             <Clock size={13} strokeWidth={2} />
             {!tieneHorario ? <span>Este doctor no tiene horario configurado: se puede agendar a cualquier hora de la clínica.</span>
               : turnosHoy.length ? <span>{fechaLegible(f.fecha)} atiende {turnosHoy.map((t, i) => <b key={i}>{String(t.horaInicio).slice(0, 5)}–{String(t.horaFin).slice(0, 5)}{t.sede != null || t.sedeId != null ? ` (${nomSede(t.sede ?? t.sedeId).replace(/^Sede\s+/, "") || "sede"})` : ""}</b>).reduce((a, b) => [a, " y ", b])}</span>
               : <span>No atiende el {fechaLegible(f.fecha)}. Elige otra fecha u otro doctor.</span>}
           </div>}
-          <div className="dc-agm__paso"><i>3</i>Cuándo y dónde</div>
-          <label><span style={lbl}>Sede / consultorio{req}</span>
-            <Select value={f.sedeId} onChange={(v) => { setSillonAuto(true); setF({ ...f, sedeId: v, sillon: "" }); }} placeholder="Seleccionar sede"
-                    options={seds.map((s) => ({ value: s.id, label: s.nombre }))} />
-          </label>
+          <div className="dc-agm__paso"><i>3</i>Cuándo</div>
           <div>
             <div className="dc-agm__fh"><span style={{ ...lbl, marginBottom: 0 }}>Fecha y hora</span>
               <button type="button" onClick={buscarHuecos} disabled={huecos === "buscando"}><Search size={13} strokeWidth={2.2} /> {huecos === "buscando" ? "Buscando…" : `Primer hueco libre${f.medicoId ? "" : espObj ? ` de ${espObj.nombre.toLowerCase()}` : ""}`}</button>
             </div>
             {Array.isArray(huecos) && <div className="dc-agm__huecos">
               {huecos.length === 0 ? <p>Sin huecos en los próximos 14 días con estas condiciones.</p> : huecos.map((h, i) => (
-                <button key={i} type="button" onClick={() => usarHueco(h)}><b>{h.fecha === fmt(hoy) ? "Hoy" : fechaLegible(h.fecha)} · {h.hora}</b><small>{h.medico} · {(seds.find((x) => String(x.id) === String(h.sede)) || {}).nombre?.replace(/^Sede\s+/, "") || "Sede"} · {h.silNombre}</small></button>
+                <button key={i} type="button" onClick={() => usarHueco(h)}><b>{h.fecha === fmt(hoy) ? "Hoy" : fechaLegible(h.fecha)} · {h.hora}</b><small>{h.medico} · {nomSede(h.sede).replace(/^Sede\s+/, "")} · {h.silNombre}</small></button>
               ))}
               <button type="button" className="is-cerrar" onClick={() => setHuecos(null)} aria-label="Cerrar sugerencias">×</button>
             </div>}

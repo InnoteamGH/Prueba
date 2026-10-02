@@ -3414,16 +3414,34 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
 
 /* ---- Lista de espera detallada ---- */
 const URGENCIA = { alta: { l: "Alta", bg: "var(--dc-fee)", fg: "var(--dc-danger-700)" }, media: { l: "Media", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" }, baja: { l: "Baja", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" } };
+// Cada entrada espera cupo en una sede: la del doctor que pidió (Quispe y la odontopediatría
+// solo atienden en Surco) o la del paciente.
 const ESPERA_INIT = [
-  { id: 1, n: "Lucía Vargas", tel: "987 111 222", e: "Ortodoncia", medico: "Dr. Luis Paredes", pref: "Tardes", urg: "media", desde: "2 días", ofrecido: [] },
-  { id: 2, n: "Andrés Soto", tel: "912 333 444", e: "Odontología general", medico: "Cualquiera", pref: "Mañanas", urg: "baja", desde: "1 día", ofrecido: [] },
-  { id: 3, n: "Elena Ríos", tel: "998 555 666", e: "Endodoncia", medico: "Dra. Ana Quispe", pref: "Indiferente", urg: "alta", desde: "Hoy", ofrecido: ["Cupo 09:00 (rechazado)"] },
-  { id: 4, n: "Marco Salas", tel: "956 204 118", e: "Cirugía oral", medico: "Dr. Jorge Ramos", pref: "Mañanas", urg: "alta", desde: "1 día", ofrecido: [] },
-  { id: 5, n: "Valeria Núñez", tel: "944 870 312", e: "Odontopediatría", medico: "Cualquiera", pref: "Tardes", urg: "media", desde: "3 días", ofrecido: [] },
-  { id: 6, n: "Óscar Medina", tel: "981 445 097", e: "Limpieza dental", medico: "Cualquiera", pref: "Sábados", urg: "baja", desde: "5 días", ofrecido: [] },
+  { id: 1, n: "Lucía Vargas", tel: "987 111 222", e: "Ortodoncia", medico: "Dr. Luis Paredes", pref: "Tardes", urg: "media", desde: "2 días", ofrecido: [], sede: 1 },
+  { id: 2, n: "Andrés Soto", tel: "912 333 444", e: "Odontología general", medico: "Cualquiera", pref: "Mañanas", urg: "baja", desde: "1 día", ofrecido: [], sede: 1 },
+  { id: 3, n: "Elena Ríos", tel: "998 555 666", e: "Endodoncia", medico: "Dra. Ana Quispe", pref: "Indiferente", urg: "alta", desde: "Hoy", ofrecido: ["Cupo 09:00 (rechazado)"], sede: 2 },
+  { id: 4, n: "Marco Salas", tel: "956 204 118", e: "Cirugía oral", medico: "Dr. Jorge Ramos", pref: "Mañanas", urg: "alta", desde: "1 día", ofrecido: [], sede: 1 },
+  { id: 5, n: "Valeria Núñez", tel: "944 870 312", e: "Odontopediatría", medico: "Cualquiera", pref: "Tardes", urg: "media", desde: "3 días", ofrecido: [], sede: 2 },
+  { id: 6, n: "Óscar Medina", tel: "981 445 097", e: "Limpieza dental", medico: "Cualquiera", pref: "Sábados", urg: "baja", desde: "5 días", ofrecido: [], sede: 2 },
 ];
 function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pacientes = [], setPacientes = () => {} }) {
   const conectado = !!auth.token;
+  // Sede: se ven solo las entradas de las sedes del filtro; el alta va a la sede activa
+  // (o a la que se elija si el usuario ve varias) y ofrece los doctores de esa sede.
+  const { ids: sedesVer, activa, enSede } = useSede();
+  const sedesKey = (sedesVer || []).join(",");
+  const demoDb = useContext(DatosDemoCtx);
+  // Sede de una entrada. Las guardadas antes de existir el campo se atribuyen a la sede
+  // principal de su paciente o, si no se le ubica, a la única sede de su doctor.
+  const sedeDeEntrada = (x) => {
+    if (x.sede != null && x.sede !== "") return x.sede;
+    if (conectado) return null;   // con API la sede la manda el servidor; sin ella, se deja ver
+    const p = (demoDb?.pacientes || pacientes).find((q) => (x.pacienteId != null && String(q.id) === String(x.pacienteId)) || q.nombre === x.n);
+    if (p) return p.sede ?? sedesDe(p)[0] ?? null;
+    const ss = sedesDe(MEDICOS.find((m) => m.nombre === x.medico));
+    return ss.length === 1 ? ss[0] : null;
+  };
+  const medicosDeSede = (sid) => MEDICOS.filter((m) => sedesDe(m).some((x) => mismaSede(x, sid)));
   const mapEsp = (r) => {
     const creado = r.creadoEn || r.creado_en || null;
     let desde = "—";
@@ -3434,45 +3452,49 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
         desde = dias === 0 ? "Hoy" : pluralEs(dias, "día", "días");
       }
     }
-    return { id: r.id, n: r.paciente || "—", tel: r.telefono || "", e: r.especialidad || "—", medico: r.medico || "Cualquiera", pref: r.preferenciaHorario || "Indiferente", urg: r.urgencia || "media", desde, creadoEn: creado, ofrecido: (() => { try { return JSON.parse(r.ofertas || "[]"); } catch { return []; } })(), pacienteId: r.pacienteId || null };
+    return { id: r.id, n: r.paciente || "—", tel: r.telefono || "", e: r.especialidad || "—", medico: r.medico || "Cualquiera", pref: r.preferenciaHorario || "Indiferente", urg: r.urgencia || "media", desde, creadoEn: creado, ofrecido: (() => { try { return JSON.parse(r.ofertas || "[]"); } catch { return []; } })(), pacienteId: r.pacienteId || null, sede: r.sedeId ?? r.sede ?? null };
   };
   const [remoto, setRemoto] = useState(null);
   const [asignarBase, setAsignarBase] = useState(null); // prefill del modal real de agendado (standalone)
   const [nuevoEsp, setNuevoEsp] = useState(null); // form para agregar paciente a espera
   const [busca, setBusca] = useState("");         // buscador de paciente registrado
   const [abrePac, setAbrePac] = useState(false);  // dropdown de pacientes abierto
-  const recargar = () => { if (conectado) api.espera.listar().then((r) => setRemoto((r || []).map(mapEsp))).catch(() => notify("No se pudo cargar la lista de espera.")); };
-  useEffect(() => { recargar(); }, []); // eslint-disable-line
-  const esp = conectado ? (remoto || []) : espProp;
+  const recargar = () => { if (conectado) api.espera.listar(sedesVer ? sedesVer.map(sedeApiUuid).filter(Boolean) : null).then((r) => setRemoto((r || []).map(mapEsp))).catch(() => notify("No se pudo cargar la lista de espera.")); };
+  useEffect(() => { recargar(); }, [sedesKey]); // eslint-disable-line
+  // Solo para mostrar: las escrituras van siempre con setEsp funcional sobre la lista completa.
+  const esp = (conectado ? (remoto || []) : (espProp || [])).filter((x) => enSede(sedeDeEntrada(x)));
   const ordenada = [...esp].sort((a, b) => ({ alta: 0, media: 1, baja: 2 }[a.urg] - { alta: 0, media: 1, baja: 2 }[b.urg]));
 
   const ofrecer = (p) => {
     notify(`Oferta de cupo enviada a ${p.n} por WhatsApp. Esperando respuesta.`);
     if (!conectado) setEsp((e) => e.map((x) => x.id === p.id ? { ...x, ofrecido: [...x.ofrecido, `Cupo ofrecido hoy`] } : x));
   };
-  // "Asignar" abre el flujo del padre (elegir doctor/fecha/hora); el padre quita de la lista al confirmar.
-  // "Asignar": en Agenda lo maneja el padre (onAsignar). En el módulo standalone, abre el
-  // agendado real (crea la cita) y al confirmar retira de la lista.
+  // "Asignar": en Agenda lo maneja el padre (onAsignar). Aquí abre el agendado real en la sede
+  // de la entrada (también en la demostración) y, al confirmar la cita, la retira de la lista.
   const asignar = (p) => {
     if (onAsignar) { onAsignar(p); return; }
-    if (conectado) { setAsignarBase({ pacienteId: p.pacienteId || "", motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", _esperaId: p.id }); return; }
-    setEsp((e) => e.filter((x) => x.id !== p.id)); notify(`Cupo asignado a ${p.n}.`);
+    const sedeP = sedeDeEntrada(p) ?? activa;
+    const med = MEDICOS.find((m) => m.nombre === p.medico && sedesDe(m).some((x) => mismaSede(x, sedeP)));
+    const espId = ESPECIALIDADES.find((x) => x.nombre === p.e)?.id;
+    setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), _esperaId: p.id });
   };
-  const nuevoEspera = () => { setBusca(""); setAbrePac(false); setNuevoEsp({ pacienteId: null, n: "", tel: "", dni: "", e: "Odontología general", medico: "Cualquiera", pref: "Indiferente", urg: "media", esNuevo: false }); };
+  const nuevoEspera = () => { setBusca(""); setAbrePac(false); setNuevoEsp({ pacienteId: null, n: "", tel: "", dni: "", e: "Odontología general", medico: "Cualquiera", pref: "Indiferente", urg: "media", esNuevo: false, sede: (SEDES.find((x) => mismaSede(x.id, activa)) || {}).id ?? activa }); };
   const elegirPac = (p) => { setNuevoEsp((f) => ({ ...f, pacienteId: p.id, n: p.nombre, tel: p.telefono || p.tel || "", dni: p.dni || "", esNuevo: false })); setAbrePac(false); setBusca(""); };
   const modoNuevoPac = () => { setNuevoEsp((f) => ({ ...f, pacienteId: null, esNuevo: true, n: (busca || f.n || "") })); setAbrePac(false); };
   const guardarEsp = () => {
     if (!nuevoEsp.n.trim()) { notify("Elige un paciente registrado o registra uno nuevo."); return; }
+    const sedeAlta = nuevoEsp.sede ?? activa;
     const finalizar = (pacienteId) => {
-      if (conectado) { api.espera.crear({ paciente: nuevoEsp.n, telefono: nuevoEsp.tel, especialidad: nuevoEsp.e, medico: nuevoEsp.medico, preferenciaHorario: nuevoEsp.pref, urgencia: nuevoEsp.urg, pacienteId }).then(() => { notify(`${nuevoEsp.n} agregado a la lista de espera.`); recargar(); }).catch(() => notify("Error al agregar a espera.")); setNuevoEsp(null); return; }
-      setEsp((e) => [...(e || []), { id: Date.now(), n: nuevoEsp.n, tel: nuevoEsp.tel, e: nuevoEsp.e, medico: nuevoEsp.medico, pref: nuevoEsp.pref, urg: nuevoEsp.urg, desde: "Hoy", ofrecido: [], pacienteId }]);
+      if (conectado) { api.espera.crear({ paciente: nuevoEsp.n, telefono: nuevoEsp.tel, especialidad: nuevoEsp.e, medico: nuevoEsp.medico, preferenciaHorario: nuevoEsp.pref, urgencia: nuevoEsp.urg, pacienteId, sedeId: sedeApiUuid(sedeAlta) }).then(() => { notify(`${nuevoEsp.n} agregado a la lista de espera.`); recargar(); }).catch(() => notify("Error al agregar a espera.")); setNuevoEsp(null); return; }
+      setEsp((e) => [...(e || []), { id: Date.now(), n: nuevoEsp.n, tel: nuevoEsp.tel, e: nuevoEsp.e, medico: nuevoEsp.medico, pref: nuevoEsp.pref, urg: nuevoEsp.urg, desde: "Hoy", ofrecido: [], pacienteId, sede: sedeAlta }]);
       notify(`${nuevoEsp.n} agregado a la lista de espera${pacienteId ? " (ligado a su ficha)" : ""}.`); setNuevoEsp(null);
     };
     // Paciente no registrado → se registra primero y queda ligado
     if (nuevoEsp.esNuevo && !nuevoEsp.pacienteId) {
-      if (conectado) { api.pacientes.crear({ nombre: nuevoEsp.n, dni: nuevoEsp.dni, telefono: nuevoEsp.tel }).then((p) => finalizar(p?.id || null)).catch(() => notify("No se pudo registrar el paciente.")); return; }
-      const nid = Math.max(0, ...pacientes.map((p) => p.id || 0)) + 1;
-      setPacientes((ps) => [...ps, { id: nid, nombre: nuevoEsp.n, dni: nuevoEsp.dni, telefono: nuevoEsp.tel, sede: 1, ultima: null }]);
+      if (conectado) { api.pacientes.crear({ nombre: nuevoEsp.n, dni: nuevoEsp.dni, telefono: nuevoEsp.tel, sedeRegistroId: sedeApiUuid(sedeAlta) }).then((p) => finalizar(p?.id || null)).catch(() => notify("No se pudo registrar el paciente.")); return; }
+      // El id se calcula sobre TODOS los pacientes (no solo los de esta sede) para no repetirlo.
+      const nid = Math.max(0, ...(demoDb?.pacientes || pacientes).map((p) => Number(p.id) || 0)) + 1;
+      setPacientes((ps) => [...ps, { id: nid, nombre: nuevoEsp.n, dni: nuevoEsp.dni, telefono: nuevoEsp.tel, sede: sedeAlta, sedes: [sedeAlta], ultima: null }]);
       notify(`${nuevoEsp.n} registrado como paciente nuevo.`);
       finalizar(nid); return;
     }
@@ -3549,8 +3571,10 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
           )}
         </Card>
       )}
-      {asignarBase && <AgendarRecepcionModal base={asignarBase} notify={notify} onClose={() => setAsignarBase(null)} onCreada={() => { const eid = asignarBase._esperaId; setAsignarBase(null); if (conectado && eid) api.espera.resolver(eid).catch(() => {}).finally(recargar); else recargar(); }} />}
+      {asignarBase && <AgendarRecepcionModal base={asignarBase} notify={notify} onClose={() => setAsignarBase(null)} onCreada={() => { const eid = asignarBase._esperaId; setAsignarBase(null); if (conectado && eid) api.espera.resolver(eid).catch(() => {}).finally(recargar); else if (eid != null) setEsp((e) => (e || []).filter((x) => x.id !== eid)); }} />}
       {nuevoEsp && (() => {
+        // Sedes entre las que elige quien ve varias (admin general sin filtro o varias sedes suyas).
+        const sedesAlta = SEDES.filter((x) => !sedesVer || sedesVer.some((w) => mismaSede(x.id, w)));
         const selSty = { width: "100%", padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, fontWeight: 500, cursor: "pointer", boxSizing: "border-box" };
         const lblSty = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
         return (
@@ -3602,13 +3626,17 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
             )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            {sedesAlta.length > 1 && <div style={{ gridColumn: "1 / -1" }}>
+              <label style={lblSty}>Sede donde espera cupo</label>
+              <Select value={nuevoEsp.sede ?? activa} onChange={(v) => setNuevoEsp({ ...nuevoEsp, sede: v, medico: nuevoEsp.medico !== "Cualquiera" && !medicosDeSede(v).some((m) => m.nombre === nuevoEsp.medico) ? "Cualquiera" : nuevoEsp.medico })} options={sedesAlta.map((x) => ({ value: x.id, label: x.nombre }))} />
+            </div>}
             <div>
               <label style={lblSty}>Especialidad</label>
               <Select value={nuevoEsp.e} onChange={(v) => setNuevoEsp({ ...nuevoEsp, e: v })} options={ESPECIALIDADES.map((x) => ({ value: x.nombre, label: x.nombre }))} />
             </div>
             <div>
               <label style={lblSty}>Médico preferido</label>
-              <Select value={nuevoEsp.medico} onChange={(v) => setNuevoEsp({ ...nuevoEsp, medico: v })} options={[{ value: "Cualquiera", label: "Cualquiera" }, ...MEDICOS.map((m) => ({ value: m.nombre, label: m.nombre }))]} />
+              <Select value={nuevoEsp.medico} onChange={(v) => setNuevoEsp({ ...nuevoEsp, medico: v })} options={[{ value: "Cualquiera", label: "Cualquiera" }, ...medicosDeSede(nuevoEsp.sede ?? activa).map((m) => ({ value: m.nombre, label: m.nombre }))]} />
             </div>
             <div>
               <label style={lblSty}>Preferencia de horario</label>
@@ -9905,11 +9933,17 @@ function AgendarCitaModal({ paciente, onClose, onConfirm, base, citas = CITAS_IN
   const espObj = ESPECIALIDADES.find((e) => e.id === esp);
   // El paciente puede pertenecer a varias sedes: elige en cuál se atenderá (editable).
   const sedesPac = sedesDe(paciente);
-  const [sedeSel, setSedeSel] = useState(base?.sede || sedesPac[0] || 1);
-  const medico = MEDICOS.find((m) => m.esp === esp && sedesDe(m).includes(sedeSel)) || MEDICOS.find((m) => m.esp === esp) || MEDICOS[0];
-  const sede = SEDES.find((s) => s.id === sedeSel) || SEDES[0];
-  const conflicto = citas.some((c) => (!base || c.id !== base.id) && c.medicoId === medico.id && c.fecha === fecha && c.hora === hora && c.estado !== "cancelada");
-  const confirmar = () => onConfirm({ id: base?.id || Date.now(), paciente: paciente.nombre, dni: paciente.dni, medicoId: medico.id, esp, sede: sedeSel, fecha, hora, motivo: motivo.trim() || espObj.nombre, estado: "confirmada", llegada: false });
+  const [sedeSel, setSedeSel] = useState(base?.sede ?? sedesPac[0] ?? SEDES[0]?.id);
+  // Doctor y precio son los de la sede elegida: si nadie hace ese servicio ahí, no se
+  // asigna un doctor de otra sede (antes la cita quedaba en San Isidro con la Dra. de Surco).
+  const medicoDe = (espId) => MEDICOS.find((m) => espsDe(m).includes(espId) && sedesDe(m).some((x) => mismaSede(x, sedeSel))) || null;
+  const medico = medicoDe(esp);
+  const catalogo = useMemo(() => leerCatalogo(), []);
+  const precioDe = (espId) => precioCita(catalogo, espId, sedeSel) ?? ESPECIALIDADES.find((e) => e.id === espId)?.precio ?? null;
+  const precio = precioDe(esp);
+  const sede = SEDES.find((s) => mismaSede(s.id, sedeSel)) || SEDES[0];
+  const conflicto = !!medico && citas.some((c) => (!base || c.id !== base.id) && c.medicoId === medico.id && c.fecha === fecha && c.hora === hora && c.estado !== "cancelada");
+  const confirmar = () => { if (!medico) return; onConfirm({ id: base?.id || Date.now(), paciente: paciente.nombre, dni: paciente.dni, medicoId: medico.id, esp, sede: sedeSel, precio: precio ?? undefined, fecha, hora, motivo: motivo.trim() || espObj.nombre, estado: "confirmada", llegada: false }); };
   const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
   const inp = { width: "100%", padding: "11px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
   return (
@@ -9921,27 +9955,33 @@ function AgendarCitaModal({ paciente, onClose, onConfirm, base, citas = CITAS_IN
           <div style={{ fontSize: 13, color: "var(--dc-sky)", marginTop: 2 }}>{esReprog ? "Elige la nueva fecha y hora." : "Elige el servicio y el horario que más te convenga."}</div>
         </div>
         <div style={{ padding: 22, display: "grid", gap: 14 }}>
-          <label><span style={lbl}>Servicio</span>
-            <Select value={esp} onChange={(v) => setEsp(Number(v))} options={ESPECIALIDADES.map((e) => ({ value: e.id, label: `${e.nombre} — desde S/ ${e.precio}` }))} />
-          </label>
+          {/* La sede va primero: cada sede tiene sus doctores y sus precios. */}
           {sedesPac.length > 1 && (
             <label><span style={lbl}>Sede <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– te atiendes en más de una</span></span>
               <Select value={sedeSel} onChange={(v) => setSedeSel(Number(v))} options={sedesPac.map((s) => ({ value: s, label: nombreSede(s) }))} />
             </label>
           )}
+          <label><span style={lbl}>Servicio</span>
+            <Select value={esp} onChange={(v) => setEsp(Number(v))} options={ESPECIALIDADES.map((e) => { const p = precioDe(e.id); return { value: e.id, label: e.nombre, sub: !medicoDe(e.id) ? `No disponible en ${sede.nombre}` : p != null ? `desde S/ ${p}` : undefined }; })} />
+          </label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label><span style={lbl}>Fecha</span><input className="dc-premium-inp" type="date" min={fmt(hoy)} value={fecha} onChange={(e) => setFecha(e.target.value)} style={inp} /></label>
             <label><span style={lbl}>Hora</span><div><TimeSelect value={hora} onChange={setHora} width={"100%"} /></div></label>
           </div>
           <label><span style={lbl}>Motivo (opcional)</span><input className="dc-premium-inp" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder={espObj.nombre} style={inp} /></label>
-          <div style={{ background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-md)", padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: medico.color, color: "#fff", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{medico.foto}</div>
-            <div style={{ fontSize: 13 }}><div style={{ fontWeight: 500, color: NAVY }}>{medico.nombre}</div><div style={{ color: "var(--dc-ink-700)" }}>{sede.nombre} – {fechaLegible(fecha)} {hora}</div></div>
-          </div>
+          {medico ? (
+            <div style={{ background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-md)", padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: medico.color, color: "#fff", display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{medico.foto}</div>
+              <div style={{ fontSize: 13, flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }}>{medico.nombre}</div><div style={{ color: "var(--dc-ink-700)" }}>{sede.nombre} – {fechaLegible(fecha)} {hora}</div></div>
+              {precio != null && <div style={{ textAlign: "right", fontSize: 12, color: "var(--dc-ink-500)" }}>Desde<div style={{ fontSize: 15, fontWeight: 600, color: NAVY, fontVariantNumeric: "tabular-nums" }}>S/ {Number(precio).toFixed(2)}</div></div>}
+            </div>
+          ) : (
+            <div style={{ background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-md)", padding: "12px 14px", display: "flex", gap: 9, alignItems: "center", fontSize: 13, color: "var(--dc-warn-ink)" }}><AlertTriangle size={16} strokeWidth={1.75} style={{ flexShrink: 0 }} /> {espObj.nombre} no está disponible en {sede.nombre}.{sedesPac.length > 1 ? " Prueba con tu otra sede o elige otro servicio." : " Elige otro servicio o escríbenos por WhatsApp."}</div>
+          )}
           {conflicto && <div style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-fee)", borderRadius: "var(--dc-r-md)", padding: "10px 14px", display: "flex", gap: 9, alignItems: "center", fontSize: 13, color: "var(--dc-danger-700)" }}><AlertTriangle size={16} strokeWidth={1.75} style={{ flexShrink: 0 }} /> {medico.nombre} ya tiene una cita a las {hora} el {fechaLegible(fecha)}. Elige otro horario o agenda de todos modos.</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 2 }}>
             <Btn small kind="ghost" onClick={onClose}>Cancelar</Btn>
-            <Btn small kind={conflicto ? "red" : "navy"} onClick={confirmar}><CheckCircle2 size={15} strokeWidth={1.75} /> {conflicto ? "Agendar de todos modos" : (esReprog ? "Reprogramar" : "Confirmar cita")}</Btn>
+            <Btn small kind={conflicto ? "red" : "navy"} onClick={confirmar} disabled={!medico}><CheckCircle2 size={15} strokeWidth={1.75} /> {conflicto ? "Agendar de todos modos" : (esReprog ? "Reprogramar" : "Confirmar cita")}</Btn>
           </div>
         </div>
       </div>

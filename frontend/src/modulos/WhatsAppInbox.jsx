@@ -3,7 +3,9 @@
 import React, { useContext, useState, useEffect, useRef } from "react";
 import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
-import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, puede, tint} from "../comun";
+import { sedeApiUuid } from "../routing";
+import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, Field, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, nombreSede, puede, tint, useSede} from "../comun";
+import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 import { AgendarRecepcionModal, BtnReniec } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
 import { proximaCita, cuentaPaciente } from "../compartido/metricas";
@@ -17,7 +19,8 @@ function respuestaAgente(texto, ctx) {
     let esp = ESPECIALIDADES.find((e) => t.includes(e.nombre.split(" ")[0].toLowerCase()));
     if (/limpieza|profilaxis/.test(t)) esp = ESPECIALIDADES[0];
     if (/brackets|ortodonc/.test(t)) esp = ESPECIALIDADES[1];
-    if (esp) return { texto: `Una consulta de ${esp.nombre} cuesta S/ ${esp.precio}. ¿Te agendo una cita? Tengo cupos esta semana. 😊`, tools: ["consultar_precio"], propone: true };
+    // Cada sede cobra su precio: la IA da el de la sede activa (catálogo › precio por sede).
+    if (esp) { const p = ctx.precio ? ctx.precio(esp.id) : null; return { texto: `Una consulta de ${esp.nombre} cuesta S/ ${p ?? esp.precio}${ctx.sedeNombre ? ` en ${ctx.sedeNombre}` : ""}. ¿Te agendo una cita? Tengo cupos esta semana. 😊`, tools: ["consultar_precio"], propone: true }; }
     return { texto: "Con gusto. Nuestras consultas van desde S/ 80 (general) hasta S/ 220 (endodoncia). ¿Para qué especialidad quieres saber?", tools: ["consultar_precio"] };
   }
   if (/(cita|agendar|reservar|turno|disponib|atend)/.test(t)) {
@@ -66,9 +69,12 @@ const CHATS_INIT = [
 
 function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   const conectado = !!auth.token;
+  // Sede: la cita y el paciente nuevo se registran en la sede activa; la ficha, la próxima
+  // cita y el saldo solo se muestran si el paciente es de las sedes que se ven.
+  const { activa, pacientes: pacVisibles, citas: citasVisibles } = useSede();
   const [chats, setChats] = useState(conectado ? [] : CHATS_INIT);
-  const [agendar, setAgendar] = useState(null);   // {canal, motivo} para abrir el modal
-  const abrirAgendar = (motivo) => { if (conectado) setAgendar({ canal: "whatsapp", motivo: motivo || "" }); else onAgendar?.(); };
+  const [agendar, setAgendar] = useState(null);   // {canal, motivo, sedeId} para abrir el modal
+  const abrirAgendar = (motivo) => { if (conectado) setAgendar({ canal: "whatsapp", motivo: motivo || "", sedeId: sedeApiUuid(activa) }); else onAgendar?.(); };
   const [activo, setActivo] = useState(conectado ? null : 1);
   const [input, setInput] = useState("");
   const [ctx, setCtx] = useState({});
@@ -194,6 +200,8 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
   const dbWa = useContext(DatosDemoCtx);
   const soloDig = (t) => String(t || "").replace(/\D/g, "").slice(-9);
   const pacDeChat = (c) => { if (!c) return null; const lista = dbWa?.pacientes || []; return lista.find((p) => (c.pacienteId && p.id === c.pacienteId) || (soloDig(p.telefono) && soloDig(p.telefono) === soloDig(c.tel)) || p.nombre === c.nombre) || null; };
+  // ¿El paciente es de las sedes que ve el usuario? (sin filtro de sede, sí)
+  const pacVisible = (p) => !pacVisibles || pacVisibles.some((x) => String(x.id) === String(p.id));
   const scrollBottom = (smooth) => { const el = scrollRef.current; if (el) { el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" }); setAtBottom(true); } };
   // Al abrir una conversación: baja al último mensaje.
   useEffect(() => { const t = setTimeout(() => scrollBottom(false), 40); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [activo]);
@@ -306,7 +314,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     const tel = (nuevoPac.telefono || "").replace(/\D/g, "").replace(/^51/, "").slice(-9);
     if (tel && tel.length !== 9) { notify("Celular: 9 dígitos (ej. 999888777)."); return; }
     if (conectado) {
-      api.pacientes.crear({ nombre: nuevoPac.nombre, dni: nuevoPac.dni || null, telefono: tel || null })
+      api.pacientes.crear({ nombre: nuevoPac.nombre, dni: nuevoPac.dni || null, telefono: tel || null, sedeRegistroId: sedeApiUuid(activa) })
         .then(() => { notify(`${nuevoPac.nombre} registrado como paciente.`); setNuevoPac(null); cargarConversaciones(); if (agendarDespues) abrirAgendar(`Cita para ${nuevoPac.nombre} (desde WhatsApp)`); })
         .catch((e) => notify("No se pudo registrar: " + ((e && e.message) || "")));
     } else { notify("En demo, registra pacientes desde el módulo Pacientes."); setNuevoPac(null); if (agendarDespues) abrirAgendar("Registrado desde WhatsApp"); }
@@ -323,7 +331,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
     setChats((cs) => cs.map((c) => c.id === activo ? { ...c, actualizado: new Date().toISOString(), msgs: [...c.msgs, { de: "paciente", txt, t: ahora() }] } : c));
     if (chat.modo === "humano") return;
     setTimeout(() => {
-      const r = respuestaAgente(txt, ctx);
+      const r = respuestaAgente(txt, { ...ctx, precio: (id) => precioCita(dbWa?.catalogo || CATALOGO_SEED, id, activa), sedeNombre: nombreSede(activa) });
       setChats((cs) => cs.map((c) => {
         if (c.id !== activo) return c;
         const add = [{ de: "ia", txt: r.texto, t: ahora(), tools: r.tools }];
@@ -581,7 +589,10 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             </div>
           </div>
           {/* WSP-01: contexto del paciente siempre visible en el hilo (no depende del panel). */}
-          {(() => { const pac = pacDeChat(chat); if (!pac) return null; const prox = proximaCita(pac, dbWa?.citas || []); const cta = cuentaPaciente((dbWa?.fichas || {})[pac.id]); return (
+          {(() => { const pac = pacDeChat(chat); if (!pac) return null;
+            // De otra sede: se identifica, pero sin ficha, citas ni saldo (son datos de esa sede).
+            if (!pacVisible(pac)) return <div className="wa-ctx"><span>Paciente de otra sede: su ficha, citas y saldo los ve esa sede.</span></div>;
+            const prox = proximaCita(pac, citasVisibles || dbWa?.citas || []); const cta = cuentaPaciente((dbWa?.fichas || {})[pac.id]); return (
             <div className="wa-ctx">
               <button type="button" className="wa-ctx__ficha" onClick={() => { window.location.hash = `#/pacientes/${pac.id}`; }}>Ver ficha de {pac.nombre.split(" ")[0]}</button>
               <span>Próxima cita: <b>{prox ? `${prox.fecha === fmt(hoy) ? "hoy" : new Date(prox.fecha + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })} ${prox.hora || ""}` : "sin agendar"}</b></span>
@@ -589,7 +600,7 @@ function WhatsAppInbox({ onAgendar, notify = () => {} }) {
             </div>
           ); })()}
           <div ref={scrollRef} className="wa-hilo" onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }}>{hilo(chat.msgs)}</div>
-          {!atBottom && <button type="button" className="dc-icon-btn" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" className="wa-bajar"><ChevronDown size={20} strokeWidth={1.75} /></button>}
+          {!atBottom && <button type="button" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" className="wa-bajar"><ChevronDown size={20} strokeWidth={1.75} /></button>}
           {chat.modo === "ia" && conectado && !modoDemo ? (
             <div className="wa-pie wa-pie--nota">
               <Bot size={14} strokeWidth={1.75} /> El asistente IA responde automáticamente por WhatsApp. Usa <b>&nbsp;Tomar control&nbsp;</b> para responder tú.
