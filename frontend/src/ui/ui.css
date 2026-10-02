@@ -5479,3 +5479,7 @@ button, input, select, textarea { font-family: inherit; }
 .dc-cfg__metas li { display: flex; justify-content: space-between; font-size: 13px; color: var(--dc-ink-700); }
 .dc-cfg__metas li b { color: var(--dc-navy); font-variant-numeric: tabular-nums; }
 .dc-cfg__metas button { all: unset; cursor: pointer; justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(118deg, #0B6C78, #14A3A8); }
+
+/* Ocupación: el botón central muestra la semana elegida y vuelve a la actual */
+.dc-ocs__nav--hero .is-otra { display: inline-grid; line-height: 1.1; padding: 4px 12px; height: auto; min-height: 30px; text-align: center; }
+.dc-ocs__nav--hero .is-otra small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }

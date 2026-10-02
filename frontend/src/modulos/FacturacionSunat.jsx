@@ -114,7 +114,7 @@ const EstadoChip = ({ e, msg }) => { const x = ESTADO[e] || ESTADO.pendiente; co
 /* ───────────────────────── Caja › Facturación ───────────────────────── */
 /* pagos: los cobros de toda la clínica (con su sede) para numerar igual en cualquier filtro;
    verSedes: sedes que se muestran (null = todas); consulta: { sedeIds } para el servidor. */
-export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = null, consulta = null, notify = () => {}, abrirBoleta = () => {}, onIntegraciones = null }) {
+export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = null, consulta = null, notify = () => {}, abrirBoleta = () => {}, onIntegraciones = null, puedeEmitir = true }) {
   const conectado = !!auth.token;
   const listaSedes = sedes.length ? sedes : sedesPorDefecto();
   const seVe = (sd) => !verSedes || sd == null || sd === "" || verSedes.some((v) => mismaSede(sd, v));
@@ -185,10 +185,10 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
             <span className="dc-fe__acc">
               <button type="button" title="Ver comprobante" aria-label={`Ver ${c.id}`} onClick={(e) => { e.stopPropagation(); abrirBoleta({ ...(c.pago || {}), paciente: c.cliente, comprobanteSerie: c.serie, comprobanteNumero: c.numero, fecha: c.fecha, monto: Math.abs(c.total), moneda: c.moneda, concepto: c.concepto, metodo: c.metodo, tipo: c.tipo, docTipo: c.docTipo, docNum: c.docNum, refComprobante: c.ref }); }}><FileText size={14} strokeWidth={2} /></button>
               {(c.estado === "rechazado" || c.estado === "observado" || c.estado === "pendiente")
-                ? <button type="button" title="Reenviar a SUNAT" aria-label={`Reenviar ${c.id}`} onClick={(e) => { e.stopPropagation(); reenviar(c); }}><RefreshCw size={14} strokeWidth={2} /></button>
+                ? puedeEmitir && <button type="button" title="Reenviar a SUNAT" aria-label={`Reenviar ${c.id}`} onClick={(e) => { e.stopPropagation(); reenviar(c); }}><RefreshCw size={14} strokeWidth={2} /></button>
                 : null}
               <MenuAcciones opciones={[
-                c.estado === "aceptado" && c.total > 0 && { label: "Anular con nota de crédito", peligro: true, onClick: () => setNc({ c, tipo: "Anulación de la operación", motivo: "" }) },
+                puedeEmitir && c.estado === "aceptado" && c.total > 0 && { label: "Anular con nota de crédito", peligro: true, onClick: () => setNc({ c, tipo: "Anulación de la operación", motivo: "" }) },
                 { label: "Descargar XML", onClick: () => notify(conectado ? "Descargando XML…" : "El XML se descarga cuando el envío a SUNAT esté activo.") },
                 c.estado === "aceptado" && { label: "Descargar constancia (CDR)", onClick: () => notify(conectado ? "Descargando CDR…" : "La constancia de SUNAT se descarga cuando el envío esté activo.") },
               ]} />

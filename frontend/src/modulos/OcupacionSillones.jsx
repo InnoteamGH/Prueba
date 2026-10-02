@@ -86,7 +86,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
       {/* Misma franja que el resto de pantallas: cifra principal, cifras con punto y acción. */}
       <section className="dc-esp-hero dc-ocs-hero">
         <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>{datos.pct ?? "—"}%</b><span>ocupación de la semana</span></div>
+          <div className="dc-esp-hero__num"><b>{datos.pct ?? "—"}%</b><span>ocupación {off === 0 ? "de esta semana" : off === 1 ? "de la próxima semana" : off === -1 ? "de la semana pasada" : `de la semana del ${rango.split(" – ")[0]}`}</span></div>
           <p>Horas agendadas sobre las horas que abre cada sede · {rango}</p>
         </div>
         <div className="dc-esp-hero__cifras">
@@ -97,7 +97,8 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
         <span />
         <div className="dc-ocs__nav dc-ocs__nav--hero">
           <button type="button" aria-label="Semana anterior" onClick={() => setOff(off - 1)}><ChevronLeft size={15} strokeWidth={2} /></button>
-          <button type="button" className={off === 0 ? "is-on" : ""} onClick={() => setOff(0)}>Esta semana</button>
+          {/* Dice qué semana se ve; fuera de la actual, un clic vuelve a esta semana. */}
+          <button type="button" className={off === 0 ? "is-on" : "is-otra"} onClick={() => setOff(0)} title={off === 0 ? "Semana actual" : "Volver a esta semana"}>{off === 0 ? "Esta semana" : <>{rango}<small>Volver a hoy</small></>}</button>
           <button type="button" aria-label="Semana siguiente" onClick={() => setOff(off + 1)}><ChevronRight size={15} strokeWidth={2} /></button>
         </div>
       </section>
@@ -116,7 +117,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
                 <h3>{nomSede(sd)}</h3>
                 <span>{filas.length} {filas.length === 1 ? "sillón" : "sillones"} · {horas(min)} h agendadas de {horas(cap)} h</span>
               </div>
-              <span className="dc-ocz__libre"><Clock size={14} strokeWidth={2} /><b>{Math.round((cap - min) / 60)} h</b> libres esta semana</span>
+              <span className="dc-ocz__libre"><Clock size={14} strokeWidth={2} /><b>{Math.round((cap - min) / 60)} h</b> libres {off === 0 ? "esta semana" : "esa semana"}</span>
             </header>
             <div className="dc-ocz__scroll">
               <div className="dc-ocz__grid" role="table" aria-label={`Ocupación ${nomSede(sd)}`} style={{ "--dias": dias.length }}>

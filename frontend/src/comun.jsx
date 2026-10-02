@@ -1397,6 +1397,14 @@ export const DatosDemoCtx = React.createContext(null);
    - global: el usuario es de toda la clínica; rol: su rol.
    Sin proveedor (pruebas, portal del paciente) no limita nada. */
 export const SedeCtx = React.createContext(null);
+/** ¿Puede abrir caja, cobrar y emitir comprobantes? Con varias sedes, el administrador
+    general supervisa (ve todas las cajas) y emite cada sede: su administrador o recepción.
+    Con una sola sede, el administrador general también opera la caja. */
+export function useEmiteCobros(can) {
+  const c = React.useContext(SedeCtx);
+  const supervisor = c?.rol === "admin" && (c?.mias || []).length > 1;
+  return { puede: !supervisor && (can ? can("facturacion", "crear") : true), supervisor };
+}
 /** Id de sede comparable: en la demo 1/2; con API llega un UUID que el resto del frontend
     ya traduce a 1/2 al iniciar sesión (sedeInt en App.jsx). Misma regla aquí. */
 export const sedeNum = (x) => (x == null || x === "" ? null : /^\d+$/.test(String(x)) ? Number(x) : (String(x).endsWith("a2") ? 2 : 1));

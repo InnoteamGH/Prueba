@@ -57,7 +57,7 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Núcleo compartido (tokens DS, primitivos, permisos, helpers, datos demo).
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import { medicoEnSedes } from "./compartido/medicosSede";
-import {SedeCtx, useSede, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {SedeCtx, useSede, useEmiteCobros, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -1316,6 +1316,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // usa todo (un doctor puede tener citas en otra sede a la misma hora).
   const sedeCx = useSede();
   const enFiltro = (c) => sedeCx.enSede(c.sede ?? c.sedeId);
+  const { supervisor: supervisaAg } = useEmiteCobros(can);
   const reglasVis = useMemo(() => ({
     ...reglasAg,
     sillones: (reglasAg.sillones || []).filter((x) => sedeCx.enSede(x.sede)),
@@ -1505,7 +1506,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           : rol !== "medico" && puedeOperarAgenda && estadoCita(c) === "confirmada" && c.fecha === fmt(hoy) ? <ActionBtn onClick={() => checkIn(c.id)} color="var(--dc-ok-700)">Marcar llegada</ActionBtn>
           : rol !== "medico" && puedeOperarAgenda && estadoCita(c) === "en_sala" ? <ActionBtn onClick={() => set(c.id, "en_atencion", `${c.paciente} pasa al sillón.`)} color="var(--dc-warn-600)">Pasar a sillón</ActionBtn>
           : rol !== "medico" && puedeOperarAgenda && estadoCita(c) === "en_atencion" ? <ActionBtn onClick={() => { set(c.id, "atendida", `Atención de ${c.paciente} finalizada. Cóbrala en Caja.`); window.location.hash = "#/caja"; }} color="var(--dc-ok-700)">Finalizar y cobrar</ActionBtn>
-          : rol !== "medico" && conectado && c.pacienteId && saldos[c.pacienteId] > 0 ? <ActionBtn onClick={() => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede })} color={DS.c.primary}>Cobrar S/ {saldos[c.pacienteId].toFixed(0)}</ActionBtn>
+          : rol !== "medico" && !supervisaAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0 ? <ActionBtn onClick={() => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede })} color={DS.c.primary}>Cobrar S/ {saldos[c.pacienteId].toFixed(0)}</ActionBtn>
           : null;
         const opciones = puedeOperarAgenda && abierta ? [
           rol === "medico" && c.estado === "pendiente" && { label: "Confirmar cita", onClick: () => set(c.id, "confirmada", `Cita de ${c.paciente} confirmada.`) },
@@ -3280,7 +3281,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
 function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can, sedeActiva = "all" }) {
   // Cobrar una fase es caja, no plan de tratamiento. Gerencia consulta el plan; el
   // cobro lo hace quien tiene caja (recepción, administración).
-  const puedeCobrar = can ? can("facturacion", "crear") : true;
+  const { puede: puedeCobrar } = useEmiteCobros(can);
   const puedeTerminar = can ? can("tratamientos", "editar") || can("tratamientos", "crear") : true;
   const conectado = !!auth.token;
   const sx = useSede();
@@ -3813,7 +3814,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const puedeEgresos = can ? can("facturacion", "aprobar") : rol !== "recepcion" && rol !== "gerencia";
   // Bug #26 re-test: Gerencia debe VER la pestaña Ingresos/egresos (solo lectura), aunque no pueda crear egresos
   const puedeVerMovimientos = can ? can("facturacion", "ver") : rol !== "recepcion";
-  const puedeAbrirCaja = can ? can("facturacion", "crear") : rol !== "gerencia";
+  // Con varias sedes el administrador general solo supervisa: cada sede abre su caja y emite.
+  const { supervisor: supervisaCaja } = useEmiteCobros(can);
+  const puedeAbrirCaja = !supervisaCaja && (can ? can("facturacion", "crear") : rol !== "gerencia");
   const puedeConfig = can ? can("facturacion", "configurar") : rol !== "recepcion" && rol !== "gerencia";
   const conectado = !!auth.token;
   // Conectado se dice la verdad; en demostracion se conserva el ejemplo de siempre.
@@ -4001,7 +4004,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   useEffect(() => { if (tab === "historial" && conectado) recargarHistCaja(); }, [tab, histCajaRango.desde, histCajaRango.hasta, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
   const [aperturaForm, setAperturaForm] = useState({ fondo: "100", fondoUsd: "", nota: "" });
   const abrirCaja = () => {
-    if (!puedeAbrirCaja) { notify("Tu rol solo consulta la caja; recepción o administración la abren."); return; }
+    if (!puedeAbrirCaja) { notify(supervisaCaja ? "La caja la abre y cobra cada sede (su administrador o recepción). Tú la supervisas." : "Tu rol solo consulta la caja; recepción o administración la abren."); return; }
     const sid = sedeUuid();
     if (!sid) { notify("Elige una sede concreta antes de abrir la caja. No se puede abrir «todas» a la vez."); return; }
     if (!conectado) {
@@ -4477,7 +4480,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {/* CAJA-17: los comprobantes de ejemplo se numeran con los cobros de TODA la clínica (así
           un cobro no cambia de número al cambiar de sede) y después se muestran los de las
           sedes que se ven. Las series son por sede de la clínica (Integraciones). */}
-      {tab === "sunat" && <FacturacionSunat onIntegraciones={() => { window.location.hash = "#/integraciones"; }} notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
+      {tab === "sunat" && <FacturacionSunat puedeEmitir={puedeAbrirCaja} onIntegraciones={() => { window.location.hash = "#/integraciones"; }} notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
         sedes={(conectado && sedes.length ? sedes : SEDES).map((x) => ({ id: x.id, nombre: x.nombre || nombreSede(x.id) }))}
         verSedes={limiteSedes} consulta={{ sedeIds: sedesApi }}
         pagos={(demoDb.pacientes || pacientes).flatMap((p) => (fichas[p.id]?.pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", sede: sedeDeRegistro(pg, p) })))} />}
@@ -4515,7 +4518,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               </div>}
             </section>
           ) : (
-            <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>La caja de hoy aún no se abre. Tu rol puede ver los saldos, pero no abrir caja ni cobrar.</span></div>
+            <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>{supervisaCaja ? <><b>Supervisión.</b> Cada sede abre su caja, cobra y emite sus comprobantes (su administrador o recepción). Aquí ves los saldos y movimientos de todas.</> : "La caja de hoy aún no se abre. Tu rol puede ver los saldos, pero no abrir caja ni cobrar."}</span></div>
           )}
         </div>
         );
@@ -5238,7 +5241,9 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
     return { pid, pac, pagos: ficha.pagos || [], saldo: cta.saldoPlan, total: cta.total, pagado: cta.pagado };
   };
   // Se cobra en la caja de la sede de la cita y solo con esa caja abierta.
+  const { supervisor: supervisaT } = useEmiteCobros();
   const cobrar = (c, monto) => {
+    if (supervisaT) { notify("Cobra la sede de la cita (su administrador o recepción)."); return; }
     const dp = datosPago(c);
     const abrir = () => setPago({ monto, nombre: c.paciente, pid: dp.pid, cita: c });
     const cerrada = () => notify(`Abre la caja de ${nombreSedeEn(sedesApi, c.sede)} antes de cobrar.`);
