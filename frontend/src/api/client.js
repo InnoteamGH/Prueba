@@ -262,7 +262,8 @@ export const api = {
     // citas.listar("all"), que traia todo el historico de la clinica al navegador.
     resumenCitas: () => request("GET", "/pacientes/resumen-citas"),
     // Plan total / pagado / saldo por paciente (pacientes:ver). Alinea directorio con Caja.
-    resumenFinanciero: () => request("GET", "/pacientes/resumen-financiero"),
+    // sedeIds: saldo solo de lo atendido en esas sedes (lo de otra sede se cobra allá).
+    resumenFinanciero: (sedeIds) => request("GET", `/pacientes/resumen-financiero${conQuery({ sedeIds })}`),
     resumen: () => request("GET", "/pacientes/resumen"),
   },
   agente: {

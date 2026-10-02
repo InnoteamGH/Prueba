@@ -87,6 +87,9 @@ Cada bloque dice qué llama el frontend y qué espera. **Negrita = campo o pará
 - **Pacientes:**
   - `GET /pacientes` debe filtrar por las sedes del token y devolver **`sedeRegistroId`**.
   - `POST /pacientes` → `{ nombre, dni, telefono, email, fechaNacimiento, genero, distrito, canal, aseguradora, marketing, comentario, tags, `**`sedeRegistroId`**` }`.
+  - **DNI único en toda la clínica:** `POST /pacientes` y `PUT /pacientes/{id}` deben responder **409** con el nombre del paciente que ya tiene ese DNI. El frontend ya lo bloquea con el padrón que ve, pero un paciente de otra sede no está en ese padrón.
+  - **Borrar:** `DELETE /pacientes/{id}` solo con el permiso **`pacientes:eliminar`** (por defecto, solo el administrador general) y **400** si tiene citas, tratamientos, evoluciones, recetas o archivos (`GET /pacientes/{id}/tiene-historia`). Recepción da de alta y edita, pero no borra.
+  - **Saldo por sede:** `GET /pacientes/resumen-financiero` debe aceptar **`sedeIds=`** y devolver `total` y `pagado` solo de esas sedes. Lo mismo `ficha360.resumen.saldo`, más **`saldoOtras`** (lo pendiente en otras sedes). Así el directorio, la cabecera de la ficha, Plan y cuenta y Caja muestran la misma cifra.
 - **Citas:**
   - `GET /citas?fecha=` o `?desde=&hasta=`, más **`&sedeIds=`**.
   - `POST /citas` → `{ pacienteId, especialidadId, medicoId, `**`sedeId`**`, fecha, hora, duracionMin, sillon, motivo, canalOrigen, estado }`.
@@ -105,7 +108,7 @@ Cada bloque dice qué llama el frontend y qué espera. **Negrita = campo o pará
 - `PUT /automatizaciones/{clave}` debe actualizar **solo esa** automatización (recibe `activo`, `plantilla`, `hsmNombre`, `hsmIdioma`). Si reemplazara toda la configuración, apagar una apagaría las demás.
 - `GET /automatizaciones/historial?`**`sedeIds=`**.
 - `GET /automatizaciones/recall-pendientes?`**`sedeIds=`**.
-- `POST /automatizaciones/recall/{pacienteId}`.
+- `POST /automatizaciones/recall/{pacienteId}`: solo envía el WhatsApp; la cita se crea cuando el paciente responde (el frontend ya no crea una cita por su cuenta).
 - Para enviar fuera de la ventana de 24 h, las plantillas HSM deben estar aprobadas en Meta.
 
 **WhatsApp** (depende de la integración con el proveedor)

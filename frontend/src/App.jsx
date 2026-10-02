@@ -1806,7 +1806,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         m[x.pacienteId] = { total: Number(x.total) || 0, pagado: Number(x.pagado) || 0 };
       setSaldos(m);
     };
-    api.pacientes.resumenFinanciero().then(mapRows).catch(() => {
+    api.pacientes.resumenFinanciero(sedeIds && sedeIds.length ? sedeIds.map(sedeApiUuid).filter(Boolean) : null).then(mapRows).catch(() => {
       if (can && !can("facturacion", "ver")) { setSaldos({}); return; }
       api.caja().then((c) => {
         const m = {};
@@ -1815,7 +1815,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         setSaldos(m);
       }).catch(() => setSaldos({}));
     });
-  }, []); // eslint-disable-line
+  }, [(sedeIds || []).join(",")]); // eslint-disable-line
   // NAV-05: ante 5xx no pintar «0 registrados» como dato — conservar último listado bueno.
   const [listaError, setListaError] = useState(false);
   const recargar = () => {
