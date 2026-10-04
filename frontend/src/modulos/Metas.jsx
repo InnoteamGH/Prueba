@@ -43,9 +43,10 @@ function Porcentaje({ value, onChange, disabled, label }) {
 
 export default function Metas({ notify = () => {}, can, sedes = null }) {
   const conectado = !!auth.token;
-  const { esMia, mias, sede: sedeSel } = useSede();
+  const { esMia, mias, sede: sedeSel, global: usuarioGlobal } = useSede();
   // Meta global (doctor sin sede, con API): solo quien ve toda la clínica y sin filtro de sede.
-  const esGlobal = sedeSel === "all" && (!mias || mias.length >= SEDE_IDS.length);
+  // Con sesión SEDE_IDS son las sedes reales (registro), así que también vale el recuento.
+  const esGlobal = sedeSel === "all" && (usuarioGlobal || !mias || mias.length >= SEDE_IDS.length);
   const puedeEditar = can ? can("metas", "editar") : true;
   const verSedes = useMemo(() => (sedes && sedes.length ? sedes.map(String) : null), [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [meds, setMeds] = useState([]);

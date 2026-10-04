@@ -4,9 +4,15 @@ import { AlertCircle, AlertTriangle, BellRing, CalendarCheck, Check, ChevronRigh
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import { DISP_DEMO } from "../compartido/sillones";
-import {DatosDemoCtx, Pestanas, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, mismaSede, nombreSede, puede, sedesDe, toMin, tint, useSede} from "../comun";
+import {DatosDemoCtx, Pestanas, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, mismaSede, nombreSede, puede, sedeNum, sedesDe, toMin, tint, useSede} from "../comun";
+import { horarioConfigurado } from "../compartido/horarioReal";
 
-function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica = { horario: {}, feriados: [] } }) {
+// Nombre comparable (sin «Dr./Dra.», sin tildes ni mayúsculas) para reconocer al médico de la sesión.
+const normNom = (s) => String(s || "").replace(/^(?:\s*(?:dr\(a\)\.?|dra\.?|dr\.?)\s*)+/i, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+// Las sustituciones entre colegas aún no tienen endpoint: con sesión no se simulan.
+const TXT_SIN_SERVIDOR = "Disponible cuando el servidor lo soporte";
+
+function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, horarioClinica = { horario: {}, feriados: [] } }) {
   // Los días y las horas los pone el horario de la clínica, no este módulo: es lo que
   // cambia de una clínica a otra (unas abren sábado, otras domingo, otras solo hasta la
   // una). El doctor ajusta lo suyo dentro de ese marco.
@@ -46,20 +52,42 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   const HORAS = horasEntre(String(RANGO[0]).padStart(2, "0") + ":00", String(RANGO[1]).padStart(2, "0") + ":00")
     .map((h) => String(h).padStart(2, "0") + ":00");
   const TEAL = DS.c.primary;
-  const [jornada, setJornada] = useState({ ini: "08:00", fin: "18:00" });
-  const [diasAtiende, setDiasAtiende] = useState(() => DOW_SEMANA.map(() => true));
   const conectado = !!auth.token;
+  // Con sesión y sin horario de la clínica no se supone uno: se avisa arriba.
+  const sinHorarioClinica = conectado && !horarioConfigurado(HOR);
+  // Jornada inicial: con sesión, la de la clínica (hasta que llega la guardada del doctor).
+  const [jornada, setJornada] = useState(() => (conectado
+    ? { ini: `${String(RANGO[0]).padStart(2, "0")}:00`, fin: `${String(RANGO[1]).padStart(2, "0")}:00` }
+    : { ini: "08:00", fin: "18:00" }));
+  const [diasAtiende, setDiasAtiende] = useState(() => DOW_SEMANA.map(() => true));
+  // Con sesión, el médico de la sesión sale de GET /medicos (por nombre); nunca MEDICOS[0].
+  const [medSrv, setMedSrv] = useState(null);
+  const [medSrvListo, setMedSrvListo] = useState(!conectado);
+  useEffect(() => {
+    if (!conectado) return;
+    const yo = normNom(auth.sesion?.nombre || usuario?.nombre);
+    api.catalogo.medicos().then((rows) => {
+      const lista = Array.isArray(rows) ? rows : [];
+      const m = (yo && (lista.find((x) => normNom(x.nombre) === yo) || lista.find((x) => normNom(x.nombre).includes(yo) || yo.includes(normNom(x.nombre))))) || null;
+      setMedSrv(m);
+    }).catch(() => setMedSrv(null)).finally(() => setMedSrvListo(true));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [guardandoDisp, setGuardandoDisp] = useState(false);
   // Demostración: el horario del doctor vive en los datos compartidos, los mismos que
   // usan la agenda y el modal de agendado para validar sus citas.
   const demoDb = useContext(DatosDemoCtx);
-  const miMedId = (MEDICOS.find((m) => m.nombre === usuario?.nombre) || {}).id ?? null;
+  const miMedId = conectado ? (medSrv?.id ?? null) : ((MEDICOS.find((m) => m.nombre === usuario?.nombre) || {}).id ?? null);
   const misBloquesDemo = (demoDb?.dispMedicos || DISP_DEMO).filter((d) => d.medicoId === miMedId);
   const [jornadaCargada, setJornadaCargada] = useState(null);
   // Cada turno es de una sede (mañana en una, tarde en otra). Al guardar se conserva la sede
   // de cada turno; un día que se abre de nuevo va a la sede elegida aquí (si atiende en varias).
   const { activa, enSede, esMia } = useSede();
-  const sedesDoc = (() => { const m = MEDICOS.find((x) => x.id === miMedId); const ss = m ? sedesDe(m) : []; return ss.length ? ss : MIS_SEDES.filter((x) => x != null); })();
+  const sedesDoc = (() => {
+    // Con sesión: las sedes de la ficha del médico en el servidor (UUID → número del registro).
+    const ss = conectado ? (medSrv?.sedes || medSrv?.sedeIds || []).map((x) => sedeNum(x?.id ?? x)).filter((x) => typeof x === "number")
+      : (() => { const m = MEDICOS.find((x) => x.id === miMedId); return m ? sedesDe(m) : []; })();
+    return ss.length ? ss : MIS_SEDES.filter((x) => x != null);
+  })();
   const [sedeNueva, setSedeNueva] = useState(() => sedesDoc.find((x) => mismaSede(x, activa)) ?? sedesDoc[0] ?? null);
   const [filasMias, setFilasMias] = useState([]);   // con sesión: los turnos guardados (con su sede)
   /** Mueve los bordes de la jornada sin perder la sede de cada turno: el que empezaba con la
@@ -84,9 +112,11 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   }, [conectado, miMedId]); // eslint-disable-line
   // Carga la disponibilidad guardada del médico (días + jornada) al abrir.
   useEffect(() => {
-    if (!conectado) return;
-    api.disponibilidad.listar().then((rows) => {
-      if (!Array.isArray(rows) || !rows.length) return;
+    if (!conectado || !medSrvListo) return;
+    api.disponibilidad.listar(miMedId || undefined).then((rows0) => {
+      // Solo los turnos del médico de la sesión (si el servidor devuelve los de todos).
+      const rows = Array.isArray(rows0) ? (miMedId ? rows0.filter((d) => d.medicoId == null || String(d.medicoId) === String(miMedId)) : rows0) : [];
+      if (!rows.length) return;
       // Solo si son los turnos de un único doctor (los suyos) sirven para conservar la sede al guardar.
       setFilasMias(new Set(rows.map((d) => String(d.medicoId ?? ""))).size <= 1 ? rows : []);
       const r0j = rows.map((d) => String(d.horaInicio || "").slice(0, 5)).filter(Boolean).sort()[0];
@@ -98,7 +128,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
       // La jornada va de la primera entrada a la última salida (antes se tomaba solo el primer turno).
       if (r0j && rfj) setJornada({ ini: r0j, fin: rfj });
     }).catch(() => {});
-  }, []); // eslint-disable-line
+  }, [medSrvListo, miMedId]); // eslint-disable-line
   const guardarDisp = async () => {
     if (!conectado) {
       if (miMedId == null || !demoDb?.setDispMedicos) { notify("Disponibilidad guardada. Tu agenda ya la usa."); return; }
@@ -144,22 +174,22 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
     setGuardandoDisp(false);
   };
   const [bloqueos, setBloqueos] = useState([]);
-  // Cargar bloqueos desde la API
+  // Bloqueos recurrentes: una entrada por día de la semana (se repiten cada semana).
+  // Con sesión arrancan vacíos y salen del servidor (bloqueos con diaSemana); el almuerzo
+  // de 13:00 a 14:00 es solo el ejemplo de la demostración.
+  const [recurrentes, setRecurrentes] = useState(() => (conectado ? [] : [0, 1, 2, 3, 4, 5].map((d) => ({ id: 100 + d, dia: d, ini: "13:00", fin: "14:00", motivo: "Almuerzo" }))));
+  // Cargar bloqueos desde la API: solo los del médico de la sesión (los de toda la agenda o
+  // de otros doctores no son suyos para liberar).
   useEffect(() => {
-    if (!conectado) return;
+    if (!conectado || !miMedId) return;
     api.bloqueos.listar().then((rows) => {
       if (!Array.isArray(rows)) return;
-      setBloqueos(rows.map((b) => ({
-        id: b.id,
-        fecha: b.fecha,
-        ini: String(b.horaInicio || "").slice(0, 5),
-        fin: String(b.horaFin || "").slice(0, 5),
-        motivo: b.motivo || "Bloqueo"
-      })));
+      const mios = rows.filter((b) => b.medicoId != null && String(b.medicoId) === String(miMedId));
+      const hm = (h) => String(h || "").slice(0, 5);
+      setBloqueos(mios.filter((b) => b.fecha).map((b) => ({ id: b.id, fecha: b.fecha, ini: hm(b.horaInicio), fin: hm(b.horaFin), motivo: b.motivo || "Bloqueo" })));
+      setRecurrentes(mios.filter((b) => !b.fecha && b.diaSemana != null).map((b) => ({ id: b.id, dia: DOW_SEMANA.indexOf(Number(b.diaSemana)), ini: hm(b.horaInicio), fin: hm(b.horaFin), motivo: b.motivo || "Bloqueo" })).filter((r) => r.dia >= 0));
     }).catch(() => {});
-  }, [conectado]);
-  // Bloqueos recurrentes: una entrada por día de la semana (se repiten cada semana).
-  const [recurrentes, setRecurrentes] = useState(() => [0, 1, 2, 3, 4, 5].map((d) => ({ id: 100 + d, dia: d, ini: "13:00", fin: "14:00", motivo: "Almuerzo" })));
+  }, [conectado, miMedId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [motivo, setMotivo] = useState("Bloqueo");
   const [modo, setModo] = useState("semana"); // "semana" | "recurrente"
   const ANTICIP = 7;                                  // días de anticipación exigidos
@@ -185,15 +215,30 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
              esHoy: fecha === fmt(hoy), jornada: j };
   });
 
+  // Con sesión, las citas del médico salen de GET /citas (semana que se ve y los próximos
+  // 7 días); el estado global de citas arranca vacío y no es la fuente.
+  const [citasSrv, setCitasSrv] = useState([]);
+  const finSemana = fmt(new Date(lunes.getTime() + 6 * 86400000));
+  useEffect(() => {
+    if (!conectado || !miMedId) return;
+    const desde = [fmt(hoy), fmt(lunes)].sort()[0], hasta = [addDays(ANTICIP), finSemana].sort()[1];
+    api.citas.listar(null, desde, hasta).then((r) => setCitasSrv((Array.isArray(r) ? r : [])
+      .filter((c) => String(c.medicoId) === String(miMedId))
+      .map((c) => ({ id: c.id, medicoId: c.medicoId, paciente: c.paciente || "—", fecha: String(c.fecha || "").slice(0, 10), hora: String(c.hora || "").slice(0, 5), estado: c.estado, sede: sedeNum(c.sedeId ?? c.sede), esp: c.especialidadId, espNombre: c.especialidad || null, motivo: c.motivo || "" }))))
+      .catch(() => setCitasSrv([]));
+  }, [conectado, miMedId, semOff]); // eslint-disable-line react-hooks/exhaustive-deps
+  const citas = conectado ? citasSrv : citasProp;
+
   /* ---- Reglas de negocio: multi-sede, anticipación y sustituciones ---- */
-  const miMedico = MEDICOS.find((m) => m.nombre === usuario?.nombre) || MEDICOS[0];
+  const miMedico = conectado
+    ? (medSrv ? { id: medSrv.id, nombre: medSrv.nombre, esp: medSrv.especialidadId, sedes: sedesDoc } : { id: null, nombre: "", esp: null, sedes: [] })
+    : (MEDICOS.find((m) => m.nombre === usuario?.nombre) || MEDICOS[0]);
   const miId = miMedico.id;
-  const espNombre = ESPECIALIDADES.find((e) => e.id === miMedico.esp)?.nombre || "tu especialidad";
   // Colegas que pueden cubrir una cita = otros médicos que tengan LA ESPECIALIDAD DE ESA CITA
   // y trabajen en LA SEDE de la cita (si no, la cita quedaría con un doctor que no atiende ahí).
   const atiendeEnSede = (m, sede) => sede == null || sedesDe(m).some((x) => mismaSede(x, sede));
-  const colegasDeCita = (cita) => cita ? MEDICOS.filter((m) => m.id !== miId && espsDe(m).includes(cita.esp) && atiendeEnSede(m, cita.sede)) : [];
-  const espDeCita = (cita) => ESPECIALIDADES.find((e) => e.id === cita?.esp)?.nombre || "esa especialidad";
+  const colegasDeCita = (cita) => cita && !conectado ? MEDICOS.filter((m) => m.id !== miId && espsDe(m).includes(cita.esp) && atiendeEnSede(m, cita.sede)) : [];
+  const espDeCita = (cita) => (conectado ? cita?.espNombre : ESPECIALIDADES.find((e) => e.id === cita?.esp)?.nombre) || "esa especialidad";
   const limiteEdicion = addDays(ANTICIP);            // solo se puede editar desde esta fecha (ISO comparable)
   const editableFecha = (f) => f >= limiteEdicion;
   // Cita del médico en una franja (en CUALQUIER sede → da visibilidad cruzada).
@@ -207,6 +252,8 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
 
   // Conflicto de viaje: ¿el médico `medId` alcanza a llegar a la cita `c` dadas sus otras citas ese día en OTRA sede?
   const conflictoViaje = (medId, c) => {
+    // Con sesión no hay coordenadas de las sedes reales para estimar el viaje: no se inventa.
+    if (conectado) return null;
     const otras = citas.filter((x) => x.medicoId === medId && x.fecha === c.fecha && x.id !== c.id && x.estado !== "cancelada" && x.sede !== c.sede);
     let peor = null;
     for (const x of otras) {
@@ -221,6 +268,8 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   // (demuestra multi-especialidad y, en la de horario cruzado, la alerta de viaje al aceptar).
   const [solicitudes, setSolicitudes] = useState(() => {
     const vistos = new Set(), out = [];
+    // Solicitudes de ejemplo solo en la demostración.
+    if (conectado) return out;
     for (const c of citas) {
       if (c.medicoId === miId || c.fecha < fmt(hoy) || c.estado === "cancelada" || c.estado === "atendida") continue;
       // Solo citas de una sede donde este doctor atiende (y que el usuario puede ver).
@@ -246,7 +295,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   const pendientesRecibidas = recibidas.filter((s) => s.estado === "pendiente").length;
   const yaPedida = (citaId) => enviadas.find((e) => e.citaId === citaId);
 
-  const abrirSust = (cita) => { setSustDest(colegasDeCita(cita)[0]?.id || ""); setSustMotivo(""); setSust(cita); };
+  const abrirSust = (cita) => { if (conectado) { notify(`Cita de ${cita.paciente} (${cita.hora}). Las sustituciones entre colegas: ${TXT_SIN_SERVIDOR.toLowerCase()}.`); return; } setSustDest(colegasDeCita(cita)[0]?.id || ""); setSustMotivo(""); setSust(cita); };
   const enviarSust = () => {
     const cols = colegasDeCita(sust);
     if (!cols.length || !sustDest) { notify(`No hay otro odontólogo de ${espDeCita(sust)} para sustituirte.`); return; }
@@ -284,6 +333,11 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   };
   const liberar = async (e) => {
     if (e.recurrente) {
+      if (conectado) {
+        try { await api.bloqueos.eliminar(e.rec.id); setRecurrentes((r) => r.filter((x) => x.id !== e.rec.id)); }
+        catch { notify("No se pudo eliminar el bloqueo recurrente."); }
+        return;
+      }
       setRecurrentes((r) => r.filter((x) => x.id !== e.rec.id));
     } else {
       if (conectado && e.blk.id) {
@@ -301,9 +355,18 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   };
   const bloquear = async (dia, hora) => {
     if (modo === "recurrente") {
+      if (conectado) {
+        // Bloqueo semanal del propio médico (POST /bloqueos con diaSemana y medicoId, como en la Agenda).
+        try {
+          const creado = await api.bloqueos.crear({ diaSemana: dia.dow, fecha: null, horaInicio: hora, horaFin: nextH(hora), motivo: mot(), medicoId: miId });
+          setRecurrentes((r) => [...r, { id: creado?.id ?? rid(), dia: dia.idx, ini: hora, fin: nextH(hora), motivo: mot() }]);
+        } catch { notify("No se pudo crear el bloqueo recurrente."); }
+        return;
+      }
       setRecurrentes((r) => [...r, { id: rid(), dia: dia.idx, ini: hora, fin: nextH(hora), motivo: mot() }]);
     } else {
-      const nuevoBloqueo = { fecha: dia.date, horaInicio: hora, horaFin: nextH(hora), motivo: mot() };
+      // Con sesión el bloqueo es del médico (medicoId): sin él bloquearía la agenda de toda la clínica.
+      const nuevoBloqueo = { fecha: dia.date, horaInicio: hora, horaFin: nextH(hora), motivo: mot(), ...(conectado ? { medicoId: miId } : {}) };
       if (conectado) {
         try {
           const creado = await api.bloqueos.crear(nuevoBloqueo);
@@ -354,19 +417,43 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
   const rango = semana.length ? `${semana[0].num} ${semana[0].mes} – ${ultimo.num} ${ultimo.mes}` : "Sin días de atención";
   // Agrupar recurrentes por hora+motivo para el resumen.
   const recGrupos = Object.values(recurrentes.reduce((a, r) => { const k = `${r.ini}|${r.fin}|${r.motivo}`; (a[k] = a[k] || { ini: r.ini, fin: r.fin, motivo: r.motivo, dias: [], ids: [] }); a[k].dias.push(r.dia); a[k].ids.push(r.id); return a; }, {})).sort((a, b) => a.ini.localeCompare(b.ini));
-  const quitarGrupo = (ids) => { setRecurrentes((r) => r.filter((x) => !ids.includes(x.id))); notify("Bloqueo recurrente eliminado."); };
+  const quitarGrupo = (ids) => {
+    if (conectado) {
+      Promise.all(ids.map((id) => api.bloqueos.eliminar(id)))
+        .then(() => { setRecurrentes((r) => r.filter((x) => !ids.includes(x.id))); notify("Bloqueo recurrente eliminado."); })
+        .catch(() => notify("No se pudo eliminar el bloqueo recurrente."));
+      return;
+    }
+    setRecurrentes((r) => r.filter((x) => !ids.includes(x.id))); notify("Bloqueo recurrente eliminado.");
+  };
   const segBtn = (k, l) => <button onClick={() => setModo(k)} style={{ padding: "7px 13px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, background: modo === k ? "var(--dc-white)" : "transparent", color: modo === k ? NAVY : "var(--dc-ink-400)", boxShadow: modo === k ? "0 1px 3px rgba(16,24,40,.12)" : "none", display: "inline-flex", alignItems: "center", gap: 5 }}>{l}</button>;
   const pill = (estado) => ({ fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap", background: estado === "aceptada" ? "var(--dc-ok-soft)" : estado === "rechazada" ? "var(--dc-bg)" : "var(--dc-warn-soft)", color: estado === "aceptada" ? "var(--dc-ok-700)" : estado === "rechazada" ? "var(--dc-danger-700)" : "var(--dc-warn-600)" });
 
+  // Con sesión, un usuario sin ficha de médico no tiene disponibilidad que editar.
+  if (conectado && medSrvListo && !medSrv) {
+    return (
+      <Card style={{ padding: 20, fontSize: 14, color: "var(--dc-ink-500)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <AlertCircle size={18} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span><b style={{ color: NAVY }}>Tu usuario no está vinculado a una ficha de médico.</b> Pide a administración que te registre en Configuración › Doctores con el mismo nombre de tu usuario para poder editar tu disponibilidad.</span>
+      </Card>
+    );
+  }
+  if (conectado && !medSrvListo) return <Card style={{ padding: 20, fontSize: 14, color: "var(--dc-ink-500)" }}>Cargando tu ficha de médico…</Card>;
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      {sinHorarioClinica && (
+        <Card style={{ padding: "12px 16px", fontSize: 13, color: "var(--dc-warn-700)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-line)" }}>
+          La clínica todavía no cargó su horario de atención: los días y horas de esta rejilla son provisionales hasta que administración lo configure.
+        </Card>
+      )}
       <Card style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, background: "var(--dc-info-soft)", border: "1px solid var(--dc-sky)" }}>
         <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: "var(--dc-info-soft)", color: "var(--dc-info-ink)", display: "grid", placeItems: "center", flexShrink: 0 }}><AlertCircle size={18} strokeWidth={1.75} /></div>
-        <div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>La clínica atiende {semana.length} día(s) a la semana; aquí solo salen esos. Tu disponibilidad solo se puede modificar con <strong>1 semana de anticipación</strong> (desde el <strong>{fechaLegible(limiteEdicion)}</strong>). Las franjas con <MapPin size={11} strokeWidth={1.75} style={{ verticalAlign: -1 }} /> son citas ya agendadas — incluidas las de <strong>otra sede</strong>. Si no podrás atender, pide una <strong>sustitución</strong> (por cita o el día completo) a un colega de la especialidad de cada cita.</div>
+        <div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>La clínica atiende {semana.length} día(s) a la semana; aquí solo salen esos. Tu disponibilidad solo se puede modificar con <strong>1 semana de anticipación</strong> (desde el <strong>{fechaLegible(limiteEdicion)}</strong>). Las franjas con <MapPin size={11} strokeWidth={1.75} style={{ verticalAlign: -1 }} /> son citas ya agendadas — incluidas las de <strong>otra sede</strong>. {conectado ? "Si no podrás atender una cita ya agendada, coordínalo con recepción." : <>Si no podrás atender, pide una <strong>sustitución</strong> (por cita o el día completo) a un colega de la especialidad de cada cita.</>}</div>
       </Card>
 
       {/* AGE-11: dos pestañas. Las citas del día a día se ven en la Agenda. */}
-      <Pestanas etiqueta="Mi disponibilidad" valor={tabDisp} onChange={setTabDisp} opciones={[{ id: "horario", label: "Mi horario" }, { id: "sust", label: `Sustituciones${recibidas.filter((r) => r.estado === "pendiente").length ? ` (${recibidas.filter((r) => r.estado === "pendiente").length})` : ""}` }]} />
+      <Pestanas etiqueta="Mi disponibilidad" valor={tabDisp} onChange={setTabDisp} opciones={[{ id: "horario", label: "Mi horario" }, { id: "sust", label: conectado ? "Sustituciones" : `Sustituciones${recibidas.filter((r) => r.estado === "pendiente").length ? ` (${recibidas.filter((r) => r.estado === "pendiente").length})` : ""}` }]} />
       {tabDisp === "horario" && <>
       <Card style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -457,6 +544,12 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
         </div>
       </Card>
       </>}
+      {tabDisp === "sust" && conectado && (
+        <Card style={{ padding: 18, fontSize: 13, color: "var(--dc-ink-500)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <AlertCircle size={16} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span><b style={{ color: NAVY }}>Sustituciones entre colegas: {TXT_SIN_SERVIDOR.toLowerCase()}.</b> Por ahora el cambio de doctor de una cita se coordina con recepción desde la Agenda.</span>
+        </Card>
+      )}
       {tabDisp === "sust" && <>
       {/* Solicitudes de sustitución (recibidas / enviadas) */}
       {(recibidas.length > 0 || enviadas.length > 0) && (
@@ -496,13 +589,13 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
         <Card style={{ overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--dc-line)" }}>
             <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Tus citas de los próximos 7 días</h3>
-            <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>No se pueden cancelar. Puedes sustituir el <strong>día completo</strong> o <strong>cada cita</strong>; cada una la cubre un colega de <strong>su</strong> especialidad.</div>
+            <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{conectado ? "No se pueden cancelar desde aquí." : <>No se pueden cancelar. Puedes sustituir el <strong>día completo</strong> o <strong>cada cita</strong>; cada una la cubre un colega de <strong>su</strong> especialidad.</>}</div>
           </div>
           {diasComprometidos.map((fecha) => { const cs = citasDia(fecha); const pend = cs.filter((c) => !yaPedida(c.id)); return (
             <div key={fecha}>
               <div style={{ padding: "10px 20px", background: "var(--dc-bg)", borderTop: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, textTransform: "capitalize" }}>{fechaLegible(fecha)} – {cs.length} cita{cs.length > 1 ? "s" : ""}</div>
-                {pend.length > 1 && <Btn small kind="ghost" onClick={() => abrirDia(fecha)}><Repeat size={13} strokeWidth={1.75} /> Sustituir todo el día</Btn>}
+                {pend.length > 1 && !conectado && <Btn small kind="ghost" onClick={() => abrirDia(fecha)}><Repeat size={13} strokeWidth={1.75} /> Sustituir todo el día</Btn>}
               </div>
               {cs.map((c) => { const env = yaPedida(c.id); const cv = conflictoViaje(miId, c); return (
                 <div key={c.id} style={{ padding: "12px 20px", borderTop: "1px solid var(--dc-line)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -512,7 +605,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
                     <div style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 5 }}><MapPin size={12} strokeWidth={1.75} /> {nombreSede(c.sede)} – {c.motivo}</div>
                     {cv && <div style={{ fontSize: 12, color: "var(--dc-danger-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-danger-mid)", borderRadius: "var(--dc-r-sm)", padding: "4px 8px", marginTop: 5, display: "inline-flex", alignItems: "center", gap: 5 }}><AlertTriangle size={12} strokeWidth={1.75} /> Ajustado: ~{cv.viaje} min de viaje desde {cortaSede(cv.otra.sede)} ({cv.gap} min de margen)</div>}
                   </div>
-                  {env
+                  {conectado ? null : env
                     ? <span style={pill(env.estado)}>{env.estado === "pendiente" ? "Sustitución pedida" : env.estado === "aceptada" ? "Cubierta" : "Rechazada — la mantienes"}</span>
                     : <Btn small kind="ghost" onClick={() => abrirSust(c)}><Repeat size={14} strokeWidth={1.75} /> Sustituir</Btn>}
                 </div>
@@ -521,7 +614,7 @@ function Disponibilidad({ notify, usuario, citas = [], setCitas, horarioClinica 
           ); })}
         </Card>
       )}
-      {!(recibidas.length > 0 || enviadas.length > 0) && <Card style={{ padding: 18, fontSize: 13, color: "var(--dc-ink-500)" }}>Sin solicitudes de sustitución.</Card>}
+      {!conectado && !(recibidas.length > 0 || enviadas.length > 0) && <Card style={{ padding: 18, fontSize: 13, color: "var(--dc-ink-500)" }}>Sin solicitudes de sustitución.</Card>}
       </>}
 
       {/* Modal: solicitar sustitución */}

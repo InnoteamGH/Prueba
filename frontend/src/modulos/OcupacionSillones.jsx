@@ -6,6 +6,7 @@ import { Armchair, ChevronLeft, ChevronRight, Clock, Info, Send } from "lucide-r
 import api, { auth } from "../api/client";
 import { DatosDemoCtx, ESPECIALIDADES, MEDICOS, fmt, horarioDeSede, jornadaClinica, mismaSede, nombreSede, toMin } from "../comun";
 import { useReglasAgenda } from "../compartido/useReglasAgenda";
+import { horarioConfigurado } from "../compartido/horarioReal";
 import { etiquetaUso } from "../compartido/sillones";
 
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -17,19 +18,23 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
   const reglas = useReglasAgenda();
   const [remotas, setRemotas] = useState([]);
   const [horario, setHorario] = useState({ horario: {}, feriados: [] });
+  const [horarioListo, setHorarioListo] = useState(false);
   const lunes = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + off * 7); return d; }, [off]);
   const dias = useMemo(() => DIAS.map((_, i) => { const d = new Date(lunes); d.setDate(d.getDate() + i); return fmt(d); }), [lunes]);
   useEffect(() => {
     if (!conectado) return;
     api.citas.listar(null, dias[0], dias[5]).then((r) => setRemotas((r || []).map((c) => ({ ...c, sede: c.sedeId ?? c.sede, hora: String(c.hora || "").slice(0, 5) })))).catch(() => setRemotas([]));
-    api.clinica.get().then((r) => setHorario({ horario: r?.horario || {}, feriados: r?.feriados || [] })).catch(() => {});
+    api.clinica.get().then((r) => setHorario({ horario: r?.horario || {}, feriados: r?.feriados || [] })).catch(() => {}).finally(() => setHorarioListo(true));
   }, [conectado, dias]);
   const citas = conectado ? remotas : (demoDb?.citas || []);
   const hor = conectado ? horario : (demoDb?.horarioClinica || horario);
+  // Con sesión y sin horario cargado no se supone 09–19: la pantalla lo dice.
+  const sinHorario = conectado && horarioListo && !horarioConfigurado(hor.horario);
   const sillones = (reglas.sillones || []).filter((s) => s.activo !== false && (!sedesVisibles || sedesVisibles.some((v) => mismaSede(v, s.sede))));
 
   const datos = useMemo(() => {
     const capDia = (sede, fecha) => {
+      if (conectado && !horarioConfigurado(hor.horario)) return 0;
       const j = jornadaClinica(horarioDeSede(hor.horario || {}, sede), hor.feriados || [], fecha);
       if (!j.abierta) return 0;
       return Math.max(0, toMin(j.cierra || "19:00") - toMin(j.abre || "09:00"));
@@ -37,7 +42,7 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
     const filas = sillones.map((s) => {
       const celdas = dias.map((fecha) => {
         const cap = capDia(s.sede, fecha);
-        const min = citas.filter((c) => c.fecha === fecha && !INACTIVAS.includes(c.estado) && String(c.sede) === String(s.sede) && String(c.sillon) === String(s.numero)).reduce((a, c) => a + (Number(c.duracionMin) || 30), 0);
+        const min = citas.filter((c) => c.fecha === fecha && !INACTIVAS.includes(c.estado) && mismaSede(c.sede, s.sede) && String(c.sillon) === String(s.numero)).reduce((a, c) => a + (Number(c.duracionMin) || 30), 0);
         return { fecha, cap, min, pct: cap ? Math.min(100, Math.round(min / cap * 100)) : null };
       });
       const cap = celdas.reduce((a, c) => a + c.cap, 0), min = celdas.reduce((a, c) => a + c.min, 0);
@@ -46,9 +51,10 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
     const porDia = dias.map((fecha, i) => { const cap = filas.reduce((a, f) => a + f.celdas[i].cap, 0), min = filas.reduce((a, f) => a + f.celdas[i].min, 0); return { fecha, cap, min, pct: cap ? Math.round(min / cap * 100) : null }; });
     const cap = filas.reduce((a, f) => a + f.cap, 0), min = filas.reduce((a, f) => a + f.min, 0);
     return { filas, porDia, cap, min, pct: cap ? Math.round(min / cap * 100) : null };
-  }, [sillones, dias, citas, hor]);
+  }, [sillones, dias, citas, hor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { conectado, sillones, dias, datos };
+  // Médicos y especialidades para la etiqueta de uso: los del servidor con sesión.
+  return { conectado, sillones, dias, datos, sinHorario, medicos: reglas.medicos || [], especialidades: reglas.especialidades || [] };
 }
 
 const horas = (min) => { const h = Math.round((min / 60) * 10) / 10; return Number.isInteger(h) ? String(h) : h.toFixed(1).replace(".", ","); };
@@ -65,7 +71,7 @@ function Anillo({ pct, size = 44 }) {
 
 export default function OcupacionSillones({ sedes: sedesVer = null }) {
   const [off, setOff] = useState(0);
-  const { conectado, sillones, dias, datos } = useOcupacionSillones(off, sedesVer);
+  const { conectado, sillones, dias, datos, sinHorario, medicos, especialidades } = useOcupacionSillones(off, sedesVer);
   const conPct = datos.filas.filter((f) => f.pct != null);
   const sedes = [...new Set(sillones.map((s) => String(s.sede)))];
   const nomSede = (id) => { const n = nombreSede(/^\d+$/.test(String(id)) ? Number(id) : id); return n && n !== "—" ? n : "Sede"; };
@@ -75,11 +81,12 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
   const horasLibres = Math.round((datos.cap - datos.min) / 60);
   const rango = `${dias[0].split("-").reverse().slice(0, 2).join("/")} – ${dias[5].split("-").reverse().slice(0, 2).join("/")}`;
   const hoyF = fmt(new Date());
-  const usoTxt = (s) => { try { return etiquetaUso(s, { medicos: MEDICOS, especialidades: ESPECIALIDADES })?.txt || "Flexible"; } catch (e) { return "Flexible"; } };
+  const usoTxt = (s) => { try { return etiquetaUso(s, { medicos: conectado ? medicos : MEDICOS, especialidades: conectado ? especialidades : ESPECIALIDADES })?.txt || "Flexible"; } catch (e) { return "Flexible"; } };
   // Los tres sillón-día (de hoy en adelante) con más horas libres: lo primero que ofrecer.
   const huecos = datos.filas.flatMap((f) => f.celdas.map((c, i) => ({ k: `${f.s.id}-${c.fecha}`, sillon: f.s.nombre, sede: sedes.length > 1 ? corta(f.s.sede) : "", dia: `${DIAS[i]} ${c.fecha.slice(8)}`, fecha: c.fecha, libres: (c.cap - c.min) / 60, pct: c.pct })))
     .filter((h) => h.fecha >= hoyF && h.libres > 0).sort((a, b) => b.libres - a.libres).slice(0, 3);
-  if (!sillones.length) return null;
+  if (!sillones.length) return conectado ? <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>No hay sillones activos registrados en las sedes que se ven. Se dan de alta en Configuración › Sedes.</p></section> : null;
+  if (sinHorario) return <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>La clínica todavía no tiene cargado su horario de atención: sin él no se puede calcular la ocupación. Se configura en Configuración › Horarios.</p></section>;
   const tonoCelda = (p) => (p == null ? "is-na" : p === 0 ? "is-cero" : p >= 85 ? "is-full" : p >= 60 ? "is-alta" : p >= 30 ? "is-media" : "is-baja");
   return (
     <section className="dc-ocs dc-ocs--rep" aria-label="Ocupación de sillones">
@@ -187,8 +194,8 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
 
 /* Tarjeta compacta para el Panel gerencial: solo el dato y el enlace al detalle en la Agenda. */
 export function ResumenOcupacion({ onVer, variante, sedes = null }) {
-  const { sillones, datos } = useOcupacionSillones(0, sedes);
-  if (!sillones.length) return null;
+  const { sillones, datos, sinHorario } = useOcupacionSillones(0, sedes);
+  if (!sillones.length || sinHorario) return null;
   const libres = Math.round((datos.cap - datos.min) / 60);
   if (variante === "hoy") return (
     <div className="dc-hoy__t" role="button" tabIndex={0} onClick={onVer}>

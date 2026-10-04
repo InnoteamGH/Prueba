@@ -349,12 +349,15 @@ export const api = {
     actualizarFase: (id, f) => request("PATCH", `/tratamientos/fases/${id}`, f),
     borrarFase: (id) => request("DELETE", `/tratamientos/fases/${id}`),
     desdeOdontograma: (pacienteId) => request("POST", `/tratamientos/desde-odontograma?pacienteId=${pacienteId}`),
-    resumen: (desde, hasta, { especialidadId, areaClinica } = {}) => {
+    // sedeIds (opcional): solo lo producido en esas sedes (UUID). Si el servidor aún no
+    // filtra por sede, lo ignora y devuelve toda la clínica.
+    resumen: (desde, hasta, { especialidadId, areaClinica, sedeIds } = {}) => {
       const q = new URLSearchParams();
       if (desde) q.set("desde", desde);
       if (hasta) q.set("hasta", hasta);
       if (especialidadId) q.set("especialidadId", especialidadId);
       if (areaClinica) q.set("areaClinica", areaClinica);
+      if (Array.isArray(sedeIds) && sedeIds.length) q.set("sedeIds", sedeIds.join(","));
       const qs = q.toString();
       return request("GET", `/tratamientos/resumen${qs ? `?${qs}` : ""}`);
     },

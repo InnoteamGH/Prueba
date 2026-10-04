@@ -5,7 +5,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
 import api, { auth } from "../api/client";
-import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden } from "../comun";
+import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden, mismaSede, useSede } from "../comun";
+import { sedeApiUuid } from "../routing";
 import { medicoEnSedes } from "../compartido/medicosSede";
 
 /* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
@@ -752,7 +753,40 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   );
 }
 
-export default function ProduccionComisiones({ citas = [], can, tab = "resumen", sedes = null }) {
+export default function ProduccionComisiones({ citas: citasProp = [], can, tab = "resumen", sedes = null }) {
+  const conectado = !!auth.token;
+  // Sedes para la API como UUID (antes iban los números 1/2/3). Con «Todas» y un usuario
+  // de toda la clínica, null: las decide el servidor.
+  const sedeCx = useSede();
+  const sedesApi = (!sedes || !sedes.length || (sedeCx.sede === "all" && sedeCx.global)) ? null
+    : sedes.map((x) => sedeApiUuid(x)).filter(Boolean);
+  const claveSedes = sedesApi ? sedesApi.join(",") : "todas";
+  // Ausentismo con sesión: citas del mes en curso del servidor (GET /citas?desde&hasta&sedeIds),
+  // no las del estado de la demostración.
+  const hoyD = new Date();
+  const ymdL = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const desdeMes = ymdL(new Date(hoyD.getFullYear(), hoyD.getMonth(), 1)), hastaHoy = ymdL(hoyD);
+  const [citasSrv, setCitasSrv] = useState(null);
+  const [citasErr, setCitasErr] = useState(false);
+  useEffect(() => {
+    if (!conectado || tab !== "ausencias") return;
+    setCitasErr(false);
+    api.citas.listar(null, desdeMes, hastaHoy, sedesApi)
+      .then((r) => setCitasSrv((Array.isArray(r) ? r : []).filter((c) => !sedesApi || sedes.some((v) => mismaSede(v, c.sedeId ?? c.sede)))))
+      .catch(() => { setCitasSrv([]); setCitasErr(true); });
+  }, [conectado, tab, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const citas = conectado ? (citasSrv || []) : citasProp;
+  // Metas con sesión: las del catálogo de médicos del servidor (no las de ejemplo de MEDICOS).
+  const [medsSrv, setMedsSrv] = useState([]);
+  useEffect(() => { if (conectado) api.catalogo.medicos().then((r) => setMedsSrv(Array.isArray(r) ? r : [])).catch(() => setMedsSrv([])); }, [conectado]);
+  const metaSrv = (m) => {
+    const md = medsSrv.find((x) => String(x.id) === String(m.medicoId ?? m.id));
+    if (!md) return 0;
+    const ms = Array.isArray(md.metasSede) ? md.metasSede : Object.entries(md.metasSede || {}).map(([sedeId, x]) => ({ sedeId, ...x }));
+    const propias = sedesApi ? ms.filter((x) => sedes.some((v) => mismaSede(v, x.sedeId))) : ms;
+    if (propias.length) return propias.reduce((a, x) => a + (Number(x.metaMensual) || 0), 0);
+    return Number(md.metaMensual) || 0;
+  };
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [ficha, setFicha] = useState(null);
@@ -764,10 +798,10 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen",
   const cargar = useCallback(() => {
     setErr(null);
     if (!auth.token) { setData(datosDemo(sedes)); return; }
-    api.comisiones(null, null, sedes)
-      .then((r) => setData(r))
+    api.comisiones(null, null, sedesApi)
+      .then((r) => setData(r && !Array.isArray(r) ? r : {}))
       .catch((e) => setErr(e?.message || "No se pudo cargar comisiones"));
-  }, [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
+  }, [sedes && sedes.join(","), claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
 
   useEffect(() => { cargar(); }, [cargar]);
   useEffect(() => {
@@ -830,6 +864,11 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen",
         ? <div className="fm-aviso-edad is-info" style={{ marginBottom: 16 }}><span><b>Sin datos del servidor.</b> Producción y comisiones se calculan con las citas atendidas reales; en la demostración no hay servidor conectado.</span></div>
         : <div className="dc-banda dc-banda--peligro" style={{ marginBottom: 16 }}><p>{err}</p></div>)}
 
+      {tab === "ausencias" && conectado && (
+        <p className="dc-nota" style={{ marginBottom: 12 }}>
+          {citasErr ? "No se pudieron cargar las citas del servidor." : citasSrv == null ? "Cargando citas del servidor…" : `Agenda del mes en curso: del ${desdeMes.split("-").reverse().join("/")} al ${hastaHoy.split("-").reverse().join("/")}.`}
+        </p>
+      )}
       {tab === "ausencias" ? (
         <AusentismoTab
           citas={citas}
@@ -880,7 +919,7 @@ export default function ProduccionComisiones({ citas = [], can, tab = "resumen",
             {(() => {
               const hoyD = new Date();
               const ritmoM = (hoyD.getDate() / new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0).getDate()) * 100;
-              const conMeta = porMedico.map((m) => { const md = MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const meta = Number(m.meta ?? (md ? medicoEnSedes(md, sedes).meta : 0)) || 0; return { ...m, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
+              const conMeta = porMedico.map((m) => { const md = conectado ? null : MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const meta = Number(m.meta ?? (conectado ? metaSrv(m) : md ? medicoEnSedes(md, sedes).meta : 0)) || 0; return { ...m, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
               const alRitmo = conMeta.filter((m) => m.pct >= ritmoM).length;
               const metaTot = conMeta.reduce((a, m) => a + m.meta, 0);
               return (

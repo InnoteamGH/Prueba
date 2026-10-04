@@ -33,7 +33,7 @@ export const avanceDemo = (d = new Date()) => {
   return Math.min(1, Math.max(0.12, (d.getDate() / dias) * 1.08));
 };
 
-export default function ResumenMes({ kd, acciones = null, sedes = null }) {
+export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi = null }) {
   const conectado = !!auth.token;
   const hoy = new Date();
   const desde = ymd(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
@@ -45,9 +45,10 @@ export default function ResumenMes({ kd, acciones = null, sedes = null }) {
 
   useEffect(() => {
     if (!conectado) return;
-    api.egresos.listar().then((r) => setEgresos(Array.isArray(r) ? r : [])).catch(() => setEgresos([]));
-    api.tratamientos.resumen(desde, hasta).then((r) => setTop(Array.isArray(r) ? r : [])).catch(() => setTop([]));
-  }, [conectado, desde, hasta]);
+    // Solo las sedes que se ven (sedesApi = UUID; null = todas las del usuario).
+    api.egresos.listar({ sedeIds: sedesApi }).then((r) => setEgresos(Array.isArray(r) ? r : [])).catch(() => setEgresos([]));
+    api.tratamientos.resumen(desde, hasta, { sedeIds: sedesApi }).then((r) => setTop(Array.isArray(r) ? r : [])).catch(() => setTop([]));
+  }, [conectado, desde, hasta, sedesApi && sedesApi.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const d = useMemo(() => {
     if (!conectado) {
@@ -68,7 +69,8 @@ export default function ResumenMes({ kd, acciones = null, sedes = null }) {
         top: DEMO_TOP.map((t) => ({ ...t, importe: Math.round(t.importe * f * parte), ventas: Math.max(1, Math.round(t.ventas * f * parte)) })),
       };
     }
-    const delMes = (egresos || []).filter((e) => String(e.fecha || "").slice(0, 10) >= desde && (!sedes || e.sedeId == null || sedes.some((v) => mismaSede(v, e.sedeId))));
+    // Con una sede elegida un egreso sin sede no es de ninguna (igual que en la demostración).
+    const delMes = (egresos || []).filter((e) => String(e.fecha || "").slice(0, 10) >= desde && (!sedesApi || (e.sedeId != null && sedes.some((v) => mismaSede(v, e.sedeId)))));
     const pen = delMes.filter((e) => (e.moneda || "PEN") !== "USD");
     const cat = {};
     pen.forEach((e) => { const k = e.categoria || "Otros"; cat[k] = (cat[k] || 0) + (Number(e.monto) || 0); });

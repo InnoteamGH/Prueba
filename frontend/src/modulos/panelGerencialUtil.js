@@ -93,8 +93,9 @@ export function filtraMicro(micro, cifra, parte) {
   });
 }
 
-/** Acumula pagos del día en puntos [horaDecimal, acumulado] de 08→20. */
-export function curvaCajaAcumulada(pagos, fechaYmd) {
+/** Acumula pagos del día en puntos [horaDecimal, acumulado] dentro de la jornada
+ *  (por defecto 08→20; el panel pasa el horario real de la clínica). */
+export function curvaCajaAcumulada(pagos, fechaYmd, { abre = 8, cierra = 20 } = {}) {
   const delDia = (pagos || [])
     .filter((p) => {
       const raw = p.creadoEn || p.fecha || p.createdAt || "";
@@ -106,17 +107,17 @@ export function curvaCajaAcumulada(pagos, fechaYmd) {
       const t = raw.includes("T") ? new Date(raw) : null;
       const h = t && !Number.isNaN(t.getTime())
         ? t.getHours() + t.getMinutes() / 60
-        : 8;
-      return { h: Math.min(20, Math.max(8, h)), monto: Number(p.monto) || 0 };
+        : abre;
+      return { h: Math.min(cierra, Math.max(abre, h)), monto: Number(p.monto) || 0 };
     })
     .sort((a, b) => a.h - b.h);
-  const pts = [[8, 0]];
+  const pts = [[abre, 0]];
   let acc = 0;
   for (const p of delDia) {
     acc += p.monto;
     pts.push([p.h, acc]);
   }
-  if (pts.length === 1) pts.push([8.01, 0]);
+  if (pts.length === 1) pts.push([abre + 0.01, 0]);
   return pts;
 }
 

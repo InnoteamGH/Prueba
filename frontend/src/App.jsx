@@ -30,6 +30,7 @@ import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, 
 // Soles y dólares en caja, montos escritos y la boleta de un cobro (compartido/cajaMoneda.js).
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
+import { horarioConfigurado } from "./compartido/horarioReal";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
@@ -381,8 +382,8 @@ function AreaChart({ data, color = DS.c.primary, labels, formato }) {
  */
 
 
-function Gerencial({ citas, sede, sedes }) {
-  return <PanelGerencial citas={citas} sede={sede} sedes={sedes} />;
+function Gerencial({ citas, sede, sedes, horarioClinica }) {
+  return <PanelGerencial citas={citas} sede={sede} sedes={sedes} horarioClinica={horarioClinica} />;
 }
 
 /* ---- Pendientes de hoy: bandeja de tareas accionables para todos los roles ---- */
@@ -401,12 +402,21 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // Sedes que se ven, como UUID para la API (null = todas las del usuario, las decide el servidor).
   const sedeCtxDash = useSede();
   const sedesApiDash = () => (sedeCtxDash.sede === "all" && sedeCtxDash.global ? null : (sedeCtxDash.ids || []).map((x) => sedeApiUuid(x)));
+  // Todas las sedes del usuario (no solo la del filtro): al cambiar de sede no hay que volver a pedir.
+  const sedesMiasApiDash = () => (sedeCtxDash.global ? null : (sedeCtxDash.mias || []).map((x) => sedeApiUuid(x)).filter(Boolean));
   const mapCD = (c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || null, especialidad: c.especialidad || null, esp: c.especialidadId, sede: c.sedeId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), motivo: c.motivo, estado: c.estado, llegada: !!c.llegada, valor: c.valor });
   const [remC, setRemC] = useState(null);
   const [cajaDeuda, setCajaDeuda] = useState(null);
   // NEW-29/30: cobros reales (misma base que Caja), filtrados por sede activa.
   const [pagosHist, setPagosHist] = useState(null);
   const [usrTiDash, setUsrTiDash] = useState(null);
+  const [saludWa, setSaludWa] = useState(null);
+  const [cfgSunat, setCfgSunat] = useState(null);
+  const [silDash, setSilDash] = useState(null);
+  const [resCitas, setResCitas] = useState(null);
+  const [labRem, setLabRem] = useState([]);
+  const [segRem, setSegRem] = useState([]);
+  const [docsRem, setDocsRem] = useState([]);
   useEffect(() => {
     if (conectado && esAdmin) {
       api.caja().then(setCajaDeuda).catch(() => setCajaDeuda({ porCobrar: [] }));
@@ -417,6 +427,19 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     // NEW-49: directorio para panel TI.
     if (conectado && esTI) {
       api.usuarios.listar().then((u) => setUsrTiDash(u || [])).catch(() => setUsrTiDash([]));
+      // Estado real de las integraciones: lo que el servidor sabe (WhatsApp y SUNAT).
+      api.agente.salud().then((s) => setSaludWa(s && !Array.isArray(s) && typeof s === "object" ? s : null)).catch(() => setSaludWa(null));
+      api.sunat.config().then((c) => setCfgSunat(c && typeof c === "object" && !Array.isArray(c) ? c : {})).catch(() => setCfgSunat(null));
+    }
+    if (conectado && !esTI) {
+      // Sillones activos: la capacidad del día sale de ellos (antes eran 4 cupos por hora fijos).
+      api.sillones.listar().then((r) => setSilDash(Array.isArray(r) ? r : [])).catch(() => setSilDash(null));
+      // Última visita y próxima cita por paciente (la misma fuente que el directorio).
+      api.pacientes.resumenCitas().then((r) => { const m = {}; (Array.isArray(r) ? r : []).forEach((x) => { if (x && x.pacienteId) m[x.pacienteId] = x; }); setResCitas(m); }).catch(() => setResCitas(null));
+      // Tareas de laboratorio, seguros y documentos: de sus propios módulos en el servidor.
+      if (!esRec) api.laboratorio.listar(null, sedesMiasApiDash()).then((r) => setLabRem(Array.isArray(r) ? r : [])).catch(() => setLabRem([]));
+      if (esAdmin || esAdmSede) api.seguros.listar(sedesMiasApiDash()).then((r) => setSegRem(Array.isArray(r) ? r : [])).catch(() => setSegRem([]));
+      if (!esGer) api.consentimientos.listar().then((r) => setDocsRem(Array.isArray(r) ? r : [])).catch(() => setDocsRem([]));
     }
   }, []); // eslint-disable-line
   const [remP, setRemP] = useState(null);
@@ -450,10 +473,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     }
     // NEW-48: TI no tiene pacientes:ver — no pedir padrón ni evoluciones.
     if (!esTI) {
+      // La «última visita» ya no se toma de creadoEn (la fecha de alta no es una visita):
+      // sale de GET /pacientes/resumen-citas, abajo.
       api.pacientes.listar().then((r) => setRemP((r || []).map((p) => {
         const s = sedeDash(p.sedeRegistroId);
-        const ult = (p.creadoEn || "").toString().slice(0, 10) || null;
-        return { id: p.id, nombre: p.nombre, dni: p.dni || "", ultima: ult, sede: s, sedes: [s], sedeRegistroId: p.sedeRegistroId || null };
+        return { id: p.id, nombre: p.nombre, dni: p.dni || "", ultima: null, sede: s, sedes: [s], sedeRegistroId: p.sedeRegistroId || null };
       }))).catch(() => {});
       api.evolucionesPendientes(sedesApiDash()).then(setPendEvo).catch(() => {});
     }
@@ -463,20 +487,15 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const sedeCxD = useSede();
   const citas = conectado ? (remC || []).filter((c) => sedeCxD.enSede(c.sede)) : citasProp;
   const pacientesAllRaw = conectado ? (remP || []) : pacProp;
-  // NEW-47: enriquecer ultima visita con la cita más reciente del rango cargado.
+  // Última visita (cita atendida) y próxima cita: las de GET /pacientes/resumen-citas,
+  // las mismas que muestra el directorio de pacientes.
   const pacientesAll = useMemo(() => {
     if (!conectado || !remP) return pacientesAllRaw;
-    const ultPorPac = {};
-    for (const c of (remC || [])) {
-      if (!c.pacienteId || !c.fecha) continue;
-      const prev = ultPorPac[c.pacienteId];
-      if (!prev || c.fecha > prev) ultPorPac[c.pacienteId] = c.fecha;
-    }
     return remP.map((p) => {
-      const u = ultPorPac[p.id];
-      return u && (!p.ultima || u > String(p.ultima).slice(0, 10)) ? { ...p, ultima: u } : p;
+      const x = resCitas && resCitas[p.id];
+      return x ? { ...p, ultima: x.ultimaVisita ? String(x.ultimaVisita).slice(0, 10) : null, proxima: x.proximaFecha || null } : p;
     });
-  }, [conectado, remP, remC, pacientesAllRaw]);
+  }, [conectado, remP, resCitas, pacientesAllRaw]);
   // BUG-111 / NEW-37: Filtrar pacientes por sede activa (campo sede conservado).
   const pacientes = sedeActiva === "all" ? pacientesAll : pacientesAll.filter((p) => sedesDe(p).map(String).includes(String(sedeActiva)) || String(p.sedeRegistroId) === String(sedeActiva));
   // NEW-29/30: resolver UUID de sede como Caja (lista real), no solo a1/a2 hardcode.
@@ -485,7 +504,8 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // NEW-38: médico solo ve sus citas también en el gráfico (no abrir el filtro con `conectado`).
   const normMedNom = (s) => String(s || "").replace(/^(?:\s*(?:dr\(a\)\.?|dra\.?|dr\.?)\s*)+/i, "").trim().toLowerCase();
   // El doctor de la sesión (estaba fijo en el id 1: todos los doctores veían a la Dra. Mendoza).
-  const miMedDash = MEDICOS.find((m) => m.nombre === usuario?.nombre);
+  // Solo en la demostración: con sesión el doctor se reconoce por el nombre de la sesión (abajo).
+  const miMedDash = conectado ? null : MEDICOS.find((m) => m.nombre === usuario?.nombre);
   const citasMed = !esMed ? citas : (!conectado
     ? citas.filter((c) => miMedDash && c.medicoId === miMedDash.id)
     : citas.filter((c) => {
@@ -517,7 +537,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     const corta = cortaSede(sedeActiva);
     return lista.filter((p) => {
       if (p.sedeId && sid) {
-        if (p.sedeId === sid || String(p.sedeId).endsWith(want)) return true;
+        if (mismaSede(p.sedeId, sid)) return true;
       }
       if (p.sede && nom) {
         if (p.sede === nom || String(p.sede).includes(corta)) return true;
@@ -551,16 +571,18 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // Antes eran once horas fijas de 8 a 18 para todo el mundo.
   // El horario es de cada SEDE: con una sede concreta se usa el suyo; con "todas" se
   // usa el general de la clínica, porque no hay una jornada única que valga para varias.
-  const jornadaHoy = jornadaClinica(horarioDeSede(horarioClinica.horario, sedeActiva), horarioClinica.feriados, fmt(hoy));
-  const HH = jornadaHoy.abierta ? horasEntre(jornadaHoy.abre, jornadaHoy.cierra) : [];
-  const capHora = esMed ? 2 : 4;
-  // La capacidad del día es la jornada por los cupos de cada hora, que es justo lo que
-  // dibuja la rejilla "Agenda de hoy por hora". Antes era un 16 suelto que no cuadraba
-  // con esa rejilla: la ocupación salía sobre 16 y los cupos libres sobre 44.
-  const capacidad = HH.length * capHora;
+  // Con sesión y sin horario cargado no se supone uno (jornadaClinica caería en 09–19).
+  const sinHorarioReal = conectado && !horarioConfigurado(horarioClinica.horario);
   // Integraciones del panel de sistemas. Definidas aquí y no dentro de su tarjeta
   // porque la cabecera también necesita saber cuántas están con incidencia.
-  const INTEGRACIONES_TI = [["WhatsApp Business API (Meta)", "operativo", "Última sync hace 2 min"],
+  // Con sesión solo se listan las que el servidor informa: WhatsApp (GET /whatsapp/salud) y
+  // SUNAT (GET /facturacion-electronica/config). Pasarela, respaldo y correo no tienen
+  // endpoint de estado, así que no se muestran (antes eran textos fijos «hace 2 min», «03:00»).
+  const INTEGRACIONES_TI = conectado ? [
+    saludWa && (() => { const sem = saludWa.semaforo || (saludWa.ok ? "verde" : "rojo"); const fallos = Number(saludWa.fallos24h) || 0;
+      return ["WhatsApp Business API (Meta)", sem === "verde" ? "operativo" : sem === "gris" ? "pendiente" : "incidencia", sem === "verde" ? (fallos ? `${fallos} fallo(s) en 24 h` : "Conexión correcta") : (saludWa.mensaje && !/quarkus|endpoint|WHATSAPP_|OPENAI_/i.test(saludWa.mensaje) ? saludWa.mensaje : "Sin conexión")]; })(),
+    cfgSunat && (cfgSunat.proveedor ? ["Facturación electrónica (SUNAT)", "operativo", "Proveedor conectado"] : ["Facturación electrónica (SUNAT)", "pendiente", "Sin proveedor: comprobantes «Sin enviar»"]),
+  ].filter(Boolean) : [["WhatsApp Business API (Meta)", "operativo", "Última sync hace 2 min"],
                             (() => { const pa = pasarelaActiva(); return [`Pasarela de pago${pa ? ` (${pa.n})` : ""}`, pa ? "operativo" : "pendiente", pa ? "Transacciones OK" : "Sin conectar"]; })(),
                             // Decía "incidencia – 2 comprobantes observados", que da por hecha una
                             // integración activa con SUNAT, mientras la tarjeta de administración de
@@ -569,10 +591,6 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
                             ["Respaldo automático", "operativo", "Último backup 03:00 h"],
                             ["Servidor de correo", "operativo", "Cola vacía"]];
   const incidenciasTI = INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").length;
-  // Sin capacidad (día cerrado) no hay ocupación que calcular: 0/0 daba NaN y la tarjeta
-  // escribía "NaN%" con una barra de ancho "NaN%".
-  const ocupacion = capacidad > 0 ? Math.min(100, Math.round((ch.length / capacidad) * 100)) : null;
-  const proxima = ch.filter((c) => c.estado === "confirmada" || c.estado === "pendiente").sort((a, b) => a.hora.localeCompare(b.hora))[0];
   const dias = [...Array(7)].map((_, i) => { const f = addDays(i - 6); return { v: citasMed.filter((c) => c.fecha === f).length, lbl: new Date(f + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short" }).slice(0, 2) }; });
   const estados = [
     { k: "pendiente", c: "var(--dc-warn)" }, { k: "confirmada", c: DS.c.primary }, { k: "en_atencion", c: "var(--dc-purple)" }, { k: "atendida", c: "var(--dc-ok-700)" }, { k: "cancelada", c: "var(--dc-red)" },
@@ -597,20 +615,18 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     ["Ingresos del día", pagosHistFalló ? "No disponible" : (pagosHist == null && conectado ? "…" : `S/ ${(ingresos ?? 0).toLocaleString()}`), Wallet, RED, pagosHistFalló ? [{ izq: "No se pudo cargar el historial de pagos", der: "Reintenta" }] : prodRows],
     ["Pacientes", pacientes.length, Users, DS.c.primary, pacRows],
   ];
-  const porHora = HH.map((h) => { const n = ch.filter((c) => parseInt(c.hora, 10) === h).length; return { h, n, pct: Math.min(100, Math.round((n / capHora) * 100)) }; });
-  const maxN = Math.max(1, ...porHora.map((x) => x.n));
-  const pico = porHora.reduce((a, b) => (b.n > a.n ? b : a), porHora[0]);
-  // Solo lo que queda POR DELANTE: contar las franjas de la mañana ya pasada hacía que a
-  // las seis de la tarde el asistente propusiera llenar las nueve de la mañana.
   const horaAhora = new Date().getHours();
-  const porHoraQuedan = porHora.filter((x) => x.h >= horaAhora);
-  const libres = porHoraQuedan.filter((x) => x.n === 0).length;    // franjas sin cita que aún quedan
   // M-04: cupos libres = horas de sillón abiertas − horas agendadas (misma función que
-  // Agenda y Ocupación de sillones), en cupos de 30 min.
+  // Agenda y Ocupación de sillones), en cupos de 30 min. Con sesión, sobre los sillones
+  // activos de la sede (GET /sillones) y su horario; sin horario o sin sillones no se
+  // inventa una cifra (null: la frase no la menciona).
+  const jornadaDeDash = (sid) => jornadaClinica(horarioDeSede(horarioClinica.horario, sid), horarioClinica.feriados, fmt(hoy));
+  const silsDash = conectado
+    ? (silDash || []).map((r) => { const x = normSillon(r); return { ...x, sede: numSede(r.sedeId ?? r.sede) }; }).filter((x) => x.activo && sedeCxD.enSede(x.sede))
+    : null;
   const cuposLibres = conectado
-    ? Math.max(0, porHoraQuedan.length * capHora - ch.filter((c) => parseInt(c.hora, 10) >= horaAhora).length)
-    : M.cuposLibres({ citas, sillones: dbDash?.sillones || [], fecha: fmt(hoy), sede: sedeActiva, jornadaDe: (sid) => jornadaClinica(horarioDeSede(horarioClinica.horario, sid), horarioClinica.feriados, fmt(hoy)) }).cupos30;
-  const colHora = (x) => x.n === 0 ? "var(--dc-line)" : x.pct >= 100 ? "var(--dc-red)" : x.pct >= 60 ? "var(--dc-warn-600)" : DS.c.primary;
+    ? (sinHorarioReal || !silDash || !silsDash.length ? null : M.cuposLibres({ citas: ch, sillones: silsDash, fecha: fmt(hoy), sede: null, jornadaDe: jornadaDeDash }).cupos30)
+    : M.cuposLibres({ citas, sillones: dbDash?.sillones || [], fecha: fmt(hoy), sede: sedeActiva, jornadaDe: jornadaDeDash }).cupos30;
   const num = (v) => Number(v || 0).toLocaleString();
   const bloque = (valor, color, pie) => (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
@@ -626,7 +642,8 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // jornada, después lo que queda por hacer. Un número suelto no dice si el día va
   // bien; "3 de 8 atendidos" sí.
   const saludo = horaAhora < 12 ? "Buenos días" : horaAhora < 19 ? "Buenas tardes" : "Buenas noches";
-  const miNombre = (auth.sesion && (auth.sesion.nombre || "").split(" ")[0]) || "";
+  // Primer nombre sin el tratamiento («Dra. Ana Torres» → «Ana»; antes saludaba «Dra.»).
+  const miNombre = (auth.sesion && String(auth.sesion.nombre || "").replace(/^(?:\s*(?:dr\(a\)\.?|dra\.?|dr\.?)\s+)+/i, "").split(" ")[0]) || "";
   const atendidasHoy = ch.filter((c) => c.estado === "atendida").length;
   const sinConfirmar = ch.filter((c) => c.estado === "pendiente").length;
   const frase = esMed
@@ -634,12 +651,14 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     : esTI
       // Decía "Todo operativo" incluso con la incidencia de SUNAT abierta en la tarjeta
       // de abajo. Cuenta las que hay, sobre la misma lista que pinta esa tarjeta.
-      ? (incidenciasTI === 0
+      ? (INTEGRACIONES_TI.length === 0
+          ? "El servidor aún no informa el estado de las integraciones."
+          : incidenciasTI === 0
           ? "Todo operativo. Sin incidencias en las integraciones."
           : `${incidenciasTI} integración(es) con incidencia. Revísalas antes que nada.`)
       : esGer
-        ? (ch.length === 0 ? "Hoy no hay citas agendadas en la clínica." : `La clínica tiene ${pluralEs(ch.length, "cita", "citas")} hoy y ${pluralEs(cuposLibres, "cupo sin vender", "cupos sin vender")}.`)
-        : (ch.length === 0 ? "Hoy no hay citas agendadas." : `${pluralEs(ch.length, "cita", "citas")} hoy${sinConfirmar ? `, ${pluralEs(sinConfirmar, "sin confirmar", "sin confirmar")}` : ""}. Quedan ${pluralEs(cuposLibres, "cupo libre", "cupos libres")}.`);
+        ? (ch.length === 0 ? "Hoy no hay citas agendadas en la clínica." : cuposLibres == null ? `La clínica tiene ${pluralEs(ch.length, "cita", "citas")} hoy.` : `La clínica tiene ${pluralEs(ch.length, "cita", "citas")} hoy y ${pluralEs(cuposLibres, "cupo sin vender", "cupos sin vender")}.`)
+        : (ch.length === 0 ? "Hoy no hay citas agendadas." : `${pluralEs(ch.length, "cita", "citas")} hoy${sinConfirmar ? `, ${pluralEs(sinConfirmar, "sin confirmar", "sin confirmar")}` : ""}.${cuposLibres == null ? "" : ` Quedan ${pluralEs(cuposLibres, "cupo libre", "cupos libres")}.`}`);
   const avance = ch.length ? Math.round((atendidasHoy / ch.length) * 100) : 0;
 
   // ======================================================================
@@ -653,7 +672,8 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const mesesDesde = (iso) => { if (!iso) return 0; const d = new Date(iso + "T00:00:00"); return (hoy.getFullYear() - d.getFullYear()) * 12 + (hoy.getMonth() - d.getMonth()); };
   // INI-01..05: cada tarea es una consulta viva sobre la misma fuente que su módulo
   // (compartido/metricas.js). Nada de cifras escritas a mano.
-  const porReactivar = conectado ? pacientes.filter((p) => p.ultima && mesesDesde(p.ultima) >= 6) : M.porReactivar(pacientes, citas);
+  // Con sesión: última visita > 6 meses y sin próxima cita (GET /pacientes/resumen-citas).
+  const porReactivar = conectado ? (resCitas ? pacientes.filter((p) => p.ultima && mesesDesde(p.ultima) >= 6 && !p.proxima) : []) : M.porReactivar(pacientes, citas);
   const carteraDemo = conectado ? null : M.cartera(dbDash?.fichas || {}, pacientes, { sede: sedeActiva });
   const deudores = conectado
     ? ((cajaDeuda && cajaDeuda.porCobrar) || []).filter((r) => Number(r.saldo) > 0).map((r) => ({ n: r.paciente || "—", v: Number(r.saldo) || 0 }))
@@ -662,10 +682,21 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const deVisible = (pid, nom) => pacientes.some((p) => String(p.id) === String(pid) || (nom && p.nombre === nom));
   // Liquidaciones y laboratorio: por la sede del registro (si no tiene, la principal del paciente), como en Seguros y Laboratorio.
   const sedeReg = (x, pid) => x.sede ?? sedesDe(pacientesAll.find((p) => String(p.id) === String(pid)) || {})[0];
-  const liqs = conectado ? [] : (dbDash?.liquidaciones || []).filter((l) => deVisible(l.pid) && sedeCxD.enSede(sedeReg(l, l.pid)));
+  // Con sesión vienen de GET /seguros, /laboratorio y /consentimientos (mismos estados que sus módulos).
+  const ESTADO_SEG = { por_enviar: "borrador", enviado: "enviado", en_revision: "aprobado", pagado: "pagado", observado: "observado" };
+  const ESTADO_LAB = { solicitado: "enviado", en_proceso: "en_proceso", listo: "recibido", entregado: "entregado" };
+  const liqs = conectado
+    ? segRem.map((l) => ({ id: l.id, pid: l.pacienteId ?? null, sede: l.sedeId != null ? numSede(l.sedeId) : null, aseg: l.aseguradora || "Aseguradora", paciente: l.paciente || null, estado: ESTADO_SEG[l.estado] || "enviado" }))
+        .filter((l) => (l.sede != null ? sedeCxD.enSede(l.sede) : deVisible(l.pid, l.paciente)))
+    : (dbDash?.liquidaciones || []).filter((l) => deVisible(l.pid) && sedeCxD.enSede(sedeReg(l, l.pid)));
   const liqObs = liqs.filter((l) => l.estado === "observado"), liqBorr = liqs.filter((l) => l.estado === "borrador");
-  const labAtr = conectado ? [] : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso) && deVisible(c.pacienteId, c.paciente) && sedeCxD.enSede(sedeReg(c, c.pacienteId)));
-  const docsPend = conectado ? [] : (dbDash?.documentos || []).filter((d) => (d.estado === "pendiente" || d.estado === "enviado") && deVisible(d.pacienteId));
+  const labAtr = conectado
+    ? labRem.map((o) => ({ id: o.id, pacienteId: o.pacienteId ?? null, paciente: o.paciente || null, sede: o.sedeId != null ? numSede(o.sedeId) : null, trabajo: o.tipoTrabajo || "Trabajo", entrega: o.fechaEstimada, estado: ESTADO_LAB[o.estado] || "enviado" }))
+        .filter((c) => labAtrasado(c, hoyIso) && (c.sede != null ? sedeCxD.enSede(c.sede) : deVisible(c.pacienteId, c.paciente)))
+    : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso) && deVisible(c.pacienteId, c.paciente) && sedeCxD.enSede(sedeReg(c, c.pacienteId)));
+  const docsPend = conectado
+    ? docsRem.filter((d) => !d.firmado && deVisible(d.pacienteId))
+    : (dbDash?.documentos || []).filter((d) => (d.estado === "pendiente" || d.estado === "enviado") && deVisible(d.pacienteId));
   const nomPac = (id) => (pacientesAll.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
   const verCaja = esAdmin || esGer || esAdmSede;
   const nombres = (arr, k = "paciente") => arr.slice(0, 3).map((x) => x[k]).join(", ") + (arr.length > 3 ? ` y ${arr.length - 3} más` : "");
@@ -676,7 +707,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     // INI-04: una sola tarjeta de confirmaciones (hoy + mañana) con una sola acción.
     !esTI && (sinConfHoy.length + (esMed ? 0 : mananaSinConf.length)) > 0 && { id: "conf", tono: sinConfHoy.length ? "aviso" : "info", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `Confirmaciones pendientes · hoy ${sinConfHoy.length}${esMed ? "" : ` · mañana ${mananaSinConf.length}`}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))) || "Las de hoy ya están confirmadas.", accion: esMed ? "Ir a la agenda" : "Enviar confirmaciones", ir: esMed ? () => onIr("agenda") : () => { if (conectado) enviarConfMañana(); else notify(`Confirmaciones enviadas por WhatsApp a ${sinConfHoy.length + mananaSinConf.length} pacientes.`); } },
     verCaja && deudores.length > 0 && { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") },
-    (esAdmin || esAdmSede) && liqObs.length > 0 && { id: "seguros", tono: "aviso", icon: <Umbrella size={18} strokeWidth={1.75} />, titulo: `${pluralEs(liqObs.length, "liquidación de seguro observada", "liquidaciones de seguro observadas")}`, detalle: `${liqObs.map((l) => `${l.aseg} (${nomPac(l.pid)})`).join(", ")}${liqBorr.length ? ` · ${pluralEs(liqBorr.length, "borrador", "borradores")} por enviar` : ""}.`, accion: "Ver seguros", ir: () => onIr("seguros") },
+    (esAdmin || esAdmSede) && liqObs.length > 0 && { id: "seguros", tono: "aviso", icon: <Umbrella size={18} strokeWidth={1.75} />, titulo: `${pluralEs(liqObs.length, "liquidación de seguro observada", "liquidaciones de seguro observadas")}`, detalle: `${liqObs.map((l) => `${l.aseg} (${l.paciente || nomPac(l.pid)})`).join(", ")}${liqBorr.length ? ` · ${pluralEs(liqBorr.length, "borrador", "borradores")} por enviar` : ""}.`, accion: "Ver seguros", ir: () => onIr("seguros") },
     !esTI && !esRec && labAtr.length > 0 && { id: "lab", tono: "aviso", icon: <FlaskConical size={18} strokeWidth={1.75} />, titulo: `${pluralEs(labAtr.length, "caso de laboratorio atrasado", "casos de laboratorio atrasados")}`, detalle: labAtr.map((c) => `${c.trabajo} – ${c.paciente || nomPac(c.pacienteId)}`).slice(0, 3).join(", "), accion: "Ver laboratorio", ir: () => onIr("laboratorio") },
     !esTI && !esGer && docsPend.length > 0 && { id: "docs", tono: "info", icon: <FileCheck size={18} strokeWidth={1.75} />, titulo: `${pluralEs(docsPend.length, "documento sin firmar", "documentos sin firmar")}`, detalle: `${[...new Set(docsPend.map((d) => nomPac(d.pacienteId)))].slice(0, 3).join(", ")}. Envía el enlace o fírmalo en consultorio.`, accion: "Ver pacientes", ir: () => onIr("pacientes") },
     !esTI && !esMed && porReactivar.length > 0 && { id: "reactivar", tono: "info", icon: <Repeat size={18} strokeWidth={1.75} />, titulo: `${pluralEs(porReactivar.length, "paciente para reactivar", "pacientes para reactivar")}`, detalle: `Más de 6 meses sin venir: ${nombres(porReactivar, "nombre")}.`, accion: "Enviar recordatorio", ir: () => onIr("recall") },
@@ -689,7 +720,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const proximas = activasHoy.filter((c) => !["atendida", "en_atencion"].includes(estadoCita(c)) && (c.hora >= ahoraHM || estadoCita(c) === "en_sala")).slice(0, 5);
   const fechaHoy = (() => { const f = hoy.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" }); return f.charAt(0).toUpperCase() + f.slice(1); })();
   const cifras = esTI
-    ? [["Integraciones operativas", `${INTEGRACIONES_TI.filter(([, e]) => e === "operativo").length}/${INTEGRACIONES_TI.length}`], ["Con incidencia", incidenciasTI], ["Por activar", INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length], ["Usuarios", usrTiDash ? usrTiDash.length : STAFF_INIT.length]]
+    ? [["Integraciones operativas", `${INTEGRACIONES_TI.filter(([, e]) => e === "operativo").length}/${INTEGRACIONES_TI.length}`], ["Con incidencia", incidenciasTI], ["Por activar", INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length], ["Usuarios", usrTiDash ? usrTiDash.length : conectado ? "…" : STAFF_INIT.length]]
     : [["Citas hoy", citasHoyKpi.length], ["Atendidas", atendidasHoy], ["Por confirmar", sinConfirmar], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE")}`]];
   return (
     <div className="dc-hoy">
@@ -5743,16 +5774,20 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
 /* ---- Mi producción (rol médico: solo SUS números) ---- */
 function MiProduccion({ usuario, citas, sedes = null }) {
   const conectado = !!auth.token;
+  const sedeMp = useSede();
   // Conectado: los números REALES del médico en sesión (GET /api/mi-produccion).
   // Antes todo esto era inventado: producción del mes fija en 9200, 58 atenciones,
   // una tendencia [6200, 7100, ...] escrita a mano y un desglose por tratamiento fijo.
   const [real, setReal] = useState(null);
   const [detK, setDetK] = useState(null);
   useEffect(() => {
-    if (conectado) api.miProduccion(sedes ? sedes.map(sedeApiUuid) : null).then(setReal).catch(() => setReal({ fallo: true }));
+    // Sedes como UUID; con «Todas» y un usuario de toda la clínica, null (las decide el servidor).
+    if (conectado) api.miProduccion(sedes && !(sedeMp.sede === "all" && sedeMp.global) ? sedes.map(sedeApiUuid).filter(Boolean) : null)
+      .then((r) => setReal(r && typeof r === "object" && !Array.isArray(r) ? r : { fallo: true })).catch(() => setReal({ fallo: true }));
   }, [sedes && sedes.join(",")]); // eslint-disable-line
 
-  // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1).
+  // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1). Solo la demostración
+  // usa MEDICOS; con sesión todo sale de GET /mi-produccion.
   const miMed = MEDICOS.find((m) => m.nombre === usuario.nombre) || MEDICOS[0];
   const miId = miMed.id;
   const misCitas = citas.filter((c) => String(c.medicoId) === String(miId));
@@ -5817,6 +5852,14 @@ function MiProduccion({ usuario, citas, sedes = null }) {
              sub="No llegó la respuesta del servidor. Se prefiere no mostrar nada antes que enseñar cifras que no son tuyas." />
     );
   }
+  // Respuesta sin la marca esMedico (servidor que aún no la envía): no se cae a la demostración.
+  if (conectado && real && real.esMedico !== true && real.esMedico !== false) {
+    return (
+      <Vacio icon={<AlertTriangle size={26} strokeWidth={1.75} />}
+             titulo="El servidor no devolvió tu producción"
+             sub="La respuesta de GET /mi-produccion llegó sin tus números (falta esMedico). Se prefiere no mostrar nada antes que enseñar cifras que no son tuyas." />
+    );
+  }
   if (conectado && real && real.esMedico === false) {
     return (
       <Vacio icon={<Stethoscope size={26} strokeWidth={1.75} />}
@@ -5829,7 +5872,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     // El porcentaje sale del que tiene pactado este médico (backend: porcentajeComision),
     // no de un 40% escrito a mano: el importe ya se calculaba con el suyo y la etiqueta
     // decía otra cosa.
-    { l: pctComision != null ? `Mi comisión (${pctComision}%)` : "Mi comisión", v: `S/ ${comision.toLocaleString()}`, icon: Percent, color: RED, sub: "Se paga el 5 del mes", desc: pctComision != null ? `El ${pctComision}% de tu producción (S/ ${mesProd.toLocaleString()}). Se liquida el día 5 del mes siguiente.` : `Sobre una producción de S/ ${mesProd.toLocaleString()}. Se liquida el día 5 del mes siguiente. Tu porcentaje lo fija administración.` },
+    { l: pctComision != null ? `Mi comisión (${pctComision}%)` : "Mi comisión", v: `S/ ${comision.toLocaleString()}`, icon: Percent, color: RED, sub: conectado ? undefined : "Se paga el 5 del mes", desc: pctComision != null ? `El ${pctComision}% de tu producción (S/ ${mesProd.toLocaleString()}).${conectado ? "" : " Se liquida el día 5 del mes siguiente."}` : `Sobre una producción de S/ ${mesProd.toLocaleString()}.${conectado ? "" : " Se liquida el día 5 del mes siguiente."} Tu porcentaje lo fija administración.` },
     { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString()}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: `${citasHoyN} citas hoy`, desc: `Lo facturado en tus atenciones de hoy (${citasHoyN} citas programadas).` },
     { l: "Promedio por atención", v: `S/ ${ticket}`, icon: CreditCard, color: DS.c.primary, sub: `${atenciones} atenciones del mes`, desc: `Producción del mes dividida entre tus ${atenciones} atenciones. Subirlo con tratamientos de mayor valor mejora tu comisión.` },
     { l: "Tasa de ausentismo", v: noShow != null ? `${noShow}%` : "—", icon: TrendingDown, color: DS.c.primary, sub: "de tus citas", desc: `Porcentaje de citas canceladas o no asistidas sobre tu agenda. Los recordatorios automáticos ayudan a bajarlo.` },
@@ -9206,8 +9249,20 @@ function AvisoBackend({ vista, onReintentar }) {
 }
 
 /* Buscador global (Ctrl + K): módulos, pacientes y acciones de crear, con teclado. */
-function Buscador({ onClose, grupos, modAllowed, pacientes = [], onIr, acciones = [], onCrear }) {
+function Buscador({ onClose, grupos, modAllowed, pacientes: pacProp = [], sedesVer = null, onIr, acciones = [], onCrear }) {
   const [q, setQ] = useState("");
+  // Con sesión el estado global de pacientes arranca vacío: se busca en el padrón del
+  // servidor (GET /pacientes), filtrado en el navegador por nombre/DNI y por las sedes que se ven.
+  const conectado = !!auth.token;
+  const puedePac = modAllowed("pacientes");
+  const [pacRem, setPacRem] = useState(null);
+  useEffect(() => {
+    if (!conectado || !puedePac) return;
+    api.pacientes.listar().then((r) => setPacRem(Array.isArray(r) ? r : [])).catch(() => setPacRem([]));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const pacientes = !conectado ? pacProp : !puedePac ? [] : (pacRem || [])
+    .filter((p) => !sedesVer || !p.sedeRegistroId || sedesVer.some((v) => mismaSede(p.sedeRegistroId, v)))
+    .map((p) => ({ id: p.id, nombre: p.nombre || "", dni: p.dni || "" }));
   const [sel, setSel] = useState(0);
   const inRef = useRef(null);
   useEffect(() => { inRef.current && inRef.current.focus(); }, []);
@@ -9218,6 +9273,7 @@ function Buscador({ onClose, grupos, modAllowed, pacientes = [], onIr, acciones 
     if (it.children) it.children.forEach((c) => modAllowed(c.mod) && mods.push({ tipo: "mod", id: c.id, label: `${it.corto || it.label} › ${c.label}`, sub: g.grupo, Icon: it.icon }));
     else if (modAllowed(modDeVista(it.id))) mods.push({ tipo: "mod", id: it.id, label: it.label, sub: g.grupo, Icon: it.icon });
   }));
+  const cargandoPac = conectado && puedePac && pacRem == null && nq.length >= 2;
   const pacs = nq.length >= 2 ? pacientes.filter((p) => norm(p.nombre).includes(nq) || String(p.dni || "").includes(nq)).slice(0, 6).map((p) => ({ tipo: "pac", id: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : "Paciente", Icon: User })) : [];
   const res = [
     ...pacs,
@@ -9238,7 +9294,8 @@ function Buscador({ onClose, grupos, modAllowed, pacientes = [], onIr, acciones 
       <div className="dc-kbar" role="dialog" aria-label="Buscar" onMouseDown={(e) => e.stopPropagation()}>
         <label className="dc-kbar__in"><Search size={18} strokeWidth={2} /><input ref={inRef} value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} onKeyDown={onKey} placeholder="Busca un módulo, un paciente o qué quieres crear…" /><kbd>Esc</kbd></label>
         <div className="dc-kbar__lista" role="listbox">
-          {res.length === 0 && <div className="dc-kbar__vacio">Nada coincide con «{q}».</div>}
+          {cargandoPac && <div className="dc-kbar__vacio">Buscando pacientes en el servidor…</div>}
+          {res.length === 0 && !cargandoPac && <div className="dc-kbar__vacio">Nada coincide con «{q}».</div>}
           {res.map((r, i) => { const Ic = r.Icon; const cab = r.tipo !== ultimo; ultimo = r.tipo; return (
             <React.Fragment key={r.tipo + r.id}>
               {cab && <div className="dc-kbar__sec">{r.tipo === "crear" ? "Crear" : r.tipo === "pac" ? "Pacientes" : "Módulos"}</div>}
@@ -9797,7 +9854,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     if (vista !== "plan" && !["usuarios", "permisos", "auditoria"].includes(vista) && !modAllowed(modDeVista(vista))) return <PlanBloqueado modulo={vista} onVerPlanes={() => setVista("plan")} />;
     switch (vista) {
       case "plataforma": return <Plataforma notify={notify} />;
-      case "gerencial": return <Gerencial citas={cf} sede={sede} sedes={idsSede} />;
+      case "gerencial": return <Gerencial citas={cf} sede={sede} sedes={idsSede} horarioClinica={horarioClinica} />;
       // Reportes (spec §3): una página con pestañas. Metas y comisiones se editan en
       // Configuración › Doctores; aquí solo se ve el avance (NAV-07).
       case "metas": return <React.Suspense fallback={null}><Metas notify={notify} can={can} sedes={idsSede} /></React.Suspense>;
@@ -10058,7 +10115,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         <div data-dc-scroll className="dc-contenido" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}><div className={`dc-pagina${vista === "whatsapp" ? " dc-pagina--chat" : ""}`}><div id="dc-top-slot" className="dc-vista-acc" /><AvisoBackend vista={vista} /><React.Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: DS.c.muted, fontSize: 14 }}>Cargando módulo…</div>}><React.Fragment key={retryTick}>{render()}</React.Fragment></React.Suspense></div></div>
       </main>
 
-      {buscador && <Buscador onClose={() => setBuscador(false)} grupos={NAV_GRUPOS} modAllowed={modAllowed} pacientes={pf}
+      {buscador && <Buscador onClose={() => setBuscador(false)} grupos={NAV_GRUPOS} modAllowed={modAllowed} pacientes={pf} sedesVer={idsSede}
         onIr={(id, extra) => { setBuscador(false); setSidebarOpen(false); setVista(id, extra); }}
         acciones={ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear"))}
         onCrear={(k, t) => { setBuscador(false); setSidebarOpen(false); crearAccion(k, t); }} />}

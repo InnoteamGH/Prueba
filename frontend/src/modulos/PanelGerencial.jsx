@@ -16,7 +16,8 @@ import {
   metaEstado,
   moneyFmt,
 } from "./panelGerencialUtil";
-import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES, sedesDe, mismaSede } from "../comun";
+import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES, sedesDe, mismaSede, useSede, jornadaClinica, horarioDeSede, horasEntre } from "../comun";
+import { horarioConfigurado, horaDecimal } from "../compartido/horarioReal";
 import { leerCatalogo, precioCita } from "../compartido/catalogo";
 import { medicoEnSedes } from "../compartido/medicosSede";
 import { SILLONES_DEMO } from "../compartido/sillones";
@@ -212,11 +213,12 @@ function FichaDato({ dato, onClose }) {
 }
 
 /* ── Canvas: caja ── */
-function CanvasCaja({ puntos, onOpen }) {
+// abre/cierra: la jornada de la clínica en horas decimales (antes 08–20 fijo para todas).
+function CanvasCaja({ puntos, onOpen, abre = 8, cierra = 20 }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const badgeRef = useRef(null);
-  const state = useRef({ hVis: 8, max: 40, listo: false });
+  const state = useRef({ hVis: abre, max: 40, listo: false });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -240,7 +242,7 @@ function CanvasCaja({ puntos, onOpen }) {
       if (stopped) return;
       const { W, H } = medir();
       const pad = { l: 8, r: 12, t: 18, b: 28 };
-      const pts = puntos?.length ? puntos : [[8, 0], [8.01, 0]];
+      const pts = puntos?.length ? puntos : [[abre, 0], [abre + 0.01, 0]];
       const pico = Math.max(...pts.map((p) => p[1]), 0);
       const objetivo = Math.max(40, Math.ceil((pico * 1.08) / 20) * 20);
       const st = state.current;
@@ -255,7 +257,7 @@ function CanvasCaja({ puntos, onOpen }) {
         st.hVis += (ult - st.hVis) * 0.045;
         if (ult - st.hVis < 0.015) st.hVis = ult;
       }
-      const xOf = (h) => pad.l + ((h - 8) / 12) * (W - pad.l - pad.r);
+      const xOf = (h) => pad.l + ((h - abre) / Math.max(1, cierra - abre)) * (W - pad.l - pad.r);
       const yOf = (v) => pad.t + (1 - v / st.max) * (H - pad.t - pad.b);
       const poly = [];
       for (let i = 0; i < pts.length; i++) {
@@ -276,7 +278,7 @@ function CanvasCaja({ puntos, onOpen }) {
       const ink = cssVar("--dc-ink-400", "#667085");
       // zona futura
       const ahora = new Date().getHours() + new Date().getMinutes() / 60;
-      const xAhora = xOf(Math.min(20, Math.max(8, ahora)));
+      const xAhora = xOf(Math.min(cierra, Math.max(abre, ahora)));
       ctx.fillStyle = hexToRgba(line.replace(/\s/g, "") || "#E7EAF0", 0.55);
       // use soft fill
       ctx.fillStyle = "color-mix(in srgb, var(--dc-line) 55%, transparent)";
@@ -287,7 +289,7 @@ function CanvasCaja({ puntos, onOpen }) {
 
       ctx.strokeStyle = line;
       ctx.lineWidth = 1;
-      for (let h = 8; h <= 20; h += 2) {
+      for (let h = Math.ceil(abre); h <= cierra; h += 2) {
         const x = xOf(h);
         ctx.beginPath();
         ctx.moveTo(x, pad.t);
@@ -343,7 +345,7 @@ function CanvasCaja({ puntos, onOpen }) {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [puntos]);
+  }, [puntos, abre, cierra]);
 
   return (
     <div className="serie serie--alto" ref={wrapRef}>
@@ -584,8 +586,21 @@ function CanvasEsfera({ pacientes, onPick }) {
   );
 }
 
+const ESCALA_CUBO_DEF = { dias: 180, importe: 1650, visitas: 6 };
+/** Máximos de los ejes del cubo a partir de los pacientes (con un mínimo para que no colapse). */
+export function escalaCubo(pacientes, hoy = new Date()) {
+  const lista = (pacientes || []).slice(0, 60);
+  if (!lista.length) return ESCALA_CUBO_DEF;
+  const dias = Math.max(30, ...lista.map((p) => (p.ultimaCita ? Math.max(0, (hoy - new Date(p.ultimaCita)) / 86400000) : 0)));
+  const importe = Math.max(100, ...lista.map((p) => Math.max(0, Number(p.importeAcumulado) || 0)));
+  const visitas = Math.max(2, ...lista.map((p) => Number(p.numeroDeCitas) || 0));
+  return { dias: Math.ceil(dias), importe: Math.ceil(importe), visitas: Math.ceil(visitas) };
+}
+
 /* ── Canvas: cubo ── */
-function CanvasCubo({ pacientes, onPick }) {
+// esc: { dias, importe, visitas } máximos de los ejes, calculados de los propios pacientes
+// (antes 180 días, S/ 1 650 y 6 visitas fijos: con importes mayores los puntos salían del cubo).
+function CanvasCubo({ pacientes, onPick, esc = ESCALA_CUBO_DEF }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const rotRef = useRef(null);
@@ -600,18 +615,18 @@ function CanvasCubo({ pacientes, onPick }) {
     const ctx = canvas.getContext("2d");
     const hoy = new Date();
     const pts = (pacientes || []).slice(0, 60).map((p) => {
-      let dias = 90;
+      let dias = esc.dias / 2;
       if (p.ultimaCita) {
         const u = new Date(p.ultimaCita);
-        dias = Math.max(0, Math.min(180, (hoy - u) / 86400000));
+        dias = Math.max(0, Math.min(esc.dias, (hoy - u) / 86400000));
       }
-      const importe = Math.max(0, Number(p.importeAcumulado) || 0);
-      const visitas = Math.max(1, Math.min(6, Number(p.numeroDeCitas) || 1));
+      const importe = Math.min(esc.importe, Math.max(0, Number(p.importeAcumulado) || 0));
+      const visitas = Math.max(1, Math.min(esc.visitas, Number(p.numeroDeCitas) || 1));
       return {
         p,
-        x: (dias / 180) * 2 - 1,
-        y: -(importe / 1650) * 2 + 1,
-        z: (visitas / 6) * 2 - 1,
+        x: (dias / esc.dias) * 2 - 1,
+        y: -(importe / esc.importe) * 2 + 1,
+        z: (visitas / esc.visitas) * 2 - 1,
         saldo: Number(p.saldo) || 0,
       };
     });
@@ -711,7 +726,7 @@ function CanvasCubo({ pacientes, onPick }) {
       canvas.removeEventListener("mouseleave", onLeave);
       canvas.removeEventListener("click", onClick);
     };
-  }, [pacientes, onPick]);
+  }, [pacientes, onPick, esc.dias, esc.importe, esc.visitas]);
 
   return (
     <div className="lienzo" ref={wrapRef}>
@@ -763,11 +778,16 @@ function StackSegs({ items, total }) {
 }
 
 /* ── Panel principal ── */
-export default function PanelGerencial({ citas: citasProp = [], sede, sedes = null }) {
+export default function PanelGerencial({ citas: citasProp = [], sede, sedes = null, horarioClinica = null }) {
   // Sedes que se ven (filtro global o sedes del usuario): todo el panel se limita a ellas.
   const verSedes = sedes && sedes.length ? sedes.map(String) : null;
   const claveSedes = verSedes ? verSedes.join(",") : "todas";
   const conectado = !!auth.token;
+  // Para la API las sedes van como UUID: con «Todas» y un usuario de toda la clínica, null
+  // (las decide el servidor); si no, el UUID real de cada una (antes iban los números 1/2/3).
+  const sedeCx = useSede();
+  const sedesApi = (!verSedes || (sedeCx.sede === "all" && sedeCx.global)) ? null
+    : verSedes.map((x) => sedeApiUuid(x)).filter(Boolean);
   const [kd, setKd] = useState(null);
   const [ind, setInd] = useState(null);
   const [rep, setRep] = useState(null);
@@ -862,20 +882,21 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
 
   const recargar = useCallback(() => {
     if (!conectado) { cargarDemo(); return; }
-    api.gerencial(verSedes).then(setKd).catch(() => setKd({ error: true }));
-    api.gerencialIndicadores(verSedes).then(setInd).catch(() => setInd({ errorDeCarga: true }));
-    api.gerencialReportes(verSedes).then(setRep).catch(() => setRep({ errorDeCarga: true }));
+    api.gerencial(sedesApi).then(setKd).catch(() => setKd({ error: true }));
+    api.gerencialIndicadores(sedesApi).then(setInd).catch(() => setInd({ errorDeCarga: true }));
+    api.gerencialReportes(sedesApi).then(setRep).catch(() => setRep({ errorDeCarga: true }));
     const deSede = (x) => !verSedes || x?.sedeId == null || verSedes.some((v) => mismaSede(v, x.sedeId));
     api.pagos.listar().then((r) => setPagos((r || []).filter(deSede))).catch(() => setPagos([]));
-    api.citas.listar(fecha).then((r) => setCitasHoy((r || []).filter(deSede))).catch(() => setCitasHoy([]));
+    api.citas.listar(fecha, null, null, sedesApi).then((r) => setCitasHoy((r || []).filter(deSede))).catch(() => setCitasHoy([]));
     api.actividad(fecha).then((r) => setActividad(r || [])).catch(() => setActividad([]));
     const d = new Date();
     const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-    api.tratamientos.resumen(desde, fecha, { areaClinica: "Odontología general" })
+    // Todas las áreas y solo las sedes que se ven (antes: área «Odontología general» fija y sin sede).
+    api.tratamientos.resumen(desde, fecha, { sedeIds: sedesApi })
       .then((r) => setTratResumen(r || []))
       .catch(() => setTratResumen([]));
     api.pacientes.resumen().then((r) => setPacResumen(r || [])).catch(() => setPacResumen([]));
-    api.inventario.listar(verSedes ? verSedes.map(sedeApiUuid) : null).then((rows) => {
+    api.inventario.listar(sedesApi).then((rows) => {
       // Solo el almacén de las sedes que se ven.
       const list = (Array.isArray(rows) ? rows : []).filter((it) => deSede({ sedeId: it.sedeId ?? it.sede }));
       let total = 0;
@@ -897,9 +918,24 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     api.sedes.listar().then((rows) => {
       setNSedes(verSedes ? verSedes.length : Array.isArray(rows) ? rows.length : null);
     }).catch(() => setNSedes(null));
-  }, [conectado, fecha, citasProp, cargarDemo, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, fecha, citasProp, cargarDemo, claveSedes, sedeCx.sede]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { recargar(); }, [recargar]);
+
+  // Jornada de hoy: del horario de la clínica (o de la sede elegida). Con sesión y sin
+  // horario cargado no se supone uno; en la demostración vale el horario por defecto.
+  // La demostración conserva su jornada de ejemplo (08:00–20:00, 12 franjas).
+  const horarioReal = horarioClinica?.horario || {};
+  const sinHorario = conectado && !horarioConfigurado(horarioReal);
+  const jornada = !conectado ? { abierta: true, abre: "08:00", cierra: "20:00" } : sinHorario ? null
+    : jornadaClinica(horarioDeSede(horarioReal, sede && sede !== "all" ? sede : null), horarioClinica?.feriados || [], fecha);
+  const jAbre = jornada?.abierta ? horaDecimal(jornada.abre) : null;
+  const jCierra = jornada?.abierta ? horaDecimal(jornada.cierra) : null;
+  const rangoCaja = jAbre != null && jCierra != null && jCierra > jAbre ? { abre: jAbre, cierra: jCierra } : null;
+  const horasJornada = jornada?.abierta ? horasEntre(jornada.abre, jornada.cierra) : [];
+  const rotuloJornada = sinHorario ? "horario sin configurar"
+    : !jornada?.abierta ? "hoy no abre"
+    : `${jornada.abre} – ${jornada.cierra} – en vivo`;
 
 
   const meta = metaEstado(kd?.hayMeta, kd?.metaMensualClinica);
@@ -919,7 +955,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   );
   const cobradoHoy = pagosHoy.reduce((s, p) => s + (Number(p.monto) || 0), 0);
   const ticketMedio = pagosHoy.length ? cobradoHoy / pagosHoy.length : 0;
-  const curva = useMemo(() => curvaCajaAcumulada(pagosHoy, fecha), [pagosHoy, fecha]);
+  const curva = useMemo(() => curvaCajaAcumulada(pagosHoy, fecha, rangoCaja || undefined), [pagosHoy, fecha, rangoCaja?.abre, rangoCaja?.cierra]); // eslint-disable-line react-hooks/exhaustive-deps
   const funnel = rep?.funnel || {};
   const waConversaciones = Number(funnel.conversaciones) || 0;
   const waAgendadas = Number(funnel.agendadas) || 0;
@@ -952,6 +988,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const cartera = ind?.cartera || {};
   const pacs = pacResumen || [];
   const conSaldo = pacs.filter((p) => Number(p.saldo) > 0);
+  // Ejes del cubo a la medida de los pacientes que se dibujan.
+  const escCubo = useMemo(() => (conectado ? escalaCubo(pacs) : ESCALA_CUBO_DEF), [pacs, conectado]);
+  // Sin pacientes no hay rango que contar (no se muestran los topes por defecto como si fueran datos).
+  const ejeCubo = (txt) => (pacs.length || !conectado ? txt : "sin pacientes aún");
   const saldoMayor = conSaldo.reduce((m, p) => Math.max(m, Number(p.saldo) || 0), 0);
 
   const rankingBase = kd?.ranking || [];
@@ -967,8 +1007,11 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
 
   const enSillon = citasHoy.filter((c) => c.estado === "en_atencion").length;
   const cobradas = citasHoy.filter((c) => c.estado === "atendida").length;
-  const franjas = 12;
-  const ocupadas = Math.min(franjas, citasHoy.length);
+  // Franjas = horas de la jornada de hoy (antes 12 fijas); ocupadas = horas con alguna cita.
+  const franjas = horasJornada.length;
+  const horasConCita = new Set(citasHoy.filter((c) => c.estado !== "cancelada").map((c) => parseInt(String(c.hora || ""), 10)).filter((h) => horasJornada.includes(h)));
+  // Demostración: como antes, una franja por cita (hasta 12).
+  const ocupadas = conectado ? horasConCita.size : Math.min(franjas, citasHoy.length);
   const sillonesLibres = nSillones != null
     ? Math.max(0, nSillones - enSillon)
     : null;
@@ -1019,7 +1062,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     <div className="dc-pg">
 
       {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
-      <ResumenMes kd={kd} sedes={verSedes} acciones={<div className="dc-head-acc" title={subHead}>
+      <ResumenMes kd={kd} sedes={verSedes} sedesApi={sedesApi} acciones={<div className="dc-head-acc" title={subHead}>
           <button type="button" className="dc-rm__ib" aria-label="Actualizar" title="Actualizar datos" onClick={recargar}><RefreshCw size={15} strokeWidth={2} /></button>
           <button type="button" className="dc-rm__ib" aria-label="Qué mide cada gráfico" title="Qué mide cada gráfico" onClick={() => abrir({
             t: "Qué mide cada gráfico",
@@ -1049,7 +1092,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g1)" }} />
             <h2>Caja del día</h2>
-            <span className="dc-card__meta">08:00 – 20:00 – en vivo</span>
+            <span className="dc-card__meta">{rotuloJornada}</span>
             <button type="button" className="dc-info" aria-label="Detalle de caja"
               onClick={() => abrir({
                 t: "Caja del día",
@@ -1076,7 +1119,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               <div><dt>Cobros</dt><dd>{pagosHoy.length}</dd></div>
               <div><dt>Ticket medio</dt><dd>{moneyFmt(ticketMedio)}</dd></div>
             </dl>
-            <CanvasCaja puntos={curva} onOpen={() => abrir({
+            <CanvasCaja puntos={curva} abre={rangoCaja?.abre ?? 8} cierra={rangoCaja?.cierra ?? 20} onOpen={() => abrir({
               t: "Caja del día", s: "Curva acumulada", cifra: moneyFmt(cobradoHoy),
               como: "Cada cobro añade un punto a la línea.", cols: [["Monto", "n"]], filas: [[moneyFmt(cobradoHoy)]], tono: "cian",
             })} />
@@ -1358,7 +1401,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--g1)" }} />
-          <h2>Odontología general – por tratamiento</h2>
+          <h2>{conectado ? "Producción por tratamiento" : "Odontología general – por tratamiento"}</h2>
           <span className="dc-card__meta">{tratTotal > 0 ? `100% = ${moneyFmt(tratTotal)}` : "Sin datos aún"}</span>
           {tratTotal <= 0 && (
             <span className="marca-demo" title="Sin ventas enlazadas a servicio del catálogo">sin desglose aún</span>
@@ -1497,12 +1540,18 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <div className="dc-card__body">
           <div className="dc-split" style={{ gridTemplateColumns: "250px 1fr" }}>
             <div>
-              <p className="dc-rotulo">Franjas horarias con citas – {ocupadas} de {franjas}</p>
-              <div className="gate" aria-label={`Ocupación: ${ocupadas} de ${franjas}`}>
-                {Array.from({ length: franjas }, (_, g) => (
-                  <i key={g} className={g < ocupadas ? (g === ocupadas - 1 ? "hoy" : "on") : undefined} />
-                ))}
-              </div>
+              {franjas > 0 ? (<>
+                <p className="dc-rotulo">Franjas horarias con citas – {ocupadas} de {franjas}</p>
+                <div className="gate" aria-label={`Ocupación: ${ocupadas} de ${franjas}`}>
+                  {horasJornada.map((h, g) => (
+                    <i key={h} title={`${String(h).padStart(2, "0")}:00`} className={conectado
+                      ? (horasConCita.has(h) ? (h === new Date().getHours() ? "hoy" : "on") : undefined)
+                      : (g < ocupadas ? (g === ocupadas - 1 ? "hoy" : "on") : undefined)} />
+                  ))}
+                </div>
+              </>) : (
+                <p className="dc-rotulo">{sinHorario ? "Franjas horarias: configura el horario de la clínica en Configuración." : "Hoy la clínica no abre."}</p>
+              )}
               <dl className="dc-cifras">
                 <div className="dc-cifra"><dt>Citas hoy</dt><dd>{citasHoy.length}</dd></div>
                 <div className="dc-cifra"><dt>En sillón</dt><dd>{enSillon}</dd></div>
@@ -1586,9 +1635,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                 como: "Azul: hace cuánto no viene. Ámbar: cuánto ha dejado. Morado: cuántas veces ha venido.",
                 cols: [["Eje"], ["Rango"]],
                 filas: [
-                  ["Hace cuánto no viene", "0 a 180 días"],
-                  ["Cuánto ha dejado", "S/ 0 a S/ 1 650"],
-                  ["Cuántas veces ha venido", "1 a 6 visitas"],
+                  ["Hace cuánto no viene", ejeCubo(`0 a ${escCubo.dias} días`)],
+                  ["Cuánto ha dejado", ejeCubo(`S/ 0 a ${moneyFmt(escCubo.importe)}`)],
+                  ["Cuántas veces ha venido", ejeCubo(`1 a ${escCubo.visitas} visitas`)],
                 ],
                 tono: "aviso",
               })}>i</button>
@@ -1598,9 +1647,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               <div>
                 <p className="dc-rotulo">Cómo leerlo</p>
                 <dl className="ejes">
-                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-accent-cyan)" }} /><div><dt>Hace cuánto no viene</dt><dd>de 0 a 180 días</dd></div></div>
-                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-amber-ink)" }} /><div><dt>Cuánto ha dejado</dt><dd>de S/ 0 a S/ 1 650</dd></div></div>
-                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-purple)" }} /><div><dt>Cuántas veces ha venido</dt><dd>de 1 a 6 visitas</dd></div></div>
+                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-accent-cyan)" }} /><div><dt>Hace cuánto no viene</dt><dd>{ejeCubo(`de 0 a ${escCubo.dias} días`)}</dd></div></div>
+                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-amber-ink)" }} /><div><dt>Cuánto ha dejado</dt><dd>{ejeCubo(`de S/ 0 a ${moneyFmt(escCubo.importe)}`)}</dd></div></div>
+                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-purple)" }} /><div><dt>Cuántas veces ha venido</dt><dd>{ejeCubo(`de 1 a ${escCubo.visitas} visitas`)}</dd></div></div>
                 </dl>
                 <dl className="dc-cifras" style={{ marginTop: "var(--dc-sp-4)", paddingTop: "var(--dc-sp-3)", borderTop: "1px solid var(--dc-line)" }}>
                   <div className="dc-cifra"><dt>Pacientes en el cubo</dt><dd>{pacs.length}</dd></div>
@@ -1609,6 +1658,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               </div>
               <CanvasCubo
                 pacientes={pacs}
+                esc={escCubo}
                 onPick={(p) => abrir({
                   t: p.nombre || "Paciente",
                   s: "Prioridad de llamada",
