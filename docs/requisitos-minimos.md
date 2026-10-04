@@ -271,3 +271,42 @@ El modal de agendado propone solo el sillón (el propio del doctor, luego el de 
 52. Egresos: métodos `plin` y categorías «Movilidad» y «Caja chica». Registrar = `facturacion:crear` con la caja de la sede abierta (no el administrador general con varias sedes); anular o reclasificar = `facturacion:aprobar`.
 53. WhatsApp: `GET /conversaciones` con `pacienteId` y sede de cada chat; `PATCH /conversaciones/:id` para ligar un chat a una ficha; `creadoEn` de los mensajes en ISO con zona horaria. Agendar desde el chat usa `POST /citas` con canal `whatsapp`.
 54. Recordatorios: `POST /automatizaciones/recall/:pacienteId` solo envía el mensaje; la cita se crea cuando el paciente responde.
+
+### Sin datos fijos con sesión (QA de producción, 04/10/2026)
+Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que no tiene endpoint queda oculto o avisa. Para completar esas funciones:
+55. GET /tratamientos/resumen?desde&hasta&sedeIds → filtrar por sede; [{nombre, numeroDeVentas, importeTotal}].
+56. GET /pacientes/resumen-citas → añadir primeraVisita.
+57. GET /pacientes/resumen-financiero?sedeIds → añadir porCobrar, vencido (>30 días), diasSinPagar (y opcional nombre).
+58. Sustituciones: GET /sustituciones?medicoId, POST /sustituciones {citaId,destinatarioId,motivo}, PATCH /sustituciones/{id} {estado} (al aceptar cambia medicoId de la cita).
+59. GET /integraciones/estado → [{clave: pasarela|respaldo|correo, estado, detalle, ultimaActividad}].
+60. GET /mi-produccion?sedeIds → siempre esMedico.
+61. Bloqueos: GET devuelve medicoId, diaSemana, fecha; POST acepta medicoId + diaSemana (semanal) o fecha (puntual).
+62. GET /disponibilidad?medicoId → filtrar por médico.
+63. GET /pagos (o /pagos/historial) con fecha/desde/hasta + sedeIds y creadoEn con hora.
+64. GET /pacientes → siempre alergias: string[]; POST/PUT /pacientes aceptan sedeIds: uuid[].
+65. POST /recetas acepta medicoId, alertaAlergia (JSON), overrideAlergia; GET /recetas devuelve medicoId, medico, cop, firmada/firmadaEn.
+66. Lista de espera: POST /espera acepta especialidadId y medicoId; POST /espera/{id}/ofrecer {citaId|fecha,hora,medicoId}.
+67. Consentimientos: POST /consentimientos/{id}/enviar y /reenviar (enlace de firma); firmar guarda firmaUrl (PNG base64 o archivo).
+68. Reseñas: PATCH /resenas/{id} {respondida, respuesta}; GET /encuestas?sedeIds; PATCH /resenas/{id}/alerta-atendida.
+69. Campañas por email: POST /pacientes/campana con canal email|ambos.
+70. /auth/me (o login) devuelve medicoId y cop del usuario médico.
+71. Cada clínica debe cargar su horario (GET /clinica.horario) y sus sillones (/sillones): sin ellos la agenda avisa y no restringe horas.
+72. GET /especialidades: codigo, hallazgos[] (ids del dibujo: caries, fractura, endodoncia, corona, extraer/extraccion, ausente, coronaT, rr, fractR, absceso, periapic, dde…) y preciosSede{uuid:monto}. Sin hallazgos, «Al plan» solo avisa.
+73. Catálogo periodontal con codigo IHO, PRO, RAR, REE, CIR, FUR, FER, MAN.
+74. POST /tratamientos/{plan}/fases acepta servicioId, piezaNumero, cara, sedeId, origen; GET /tratamientos devuelve [{plan, fases:[…origen, servicioId, piezaNumero]}].
+75. POST /pagos con faseIds[] pasa esas fases a atendida y devuelve comprobanteSerie/comprobanteNumero.
+76. GET /medicos con cop; sesión (login o /auth/me) con medicoId y cop.
+77. Tomas del odontograma: GET/POST /odontograma/{pacienteId}/tomas → {id, fecha, etiqueta, fase, denticion, piezas[]}.
+78. Opcional /clinica/impresion: documento (descuento, vigencia), textos.condiciones, tarifa por sede.
+79. POST /usuarios: aceptar clave temporal y forzar cambio al primer ingreso (debeCambiarClave); ideal invitación por correo; endpoint de restablecer clave.
+80. POST /auth/registro {nombreClinica, ruc, nombre, email, password} (confirmar contrato).
+81. POST /pagos/niubiz/sesion devuelve checkoutUrl (o definir VITE_NIUBIZ_JS); nunca simulado:true en producción.
+82. Portal: pago en línea del paciente, descarga de comprobante, GET /portal/{id}/resumen con clinica.nombre.
+83. GET /facturacion-electronica/comprobantes con xmlUrl y cdrUrl.
+84. Pasarela y links de pago: GET/PUT /pasarela, POST/GET /links-pago.
+85. Plan: endpoint para cambiar plan, planVence en GET /clinica, historial de cobros de membresía.
+86. GET /whatsapp/salud con ia:boolean.
+87. Inventario: consumoDiario por insumo.
+88. Laboratorio: endpoint para contactar/avisar al laboratorio; confirmar campos de POST /laboratorio (pacienteId, paciente, sedeId, tipoTrabajo, laboratorio, fechaEnvio, fechaEstimada, estado).
+89. BackOffice de plataforma: tenants, suscripciones, usuarios globales, soporte.
+90. El RUC de la clínica debe tener dígito verificador SUNAT válido (si no, la boleta no se abre).

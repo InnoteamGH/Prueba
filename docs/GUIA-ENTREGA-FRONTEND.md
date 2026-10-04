@@ -17,7 +17,7 @@ El detalle completo de cada endpoint y campo está en `requisitos-minimos.md`, q
 |---|---|
 | `frontend.zip` | La carpeta `frontend/` completa (código fuente, `package.json`, `package-lock.json`, `public/`, `vercel.json`). No incluye `node_modules` ni compilados. |
 | `GUIA-ENTREGA-FRONTEND.md` | Este documento. |
-| `requisitos-minimos.md` | La lista de cambios de backend, punto por punto (del 1 al 54; los 47 a 54 salen del QA de recepción y doctor). |
+| `requisitos-minimos.md` | La lista de cambios de backend, punto por punto (del 1 al 90; 47–54 del QA de recepción y doctor, 55–90 de quitar datos fijos con sesión). |
 
 El backend (Spring Boot) no se toca desde este repositorio. Todo lo que el backend tiene que cambiar está descrito en la sección 3 y en `requisitos-minimos.md`.
 
@@ -190,8 +190,19 @@ Cada bloque dice qué llama el frontend y qué espera. **Negrita = campo o pará
   - serie por sede;
   - `GET /facturacion-electronica/comprobantes?sedeIds=`, que devuelva `sedeId`.
 
-### 3.3 Limitación conocida del frontend (a resolver con el backend)
-Con sesión iniciada, el frontend traduce el UUID de sede a 1 o 2, que es la regla que ya usaba el login. Con **más de dos sedes reales**, la tercera se confunde con la primera en los filtros de pantalla. Mientras tanto, el servidor debe filtrar por sede: con eso, el dato de otra sede no llega aunque el filtro de pantalla falle. La solución definitiva es que el login devuelva los UUID y el frontend los use tal cual (cambio pequeño, a coordinar).
+### 3.3 Sedes: resuelto
+Antes el frontend traducía los UUID de sede a 1/2 y con 3 o más sedes se mezclaban. Ya no: usa los UUID reales de `GET /sedes` (ver 3.4).
+
+### 3.4 Datos reales con sesión (sin nada fijo)
+Con sesión iniciada el frontend ya **no usa ningún dato de ejemplo**: pacientes, citas, médicos, sedes, catálogo, precios, tipo de cambio, datos de la clínica, horario y sillones vienen del servidor. Lo que todavía no tiene endpoint queda oculto o avisa «disponible cuando el servidor lo soporte» (nunca finge que se envió o guardó). La lista de lo que falta en el backend está en `requisitos-minimos.md`, puntos 55 en adelante.
+
+Puntos clave para el programador:
+- **Sedes:** el frontend registra las sedes de `GET /sedes` y trabaja con sus UUID reales (sirve para 3 o más sedes). El login debe devolver `sedes` (UUID) del usuario o el claim `sedes` en el JWT; sin ellos, solo los roles globales ven todo.
+- **Configuración mínima por clínica antes de probar:** horario de atención (`/clinica.horario`), sillones por sede (`/sillones`), catálogo de servicios con precio por sede, médicos con COP y sus horarios por sede, RUC con dígito verificador válido y tipo de cambio (`/tipo-cambio`). Sin horario o sin sillones, la agenda lo avisa y no restringe horas.
+- **Recetas:** el cruce de alergias usa `alergias` de `GET /pacientes` (o la ficha 360). Si no puede confirmarlas, no deja emitir.
+- **Usuarios nuevos:** se crean con una clave temporal aleatoria que se muestra una sola vez (ya no «demo»).
+- **Pagos con tarjeta:** la URL del checkout de Niubiz viene de `POST /pagos/niubiz/sesion` (`checkoutUrl`) o de `VITE_NIUBIZ_JS`; ya no se usa el entorno de pruebas fijo ni se autoconfirma.
+- **Variables de entorno del despliegue:** `VITE_API_URL` (obligatoria; sin ella apunta a localhost) y, si aplica, `VITE_NIUBIZ_JS`.
 
 ---
 
