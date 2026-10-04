@@ -12,6 +12,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Clock, Cloud, FileCheck2, File
 import api, { auth } from "../api/client";
 import { BotonExportar, Btn, DataTable, MenuAcciones, Modal, SEDES, Select, fmt, hoy, mismaSede, nombreSede } from "../comun";
 import { datosImpresion } from "../util/membrete";
+import { fijarProveedorSunat } from "../compartido/integraciones";
 
 const CLAVE_CFG = "dc_data_v1_sunat_cfg";
 const CLAVE_EST = "dc_data_v1_sunat_estados";
@@ -46,7 +47,18 @@ const cfgDefecto = (sedes) => ({
   proveedor: "", ambiente: "pruebas", url: "", token: "", afectacion: "gravado", envioAuto: true, horaResumen: "23:00",
   series: Object.fromEntries((sedes.length ? sedes : SEDES).map((s, i) => [String(s.id), { boleta: `B00${i + 1}`, factura: `F00${i + 1}`, ncBoleta: `BC0${i + 1}`, ncFactura: `FC0${i + 1}` }])),
 });
-const leerCfg = (sedes) => ({ ...cfgDefecto(sedes), ...leer(CLAVE_CFG, {}) });
+// Con sesión la configuración es solo la del servidor (GET /facturacion-electronica/config):
+// ni lo guardado en este navegador ni series sugeridas que nadie configuró.
+const leerCfg = (sedes) => (auth.token ? { ...cfgDefecto([]), series: {} } : { ...cfgDefecto(sedes), ...leer(CLAVE_CFG, {}) });
+/* Copia de la configuración del servidor para serieSede (la boleta la lee sin React). */
+let cfgServidor = null;
+let cfgPedida = false;
+export function fijarCfgSunat(c) { if (c && typeof c === "object") { cfgServidor = c; fijarProveedorSunat(c.proveedor); } }
+const cfgParaSerie = () => {
+  if (!auth.token) return leerCfg(sedesPorDefecto());
+  if (!cfgServidor && !cfgPedida) { cfgPedida = true; api.sunat.config().then(fijarCfgSunat).catch(() => {}); }
+  return cfgServidor || { series: {} };
+};
 // Sin lista de sedes (demostración), las sedes de la clínica; nunca un par fijo.
 const sedesPorDefecto = () => SEDES.map((s) => ({ id: s.id, nombre: nombreSede(s.id) }));
 /** Series de una sede: la clave puede ser el id de la demo (1/2) o el UUID del servidor. */
@@ -60,7 +72,7 @@ const seriesDe = (cfg, sede) => {
     Integraciones › Facturación electrónica; null si esa sede no tiene serie. */
 export function serieSede(sede, tipo = "boleta") {
   if (sede == null || sede === "all") return null;
-  const x = seriesDe(leerCfg(sedesPorDefecto()), sede);
+  const x = seriesDe(cfgParaSerie(), sede);
   return (x && x[tipo]) || null;
 }
 
@@ -129,7 +141,7 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
   useEffect(() => {
     if (!conectado) return;
     Promise.all([api.sunat.config().catch(() => null), api.sunat.comprobantes(null, null, consulta || undefined).catch((e) => ({ error: e?.status || true }))])
-      .then(([c, r]) => { if (c) setCfg((x) => ({ ...x, ...c })); setRemoto(r?.error ? { error: r.error } : { comprobantes: r?.comprobantes || r || [] }); });
+      .then(([c, r]) => { if (c) { fijarCfgSunat(c); setCfg((x) => ({ ...x, ...c })); } setRemoto(r?.error ? { error: r.error } : { comprobantes: r?.comprobantes || r || [] }); });
   }, [conectado, claveConsulta]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Primero se simulan (o llegan) todos; después se recortan a las sedes que se ven, con las
@@ -191,8 +203,9 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
                 : null}
               <MenuAcciones opciones={[
                 puedeEmitir && c.estado === "aceptado" && c.total > 0 && { label: "Anular con nota de crédito", peligro: true, onClick: () => setNc({ c, tipo: "Anulación de la operación", motivo: "" }) },
-                { label: "Descargar XML", onClick: () => notify(conectado ? "Descargando XML…" : "El XML se descarga cuando el envío a SUNAT esté activo.") },
-                c.estado === "aceptado" && { label: "Descargar constancia (CDR)", onClick: () => notify(conectado ? "Descargando CDR…" : "La constancia de SUNAT se descarga cuando el envío esté activo.") },
+                // Con sesión solo se ofrece si el servidor manda el enlace del archivo (xmlUrl / cdrUrl).
+                (!conectado || c.xmlUrl) && { label: "Descargar XML", onClick: () => (conectado ? window.open(c.xmlUrl, "_blank", "noopener") : notify("El XML se descarga cuando el envío a SUNAT esté activo.")) },
+                c.estado === "aceptado" && (!conectado || c.cdrUrl) && { label: "Descargar constancia (CDR)", onClick: () => (conectado ? window.open(c.cdrUrl, "_blank", "noopener") : notify("La constancia de SUNAT se descarga cuando el envío esté activo.")) },
               ]} />
             </span>
           ) },
@@ -255,16 +268,17 @@ export function ConexionSunat({ notify = () => {}, sedes = null }) {
   const listaSedes = sedes && sedes.length ? sedes : sedesApi && sedesApi.length ? sedesApi : sedesPorDefecto();
   const [cfg, setCfg] = useState(() => leerCfg(listaSedes));
   // Al llegar las sedes del servidor, las que aún no tienen serie toman la sugerida.
-  useEffect(() => { setCfg((x) => ({ ...x, series: { ...cfgDefecto(listaSedes).series, ...(x.series || {}) } })); }, [listaSedes.map((s) => s.id).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Con sesión no se inventan series: las sugeridas solo se proponen al editar (placeholder).
+  useEffect(() => { if (!conectado) setCfg((x) => ({ ...x, series: { ...cfgDefecto(listaSedes).series, ...(x.series || {}) } })); }, [listaSedes.map((s) => s.id).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editCfg, setEditCfg] = useState(null);
   const [probando, setProbando] = useState(false);
-  useEffect(() => { if (conectado) api.sunat.config().then((c) => c && setCfg((x) => ({ ...x, ...c }))).catch(() => {}); }, [conectado]);
+  useEffect(() => { if (conectado) api.sunat.config().then((c) => { if (c) { fijarCfgSunat(c); setCfg((x) => ({ ...x, ...c })); } }).catch(() => {}); }, [conectado]);
   const emisor = (datosImpresion() || {}).empresa || {};
   const conectadoProv = !!cfg.proveedor;
   const guardarCfg = () => {
     const c = editCfg;
     if (c.proveedor && !c.url.trim()) { notify("Falta la ruta (URL) que entrega el proveedor."); return; }
-    if (conectado) { api.sunat.guardarConfig(c).then(() => { setCfg(c); setEditCfg(null); notify("Conexión guardada."); }).catch(() => notify("No se pudo guardar la conexión.")); return; }
+    if (conectado) { api.sunat.guardarConfig(c).then(() => { setCfg(c); fijarCfgSunat(c); setEditCfg(null); notify("Conexión guardada."); }).catch(() => notify("No se pudo guardar la conexión.")); return; }
     const { token, ...sinToken } = c;   // el token nunca se guarda en el navegador
     setCfg({ ...c }); guardar(CLAVE_CFG, { ...sinToken, token: "" }); setEditCfg(null);
     notify(c.proveedor ? "Conexión guardada (demostración: no se envía nada)." : "Configuración guardada.");
@@ -320,7 +334,7 @@ export function ConexionSunat({ notify = () => {}, sedes = null }) {
             <div className="dc-fe__tseries">
               <div className="is-cab"><span>Sede</span><span>Boleta</span><span>Factura</span><span>NC boleta</span><span>NC factura</span></div>
               {listaSedes.map((s) => { const k = String(s.id); const x = editCfg.series[k] || {}; const setS = (campo, v) => setEditCfg({ ...editCfg, series: { ...editCfg.series, [k]: { ...x, [campo]: v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4) } } }); return (
-                <div key={k}><span>{s.nombre}</span>{["boleta", "factura", "ncBoleta", "ncFactura"].map((c) => <input key={c} className="dc-premium-inp" aria-label={`${c} ${s.nombre}`} value={x[c] || ""} onChange={(e) => setS(c, e.target.value)} />)}</div>
+                <div key={k}><span>{s.nombre}</span>{["boleta", "factura", "ncBoleta", "ncFactura"].map((c) => <input key={c} className="dc-premium-inp" aria-label={`${c} ${s.nombre}`} value={x[c] || ""} placeholder={(cfgDefecto(listaSedes).series[k] || {})[c] || ""} onChange={(e) => setS(c, e.target.value)} />)}</div>
               ); })}
             </div>
           </div>
