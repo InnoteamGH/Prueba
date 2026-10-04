@@ -275,7 +275,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
         if (c.fecha !== f.fecha) return;
         if (f.medicoId && c.medicoId && String(c.medicoId) !== String(f.medicoId)) return;
         if (!deLaSede(c)) return;
-        if (["cancelada", "no_show", "reprogramada"].includes(c.estado)) return;
+        if (["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(c.estado)) return;
         ocupadas.add(String(c.hora || "").slice(0, 5));
       });
       apply(); return;
@@ -284,7 +284,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       (rows || []).forEach((c) => {
         if (f.medicoId && c.medicoId && String(c.medicoId) !== String(f.medicoId)) return;
         if (!deLaSede(c)) return;
-        if (["cancelada", "no_show", "reprogramada"].includes(c.estado)) return;
+        if (["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(c.estado)) return;
         const h = String(c.hora || "").slice(0, 5);
         if (h) ocupadas.add(h);
       });
