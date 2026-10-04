@@ -987,7 +987,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const tratSorted = [...tratList].sort((a, b) => (Number(b.importeTotal) || 0) - (Number(a.importeTotal) || 0));
 
   const cartera = ind?.cartera || {};
-  const pacs = pacResumen || [];
+  const pacs = Array.isArray(pacResumen) ? pacResumen : [];
   const conSaldo = pacs.filter((p) => Number(p.saldo) > 0);
   // Ejes del cubo a la medida de los pacientes que se dibujan.
   const escCubo = useMemo(() => (conectado ? escalaCubo(pacs) : ESCALA_CUBO_DEF), [pacs, conectado]);

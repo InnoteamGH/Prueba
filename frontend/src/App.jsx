@@ -1692,32 +1692,33 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>{c.hora}</div>
           {c.id === nuevaCita ? <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", letterSpacing: .4 }}><CheckCircle2 size={9} strokeWidth={1.75} /> NUEVA</span> : esProx && !pasada ? <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 500, color: e.c, letterSpacing: .4 }}><span style={{ width: 5, height: 5, borderRadius: "var(--dc-r-full)", background: e.c, animation: "dcBlink 1.6s ease-in-out infinite" }} /> PRÓXIMA</span> : null}
         </div>); } },
-    { key: "paciente", label: "Paciente", get: (c) => c.paciente, w: "minmax(150px,1.4fr)", a: "left",
+    // Paciente y sede pasan a dos líneas si no caben (antes se cortaban: «Zoila Quis…»).
+    { key: "paciente", label: "Paciente", get: (c) => c.paciente, w: "minmax(150px,1.5fr)", a: "left",
       cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada" || c.estado === "cerrada_sistema"; return (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 11, minWidth: 0 }}>
           <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : tint(colorDe(c.paciente), 0.14), color: pasada ? "var(--dc-ink-400)" : colorDe(c.paciente), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0, boxShadow: pasada ? "none" : `inset 0 0 0 1.5px ${tint(colorDe(c.paciente), 0.25)}` }}>{iniciales(c.paciente)}</div>
           <div style={{ minWidth: 0 }}>
-            <span title={c.paciente} style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}><span style={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{c.paciente}</span>{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
+            <span title={c.paciente} style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, minWidth: 0, lineHeight: 1.3 }}><span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{c.paciente}</span>{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
             {c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> Agendada por IA</span>}
           </div>
         </div>); } },
-    { key: "dni", label: "DNI", get: (c) => c.dni || "", w: "84px", a: "left", cell: (c) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{c.dni || "—"}</span> },
-    { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(140px,1.3fr)", a: "left",
-      cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
+    { key: "dni", label: "DNI", get: (c) => c.dni || "", w: "80px", a: "left", cell: (c) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{c.dni || "—"}</span> },
+    { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(120px,1.3fr)", a: "left",
+      cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span title={c.medico || nom(c.medicoId)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
     // Más ancha y con el nombre completo al pasar el ratón: los nombres reales de sede
     // («Sede Miraflores…») no cabían en 78 px.
-    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(110px,.8fr)", a: "left", noSort: true,
-      cell: (c) => { const n = c.sedeNombre && c.sedeNombre !== "—" ? c.sedeNombre : nombreSede(c.sede); return <span title={n} style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, display: "block" }}>{c.sedeNombre && c.sedeNombre !== "—" ? c.sedeNombre : cortaSede(c.sede)}</span>; } },
-    { key: "sillon", label: "Sillón", get: (c) => nombreSillon(c) || "", w: "70px", a: "left", noSort: true,
+    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(100px,.8fr)", a: "left", noSort: true,
+      cell: (c) => { const n = c.sedeNombre && c.sedeNombre !== "—" ? c.sedeNombre : nombreSede(c.sede); return <span title={n} style={{ fontSize: 13, color: "var(--dc-ink-700)", minWidth: 0, display: "block", lineHeight: 1.3, overflowWrap: "anywhere" }}>{c.sedeNombre && c.sedeNombre !== "—" ? c.sedeNombre : cortaSede(c.sede)}</span>; } },
+    { key: "sillon", label: "Sillón", get: (c) => nombreSillon(c) || "", w: "64px", a: "left", noSort: true,
       cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{nombreSillon(c) || "—"}</span> },
-    { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(110px,1.2fr)", a: "left",
+    { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(100px,1.2fr)", a: "left",
       cell: (c) => { const base = c.motivo.replace(/\s*\([^)]*\)\s*/g, " ").trim(); const hasDet = base !== c.motivo; return (
         <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", gap: 6, minWidth: 0 }} title={c.motivo}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{base}</span>
           {hasDet && <Info size={13} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} />}
         </div>); } },
     // La llegada se muestra en el mismo estado («En sala») en vez de una columna aparte.
-    { key: "estado", label: "Estado", get: (c) => estadoInfo("cita", estadoCita(c)).label, w: "124px", a: "center",
+    { key: "estado", label: "Estado", get: (c) => estadoInfo("cita", estadoCita(c)).label, w: "120px", a: "center",
       cell: (c) => <div style={{ display: "flex", justifyContent: "center" }}><EstadoPill entidad="cita" estado={estadoCita(c)} /></div> },
     // Ancho fijo: cada fila es su propia rejilla, así que un ancho "según contenido"
     // descuadraba la columna de una fila a otra.
