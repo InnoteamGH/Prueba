@@ -12,23 +12,30 @@ export function apiRowsAHtmlDatos(rows = []) {
       try { carasRaw = JSON.parse(carasRaw || "{}") || {}; } catch { carasRaw = {}; }
     }
     carasRaw = carasRaw || {};
+    const colores = (carasRaw._colores && typeof carasRaw._colores === "object") ? carasRaw._colores : {};
+    const coloresRaiz = (carasRaw._coloresRaiz && typeof carasRaw._coloresRaiz === "object") ? carasRaw._coloresRaiz : {};
     const caras = {};
     const raices = {};
-    const pieza = [];
+    let pieza = [];
     for (const [k, v] of Object.entries(carasRaw)) {
       if (k === "raices" && v && typeof v === "object") {
         for (const [idx, h] of Object.entries(v)) {
-          if (h) raices[String(idx)] = { h: String(h), c: "r" };
+          if (h) raices[String(idx)] = { h: String(h), c: coloresRaiz[idx] || "r" };
         }
         continue;
       }
-      if (k === "hallazgos" || k === "_pieza") continue;
-      if (v) caras[k] = { h: String(v), c: "r" };
+      if (k === "hallazgos" || k.startsWith("_")) continue;
+      if (v) caras[k] = { h: String(v), c: colores[k] || "r" };
     }
-    if (r.estadoPieza) {
-      const h = String(r.estadoPieza);
-      const id = h === "extraer" ? "extraccion" : h;
-      pieza.push({ h: id, c: "r" });
+    // Marcas de pieza completa: la lista con su color; en registros antiguos, _pieza y estadoPieza.
+    if (Array.isArray(carasRaw._piezas) && carasRaw._piezas.length) {
+      pieza = carasRaw._piezas.filter((m) => m && m.h).map((m) => ({ h: String(m.h), c: m.c || "r" }));
+    } else {
+      if (carasRaw._pieza) pieza.push({ h: String(carasRaw._pieza), c: "r" });
+      if (r.estadoPieza) {
+        const h = String(r.estadoPieza);
+        pieza.push({ h: h === "extraer" ? "extraccion" : h, c: "r" });
+      }
     }
     datos[pz] = { caras, raices, pieza, nota: r.nota || "" };
   }
