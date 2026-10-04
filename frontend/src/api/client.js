@@ -110,7 +110,11 @@ function emitirCierreSesion() {
   for (const fn of oyentesSesion) { try { fn(); } catch { /* */ } }
 }
 
-function avisarFallo(estado, path, mensaje) {
+function avisarFallo(estado, path, mensaje, method = "GET") {
+  // Un 403 al LEER no levanta el aviso global: casi siempre es una llamada de fondo (p. ej.
+  // /clinica/impresion o los saldos) y el banner rojo quedaba en todas las pantallas. Cada
+  // pantalla que lista algo muestra «Sin permiso para ver…» donde falta el dato.
+  if (estado === 403 && method === "GET") return;
   // 403 = permiso; 0 = no hay servidor; 5xx = el backend se cayo. El resto suele
   // ser una validacion que el modulo ya muestra por su cuenta.
   // /caja sin permiso de facturación es esperado (p. ej. odontólogo en Pacientes):
@@ -224,7 +228,7 @@ async function request(method, path, body, extraHeaders) {
         const st = e && (e.status || e._httpStatus);
         const retriable = st === 503 || st === 502 || st === 0;
         if (attempt === maxAttempts || !retriable) {
-          if (st === 0 || st) avisarFallo(st, path, e.message);
+          if (st === 0 || st) avisarFallo(st, path, e.message, method);
           throw e;
         }
         const delayMs = Math.min(5000, 800 * (2 ** (attempt - 1)));
@@ -248,6 +252,18 @@ function safeJson(t) { try { return JSON.parse(t); } catch { return t; } }
 
 export class ApiError extends Error {
   constructor(status, message, data) { super(message); this.status = status; this.data = data; }
+}
+
+/** ¿La petición falló por falta de permiso (403)? Para mostrar «Sin permiso para ver…» en
+    vez de una lista vacía que parece real. */
+export const esSinPermiso = (e) => !!e && (e.status === 403 || e._httpStatus === 403);
+
+/** Motivo que dio el servidor, sin la coletilla técnica «(409 PATCH /citas/…)». */
+export function msgServidor(e, porDefecto = "") {
+  const d = e && e.data;
+  const m = (d && typeof d === "object" && (d.message || d.error || d.mensaje)) || (e && e.message) || "";
+  const limpio = String(m).replace(/\s*\(\d{3} [A-Z]+ [^)]*\)\s*$/, "").trim();
+  return limpio || porDefecto;
 }
 
 export const api = {

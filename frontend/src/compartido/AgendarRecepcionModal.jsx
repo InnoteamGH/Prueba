@@ -170,6 +170,13 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       const pid = base?.pacienteId;
       const extra = pid != null && pid !== "" && !visibles.some((p) => String(p.id) === String(pid)) ? todos.filter((p) => String(p.id) === String(pid)) : [];
       setPacTodos(todos.map(mapPac)); setPac([...visibles, ...extra].map(mapPac));
+      // Con sesión, GET /pacientes a veces aún no trae a un paciente recién creado (p. ej. el
+      // de la lista de espera): se pide suelto y, si tampoco llega, se usa el nombre que trae.
+      if (!demo && pid != null && pid !== "" && !todos.some((p) => String(p.id) === String(pid))) {
+        const sumar = (p) => { setPacTodos((xs) => xs.some((x) => String(x.id) === String(p.id)) ? xs : [...xs, mapPac(p)]); setPac((xs) => xs.some((x) => String(x.id) === String(p.id)) ? xs : [...xs, mapPac(p)]); };
+        api.pacientes.ver(pid).then((p) => sumar(p && p.id != null ? p : { id: pid, nombre: base?.pacienteNombre || "Paciente", dni: "" }))
+          .catch(() => { if (base?.pacienteNombre) sumar({ id: pid, nombre: base.pacienteNombre, dni: "" }); });
+      }
       // Desde la lista de espera llega solo el nombre y desde WhatsApp el celular: se liga a
       // su ficha si existe; si no, se abre el alta rápida con lo que ya se sabe.
       if (ligadoRef.current || base?.pacienteId || (!base?.pacienteNombre && !base?.telefono)) return;
@@ -203,6 +210,14 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     }).catch(() => {});
     api.clinica.get().then((r) => setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] })).catch(() => {});
   }, []); // eslint-disable-line
+  // Desde la lista de espera llega el servicio por nombre (o su id): se preselecciona en
+  // cuanto el catálogo está cargado.
+  useEffect(() => {
+    if (f.especialidadId || !esps.length || !(base?.especialidadNombre || base?.especialidadId)) return;
+    const nom = String(base.especialidadNombre || "").trim().toLowerCase();
+    const e = esps.find((x) => base.especialidadId != null && String(x.id) === String(base.especialidadId)) || (nom && esps.find((x) => String(x.nombre || "").trim().toLowerCase() === nom));
+    if (e) setF((x) => (x.especialidadId ? x : { ...x, especialidadId: e.id }));
+  }, [esps]); // eslint-disable-line react-hooks/exhaustive-deps
   // Reglas de la agenda: sillones (con su uso), horario de cada doctor y bloqueos.
   const reglas = useReglasAgenda();
   const [citasDia, setCitasDia] = useState([]);   // con sesión: las citas del día elegido

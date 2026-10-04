@@ -15,6 +15,8 @@
    4. no cae en un bloqueo de agenda,
    5. no empieza antes de ahora (no se agenda ni se reprograma al pasado). */
 
+import { hayRegistroSedes, idxDeUuid } from "./sedesRegistro";
+
 export const USOS_SILLON = [
   { v: "flexible", l: "Flexible", d: "Lo usa el doctor que esté libre." },
   { v: "doctor", l: "Fijo de un doctor", d: "Es el sillón habitual de un doctor." },
@@ -49,6 +51,17 @@ const aMin = (h) => { const [a, b] = String(h || "0:0").slice(0, 5).split(":").m
 const aHora = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 const dur = (c) => Number(c.duracionMin) || 30;
 const mismo = (a, b) => a != null && b != null && String(a) === String(b);
+// Sedes: con sesión el horario y los sillones llegan con UUID y la agenda puede mirar por el
+// número del registro (1, 2…). Se comparan por ese número, como mismaSede de comun.jsx (que
+// aquí no se importa para no crear una dependencia circular).
+const numSede = (x) => {
+  if (x == null || x === "") return null;
+  const s = String(x);
+  if (/^\d+$/.test(s)) return Number(s);
+  if (hayRegistroSedes()) return idxDeUuid(s) ?? s;
+  return s.endsWith("a2") ? 2 : 1;
+};
+const mismaSedeS = (a, b) => a != null && b != null && (String(a) === String(b) || numSede(a) === numSede(b));
 const sedeDe = (c) => c.sede ?? c.sedeId;
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const diaDe = (fecha) => new Date(`${fecha}T00:00:00`).getDay();
@@ -82,7 +95,7 @@ export const normSillon = (r) => ({
   nota: r.nota || "",
 });
 
-export const sillonesDeSede = (sillones, sede) => (sillones || []).filter((s) => sede == null || mismo(s.sede, sede)).sort((a, b) => a.numero - b.numero);
+export const sillonesDeSede = (sillones, sede) => (sillones || []).filter((s) => sede == null || mismaSedeS(s.sede, sede)).sort((a, b) => a.numero - b.numero);
 
 /** Etiqueta corta del uso del sillón: «Flexible», «Solo Odontopediatría», «Fijo · Dra. Quispe». */
 export function etiquetaUso(s, { medicos = [], especialidades = [] } = {}) {
@@ -129,7 +142,7 @@ export function cruces(citas, { fecha, hora, duracionMin, excluirId }) {
 
 /** Bloques del horario del doctor para ese día (y sede, si el bloque la indica). */
 export const turnosDelDia = (disp, medicoId, fecha, sede) => (disp || [])
-  .filter((d) => mismo(d.medicoId, medicoId) && Number(d.diaSemana) === diaDe(fecha) && d.activo !== false && (sede == null || (d.sede ?? d.sedeId) == null || mismo(d.sede ?? d.sedeId, sede)))
+  .filter((d) => mismo(d.medicoId, medicoId) && Number(d.diaSemana) === diaDe(fecha) && d.activo !== false && (sede == null || (d.sede ?? d.sedeId) == null || mismaSedeS(d.sede ?? d.sedeId, sede)))
   .sort((a, b) => aMin(a.horaInicio) - aMin(b.horaInicio));
 
 const txtTurnos = (ts) => ts.map((t) => `${String(t.horaInicio).slice(0, 5)}–${String(t.horaFin).slice(0, 5)}`).join(" y ");
@@ -141,7 +154,7 @@ export function medicoAtiende(disp, { medicoId, fecha, hora, duracionMin, sede }
   const ini = aMin(hora), fin = ini + (Number(duracionMin) || 30);
   const delDia = (disp || []).filter((d) => mismo(d.medicoId, medicoId) && Number(d.diaSemana) === diaDe(fecha) && d.activo !== false);
   if (!delDia.length) return { ok: false, motivo: `${nombre} no atiende los ${DIAS[diaDe(fecha)]}.` };
-  const enSede = delDia.filter((d) => sede == null || (d.sede ?? d.sedeId) == null || mismo(d.sede ?? d.sedeId, sede));
+  const enSede = delDia.filter((d) => sede == null || (d.sede ?? d.sedeId) == null || mismaSedeS(d.sede ?? d.sedeId, sede));
   if (!enSede.length) return { ok: false, motivo: `${nombre} no atiende en esta sede los ${DIAS[diaDe(fecha)]} (está en otra sede: ${txtTurnos(delDia)}).` };
   if (enSede.some((d) => aMin(d.horaInicio) <= ini && fin <= aMin(d.horaFin))) return { ok: true, motivo: "" };
   return { ok: false, motivo: `${nombre} atiende ese día de ${txtTurnos(enSede)}; ${aHora(ini)}–${aHora(fin)} queda fuera.` };
@@ -154,9 +167,9 @@ export function bloqueoQuePisa(bloqueos, { fecha, hora, duracionMin, medicoId, s
     const aplica = (b.fecha && String(b.fecha).slice(0, 10) === fecha) || (!b.fecha && Number(b.diaSemana) === dow);
     if (!aplica) return false;
     if (b.medicoId != null && !mismo(b.medicoId, medicoId)) return false;
-    if (b.sillon != null && (!mismo(b.sillon, sillon) || (b.sede != null && !mismo(b.sede, sede)))) return false;
+    if (b.sillon != null && (!mismo(b.sillon, sillon) || (b.sede != null && !mismaSedeS(b.sede, sede)))) return false;
     // Toda la agenda o un doctor: el bloqueo vale solo en su sede (sin sede = todas).
-    if (b.sillon == null && b.sede != null && sede != null && !mismo(b.sede, sede)) return false;
+    if (b.sillon == null && b.sede != null && sede != null && !mismaSedeS(b.sede, sede)) return false;
     return aMin(b.horaInicio) < fin && ini < aMin(b.horaFin);
   }) || null;
 }
@@ -166,7 +179,7 @@ export function bloqueoQuePisa(bloqueos, { fecha, hora, duracionMin, medicoId, s
 export function asignacionDe(asignaciones, s, { fecha, hora, duracionMin }) {
   if (!fecha || !hora) return null;
   const ini = aMin(hora), fin = ini + (Number(duracionMin) || 30);
-  return (asignaciones || []).find((a) => a.fecha === fecha && mismo(a.sede, s.sede) && mismo(a.sillon, s.numero) && aMin(a.desde) < fin && ini < aMin(a.hasta)) || null;
+  return (asignaciones || []).find((a) => a.fecha === fecha && mismaSedeS(a.sede, s.sede) && mismo(a.sillon, s.numero) && aMin(a.desde) < fin && ini < aMin(a.hasta)) || null;
 }
 
 export function estadoSillones(ctx, cita) {
@@ -183,7 +196,7 @@ export function estadoSillones(ctx, cita) {
     // Bloqueo solo de este sillón (mantenimiento, por ejemplo).
     const blq = bloqueoQuePisa((bloqueos || []).filter((b) => b.sillon != null), { ...cita, sillon: s.numero, sede: s.sede });
     if (blq && regla.nivel !== "no") regla = { nivel: "no", motivo: `${s.nombre} bloqueado: ${blq.motivo || "no disponible"} (${String(blq.horaInicio).slice(0, 5)}–${String(blq.horaFin).slice(0, 5)}).` };
-    const ocup = cruces(citas, { ...cita, excluirId: cita.id }).filter((c) => mismo(sedeDe(c), s.sede) && mismo(c.sillon, s.numero));
+    const ocup = cruces(citas, { ...cita, excluirId: cita.id }).filter((c) => mismaSedeS(sedeDe(c), s.sede) && mismo(c.sillon, s.numero));
     const estado = regla.nivel === "no" ? "no" : ocup.length ? "ocupado" : regla.nivel;
     return { s, estado, regla, ocupante: ocup[0] || null };
   });

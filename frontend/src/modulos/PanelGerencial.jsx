@@ -21,6 +21,7 @@ import { horarioConfigurado, horaDecimal } from "../compartido/horarioReal";
 import { leerCatalogo, precioCita } from "../compartido/catalogo";
 import { medicoEnSedes } from "../compartido/medicosSede";
 import { SILLONES_DEMO } from "../compartido/sillones";
+import { sillonesPorSede } from "../compartido/useReglasAgenda";
 import * as M from "../compartido/metricas";
 import { labAtrasado } from "../compartido/estados";
 import "./panelGerencial.css";
@@ -912,7 +913,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       }
       setInventarioValorizado(ok ? total : null);
     }).catch(() => setInventarioValorizado(null));
-    api.sillones.listar().then((rows) => {
+    sillonesPorSede(null).then((rows) => {
       setNSillones(Array.isArray(rows) ? rows.filter((x) => deSede({ sedeId: x.sedeId ?? x.sede })).length : null);
     }).catch(() => setNSillones(null));
     api.sedes.listar().then((rows) => {
