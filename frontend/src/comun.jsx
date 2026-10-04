@@ -1957,7 +1957,7 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
                     value={(pacienteId == null || (typeof pacienteId === "number" && Number.isNaN(pacienteId))) ? "" : pacienteId}
                     onChange={(v) => setPacienteId(/^\d+$/.test(String(v)) ? Number(v) : v)}
                     options={pacientes.map((x) => ({ value: x.id, label: x.nombre }))} />
-            <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-700)", background: "var(--dc-bg)" }}>DNI {p.dni}</span>
+            {String(p.dni || "").trim() && <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-700)", background: "var(--dc-bg)" }}>DNI {p.dni}</span>}
             <span className="dc-chip" style={{ ...chip, color: DS.c.primary, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)" }}><MapPin size={11} strokeWidth={1.75} /> {sedeTxt}</span>
             {p.ultima && <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-400)", background: "var(--dc-bg)" }}><Clock size={11} strokeWidth={1.75} /> Última visita {/^\d{4}-\d{2}-\d{2}/.test(String(p.ultima)) ? fechaLegible(String(p.ultima).slice(0, 10)) : p.ultima}</span>}
             {alergias.length > 0

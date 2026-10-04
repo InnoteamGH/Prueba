@@ -7,6 +7,7 @@ import { Check, Info, MapPin, Minus, Plus, RotateCcw, Target, TrendingUp } from 
 import api, { auth } from "../api/client";
 import { Card, ESPECIALIDADES, MEDICOS, SEDE_IDS, Vacio, colorDe, iniciales, mismaSede, nombreSede, tint, useSede } from "../comun";
 import { comisionSede, guardarMetaSedeDemo, metaSede, sedesMed } from "../compartido/medicosSede";
+import { sedeApiUuid } from "../routing";
 
 const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
 const miles = (v) => (v === "" || v == null ? "" : Number(v).toLocaleString("es-PE"));
@@ -51,6 +52,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
   const verSedes = useMemo(() => (sedes && sedes.length ? sedes.map(String) : null), [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [meds, setMeds] = useState([]);
   const [nombres, setNombres] = useState({});   // sedeId → nombre (conectado)
+  const [espNom, setEspNom] = useState({});     // especialidadId → nombre (GET /especialidades)
   const [base, setBase] = useState({});         // k → { meta, com } guardado
   const [draft, setDraft] = useState({});       // k → { meta, com } en edición
   const [saving, setSaving] = useState(false);
@@ -69,6 +71,8 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
       return;
     }
     api.sedes.listar().then((ss) => setNombres(Object.fromEntries((ss || []).map((s) => [String(s.id), s.nombre])))).catch(() => {});
+    // El nombre de la especialidad sale del catálogo (/medicos solo trae especialidadId).
+    api.catalogo.especialidades().then((es) => setEspNom(Object.fromEntries((es || []).map((e) => [String(e.id), e.nombre])))).catch(() => {});
     api.catalogo.medicos()
       .then((rows) => {
         armar((rows || []).filter((m) => m.activo !== false).map((m) => {
@@ -76,7 +80,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
           const ms = Array.isArray(m.metasSede) ? Object.fromEntries(m.metasSede.map((x) => [String(x.sedeId), x])) : (m.metasSede || {});
           const ids = (m.sedes || m.sedeIds || (m.sedeId != null ? [m.sedeId] : [])).map((x) => String(x?.id ?? x));
           return { id: m.id, nombre: m.nombre, especialidad: m.especialidad, especialidadId: m.especialidadId, cop: m.cop, activo: m.activo,
-            sedesIds: ids.length ? ids : ["todas"],
+            sedesIds: ids.length ? ids : ["todas"], sinSede: !ids.length,
             metaDe: (s) => (ms[s]?.metaMensual !== undefined ? ms[s].metaMensual : m.metaMensual ?? null),
             comDe: (s) => (ms[s]?.porcentajeComision !== undefined ? ms[s].porcentajeComision : m.porcentajeComision ?? null) };
         }));
@@ -85,19 +89,39 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
   };
   useEffect(() => { cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Doctores para los que el servidor no dice en qué sede atienden (/medicos sin sedes).
+  const sinSede = meds.filter((m) => m.sinSede);
   // Sedes que se muestran: las del filtro global (o del usuario) que tengan doctores.
   const grupos = useMemo(() => {
     const todas = [...new Set(meds.flatMap((m) => m.sedesIds))];
     const orden = [...SEDE_IDS.map(String), ...todas].filter((s, i, a) => a.indexOf(s) === i && todas.includes(s));
     // "todas" = doctores sin sede (con API): su meta es global, solo para quien ve toda la clínica.
-    return orden.filter((s) => (s === "todas" ? esGlobal : !verSedes || verSedes.some((v) => mismaSede(v, s))))
-      .map((s) => ({ sede: s, meds: meds.filter((m) => m.sedesIds.includes(s)) }))
-      .filter((g) => g.meds.length);
-  }, [meds, verSedes, esGlobal]);
-  const nomSede = (s) => (s === "todas" ? "Todas las sedes" : nombres[s] || nombreSede(Number(s)) || "Sede");
+    const gs = orden.filter((s) => (s === "todas" ? esGlobal : !verSedes || verSedes.some((v) => mismaSede(v, s))))
+      .map((s) => ({ sede: s, meds: meds.filter((m) => m.sedesIds.includes(s)) }));
+    // Con una sede elegida, los doctores sin sede no pueden desaparecer («0 de 0»): se listan
+    // en cada sede que se ve, con el aviso de que el servidor no indica dónde atienden.
+    if (!esGlobal && sinSede.length) {
+      const vistas = (verSedes || (mias || []).map(String)).map(String);
+      vistas.forEach((v) => {
+        const g = gs.find((x) => mismaSede(x.sede, v));
+        if (g) g.meds = [...g.meds, ...sinSede.filter((m) => !g.meds.includes(m))];
+        else gs.push({ sede: v, meds: [...sinSede] });
+      });
+    }
+    return gs.filter((g) => g.meds.length);
+  }, [meds, verSedes, esGlobal]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nomSede = (s) => (s === "todas" ? "Todas las sedes" : nombres[s] || nombres[sedeApiUuid(s)] || nombreSede(Number(s)) || "Sede");
+  const nomEsp = (m) => m.especialidad || (m.especialidadId != null ? espNom[String(m.especialidadId)] : null) || "Sin especialidad";
 
   const val = (key, campo) => { const v = draft[key]?.[campo]; return v === "" || v == null ? null : Number(v); };
   const filas = grupos.flatMap((g) => g.meds.map((m) => ({ m, s: g.sede, key: k(m.id, g.sede) })));
+  // Filas agregadas (doctor sin sede en la sede elegida): su meta y % parten de lo guardado.
+  const clavesFilas = filas.map((f) => f.key).join(",");
+  useEffect(() => {
+    const falt = {};
+    filas.forEach(({ m, s, key }) => { if (!(key in base)) { const me = m.metaDe(s), co = m.comDe(s); falt[key] = { meta: me != null ? String(me) : "", com: co != null ? String(co) : "" }; } });
+    if (Object.keys(falt).length) { setBase((b) => ({ ...falt, ...b })); setDraft((d) => ({ ...falt, ...d })); }
+  }, [clavesFilas]); // eslint-disable-line react-hooks/exhaustive-deps
   const cambiados = filas.filter(({ key }) => (draft[key]?.meta ?? "") !== (base[key]?.meta ?? "") || (draft[key]?.com ?? "") !== (base[key]?.com ?? ""));
   const metaTotal = filas.reduce((a, f) => a + (val(f.key, "meta") || 0), 0);
   const comTotal = filas.reduce((a, f) => a + ((val(f.key, "meta") || 0) * (val(f.key, "com") || 0)) / 100, 0);
@@ -122,7 +146,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
     setSaving(true);
     Promise.all(cambiados.map(({ m, s, key }) => {
       const body = { metaMensual: val(key, "meta"), porcentajeComision: val(key, "com") };
-      if (s !== "todas") return api.catalogo.fijarMetaSede(m.id, s, body);
+      if (s !== "todas") return api.catalogo.fijarMetaSede(m.id, sedeApiUuid(s) || s, body);
       return Promise.all([
         api.catalogo.fijarMeta(m.id, body.metaMensual),
         api.catalogo.actualizarMedico(m.id, { nombre: m.nombre, especialidadId: m.especialidadId || null, cop: m.cop || null, activo: m.activo !== false, porcentajeComision: body.porcentajeComision }),
@@ -149,6 +173,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
         <button type="button" className="dc-esp-hero__btn" onClick={() => { window.location.hash = "#/reportes"; }}><TrendingUp size={14} strokeWidth={2} /> Ver avance del mes</button>
       </section>
       {error && <div className="fm-aviso-edad is-mal"><Target size={15} strokeWidth={2} /><span>{error}</span><button type="button" onClick={cargar}>Reintentar</button></div>}
+      {conectado && !error && sinSede.length > 0 && !esGlobal && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>El servidor no indica en qué sede atiende cada doctor: {sinSede.length === 1 ? "este doctor se muestra" : `estos ${sinSede.length} doctores se muestran`} en la sede elegida. Indícalo en Configuración › Doctores.</span></div>}
       {conectado && !error && meds.length === 0 && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>}
 
       {grupos.map((g) => {
@@ -179,7 +204,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
                   <div key={key} role="row" className={`dc-mtz__fila${cambio ? " is-cambio" : ""}`}>
                     <span role="cell" className="dc-mtz__doc">
                       <span className="dc-mtz__av" style={{ background: `linear-gradient(135deg, ${tint(col, 0.22)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(m.nombre.replace(/^Dra?\.\s*/, ""))}</span>
-                      <span className="dc-mtz__dn"><b>{m.nombre}{cambio && <em className="dc-mtz__tag">Editado</em>}</b><small>{m.especialidad || "Sin especialidad"}{otras.length ? <> · <i>también en {otras.map((s) => nomSede(s).replace(/^Sede\s+/i, "")).join(", ")}</i></> : null}</small></span>
+                      <span className="dc-mtz__dn"><b>{m.nombre}{cambio && <em className="dc-mtz__tag">Editado</em>}</b><small>{nomEsp(m)}{m.sinSede && !esGlobal ? <> · <i>sede no indicada por el servidor</i></> : null}{otras.length ? <> · <i>también en {otras.map((s) => nomSede(s).replace(/^Sede\s+/i, "")).join(", ")}</i></> : null}</small></span>
                     </span>
                     <span role="cell"><Monto value={draft[key]?.meta} disabled={!puedeEditar} label={`Meta mensual de ${m.nombre} en ${nomSede(g.sede)}`} onChange={(v) => set(key, "meta", v)} /></span>
                     <span role="cell"><Porcentaje value={draft[key]?.com} disabled={!puedeEditar} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>

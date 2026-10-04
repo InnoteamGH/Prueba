@@ -49,6 +49,7 @@ import {
 } from "./util/odontogramaCatalogo";
 import { metaEstado, colorEstado, labelEstado, inicialCara } from "./util/odontogramaEstado";
 import { formatearFDI } from "./util/formatearFDI";
+import { conCop } from "./util/cop";
 import PlanInversionDocumento from "./modulos/PlanInversionDocumento";
 import { abrirDocumento, datosDemo, datosImpresion, fijarDatosImpresion, normalizarImpresion, resolverVars, useDatosImpresion } from "./util/membrete";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
@@ -3657,7 +3658,10 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const [detF, setDetF] = useState(null); // fase abierta en modal de detalle
   const [planId, setPlanId] = useState(null);
   const [fasesRem, setFasesRem] = useState([]);
-  const recargarTrat = () => { if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); }).catch(() => {}); };
+  // Pagos del paciente (con sesión) para el «Pagado» del presupuesto impreso.
+  const [pagosRem, setPagosRem] = useState(null);
+  useEffect(() => { setPagosRem(null); }, [pacienteId, conectado]);
+  const recargarTrat = () => { if (conectado && pacienteId) api.pagos.listar(pacienteId).then((r) => setPagosRem(Array.isArray(r) ? r : [])).catch(() => {}); if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); }).catch(() => {}); };
   useEffect(() => { if (pacienteId) recargarTrat(); else setFasesRem([]); }, [pacienteId, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => p.id === pacienteId) || { id: pacienteId, nombre: "Selecciona un paciente" };
   // Para mostrar, solo los ítems de las sedes que se ven: cada sede presupuesta y cobra lo
@@ -3795,7 +3799,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && <BotonPDF chico onClick={() => { const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? [] : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}<Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && <BotonPDF chico onClick={() => { if (conectado && pagosRem == null) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? pagosRem : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}<Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -4218,6 +4222,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // Con varias sedes el administrador general solo supervisa: cada sede abre su caja y emite.
   const { supervisor: supervisaCaja } = useEmiteCobros(can);
   const puedeAbrirCaja = !supervisaCaja && (can ? can("facturacion", "crear") : rol !== "gerencia");
+  // Texto del botón Cobrar: si está deshabilitado se dice por qué (supervisión o rol).
+  const tituloCobrar = (x) => (supervisaCaja ? "Supervisión: cobra cada sede con su caja (su administrador o recepción)"
+    : !puedeAbrirCaja ? "Tu rol solo consulta la caja"
+    : !cajaAbierta ? "Abre la caja para cobrar" : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono");
   // C4: el egreso sale de la gaveta, así que lo registra quien opera la caja (recepción y
   // administrador de sede), igual aquí que en «Crear › Registrar egreso». Anularlo o
   // reclasificarlo es de quien aprueba. Autorización granular: con `can` manda la matriz.
@@ -4405,7 +4413,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     // lista se recorta igual en el cliente a las sedes que se ven.
     const sid = sedeUuid();
     api.cajaApertura.historial({ sedeId: sid || undefined, desde: histCajaRango.desde, hasta: histCajaRango.hasta })
-      .then((rows) => setHistCaja(Array.isArray(rows) ? rows.map((r) => ({ ...r, ...mapJornada(r) })) : []))
+      // Una jornada sin cierre registrado sigue abierta aunque el servidor no mande «abierta»:
+      // la de un día anterior sin cerrar salía «Cerrada».
+      .then((rows) => setHistCaja(Array.isArray(rows) ? rows.map((r) => ({ ...r, ...mapJornada(r), abierta: r.abierta === true || (r.abierta !== false && !r.cerradaEn) })) : []))
       .catch(() => { setHistCaja([]); notify("No se pudo cargar el historial de caja."); });
   };
   // Al cambiar de caja no se arrastra la apertura de la anterior mientras llega la nueva.
@@ -4413,6 +4423,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   useEffect(() => { recargarCajaMovs(); }, [conectado, apertura?.id, apertura?.abierta]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "historial" && conectado) recargarHistCaja(); }, [tab, histCajaRango.desde, histCajaRango.hasta, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
   const [aperturaForm, setAperturaForm] = useState({ fondo: "100", fondoUsd: "", nota: "" });
+  // Con una jornada anterior abierta no se abre otra: se avisa y se ofrece ir a cerrarla
+  // (antes el botón no hacía nada y no decía por qué).
+  const irCerrarPrevia = () => {
+    const j = jornadaAbiertaPrevia;
+    if (!j?.id) return;
+    if (supervisaCaja || !puedeAbrirCaja) { notify(`La caja de esta sede tiene abierta la jornada del ${j.fecha || "día anterior"}; la cierra la sede.`); return; }
+    if (!confirm(`La jornada del ${j.fecha || "día anterior"} sigue abierta en esta sede. Antes de abrir otra caja hay que cerrarla. ¿Ir a cerrarla ahora?`)) { notify(`Primero cierra la jornada del ${j.fecha || "día anterior"} (Historial).`); return; }
+    setTab("historial"); setCierreAdmin({ id: j.id, fecha: j.fecha, sedeId: j.sedeId, fondo: Number(j.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" });
+  };
   const abrirCaja = () => {
     if (!puedeAbrirCaja) { notify(supervisaCaja ? "La caja la abre y cobra cada sede (su administrador o recepción). Tú la supervisas." : "Tu rol solo consulta la caja; recepción o administración la abren."); return; }
     const sid = sedeUuid();
@@ -5045,20 +5064,19 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         // Apertura en un solo bloque (CAJ-02): sede (solo si hace falta elegirla), fondo en
         // soles y dólares, nota y «Abrir caja». Los medios de pago se configuran aparte.
         const sedesOpc = sedesCaja;
-        const bloqueado = sedeCaja == null || !!jornadaAbiertaPrevia?.id;
         return (
         <div className="dc-ap" style={{ display: "grid", gap: 12 }}>
           {jornadaAbiertaPrevia?.id && (
             <div className="fm-aviso-edad is-mal">
               <AlertTriangle size={15} strokeWidth={2} />
-              <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}. Ciérrala antes de abrir otra caja en esta sede.</span>
-              <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" }); }}>Cerrarla</button>
+              <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}. {supervisaCaja ? "La cierra la sede (su administrador o recepción)." : "Ciérrala antes de abrir otra caja en esta sede."}</span>
+              {!supervisaCaja && <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" }); }}>Cerrarla</button>}
             </div>
           )}
           {puedeAbrirCaja ? (
             <section className={`dc-ap3${verApertura ? " is-abierta" : " is-compacta"}`} aria-label="Abrir caja">
               <div className="dc-ap3__tit"><span><KeyRound size={18} strokeWidth={2} /></span><div><b>{verApertura ? "Abrir caja" : sedeCaja == null ? "Elige la caja de una sede" : `La caja de ${sedeNombre()} está cerrada`}</b><small>{fechaLegible(fmt(hoy))} · {verApertura ? "indica el fondo con el que empiezas" : "ábrela para empezar a cobrar"}</small></div>
-                {!verApertura && <button type="button" className="dc-ap2__cta" onClick={() => setVerApertura(true)}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>}
+                {!verApertura && <button type="button" className="dc-ap2__cta" onClick={() => { if (jornadaAbiertaPrevia?.id) { irCerrarPrevia(); return; } setVerApertura(true); }}><KeyRound size={16} strokeWidth={2} /> Abrir caja</button>}
                 {verApertura && <button type="button" className="dc-ap3__x" onClick={() => setVerApertura(false)}>Cancelar</button>}
               </div>
               {verApertura && <div className="dc-ap3__campos">
@@ -5070,7 +5088,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <label className="dc-ap3__campo"><span>Fondo inicial</span><span className="dc-ap3__monto"><i>S/</i><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo"><span>Fondo en dólares</span><span className="dc-ap3__monto"><i>US$</i><input inputMode="decimal" aria-label="Fondo inicial en dólares (US$)" value={aperturaForm.fondoUsd} onChange={(e) => setAperturaForm({ ...aperturaForm, fondoUsd: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo is-nota"><span>Nota (opcional)</span><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Ej. turno mañana" /></label>
-                <button type="button" className="dc-ap2__cta" onClick={abrirCaja} disabled={bloqueado} title={sedeCaja == null ? "Elige la sede" : undefined}><KeyRound size={16} strokeWidth={2} /> Confirmar apertura</button>
+                <button type="button" className="dc-ap2__cta" onClick={() => { if (jornadaAbiertaPrevia?.id) { irCerrarPrevia(); return; } abrirCaja(); }} disabled={sedeCaja == null} title={sedeCaja == null ? "Elige la sede" : jornadaAbiertaPrevia?.id ? `Primero cierra la jornada del ${jornadaAbiertaPrevia.fecha || "día anterior"}` : undefined}><KeyRound size={16} strokeWidth={2} /> Confirmar apertura</button>
               </div>}
             </section>
           ) : (
@@ -5153,7 +5171,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               { key: "listo", label: "Listo para cobrar", w: "minmax(140px,1fr)", cell: (x) => x.porCobrar > 0 ? <span className="dc-tp__num is-mal" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>S/ {M.sol2(x.porCobrar)}{x.vencido > 0 ? <small className="dc-cob__venc"> · vencido</small> : null}</span> : <span className="dc-tp__sub">—</span> },
               { key: "cob", label: "Pagado del plan", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
               { key: "saldo", label: "Saldo del plan", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {M.sol2(x.saldo)}</span> },
-              { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={!cajaAbierta ? "Abre la caja para cobrar" : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono"} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
+              { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
             ] }} cols={[
               { key: "paciente", label: "Paciente", get: (x) => x.p.nombre || "" },
               { key: "sede", label: "Sede", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") },
@@ -5168,7 +5186,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     <div className="dc-cob__quien"><b>{x.p.nombre}</b><span>{x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} · {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span></div>
                     <div className="dc-cob__ahora" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}><small>Por cobrar ahora</small><b className={x.porCobrar > 0 ? "is-si" : ""}>{x.porCobrar > 0 ? `S/ ${M.sol2(x.porCobrar)}` : "—"}</b></div>
                     <div className="dc-cob__plan"><small>Saldo del plan</small><b>S/ {M.sol2(x.saldo)}</b><i title={`Cobrado S/ ${x.pagado} de S/ ${x.total}`}><u style={{ width: `${pct}%`, background: pc }} /></i><em>{pct}% cobrado</em></div>
-                    <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={!cajaAbierta ? "Abre la caja para cobrar" : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono"} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button>
+                    <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button>
                   </div>
                 ); })}
               </div>
@@ -5178,8 +5196,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         <aside className="dc-cob__lado">
           <div className={`dc-cob__estado${cajaAbierta ? " is-abierta" : ""}`} hidden={!jornadaAbiertaPrevia?.id}>
             <span className="dc-cob__estado-ico"><KeyRound size={18} strokeWidth={1.9} /></span>
-            <div><small>{!cajaAbierta && jornadaAbiertaPrevia?.id ? `Jornada del ${jornadaAbiertaPrevia.fecha} sin cerrar` : "Caja del día"}</small><b>{cajaAbierta ? "Abierta" : "Cerrada"}</b></div>
-            {!cajaAbierta && <button type="button" onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>{jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}</button>}
+            <div><small>{!cajaAbierta && jornadaAbiertaPrevia?.id ? `Jornada del ${jornadaAbiertaPrevia.fecha} sin cerrar` : "Caja del día"}</small><b>{cajaAbierta ? "Abierta" : jornadaAbiertaPrevia?.id ? "Abierta, sin cerrar" : "Cerrada"}</b></div>
+            {!cajaAbierta && (jornadaAbiertaPrevia?.id || puedeAbrirCaja) && <button type="button" onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>{jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}</button>}
           </div>
           <div className="dc-cob__hoy" hidden={!boletasHoyActivas.some((b) => b.moneda === "USD")}>
             <div><small>Cobrado hoy</small><b>S/ {montoHoy.toLocaleString("es-PE")}</b></div>
@@ -5422,7 +5440,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     {sedeCaja == null
                       ? <div><b>Elige la caja de una sede</b><p>El arqueo es de una sola gaveta: elige arriba la sede para contar y cerrar su caja. Con «Todas» solo ves los cobros sumados.</p></div>
                       : <div><b>El arqueo se habilita con la caja abierta</b><p>Abre la caja de {sedeNombre()} para contar la gaveta y cerrar con el resultado del cuadre.</p></div>}
-                    {sedeCaja != null && <button type="button" className="dc-ap2__cta" onClick={() => setTab("hoy")}><KeyRound size={15} strokeWidth={2} /> Abrir caja</button>}
+                    {sedeCaja != null && puedeAbrirCaja && <button type="button" className="dc-ap2__cta" onClick={() => setTab("hoy")}><KeyRound size={15} strokeWidth={2} /> Abrir caja</button>}
                   </Card>
                 )}
               </div>
@@ -5493,7 +5511,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </Card>
           )}
           {(() => {
-            const js = (histCaja || []).filter((r) => deCaja(r.sedeId));
+            const js = (histCaja || []).filter((r) => deCaja(r.sedeId)).map((r) => (!r.abierta && jornadaAbiertaPrevia?.id && String(r.id) === String(jornadaAbiertaPrevia.id) ? { ...r, abierta: true } : r));
             // C8: faltantes y sobrantes por separado (−5 y +5 no son «S/ 0.00»); los dólares aparte.
             const rs = resumenDiferencias(js), ru = resumenDiferencias(js, "diferenciaUsd");
             // Resultado de un cierre en una moneda: abierta, cerrada sin arqueo, cuadra, falta o sobra.
@@ -5962,6 +5980,10 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     if (conectado) api.miProduccion(sedes && !(sedeMp.sede === "all" && sedeMp.global) ? sedes.map(sedeApiUuid).filter(Boolean) : null)
       .then((r) => setReal(r && typeof r === "object" && !Array.isArray(r) ? r : { fallo: true })).catch(() => setReal({ fallo: true }));
   }, [sedes && sedes.join(",")]); // eslint-disable-line
+  // Calificación: una sola fuente, la lista de Satisfacción y reseñas (GET /resenas),
+  // filtrada por este doctor. Antes salía de otro campo y no cuadraba con Reseñas.
+  const [resApi, setResApi] = useState(null);
+  useEffect(() => { if (conectado) api.resenas.listar().then((r) => setResApi(Array.isArray(r) ? r : [])).catch(() => setResApi(null)); }, [conectado]);
 
   // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1). Solo la demostración
   // usa MEDICOS; con sesión todo sale de GET /mi-produccion.
@@ -5988,7 +6010,16 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   const comision = R ? (Number(R.comisionMes) || 0) : enSedes.comision;
   const atenciones = R ? (R.atenciones || 0) : enSedes.citas;
   const ticket = R ? Math.round(Number(R.ticketPromedio) || 0) : (atenciones ? Math.round(mesProd / atenciones) : 0);
-  const deltaProd = mesAnterior > 0 ? Math.round(((mesProd - mesAnterior) / mesAnterior) * 100) : 0;
+  // Comparar periodos equivalentes: el mes en curso contra el mismo tramo del anterior. Si el
+  // servidor no manda ese tramo, se prorratea el mes anterior al día de hoy, y en los
+  // primeros días (mes corto) no se muestra variación: el día 4 salía «−100 %».
+  const diaMes = Number(String(ymdLima(new Date()) || "").slice(8, 10)) || new Date().getDate();
+  const antEquiv = R ? Number(R.produccionMesAnteriorAlDia ?? R.produccionMesAnteriorMismoPeriodo ?? NaN) : NaN;
+  const diasMesAnt = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 0).getDate(); })();
+  const baseComp = Number.isFinite(antEquiv) && antEquiv > 0 ? antEquiv
+    : (mesAnterior > 0 && diaMes >= 10 ? mesAnterior * Math.min(1, diaMes / diasMesAnt) : null);
+  const compTxt = Number.isFinite(antEquiv) && antEquiv > 0 ? "vs mismo periodo del mes anterior" : "vs mes anterior al mismo día";
+  const deltaProd = baseComp ? Math.round(((mesProd - baseComp) / baseComp) * 100) : null;
   // DEV-12: sin relleno de tasa inventada; sin dato → null y la UI muestra guion.
   const noShow = R && R.ausentismo != null ? Number(R.ausentismo) : null;
   const pct = meta > 0 ? Math.min(100, Math.round((mesProd / meta) * 100)) : null;
@@ -6045,7 +6076,8 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     );
   }
   const kpis = [
-    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: mesAnterior > 0 ? deltaProd : null, desc: mesAnterior > 0 ? `Suma de tus tratamientos facturados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% vs. el mes anterior (S/ ${mesAnterior.toLocaleString()}).` : "Suma de tus tratamientos terminados este mes. Aún no hay mes anterior para comparar." },
+    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: deltaProd, deltaTxt: compTxt, sub: mesAnterior > 0 && deltaProd == null ? "el mes recién empieza: aún sin comparar" : undefined,
+      desc: deltaProd != null ? `Suma de tus tratamientos facturados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% ${compTxt} (S/ ${Math.round(baseComp).toLocaleString()}).` : mesAnterior > 0 ? `Suma de tus tratamientos terminados este mes. Con pocos días del mes no se compara con el anterior (S/ ${mesAnterior.toLocaleString()} en todo el mes).` : "Suma de tus tratamientos terminados este mes. Aún no hay mes anterior para comparar." },
     // El porcentaje sale del que tiene pactado este médico (backend: porcentajeComision),
     // no de un 40% escrito a mano: el importe ya se calculaba con el suyo y la etiqueta
     // decía otra cosa.
@@ -6055,11 +6087,20 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     { l: "Tasa de ausentismo", v: noShow != null ? `${noShow}%` : "—", icon: TrendingDown, color: DS.c.primary, sub: "de tus citas", desc: `Porcentaje de citas canceladas o no asistidas sobre tu agenda. Los recordatorios automáticos ayudan a bajarlo.` },
     // La calificación real de este médico (backend: calificacion / resenas). Era un
     // "4.9 ★ – 120 reseñas" escrito a mano: un doctor sin una sola reseña lo veía igual.
-    ...(R
-      ? (R.calificacion != null
+    ...(R && resApi
+      ? (() => {
+          const norm = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+          const miIdApi = R.medicoId ?? auth.sesion?.medicoId ?? null;
+          const conDoctor = resApi.some((r) => r.medicoId != null || r.medico);
+          const mias = resApi.filter((r) => (miIdApi != null && r.medicoId != null && String(r.medicoId) === String(miIdApi)) || (r.medico && norm(r.medico) === norm(usuario.nombre)));
+          const pr = mias.length ? (mias.reduce((a, r) => a + (Number(r.calificacion ?? r.estrellas) || 0), 0) / mias.length).toFixed(1) : null;
+          return [{ l: "Calificación", v: pr ? `${pr} ★` : "—", icon: Star, color: "var(--dc-warn-600)", sub: mias.length ? `${mias.length} reseña${mias.length === 1 ? "" : "s"} que te mencionan` : conDoctor || !resApi.length ? "sin reseñas todavía" : "las reseñas no indican el doctor",
+            desc: "Promedio de las reseñas públicas (1–5) que te mencionan. Es la misma lista de Satisfacción y reseñas." }];
+        })()
+      : R ? (R.calificacion != null
           ? [{ l: "Calificación", v: `${R.calificacion} ★`, icon: Star, color: "var(--dc-warn-600)", sub: `${R.resenas} reseña${R.resenas === 1 ? "" : "s"}`, desc: `Tu promedio en ${R.resenas} reseña${R.resenas === 1 ? "" : "s"} de pacientes. Una nota alta atrae más pacientes por recomendación.` }]
           : [{ l: "Calificación", v: "—", icon: Star, color: "var(--dc-warn-600)", sub: "sin reseñas todavía", desc: "Todavía ningún paciente ha calificado tu atención. Las encuestas automáticas se envían tras la cita." }])
-      : (() => { const mias = RESENAS_SEED.filter((r) => r.medicoId === miMed.id); const pr = mias.length ? (mias.reduce((a, r) => a + r.estrellas, 0) / mias.length).toFixed(1) : null;
+      : conectado ? [] : (() => { const mias = RESENAS_SEED.filter((r) => r.medicoId === miMed.id); const pr = mias.length ? (mias.reduce((a, r) => a + r.estrellas, 0) / mias.length).toFixed(1) : null;
           return [{ l: "Calificación", v: pr ? `${pr} ★` : "—", icon: Star, color: "var(--dc-warn-600)", sub: mias.length ? `${mias.length} reseña${mias.length === 1 ? "" : "s"} que te mencionan` : "sin reseñas todavía", desc: "Promedio de las reseñas públicas (1–5) que te mencionan. Es la misma lista de Satisfacción y reseñas." }]; })()),
   ];
   return (
@@ -6076,7 +6117,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
               <div style={{ background: tint(k.color, 0.082), color: k.color, width: 36, height: 36, borderRadius: "var(--dc-r-md)", display: "grid", placeItems: "center" }}><Ic size={18} strokeWidth={1.75} /></div>
             </div>
             <div style={{ fontSize: 21, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>{k.v}</div>
-            {k.delta != null ? <div style={{ fontSize: 12, fontWeight: 500, color: k.delta >= 0 ? "var(--dc-ok-700)" : RED, marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}><ArrowUpRight size={13} strokeWidth={1.75} style={{ transform: k.delta < 0 ? "rotate(90deg)" : "none" }} /> {k.delta >= 0 ? "+" : ""}{k.delta}% vs mes anterior</div> : <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 2 }}>{k.sub}</div>}
+            {k.delta != null ? <div style={{ fontSize: 12, fontWeight: 500, color: k.delta >= 0 ? "var(--dc-ok-700)" : RED, marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}><ArrowUpRight size={13} strokeWidth={1.75} style={{ transform: k.delta < 0 ? "rotate(90deg)" : "none" }} /> {k.delta >= 0 ? "+" : ""}{k.delta}% {k.deltaTxt || "vs mes anterior"}</div> : <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 2 }}>{k.sub}</div>}
           </Card>
         ); })}
       </div>
@@ -6141,9 +6182,10 @@ function MiProduccion({ usuario, citas, sedes = null }) {
           <h3 style={{ margin: "0 0 14px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 7 }}><Sparkles size={16} strokeWidth={1.75} color="var(--dc-warn-600)" /> Para decidir</h3>
           <div style={{ display: "grid", gap: 10 }}>
             {[
-              [`${top.n} es tu mayor fuente: ${topPct}% de tus ingresos. Reservar más cupos de esta especialidad sube tu producción.`, DS.c.primary],
-              mesAnterior > 0 && [`Tu producción ${deltaProd >= 0 ? "creció" : "bajó"} ${Math.abs(deltaProd)}% vs el mes anterior.`, deltaProd >= 0 ? "var(--dc-ok-700)" : "var(--dc-warn-600)"],
-              [`Tus atenciones dejan de media S/ ${ticket}. Proponer tratamientos integrales (no solo limpiezas) lo sube.`, DS.c.primary],
+              // Sin producción por tratamiento no hay «mayor fuente» (salía «— es tu mayor fuente: 0 %»).
+              top.v > 0 && top.n && top.n !== "—" && [`${top.n} es tu mayor fuente: ${topPct}% de tus ingresos. Reservar más cupos de esta especialidad sube tu producción.`, DS.c.primary],
+              deltaProd != null && [`Tu producción ${deltaProd >= 0 ? "creció" : "bajó"} ${Math.abs(deltaProd)}% ${compTxt}.`, deltaProd >= 0 ? "var(--dc-ok-700)" : "var(--dc-warn-600)"],
+              ticket > 0 && [`Tus atenciones dejan de media S/ ${ticket}. Proponer tratamientos integrales (no solo limpiezas) lo sube.`, DS.c.primary],
               [noShow != null
                 ? `Ausentismo ${noShow}%. Confirmar por WhatsApp 24h antes reduce los espacios vacíos.`
                 : "Sin dato de ausentismo todavía. Cuando haya citas en el mes, verás el porcentaje aquí.", DS.c.primary],
@@ -7027,7 +7069,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       cuerpo: `<div class="rx-m"><span><b>Paciente:</b> ${esc2(r.paciente)}</span>${r.dni ? `<span><b>DNI:</b> ${esc2(r.dni)}</span>` : ""}<span><b>Fecha:</b> ${esc2(fechaLegible(r.fecha))}</span></div><h3>Rp/</h3>`
         + (r.items || []).map((it) => `<div class="rx-i"><b>${esc2(it.med)}</b>${it.detalle ? `<small>${esc2(it.detalle)}</small>` : ""}</div>`).join("")
         + (r.indic ? `<h3>Indicaciones</h3><p>${esc2(r.indic)}</p>` : "")
-        + `<div class="rx-f"><div>${esc2(r.medico || "Firma y sello del profesional")}${med?.cop ? ` · COP ${esc2(med.cop)}` : ""}</div></div>`,
+        + `<div class="rx-f"><div>${esc2(r.medico || "Firma y sello del profesional")}${conCop(med?.cop) ? ` · ${esc2(conCop(med.cop))}` : ""}</div></div>`,
     });
     if (!ok) notify("Permite ventanas emergentes para imprimir la receta.");
   };
@@ -7102,7 +7144,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
           {conectado && (
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginTop: 12 }}>Médico que prescribe<br />
               <div style={{ maxWidth: 320 }}><Select value={form.medicoId || ""} onChange={(v) => setForm({ ...form, medicoId: v })} placeholder="— Selecciona —"
-                options={[{ value: "", label: medicosRx.length ? "— Selecciona —" : "Sin médicos registrados", disabled: true }, ...medicosRx.filter((m) => m.activo !== false).map((m) => ({ value: String(m.id), label: `${m.nombre}${m.cop ? ` · COP ${m.cop}` : ""}` }))]} /></div>
+                options={[{ value: "", label: medicosRx.length ? "— Selecciona —" : "Sin médicos registrados", disabled: true }, ...medicosRx.filter((m) => m.activo !== false).map((m) => ({ value: String(m.id), label: `${m.nombre}${conCop(m.cop) ? ` · ${conCop(m.cop)}` : ""}` }))]} /></div>
             </label>
           )}
           <div style={{ margin: "16px 0 8px", fontSize: 13, fontWeight: 500, color: NAVY }}>Medicamentos</div>
@@ -8272,6 +8314,8 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
   // Mandar un trabajo al laboratorio es dar de alta un caso. Quien solo consulta el
   // estado de las entregas -gerencia, o el odontologo segun la matriz- no lo hace.
   const puedeGestionar = can ? can("laboratorio", "crear") : true;
+  // Avanzar el estado de un caso es escribir: gerencia solo consulta (el servidor lo rechaza).
+  const puedeAvanzar = can ? can("laboratorio", "editar") || can("laboratorio", "crear") : true;
   const conectado = !!auth.token;
   // Con sesión el padrón global de la app llega vacío (cada módulo pide el suyo): el
   // formulario de envío lista los pacientes del servidor de las sedes que se ven.
@@ -8318,7 +8362,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
     setCasos((cs) => cs.map((c) => { if (c.id !== id) return c; const i = LAB_FLUJO.indexOf(c.estado); const n = LAB_FLUJO[Math.min(LAB_FLUJO.length - 1, i + 1)]; notify(`${c.paciente}: ${LAB_INFO[n].l}.`); return { ...c, estado: n }; }));
   };
   const [detalle, setDetalle] = useState(null);
-  const crear = () => { if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (!nuevo.sede) { notify("Elige la sede que envía el caso."); return; } if (conectado) {
+  const crear = () => { if (!nuevo.paciente) { notify("Elige el paciente."); return; } if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (!nuevo.sede) { notify("Elige la sede que envía el caso."); return; } if (conectado) {
     // POST /laboratorio con el contrato que devuelve la lista (mapCaso al revés).
     const pid = pidDe(nuevo.paciente);
     if (!pid) { notify("Elige un paciente del padrón."); return; }
@@ -8328,7 +8372,9 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
     return;
   } const id = Date.now(); const caso = { id, pacienteId: pidDe(nuevo.paciente) || null, paciente: nuevo.paciente, sede: Number(nuevo.sede), trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); notify("Caso enviado a laboratorio. Ya aparece en la ficha del paciente (Archivos › Laboratorio)."); setNuevo(null); };
   // El envío sale de la sede activa; si no es una de las que se ven, de la primera visible.
-  const sedeEnvioDef = (sedesEnvio.find((x) => mismaSede(x.id, sedeLab.activa)) || sedesEnvio[0] || {}).id ?? null;
+  // Sin sede de ejemplo por defecto: solo la que eligió arriba o, si hay una sola, esa.
+  const sedeEnvioDef = sedesEnvio.length === 1 ? sedesEnvio[0].id
+    : (sedeLab.sede !== "all" && sedeLab.sede != null ? (sedesEnvio.find((x) => mismaSede(x.id, sedeLab.sede)) || {}).id ?? null : null);
   const faltanDias = (c) => Math.round((new Date(c.entrega) - new Date(fmt(hoy))) / 86400000);
   // DC-42: KPI y tabla desde el mismo conjunto filtrado.
   const casosVista = filtroLab === "todos" ? casos
@@ -8357,7 +8403,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
               {!conectado && <button type="button" className="dc-esp-hero__btn" onClick={() => notify(`Se contactó al laboratorio por ${atr.length} trabajo(s) atrasado(s).`)}><Phone size={13} strokeWidth={1.9} /> Contactar</button>}
             </div>
           ) : <span />}
-          {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", sede: sedeEnvioDef, trabajo: "", lab: conectado ? "" : "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
+          {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: "", sede: sedeEnvioDef, trabajo: "", lab: conectado ? "" : "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
         </section>
       ); })()}
       <div className="dc-chips-fila" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -8369,7 +8415,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
       {nuevo && (
         <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Enviar caso a laboratorio" sub="Registra un trabajo (corona, prótesis, férula)" onClose={() => setNuevo(null)} maxW={560} footer={<><Btn small kind="ghost" onClick={() => setNuevo(null)}>Cancelar</Btn><Btn small onClick={crear}><Send size={15} strokeWidth={1.75} /> Enviar</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={nuevo.paciente} onChange={(v) => setNuevo({ ...nuevo, paciente: v })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={nuevo.paciente} onChange={(v) => setNuevo({ ...nuevo, paciente: v })} placeholder="— Selecciona —" options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Laboratorio<br /><input className="dc-premium-inp" value={nuevo.lab} onChange={(e) => setNuevo({ ...nuevo, lab: e.target.value })} style={{ ...inp, marginTop: 4 }} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", gridColumn: "1 / -1" }}>Trabajo<br /><input className="dc-premium-inp" value={nuevo.trabajo} onChange={(e) => setNuevo({ ...nuevo, trabajo: e.target.value })} placeholder="Corona de porcelana – pieza 36" style={{ ...inp, marginTop: 4 }} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Fecha de entrega<br /><input className="dc-premium-inp" type="date" value={nuevo.entrega} onChange={(e) => setNuevo({ ...nuevo, entrega: e.target.value })} style={{ ...inp, marginTop: 4 }} /></label>
@@ -8386,10 +8432,10 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
         ...(variasSedes ? [{ key: "sede", label: "Sede", w: "120px", a: "center", get: (c) => cortaSede(sedeDelCaso(c)), cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{cortaSede(sedeDelCaso(c))}</span> }] : []),
         { key: "entrega", label: "Entrega", w: "minmax(160px,1.1fr)", a: "center", get: (c) => c.entrega, cell: (c) => { const d = faltanDias(c); const done = c.estado === "entregado" || c.estado === "recibido"; const atr = labAtrasado(c, fmt(hoy)); const lbl = done ? (c.estado === "recibido" ? "Recibido" : "Entregado") : atr ? `Atrasado ${Math.abs(d)} d` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : d < 0 ? "Vencido" : `Faltan ${d} d`; const col = done ? "var(--dc-ok-700)" : atr ? "var(--dc-red)" : d <= 2 ? "var(--dc-warn-600)" : DS.c.primary; return <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}><span style={{ fontSize: 13, fontWeight: 500, color: col, background: tint(col, 0.078), padding: "3px 11px", borderRadius: "var(--dc-r-full)" }}>{lbl}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{fechaLegible(c.entrega)}</span></div>; } },
         { key: "estado", label: "Estado", w: "130px", a: "center", get: (c) => (LAB_INFO[c.estado] || { l: c.estado || "—" }).l, cell: (c) => { const I = LAB_INFO[c.estado] || { l: c.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; return <span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>; } },
-        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? <Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Entregado</span> },
+        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? (puedeAvanzar ? <Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{LAB_INFO[c.estado]?.l || c.estado}</span>) : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Entregado</span> },
       ]} />
       {detalle && (() => { const I = LAB_INFO[detalle.estado] || { l: detalle.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; const atrasado = labAtrasado(detalle, fmt(hoy)); return (
-        <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detalle.trabajo} sub={detalle.paciente} onClose={() => setDetalle(null)} maxW={520} footer={detalle.estado !== "entregado" ? <Btn small onClick={() => { avanzar(detalle.id); setDetalle(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
+        <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detalle.trabajo} sub={detalle.paciente} onClose={() => setDetalle(null)} maxW={520} footer={detalle.estado !== "entregado" && puedeAvanzar ? <Btn small onClick={() => { avanzar(detalle.id); setDetalle(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
           <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 18 }}>
             {LAB_FLUJO.map((st, i) => { const idx = LAB_FLUJO.indexOf(detalle.estado); const done = i <= idx; return (
               <React.Fragment key={st}>
@@ -8744,8 +8790,12 @@ function usePacientesServidor(pacientesProp) {
   return (rem || []).filter((p) => p.sede == null || sx.enSede(p.sede));
 }
 /* ---- Seguros y EPS (convenios, coberturas y liquidaciones) ---- */
-function Seguros({ notify, pacientes: pacientesProp = [], fichas = {} }) {
+function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
   const conectado = !!auth.token;
+  // Gerencia consulta: crear o avanzar una liquidación lo rechaza el servidor, así que los
+  // botones de escritura solo salen con el permiso (matriz de permisos).
+  const puedeCrearLiq = can ? can("seguros", "crear") : true;
+  const puedeEditarLiq = can ? can("seguros", "editar") : true;
   const pacientes = usePacientesServidor(pacientesProp);
   // Los convenios y sus coberturas los pacta cada clínica: estos cinco son el ejemplo.
   // Se enseñaban también con sesión abierta, y alimentaban "Cobertura promedio" y
@@ -8859,7 +8909,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {} }) {
           <div><b>{segurosError ? "—" : conveniosVista.length}</b><span>Aseguradoras</span></div>
         </div>
         <span />
-        {conectado && !segurosError && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevaLiq({ pacienteId: pacientes[0]?.id ?? "", aseguradora: "", monto: "", sede: (sedesSeg.find((x) => mismaSede(x.id, sedeSeg.activa)) || sedesSeg[0] || {}).id ?? null })}><Plus size={15} strokeWidth={2} /> Nueva liquidación</button>}
+        {conectado && !segurosError && puedeCrearLiq && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevaLiq({ pacienteId: "", aseguradora: "", monto: "", sede: sedesSeg.length === 1 ? sedesSeg[0].id : null })}><Plus size={15} strokeWidth={2} /> Nueva liquidación</button>}
       </section>
       {nuevaLiq && (
         <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo="Nueva liquidación" sub="Lo que cubre la aseguradora o EPS" onClose={() => setNuevaLiq(null)} maxW={520}
@@ -8916,7 +8966,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {} }) {
                   <span>Copago <b className="is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</b></span>
                   <span>Total <b>S/ {Number(x.total).toLocaleString("es-PE")}</b></span>
                 </div>
-                {x.estado !== "pagado" && <button type="button" className="dc-seg__av" onClick={(e) => { e.stopPropagation(); avanzar(x.id); }}>{({ borrador: "Enviar", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={13} strokeWidth={2.2} /></button>}
+                {x.estado !== "pagado" && puedeEditarLiq && <button type="button" className="dc-seg__av" onClick={(e) => { e.stopPropagation(); avanzar(x.id); }}>{({ borrador: "Enviar", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={13} strokeWidth={2.2} /></button>}
               </article>
             ); })}
           </section>
@@ -8924,7 +8974,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {} }) {
       </div>
       )}</ListaFiltrable>
       {detalleLiq && (() => { const x = detalleLiq; const I = LI[x.estado]; return (
-        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={<>{conectado && <Btn small kind="ghost" onClick={() => borrarLiq(x)}><Trash2 size={14} strokeWidth={1.75} /> Eliminar</Btn>}{x.estado !== "pagado" ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>{({ borrador: "Enviar a la aseguradora", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}</>}>
+        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={<>{conectado && (can ? can("seguros", "eliminar") || can("seguros", "editar") : true) && <Btn small kind="ghost" onClick={() => borrarLiq(x)}><Trash2 size={14} strokeWidth={1.75} /> Eliminar</Btn>}{x.estado !== "pagado" && puedeEditarLiq ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>{({ borrador: "Enviar a la aseguradora", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}</>}>
           {x.estado === "observado" && x.motivo && <div style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", borderRadius: "var(--dc-r-md)", padding: "10px 12px", fontSize: 13, marginBottom: 12 }}><b>Observación de la aseguradora:</b> {x.motivo}</div>}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
             {[["Total tratamiento", `S/ ${x.total}`, NAVY], ["Cubre seguro", `S/ ${x.cob}`, "var(--dc-ok-700)"], ["Copago paciente", `S/ ${x.copago}`, "var(--dc-warn-600)"]].map(([l, v, col]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "12px 14px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 600, color: col, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{v}</div></div>)}
@@ -9290,6 +9340,8 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   const [subiendo, setSubiendo] = useState(null); // { url, tipo, nota, nombre, piezas, vista, momento }
   const onFile = (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
+    // Sin paciente no hay a quién anexar el estudio (con sesión se subía sin paciente).
+    if (!pid) { notify("Elige primero el paciente."); e.target.value = ""; return; }
     if (!f.type.startsWith("image/")) { notify("Selecciona una imagen (JPG o PNG)."); e.target.value = ""; return; }
     if (f.size > 8 * 1024 * 1024) { notify("La imagen supera 8 MB. Usa una más liviana."); e.target.value = ""; return; }
     // Se reduce antes de guardar: una foto de celular sin reducir llenaba el almacenamiento.
@@ -9354,9 +9406,9 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
           {opcionesSede.length > 1 && <label className="dc-rx-sede" title="Sede donde se registra">
             <MapPin size={14} strokeWidth={1.9} />
             <span>Registrar en</span>
-            <Select small width={170} ariaLabel="Sede" value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: nombreSede(s) }))} />
+            <Select small width={170} ariaLabel="Sede" disabled={!pid} value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: nombreSede(s) }))} />
           </label>}
-          <button type="button" className="dc-esp-hero__btn" onClick={() => fileRef.current && fileRef.current.click()}>{esFotos ? <Camera size={14} strokeWidth={1.9} /> : <Upload size={14} strokeWidth={1.9} />} {esFotos ? "Subir foto" : "Subir radiografía"}</button>
+          <button type="button" className="dc-esp-hero__btn" disabled={!pid} title={pid ? undefined : "Elige primero el paciente"} style={pid ? undefined : { opacity: 0.55, cursor: "not-allowed" }} onClick={() => { if (!pid) { notify("Elige primero el paciente."); return; } if (fileRef.current) fileRef.current.click(); }}>{esFotos ? <Camera size={14} strokeWidth={1.9} /> : <Upload size={14} strokeWidth={1.9} />} {esFotos ? "Subir foto" : "Subir radiografía"}</button>
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
       } />
@@ -10128,6 +10180,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     // El paciente de la cita por su id; solo en la demo (citas antiguas sin id) se busca por DNI o nombre.
     const pid = cita.pacienteId ?? (auth.token ? null : (pacientes.find((p) => p.dni && p.dni === cita.dni) || pacientes.find((p) => p.nombre === cita.paciente) || {}).id);
     if (pid != null) setPacienteActivo(pid);
+    // La evolución que se escriba después en la historia queda ligada a esta cita (citaId).
+    try { if (pid != null && cita.id != null) sessionStorage.setItem("dc_cita_atencion", JSON.stringify({ pacienteId: String(pid), citaId: String(cita.id) })); } catch { /* sin almacenamiento */ }
     setVista("odontograma");
     notify(`Atención iniciada con ${cita.paciente}.`);
   };
@@ -10286,7 +10340,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "consentimientos": return <Consentimientos pacientes={pf} notify={notify} />;
       case "formularios": return <Formularios pacientes={pf} notify={notify} />;
       case "pacientes": return <PacientesView consumirInsumos={consumirInsumos} sedeActiva={sedeActiva} misSedes={misSedes} onIr={setVista} pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
-        onAgendarPaciente={(pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta", sedeId: sedeActiva }); setVista("agenda"); }}
+        onAgendarPaciente={can("agenda", "crear") ? (pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta", sedeId: sedeActiva }); setVista("agenda"); } : undefined}
         onCobrarPaciente={(pac) => { setCobroDesdeFicha({ pid: pac.id, nombre: pac.nombre }); setVista("caja"); }} />;
       case "inventario": return <Inventario key="inv-productos" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_compras": return <Inventario key="inv-compras" tabInicial="compras" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
@@ -10303,7 +10357,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
           {t === "encuestas" ? <Recall key="sat" pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="satisfaccion" /> : <Resenas notify={notify} can={can} citas={cf} />}
         </div>);
       }
-      case "seguros": return <Seguros notify={notify} pacientes={pf} fichas={fichas} />;
+      case "seguros": return <Seguros notify={notify} pacientes={pf} fichas={fichas} can={can} />;
       // Cambiar el plan es de toda la clínica: solo quien ve todas las sedes y puede editarlo.
       case "plan": return <Plan notify={notify} plan={plan} renuevaEl={planRenueva} setPlan={setPlan} esSuper={esSuper} can={can} puedeCambiar={esSuper || (usuario.sedes === "all" && (!can || can("plan", "editar")))} />;
       // La lista se filtra por sede dentro de Espera (useSede) para no perder las entradas de otras sedes al guardar.

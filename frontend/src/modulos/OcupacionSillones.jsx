@@ -85,7 +85,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
   // Los tres sillón-día (de hoy en adelante) con más horas libres: lo primero que ofrecer.
   const huecos = datos.filas.flatMap((f) => f.celdas.map((c, i) => ({ k: `${f.s.id}-${c.fecha}`, sillon: f.s.nombre, sede: sedes.length > 1 ? corta(f.s.sede) : "", dia: `${DIAS[i]} ${c.fecha.slice(8)}`, fecha: c.fecha, libres: (c.cap - c.min) / 60, pct: c.pct })))
     .filter((h) => h.fecha >= hoyF && h.libres > 0).sort((a, b) => b.libres - a.libres).slice(0, 3);
-  if (!sillones.length) return conectado ? <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>No hay sillones activos registrados en las sedes que se ven. Se dan de alta en Configuración › Sedes.</p></section> : null;
+  if (!sillones.length) return conectado ? <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>No hay sillones activos registrados en las sedes que se ven. Se dan de alta en Configuración › Sillones.</p></section> : null;
   if (sinHorario) return <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>La clínica todavía no tiene cargado su horario de atención: sin él no se puede calcular la ocupación. Se configura en Configuración › Horarios.</p></section>;
   const tonoCelda = (p) => (p == null ? "is-na" : p === 0 ? "is-cero" : p >= 85 ? "is-full" : p >= 60 ? "is-alta" : p >= 30 ? "is-media" : "is-baja");
   return (

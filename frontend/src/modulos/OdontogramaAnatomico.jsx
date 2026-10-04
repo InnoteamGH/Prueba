@@ -7,6 +7,7 @@ import { useDatosImpresion } from "../util/membrete";
 import { MEDICOS, useSede } from "../comun";
 import { useCatalogoApi, useMedicosApi, medicoEn, tarifaDibujoDesdeCatalogo } from "../compartido/catalogoApi";
 import { precioEnSede } from "../compartido/cajaSede";
+import { copNumero } from "../util/cop";
 
 /* Profesional que firma los documentos del odontograma: el odontólogo que tiene la
    sesión abierta; si imprime otra persona (recepción), el médico tratante del
@@ -21,15 +22,41 @@ function profesionalDoc(medicoTratante, medicosApi = null) {
   const nombre = (esMedico ? u2.nombre : "") || medicoTratante || "";
   if (auth.token) {
     const m = medicoEn(medicosApi, { id: esMedico ? u2.medicoId : null, nombre });
-    const cop = String((m && m.cop) || (esMedico && u2.cop) || "").replace(/^\s*COP\s*/i, "");
+    const cop = copNumero((m && m.cop) || (esMedico && u2.cop) || "");
     return { nombre: (m && m.nombre) || nombre, cop, impreso: u2.nombre || "" };
   }
   const m = MEDICOS.find((x) => (u2.medicoId != null && x.id === u2.medicoId) || (nombre && x.nombre === nombre));
-  const cop = String((esMedico && u2.cop) || (m && m.cop) || "").replace(/^\s*COP\s*/i, "");
+  const cop = copNumero((esMedico && u2.cop) || (m && m.cop) || "");
   return { nombre: nombre || (m && m.nombre) || "", cop, impreso: u2.nombre || "" };
 }
 
 export { snapshotAGuardados };
+
+/* Firma de una pieza tal como se guarda (claves ordenadas): sirve para mandar al servidor
+   solo las piezas que cambiaron. Antes, al abrir el odontograma el dibujo devolvía su
+   estado (con otro orden de claves) y se reenviaban todas las piezas sin cambios. */
+const ordenar = (o) => (Array.isArray(o) ? o.map(ordenar) : o && typeof o === "object" ? Object.keys(o).sort().reduce((a, k) => { a[k] = ordenar(o[k]); return a; }, {}) : o);
+function firmaFila(r) {
+  let c = {};
+  try { c = typeof r.estadosCara === "string" ? JSON.parse(r.estadosCara || "{}") || {} : (r.estadosCara || {}); } catch { c = {}; }
+  return JSON.stringify([r.estadoPieza || null, ordenar(c), r.nota || null]);
+}
+const FIRMA_VACIA = firmaFila({ estadoPieza: null, estadosCara: "{}", nota: null });
+export function firmasDe(datos) {
+  const m = {};
+  snapshotAGuardados(datos || {}).forEach((r) => { const f = firmaFila(r); if (f !== FIRMA_VACIA) m[r.numeroPieza] = f; });
+  return m;
+}
+/** Filas que cambiaron respecto de lo hidratado (las piezas que se vaciaron van vacías). */
+export function filasCambiadas(antes, datos) {
+  const prev = antes || {};
+  const rows = snapshotAGuardados(datos || {});
+  const vistas = new Set();
+  const out = [];
+  rows.forEach((r) => { vistas.add(String(r.numeroPieza)); if (firmaFila(r) !== (prev[r.numeroPieza] || FIRMA_VACIA)) out.push(r); });
+  Object.keys(prev).forEach((n) => { if (!vistas.has(String(n))) out.push({ numeroPieza: Number(n), estadoPieza: null, estadosCara: "{}", nota: null }); });
+  return out;
+}
 
 /* Hallazgos guardados en la ficha (formato de la app) → formato del dibujo anatómico. */
 const CARA_APP = { top: "V", left: "M", right: "D", center: "O" };
@@ -141,6 +168,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   const lastJson = useRef("");
   const lastDemo = useRef("");
   const hydrated = useRef(false);
+  const lastFirmas = useRef({});   // firma por pieza de lo hidratado / último guardado
   const faseDesdeIframe = useRef(null);
 
   const src = useMemo(() => {
@@ -211,6 +239,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       const rows = await api.odontograma.porPaciente(pacienteId, faseH);
       const datos = apiRowsAHtmlDatos(rows || []);
       postToIframe({ type: "dento-odontograma-hydrate", fase: faseH, datos });
+      lastFirmas.current = firmasDe(datos);
       hydrated.current = true;
       lastJson.current = JSON.stringify(datos);
       setSyncState("ok");
@@ -228,6 +257,21 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   const sedeCx = useSede();
   const sedeTarifa = sedePrecio ?? sedeCx.activa;
   const tarifaDibujo = useMemo(() => (auth.token && catApi ? tarifaDibujoDesdeCatalogo(catApi, (s) => precioEnSede(s, sedeTarifa)) : null), [catApi, sedeTarifa]);
+  // Procedimientos de «Plan y cuenta» (GET /tratamientos): el plan de inversión del dibujo
+  // los incluye con su importe, así no sale «Total S/ 0» cuando el plan ya está armado.
+  const [planSrv, setPlanSrv] = useState(null);
+  useEffect(() => {
+    setPlanSrv(null);
+    if (!auth.token || !pacienteId || soloLectura) return undefined;
+    let vivo = true;
+    api.tratamientos.porPaciente(pacienteId).then((ps) => {
+      if (!vivo) return;
+      const fs = [];
+      (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && !/anulad/i.test(String(f.estado || ""))) fs.push({ id: f.id, t: f.nombre || "Procedimiento", v: Number(f.costo) || 0, pz: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || "" }); }));
+      setPlanSrv(fs);
+    }).catch(() => {});
+    return () => { vivo = false; };
+  }, [pacienteId, soloLectura]);
   const syncChrome = useCallback(() => {
     postToIframe({ type: "dento-odontograma-zoom", zoom });
     postToIframe({
@@ -238,11 +282,13 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         edad: pacienteEdad != null && pacienteEdad !== "" ? String(pacienteEdad) : "",
         hc: pacienteHc || "",
         sede: pacienteSede || "",
+        denticion: denticion || "adulto",
       },
     });
     postToIframe({ type: "dento-odontograma-profesional", profesional: profesionalDoc(medicoTratante, medsApi) });
     // Tarifa del plan de inversión del dibujo: la del catálogo de la clínica en la sede.
     if (tarifaDibujo) postToIframe({ type: "dento-odontograma-tarifa", tarifa: tarifaDibujo, sueltos: [] });
+    if (planSrv) postToIframe({ type: "dento-odontograma-plan", fases: planSrv });
     // Membrete de los documentos del odontograma (resumen y plan de inversión): los
     // mismos datos de empresa y de la sede activa que el resto del sistema.
     postToIframe({
@@ -254,7 +300,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         horario: datosDoc.sede.horario, correo: datosDoc.sede.correo, serie: datosDoc.sede.serieDocumento,
       },
     });
-  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante, medsApi, tarifaDibujo]);
+  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante, medsApi, tarifaDibujo, denticion, planSrv]);
 
   const persistir = useCallback(async (payload) => {
     if (!editable || !pacienteId || !payload?.datos || !auth.token) return;
@@ -262,8 +308,10 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     const json = JSON.stringify(payload.datos);
     if (json === lastJson.current) return;
     lastJson.current = json;
-    const rows = snapshotAGuardados(payload.datos);
+    // Solo las piezas que cambiaron frente a lo hidratado (o lo último guardado).
+    const rows = filasCambiadas(lastFirmas.current, payload.datos);
     if (!rows.length) return;
+    const firmasNuevas = firmasDe(payload.datos);
     setSyncState("syncing");
     try {
       for (const row of rows) {
@@ -277,6 +325,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
           nota: row.nota,
         });
       }
+      lastFirmas.current = firmasNuevas;
       setSyncState("ok");
     } catch {
       setSyncState("err");
@@ -320,6 +369,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   useEffect(() => {
     hydrated.current = false;
     lastJson.current = "";
+    lastFirmas.current = {};
     setSyncState("idle");
   }, [pacienteId, src]);
 

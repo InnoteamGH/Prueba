@@ -348,9 +348,15 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
       demoDb.updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: [...(cur.tratamiento || []), ...items] }));
       notify(`${items.length === 1 ? "Se agregó 1 partida" : `Se agregaron ${items.length} partidas`} al presupuesto del paciente (Plan y cuenta).`); setPf(null); return;
     }
+    // Cada partida lleva la sede donde se cobra (UUID real): la de precio; si no se puede
+    // traducir, la del paciente o la activa. Sin sede la partida no se ve en Caja ni en
+    // Plan y cuenta de esa sede, así que no se manda sin ella.
+    const uuidOk = (x) => { const u = sedeApiUuid(x); return u && /^[0-9a-f-]{36}$/i.test(u) && !UUID_DEMO.test(u) ? u : null; };
+    const sedeOk = uuidOk(sedePrecio) || uuidOk(sedeId) || [paciente?.sedeRegistroId, ...sedesDe(paciente || {})].map(uuidOk).find(Boolean) || uuidOk(sedeCx.activa);
+    if (!sedeOk) { notify("Elige la sede de atención en el selector de sede antes de pasar las partidas al presupuesto."); return; }
     api.tratamientos.porPaciente(pacienteId)
-      .then((planes) => planes?.[0]?.plan?.id || api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento" }).then((pl) => pl.id))
-      .then((planId) => { const sd = sedeApiUuid(sedePrecio); const sedeOk = sd && !UUID_DEMO.test(sd) ? sd : null; return Promise.all(items.map((it) => api.tratamientos.agregarFase(planId, { nombre: it.nombre, costo: it.costo, origen: "periodontograma", ...(sedeOk ? { sedeId: sedeOk } : {}), ...(it.servicioId ? { servicioId: it.servicioId } : {}) }))); })
+      .then((planes) => planes?.[0]?.plan?.id || api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento", sedeId: sedeOk }).then((pl) => pl.id))
+      .then((planId) => Promise.all(items.map((it) => api.tratamientos.agregarFase(planId, { nombre: it.nombre, costo: it.costo, origen: "periodontograma", sedeId: sedeOk, ...(it.servicioId ? { servicioId: it.servicioId } : {}) }))))
       .then(() => { notify("Partidas agregadas al presupuesto del paciente."); setPf(null); })
       .catch(() => notify("No se pudo agregar al presupuesto."));
   };
