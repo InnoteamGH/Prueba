@@ -264,7 +264,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     // que es la misma que sale en el membrete de los documentos.
     const e = auth.token ? {} : empresaDemo();
     return { nombre: e.nombre || "", razonSocial: e.razonSocial || "", ruc: e.ruc || "", direccion: "", telefono: "", email: "", web: e.web || "", logo: e.logo || "", cuentas: [], billeteras: [],
-             horario: local.horario || {}, feriados: local.feriados || [], tipoCambio: 3.75 };
+             horario: local.horario || {}, feriados: local.feriados || [], tipoCambio: auth.token ? null : 3.75 };
   });
   // Última versión guardada de la clínica: el usuario de sede envía esta copia con solo el
   // horario de sus sedes cambiado (no puede tocar nada más de la clínica).
@@ -279,7 +279,9 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   // configurable de verdad y no todas las clínicas se vean igual.
   const leerHorarioLocal = () => { try { return JSON.parse(localStorage.getItem("dc_data_v1_clinica_horario") || "null") || {}; } catch { return {}; } };
   const guardarHorarioLocal = (c) => { try { localStorage.setItem("dc_data_v1_clinica_horario", JSON.stringify({ horario: c.horario || {}, feriados: c.feriados || [] })); } catch { /* almacenamiento lleno o bloqueado */ } };
-  const cargarClinica = () => { if (conectado) api.clinica.get().then((r) => { const c = { nombre: r?.nombre || "", razonSocial: r?.razonSocial || "", ruc: r?.ruc || "", direccion: r?.direccion || "", telefono: r?.telefono || "", email: r?.email || "", web: r?.web || "", logo: r?.logo || r?.logoUrl || "", cuentas: Array.isArray(r?.cuentas) ? r.cuentas : [], billeteras: Array.isArray(r?.billeteras) ? r.billeteras : [], horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [], tipoCambio: Number(r?.tipoCambio) > 0 ? Number(r.tipoCambio) : 3.75 }; clinicaGuardada.current = c; setClinica(c); }).catch(() => {}); };
+  const cargarClinica = () => { if (conectado) api.clinica.get().then((r) => { const c = { nombre: r?.nombre || "", razonSocial: r?.razonSocial || "", ruc: r?.ruc || "", direccion: r?.direccion || "", telefono: r?.telefono || "", email: r?.email || "", web: r?.web || "", logo: r?.logo || r?.logoUrl || "", cuentas: Array.isArray(r?.cuentas) ? r.cuentas : [], billeteras: Array.isArray(r?.billeteras) ? r.billeteras : [], horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [], tipoCambio: Number(r?.tipoCambio) > 0 ? Number(r.tipoCambio) : null }; clinicaGuardada.current = c; setClinica(c);
+    // El TC vigente es el de GET /tipo-cambio (el mismo que usa la caja); /clinica es respaldo.
+    api.tipoCambio.get().then((t) => { const v = Number(t?.valor ?? t?.tipoCambio ?? t); if (Number.isFinite(v) && v > 0) setClinica((x) => ({ ...x, tipoCambio: v })); }).catch(() => {}); }).catch(() => {}); };
   // Lo que se guarda: todo (administración general) o, para un usuario de sede, la clínica
   // tal como estaba con solo el horario propio de sus sedes cambiado.
   const clinicaAGuardar = () => {
@@ -301,7 +303,11 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
       notify("Guardado en este navegador. Con sesión se guarda en la clínica.");
       return Promise.resolve();
     }
-    return api.clinica.actualizar(datos).then(() => { notify(limitarSede ? "Horario de tu sede guardado." : "Datos de la clínica guardados."); clinicaGuardada.current = datos; cargarGoLive(); }).catch(() => notify("No se pudieron guardar."));
+    // El tipo de cambio tiene su propio recurso (PUT /tipo-cambio): sin valor no se envía.
+    const tcNuevo = Number(datos.tipoCambio);
+    const tcCambio = !limitarSede && tcNuevo > 0 && tcNuevo !== Number(clinicaGuardada.current?.tipoCambio);
+    if (!(tcNuevo > 0)) { const { tipoCambio: _tc, ...resto } = datos; return api.clinica.actualizar(resto).then(() => { notify(limitarSede ? "Horario de tu sede guardado." : "Datos de la clínica guardados."); clinicaGuardada.current = datos; cargarGoLive(); }).catch(() => notify("No se pudieron guardar.")); }
+    return api.clinica.actualizar(datos).then(() => (tcCambio ? api.tipoCambio.actualizar(tcNuevo).then(() => true, () => false) : true)).then((tcOk) => { notify(!tcOk ? "Se guardaron los datos de la clínica, pero no el tipo de cambio." : limitarSede ? "Horario de tu sede guardado." : "Datos de la clínica guardados."); clinicaGuardada.current = datos; cargarGoLive(); }).catch(() => notify("No se pudieron guardar."));
   };
   const [rucBusy, setRucBusy] = useState(false);
   const consultarRucClinica = () => {
@@ -658,7 +664,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
               {campo("Teléfono", <input {...roEmp} value={clinica.telefono} onChange={(e) => set("telefono", e.target.value)} placeholder="01 234 5678" />, 1)}
               {campo("Correo", <input {...roEmp} value={clinica.email} onChange={(e) => set("email", e.target.value)} placeholder="contacto@clinica.pe" />, 2)}
               {campo("Web", <input {...roEmp} value={clinica.web} onChange={(e) => set("web", e.target.value)} placeholder="www.clinica.pe" />, 1)}
-              {campo("Tipo de cambio (S/ por 1 US$)", <input {...roEmp} type="number" step="0.01" min="0.01" value={clinica.tipoCambio ?? 3.75} onChange={(e) => set("tipoCambio", Number(e.target.value) || 3.75)} />, 1)}
+              {campo("Tipo de cambio (S/ por 1 US$)", <input {...roEmp} type="number" step="0.01" min="0.01" value={clinica.tipoCambio ?? ""} placeholder={conectado ? "Sin tipo de cambio" : "3.75"} onChange={(e) => set("tipoCambio", Number(e.target.value) || (conectado ? null : 3.75))} />, 1)}
               <p className="dc-emp__nota is-3">Se usa en Caja para cobros en dólares.</p>
             </div>
           </section>

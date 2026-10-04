@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
 import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales } from "./api/client";
-import { limpiarRegistroSedes, hayRegistroSedes } from "./compartido/sedesRegistro";
+import { limpiarRegistroSedes, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
 const FichaMedica = React.lazy(() => import("./FichaMedica"));
@@ -87,6 +87,7 @@ function Login({ onLogin }) {
   const [reg, setReg] = useState({ clinica: "", nombre: "", email: "", pass: "", ruc: "" });
   const [regPac, setRegPac] = useState({ nombre: "", dni: "", telefono: "" });
   const [verDemo, setVerDemo] = useState(false);
+  const [aviso, setAviso] = useState("");   // mensaje de éxito (cuenta creada)
   // NEW-44/45: panel demo y portal hardcodeado solo fuera de producción.
   const demoLoginOk = MODO_DEMO;
 
@@ -169,6 +170,25 @@ function Login({ onLogin }) {
     if (demo) onLogin({ ...demo, demo: true });
     else setError("Portal demo local no disponible.");
   };
+  // Registro de clínica. En la demostración entra como Administrador General de ejemplo; fuera
+  // de ella crea la cuenta de verdad (POST /auth/registro) y pide iniciar sesión con esa clave.
+  const registrarClinica = async () => {
+    if (demoLoginOk) { onLogin({ ...USUARIOS.find((u) => u.user === "admin"), demo: true }); return; }
+    const email = reg.email.trim().toLowerCase();
+    if (!reg.clinica.trim() || !reg.nombre.trim() || !email.includes("@")) { setError("Completa el nombre de la clínica, tu nombre y un correo válido."); return; }
+    if (reg.ruc.trim() && !/^\d{11}$/.test(reg.ruc.trim())) { setError("El RUC debe tener 11 dígitos."); return; }
+    if ((reg.pass || "").length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+    setCargando(true); setError("");
+    try {
+      await api.registro({ nombreClinica: reg.clinica.trim(), ruc: reg.ruc.trim() || null, nombre: reg.nombre.trim(), email, password: reg.pass });
+      setCargando(false);
+      setModo("login"); setUser(email); setPass("");
+      setAviso("Cuenta creada. Inicia sesión con tu correo y la contraseña que elegiste.");
+    } catch (e) {
+      setCargando(false);
+      setError(e?.status === 404 ? "El registro de clínicas aún no está disponible. Escríbenos a soporte." : (e?.message || "No se pudo crear la cuenta."));
+    }
+  };
   // P2-5: auto-registro del paciente por el link → crea su cuenta y entra a su portal.
   const registrarPaciente = () => {
     if (!regPac.nombre.trim() || !regPac.dni.trim()) { setError("Ingresa tu nombre y DNI para crear tu cuenta."); return; }
@@ -226,7 +246,7 @@ function Login({ onLogin }) {
               <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 21, fontWeight: 600, color: INK, margin: "0 0 5px", letterSpacing: "-.01em" }}>Bienvenido de vuelta</h2>
               <p style={{ color: "var(--dc-ink-400)", fontSize: 14, margin: "0 0 26px" }}>Staff con correo, o portal del paciente con DNI.</p>
               <div style={{ display: "grid", gap: 16 }}>
-                <Field label="Correo o DNI" value={user} onChange={setUser} placeholder="admin@sonrie.pe o 44567890" icon={<UserCheck size={16} strokeWidth={1.75} />} />
+                <Field label="Correo o DNI" value={user} onChange={setUser} placeholder="tucorreo@clinica.pe o tu DNI" icon={<UserCheck size={16} strokeWidth={1.75} />} />
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Contraseña</span>
@@ -240,6 +260,7 @@ function Login({ onLogin }) {
                   </div>
                 </div>
                 {error && <div style={{ background: "var(--dc-danger-soft)", color: "var(--dc-danger-700)", border: "1px solid var(--dc-danger-mid)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>{error}</div>}
+                {aviso && !error && <div role="status" style={{ background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>{aviso}</div>}
                 <button className="dc-login-btn" onClick={entrar} disabled={cargando} style={{ width: "100%", padding: "13px 16px", borderRadius: "var(--dc-r-lg)", border: "none", background: cargando ? "var(--dc-brand-soft)" : `linear-gradient(135deg,${DS.c.primary},${DS.c.primaryDark})`, color: "#fff", fontSize: 14, fontWeight: 500, cursor: cargando ? "default" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: `0 12px 24px -12px ${DS.c.primary}` }}>{cargando ? "Ingresando…" : <>Iniciar sesión <ArrowRight size={16} strokeWidth={1.75} /></>}</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 4px" }}>
@@ -247,7 +268,9 @@ function Login({ onLogin }) {
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <button className="dc-outline-btn" onClick={() => { setModo("registro"); setError(""); }} style={{ flex: 1, padding: "10px 0", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "#fff", color: NAVY, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>Registrar mi clínica</button>
-                <button className="dc-outline-btn" onClick={() => { setModo("paciente"); setError(""); }} style={{ flex: 1, padding: "10px 0", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "#fff", color: NAVY, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>Soy paciente</button>
+                {/* Sin endpoint de auto-registro del paciente: fuera de la demostración no se ofrece
+                    (el paciente entra con su DNI y la clave que le activa la clínica). */}
+                {demoLoginOk && <button className="dc-outline-btn" onClick={() => { setModo("paciente"); setError(""); }} style={{ flex: 1, padding: "10px 0", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "#fff", color: NAVY, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>Soy paciente</button>}
               </div>
               {demoLoginOk && (
                 <div style={{ marginTop: 22, textAlign: "center" }}>
@@ -275,12 +298,14 @@ function Login({ onLogin }) {
               <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 21, fontWeight: 600, color: INK, margin: "0 0 4px" }}>Empieza tu prueba gratis</h2>
               <p style={{ color: "var(--dc-ink-400)", fontSize: 14, margin: "0 0 20px" }}>14 días sin costo, sin tarjeta. La configuras en minutos.</p>
               <div style={{ display: "grid", gap: 14 }}>
-                <Field label="Nombre de la clínica" value={reg.clinica} onChange={(v) => setReg({ ...reg, clinica: v })} placeholder="Clínica Dental Sonríe+" icon={<Building2 size={16} strokeWidth={1.75} />} />
-                <Field label="RUC" value={reg.ruc} onChange={(v) => setReg({ ...reg, ruc: v })} placeholder="20123456789" icon={<FileText size={16} strokeWidth={1.75} />} />
+                <Field label="Nombre de la clínica" value={reg.clinica} onChange={(v) => setReg({ ...reg, clinica: v })} placeholder="Nombre comercial de tu clínica" icon={<Building2 size={16} strokeWidth={1.75} />} />
+                <Field label="RUC" value={reg.ruc} onChange={(v) => setReg({ ...reg, ruc: v })} placeholder="11 dígitos" icon={<FileText size={16} strokeWidth={1.75} />} />
                 <Field label="Tu nombre" value={reg.nombre} onChange={(v) => setReg({ ...reg, nombre: v })} placeholder="Nombre del responsable" icon={<UserCheck size={16} strokeWidth={1.75} />} />
                 <Field label="Correo" value={reg.email} onChange={(v) => setReg({ ...reg, email: v })} placeholder="tucorreo@mail.com" type="email" icon={<MessageSquare size={16} strokeWidth={1.75} />} />
-                <Btn full kind="red" onClick={() => onLogin({ ...USUARIOS.find((u) => u.user === "admin"), demo: true })}>Crear cuenta y empezar <ArrowRight size={16} strokeWidth={1.75} /></Btn>
-                <p style={{ fontSize: 12, color: "var(--dc-ink-500)", textAlign: "center", margin: 0 }}>En la demo, registrarte te ingresa como Administrador General para que veas todo.</p>
+                {!demoLoginOk && <Field label="Contraseña" value={reg.pass} onChange={(v) => setReg({ ...reg, pass: v })} placeholder="Mínimo 8 caracteres" type="password" icon={<Lock size={16} strokeWidth={1.75} />} />}
+                {error && <div style={{ background: "var(--dc-danger-soft)", color: "var(--dc-danger-700)", border: "1px solid var(--dc-danger-mid)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>{error}</div>}
+                <Btn full kind="red" onClick={registrarClinica} disabled={cargando}>{cargando ? "Creando…" : <>Crear cuenta y empezar <ArrowRight size={16} strokeWidth={1.75} /></>}</Btn>
+                <p style={{ fontSize: 12, color: "var(--dc-ink-500)", textAlign: "center", margin: 0 }}>{demoLoginOk ? "En la demo, registrarte te ingresa como Administrador General para que veas todo." : <button type="button" onClick={() => { setModo("login"); setError(""); }} style={{ background: "none", border: "none", color: DS.c.primary, fontSize: 12, cursor: "pointer" }}>Ya tengo cuenta: iniciar sesión</button>}</p>
               </div>
             </Card>
           ) : (
@@ -4608,8 +4633,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // TC de referencia: el de la clínica (con sesión) o el último usado al cobrar en esta caja.
   // Propone el TC de un egreso en dólares y convierte los egresos viejos que no guardaron TC.
   const [tcClinica, setTcClinica] = useState(null);
-  useEffect(() => { if (conectado) api.clinica.get().then((r) => { const v = Number(r?.tipoCambio); if (Number.isFinite(v) && v > 0) setTcClinica(v); }).catch(() => {}); }, [conectado]);
-  const tcRef = tcClinica || tcGuardado();
+  // Con sesión: GET /tipo-cambio (y si no responde, el de GET /clinica). Nunca un TC fijo.
+  useEffect(() => {
+    if (!conectado) return;
+    const ok = (v) => Number.isFinite(v) && v > 0;
+    api.tipoCambio.get().then((r) => Number(r?.valor ?? r?.tipoCambio ?? r)).catch(() => NaN)
+      .then((v) => (ok(v) ? v : api.clinica.get().then((r) => Number(r?.tipoCambio)).catch(() => NaN)))
+      .then((v) => { if (ok(v)) setTcClinica(v); });
+  }, [conectado]);
+  const tcRef = conectado ? tcClinica : tcGuardado();
   const [egForm, setEgForm] = useState(null);           // { concepto, categoria, monto, metodo, moneda, tc, sede }
   // ¿Está abierta la caja de esta sede? La de la caja elegida ya se conoce; con «Todas», en la
   // demostración se lee su apertura y con sesión se pregunta al servidor.
@@ -4630,7 +4662,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       setTab(jornadaAbiertaPrevia?.id ? "historial" : "hoy");
       return;
     }
-    setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN", tc: String(tcRef), sede: sedeCaja });
+    setEgForm({ concepto: "", categoria: "Insumos", monto: "", metodo: "efectivo", moneda: "PEN", tc: tcRef ? String(tcRef) : "", sede: sedeCaja });
   };
   // Menú «Crear › Registrar egreso»: abre el formulario cuando ya se sabe si la caja de la
   // sede está abierta (la apertura se lee al llegar a Caja), con las mismas reglas.
@@ -4853,6 +4885,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     notify("Egreso anulado.");
   };
   const crearLink = () => {
+    if (conectado) { notify("Los links de pago aún no están disponibles en el servidor."); setLinkForm(null); return; }
     if (!linkForm.paciente.trim() || !(Number(linkForm.monto) > 0)) { notify("Indica paciente y monto para el link."); return; }
     // El link es de la sede que lo genera: su cobro entra a esa caja (CAJA-19).
     const sedeLink = linkForm.sede ?? sedeCaja;
@@ -5663,7 +5696,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         );
       })()}
 
-      {tab === "links" && (() => {
+      {tab === "links" && conectado && (
+        // Con sesión no hay servicio de links de pago en el servidor: no se crean links de ejemplo.
+        <Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Links de pago aún no disponibles" sub="Tu clínica todavía no tiene el servicio de links de pago en el servidor. Cobra desde Caja con los métodos habituales." /></Card>
+      )}
+      {tab === "links" && !conectado && (() => {
         const activos = linksVis.filter((l) => l.estado === "pendiente");
         const cobrado = linksVis.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.monto, 0);
         const pend = activos.reduce((s, l) => s + l.monto, 0);
@@ -5756,7 +5793,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           {/* C5: el egreso en dólares guarda su TC para entrar al total y al neto del día en soles. */}
           {egForm.moneda === "USD" && (() => { const tcN = Number(String(egForm.tc || "").replace(",", ".")); const lm = leerMonto(egForm.monto); return (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14, alignItems: "end" }}>
-              <Field label="Tipo de cambio (S/ por US$ 1)" value={egForm.tc ?? ""} onChange={(v) => setEgForm({ ...egForm, tc: v.replace(/[^\d.,]/g, "") })} placeholder={String(tcRef)} />
+              <Field label="Tipo de cambio (S/ por US$ 1)" value={egForm.tc ?? ""} onChange={(v) => setEgForm({ ...egForm, tc: v.replace(/[^\d.,]/g, "") })} placeholder={tcRef ? String(tcRef) : "Ej. 3.70"} />
               <div style={{ fontSize: 13, color: "var(--dc-ink-500)", paddingBottom: 10 }}>{lm.ok && lm.valor > 0 && tcN > 0 ? <>Equivale a <b style={{ color: "var(--dc-ink-700)" }}>S/ {M.sol2(red2(lm.valor * tcN))}</b></> : "Se suma a los egresos del día en soles."}</div>
             </div>
           ); })()}
@@ -6121,6 +6158,14 @@ function MiProduccion({ usuario, citas, sedes = null }) {
 /* ---- Productividad / Reportes (estilo Doctocliq: embudo de ventas + reportes) ---- */
 /* ---- Integraciones (recomendaciones reales del mercado peruano) ---- */
 function Integraciones({ notify }) {
+  const conectado = !!auth.token;
+  // Con sesión el estado de WhatsApp y del motor de IA sale de GET /whatsapp/salud; nada
+  // se marca «conectado» de antemano. null = consultando; { error } = no respondió.
+  const [salud, setSalud] = useState(null);
+  useEffect(() => { if (conectado) api.agente.salud().then((r) => setSalud(r || {})).catch(() => setSalud({ error: true })); }, []); // eslint-disable-line
+  const estWa = !conectado ? "conectado" : !salud ? "pendiente" : (salud.ok && !salud.demo ? "conectado" : "pendiente");
+  const iaInfo = salud && [salud.ia, salud.openai, salud.iaConectada].find((x) => typeof x === "boolean");
+  const estIa = !conectado ? "conectado" : iaInfo === true ? "conectado" : "pendiente";
   const cats = [
     { cat: "Pagos en línea y POS", ic: CreditCard, c: "#2F6FDE", items: [
       ...PASARELAS.map((pa) => ({ n: pa.n, d: pa.d, rec: pa.rec, estado: pasarelaActiva()?.id === pa.id ? "conectado" : "disponible" })),
@@ -6129,11 +6174,11 @@ function Integraciones({ notify }) {
       { n: "Proveedor OSE / PSE (SUNAT)", d: proveedorSunat() ? "Firma y envía a SUNAT las boletas y facturas que emite Caja." : "Sin proveedor conectado: Caja emite los comprobantes y quedan «Sin enviar». Se configura en Caja › Comprobantes SUNAT.", estado: proveedorSunat() ? "conectado" : "pendiente" },
     ] },
     { cat: "Mensajería e IA", ic: MessageSquare, c: "#16A36A", items: [
-      { n: "WhatsApp Cloud API (Meta)", d: "Canal oficial para el agente IA. Más económico a escala que intermediarios.", estado: "conectado", rec: true },
+      { n: "WhatsApp Cloud API (Meta)", d: !conectado || estWa === "conectado" ? "Canal oficial para el agente IA. Más económico a escala que intermediarios." : !salud ? "Consultando el estado de WhatsApp en el servidor…" : salud.error ? "No se pudo consultar el estado de WhatsApp en el servidor." : `WhatsApp aún no está operativo${salud.mensaje && !/quarkus|endpoint|WHATSAPP_|OPENAI_/i.test(String(salud.mensaje)) ? `: ${salud.mensaje}` : ""}. Lo activa soporte.`, estado: estWa, rec: true },
       // Aquí figuraba otro proveedor del que la aplicación no depende. El motor real es
       // OpenAI (application.yml: openai.base-url), y solo con OPENAI_API_KEY cargada:
       // sin ella el asistente cae al motor de reglas.
-      { n: "API de OpenAI", d: "Motor del agente conversacional con function calling para consultar precios, ver disponibilidad y agendar. Sin clave, el asistente responde con el motor de reglas.", estado: "conectado", rec: true },
+      { n: "API de OpenAI", d: `Motor del agente conversacional con function calling para consultar precios, ver disponibilidad y agendar. Sin clave, el asistente responde con el motor de reglas.${conectado && iaInfo === undefined ? " El servidor aún no informa si la clave está cargada." : ""}`, estado: estIa, rec: true },
     ] },
     { cat: "Captación de pacientes", ic: Users, c: "#6D4FD1", items: [
       { n: "Doctoralia", d: "Directorio público con gran tráfico orgánico; sincroniza agenda para captar pacientes nuevos.", estado: "disponible" },
@@ -6189,7 +6234,7 @@ function Integraciones({ notify }) {
       })()}
       {its.length === 0 && <Card style={{ padding: 0 }}><Vacio icon={<Plug size={22} strokeWidth={1.75} />} titulo="Sin integraciones" sub="No hay conectores disponibles por ahora." /></Card>}
       {detInt && <Modal icon={<Plug size={20} strokeWidth={1.75} />} tone={detInt.estado === "conectado" ? "var(--dc-ok-700)" : NAVY} titulo={detInt.n} sub={detInt.cat} onClose={() => setDetInt(null)} maxW={480}
-        footer={detInt.estado === "conectado" ? <Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { const pa = PASARELAS.find((x) => x.n === detInt.n); if (pa) { setPasarelaActiva(pa.id); notify(`${pa.n} es ahora la pasarela de pago. Links de pago ya la usa.`); } else notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
+        footer={detInt.estado === "conectado" || conectado ? <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn>{conectado && detInt.estado !== "conectado" && <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{/SUNAT/.test(detInt.n) ? "Se configura arriba, en Facturación electrónica." : "Esta conexión la activa soporte; aún no se configura desde aquí."}</span>}</> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { const pa = PASARELAS.find((x) => x.n === detInt.n); if (pa) { setPasarelaActiva(pa.id); notify(`${pa.n} es ahora la pasarela de pago. Links de pago ya la usa.`); } else notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           {detInt.rec && <span style={{ fontSize: 12, fontWeight: 500, background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", padding: "3px 9px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 4 }}><Star size={10} strokeWidth={1.75} /> Recomendado</span>}
           {detInt.estado === "conectado" ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={14} strokeWidth={1.75} /> Conectado</span> : <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={13} strokeWidth={1.75} /> Disponible</span>}
@@ -6198,6 +6243,23 @@ function Integraciones({ notify }) {
       </Modal>}
     </div>
   );
+}
+
+/* Clave temporal de un usuario nuevo (con sesión): aleatoria y segura, generada con
+   crypto.getRandomValues. Nunca una clave fija: «demo» dejaba entrar a cualquiera. Se
+   muestra una sola vez a quien crea la cuenta; lo ideal es que el servidor invite por correo. */
+const ALFABETO_CLAVE = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+function claveTemporal(largo = 14) {
+  const c = globalThis.crypto;
+  if (!c || !c.getRandomValues) throw new Error("El navegador no puede generar una clave segura.");
+  const out = [];
+  const buf = new Uint8Array(1);
+  // Muestreo por rechazo: sin sesgo de módulo.
+  const tope = 256 - (256 % ALFABETO_CLAVE.length);
+  while (out.length < largo) { c.getRandomValues(buf); if (buf[0] < tope) out.push(ALFABETO_CLAVE[buf[0] % ALFABETO_CLAVE.length]); }
+  // Al menos una mayúscula, una minúscula y un dígito (políticas de clave habituales).
+  if (!/[A-Z]/.test(out.join("")) || !/[a-z]/.test(out.join("")) || !/\d/.test(out.join(""))) return claveTemporal(largo);
+  return out.join("");
 }
 
 /* Roles que el perfil de TI puede asignar al personal (el paciente se gestiona aparte). */
@@ -6270,6 +6332,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
   const [q, setQ] = useState("");
   const [filtroRol, setFiltroRol] = useState("todos");
   const [form, setForm] = useState(null); // null = cerrado
+  const [claveNueva, setClaveNueva] = useState(null); // { nombre, email, clave }: se muestra una sola vez
 
   const lista = staff.filter((u) =>
     (filtroRol === "todos" || u.rol === filtroRol) &&
@@ -6293,8 +6356,10 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
       // sedeIds: todas sus sedes (UUID); sedeId: la principal, para el servidor que aún guarda una sola.
       const sedeIds = sedes === "all" ? [] : sedes.map((x) => sedeApiUuid(x));
       const payload = { nombre: form.nombre, email: form.email || form.user, rol: form.rol, activo: form.activo !== false, permisos: form.permisos || null, sedeIds, sedeId: sedeIds[0] ?? null };
-      (form.id ? api.usuarios.actualizar(form.id, payload) : api.usuarios.crear({ ...payload, password: "demo" }))
-        .then(() => { notify(form.id ? `Usuario ${form.nombre} actualizado.` : `Usuario ${form.nombre} creado (clave inicial: demo).`); setForm(null); recargar(); })
+      let clave = null;
+      if (!form.id) { try { clave = claveTemporal(); } catch (e) { notify(e.message); return; } }
+      (form.id ? api.usuarios.actualizar(form.id, payload) : api.usuarios.crear({ ...payload, password: clave }))
+        .then(() => { if (form.id) notify(`Usuario ${form.nombre} actualizado.`); else setClaveNueva({ nombre: form.nombre, email: payload.email, clave }); setForm(null); recargar(); })
         .catch((e) => notify("Error al guardar: " + (e.message || "")));
       return;
     }
@@ -6348,11 +6413,11 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         {/* Formulario alta/edición */}
         {form && (
           <Modal icon={form.id ? <Pencil size={20} strokeWidth={1.75} /> : <UserPlus size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar usuario" : "Nuevo usuario"} sub={form.id ? "Actualiza sus datos, rol y sedes" : "Crea la cuenta y asigna su rol y sedes"} onClose={() => setForm(null)} maxW={620}
-            footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}><Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn><Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
+            footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}>{!conectado && <Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn>}<Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
               <Field label="Nombre completo" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Ana Torres" />
               <Field label="Usuario" value={form.user} onChange={(v) => setForm({ ...form, user: v })} placeholder="atorres" icon={<UserCheck size={15} strokeWidth={1.75} />} />
-              <Field label="Correo" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="ana@sonrie.pe" type="email" icon={<Mail size={15} strokeWidth={1.75} />} />
+              <Field label="Correo" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="nombre@tuclinica.pe" type="email" icon={<Mail size={15} strokeWidth={1.75} />} />
               <label style={{ display: "block" }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Rol</span>
                 <Select value={form.rol} onChange={(v) => setForm({ ...form, rol: v })}
@@ -6404,6 +6469,13 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
               )}
             </div>
             <div style={{ marginTop: 14, fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 7, background: "var(--dc-bg)", padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}><ShieldCheck size={15} strokeWidth={1.75} color={ROLES[form.rol].color} /> {ROLES[form.rol].desc}</div>
+          </Modal>
+        )}
+        {claveNueva && (
+          <Modal icon={<KeyRound size={20} strokeWidth={1.75} />} titulo="Usuario creado" sub={`Clave temporal de ${claveNueva.nombre}`} onClose={() => setClaveNueva(null)} maxW={480}
+            footer={<><Btn small kind="ghost" onClick={() => { try { navigator.clipboard?.writeText(claveNueva.clave); notify("Clave copiada."); } catch { notify("No se pudo copiar: anótala."); } }}><Copy size={15} strokeWidth={1.75} /> Copiar clave</Btn><Btn small onClick={() => setClaveNueva(null)}><Check size={15} strokeWidth={1.75} /> Ya la entregué</Btn></>}>
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.5 }}>Entrega esta clave a <b>{claveNueva.nombre}</b> ({claveNueva.email}) por un canal seguro. <b>Solo se muestra esta vez</b>: al cerrar ya no se puede volver a ver. Debe cambiarla en su primer ingreso.</p>
+            <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 20, letterSpacing: 1, textAlign: "center", padding: "14px 12px", border: "1.5px dashed var(--dc-line)", borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", color: NAVY, userSelect: "all" }}>{claveNueva.clave}</div>
           </Modal>
         )}
         {/* Matriz de permisos por usuario (override) */}
@@ -7408,7 +7480,9 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
   // de la pantalla y se vuelven a UUID al guardar.
   // Solo se traducen las claves de las sedes de ejemplo (…a1/…a2 ↔ 1/2); un UUID real viaja tal cual.
   const esDemoUuid = (k) => /^0{8}-0{4}-0{4}-0{4}-0{10}a[12]$/i.test(String(k));
-  const deApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [esDemoUuid(k) ? String(numSede(k)) : String(k), v]));
+  // Con sesión, el UUID real se traduce al número que le dio el registro de sedes (GET /sedes):
+  // así la columna de cada sede encuentra su precio propio.
+  const deApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => { const n = idxDeUuid(k); return [n != null ? String(n) : esDemoUuid(k) ? String(numSede(k)) : String(k), v]; }));
   const aApi = (ps) => Object.fromEntries(Object.entries(ps || {}).map(([k, v]) => [/^\d+$/.test(String(k)) ? sedeApiUuid(k) : k, v]));
   const mapApi = (e) => ({
     id: e.id,
@@ -7709,7 +7783,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
   const sedesApi = sedeCx.sede === "all" && sedeCx.global ? null : verSedes.map((x) => sedeApiUuid(x));
   const unirY = (l) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} y ${l[l.length - 1]}` : l[0] || "");
   const nomSede = (s) => (s == null || s === "" ? "Sin sede" : cortaSede(s));
-  const mapInv = (i) => ({ id: i.id, sede: i.sedeId ?? i.sede_id ?? i.sede ?? null, nombre: i.nombre, cat: i.categoria || "", unidad: i.unidad || "unid", stock: Number(i.stock) || 0, min: Number(i.stockMinimo) || 0, precio: Number(i.costoUnitario) || 0, dia: 1, lote: i.lote || "", fechaVencimiento: i.fechaVencimiento || "" });
+  const mapInv = (i) => ({ id: i.id, sede: i.sedeId ?? i.sede_id ?? i.sede ?? null, nombre: i.nombre, cat: i.categoria || "", unidad: i.unidad || "unid", stock: Number(i.stock) || 0, min: Number(i.stockMinimo) || 0, precio: Number(i.costoUnitario) || 0, dia: Number(i.consumoDiario) || 0, lote: i.lote || "", fechaVencimiento: i.fechaVencimiento || "" });
   const [remoto, setRemoto] = useState(null);
   const recargar = () => { if (conectado) api.inventario.listar(sedesApi).then((r) => setRemoto((r || []).map(mapInv))).catch(() => notify("No se pudo cargar el inventario del servidor.")); };
   useEffect(() => { recargar(); }, [claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -7841,7 +7915,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
     return d !== null && d <= 60;
   });
   // El insumo nuevo entra al almacén de la sede activa (o de la elegida entre las que se ven).
-  const nuevo = () => setForm({ sede: sedePorDefecto, nombre: "", cat: "Consumibles", stock: 0, min: 5, unidad: "unid", dia: 1, precio: 0, lote: "", fechaVencimiento: "" });
+  const nuevo = () => setForm({ sede: sedePorDefecto, nombre: "", cat: "Consumibles", stock: 0, min: 5, unidad: "unid", dia: conectado ? 0 : 1, precio: 0, lote: "", fechaVencimiento: "" });
   const editar = (it) => setForm({ ...it, lote: it.lote || "", fechaVencimiento: it.fechaVencimiento || "" });
   const guardar = async () => {
     if (!form.nombre.trim()) { notify("Indica el nombre del insumo."); return; }
@@ -8115,7 +8189,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           <Field label="Fecha de vencimiento" type="date" value={form.fechaVencimiento || ""} onChange={(v) => setForm({ ...form, fechaVencimiento: v })} hint="Caducidad del lote" />
           <Field label="Stock actual" value={String(form.stock)} onChange={(v) => setForm({ ...form, stock: v })} placeholder="0" hint={`En ${form.unidad || "unidades"}`} />
           <Field label="Stock mínimo" value={String(form.min)} onChange={(v) => setForm({ ...form, min: v })} placeholder="5" hint="Avisa por debajo de este nivel" />
-          <Field label="Consumo diario" value={String(form.dia ?? "")} onChange={(v) => setForm({ ...form, dia: v })} placeholder="1.5" hint="Para calcular la cobertura" />
+          {/* Con sesión el consumo diario no se guarda en el servidor: no se pide ni se inventa
+              (sin él no se calcula cobertura). Llega si el servidor manda consumoDiario. */}
+          {!conectado && <Field label="Consumo diario" value={String(form.dia ?? "")} onChange={(v) => setForm({ ...form, dia: v })} placeholder="1.5" hint="Para calcular la cobertura" />}
           <Field label="Precio unitario (S/)" value={String(form.precio ?? "")} onChange={(v) => setForm({ ...form, precio: v })} placeholder="0" hint="Para el valor del inventario" />
         </div>
         {(() => { const st = Number(form.stock) || 0, di = Number(form.dia) || 0, pr = Number(form.precio) || 0; const cob = di > 0 ? Math.round(st / di) : null; return (
@@ -8184,12 +8260,16 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
 /* ---- Casos a laboratorio (paridad con Doctocliq) ---- */
 const LAB_FLUJO = ["enviado", "en_proceso", "recibido", "entregado"];
 const LAB_INFO = { enviado: { l: "Enviado", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" }, en_proceso: { l: "En proceso", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" }, recibido: { l: "Recibido", bg: "#EFEAFC", fg: "#5B3FC4" }, entregado: { l: "Entregado", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)" } };
-function Laboratorio({ pacientes, notify, updFicha, can }) {
+function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
   // Mandar un trabajo al laboratorio es dar de alta un caso. Quien solo consulta el
   // estado de las entregas -gerencia, o el odontologo segun la matriz- no lo hace.
   const puedeGestionar = can ? can("laboratorio", "crear") : true;
-  const pidDe = (nombre) => (pacientes.find((p) => p.nombre === nombre) || PACIENTES_INIT.find((p) => p.nombre === nombre))?.id;
   const conectado = !!auth.token;
+  // Con sesión el padrón global de la app llega vacío (cada módulo pide el suyo): el
+  // formulario de envío lista los pacientes del servidor de las sedes que se ven.
+  const pacientes = usePacientesServidor(pacientesProp);
+  // Con sesión el paciente sale solo del padrón del servidor (nunca de los de ejemplo).
+  const pidDe = (nombre) => (pacientes.find((p) => p.nombre === nombre) || (conectado ? null : PACIENTES_INIT.find((p) => p.nombre === nombre)))?.id;
   // LAB-02: en la demostración los casos son los mismos que ve la ficha (Archivos ›
   // Laboratorio) y el Inicio: una sola lista en el contexto de datos.
   const dbLab = useContext(DatosDemoCtx);
@@ -8230,7 +8310,15 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
     setCasos((cs) => cs.map((c) => { if (c.id !== id) return c; const i = LAB_FLUJO.indexOf(c.estado); const n = LAB_FLUJO[Math.min(LAB_FLUJO.length - 1, i + 1)]; notify(`${c.paciente}: ${LAB_INFO[n].l}.`); return { ...c, estado: n }; }));
   };
   const [detalle, setDetalle] = useState(null);
-  const crear = () => { if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (!nuevo.sede) { notify("Elige la sede que envía el caso."); return; } if (conectado) { notify("Crear envíos desde aquí estará disponible pronto en modo conectado."); setNuevo(null); return; } const id = Date.now(); const caso = { id, pacienteId: pidDe(nuevo.paciente) || null, paciente: nuevo.paciente, sede: Number(nuevo.sede), trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); notify("Caso enviado a laboratorio. Ya aparece en la ficha del paciente (Archivos › Laboratorio)."); setNuevo(null); };
+  const crear = () => { if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (!nuevo.sede) { notify("Elige la sede que envía el caso."); return; } if (conectado) {
+    // POST /laboratorio con el contrato que devuelve la lista (mapCaso al revés).
+    const pid = pidDe(nuevo.paciente);
+    if (!pid) { notify("Elige un paciente del padrón."); return; }
+    api.laboratorio.crear({ pacienteId: pid, paciente: nuevo.paciente, sedeId: sedeApiUuid(nuevo.sede), tipoTrabajo: nuevo.trabajo.trim(), laboratorio: (nuevo.lab || "").trim() || null, fechaEnvio: fmt(hoy), fechaEstimada: nuevo.entrega || null, estado: bE.enviado })
+      .then(() => { notify("Caso enviado a laboratorio."); setNuevo(null); recargar(); })
+      .catch((e) => notify(e?.message || "No se pudo registrar el envío."));
+    return;
+  } const id = Date.now(); const caso = { id, pacienteId: pidDe(nuevo.paciente) || null, paciente: nuevo.paciente, sede: Number(nuevo.sede), trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); notify("Caso enviado a laboratorio. Ya aparece en la ficha del paciente (Archivos › Laboratorio)."); setNuevo(null); };
   // El envío sale de la sede activa; si no es una de las que se ven, de la primera visible.
   const sedeEnvioDef = (sedesEnvio.find((x) => mismaSede(x.id, sedeLab.activa)) || sedesEnvio[0] || {}).id ?? null;
   const faltanDias = (c) => Math.round((new Date(c.entrega) - new Date(fmt(hoy))) / 86400000);
@@ -8257,10 +8345,11 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
             <div className="dc-esp-hero__prox dc-lab-hero__atr">
               <span className="dc-pac-hero__ico" style={{ background: "rgba(245,154,141,.28)", color: "#FFD1C9" }}><AlertTriangle size={15} strokeWidth={1.9} /></span>
               <div className="dc-esp-hero__prox-txt"><span>{atr.length === 1 ? "1 trabajo atrasado" : `${atr.length} trabajos atrasados`}</span><b>{atr.map((c) => c.paciente).join(", ")}</b></div>
-              <button type="button" className="dc-esp-hero__btn" onClick={() => notify(`Se contactó al laboratorio por ${atr.length} trabajo(s) atrasado(s).`)}><Phone size={13} strokeWidth={1.9} /> Contactar</button>
+              {/* Con sesión no hay envío de avisos al laboratorio: no se finge el contacto. */}
+              {!conectado && <button type="button" className="dc-esp-hero__btn" onClick={() => notify(`Se contactó al laboratorio por ${atr.length} trabajo(s) atrasado(s).`)}><Phone size={13} strokeWidth={1.9} /> Contactar</button>}
             </div>
           ) : <span />}
-          {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", sede: sedeEnvioDef, trabajo: "", lab: "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
+          {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: pacientes[0]?.nombre || "", sede: sedeEnvioDef, trabajo: "", lab: conectado ? "" : "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
         </section>
       ); })()}
       <div className="dc-chips-fila" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -8325,8 +8414,9 @@ function Laboratorio({ pacientes, notify, updFicha, can }) {
 }
 
 /* ---- Mi plan y facturación (membresía del SaaS) ---- */
-function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = true }) {
-  const actual = PLANES.find((p) => p.id === plan) || PLANES[1];
+function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = true, renuevaEl = null }) {
+  // Con sesión el plan es el que devuelve GET /clinica; mientras no llega no se supone ninguno.
+  const actual = PLANES.find((p) => p.id === plan) || (auth.token ? null : PLANES[1]);
   const totalMods = (id) => new Set(PLAN_MODULOS[id]).size;
   const [confirmP, setConfirmP] = useState(null);
   const cambiarPlan = (p) => {
@@ -8377,6 +8467,7 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
     : PACIENTES_INIT.length;
   const SIN_CONTEO = "Aún no llega el conteo de tu clínica";
   const SIN_PERM = "Tu rol no consulta el padrón de pacientes";
+  if (!actual) return <Card><p className="dc-seg__nada">Aún no llega el plan de tu clínica desde el servidor.</p></Card>;
   const sedesExtra = Math.max(0, (sedesUsadas ?? 0) - actual.sedesIncl);
   const odExtra = actual.odontologos === "ilim" ? 0 : Math.max(0, (odontologos ?? 0) - actual.odontologos);
   const cuenta = [
@@ -8386,12 +8477,14 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
     { l: "Pacientes", ic: <Smile size={18} strokeWidth={1.75} />, c: "var(--dc-ok)", v: totalPacientes == null ? "—" : `${totalPacientes} – Ilimitados`, sub: totalPacientes == null ? (consumoReal?.pacientes === undefined ? SIN_PERM : SIN_CONTEO) : "Con auto-registro por link" },
   ];
   const TONO_PLAN = ["#0E9199", "#6D4FD1", "#D97706", "#E0694F"];
+  // Con sesión el cambio de plan no tiene endpoint: no se finge, se pide a soporte.
+  const cambioLocal = !conectado;
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <section className="dc-esp-hero is-tablero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>{actual.nombre}</b><span>tu plan</span></div>
-          <p>S/ {actual.precio}/mes – {totalMods(actual.id)} módulos activos – renueva el {fechaLegible(addDays(26))}</p>
+          <p>S/ {actual.precio}/mes – {totalMods(actual.id)} módulos activos{conectado ? (renuevaEl ? ` – renueva el ${fechaLegible(String(renuevaEl).slice(0, 10))}` : "") : ` – renueva el ${fechaLegible(addDays(26))}`}</p>
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{sedesUsadas == null ? "—" : `${sedesUsadas} ${sedesUsadas === 1 ? "sede" : "sedes"}`}</b><span>{sedesUsadas == null ? "Sedes" : sedesExtra > 0 ? `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"} + ${sedesExtra} adicional${sedesExtra === 1 ? "" : "es"}` : `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"}`}</span></div>
@@ -8430,6 +8523,7 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
               <ul>{p.incluye.slice(0, 3).map((f, i) => <li key={i}><Check size={13} strokeWidth={2.6} /> {f}</li>)}</ul>
               {esActual
                 ? <span className="dc-plan__cta is-actual"><CheckCircle2 size={14} strokeWidth={2.2} /> Tu plan actual</span>
+                : puedeCambiar && !cambioLocal ? <span className="dc-plan__cta is-actual" title="El cambio de plan aún no se puede hacer desde el sistema.">Escríbenos a soporte para cambiar</span>
                 : puedeCambiar ? <button type="button" className={`dc-plan__cta${sube ? " is-sube" : ""}`} onClick={() => setConfirmP(p)}>{sube ? "Mejorar a " : "Cambiar a "}{p.nombre}</button>
                 : <span className="dc-plan__cta is-actual" title="El plan lo cambia la administración general de la clínica.">Lo cambia la administración general</span>}
             </article>
@@ -8631,9 +8725,20 @@ function Resenas({ notify, citas = [], can }) {
 
 /* ---- Recordatorios y recall automáticos (anti-ausentismo) ---- */
 
-/* ---- Seguros y EPS (convenios, coberturas y liquidaciones) ---- */
-function Seguros({ notify, pacientes = [], fichas = {} }) {
+/* Pacientes para los formularios de Laboratorio y Seguros. Sin sesión, los de la demo
+   (prop). Con sesión, GET /pacientes recortado a las sedes que se ven. */
+function usePacientesServidor(pacientesProp) {
   const conectado = !!auth.token;
+  const sx = useSede();
+  const [rem, setRem] = useState(null);
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setRem((r || []).map((p) => ({ ...p, id: p.id, nombre: p.nombre || "—", sede: p.sedeRegistroId ?? p.sedeId ?? null })))).catch(() => setRem([])); }, []); // eslint-disable-line
+  if (!conectado) return pacientesProp || [];
+  return (rem || []).filter((p) => p.sede == null || sx.enSede(p.sede));
+}
+/* ---- Seguros y EPS (convenios, coberturas y liquidaciones) ---- */
+function Seguros({ notify, pacientes: pacientesProp = [], fichas = {} }) {
+  const conectado = !!auth.token;
+  const pacientes = usePacientesServidor(pacientesProp);
   // Los convenios y sus coberturas los pacta cada clínica: estos cinco son el ejemplo.
   // Se enseñaban también con sesión abierta, y alimentaban "Cobertura promedio" y
   // "Aseguradoras 4/5", así que recepción acababa diciéndole a un paciente que su seguro
@@ -8681,6 +8786,24 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
   useEffect(() => { recargarLiq(); }, [sedesApiSeg ? sedesApiSeg.join(",") : "todas"]); // eslint-disable-line
   const LI = Object.fromEntries(["borrador", "enviado", "observado", "aprobado", "pagado"].map((k) => { const e = estadoInfo("liquidacion", k); return [k, { l: e.label, bg: tint(e.color, 0.12), fg: e.color }]; }));
   const [detalleLiq, setDetalleLiq] = useState(null);
+  // Con sesión: alta y baja de liquidaciones contra POST/DELETE /seguros.
+  const [nuevaLiq, setNuevaLiq] = useState(null);   // { pacienteId, aseguradora, monto, sede }
+  const sedesSeg = SEDES.filter((x) => sedeSeg.esMia(x.id) && sedeSeg.enSede(x.id));
+  const crearLiq = () => {
+    const pac = pacientes.find((p) => String(p.id) === String(nuevaLiq.pacienteId));
+    const monto = Number(String(nuevaLiq.monto || "").replace(",", "."));
+    if (!pac) { notify("Elige el paciente."); return; }
+    if (!nuevaLiq.aseguradora.trim()) { notify("Indica la aseguradora o EPS."); return; }
+    if (!(monto > 0)) { notify("Indica el monto que cubre el seguro."); return; }
+    if (nuevaLiq.sede == null) { notify("Elige la sede del tratamiento."); return; }
+    api.seguros.crear({ pacienteId: pac.id, paciente: pac.nombre, aseguradora: nuevaLiq.aseguradora.trim(), monto, sedeId: sedeApiUuid(nuevaLiq.sede), estado: "por_enviar" })
+      .then(() => { notify(`Liquidación de ${pac.nombre} registrada.`); setNuevaLiq(null); recargarLiq(); })
+      .catch((e) => notify(e?.message || "No se pudo registrar la liquidación."));
+  };
+  const borrarLiq = (x) => {
+    if (!confirm(`¿Eliminar la liquidación de ${x.paciente} con ${x.aseg}?`)) return;
+    api.seguros.borrar(x.id).then(() => { notify("Liquidación eliminada."); setDetalleLiq(null); recargarLiq(); }).catch(() => notify("No se pudo eliminar la liquidación."));
+  };
   // El total es lo tratado en la sede de la liquidación: un paciente de dos sedes no suma
   // aquí lo que se le hizo en la otra. Un ítem sin sede cuenta en la sede principal del paciente.
   const totalDe = (l) => {
@@ -8728,7 +8851,19 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
           <div><b>{segurosError ? "—" : conveniosVista.length}</b><span>Aseguradoras</span></div>
         </div>
         <span />
+        {conectado && !segurosError && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevaLiq({ pacienteId: pacientes[0]?.id ?? "", aseguradora: "", monto: "", sede: (sedesSeg.find((x) => mismaSede(x.id, sedeSeg.activa)) || sedesSeg[0] || {}).id ?? null })}><Plus size={15} strokeWidth={2} /> Nueva liquidación</button>}
       </section>
+      {nuevaLiq && (
+        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo="Nueva liquidación" sub="Lo que cubre la aseguradora o EPS" onClose={() => setNuevaLiq(null)} maxW={520}
+          footer={<><Btn small kind="ghost" onClick={() => setNuevaLiq(null)}>Cancelar</Btn><Btn small onClick={crearLiq}><Check size={15} strokeWidth={1.75} /> Registrar</Btn></>}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<Select value={nuevaLiq.pacienteId} onChange={(v) => setNuevaLiq({ ...nuevaLiq, pacienteId: v })} placeholder="— Selecciona —" options={pacientes.map((p) => ({ value: p.id, label: p.nombre }))} /></label>
+            <Field label="Aseguradora o EPS" value={nuevaLiq.aseguradora} onChange={(v) => setNuevaLiq({ ...nuevaLiq, aseguradora: v })} placeholder="Nombre de la aseguradora" />
+            <Field label="Monto que cubre (S/)" value={nuevaLiq.monto} onChange={(v) => setNuevaLiq({ ...nuevaLiq, monto: v.replace(/[^\d.,]/g, "") })} placeholder="0.00" />
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Sede del tratamiento<Select value={nuevaLiq.sede ?? ""} onChange={(v) => setNuevaLiq({ ...nuevaLiq, sede: v })} placeholder="— Selecciona —" disabled={sedesSeg.length < 2} options={sedesSeg.map((x) => ({ value: x.id, label: x.nombre }))} /></label>
+          </div>
+        </Modal>
+      )}
       {segurosError && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span><b>Módulo no conectado.</b> {segurosError} No significa que la clínica no tenga convenios.</span><button type="button" onClick={recargarLiq}>Reintentar</button></div>}
       <section className="dc-seg__conv">
         <div className="dc-seg__tit"><h3>Convenios</h3><span>Cobertura pactada y lo pendiente por aseguradora</span></div>
@@ -8781,7 +8916,7 @@ function Seguros({ notify, pacientes = [], fichas = {} }) {
       </div>
       )}</ListaFiltrable>
       {detalleLiq && (() => { const x = detalleLiq; const I = LI[x.estado]; return (
-        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={x.estado !== "pagado" ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>{({ borrador: "Enviar a la aseguradora", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}>
+        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={<>{conectado && <Btn small kind="ghost" onClick={() => borrarLiq(x)}><Trash2 size={14} strokeWidth={1.75} /> Eliminar</Btn>}{x.estado !== "pagado" ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>{({ borrador: "Enviar a la aseguradora", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}</>}>
           {x.estado === "observado" && x.motivo && <div style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", borderRadius: "var(--dc-r-md)", padding: "10px 12px", fontSize: 13, marginBottom: 12 }}><b>Observación de la aseguradora:</b> {x.motivo}</div>}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
             {[["Total tratamiento", `S/ ${x.total}`, NAVY], ["Cubre seguro", `S/ ${x.cob}`, "var(--dc-ok-700)"], ["Copago paciente", `S/ ${x.copago}`, "var(--dc-warn-600)"]].map(([l, v, col]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "12px 14px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 600, color: col, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{v}</div></div>)}
@@ -9694,7 +9829,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   // Plan de membresía contratado por la clínica (demo: se puede cambiar en vivo desde "Mi plan").
   const esSuper = rol === "superadmin";
-  const [plan, setPlan] = useState("mediana");
+  // Con sesión el plan es el de GET /clinica; hasta que llega no se supone ninguno (null).
+  const [plan, setPlan] = useState(() => (auth.token ? null : "mediana"));
+  const [planRenueva, setPlanRenueva] = useState(null);
   // Horario de atención de la clínica (Configuración › Horario de atención). Se carga
   // una vez aquí y se reparte: manda sobre la capacidad del día en el dashboard y sobre
   // los días y horas que el odontólogo puede ofrecer. Sin sesión vale lo guardado en el
@@ -9715,6 +9852,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       });
       const p = r?.plan === "cadena" ? "grande" : r?.plan;
       if (p && PLAN_MODULOS[p]) setPlan(p);
+      setPlanRenueva(r?.planVence || r?.planRenuevaEl || null);
     }).catch(() => { /* sin respuesta se conserva lo que hubiera */ });
     api.sedes.listar().then((s) => {
       const list = s || [];
@@ -9726,7 +9864,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   useEffect(() => { if (!auth.token) localStorage.setItem("dc_plan", plan); }, [plan]);
   const planMods = PLAN_MODULOS[plan] || PLAN_MODULOS.mediana;
   // Un módulo está disponible si el rol lo permite Y el plan lo incluye. "plan" siempre disponible.
-  const modAllowed = (id) => esSuper || id === "plan" || planMods.includes(id);
+  // Con sesión y sin plan aún (no llegó /clinica) no se bloquea nada: el servidor es quien manda.
+  const modAllowed = (id) => esSuper || id === "plan" || (auth.token && !plan) || planMods.includes(id);
 
   // Permisos EFECTIVOS: en modo conectado manda el mapa del login/API (no localStorage).
   const conectado = !!auth.token || !!usuario?.conectado || !!usuario?.organizacionId;
@@ -10158,7 +10297,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       }
       case "seguros": return <Seguros notify={notify} pacientes={pf} fichas={fichas} />;
       // Cambiar el plan es de toda la clínica: solo quien ve todas las sedes y puede editarlo.
-      case "plan": return <Plan notify={notify} plan={plan} setPlan={setPlan} esSuper={esSuper} can={can} puedeCambiar={esSuper || (usuario.sedes === "all" && (!can || can("plan", "editar")))} />;
+      case "plan": return <Plan notify={notify} plan={plan} renuevaEl={planRenueva} setPlan={setPlan} esSuper={esSuper} can={can} puedeCambiar={esSuper || (usuario.sedes === "all" && (!can || can("plan", "editar")))} />;
       // La lista se filtra por sede dentro de Espera (useSede) para no perder las entradas de otras sedes al guardar.
       case "espera": return <Espera notify={notify} esp={espera} setEsp={setEspera} pacientes={pf} setPacientes={setPacientes} />;
       case "tickets": return <Tickets citas={cf} setCitas={setCitas} fichas={fichas} notify={notify} />;
@@ -10339,7 +10478,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
           <div className="dc-sb__user">
             <div className="dc-sb__avatar" title={usuario.nombre} style={{ background: R.color }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
             {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{R.label}</div>
-              {!esSuper && (mods.includes("plan")
+              {!esSuper && plan && (mods.includes("plan")
                 ? <button type="button" className="dc-sb__planchip" title="Ver mi plan" onClick={() => { setVista("plan"); setSidebarOpen(false); }}><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</button>
                 : <span className="dc-sb__planchip"><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</span>)}
             </div>}
@@ -10449,7 +10588,7 @@ const hydrateEmisor = (r) => {
     ruc: String(r.ruc || "").replace(/\D/g, "").slice(0, 11),
     dir: String(r.direccion || "").trim(),
     tel: String(r.telefono || "").trim(),
-    serie: String(r.comprobanteSerie || r.serie || "B001").toUpperCase().slice(0, 4),
+    serie: String(r.comprobanteSerie || r.serie || "").toUpperCase().slice(0, 4),
   };
 };
 /* Estado del comprobante ante SUNAT (lo informa el backend tras enviarlo al OSE/PSE):
@@ -10485,10 +10624,12 @@ const emisorBoletaListo = () => {
 const getEmisor = (sede = null) => {
   const vacio = { nombre: "", ruc: "", dir: "", tel: "", serie: "B001" };
   let ls = {};
-  try { ls = JSON.parse(localStorage.getItem("dc_emisor") || "{}") || {}; } catch { ls = {}; }
+  // Con sesión el emisor es solo el del servidor (/clinica y /clinica/impresion): nada
+  // guardado en este navegador ni de la clínica de ejemplo.
+  if (!auth.token) { try { ls = JSON.parse(localStorage.getItem("dc_emisor") || "{}") || {}; } catch { ls = {}; } }
   const clinic = emisorClinica || {};
   // Respaldo: los mismos datos de empresa y sede del membrete de documentos (en la demo,
-  // la empresa de ejemplo con su RUC), para que la boleta no pida datos que ya existen.
+  // la empresa de ejemplo con su RUC; con sesión, lo que devolvió /clinica/impresion).
   let mb = {};
   try { const d = datosImpresion(); mb = { nombre: d.empresa.razonSocial || d.empresa.nombre, ruc: d.empresa.ruc, dir: d.sede.direccion, tel: d.sede.telefonos, serie: d.sede.serieDocumento ? `B${String(d.sede.serieDocumento).replace(/[^A-Z0-9]/gi, "").slice(0, 3)}` : "" }; } catch { mb = {}; }
   const nombre = (clinic.nombre || ls.nombre || mb.nombre || "").trim();
@@ -10682,9 +10823,9 @@ function DatosFacturacion({ onClose, notify = () => {}, readOnly = false }) {
       }))
       .filter((d) => d.label);
     const payload = { nombre: f.nombre.trim(), ruc: f.ruc.trim(), dir: f.dir || "", tel: f.tel || "", serie: (f.serie || "B001").toUpperCase() };
-    localStorage.setItem("dc_emisor", JSON.stringify(payload));
-    hydrateEmisor({ razonSocial: payload.nombre, ruc: payload.ruc, direccion: payload.dir, telefono: payload.tel, comprobanteSerie: payload.serie });
+    const emisorNuevo = { razonSocial: payload.nombre, ruc: payload.ruc, direccion: payload.dir, telefono: payload.tel, comprobanteSerie: payload.serie };
     if (auth.token) {
+      // Con sesión solo vale lo que guardó el servidor: si falla, no se da por guardado.
       api.clinica.actualizar({
         razonSocial: payload.nombre,
         ruc: payload.ruc,
@@ -10693,10 +10834,12 @@ function DatosFacturacion({ onClose, notify = () => {}, readOnly = false }) {
         comprobanteSerie: payload.serie,
         cajaDestinos: destinosClean,
       })
-        .then(() => { notify("Datos de facturación y destinos de caja guardados."); onClose(); })
-        .catch(() => { notify("Se guardaron en este navegador. No se pudo actualizar la clínica."); onClose(); });
+        .then((r) => { hydrateEmisor(r && (r.ruc || r.razonSocial) ? r : emisorNuevo); notify("Datos de facturación y destinos de caja guardados."); onClose(); })
+        .catch((e) => notify(`No se pudieron guardar los datos de facturación: ${e?.message || "error del servidor"}.`));
       return;
     }
+    localStorage.setItem("dc_emisor", JSON.stringify(payload));
+    hydrateEmisor(emisorNuevo);
     notify("Datos de facturación guardados. Las boletas usarán estos datos.");
     onClose();
   };
@@ -10755,7 +10898,10 @@ function DatosFacturacion({ onClose, notify = () => {}, readOnly = false }) {
 
 // `conceptoAbono`: concepto de la boleta si se cobra solo una parte (por defecto, `concepto`).
 function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", conceptoAbono = null, email, paciente, dni, direccion = "", items = null, faseIds = null, onClose, onAprobado, notify = () => {} }) {
+  // Con sesión todo cobro pasa por el servidor: sin paciente del servidor no se simula nada
+  // (antes, sin pacienteId, se «aprobaba» en local con boleta inventada).
   const real = !!auth.token && !!pacienteId;
+  const sinPaciente = !!auth.token && !pacienteId;
   const sxCobro = useSede();   // quién cobra: va en la boleta (C6)
   const [idempotencyKey] = useState(() => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `pay-${Date.now()}-${Math.random().toString(36).slice(2)}`));
   const [posting, setPosting] = useState(false);
@@ -10781,23 +10927,29 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
   const [cuotas, setCuotas] = useState(1);                   // cuotas de la clínica
   const [desc, setDesc] = useState(0);                       // descuento / promoción
   const [moneda, setMoneda] = useState("PEN");               // DC-13 PEN | USD (UI)
+  // Tipo de cambio. Con sesión sale solo del servidor (GET /tipo-cambio, y si no responde,
+  // el de GET /clinica); mientras no llega, no se cobra en dólares. Sin sesión, el del
+  // navegador o 3.75 de ejemplo.
   const [tcUsd, setTcUsd] = useState(() => {
+    if (auth.token) return null;
     const raw = Number(localStorage.getItem("dc_tipo_cambio") || "3.75");
     return Number.isFinite(raw) && raw > 0 ? raw : 3.75;
   });
-  const [tcFuente, setTcFuente] = useState("local"); // clinica | local
+  const [tcFuente, setTcFuente] = useState(auth.token ? "pendiente" : "local"); // clinica | local | pendiente | error
   useEffect(() => {
     if (!auth.token) return;
-    api.clinica.get().then((r) => {
-      const v = Number(r?.tipoCambio);
-      if (Number.isFinite(v) && v > 0) {
-        setTcUsd(v);
-        setTcFuente("clinica");
-        localStorage.setItem("dc_tipo_cambio", String(v));
-      }
-    }).catch(() => {});
+    const deClinica = () => api.clinica.get().then((r) => Number(r?.tipoCambio));
+    api.tipoCambio.get()
+      .then((r) => Number(r?.valor ?? r?.tipoCambio ?? r))
+      .catch(() => NaN)
+      .then((v) => (Number.isFinite(v) && v > 0 ? v : deClinica()))
+      .then((v) => {
+        if (Number.isFinite(v) && v > 0) { setTcUsd(v); setTcFuente("clinica"); }
+        else setTcFuente("error");
+      })
+      .catch(() => setTcFuente("error"));
   }, []); // eslint-disable-line
-  const TC_USD = tcUsd;
+  const TC_USD = tcUsd || 0;
   const sym = moneda === "USD" ? "US$" : "S/";
   const aUi = (pen) => moneda === "USD" ? Math.round((Number(pen) / TC_USD) * 100) / 100 : Number(pen) || 0;
   const aPen = (ui) => moneda === "USD" ? Math.round((Number(ui) * TC_USD) * 100) / 100 : Number(ui) || 0;
@@ -10887,6 +11039,13 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
       if (!s) { liberar(); return fallo("No se pudo iniciar la sesión de pago."); }
       if (s.simulado) {
         setSandbox(true);
+        // Niubiz no está activo en el servidor. Nunca se autoconfirma en producción: se
+        // cobra en el POS físico y se registra al validar. Solo un entorno de pruebas
+        // declarado (VITE_NIUBIZ_SANDBOX=true) confirma con el token de sandbox.
+        if (import.meta.env.VITE_NIUBIZ_SANDBOX !== "true") {
+          liberar(); setSandbox(false); setMsg("La pasarela en línea (Niubiz) no está activa en el servidor. Cobra en el POS de la clínica y registra el pago al validarlo.");
+          setPaso("pos"); return undefined;
+        }
         return api.pagos.niubizConfirmar({ transactionToken: "SANDBOX", purchaseNumber: s.purchaseNumber, monto: netPen, pacienteId, sedeId, concepto: conceptoFull, metodo: m })
           .then((r) => {
             liberar();
@@ -10922,14 +11081,19 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
                 if (!(r && r.aprobado)) return fallo(r && r.mensaje);
                 if (r.comprobanteNumero == null || r.comprobanteNumero === "") return fallo("El servidor no asignó número de comprobante.");
                 return aprobado({ metodo: m, pagoId: r.pagoId, montoCobrado: netPen, parcial, moneda, montoOriginal: net, tipoCambio: TC_USD, comprobanteSerie: r.comprobanteSerie, comprobanteNumero: r.comprobanteNumero });
-              });
+              })
+              .catch((e) => fallo(e?.message || "Niubiz no confirmó el pago."));
           } });
         window.VisanetCheckout.open();
       } catch (e) { fallo("No se pudo abrir el checkout de Niubiz."); }
     };
     if (window.VisanetCheckout) return configurar();
+    // URL del checkout: la que manda el servidor con la sesión o la del despliegue
+    // (VITE_NIUBIZ_JS). Nunca fija: la de pruebas (QAS) cobraba en sandbox en producción.
+    const urlCheckout = s.checkoutUrl || s.scriptUrl || import.meta.env.VITE_NIUBIZ_JS || "";
+    if (!urlCheckout) return fallo("Falta configurar la URL del checkout de Niubiz (VITE_NIUBIZ_JS o checkoutUrl del servidor). Cobra en el POS de la clínica.");
     const sc = document.createElement("script");
-    sc.src = "https://static-content-qas.vnforapps.com/v2/js/checkout.js";
+    sc.src = urlCheckout;
     sc.onload = configurar; sc.onerror = () => fallo("No se pudo cargar el checkout de Niubiz.");
     document.body.appendChild(sc);
   };
@@ -11011,7 +11175,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
         else fallo(e?.message || "No se pudo registrar el pago mixto.");
       });
   };
-  const volver = () => { setMetodo(null); setRef(""); setBanco(""); setFoto(null); setRecibidoEfectivo(""); setMixEf(""); setMixOtro(""); setPaso("elegir"); };
+  const volver = () => { setMsg(""); setMetodo(null); setRef(""); setBanco(""); setFoto(null); setRecibidoEfectivo(""); setMixEf(""); setMixOtro(""); setPaso("elegir"); };
   const serieBoleta = resultado?.comprobanteSerie || getEmisor(sedeId).serie;
   const numeroBoleta = resultado?.comprobanteNumero != null ? fmtComprobante(resultado.comprobanteNumero) : (real ? null : boletaNum);
   const abrirBoletaAprobada = () => {
@@ -11042,12 +11206,21 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
     </div>
   );
 
+  if (sinPaciente) return wrap(
+    <div style={{ padding: 12, textAlign: "center" }}>
+      <AlertCircle size={30} strokeWidth={1.75} color={RED} />
+      <div style={{ fontWeight: 500, color: NAVY, fontSize: 15, marginTop: 10 }}>No se puede registrar este cobro</div>
+      <div style={{ fontSize: 13, color: "var(--dc-ink-400)", margin: "6px 0 16px" }}>El cobro no está ligado a un paciente del servidor. Ábrelo desde la ficha, la agenda o la caja del paciente.</div>
+      <Btn full kind="ghost" onClick={onClose}>Cerrar</Btn>
+    </div>, 22
+  );
+
   if (paso === "elegir") return wrap(
     <>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
         {[["PEN", "Soles (PEN)"], ["USD", "Dólares (USD)"]].map(([k, lbl]) => (
-          <button key={k} type="button" onClick={() => {
-            if (k === moneda) return;
+          <button key={k} type="button" disabled={k === "USD" && !tcUsd} title={k === "USD" && !tcUsd ? (tcFuente === "error" ? "El servidor no devolvió el tipo de cambio" : "Cargando el tipo de cambio del servidor…") : undefined} onClick={() => {
+            if (k === moneda || (k === "USD" && !tcUsd)) return;
             const prevUi = Number(montoCobrar) || 0;
             const pen = moneda === "USD" ? Math.round(prevUi * TC_USD * 100) / 100 : prevUi;
             const nextUi = k === "USD" ? Math.round((pen / TC_USD) * 100) / 100 : pen;
@@ -11066,13 +11239,14 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
                 const v = Number(e.target.value);
                 if (!Number.isFinite(v) || v <= 0) return;
                 cambiarTc(v);
-                try { localStorage.setItem("dc_tipo_cambio", String(v)); } catch { /* sin almacenamiento */ }
+                if (!auth.token) { try { localStorage.setItem("dc_tipo_cambio", String(v)); } catch { /* sin almacenamiento */ } }
+                else setTcFuente("local");
               }}
               onBlur={() => {
-                if (!auth.token || !(Number(tcUsd) > 0)) return;
-                api.clinica.actualizar({ tipoCambio: Number(tcUsd) })
+                if (!auth.token || !(Number(tcUsd) > 0) || tcFuente !== "local") return;
+                api.tipoCambio.actualizar(Number(tcUsd))
                   .then(() => setTcFuente("clinica"))
-                  .catch(() => { /* sin permiso config: queda override de sesión */ });
+                  .catch(() => notify("No se pudo guardar el tipo de cambio en el servidor: se usa solo en este cobro."));
               }}
               style={{ ...inp2, width: 72 }} title={tcFuente === "clinica" ? "Tipo de cambio de la clínica" : "Tipo de cambio (sesión)"} />
           </label>
@@ -11080,7 +11254,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
       </div>
       {moneda === "USD" && (
         <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginBottom: 10 }}>
-          TC {tcFuente === "clinica" ? "de la clínica" : "de esta sesión"}: {TC_USD} (PEN por 1 USD)
+          TC {tcFuente === "clinica" ? "de la clínica" : "de este cobro"}: {TC_USD} (PEN por 1 USD)
         </div>
       )}
       {saldoMax > 0 && (
@@ -11199,6 +11373,7 @@ function ModalCobro({ monto, pacienteId, sedeId, concepto = "Cobro en caja", con
         <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: metaMet.color, display: "grid", placeItems: "center" }}>{metaMet.icon}</div>
         <div><div style={{ fontWeight: 500, color: NAVY }}>{metaMet.label}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{metodo === "tarjeta" ? "Pasa o inserta la tarjeta en el POS" : "Muestra el QR / cobra en el POS"}</div></div>
       </div>
+      {msg && real && <div role="status" style={{ fontSize: 12, color: "var(--dc-warn-600)", marginBottom: 10 }}>{msg}</div>}
       <div style={{ background: "var(--dc-white)", border: "1px solid var(--dc-sky)", borderRadius: "var(--dc-r-lg)", padding: "14px 16px", marginBottom: 16, display: "flex", gap: 11, alignItems: "center" }}>
         <CreditCard size={20} strokeWidth={1.75} color="var(--dc-accent-cyan)" />
         <div style={{ fontSize: 13, color: "var(--dc-brand-500)" }}>Envía <strong>{sym} {net.toFixed(2)}</strong> al POS y espera la aprobación. El cobro se registra <strong>solo cuando el POS valida</strong> el pago.</div>
@@ -11437,6 +11612,8 @@ function PortalPaciente({ usuario, onLogout }) {
   const [portalError, setPortalError] = useState(null);
   const [totalInvertidoApi, setTotalInvertidoApi] = useState(null);
   const [totalAhorradoApi, setTotalAhorradoApi] = useState(null);
+  // Nombre de la clínica: con sesión, el que manda el resumen del portal; nunca la marca de ejemplo.
+  const [clinicaPortal, setClinicaPortal] = useState(conectado ? "" : "Clínica Dental Sonríe+");
 
   const tratamiento = ficha.tratamiento || [];
   const total = tratamiento.reduce((s, f) => s + (Number(f.costo) || 0), 0);
@@ -11461,6 +11638,7 @@ function PortalPaciente({ usuario, onLogout }) {
     api.portal.resumen().then((r) => {
       setPortalError(null);
       const p = r.paciente || {};
+      setClinicaPortal(String(r.clinica?.nombre || r.clinicaNombre || "").trim());
       setPortalPac({
         id: p.id || pid,
         nombre: p.nombre || usuario.nombre || "Paciente",
@@ -11578,7 +11756,7 @@ function PortalPaciente({ usuario, onLogout }) {
       <aside className={`dc-side${navOpen ? " open" : ""}`} style={{ width: 230, background: "linear-gradient(180deg,var(--dc-accent-cyan),var(--dc-brand-600))", color: "#fff", flexShrink: 0, position: "relative", height: "calc(calc(100vh / var(--dc-z, 1)) - 24px)", margin: "12px 0 12px 12px", borderRadius: "var(--dc-r-lg)", boxShadow: "0 10px 40px -10px rgba(14,116,144,.3)", border: "1px solid rgba(255,255,255,.15)", display: "flex", flexDirection: "column", zIndex: 50 }}>
         <div style={{ padding: 18, borderBottom: "1px solid rgba(255,255,255,.15)", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ background: "#fff", borderRadius: "var(--dc-r-sm)", width: 34, height: 34, display: "grid", placeItems: "center" }}><Smile size={19} strokeWidth={1.75} color={DS.c.primary} /></div>
-          <div><div style={{ fontWeight: 500, fontSize: 14 }}>Mi Sonríe+</div><div style={{ fontSize: 12, color: "var(--dc-sky)" }}>Portal del paciente</div></div>
+          <div><div style={{ fontWeight: 500, fontSize: 14 }}>{conectado ? "Mi portal" : "Mi Sonríe+"}</div><div style={{ fontSize: 12, color: "var(--dc-sky)" }}>Portal del paciente</div></div>
         </div>
         <nav style={{ padding: 10, flex: 1 }}>
           {NAV.map((it) => { const Icon = it.icon; const active = vista === it.id; return (
@@ -11600,7 +11778,7 @@ function PortalPaciente({ usuario, onLogout }) {
             <button className="dc-burger" onClick={() => setNavOpen((s) => !s)} aria-label="Abrir menú" style={{ background: "none", border: "none", cursor: "pointer", color: NAVY, display: "none", padding: 0, minWidth: "var(--dc-tap-min)", minHeight: "var(--dc-tap-min)" }}><Menu size={22} strokeWidth={1.75} /></button>
             <div style={{ fontSize: 18, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{NAV.find((n) => n.id === vista)?.label}</div>
           </div>
-          <div style={{ fontSize: 13, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 6 }}><Smile size={14} strokeWidth={1.75} color={TEAL} /> Clínica Dental Sonríe+</div>
+          {clinicaPortal && <div style={{ fontSize: 13, color: "var(--dc-ink-500)", display: "flex", alignItems: "center", gap: 6 }}><Smile size={14} strokeWidth={1.75} color={TEAL} /> {clinicaPortal}</div>}
         </header>
 
         <div style={{ padding: 22 }}>
@@ -11750,8 +11928,11 @@ function PortalPaciente({ usuario, onLogout }) {
               {saldo > 0 && (
                 <Card style={{ padding: 20, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                    <div><div style={{ fontWeight: 500, color: NAVY }}>Paga cómodo en cuotas</div><div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>Saldo S/ {M.sol2(saldo)} en 3 cuotas de S/ {M.sol2((saldo / 3))} con Yape, Plin o tarjeta.</div></div>
-                    <Btn kind="red" onClick={() => setPagoModal(saldo)}><CreditCard size={16} strokeWidth={1.75} /> Pagar con Niubiz</Btn>
+                    {/* Con sesión el pago en línea desde el portal no tiene endpoint: no se simula. */}
+                    {conectado
+                      ? <div><div style={{ fontWeight: 500, color: NAVY }}>Saldo pendiente S/ {M.sol2(saldo)}</div><div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>El pago en línea desde el portal aún no está disponible. Puedes pagar en la clínica.</div></div>
+                      : <><div><div style={{ fontWeight: 500, color: NAVY }}>Paga cómodo en cuotas</div><div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>Saldo S/ {M.sol2(saldo)} en 3 cuotas de S/ {M.sol2((saldo / 3))} con Yape, Plin o tarjeta.</div></div>
+                    <Btn kind="red" onClick={() => setPagoModal(saldo)}><CreditCard size={16} strokeWidth={1.75} /> Pagar con Niubiz</Btn></>}
                   </div>
                 </Card>
               )}
@@ -11762,7 +11943,7 @@ function PortalPaciente({ usuario, onLogout }) {
                     <div style={{ background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", width: 34, height: 34, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center" }}><CheckCircle2 size={17} strokeWidth={1.75} /></div>
                     <div style={{ flex: 1 }}><div style={{ fontWeight: 500, color: NAVY }}>{p.concepto}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{p.fecha} – {p.metodo}</div></div>
                     <div style={{ fontWeight: 500, color: NAVY }}>S/ {p.monto}</div>
-                    <button type="button" className="dc-icon-btn" aria-label="Descargar boleta" onClick={(e) => { e.stopPropagation(); notify("Descargando boleta electrónica..."); }} style={{ background: "none", border: "none", cursor: "pointer", color: DS.c.primary }} title="Descargar boleta"><FileText size={17} strokeWidth={1.75} /></button>
+                    {!conectado && <button type="button" className="dc-icon-btn" aria-label="Descargar boleta" onClick={(e) => { e.stopPropagation(); notify("Descargando boleta electrónica..."); }} style={{ background: "none", border: "none", cursor: "pointer", color: DS.c.primary }} title="Descargar boleta"><FileText size={17} strokeWidth={1.75} /></button>}
                   </div>
                 ))}
                 {(!ficha.pagos || ficha.pagos.length === 0) && <Vacio icon={<Wallet size={22} strokeWidth={1.75} />} titulo="Sin pagos" sub="Aquí verás tus boletas cuando realices un pago." />}
@@ -11818,7 +11999,7 @@ function PortalPaciente({ usuario, onLogout }) {
       ); })()}
       {verPago && (
         <Modal icon={<CheckCircle2 size={20} strokeWidth={1.75} />} tone="var(--dc-ok)" titulo="Comprobante de pago" sub={verPago.concepto} onClose={() => setVerPago(null)} maxW={420}
-          footer={<><Btn small kind="ghost" onClick={() => setVerPago(null)}>Cerrar</Btn><Btn small onClick={() => { notify("Descargando boleta electrónica…"); setVerPago(null); }}><FileText size={15} strokeWidth={1.75} /> Descargar boleta</Btn></>}>
+          footer={<><Btn small kind="ghost" onClick={() => setVerPago(null)}>Cerrar</Btn>{!conectado && <Btn small onClick={() => { notify("Descargando boleta electrónica…"); setVerPago(null); }}><FileText size={15} strokeWidth={1.75} /> Descargar boleta</Btn>}</>}>
           <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
             <div style={{ width: 52, height: 52, borderRadius: "var(--dc-r-lg)", background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", display: "grid", placeItems: "center", margin: "0 auto 10px" }}><CheckCircle2 size={26} strokeWidth={1.75} /></div>
             <div style={{ fontSize: 27, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>S/ {verPago.monto}</div>
@@ -11844,7 +12025,7 @@ function PortalPaciente({ usuario, onLogout }) {
         </Modal>
       )}
       {agendar && <AgendarCitaModal paciente={paciente} base={agendar !== "nueva" ? agendar : null} onClose={() => setAgendar(null)} onConfirm={agendarCita} />}
-      {pagoModal != null && <ModalCobro monto={pagoModal} onClose={() => setPagoModal(null)} onAprobado={() => { setPagoModal(null); notify(auth.token ? "¡Pago aprobado! Comprobante registrado (todavía no se envía a SUNAT ni por correo)." : "¡Pago aprobado! Boleta electrónica emitida y enviada a tu correo."); }} />}
+      {pagoModal != null && !conectado && <ModalCobro monto={pagoModal} onClose={() => setPagoModal(null)} onAprobado={() => { setPagoModal(null); notify(auth.token ? "¡Pago aprobado! Comprobante registrado (todavía no se envía a SUNAT ni por correo)." : "¡Pago aprobado! Boleta electrónica emitida y enviada a tu correo."); }} />}
       {toast && (() => { const tn = tonoAviso(toast); return (
         <div className="dc-toast" role="status" aria-live="polite" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 300, background: "#fff", borderRadius: "var(--dc-r-lg)", border: `1px solid ${tn.borde}`, boxShadow: "0 12px 32px rgba(16,24,40,.18)", padding: 16, display: "flex", gap: 12, alignItems: "center", maxWidth: 340 }}>
           <div style={{ background: tn.error ? tn.fondo : "var(--dc-accent-soft)", color: tn.error ? tn.color : DS.c.primary, borderRadius: "var(--dc-r-md)", width: 36, height: 36, display: "grid", placeItems: "center", flexShrink: 0 }}>
@@ -12267,6 +12448,9 @@ function BackOfficeAWG({ usuario, onLogout }) {
     { id: "config", label: "Configuración", icon: Settings },
   ];
   const render = () => {
+    // Con sesión no hay endpoints de plataforma (tenants, suscripciones, usuarios globales,
+    // soporte, configuración): no se muestran clínicas de ejemplo ni acciones que no hacen nada.
+    if (auth.token && secc !== "auditoria") return <Card style={{ padding: 0 }}><Vacio icon={<Globe size={22} strokeWidth={1.75} />} titulo="Aún no conectado al servidor" sub="Esta sección del BackOffice todavía no tiene servicio en el servidor. La auditoría sí está disponible." /></Card>;
     switch (secc) {
       case "clinicas": return <Plataforma notify={notify} />;
       case "suscripciones": return <AwgSuscripciones notify={notify} />;
