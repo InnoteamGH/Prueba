@@ -12,7 +12,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   const puedeEnviar = can ? can("recall", "crear") : true;
   const conectado = !!auth.token;
   // Sede: cola, historial y NPS son de las sedes que se ven con el filtro del menú.
-  const { sede: sedeFiltro, ids: sedesVer, enSede, global, activa } = useSede();
+  const { sede: sedeFiltro, ids: sedesVer, enSede, global, activa, rol: rolSes, nombre: nombreSes } = useSede();
   const sedesKey = (sedesVer || []).join(",");
   const sedesQ = sedesVer ? sedesVer.map(sedeApiUuid).filter(Boolean) : null;
   // Con API, una fila sin sede (el servidor aún no la manda) se deja ver.
@@ -96,7 +96,11 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   const [probarTel, setProbarTel] = useState("");
   const abrirCfg = (r) => { setCfg(r); setCfgMsg(r.plantilla || ""); setCfgHsm(r.hsmNombre || ""); setProbarTel(""); };
   // Vista previa: reemplaza las variables con datos de ejemplo (como llegaría al paciente).
-  const previewMsg = (t) => (t || "").replace(/\{nombre\}/g, "María").replace(/\{fecha\}/g, addDays(2).split("-").reverse().join("/")).replace(/\{hora\}/g, "10:00").replace(/\{doctor\}/g, "Dra. Carla Mendoza").replace(/\{sede\}/g, "Sede San Isidro");
+  // Con sesión, la sede real que se mira y el médico de la sesión (o un rótulo genérico),
+  // nunca los nombres de la demostración.
+  const sedePrev = conectado ? (activa != null && nombreSede(activa) !== "—" ? nombreSede(activa) : "(sede de la cita)") : "Sede San Isidro";
+  const docPrev = conectado ? (rolSes === "medico" && nombreSes ? nombreSes : "(doctor de la cita)") : "Dra. Carla Mendoza";
+  const previewMsg = (t) => (t || "").replace(/\{nombre\}/g, conectado ? "(nombre del paciente)" : "María").replace(/\{fecha\}/g, addDays(2).split("-").reverse().join("/")).replace(/\{hora\}/g, "10:00").replace(/\{doctor\}/g, docPrev).replace(/\{sede\}/g, sedePrev);
   const probarAhora = () => {
     if (!cfg) return;
     const tel = (probarTel || "").replace(/\D/g, "");
@@ -240,14 +244,15 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
             </div>
           </section>
           {/* SAT-03: la alerta se resuelve desde la tarjeta (chat, ficha o marcar atendido). */}
-          {bajos.filter((r) => !atendidosBajos.includes(r.paciente)).map((r) => { const pac = (pacientes || []).find((p) => p.nombre === r.paciente); return (
+          {bajos.filter((r) => !atendidosBajos.includes(r.paciente)).map((r) => { const pac = (pacientes || []).find((p) => p.nombre === r.paciente) || (conectado && r.pacienteId ? { id: r.pacienteId } : null); return (
             <div key={r.paciente} className="dc-banda dc-banda--peligro dc-sat-alerta">
               <AlertTriangle size={17} strokeWidth={1.75} />
               <div><b>{r.paciente} calificó {r.nps}/10</b><span>{r.comentario || "Sin comentario."} El asistente ya se disculpó; conviene que alguien del equipo lo contacte.</span></div>
               <div className="dc-sat-alerta__acc">
                 <button type="button" onClick={() => { window.location.hash = "#/whatsapp"; }}>Abrir chat</button>
                 {pac && <button type="button" onClick={() => { window.location.hash = `#/pacientes/${pac.id}`; }}>Ver ficha</button>}
-                <button type="button" className="is-pri" onClick={() => { setAtendidosBajos((x) => [...x, r.paciente]); notify(`${r.paciente}: alerta marcada como atendida.`); }}>Marcar como atendido</button>
+                {/* Con sesión no hay endpoint para marcar la alerta: solo se oculta en esta pantalla y se dice así. */}
+                <button type="button" className="is-pri" onClick={() => { setAtendidosBajos((x) => [...x, r.paciente]); notify(conectado ? `${r.paciente}: alerta ocultada en esta pantalla. Guardarla como atendida estará disponible cuando el servidor lo soporte.` : `${r.paciente}: alerta marcada como atendida.`); }}>{conectado ? "Ocultar alerta" : "Marcar como atendido"}</button>
               </div>
             </div>
           ); })}

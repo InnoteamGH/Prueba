@@ -534,10 +534,12 @@ function Ortodoncia({ pacienteId, notify }) {
 
 /* ── Receta médica ── */
 const ITEM_VACIO = () => ({ medicamento: "", presentacion: "", dosis: "", frecuencia: "", duracion: "" });
-function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
+function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medicos = [] }) {
   const demoDb = useContext(DatosDemoCtx);
   const sedeRx = useSede();   // médico de la sesión: firma la receta en la demo
   const conectado = !!auth.token;
+  // Médicos con su COP: con sesión los de GET /medicos; nunca los de ejemplo.
+  const medicosRx = medicos.length ? medicos : (conectado ? [] : MEDICOS);
   const [items, setItems] = useState([ITEM_VACIO()]);
   const [indicaciones, setIndicaciones] = useState("");
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: `1.5px solid ${LINE}`, fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box", background: "var(--dc-white)" };
@@ -634,8 +636,10 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
   // trae "Aceptar" enfocado y un Enter por inercia emitiría la receta.
   const [alergiaPend, setAlergiaPend] = useState(null);
   const emitirReceta = (validos, alertas) => {
+    const yo = sedeRx.rol === "medico" ? medicosRx.find((m) => m.nombre === sedeRx.nombre) : null;
     const body = {
       pacienteId,
+      ...(conectado && yo ? { medicoId: yo.id } : {}),
       indicaciones: indicaciones || null,
       items: JSON.stringify(validos),
     };
@@ -675,7 +679,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify }) {
       <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha ? String(r.fecha).slice(0, 10).split("-").reverse().join("/") : "")}</div></div>
       <h2>Rp/</h2>${filas || '<div class="muted">—</div>'}
       ${r.indicaciones ? `<h2>Indicaciones</h2><div class="box">${esc(r.indicaciones)}</div>` : ""}
-      <div class="firma"><div>${esc(r.medico && r.medico !== "—" ? r.medico : "Firma y sello del profesional")}${(() => { const m = MEDICOS.find((x) => x.nombre === r.medico); return m?.cop ? ` · COP ${esc(m.cop)}` : ""; })()}</div></div>`, notify);
+      <div class="firma"><div>${esc(r.medico && r.medico !== "—" ? r.medico : "Firma y sello del profesional")}${(() => { const m = r.cop ? { cop: r.cop } : medicosRx.find((x) => (r.medicoId != null && String(x.id) === String(r.medicoId)) || x.nombre === r.medico); return m?.cop ? ` · COP ${esc(m.cop)}` : ""; })()}</div></div>`, notify);
   };
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
   return (
@@ -1080,7 +1084,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           apoderadoNombre: pac.apoderadoNombre || "", apoderadoParentesco: pac.apoderadoParentesco || "", apoderadoDni: pac.apoderadoDni || "", apoderadoTelefono: pac.apoderadoTelefono || "" });
         // Lo guardado manda; el motivo de consulta empieza vacío (no se inventa a partir de la última nota).
         setFc((cur) => cur || fc.fichaClinica || { motivoConsulta: "", filiacion: { direccion: pac.distrito ? `Av. Principal 123, ${pac.distrito}` : "", ocupacion: "", estadoCivil: "", grupoSanguineo: "", contactoEmergencia: "", telefonoEmergencia: "" } });
-        setMedicos(MEDICOS.map((m) => ({ id: String(m.id), nombre: m.nombre, sedes: sedesDe(m) })));
+        setMedicos(MEDICOS.map((m) => ({ id: String(m.id), nombre: m.nombre, cop: m.cop, sedes: sedesDe(m) })));
         // El doctor de la sesión queda elegido en «Atendido por» (evita atribuir la atención a otro).
         { const yo = MEDICOS.find((m) => sedeCx?.nombre && m.nombre === sedeCx.nombre); if (yo) setEvoMedico((v) => v || String(yo.id)); }
         setConsentimientos((cur) => cur.length ? cur : [
@@ -2325,7 +2329,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura />
             </div>}
 
-            {tab === "recetas" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} />}
+            {tab === "recetas" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} medicos={medicosTodos} />}
 
             {tab === "odontograma" && subOdo === "orto" && <Ortodoncia pacienteId={pacienteId} notify={notify} />}
 
