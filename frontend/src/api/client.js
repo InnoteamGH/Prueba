@@ -328,7 +328,7 @@ export const api = {
   },
   goLive: () => request("GET", "/go-live"),
   clinica: {
-    get: async () => { const r = await request("GET", "/clinica"); if (r && r.horario) r.horario = horarioDeServidor(r.horario); return r; },
+    get: () => request("GET", "/clinica").then((r) => { if (r && r.horario) r.horario = horarioDeServidor(r.horario); return r; }),
     actualizar: (d) => request("PUT", "/clinica", d && d.horario ? { ...d, horario: horarioAlServidor(d.horario) } : d),
     impresion: (sedeId) =>
       request("GET", `/clinica/impresion${sedeId ? `?sedeId=${sedeId}` : ""}`),
