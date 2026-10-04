@@ -34,7 +34,9 @@ export function apiRowsAHtmlDatos(rows = []) {
       if (carasRaw._pieza) pieza.push({ h: String(carasRaw._pieza), c: "r" });
       if (r.estadoPieza) {
         const h = String(r.estadoPieza);
-        pieza.push({ h: h === "extraer" ? "extraccion" : h, c: "r" });
+        const hh = h === "extraer" ? "extraccion" : h;
+        // El registro antiguo guardaba la misma marca en _pieza y en estadoPieza: una sola vez.
+        if (!pieza.some((m) => m.h === hh || (m.h === "extraer" && hh === "extraccion"))) pieza.push({ h: hh, c: "r" });
       }
     }
     datos[pz] = { caras, raices, pieza, nota: r.nota || "" };
