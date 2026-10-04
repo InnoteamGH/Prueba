@@ -5,6 +5,7 @@ import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
 import { comisionSede, guardarMetaSedeDemo, medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
 import { sedeApiUuid } from "../routing";
+import { conCop } from "../util/cop";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
 import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda, useSede, mismaSede, sedeNum, nombreSede} from "../comun";
 
@@ -846,7 +847,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
           {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : (
             <ListaFiltrable rows={meds} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_doctores" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
               { key: "n", label: "Doctor", w: "minmax(180px,1.3fr)", cell: (m) => <PersonaCelda nombre={m.nombre} /> },
-              { key: "cop", label: "COP", w: "100px", get: (m) => m.cop || "—" },
+              { key: "cop", label: "COP", w: "100px", get: (m) => conCop(m.cop) || "—" },
               { key: "e", label: "Especialidad", w: "minmax(150px,1fr)", get: (m) => espNombre(m.especialidadId) || "—" },
               // Sedes donde atiende (las que se ven); sin sede, se marca para asignarla.
               { key: "sd", label: "Sedes", w: "minmax(130px,.9fr)", cell: (m) => { const l = sedesMedico(m); return l.length ? <span className="dc-tp__sub">{l.filter(sedeVisible).map((x) => nomSedeCfg(x).replace(/^Sede\s+/i, "")).join(" – ")}</span> : <span className="dc-tp__sub" style={{ color: "var(--dc-warn-600)" }}>Sin sede</span>; } },
@@ -864,7 +865,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                 <article key={m.id} className={`dc-cfg__doc${m.activo ? "" : " is-off"}`}>
                   <div className="dc-cfg__dtop">
                     <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.22)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(String(m.nombre).replace(/^Dra?\.\s*/, ""))}</span>
-                    <div><b>{m.nombre}</b><small>{espNombre(m.especialidadId)}{m.cop ? ` – ${m.cop}` : ""}{sedeUnicaVer == null && sedesMedico(m).length ? ` – ${sedesMedico(m).filter(sedeVisible).map((x) => nomSedeCfg(x).replace(/^Sede\s+/i, "")).join(", ")}` : ""}</small></div>
+                    <div><b>{m.nombre}</b><small>{espNombre(m.especialidadId)}{conCop(m.cop) ? ` – ${conCop(m.cop)}` : ""}{sedeUnicaVer == null && sedesMedico(m).length ? ` – ${sedesMedico(m).filter(sedeVisible).map((x) => nomSedeCfg(x).replace(/^Sede\s+/i, "")).join(", ")}` : ""}</small></div>
                     <span className={`dc-int__est ${m.activo ? "is-ok" : ""}`}><i />{m.activo ? "Activo" : "Inactivo"}</span>
                   </div>
                   <div className="dc-cfg__dnums">
@@ -1005,7 +1006,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
         const docAjeno = edit.tipo === "doctor" && !!it.id && medAjeno(it);
         const roDoc = docAjeno ? { readOnly: true, style: { ...inp, marginTop: 5, background: "var(--dc-bg)", color: "var(--dc-ink-500)" } } : {};
         return (
-          <Modal icon={<Settings size={20} strokeWidth={1.75} />} titulo={`${it.id ? "Editar" : "Nuevo"} ${T.toLowerCase()}`} onClose={() => setEdit(null)} maxW={460}
+          <Modal icon={<Settings size={20} strokeWidth={1.75} />} titulo={`${it.id ? "Editar" : ["sede", "promo"].includes(edit.tipo) ? "Nueva" : "Nuevo"} ${T.toLowerCase()}`} onClose={() => setEdit(null)} maxW={460}
             footer={<><Btn small kind="ghost" onClick={() => setEdit(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> Guardar</Btn></>}>
             <div style={{ display: "grid", gap: 12 }}>
               {docAjeno && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>{it.nombre} también atiende en otra sede: su nombre, especialidad y estado los cambia la administración general. Aquí fijas su comisión en tu sede.</span></div>}

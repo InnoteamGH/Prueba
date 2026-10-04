@@ -2254,10 +2254,22 @@ function hallazgosLineas(){
    gráfico dibuja las 52 posiciones porque sirve para las tres denticiones, pero el
    rótulo tiene que decir las del paciente. */
 function denticion(){
-  const e=parseInt(PACIENTE.edad,10)||0;
-  if(e>=13) return {tipo:'permanente', n:32, txt:'Boca completa – 32 piezas'};
-  if(e<=5)  return {tipo:'temporal',   n:20, txt:'Boca completa – 20 piezas temporales'};
-  return {tipo:'mixta', n:52, txt:'Dentición mixta – 32 permanentes y 20 temporales'};
+  /* Sin edad conocida no se asume un niño (antes un adulto sin fecha de nacimiento salía
+     con «20 piezas temporales»): manda la dentición que eligió el sistema. */
+  const txtE=String(PACIENTE.edad==null?'':PACIENTE.edad).trim();
+  const e=parseInt(txtE,10);
+  const PERM={tipo:'permanente', n:32, txt:'Boca completa – 32 piezas permanentes'};
+  const TEMP={tipo:'temporal',   n:20, txt:'Boca completa – 20 piezas temporales'};
+  const MIX ={tipo:'mixta', n:52, txt:'Dentición mixta – 32 permanentes y 20 temporales'};
+  if(txtE!=='' && Number.isFinite(e)){ if(e>=13) return PERM; if(e<=5) return TEMP; return MIX; }
+  const d=String(PACIENTE.dent||'').toLowerCase();
+  if(/infantil|leche|temporal|nino/.test(d)) return TEMP;
+  if(/mixt/.test(d)) return MIX;
+  return PERM;
+}
+function refrescarRotulos(){
+  try{ const ep=document.getElementById('et-piezas'); if(ep) ep.textContent=denticion().txt; }catch(e){}
+  try{ const e0=document.getElementById('estado'); if(e0&&EN_APP&&!document.getElementById('b-tras-guardar')) e0.innerHTML=textoEstado(); }catch(e){}
 }
 /* Índice CPOD (Klein, Palmer y Knutson): dientes permanentes Cariados, Perdidos por
    caries y Obturados. Se mide sobre 28 piezas: excluye los terceros molares.
@@ -2526,7 +2538,7 @@ function fechaCorta(d){const z=x=>(x<10?'0':'')+x;
 /* Número del documento: serie de la sede que emite + año + H.C. Se recalcula cuando el
    sistema envía el paciente y la sede (applyPaciente / applyClinica). */
 let NUM_DOC='';
-function calcNumDoc(){ NUM_DOC=(CLINICA.serie?CLINICA.serie+'-':'')+'PI-'+new Date().getFullYear()+'-'+(PACIENTE.hc||'SN')+'-01'; TOMA.id='ODO-'+(PACIENTE.hc||'SN')+'-0007'; }
+function calcNumDoc(){ /* La serie de la sede puede venir ya como «PI»: un solo prefijo, nunca «PI-PI-…». */ var ser=String(CLINICA.serie||'').trim().replace(/-?PI-?$/i,''); NUM_DOC=(ser?ser+'-':'')+'PI-'+new Date().getFullYear()+'-'+(PACIENTE.hc||'SN')+'-01'; TOMA.id='ODO-'+(PACIENTE.hc||'SN')+'-0007'; }
 calcNumDoc();
 const imp=v=>v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
 
@@ -3104,10 +3116,12 @@ construir(); panel();
       if(typeof PACIENTE==='object'&&PACIENTE){
         if(p.nombre) PACIENTE.nombre=String(p.nombre);
         if(p.edad!=null) PACIENTE.edad=String(p.edad);
+        if(p.denticion) PACIENTE.dent=String(p.denticion);
         if(p.dni) PACIENTE.dni=String(p.dni);
         if('hc' in p) PACIENTE.hc=p.hc?String(p.hc):'';
         if(p.sede) PACIENTE.sede=String(p.sede);
         if(typeof calcNumDoc==='function') calcNumDoc();
+        if(typeof refrescarRotulos==='function') refrescarRotulos();
       }
       var nom=document.querySelector('.exp-nom');
       var av=document.querySelector('.exp-av');
@@ -3185,6 +3199,8 @@ construir(); panel();
       }
       pintar();
       if(typeof panel==='function') panel();
+      // El estado («fase …») y el rótulo de la dentición siguen a la fase cargada.
+      if(typeof refrescarRotulos==='function') refrescarRotulos();
       notify();
     }catch(e){}
   }

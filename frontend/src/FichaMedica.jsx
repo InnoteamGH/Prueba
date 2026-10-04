@@ -4,7 +4,7 @@ import { estadoLabel } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, caraOdontoLabel, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -19,6 +19,10 @@ import { ChipAlergia } from "./ui";
 import { fichaDeSede, sedeEnLista } from "./compartido/cajaSede";
 import { puedeEscribirClinico as puedeEscribirClinicoDe } from "./util/clinicoWrite";
 import { formatearFDI } from "./util/formatearFDI";
+import { conCop } from "./util/cop";
+import { ymdLima } from "./util/fechaLima";
+import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
+import { medicoEn } from "./compartido/catalogoApi";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 import PeriodontogramaClinico from "./modulos/Periodontograma";
@@ -679,7 +683,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medi
       <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha ? String(r.fecha).slice(0, 10).split("-").reverse().join("/") : "")}</div></div>
       <h2>Rp/</h2>${filas || '<div class="muted">—</div>'}
       ${r.indicaciones ? `<h2>Indicaciones</h2><div class="box">${esc(r.indicaciones)}</div>` : ""}
-      <div class="firma"><div>${esc(r.medico && r.medico !== "—" ? r.medico : "Firma y sello del profesional")}${(() => { const m = r.cop ? { cop: r.cop } : medicosRx.find((x) => (r.medicoId != null && String(x.id) === String(r.medicoId)) || x.nombre === r.medico); return m?.cop ? ` · COP ${esc(m.cop)}` : ""; })()}</div></div>`, notify);
+      <div class="firma"><div>${esc(r.medico && r.medico !== "—" ? r.medico : "Firma y sello del profesional")}${(() => { const m = r.cop ? { cop: r.cop } : medicosRx.find((x) => (r.medicoId != null && String(x.id) === String(r.medicoId)) || x.nombre === r.medico); return m?.cop ? ` · ${esc(conCop(m.cop))}` : ""; })()}</div></div>`, notify);
   };
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
   return (
@@ -1027,6 +1031,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // Al corregir una evolución ya registrada se conserva su doctor aunque sea de otra sede.
   const medicosCon = (actual) => (!actual || medicos.some((m) => String(m.id) === String(actual)) ? medicos : [...medicos, ...medicosTodos.filter((m) => String(m.id) === String(actual))]);
   const [evoMedico, setEvoMedico] = useState("");      // doctor de la nueva evolución
+  const [evoCitaId, setEvoCitaId] = useState("");      // cita a la que pertenece la evolución ("" = sin cita)
   const [evoFile, setEvoFile] = useState(null);       // archivo a anexar a la evolución
   const [draftEdit, setDraftEdit] = useState({});     // edición de borradores de evolución (por id)
   const [secOpen, setSecOpen] = useState({});         // secciones colapsables de la historia
@@ -1034,6 +1039,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const [filtroMed, setFiltroMed] = useState("");     // filtro por doctor (nombre) de la línea de tiempo
   const [busqueda, setBusqueda] = useState("");       // buscador por palabra en la línea de tiempo
   const [rango, setRango] = useState("todo");         // rango de fechas de la línea de tiempo
+  const [odoHC, setOdoHC] = useState(null);           // tomas del odontograma por fase (con sesión)
   const [editEvo, setEditEvo] = useState(null);       // evolución en edición { id, diagnostico, detalle, medicoId }
   const [atVer, setAtVer] = useState(null);           // fecha de la atención abierta en «Detalle de la atención»
   const [upTipo, setUpTipo] = useState(TIPOS_ARCHIVO[0]);
@@ -1114,6 +1120,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   useEffect(() => {
     cargar();
     if (conectado && pacienteId) api.radiografias.porPaciente(pacienteId).then((r) => setRx(r || [])).catch(() => { });
+    // Tomas del odontograma para el PDF de la historia clínica (las tres fases).
+    setOdoHC(null);
+    if (conectado && pacienteId) Promise.all(["inicial", "evolucion", "alta"].map((f) => api.odontograma.porPaciente(pacienteId, f).catch(() => null)))
+      .then(([inicial, evolucion, alta]) => { if (inicial || evolucion || alta) setOdoHC({ inicial: inicial || [], evolucion: evolucion || [], alta: alta || [] }); });
     if (conectado) api.clinica.get().then(setClinica).catch(() => { });
     if (conectado) api.catalogo.medicos().then((ms) => {
       setMedicos(ms || []);
@@ -1194,6 +1204,23 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const linea = eventos();
   // Borradores de evolución sin llenar (creados al marcar la cita como atendida).
   const pendientes = arr(d?.historia).filter((h) => h.id && !(h.diagnostico && String(h.diagnostico).trim()) && !(h.detalle && String(h.detalle).trim()));
+  // Citas de hoy a las que se puede ligar la evolución (las que aún no tienen una firmada).
+  const hoyLima = ymdLima(new Date()) || hoy;
+  const conEvo = new Set(arr(d?.historia).filter((h) => h.citaId && (String(h.diagnostico || "").trim() || String(h.detalle || "").trim())).map((h) => String(h.citaId)));
+  const citasEvo = arr(d?.citas).filter((c) => c.id != null && c.fecha === hoyLima && !conEvo.has(String(c.id)) && !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(String(c.estado)));
+  const citasEvoKey = citasEvo.map((c) => `${c.id}:${c.estado}`).join("|");
+  useEffect(() => {
+    // La cita desde la que se abrió (#/pacientes/…?cita=) o, si no, la que está en atención
+    // o ya atendida hoy; con una sola cita del día, esa.
+    if (evoCitaId && citasEvo.some((c) => String(c.id) === String(evoCitaId))) return;
+    let pedida = null;
+    try { pedida = new URLSearchParams(String(window.location.hash || "").split("?")[1] || "").get("cita"); } catch { pedida = null; }
+    const elegida = (pedida && citasEvo.find((c) => String(c.id) === String(pedida)))
+      || citasEvo.find((c) => c.estado === "en_atencion")
+      || citasEvo.find((c) => /atend|complet/i.test(String(c.estado)))
+      || (citasEvo.length === 1 ? citasEvo[0] : null);
+    setEvoCitaId(elegida ? String(elegida.id) : "");
+  }, [citasEvoKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Resumen: última visita atendida y próxima cita programada.
   const citasArr = arr(d?.citas);
   const atendidas = citasArr.filter((c) => c.fecha && c.fecha <= hoy && /atend|complet|lleg/i.test(String(c.estado)));
@@ -1278,11 +1305,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const guardarEvolucion = async () => {
     if (!evo.diagnostico.trim() && !evo.detalle.trim()) { notify("Escribe el diagnóstico o la evolución."); return; }
     if (medicos.length && !evoMedico) { notify("Indica el doctor que atendió."); return; }
+    // Las plantillas dejan «___» para la pieza y la cara: una evolución firmada no puede
+    // quedar con huecos («pieza ___, cara ___»).
+    if (/_{3,}/.test(`${evo.diagnostico} ${evo.detalle}`)) { notify("Completa los espacios «___» de la plantilla (pieza, cara) antes de registrar la evolución."); return; }
     const sv = vitalesActivos.map(([k, l]) => (vit[k] ? `${l} ${vit[k]}` : "")).filter(Boolean).join(" – ");
     if (!conectado) {
       const med = medicosTodos.find((m) => String(m.id) === String(evoMedico));
       const ahora = new Date();
-      setD((cur) => ({ ...cur, historia: [{ id: `demo-h${Date.now()}`, fecha: hoy, hora: ahora.toTimeString().slice(0, 5), creadoEn: ahora.toISOString(), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || "", medico: med?.nombre || "", local: true }, ...arr(cur.historia)] }));
+      setD((cur) => ({ ...cur, historia: [{ id: `demo-h${Date.now()}`, fecha: hoy, hora: ahora.toTimeString().slice(0, 5), creadoEn: ahora.toISOString(), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || "", medico: med?.nombre || "", citaId: evoCitaId || null, local: true }, ...arr(cur.historia)] }));
       // Queda en la historia del sistema (no sólo en esta ventana): al reabrir la ficha sigue ahí.
       if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, historia: [{ fecha: hoy, hora: ahora.toTimeString().slice(0, 5), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medico: med ? med.nombre : "", sede: sedeCx.activa ?? undefined }, ...(cur.historia || [])] }));
       anotar("crear", "Registró una evolución", evo.diagnostico || evo.detalle);
@@ -1297,9 +1327,15 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       return;
     }
     try {
-      await api.historia.crear({ pacienteId, sedeId: sedeId || null, titulo: "Evolución", ...parseDiagnostico(evo.diagnostico), detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || null });
+      // Ligada a su cita: si la cita ya dejó su borrador de evolución (al marcarla atendida),
+      // se completa ese borrador; si no, se crea con citaId. Así se cierra la alerta de
+      // «atención sin evolución» en vez de quedar una nota suelta.
+      const borrador = evoCitaId ? pendientes.find((h) => String(h.citaId || "") === String(evoCitaId)) : null;
+      const cuerpo = { ...parseDiagnostico(evo.diagnostico), detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || null };
+      if (borrador) await api.historia.actualizar(borrador.id, { ...cuerpo, citaId: evoCitaId });
+      else await api.historia.crear({ pacienteId, sedeId: sedeId || null, titulo: "Evolución", ...cuerpo, ...(evoCitaId ? { citaId: evoCitaId } : {}) });
       if (evoFile) { try { const url = await leerArchivo(evoFile); await crearArchivo(url, "Foto intraoral", "Anexo de evolución" + (evo.diagnostico ? " – " + evo.diagnostico : "")); } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); } }
-      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); notify("Evolución registrada y firmada."); cargar(); recargarRx();
+      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); setEvoCitaId(""); notify("Evolución registrada y firmada."); cargar(); recargarRx();
     } catch { notify("No se pudo guardar la evolución."); }
   };
   const completarDraft = (id) => {
@@ -1409,12 +1445,18 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     const evos = arr(d?.historia).map((h) => `<tr><td>${esc(h.fecha || "")}</td><td><b>${esc(h.diagnostico || h.titulo || "Evolución")}</b>${h.detalle ? "<br>" + esc(h.detalle) : ""}${h.signosVitales ? `<br><span class="muted">Signos: ${esc(h.signosVitales)}</span>` : ""}</td><td>${esc(h.medico || "")}</td></tr>`).join("");
     // Una tabla por fase: lo encontrado, lo planificado y lo ejecutado son tres cosas
     // distintas y salían mezcladas en una sola lista de "hallazgos".
-    const FASES = [["inicial", "Diagnóstico — lo encontrado"], ["evolucion", "Plan — lo que falta por hacer"], ["alta", "Ejecutado — trabajo realizado"]];
-    const filaOdo = (o) => { const caras = parseJson(o.caras, {}); const cs = Object.entries(caras || {}).map(([f, e]) => `${caraOdontoLabel(o.pieza, f)}: ${ESTADOS[e]?.l || e}`).join(", "); return `<tr><td>${esc(o.pieza)}</td><td>${esc(o.estado ? (ESTADOS[o.estado]?.l || o.estado) : cs)}</td><td>${esc(o.nota || "")}</td></tr>`; };
-    const piezas = arr(d?.odontograma).filter((o) => o.estado || o.caras);
+    // Cada toma con todos sus hallazgos (caras, raíces y pieza completa) en lenguaje
+    // clínico; el estado sale del color: rojo = patológico o por hacer, azul = realizado.
+    const FASES = [["inicial", "Inicial — lo encontrado"], ["evolucion", "Evolución — estado durante el tratamiento"], ["alta", "Alta — cómo quedó al terminar"]];
+    const piezasFicha = arr(d?.odontograma);
     const odo = FASES.map(([k, titulo]) => {
-      const filas = piezas.filter((o) => (o.fase || "inicial") === k).map(filaOdo).join("");
-      return filas ? `<h2>Odontograma – ${esc(titulo)}</h2><table><thead><tr><th>Pieza</th><th>Hallazgo</th><th>Nota</th></tr></thead><tbody>${filas}</tbody></table>` : "";
+      const rows = odoHC ? (odoHC[k] || []) : piezasFicha.filter((o) => (o.fase || "inicial") === k);
+      const datos = filasADatos(rows);
+      const h = listaHallazgos(datos);
+      if (!h.total) return "";
+      const filas = h.lista.map((m) => `<tr><td>${esc(m.pieza)}</td><td>${esc(m.zona)}</td><td>${esc(m.nombre)}</td><td>${m.hecho ? "Buen estado o realizado" : "Patológico o por hacer"}</td></tr>`).join("");
+      const notas = Object.entries(datos).filter(([, x]) => x.nota).map(([n, x]) => `<div><b>${esc(n)}:</b> ${esc(x.nota)}</div>`).join("");
+      return `<h2>Odontograma – ${esc(titulo)}</h2><div class="muted">${h.total} ${h.total === 1 ? "hallazgo" : "hallazgos"} en ${h.piezas} ${h.piezas === 1 ? "pieza" : "piezas"} · ${h.rojo} por hacer · ${h.azul} realizados o en buen estado</div><table><thead><tr><th>Pieza</th><th>Zona</th><th>Hallazgo</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table>${notas ? `<div class="box">${notas}</div>` : ""}`;
     }).join("");
     imprimir("Historia clínica", `
       <h2>Filiación</h2>
@@ -1441,8 +1483,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         // Una historia clínica sin firmar no acredita quién la escribió. Va el profesional
         // que la imprime y, si el paciente es menor, la del apoderado que la recibe.
         const yo = (auth.sesion && auth.sesion.nombre) || "";
+        // COP del registro del médico (GET /medicos con sesión); sin él, la línea queda para el sello.
+        const medYo = medicoEn(medicosTodos, { id: auth.sesion?.medicoId ?? null, nombre: yo });
+        const copYo = conCop(medYo?.cop);
         const firma = (rotulo, sub) => `<div style="width:46%"><div style="border-top:1px solid #333;margin-top:56px;padding-top:6px"><b>${esc(rotulo)}</b>${sub ? `<br><span class="muted">${esc(sub)}</span>` : ""}</div></div>`;
-        return `<div class="row" style="justify-content:space-between;margin-top:26px">${firma(yo || "Profesional tratante", "Firma y sello – COP")}${esPed ? firma(p.apoderadoNombre || "Apoderado", "Firma del apoderado") : firma("Paciente", "Firma")}</div>`;
+        return `<div class="row" style="justify-content:space-between;margin-top:26px">${firma(yo || "Profesional tratante", copYo ? `Firma y sello – ${copYo}` : "Firma y sello – COP")}${esPed ? firma(p.apoderadoNombre || "Apoderado", "Firma del apoderado") : firma("Paciente", "Firma")}</div>`;
       })()}`, notify);
   };
 
@@ -1561,7 +1606,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           {e.k === "evolucion" && (String(e.h.diagnostico || "").trim() || String(e.h.detalle || "").trim()) && (
             <div className="fm-firma" title="Nota cerrada: para corregirla se agrega una adenda">
               <Lock size={11} strokeWidth={2.2} />
-              <span>Firmada por <b>{e.h.medico && e.h.medico !== "—" ? rotuloMedico(e.h.medico) || e.h.medico : "profesional sin registrar"}</b>{e.h.cop ? ` · COP ${e.h.cop}` : ""} · {fmtFecha(e.h.fecha)}{e.h.hora ? `, ${String(e.h.hora).slice(0, 5)}` : ""}</span>
+              <span>Firmada por <b>{e.h.medico && e.h.medico !== "—" ? rotuloMedico(e.h.medico) || e.h.medico : "profesional sin registrar"}</b>{conCop(e.h.cop) ? ` · ${conCop(e.h.cop)}` : ""} · {fmtFecha(e.h.fecha)}{e.h.hora ? `, ${String(e.h.hora).slice(0, 5)}` : ""}</span>
             </div>
           )}
           {e.k === "archivo" && e.x.url && <img src={e.x.url} alt="" style={{ marginTop: 6, width: 90, height: 66, objectFit: "cover", borderRadius: "var(--dc-r-sm)", border: `1px solid ${LINE}` }} />}
@@ -1763,7 +1808,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {onAgendar && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
+            {onAgendar && (!can || can("agenda", "crear")) && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
             {onCobrar && debe && rol !== "medico" && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
             {puedeEscribirClinico && <BotonPDF onClick={() => { anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }}>Historia clínica</BotonPDF>}
             {pagina ? null : <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>}
@@ -2158,6 +2203,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       <Select value={evoMedico} onChange={setEvoMedico} placeholder="— Selecciona el doctor —"
                         options={medicos.map((m) => ({ value: m.id, label: m.nombre }))} />
                     </div>
+                    {citasEvo.length > 0 && (
+                      <div>
+                        <label style={lbl}>Cita de hoy</label>
+                        <Select value={evoCitaId} onChange={setEvoCitaId} ariaLabel="Cita a la que pertenece la evolución"
+                          options={[{ value: "", label: "Sin cita (nota suelta)" }, ...citasEvo.map((c) => ({ value: String(c.id), label: `${String(c.hora || "").slice(0, 5) || "—"} · ${c.motivo || c.especialidad || "Cita"}${c.medico ? ` · ${c.medico}` : ""}` }))]} />
+                      </div>
+                    )}
                     <CieDiagInput style={inp} placeholder="Diagnóstico (CIE-10 o texto libre)" value={evo.diagnostico} onChange={(v) => setEvo({ ...evo, diagnostico: v })} />
                     <textarea style={{ ...inp, resize: "vertical" }} rows={3} placeholder="Evolución / procedimiento realizado" value={evo.detalle} onChange={(e) => setEvo({ ...evo, detalle: e.target.value })} />
                     <div>

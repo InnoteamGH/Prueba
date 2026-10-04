@@ -5,7 +5,7 @@
  * puede quitar o agregar partidas, cambiar cantidades y precios antes de emitirla.
  * Los documentos salen con el membrete de la empresa y de la sede que emite
  * (util/membrete.js). */
-import { SUP, INF, esMolar, nic, ordenVisual } from "./periodontal";
+import { SUP, INF, esMolar, nic } from "./periodontal";
 import { abrirDocumento, escDoc as esc } from "./membrete";
 
 export const CATALOGO_PERIO = {
@@ -122,12 +122,15 @@ export function abrirInformePerio({ dientes, m, dx, criticos = [], paciente = {}
   const pieza = (n) => {
     const p = dientes[n];
     if (!p || p.ausente) return `<tr><td class="c"><b>${n}</b></td><td colspan="7" style="color:#7d746a">Ausente</td></tr>`;
-    const ps = (cara) => ordenVisual(n, cara).map((i) => { const v = p.pd[i]; return v == null ? "·" : `<span class="${v >= 6 ? "g6" : v >= 4 ? "g4" : ""}">${v}</span>`; }).join(" ");
+    // Siempre mesial · central · distal, como dice la cabecera. Antes salía en el orden de
+    // pantalla (en los cuadrantes 1 y 4 el distal va a la izquierda) y la tabla mostraba
+    // el mesial y el distal invertidos frente a la lista de sitios críticos.
+    const ps = (cara) => (cara === "v" ? [0, 1, 2] : [3, 4, 5]).map((i) => { const v = p.pd[i]; return v == null ? "·" : `<span class="${v >= 6 ? "g6" : v >= 4 ? "g4" : ""}">${v}</span>`; }).join(" ");
     const nics = p.pd.map((v, i) => nic(v, p.mg[i])).filter((v) => v != null);
     const cuenta = (k) => p[k].filter(Boolean).length;
     return `<tr><td class="c"><b>${n}</b>${p.implante ? " (imp.)" : ""}</td><td class="c">${ps("v")}</td><td class="c">${ps("l")}</td><td class="c">${nics.length ? Math.max(...nics) : "·"}</td><td class="c">${cuenta("bop") || ""}</td><td class="c">${cuenta("placa") || ""}</td><td class="c">${p.movilidad ? ["", "I", "II", "III"][p.movilidad] : ""}</td><td class="c">${esMolar(n) && p.furca ? ["", "I", "II", "III"][p.furca] : ""}</td></tr>`;
   };
-  const tabla = (arco, titulo) => `<h2>${titulo}</h2><table class="doc-tabla"><thead><tr><th class="c">Pieza</th><th class="c">PS vestibular (M C D)</th><th class="c">PS ${arco === SUP ? "palatino" : "lingual"}</th><th class="c">NIC máx.</th><th class="c">Sangrado</th><th class="c">Placa</th><th class="c">Movilidad</th><th class="c">Furca</th></tr></thead><tbody>${arco.map(pieza).join("")}</tbody></table>`;
+  const tabla = (arco, titulo) => `<h2>${titulo}</h2><table class="doc-tabla"><thead><tr><th class="c">Pieza</th><th class="c">PS vestibular (M C D)</th><th class="c">PS ${arco === SUP ? "palatino" : "lingual"} (M C D)</th><th class="c">NIC máx.</th><th class="c">Sangrado</th><th class="c">Placa</th><th class="c">Movilidad</th><th class="c">Furca</th></tr></thead><tbody>${arco.map(pieza).join("")}</tbody></table>`;
   const kpi = [["Sangrado", `${m.bopPct}%`], ["Placa", `${m.placaPct}%`], ["PS media", `${m.pdMedia.toFixed(1)} mm`], ["NIC medio", `${m.calMedia.toFixed(1)} mm`], ["Sitios ≥ 4", m.s4], ["Sitios ≥ 6", m.s6]];
   const t = plan ? totalesPlan(plan) : null;
   return abrirDocumento({

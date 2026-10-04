@@ -11,6 +11,7 @@ import { ArrowRight, ClipboardList, Smile, X } from "lucide-react";
 import api, { auth } from "../api/client";
 import { DatosDemoCtx } from "../comun";
 import { estadosAppAHtml } from "./OdontogramaAnatomico";
+import { filasADatos, listaHallazgos } from "../util/odontogramaHallazgos";
 
 export const FASES_FOTO = [
   ["inicial", "Inicial", "#B42318", "Lo que se encontró al abrir la historia"],
@@ -19,7 +20,6 @@ export const FASES_FOTO = [
 ];
 // Una fase sin ninguna marca (solo piezas seleccionadas) cuenta como vacía.
 const vacio = (d) => !d || !Object.keys(d).length || hallazgosDe(d).total === 0;
-const CARA = { O: "Oclusal / incisal", V: "Vestibular", L: "Lingual", P: "Palatina", M: "Mesial", D: "Distal" };
 
 /* ── Iframe oculto compartido y cola de capturas ── */
 let frame = null, listo = null, cola = Promise.resolve(), cierre = null;
@@ -102,19 +102,8 @@ function useNombres() {
   return n;
 }
 
-/* Hallazgos de una toma, ordenados por cuadrante y pieza. */
-export function hallazgosDe(datos) {
-  let rojo = 0, azul = 0; const lista = [];
-  Object.entries(datos || {}).forEach(([pieza, e]) => {
-    const add = (zona, d) => { if (!d || !d.h) return; if (d.c === "a") azul++; else rojo++; lista.push({ pieza, zona, codigo: d.h, hallazgo: String(d.h).replace(/_/g, " "), hecho: d.c === "a" }); };
-    Object.entries(e.caras || {}).forEach(([c, d]) => add(`Cara ${(CARA[c] || c).toLowerCase()}`, d));
-    Object.entries(e.raices || {}).forEach(([c, d]) => add(`Raíz ${Number(c) + 1}`, d));
-    (e.pieza || []).forEach((d) => add("Toda la pieza", d));
-  });
-  const ord = (n) => { const x = Number(n), q = Math.floor(x / 10); return q * 100 + ([1, 4, 5, 8].includes(q) ? 10 - (x % 10) : x % 10); };
-  lista.sort((a, b) => ord(a.pieza) - ord(b.pieza));
-  return { rojo, azul, total: rojo + azul, piezas: new Set(lista.map((x) => x.pieza)).size, lista };
-}
+/* Hallazgos de una toma (caras, raíces y pieza completa), ordenados por cuadrante y pieza. */
+export function hallazgosDe(datos) { return listaHallazgos(datos); }
 const piezaFdi = (n) => { const s = String(n); return s.length === 2 ? `${s[0]}.${s[1]}` : s; };
 
 /* Datos de cada fase: con sesión, del servidor; en la demo, de la ficha del paciente. */
@@ -125,13 +114,9 @@ function useFases(pacienteId, ficha) {
     if (!conectado || !pacienteId) return undefined;
     let vivo = true;
     Promise.all(FASES_FOTO.map(([f]) => api.odontograma.porPaciente(pacienteId, f).then((rows) => {
-      const est = {};
-      (rows || []).forEach((r) => {
-        const d = {}; if (r.estadoPieza) d.whole = r.estadoPieza;
-        try { const raw = r.estadosCara; const c = typeof raw === "object" && raw ? raw : JSON.parse(raw || "{}"); if (c && Object.keys(c).length) d.caras = c; } catch { /* */ }
-        if (r.nota) d.nota = r.nota; est[r.numeroPieza] = d;
-      });
-      return estadosAppAHtml(est);
+      // Mismo formato que hidrata el módulo Odontograma: caras, raíces y todas las marcas
+      // de pieza con su color (antes solo contaba estadoPieza y la toma salía vacía).
+      return filasADatos(rows || []);
     }).catch(() => ({})))).then((xs) => vivo && setRemoto(Object.fromEntries(FASES_FOTO.map(([f], i) => [f, xs[i]]))));
     return () => { vivo = false; };
   }, [conectado, pacienteId]);
@@ -198,7 +183,7 @@ export default function OdontogramaFotos({ pacienteId, ficha = null, onAbrir }) 
             <table className="dc-ofo__tab">
               <thead><tr><th>Pieza</th><th>Zona</th><th>Hallazgo</th><th>Estado</th></tr></thead>
               <tbody>{h.lista.map((m, i) => (
-                <tr key={i}><td><b>{piezaFdi(m.pieza)}</b></td><td>{m.zona}</td><td>{nombres[m.codigo] || m.hallazgo.charAt(0).toUpperCase() + m.hallazgo.slice(1)}</td><td><span className={`dc-ofo__est ${m.hecho ? "is-ok" : "is-mal"}`}>{m.hecho ? "Buen estado o ejecutado" : "Patológico o por hacer"}</span></td></tr>
+                <tr key={i}><td><b>{piezaFdi(m.pieza)}</b></td><td>{m.zona}</td><td>{nombres[m.codigo] || m.nombre}</td><td><span className={`dc-ofo__est ${m.hecho ? "is-ok" : "is-mal"}`}>{m.hecho ? "Buen estado o ejecutado" : "Patológico o por hacer"}</span></td></tr>
               ))}</tbody>
             </table>
           </div>

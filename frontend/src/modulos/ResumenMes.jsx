@@ -40,14 +40,18 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const hasta = ymd(hoy);
   const [egresos, setEgresos] = useState(null);
   const [top, setTop] = useState(null);
+  // Un 403 (o un fallo) no es «cero»: se muestra «sin permiso / no disponible», no S/ 0.
+  const [egErr, setEgErr] = useState(null);
+  const [topErr, setTopErr] = useState(null);
+  const motivo = (e) => (e?.status === 403 ? "sin permiso" : "no disponible");
   // GER-02: en la demostración las salidas son los egresos que Caja registró (misma lista).
   const db = useContext(DatosDemoCtx);
 
   useEffect(() => {
     if (!conectado) return;
     // Solo las sedes que se ven (sedesApi = UUID; null = todas las del usuario).
-    api.egresos.listar({ sedeIds: sedesApi }).then((r) => setEgresos(Array.isArray(r) ? r : [])).catch(() => setEgresos([]));
-    api.tratamientos.resumen(desde, hasta, { sedeIds: sedesApi }).then((r) => setTop(Array.isArray(r) ? r : [])).catch(() => setTop([]));
+    api.egresos.listar({ sedeIds: sedesApi }).then((r) => { setEgErr(null); setEgresos(Array.isArray(r) ? r : []); }).catch((e) => { setEgErr(motivo(e)); setEgresos([]); });
+    api.tratamientos.resumen(desde, hasta, { sedeIds: sedesApi }).then((r) => { setTopErr(null); setTop(Array.isArray(r) ? r : []); }).catch((e) => { setTopErr(motivo(e)); setTop([]); });
   }, [conectado, desde, hasta, sedesApi && sedesApi.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const d = useMemo(() => {
@@ -90,6 +94,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const ritmo = (hoy.getDate() / diasMes) * 100;
   const avance = d.meta > 0 ? (d.facturado / d.meta) * 100 : 0;
   const proyeccion = hoy.getDate() ? Math.round((d.facturado / hoy.getDate()) * diasMes) : 0;
+  const sinSalidas = conectado && !!egErr;
   const neto = d.facturado - d.salidas;
   const delta = d.anterior ? ((d.facturado - d.anterior) / d.anterior) * 100 : null;
   const maxTop = Math.max(1, ...d.top.map((t) => t.importe));
@@ -114,14 +119,14 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         <article className="dc-rm__kpi" style={{ "--c": "#E0694F" }}>
           <span className="dc-rm__ico"><ArrowUpRight size={18} strokeWidth={2.2} /></span>
           <small>Salidas del mes</small>
-          <b>{soles(d.salidas)}</b>
-          <em>{d.salidasUsd ? `+ US$ ${d.salidasUsd.toFixed(2)} en dólares · ` : ""}{d.salidasCat[0] ? `Mayor gasto: ${d.salidasCat[0][0]}` : "Sin egresos registrados"}</em>
+          <b>{sinSalidas ? "—" : soles(d.salidas)}</b>
+          <em>{sinSalidas ? (egErr === "sin permiso" ? "Sin permiso para ver los egresos" : "Egresos no disponibles") : <>{d.salidasUsd ? `+ US$ ${d.salidasUsd.toFixed(2)} en dólares · ` : ""}{d.salidasCat[0] ? `Mayor gasto: ${d.salidasCat[0][0]}` : "Sin egresos registrados"}</>}</em>
         </article>
         <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#0B6C78" : "#D0563F" }}>
           <span className="dc-rm__ico"><Wallet size={18} strokeWidth={2.2} /></span>
           <small>Resultado del mes</small>
-          <b>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</b>
-          <em>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</em>
+          <b>{sinSalidas ? "—" : <>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</>}</b>
+          <em>{sinSalidas ? "No se calcula sin los egresos" : <>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
         </article>
         <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#C98A12" }}>
           <span className="dc-rm__ico"><Target size={18} strokeWidth={2.2} /></span>
@@ -156,7 +161,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         </article>
         <article className="dc-rm__card">
           <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>por importe facturado del mes</span></div>
-          {d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
+          {conectado && topErr ? <p className="dc-rm__vacio">{topErr === "sin permiso" ? "Sin permiso para ver las ventas por tratamiento." : "Ventas por tratamiento no disponibles."}</p> : d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
             <ol className="dc-rm__rank is-trat">
               {d.top.map((t, i) => (
                 <li key={t.nombre}>

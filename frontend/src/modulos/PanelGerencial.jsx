@@ -792,6 +792,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const [ind, setInd] = useState(null);
   const [rep, setRep] = useState(null);
   const [pagos, setPagos] = useState([]);
+  const [pagosErr, setPagosErr] = useState(null);
   const [citasHoy, setCitasHoy] = useState(citasProp || []);
   const [actividad, setActividad] = useState(null);
   const [tratResumen, setTratResumen] = useState(null);
@@ -886,7 +887,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     api.gerencialIndicadores(sedesApi).then(setInd).catch(() => setInd({ errorDeCarga: true }));
     api.gerencialReportes(sedesApi).then(setRep).catch(() => setRep({ errorDeCarga: true }));
     const deSede = (x) => !verSedes || x?.sedeId == null || verSedes.some((v) => mismaSede(v, x.sedeId));
-    api.pagos.listar().then((r) => setPagos((r || []).filter(deSede))).catch(() => setPagos([]));
+    // Un 403 no es «S/ 0 cobrado»: se marca y la tarjeta dice «sin permiso».
+    api.pagos.listar().then((r) => { setPagosErr(null); setPagos((r || []).filter(deSede)); }).catch((e) => { setPagosErr(e?.status === 403 ? "sin permiso" : "no disponible"); setPagos([]); });
     api.citas.listar(fecha, null, null, sedesApi).then((r) => setCitasHoy((r || []).filter(deSede))).catch(() => setCitasHoy([]));
     api.actividad(fecha).then((r) => setActividad(r || [])).catch(() => setActividad([]));
     const d = new Date();
@@ -1115,9 +1117,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           </div>
           <div className="dc-card__body dc-card__body--alto">
             <dl className="dc-datos">
-              <div><dt>Cobrado hoy</dt><dd style={{ color: "var(--g1)" }}>{moneyFmt(cobradoHoy)}</dd></div>
-              <div><dt>Cobros</dt><dd>{pagosHoy.length}</dd></div>
-              <div><dt>Ticket medio</dt><dd>{moneyFmt(ticketMedio)}</dd></div>
+              <div><dt>Cobrado hoy</dt><dd style={{ color: "var(--g1)" }} title={pagosErr && conectado ? `Cobros ${pagosErr}` : undefined}>{pagosErr && conectado ? "—" : moneyFmt(cobradoHoy)}</dd></div>
+              <div><dt>Cobros</dt><dd>{pagosErr && conectado ? (pagosErr === "sin permiso" ? "sin permiso" : "no disponible") : pagosHoy.length}</dd></div>
+              <div><dt>Ticket medio</dt><dd>{pagosErr && conectado ? "—" : moneyFmt(ticketMedio)}</dd></div>
             </dl>
             <CanvasCaja puntos={curva} abre={rangoCaja?.abre ?? 8} cierra={rangoCaja?.cierra ?? 20} onOpen={() => abrir({
               t: "Caja del día", s: "Curva acumulada", cifra: moneyFmt(cobradoHoy),

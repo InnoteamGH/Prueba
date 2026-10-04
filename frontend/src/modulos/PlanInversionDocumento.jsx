@@ -26,6 +26,7 @@ import {
   paginasDesdeAlturaMm,
 } from "../util/planInversionPaginacion.js";
 import { altAnexoOdontograma } from "../util/odontogramaAnexo.js";
+import { filasADatos, listaHallazgos } from "../util/odontogramaHallazgos.js";
 
 const CONDICIONES_FALLBACK = [
   ["Alcance", "Esta propuesta sale de los hallazgos marcados en mal estado en el odontograma del paciente, más los servicios añadidos en recepción. No incluye lo que ya está ejecutado ni las observaciones que no requieren tratamiento."],
@@ -175,13 +176,41 @@ export default function PlanInversionDocumento({
   const sueltosLista = sesion ? (tarifaSede.sueltos || []) : SUELTOS_PARTIDA;
   const servicioAdd = sueltosLista.find((s) => String(s.cod) === String(codAdd));
 
+  // Con sesión el plan reúne lo que ya está en Plan y cuenta (GET /tratamientos: los
+  // procedimientos añadidos desde el odontograma, el periodontograma o recepción) y los
+  // hallazgos por hacer de la toma (todas las marcas: caras, raíces y pieza completa) que
+  // aún no tienen procedimiento en esa pieza. Antes solo contaba estadoPieza y el total
+  // salía S/ 0 aunque Plan y cuenta tenía importes.
+  const [planSrv, setPlanSrv] = useState(null);
+  const [hallSrv, setHallSrv] = useState(null);
+  useEffect(() => {
+    if (!sesion || !pacienteId) return undefined;
+    let vivo = true;
+    api.tratamientos.porPaciente(pacienteId)
+      .then((ps) => { if (!vivo) return; const fs = []; (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && !/anulad/i.test(String(f.estado || ""))) fs.push(f); })); setPlanSrv(fs); })
+      .catch(() => { if (vivo) setPlanSrv([]); });
+    api.odontograma.porPaciente(pacienteId, capa)
+      .then((rows) => { if (vivo) setHallSrv(listaHallazgos(filasADatos(rows || [])).lista.filter((m) => !m.hecho).map((m) => [Number(m.pieza), m.codigo, m.zona.replace(/^Cara /, "")])); })
+      .catch(() => { if (vivo) setHallSrv(null); });
+    return () => { vivo = false; };
+  }, [sesion, pacienteId, capa]);
+
   const cargandoTarifa = sesion && !conf.tarifa && catApi == null;
   const { lineas, descartes, totales } = useMemo(() => {
     const sueltos = sueltosUI.map((s) => [s.pz, s.cod, s.max]);
-    const { lineas: L, descartes: D } = resolverLineas(hallazgos, sueltos, tarifaSede);
+    const fases = sesion ? (planSrv || []) : [];
+    const piezasPlan = new Set(fases.map((f) => f.piezaNumero ?? f.pieza).filter((x) => x != null && x !== "").map(Number));
+    const hall = (sesion && hallSrv ? hallSrv : hallazgos).filter(([pz]) => !piezasPlan.has(Number(pz)));
+    const { lineas: L0, descartes: D } = resolverLineas(hall, sueltos, tarifaSede);
+    const delPlan = fases.map((f) => {
+      const pz = f.piezaNumero ?? f.pieza;
+      const cara = String(f.cara || "").trim();
+      return { pz: pz != null && pz !== "" ? Number(pz) : null, cod: f.codigo || f.servicioId || f.id, nom: `${f.nombre || "Procedimiento"}${cara ? ` (${cara})` : ""}`, v: Number(f.costo) || 0, cant: 1, ubic: ["Plan y cuenta"], max: null };
+    });
+    const L = delPlan.length ? [...delPlan, ...L0].sort((a, b) => (a.pz == null ? 99 : a.pz) - (b.pz == null ? 99 : b.pz)) : L0;
     const totales = calcularTotales(L, doc.descuento || { activo: false });
     return { lineas: L, descartes: D, totales };
-  }, [hallazgos, sueltosUI, doc.descuento, tarifaSede]);
+  }, [hallazgos, sueltosUI, doc.descuento, tarifaSede, sesion, planSrv, hallSrv]);
 
   const hojasPlan = useMemo(() => partirLineasEnHojas(lineas), [lineas]);
   const mostrarOdo = doc.mostrarOdontograma !== false;
