@@ -30,7 +30,6 @@ import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, 
 // Soles y dólares en caja, montos escritos y la boleta de un cobro (compartido/cajaMoneda.js).
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
-import { horarioConfigurado } from "./compartido/horarioReal";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
