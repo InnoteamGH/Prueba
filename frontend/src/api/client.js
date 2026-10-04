@@ -130,6 +130,43 @@ function conQuery(o) {
   return q.length ? `?${q.join("&")}` : "";
 }
 
+/* Horario de la clínica: el servidor lo guarda por nombre de día
+   ({ lunes: { activo, abre, cierra }, … }) y el frontend trabaja con índices 0–6
+   (0 = domingo; { abre, cierra } o { cerrado: true }). Se traduce aquí, al leer y al
+   guardar, para que ninguna pantalla vea el otro formato. Antes el horario real se
+   ignoraba (Configuración mostraba 09–19 y al guardar lo pisaba). */
+const DIAS_SRV = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+const sinTilde = (k) => String(k).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function diasDeServidor(h) {
+  const out = {};
+  Object.entries(h || {}).forEach(([k, v]) => {
+    const i = DIAS_SRV.indexOf(sinTilde(k));
+    if (i < 0) { out[k] = v; return; }
+    out[String(i)] = !v || v.activo === false || v.cerrado ? { cerrado: true } : { abre: v.abre, cierra: v.cierra };
+  });
+  return out;
+}
+export function horarioDeServidor(h) {
+  if (!h || typeof h !== "object") return h;
+  const out = diasDeServidor(h);
+  if (h.sedes && typeof h.sedes === "object") out.sedes = Object.fromEntries(Object.entries(h.sedes).map(([k, v]) => [k, diasDeServidor(v)]));
+  return out;
+}
+function diasAlServidor(h) {
+  const out = {};
+  Object.entries(h || {}).forEach(([k, v]) => {
+    if (/^[0-6]$/.test(k)) out[DIAS_SRV[Number(k)]] = !v || v.cerrado ? { activo: false, abre: "00:00", cierra: "00:00" } : { activo: true, abre: v.abre, cierra: v.cierra };
+    else if (k !== "sedes") out[k] = v;
+  });
+  return out;
+}
+export function horarioAlServidor(h) {
+  if (!h || typeof h !== "object") return h;
+  const out = diasAlServidor(h);
+  if (h.sedes && typeof h.sedes === "object") out.sedes = Object.fromEntries(Object.entries(h.sedes).map(([k, v]) => [k, diasAlServidor(v)]));
+  return out;
+}
+
 async function request(method, path, body, extraHeaders) {
   const dedupeKey = method + " " + path;
   if (method === "GET" && inflightGet.has(dedupeKey)) {
@@ -291,8 +328,8 @@ export const api = {
   },
   goLive: () => request("GET", "/go-live"),
   clinica: {
-    get: () => request("GET", "/clinica"),
-    actualizar: (d) => request("PUT", "/clinica", d),
+    get: async () => { const r = await request("GET", "/clinica"); if (r && r.horario) r.horario = horarioDeServidor(r.horario); return r; },
+    actualizar: (d) => request("PUT", "/clinica", d && d.horario ? { ...d, horario: horarioAlServidor(d.horario) } : d),
     impresion: (sedeId) =>
       request("GET", `/clinica/impresion${sedeId ? `?sedeId=${sedeId}` : ""}`),
     planSueltos: () => request("GET", "/clinica/plan-sueltos"),

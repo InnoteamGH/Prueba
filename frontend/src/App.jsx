@@ -512,6 +512,13 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   useEffect(() => { cargarDash(); }, []); // eslint-disable-line
   // Con sesión las citas llegan de todas las sedes: se dejan solo las de la sede elegida.
   const sedeCxD = useSede();
+  // Las evoluciones pendientes se piden por sede: al cambiar la sede de arriba se vuelven a pedir.
+  const sedesKeyDash = (sedeCxD.ids || []).join(",");
+  const primeraSedeDash = useRef(true);
+  useEffect(() => {
+    if (primeraSedeDash.current) { primeraSedeDash.current = false; return; }
+    if (conectado && !esTI) api.evolucionesPendientes(sedesApiDash()).then(setPendEvo).catch(() => {});
+  }, [sedesKeyDash]); // eslint-disable-line react-hooks/exhaustive-deps
   const citas = conectado ? (remC || []).filter((c) => sedeCxD.enSede(c.sede)) : citasProp;
   const pacientesAllRaw = conectado ? (remP || []) : pacProp;
   // Última visita (cita atendida) y próxima cita: las de GET /pacientes/resumen-citas,
@@ -703,7 +710,8 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const porReactivar = conectado ? (resCitas ? pacientes.filter((p) => p.ultima && mesesDesde(p.ultima) >= 6 && !p.proxima) : []) : M.porReactivar(pacientes, citas);
   const carteraDemo = conectado ? null : M.cartera(dbDash?.fichas || {}, pacientes, { sede: sedeActiva });
   const deudores = conectado
-    ? ((cajaDeuda && cajaDeuda.porCobrar) || []).filter((r) => Number(r.saldo) > 0).map((r) => ({ n: r.paciente || "—", v: Number(r.saldo) || 0 }))
+    // Solo los de la sede que se mira (antes, con Surco elegido, salían los deudores de toda la clínica).
+    ? ((cajaDeuda && cajaDeuda.porCobrar) || []).filter((r) => Number(r.saldo) > 0 && (r.sedeId == null || sedeCxD.enSede(r.sedeId))).map((r) => ({ n: r.paciente || "—", v: Number(r.saldo) || 0 }))
     : carteraDemo.conVencido.map((f) => ({ n: f.p.nombre, v: f.vencido }));
   // Solo lo de los pacientes visibles (sus sedes): el admin de sede no ve avisos de otra sede.
   const deVisible = (pid, nom) => pacientes.some((p) => String(p.id) === String(pid) || (nom && p.nombre === nom));
@@ -6164,7 +6172,7 @@ function Integraciones({ notify }) {
   const [salud, setSalud] = useState(null);
   useEffect(() => { if (conectado) api.agente.salud().then((r) => setSalud(r || {})).catch(() => setSalud({ error: true })); }, []); // eslint-disable-line
   const estWa = !conectado ? "conectado" : !salud ? "pendiente" : (salud.ok && !salud.demo ? "conectado" : "pendiente");
-  const iaInfo = salud && [salud.ia, salud.openai, salud.iaConectada].find((x) => typeof x === "boolean");
+  const iaInfo = salud && [salud.iaReal, salud.ia, salud.openai, salud.iaConectada].find((x) => typeof x === "boolean");
   const estIa = !conectado ? "conectado" : iaInfo === true ? "conectado" : "pendiente";
   const cats = [
     { cat: "Pagos en línea y POS", ic: CreditCard, c: "#2F6FDE", items: [
