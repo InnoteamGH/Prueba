@@ -11,7 +11,7 @@
 - **Sección 1, bloqueantes del backend:** corregir primero.
 - **Sección 2, importantes del backend:** fugas entre sedes, permisos, rutas que faltan y campos que se pierden.
 - **Sección 3, datos de la clínica:** completar o corregir en la base.
-- **Sección 4, hallazgos del frontend:** los resolvemos nosotros en el ZIP; el programador solo despliega y vuelve a probar.
+- **Sección 4, hallazgos del frontend:** los 30 ya están corregidos en el ZIP; el programador solo despliega y vuelve a probar.
 - **Sección 5, registros de prueba:** limpiar al final.
 
 ---
@@ -92,11 +92,16 @@ Con el error 403, el frontend ahora muestra «sin permiso» en lugar de vacío, 
 
 ## 4. Hallazgos del frontend
 
-El frontend está en el ZIP (`frontend.zip`, rama `claude/laughing-edison-3rr5w6`). En la columna Estado:
-- **Corregido** = ya está en el ZIP.
-- **En corrección** = lo estamos arreglando y entra en la próxima entrega del ZIP.
+El frontend está en el ZIP (`frontend.zip`, rama `claude/laughing-edison-3rr5w6`). **Los 30 hallazgos ya están corregidos en el ZIP.** El programador no necesita tocar el código: solo desplegar el ZIP y volver a probar.
 
-El programador **no** necesita tocar estos puntos. Solo debe desplegar el ZIP y volver a probarlos.
+Verificación final con la versión nueva conectada al backend real, con 6 perfiles (recepción, doctora, administrador general, administrador de sede, gerencia y TI):
+- 0 errores de JavaScript;
+- sin el banner rojo de «sin acceso»;
+- las únicas llamadas que fallan son las del backend de las secciones 1 y 2 (`/clinica/impresion` 403, `/sillones/asignaciones` 404, `/facturacion-electronica/config` 404, `/egresos`, `/tipo-cambio`, `/consentimientos` y `/whatsapp/salud` 403 según el rol).
+
+Dos puntos para el backend que salen de estos arreglos:
+- Al limpiar todas las marcas de una pieza, el odontograma ahora envía esa pieza con marcas vacías (`PUT /odontograma`). El servidor debe aceptarlo como «sin hallazgos».
+- La evolución se envía con `citaId` cuando viene de una cita. El servidor debe guardarlo y cerrar con eso la alerta de evolución pendiente.
 
 | # | Hallazgo | Estado |
 |---|---|---|
@@ -104,32 +109,32 @@ El programador **no** necesita tocar estos puntos. Solo debe desplegar el ZIP y 
 | F2 | El odontograma perdía al recargar las marcas de pieza completa (corona + extracción) y el color por hacer / realizado. | Corregido |
 | F3 | Con una sede elegida, el Inicio mostraba deudores y evoluciones de toda la clínica. | Corregido (filtra por sede y recarga al cambiar de sede) |
 | F4 | Integraciones marcaba OpenAI como pendiente estando activa (`iaReal`). | Corregido |
-| F5 | Al crear un paciente que el listado no devuelve (ver B2), no se abría su ficha; el enlace directo volvía al directorio. | En corrección |
-| F6 | Los feriados `{fecha, nombre}` se trataban como días abiertos 09–13; se podía agendar el 08/10. | En corrección |
-| F7 | Arrastrar una cita en Semana o Por doctor siempre se rechazaba («no atiende en esta sede») porque comparaba un número con un UUID; además redondeaba la hora a :00. | En corrección |
-| F8 | Sillones: se pedían sin `sedeId`, así que Surco recibía los de San Isidro o ninguno. | En corrección (pide por sede) |
-| F9 | Al Iniciar o Finalizar la agenda navegaba aunque el servidor rechazara el cambio, y ocultaba el mensaje del servidor. | En corrección |
-| F10 | Lista de espera › «Registrar paciente nuevo» no pedía fecha de nacimiento (el servidor la exige) ni mostraba el error. «Asignar cupo» no precargaba el servicio. | En corrección |
-| F11 | «Por reactivar»: Pacientes decía 14 y Recordatorios «todos al día». | En corrección (una sola definición) |
-| F12 | Estado `cerrada_sistema`: la Agenda decía «Cerrada por sistema» y el Consolidado lo contaba como «Cancelada». | En corrección |
-| F13 | Menú ⋯ › Cobrar decía «sin saldo» cuando la ficha y Caja muestran saldo. | En corrección |
-| F14 | Recepción veía la tarea de doctor «evoluciones sin completar». | En corrección |
-| F15 | Recordatorios permitía guardar una plantilla vacía. | En corrección |
-| F16 | Un error 403 en una llamada de fondo ponía un banner rojo global, y las pantallas con 403 mostraban «vacío» o «S/ 0» como si fuera un dato real. | En corrección (dirá «sin permiso») |
-| F17 | El Consolidado no tenía rango hacia adelante (próximas citas). | En corrección |
-| F18 | Agenda: la vista Semana listaba 6 doctores y la de Mes 4; en la vista Día se truncaban el nombre del paciente y la sede. | En corrección |
-| F19 | «Evolución visual» de la ficha y PDF de historia clínica: contaban solo `estadoPieza` e imprimían claves internas («_pieza», «restaur»). | En corrección |
-| F20 | El PDF del presupuesto mostraba Pagado S/ 0 y la pieza vacía. El plan de inversión daba un total de S/ 0 y numeraba «PI-PI-…». | En corrección |
-| F21 | Periodontograma: mesial y distal invertidos en el informe; las partidas de la proforma se creaban sin sede. | En corrección |
-| F22 | Receta y PDF: «COP COP12345»; la historia clínica salía sin COP en la firma. | En corrección |
-| F23 | Evolución: se guardaba con «pieza ___, cara ___» y no quedaba ligada a la cita (la alerta no se cerraba). | En corrección |
-| F24 | Radiografías y Fotos: dejaba llenar el formulario sin paciente; la cabecera mostraba «DNI» vacío. | En corrección |
-| F25 | Odontograma: al abrir reenviaba todas las piezas aunque no hubiera cambios; textos de dentición y fase incorrectos. | En corrección |
-| F26 | Mi producción: «−100 % vs mes anterior» el día 4; consejos que salen sin datos; calificación distinta a la de Reseñas. | En corrección |
-| F27 | Gerencia veía botones de escritura que el servidor rechaza (Laboratorio › Avanzar, Seguros, Agendar). | En corrección (ocultos por permiso) |
-| F28 | Metas por sede salía vacía cuando `/medicos` no trae sedes; «Sin especialidad». | En corrección |
-| F29 | Caja en modo supervisión: aparecían «Abrir caja» y «Cerrarla»; la jornada antigua salía «Cerrada»; el administrador de sede no recibía aviso al intentar abrir con una jornada pendiente. | En corrección |
-| F30 | Textos: «Nuevo sede», «Nuevo promoción»; Ocupación remitía a «Sedes» en vez de «Sillones»; Laboratorio y Seguros traían un paciente y una sede de ejemplo por defecto. | En corrección |
+| F5 | Al crear un paciente que el listado no devuelve (ver B2), no se abría su ficha; el enlace directo volvía al directorio. | Corregido |
+| F6 | Los feriados `{fecha, nombre}` se trataban como días abiertos 09–13; se podía agendar el 08/10. | Corregido |
+| F7 | Arrastrar una cita en Semana o Por doctor siempre se rechazaba («no atiende en esta sede») porque comparaba un número con un UUID; además redondeaba la hora a :00. | Corregido |
+| F8 | Sillones: se pedían sin `sedeId`, así que Surco recibía los de San Isidro o ninguno. | Corregido |
+| F9 | Al Iniciar o Finalizar la agenda navegaba aunque el servidor rechazara el cambio, y ocultaba el mensaje del servidor. | Corregido |
+| F10 | Lista de espera › «Registrar paciente nuevo» no pedía fecha de nacimiento (el servidor la exige) ni mostraba el error. «Asignar cupo» no precargaba el servicio. | Corregido |
+| F11 | «Por reactivar»: Pacientes decía 14 y Recordatorios «todos al día». | Corregido |
+| F12 | Estado `cerrada_sistema`: la Agenda decía «Cerrada por sistema» y el Consolidado lo contaba como «Cancelada». | Corregido |
+| F13 | Menú ⋯ › Cobrar decía «sin saldo» cuando la ficha y Caja muestran saldo. | Corregido |
+| F14 | Recepción veía la tarea de doctor «evoluciones sin completar». | Corregido |
+| F15 | Recordatorios permitía guardar una plantilla vacía. | Corregido |
+| F16 | Un error 403 en una llamada de fondo ponía un banner rojo global, y las pantallas con 403 mostraban «vacío» o «S/ 0» como si fuera un dato real. | Corregido |
+| F17 | El Consolidado no tenía rango hacia adelante (próximas citas). | Corregido |
+| F18 | Agenda: la vista Semana listaba 6 doctores y la de Mes 4; en la vista Día se truncaban el nombre del paciente y la sede. | Corregido |
+| F19 | «Evolución visual» de la ficha y PDF de historia clínica: contaban solo `estadoPieza` e imprimían claves internas («_pieza», «restaur»). | Corregido |
+| F20 | El PDF del presupuesto mostraba Pagado S/ 0 y la pieza vacía. El plan de inversión daba un total de S/ 0 y numeraba «PI-PI-…». | Corregido |
+| F21 | Periodontograma: mesial y distal invertidos en el informe; las partidas de la proforma se creaban sin sede. | Corregido |
+| F22 | Receta y PDF: «COP COP12345»; la historia clínica salía sin COP en la firma. | Corregido |
+| F23 | Evolución: se guardaba con «pieza ___, cara ___» y no quedaba ligada a la cita (la alerta no se cerraba). | Corregido |
+| F24 | Radiografías y Fotos: dejaba llenar el formulario sin paciente; la cabecera mostraba «DNI» vacío. | Corregido |
+| F25 | Odontograma: al abrir reenviaba todas las piezas aunque no hubiera cambios; textos de dentición y fase incorrectos. | Corregido |
+| F26 | Mi producción: «−100 % vs mes anterior» el día 4; consejos que salen sin datos; calificación distinta a la de Reseñas. | Corregido |
+| F27 | Gerencia veía botones de escritura que el servidor rechaza (Laboratorio › Avanzar, Seguros, Agendar). | Corregido |
+| F28 | Metas por sede salía vacía cuando `/medicos` no trae sedes; «Sin especialidad». | Corregido |
+| F29 | Caja en modo supervisión: aparecían «Abrir caja» y «Cerrarla»; la jornada antigua salía «Cerrada»; el administrador de sede no recibía aviso al intentar abrir con una jornada pendiente. | Corregido |
+| F30 | Textos: «Nuevo sede», «Nuevo promoción»; Ocupación remitía a «Sedes» en vez de «Sillones»; Laboratorio y Seguros traían un paciente y una sede de ejemplo por defecto. | Corregido |
 
 ## 5. Registros de prueba creados (para limpiar)
 - **Pacientes:** QA Prueba Recepción (99100201), QA Recepción Curl (99100202), QA Agenda Recepción (99100203), QA Cancelar Recepción (99100205) y QA Prueba Doctor (99260410).
