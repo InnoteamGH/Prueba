@@ -2323,7 +2323,7 @@ function presupuesto(){
         }).join('');
         sel.addEventListener('click',function(e){e.stopPropagation();});
         sel.addEventListener('change',function(){
-          est.opcion[L.clave]=+sel.value; sucio(); presupuesto();});
+          est.opcion[L.clave]=(isNaN(+sel.value)?sel.value:+sel.value); sucio(); presupuesto();});
         tr.children[1].insertBefore(sel,tr.children[1].firstChild);
       }
       if(L.suelto){
@@ -2473,6 +2473,45 @@ const CONDICIONES=[
  ['Tratamientos pagados','Los importes pagados por un tratamiento no son objeto de devolución en efectivo. Si el tratamiento no llega a realizarse o el paciente decide cambiarlo, el importe permanece a su favor como saldo en su estado de cuenta y puede aplicarse a cualquier otro tratamiento de la clínica. Esta condición no se aplica cuando el tratamiento no se ejecute por causa atribuible a la clínica y no restringe los derechos que la ley reconoce al paciente.']
 ];
 const TOMA={id:'ODO-'+PACIENTE.hc+'-0007'};
+
+/* Con sesión (el sistema abre el dibujo con bridge=1&sesion=1) no puede quedar nada de
+   ejemplo: ni la clínica, ni la doctora, ni el paciente, ni la tarifa de Sistedent, ni los
+   servicios sueltos, ni el descuento. Todo llega del sistema por mensajes: la clínica y la
+   sede (dento-odontograma-clinica), el profesional con su COP (dento-odontograma-profesional),
+   el paciente (dento-odontograma-paciente) y la tarifa del catálogo de la clínica con el
+   precio de la sede (dento-odontograma-tarifa). Lo que no llega se imprime vacío o sale en
+   el aviso «no tiene tratamiento asociado». Sin sesión (demostración) queda todo igual. */
+const EN_SESION=/[?&]bridge=1(?:&|$)/.test(location.search||'')&&/[?&]sesion=1(?:&|$)/.test(location.search||'');
+function vaciarTarifa(){
+  Object.keys(TARIFA).forEach(function(k){delete TARIFA[k];});
+  SUELTOS.splice(0,SUELTOS.length);
+}
+if(EN_SESION){
+  Object.keys(CLINICA).forEach(function(k){CLINICA[k]='';});
+  PROF.nombre=''; PROF.cop=''; PROF.rne='';
+  Object.keys(PACIENTE).forEach(function(k){PACIENTE[k]=(k==='esMenor'?false:(k==='apoderado'?null:''));});
+  TRAZA.creado=''; TRAZA.solicitado=''; TRAZA.impreso='';
+  DESCUENTO.activo=false;
+  vaciarTarifa();
+}
+/* Tarifa enviada por el sistema: { hallazgo: {cod, t, v, alt:[{cod,t,v}]} } con los
+   servicios del catálogo (campo hallazgos[]) y el precio de la sede que emite. */
+function aplicarTarifa(m){
+  try{
+    if(!m||typeof m!=='object') return;
+    vaciarTarifa();
+    const t=m.tarifa||{};
+    Object.keys(t).forEach(function(k){
+      const x=t[k]; if(!x||!x.t) return;
+      TARIFA[k]={cod:x.cod, t:String(x.t), v:(x.v==null?null:+x.v),
+        alt:(x.alt||[]).filter(function(a){return a&&a.t;}).map(function(a){
+          return {cod:a.cod, t:String(a.t), v:(a.v==null?null:+a.v)};})};
+    });
+    (m.sueltos||[]).forEach(function(x){ if(x&&x.id&&x.t) SUELTOS.push({id:String(x.id),cod:x.cod,t:String(x.t),v:(x.v==null?null:+x.v),amb:x.amb||'general'}); });
+    if(typeof presupuesto==='function') presupuesto();
+    if(DOCU&&!DOCU.hidden) pintarDocu();
+  }catch(e){}
+}
 
 function esc(t){return String(t).replace(/[&<>"]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -2634,7 +2673,9 @@ function hojaPlan(){
         return '<tr><td class="pz">'+esc(ambitoRot(x))+'</td><td>'+esc(x.t)+'</td>'+
           '<td class="c">'+(x.cant||1)+'</td><td class="n">'+imp(x.v)+'</td>'+
           '<td class="n">'+imp(x.v*(x.cant||1))+'</td></tr>';}).join('')
-    : '<tr><td colspan="5" class="vacio">No hay hallazgos en mal estado en esta fase.</td></tr>';
+    : '<tr><td colspan="5" class="vacio">'+(EN_SESION&&R.faltan.length
+        ? 'Los hallazgos de esta fase no tienen tratamiento con precio en el catálogo de la clínica.'
+        : 'No hay hallazgos en mal estado en esta fase.')+'</td></tr>';
   /* las dos primeras columnas quedan vacías y sin borde: el bloque de totales se
      recoge a la derecha en vez de cruzar toda la tabla */
   const ft=function(et,val,cls){
@@ -3035,10 +3076,13 @@ construir(); panel();
   function applyClinica(c){
     try{
       if(!c||typeof c!=='object'||typeof CLINICA!=='object') return;
+      var sesion=(typeof EN_SESION!=='undefined')&&EN_SESION;
       ['nombre','razon','ruc','web','bajada','sede','dir','tel','horario','correo','serie'].forEach(function(k){
         if(c[k]!=null&&c[k]!=='') CLINICA[k]=String(c[k]);
+        else if(sesion) CLINICA[k]='';      /* con sesión, lo que no manda el sistema queda vacío */
       });
       if(c.logo) CLINICA.logo=String(c.logo);
+      else if(sesion) CLINICA.logo='';
       if(typeof calcNumDoc==='function') calcNumDoc();
     }catch(e){}
   }
@@ -3251,6 +3295,7 @@ construir(); panel();
     if(d.type==='dento-odontograma-paciente') applyPaciente(d.paciente);
     if(d.type==='dento-odontograma-profesional') applyProfesional(d.profesional);
     if(d.type==='dento-odontograma-clinica') applyClinica(d.clinica);
+    if(d.type==='dento-odontograma-tarifa' && typeof aplicarTarifa==='function') aplicarTarifa(d);
     if(d.type==='dento-odontograma-documento' && typeof abrirDocumento==='function'){ try{ window.scrollTo(0,0); abrirDocumento(d.que||'plan'); }catch(e){} }
   });
   window.__dentoBridge={snapshot:snapshot,notify:notify,hydrate:hydrate,exportPng:exportPng,applyZoom:applyZoom,applyPaciente:applyPaciente,applyClinica:applyClinica,applyProfesional:applyProfesional};

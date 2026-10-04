@@ -8,14 +8,20 @@ import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Keyboard, Printer, 
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import { SUP, INF, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, demoPerio } from "../util/periodontal";
-import { FASES_PERIO, abrirInformePerio, guardarPrecio, sugerirPlan, totalesPlan } from "../util/perioPlan";
+import { CATALOGO_PERIO, FASES_PERIO, abrirInformePerio, guardarPrecio, sugerirPlan, totalesPlan } from "../util/perioPlan";
 import { DatosDemoCtx, SEDE_IDS, mismaSede, nombreSede, sedeDePrecio, sedeNum, sedesDe, useSede } from "../comun";
 import { leerCatalogo, servicioPorId, precioServicio } from "../compartido/catalogo";
+import { precioEnSede } from "../compartido/cajaSede";
+import { servicioPorCodigoONombre, useCatalogoApi } from "../compartido/catalogoApi";
 import "./periodontograma.css";
 
 // PER-01: lo que sugiere el sondaje pasa al presupuesto único del paciente. Las partidas
 // que existen en el catálogo de servicios usan su precio; el resto, el de la sugerencia.
+// (Solo demostración: ids de la semilla. Con sesión el servicio se busca en el catálogo del
+// servidor por código —IHO, PRO, RAR…— o por nombre, y su precio es el de la sede.)
 const SERV_PERIO = { RAR: 15, PRO: 13, MAN: 14, REE: 14 };
+// UUID de la semilla de demostración: con sesión nunca se mandan al servidor.
+const UUID_DEMO = /^00000000-0000-0000-0000-0000000000a[12]$/i;
 
 const COL = 54, H = 150, CEJ = 86, SC = 5;
 const GEO = { 1: [32, 23, 42, 66], 2: [28, 22, 38, 62], 3: [32, 27, 44, 80], 4: [34, 31, 36, 68], 5: [33, 32, 34, 68], 6: [46, 48, 34, 62], 7: [44, 46, 33, 58], 8: [40, 42, 31, 52] };
@@ -303,6 +309,8 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
     return l.sort((a, b) => b.v - a.v || b.b - a.b);
   }, [dientes]);
 
+  // Con sesión: catálogo del servidor para la proforma (antes del retorno de «cargando»).
+  const catApi = useCatalogoApi();
   if (!dientes) return <div className="pgc-cargando">Cargando periodontograma…</div>;
 
   const cmp = comparar && previo;
@@ -316,10 +324,22 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
   // Plan sugerido con el precio de la sede (catálogo, o el corregido a mano para esa sede).
   // Lo usan la proforma y el informe, para que los dos den el mismo costo.
   const planConPrecios = () => {
+    if (conectado) {
+      // Con sesión: catálogo del servidor (sin precios de ejemplo ni correcciones guardadas en
+      // el navegador). Una partida que la clínica no tiene en su catálogo sale sin precio y sin
+      // marcar: el doctor puede poner el precio a mano o crear el servicio en Servicios y precios.
+      return sugerirPlan(dientes, dx, null).map((x) => {
+        const sv = servicioPorCodigoONombre(catApi, x.cod, CATALOGO_PERIO[x.cod]?.nombre);
+        return sv ? { ...x, nombre: sv.nombre, precio: precioEnSede(sv, sedePrecio), servicioId: sv.id } : { ...x, precio: 0, servicioId: null, incluir: false, sinCatalogo: true };
+      });
+    }
     const cat = leerCatalogo();
     return sugerirPlan(dientes, dx, sedePrecio).map((x) => { const sv = servicioPorId(cat, SERV_PERIO[x.cod]); return sv ? { ...x, precio: precioServicio(sv, sedePrecio), servicioId: sv.id } : x; });
   };
-  const abrirProforma = () => setPf({ plan: planConPrecios(), desc: 0 });
+  const abrirProforma = () => {
+    if (conectado && !catApi) { notify("Todavía se está leyendo el catálogo de servicios de la clínica."); return; }
+    setPf({ plan: planConPrecios(), desc: 0 });
+  };
   const agregarAlPresupuesto = () => {
     const items = pf.plan.filter((x) => x.incluir).map((x, i) => ({ id: Date.now() + i, servicioId: x.servicioId || null, nombre: `${x.nombre}${x.cant > 1 ? ` ×${x.cant}` : ""}${x.det ? ` · ${x.det}` : ""}`, costo: Math.round(x.cant * x.precio * (1 - (pf.desc || 0) / 100)), sede: sedePrecio ?? undefined, estado: "pendiente", origen: "periodontograma" }));
     if (!items.length) return;
@@ -330,7 +350,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
     }
     api.tratamientos.porPaciente(pacienteId)
       .then((planes) => planes?.[0]?.plan?.id || api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento" }).then((pl) => pl.id))
-      .then((planId) => Promise.all(items.map((it) => api.tratamientos.agregarFase(planId, { nombre: it.nombre, costo: it.costo, sedeId: sedeApiUuid(sedePrecio), ...(it.servicioId ? { servicioId: it.servicioId } : {}) }))))
+      .then((planId) => { const sd = sedeApiUuid(sedePrecio); const sedeOk = sd && !UUID_DEMO.test(sd) ? sd : null; return Promise.all(items.map((it) => api.tratamientos.agregarFase(planId, { nombre: it.nombre, costo: it.costo, origen: "periodontograma", ...(sedeOk ? { sedeId: sedeOk } : {}), ...(it.servicioId ? { servicioId: it.servicioId } : {}) }))); })
       .then(() => { notify("Partidas agregadas al presupuesto del paciente."); setPf(null); })
       .catch(() => notify("No se pudo agregar al presupuesto."));
   };
@@ -574,9 +594,9 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
                       {its.map((x) => (
                         <div key={x.id} className={`pgc-pf__it${x.incluir ? "" : " is-off"}`}>
                           <label className="pgc-pf__chk"><input type="checkbox" checked={x.incluir} onChange={(e) => setItem(x.id, "incluir", e.target.checked)} />
-                            <span><b>{x.nombre}</b>{x.det && <small>{x.det}</small>}{x.cond && <small className="is-cond">{x.cond}</small>}</span></label>
+                            <span><b>{x.nombre}</b>{x.det && <small>{x.det}</small>}{x.cond && <small className="is-cond">{x.cond}</small>}{x.sinCatalogo && <small className="is-cond">No está en el catálogo de servicios de la clínica: indica el precio para incluirlo.</small>}</span></label>
                           <label className="pgc-pf__num"><span>Cant.</span><input type="number" min="1" max="32" value={x.cant} onChange={(e) => setItem(x.id, "cant", Math.max(1, Number(e.target.value) || 1))} /></label>
-                          <label className="pgc-pf__num is-precio"><span>Precio S/</span><input type="number" min="0" step="10" value={x.precio} onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setItem(x.id, "precio", v); guardarPrecio(x.cod, v, sedePrecio); }} /></label>
+                          <label className="pgc-pf__num is-precio"><span>Precio S/</span><input type="number" min="0" step="10" value={x.precio} onChange={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setItem(x.id, "precio", v); if (!conectado) guardarPrecio(x.cod, v, sedePrecio); }} /></label>
                           <em>{sol(x.cant * x.precio)}</em>
                         </div>
                       ))}

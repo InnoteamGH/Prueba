@@ -2,10 +2,11 @@ import { BotonPDF } from "../comun";
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import api, { auth } from "../api/client";
 import confDefault from "../util/planInversionConf.js";
-import { urlLogo, useDatosImpresion } from "../util/membrete";
+import { normalizarImpresion, urlLogo, useDatosImpresion } from "../util/membrete";
 import { DatosDemoCtx, Select, useSede } from "../comun";
 import { leerCatalogo } from "../compartido/catalogo";
 import { precioEnSede } from "../compartido/cajaSede";
+import { useCatalogoApi, HALLAZGO_IFRAME } from "../compartido/catalogoApi";
 import {
   SUELTOS_PARTIDA,
   resolverLineas,
@@ -15,6 +16,8 @@ import {
   necesitaSelectorMaxilar,
   opcionesMaxilar,
   formatearFDI,
+  tarifa as tarifaBase,
+  ALIAS_HALLAZGO,
 } from "../util/planInversion.js";
 import {
   partirLineasEnHojas,
@@ -33,6 +36,36 @@ const CONDICIONES_FALLBACK = [
   ["Tratamientos pagados", "Los importes pagados por un tratamiento no son objeto de devolución en efectivo. Si el tratamiento no llega a realizarse o el paciente decide cambiarlo, el importe permanece a su favor como saldo en su estado de cuenta y puede aplicarse a cualquier otro servicio. Quedan excluidos los casos en que el cambio se deba a causa imputable a la clínica."],
 ];
 
+/* Con sesión el documento no usa ningún respaldo fijo (clínica, sede Los Olivos, serie PI,
+   descuento del 10 %, tarifa de Sistedent ni la consulta suelta de S/ 50): la empresa y la
+   sede salen de /clinica/impresion, y los precios del catálogo de la clínica en la sede.
+   Lo que el servidor no manda queda vacío o fuera del documento. */
+const DOC_SESION = { titulo: "PLAN DE INVERSIÓN", diasVigencia: 30, mostrarOdontograma: true, mostrarRNE: false, descuento: { activo: false } };
+
+/** Tarifa del plan con el catálogo de la clínica (sin la tabla base): cada regla toma el
+    servicio que tiene ese hallazgo en `hallazgos[]`; sin servicio, la línea no sale y queda
+    en el aviso interno. Los servicios sueltos son los del catálogo. */
+export function tarifaSesion(catalogo, precioDe) {
+  const activos = (catalogo || []).filter((x) => x && x.activo !== false);
+  const servDe = (clave) => {
+    const ids = [clave, ...Object.keys(ALIAS_HALLAZGO).filter((ui) => ALIAS_HALLAZGO[ui] === clave), HALLAZGO_IFRAME[clave]].filter(Boolean);
+    return activos.find((x) => (x.hallazgos || []).some((h) => ids.includes(h))) || null;
+  };
+  const linea = (x) => ({ cod: x.codigo || String(x.id), nom: x.nombre, v: precioDe(x) });
+  const reglas = {};
+  for (const [k, r] of Object.entries(tarifaBase.reglas || {})) {
+    if (r && r.sinTratamiento) { reglas[k] = r; continue; }
+    const sv = servDe(k) || (r && r.porPieza ? servDe("endodoncia") : null);
+    reglas[k] = sv ? linea(sv) : { sinTratamiento: "Sin servicio para este hallazgo en el catálogo de la clínica" };
+  }
+  return {
+    reglas,
+    endodonciaPorPieza: {},
+    sueltos: activos.map((x) => ({ ...linea(x), amb: "general" })),
+    maxilares: tarifaBase.maxilares,
+  };
+}
+
 function textoCond(txt, dias) {
   return String(txt || "").replace(/\{diasVigencia\}/g, String(dias ?? 30));
 }
@@ -40,7 +73,7 @@ function textoCond(txt, dias) {
 function Pie({ n, total, empresa }) {
   return (
     <div className="doc-pie">
-      <span>{empresa.nombreParaDocumento || empresa.nombreComercial} – RUC {empresa.ruc}</span>
+      <span>{[empresa.nombreParaDocumento || empresa.nombreComercial, empresa.ruc ? `RUC ${empresa.ruc}` : ""].filter(Boolean).join(" – ")}</span>
       <span data-pie-pagina>{etiquetaPie(n, total)}</span>
     </div>
   );
@@ -60,6 +93,7 @@ export default function PlanInversionDocumento({
   anexoDataUrl = null,
   onClose,
 }) {
+  const sesion = !!auth.token;
   const [confApi, setConfApi] = useState(null);
   // Sin respuesta de /clinica/impresion se usan los datos del sistema de la sede activa
   // (util/membrete.js), no una clínica fija.
@@ -70,7 +104,21 @@ export default function PlanInversionDocumento({
       razonSocial: DI.empresa.razonSocial, ruc: DI.empresa.ruc, web: DI.empresa.web, logo: DI.empresa.logo },
     sedes: [{ ...(confDefault.sedes?.[0] || {}), ...DI.sede, serieDocumento: DI.sede.serieDocumento || confDefault.sedes?.[0]?.serieDocumento }],
   }), [DI]);
-  const conf = confProp || confApi || confSistema;
+  // Con sesión: lo que manda /clinica/impresion (o, mientras llega, el membrete del sistema,
+  // que también viene del servidor); nunca planInversionConf.js.
+  const confSesion = useMemo(() => {
+    if (!sesion) return null;
+    const n = confApi ? normalizarImpresion(confApi, sedeId) : { empresa: DI.empresa, sede: DI.sede };
+    const e = n.empresa || {};
+    return {
+      empresa: { nombreComercial: e.nombre, nombreParaDocumento: e.nombre, razonSocial: e.razonSocial, ruc: e.ruc, web: e.web, logo: e.logo },
+      sedes: [{ ...(n.sede || {}) }],
+      documento: { ...DOC_SESION, ...((confApi && confApi.documento) || {}) },
+      textos: (confApi && confApi.textos) || undefined,
+      tarifa: (confApi && confApi.tarifa) || undefined,
+    };
+  }, [sesion, confApi, DI, sedeId]);
+  const conf = confProp || confSesion || confApi || confSistema;
   const sedeOrigen = conf.sedes?.[0]?.origenSedeDocumento || (sedeId ? "toma_o_activa" : "fallback");
   const sede = (conf.sedes && conf.sedes[0]) || {};
   const doc = conf.documento || {};
@@ -80,8 +128,9 @@ export default function PlanInversionDocumento({
     ? conf.textos.condiciones
     : CONDICIONES_FALLBACK);
 
-  const [sueltosUI, setSueltosUI] = useState([{ cod: 26, pz: null, max: null }]);
-  const [codAdd, setCodAdd] = useState(26);
+  // Con sesión no se precarga ninguna partida suelta (antes, una consulta fija de S/ 50).
+  const [sueltosUI, setSueltosUI] = useState(() => (auth.token ? [] : [{ cod: 26, pz: null, max: null }]));
+  const [codAdd, setCodAdd] = useState(() => (auth.token ? "" : 26));
   const [maxAdd, setMaxAdd] = useState("sup");
   const [piezaAdd, setPiezaAdd] = useState("");
   const [aviso, setAviso] = useState("");
@@ -96,7 +145,8 @@ export default function PlanInversionDocumento({
   }, [anexoDataUrl]);
 
   useEffect(() => {
-    if (confProp) return;
+    // Sin sesión (demostración) no se consulta el servidor: los datos son los del sistema.
+    if (confProp || !auth.token) return;
     api.clinica?.impresion?.(sedeId || undefined)
       .then((c) => { if (c && typeof c === "object") setConfApi(c); })
       .catch(() => {});
@@ -111,24 +161,21 @@ export default function PlanInversionDocumento({
     return () => { cancel = true; };
   }, [pacienteId, capa, tomaHash]);
 
-  const servicioAdd = SUELTOS_PARTIDA.find((s) => s.cod === Number(codAdd));
-
   // CAJA-16: los importes son los del catálogo vigente en la sede del documento (los mismos
   // que el odontograma pasa a Plan y cuenta y que Caja cobra), no una tabla fija igual para
   // todas las sedes. Si el servidor manda su tarifa por sede (conf.tarifa), manda esa.
   const sx = useSede();
   const dbDemo = useContext(DatosDemoCtx);
-  const [catApi, setCatApi] = useState(null);
-  useEffect(() => {
-    if (!auth.token || !api.catalogo?.especialidades) return;
-    api.catalogo.especialidades()
-      .then((r) => setCatApi((r || []).map((e) => ({ id: e.id, nombre: e.nombre, precio: Number(e.precioBase) || 0, preciosSede: e.preciosSede || {}, hallazgos: e.hallazgos || [], activo: e.activo !== false }))))
-      .catch(() => {});
-  }, []);
-  const catalogo = auth.token ? (catApi || []) : (dbDemo?.catalogo || leerCatalogo());
+  const catApi = useCatalogoApi();
+  const catalogo = sesion ? (catApi || []) : (dbDemo?.catalogo || leerCatalogo());
   const sedePrecio = sedeId ?? sx.activa;
-  const tarifaSede = useMemo(() => conf.tarifa || tarifaDesdeCatalogo(catalogo, (s) => precioEnSede(s, sedePrecio)), [conf.tarifa, catalogo, sedePrecio]);
+  const tarifaSede = useMemo(() => conf.tarifa || (sesion
+    ? tarifaSesion(catalogo, (s) => precioEnSede(s, sedePrecio))
+    : tarifaDesdeCatalogo(catalogo, (s) => precioEnSede(s, sedePrecio))), [conf.tarifa, catalogo, sedePrecio, sesion]);
+  const sueltosLista = sesion ? (tarifaSede.sueltos || []) : SUELTOS_PARTIDA;
+  const servicioAdd = sueltosLista.find((s) => String(s.cod) === String(codAdd));
 
+  const cargandoTarifa = sesion && !conf.tarifa && catApi == null;
   const { lineas, descartes, totales } = useMemo(() => {
     const sueltos = sueltosUI.map((s) => [s.pz, s.cod, s.max]);
     const { lineas: L, descartes: D } = resolverLineas(hallazgos, sueltos, tarifaSede);
@@ -246,8 +293,8 @@ export default function PlanInversionDocumento({
         <div className="plan-inv-no-print" style={{ margin: "12px 16px", padding: 12, background: "#F4F1EA", borderRadius: 8, fontFamily: "system-ui,sans-serif", fontSize: 13 }}>
           <div style={{ fontWeight: 500, marginBottom: 8 }}>Añadir servicio suelto</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <Select width={360} ariaLabel="Servicio suelto" value={codAdd} onChange={(v) => setCodAdd(Number(v))}
-              options={SUELTOS_PARTIDA.map((x) => ({ value: x.cod, label: `${x.cod} – ${x.nom}`, sub: x.amb === "pieza" ? "Sobre la pieza elegida" : x.fijo === "ambos" ? "Ambos maxilares" : x.amb === "maxilar" && !x.fijo ? "Por maxilar" : undefined }))} />
+            <Select width={360} ariaLabel="Servicio suelto" value={codAdd} onChange={(v) => setCodAdd(v)} placeholder={sesion && !sueltosLista.length ? "El catálogo de la clínica está vacío" : "Elige un servicio…"}
+              options={sueltosLista.map((x) => ({ value: x.cod, label: sesion ? x.nom : `${x.cod} – ${x.nom}`, sub: x.amb === "pieza" ? "Sobre la pieza elegida" : x.fijo === "ambos" ? "Ambos maxilares" : x.amb === "maxilar" && !x.fijo ? "Por maxilar" : undefined }))} />
             {servicioAdd?.amb === "pieza" && (
               <input placeholder="Pieza (ej. 16)" value={piezaAdd} onChange={(e) => setPiezaAdd(e.target.value)} style={{ ...inp, width: 100 }} />
             )}
@@ -257,6 +304,7 @@ export default function PlanInversionDocumento({
             <button type="button" onClick={addSuelto} style={btnPrimary}>Añadir</button>
           </div>
           {aviso && <div style={{ color: "#b45309", marginTop: 6 }}>{aviso}</div>}
+          {cargandoTarifa && <div style={{ color: "#6b6560", marginTop: 6 }}>Leyendo el catálogo de servicios de la clínica…</div>}
           {planRemote?.numeroDocumento && (
             <div style={{ marginTop: 6, color: "#166534" }}>Documento {planRemote.numeroDocumento} – {totalPaginas} páginas</div>
           )}
@@ -283,7 +331,7 @@ export default function PlanInversionDocumento({
                     <div>
                       {(empresa.logo || DI.empresa.logo) && <img src={urlLogo(empresa.logo || DI.empresa.logo)} alt={empresa.nombreComercial || ""} style={{ height: 46, maxWidth: 220, objectFit: "contain", display: "block", marginBottom: 6 }} />}
                       <div style={{ fontSize: 22, fontWeight: 600 }}>{empresa.nombreParaDocumento || empresa.nombreComercial || "Clínica"}</div>
-                      <div className="plan-inv-muted">RUC {empresa.ruc}</div>
+                      {empresa.ruc ? <div className="plan-inv-muted">RUC {empresa.ruc}</div> : null}
                       {empresa.web && <div className="plan-inv-muted">{empresa.web}</div>}
                     </div>
                     <div style={{ textAlign: "right" }}>
