@@ -93,7 +93,9 @@ export function normalizarImpresion(c, sedeId, extra = {}) {
 }
 
 /* ── almacén: lo fija MainApp al cambiar de sede; lo leen todas las descargas ── */
-let actual = datosDemo(1);
+// Con sesión arranca vacío hasta que llega /clinica/impresion: nunca la clínica de ejemplo.
+const VACIO = { empresa: { nombre: "", razonSocial: "", ruc: "", web: "", bajada: "", logo: "" }, sede: { id: null, nombre: "", direccion: "", telefonos: "", horario: "", correo: "", serieDocumento: "" }, demo: false };
+let actual = (() => { try { return localStorage.getItem("dc_token") ? VACIO : datosDemo(1); } catch { return datosDemo(1); } })();
 const subs = new Set();
 export function fijarDatosImpresion(d) { actual = d; subs.forEach((f) => f()); }
 export const datosImpresion = () => actual;

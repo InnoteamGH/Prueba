@@ -9279,12 +9279,16 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     irHash(dest, extra);
   };
   useEffect(() => { localStorage.setItem("dc_vista_" + rol, vista); }, [vista, rol]);
-  const [citas, setCitas] = usePersist("citas", CITAS_INIT);
-  const [pacientes, setPacientes] = usePersist("pacientes", PACIENTES_INIT);
+  // Con sesión nada arranca con datos de ejemplo: cada pantalla trae lo suyo del servidor.
+  // (Antes, al iniciar sesión, estas semillas volvían a llenar el estado global y se veían en
+  // el buscador, reportes, lista de espera, etc.)
+  const semilla = (v) => (auth.token ? (Array.isArray(v) ? [] : {}) : v);
+  const [citas, setCitas] = usePersist("citas", semilla(CITAS_INIT));
+  const [pacientes, setPacientes] = usePersist("pacientes", semilla(PACIENTES_INIT));
   // Sillones (con su uso: flexible, fijo de un doctor o de una especialidad), horario de
   // cada doctor y bloqueos de agenda de la demostración. Con sesión vienen del servidor.
-  const [sillones, setSillones] = usePersist("sillones", SILLONES_DEMO);
-  const [dispMedicos, setDispMedicos] = usePersist("disp_medicos", DISP_DEMO);
+  const [sillones, setSillones] = usePersist("sillones", semilla(SILLONES_DEMO));
+  const [dispMedicos, setDispMedicos] = usePersist("disp_medicos", semilla(DISP_DEMO));
   const [bloqueosDemo, setBloqueosDemo] = usePersist("bloqueos", []);
   const [asignaciones, setAsignaciones] = usePersist("asig_sillones", []);   // turnos del día por sillón
   // Citas guardadas antes de que existiera la regla de sillones: se les asigna uno.
@@ -9294,18 +9298,18 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Historia clínica ÚNICA y editable (antes era una constante estática): todos los
   // módulos clínicos leen y escriben aquí. Es la columna vertebral del proceso.
-  const [fichas, setFichas] = usePersist("fichas", () => JSON.parse(JSON.stringify(FICHA_CLINICA)));
+  const [fichas, setFichas] = usePersist("fichas", () => (auth.token ? {} : JSON.parse(JSON.stringify(FICHA_CLINICA))));
   const fichaDe = (pid) => fichas[pid] || {};
   const updFicha = (pid, patch) => setFichas((f) => { const cur = f[pid] || {}; const nx = typeof patch === "function" ? patch(cur) : { ...cur, ...patch }; return { ...f, [pid]: nx }; });
   // Fuente única de la demostración (spec UX/UI §5.3): catálogo de servicios, egresos de
   // caja, documentos del paciente, casos de laboratorio y liquidaciones de seguro. Las
   // pantallas transversales y la ficha leen estas mismas listas.
-  const [catalogo, setCatalogo] = usePersist("catalogo", CATALOGO_SEED);
-  const [egresos, setEgresos] = usePersist("egresos", EGRESOS_DEMO);
-  const [documentos, setDocumentos] = usePersist("documentos", DOCUMENTOS_SEED);
-  const [labCasos, setLabCasos] = usePersist("lab", LAB_SEED);
-  const [liquidaciones, setLiquidaciones] = usePersist("liquidaciones", LIQ_SEED);
-  const [espera, setEspera] = usePersist("espera", ESPERA_INIT);   // lista de espera compartida (P1-3)
+  const [catalogo, setCatalogo] = usePersist("catalogo", semilla(CATALOGO_SEED));
+  const [egresos, setEgresos] = usePersist("egresos", semilla(EGRESOS_DEMO));
+  const [documentos, setDocumentos] = usePersist("documentos", semilla(DOCUMENTOS_SEED));
+  const [labCasos, setLabCasos] = usePersist("lab", semilla(LAB_SEED));
+  const [liquidaciones, setLiquidaciones] = usePersist("liquidaciones", semilla(LIQ_SEED));
+  const [espera, setEspera] = usePersist("espera", semilla(ESPERA_INIT));   // lista de espera compartida (P1-3)
   const [pacienteActivo, setPacienteActivo] = useState(null); // paciente en atención (P1-1)
   // Ir a un módulo con un paciente ya elegido (p. ej. «Abrir en Periodontograma» desde la ficha).
   useEffect(() => {
@@ -9313,7 +9317,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     window.addEventListener("dc-ir", ir);
     return () => window.removeEventListener("dc-ir", ir);
   }, []);
-  const [inventario, setInventario] = usePersist("inventario", INVENTARIO_INIT); // insumos (P2-1)
+  const [inventario, setInventario] = usePersist("inventario", semilla(INVENTARIO_INIT)); // insumos (P2-1)
   // P2-1: al ejecutar/cobrar un procedimiento se descuentan los insumos usados.
   // Descuenta el kit del procedimiento del stock de LA SEDE donde se atendió (cada sede
   // tiene su propio almacén). Sin sede, la activa.
@@ -9324,7 +9328,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     const sd = sedeConsumo ?? sedeActivaRef.current;
     setInventario((its) => its.map((x) => mismaSede(x.sede ?? SEDE_IDS[0], sd) && kit.some((k) => x.nombre === k || x.nombre.includes(k)) ? { ...x, stock: Math.max(0, x.stock - 1) } : x));
   };
-  const [staff, setStaff] = usePersist("staff", STAFF_INIT);
+  const [staff, setStaff] = usePersist("staff", semilla(STAFF_INIT));
   // Permisos por ROL a nivel de acción (defaults editables): { rol: { modId: [acciones] } }.
   // Es la base; cada usuario puede además tener un override individual (usuario.permisos).
   const [rolePerms, setRolePerms] = usePersist("permisos_v2", () => JSON.parse(JSON.stringify(ROL_PERMS)));

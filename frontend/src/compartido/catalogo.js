@@ -33,6 +33,8 @@ export function leerCatalogo() {
     const s = JSON.parse(localStorage.getItem(CATALOGO_KEY) || "null");
     if (Array.isArray(s) && s.length) return s;
   } catch (e) { /* sin almacenamiento */ }
+  // Con sesión el catálogo es el del servidor: nunca los precios de ejemplo.
+  try { if (localStorage.getItem("dc_token")) return []; } catch (e) { /* */ }
   return CATALOGO_SEED;
 }
 
