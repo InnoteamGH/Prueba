@@ -62,7 +62,8 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto } from "./compartido/presupuestoDoc";
-import { cruceAlergias } from "./compartido/alergias";
+import { cruceAlergias, listaAlergias } from "./compartido/alergias";
+import { horasSemana, horarioConfigurado } from "./comun";
 import {BotonPDF, SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
@@ -828,7 +829,8 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const [overOk, setOverOk] = useState(null);    // ¿se puede soltar en la celda resaltada? { ok, motivo }
   const [turno, setTurno] = useState(null);      // modal de turno del sillón: { s, fecha, medicoId, desde, hasta }
   // Sillones con su uso (flexible / de un doctor / de una especialidad), por sede.
-  const silTodos = (reglas && reglas.sillones && reglas.sillones.length) ? reglas.sillones : SILLONES_CAL.map((n) => ({ id: `x${n}`, sede: null, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true }));
+  // Con sesión no se inventan sillones: sin sillones configurados la vista por sillón queda vacía con aviso.
+  const silTodos = (reglas && reglas.sillones && reglas.sillones.length) ? reglas.sillones : (auth.token ? [] : SILLONES_CAL.map((n) => ({ id: `x${n}`, sede: null, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true })));
   const sedesSil = [...new Set(silTodos.map((x) => String(x.sede)))];
   const nombreSedeCal = (id) => (citas.find((c) => String(c.sede) === String(id) && c.sedeNombre && c.sedeNombre !== "—") || {}).sedeNombre || (id !== "null" && nombreSede(Number(id))) || "Clínica";
   const [sedeSil, setSedeSil] = useState(() => (sedeInicial != null && sedesSil.includes(String(sedeInicial)) ? String(sedeInicial) : sedesSil[0]));
@@ -847,7 +849,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   // vean aquí igual que en el Mes y en el Consolidado.
   const semana = [...Array(7)].map((_, i) => { const d = new Date(lun); d.setDate(lun.getDate() + i); return d; });
   const diaSel = (() => { const d = new Date(hoyD); d.setDate(d.getDate() + diaOff); return d; })();
-  const HORAS = [...Array(14)].map((_, i) => 8 + i); // 08:00 – 21:00
+
   const NOM = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   const NOML = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
   const MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -874,6 +876,26 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   // Sede concreta que se mira (la del sillón, o la del filtro del menú): su horario manda.
   const sedeCal = modo === "sillon" ? (sedeSilEf && sedeSilEf !== "null" ? sedeSilEf : null) : (sedeFiltro !== "all" ? sedeFiltro : null);
   const horarioCal = horarioDeSede(horario, sedeCal);
+  // Filas de horas: en la demo 08:00 – 21:00; con sesión, la jornada más amplia del horario de
+  // la clínica (o de la sede que se mira), ampliada si alguna cita cae fuera de ella.
+  const HORAS = (() => {
+    if (!auth.token) return [...Array(14)].map((_, i) => 8 + i);
+    const base = horasSemana(horarioCal);
+    let a = base[0], b = base[base.length - 1];
+    citas.forEach((c) => { const h = parseInt(c.hora, 10); if (Number.isFinite(h)) { a = Math.min(a, h); b = Math.max(b, h); } });
+    return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  })();
+  // Turnos rápidos del sillón: en la demo fijos; con sesión, según la jornada de ese día y sede.
+  const rangosTurno = (sedeT, fecha) => {
+    if (!auth.token) return [["manana", "Mañana", "08:00", "13:00"], ["tarde", "Tarde", "14:00", "19:00"], ["dia", "Todo el día", "08:00", "20:00"]];
+    const j = jornadaClinica(horarioDeSede(horario, sedeT), feriados, fecha);
+    if (!j.abierta) return [];
+    const abre = String(j.abre).slice(0, 5), cierra = String(j.cierra).slice(0, 5);
+    const medio = `${String(Math.floor((toMin(abre) + toMin(cierra)) / 120)).padStart(2, "0")}:00`;
+    const r = [["dia", "Todo el día", abre, cierra]];
+    if (medio > abre && medio < cierra) r.unshift(["manana", "Mañana", abre, medio], ["tarde", "Tarde", medio, cierra]);
+    return r;
+  };
   const estadoDiaCal = (d) => {
     const fer = (feriados || []).find((x) => x && x.fecha === iso(d));
     if (fer) return fer.cerrado ? { cerrado: true } : { cerrado: false, abre: hhNum(fer.abre), cierra: hhNum(fer.cierra) };
@@ -1156,7 +1178,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                   </>); })()}
                   {modo === "sillon" && col.silObj && (() => { const turnos = (reglas?.asignaciones || []).filter((a) => a.fecha === col.dISO && String(a.sede) === String(col.silObj.sede) && String(a.sillon) === String(col.silObj.numero)); return (<>
                     {turnos.map((a) => <span key={a.id} className="dc-cal__turno" title={`Turno del día: ${a.desde}–${a.hasta}`}>{((reglas?.medicos || []).find((m) => String(m.id) === String(a.medicoId)) || {}).nombre?.replace(/^Dra?\.\s*/, "").split(" ")[0] || "Doctor"} · {a.desde}–{a.hasta}</span>)}
-                    {onAsignar && col.silObj.activo !== false && <button type="button" className="dc-cal__asig" onClick={() => setTurno({ s: col.silObj, fecha: col.dISO, medicoId: "", desde: "08:00", hasta: "13:00", rango: "manana" })}>{turnos.length ? "Turnos" : "+ Asignar doctor"}</button>}
+                    {onAsignar && col.silObj.activo !== false && <button type="button" className="dc-cal__asig" onClick={() => { const r0 = rangosTurno(col.silObj.sede, col.dISO)[0]; setTurno({ s: col.silObj, fecha: col.dISO, medicoId: "", desde: r0 ? r0[2] : "", hasta: r0 ? r0[3] : "", rango: r0 ? r0[0] : "" }); }}>{turnos.length ? "Turnos" : "+ Asignar doctor"}</button>}
                   </>); })()}
                   {modo === "doctores" && col.medKey !== "sin" && conHorario(col.medKey) && (() => { const ts = turnosDoc(col.medKey, col.dISO); return <small className={`dc-cal__silsub${ts.length ? "" : " is-no"}`}>{ts.length ? txtTurnos(ts) : "No atiende hoy"}</small>; })()}
                 </div>
@@ -1199,7 +1221,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
         const ajenas = citas.filter((c) => c.fecha === turno.fecha && String(c.sede) === String(turno.s.sede) && sillonDe(c) === turno.s.numero && ACTIVA(c) && turno.medicoId && String(c.medicoId) !== String(turno.medicoId) && c.hora >= turno.desde && c.hora < turno.hasta);
         const tsDoc = turno.medicoId ? turnosDelDia(reglas?.disp || [], turno.medicoId, turno.fecha, turno.s.sede) : [];
         const atiende = !turno.medicoId || !conHorario(turno.medicoId) || tsDoc.some((t) => String(t.horaInicio).slice(0, 5) <= turno.desde && turno.hasta <= String(t.horaFin).slice(0, 5) && (t.sede == null || String(t.sede) === String(turno.s.sede)));
-        const RANGOS = [["manana", "Mañana", "08:00", "13:00"], ["tarde", "Tarde", "14:00", "19:00"], ["dia", "Todo el día", "08:00", "20:00"]];
+        const RANGOS = rangosTurno(turno.s.sede, turno.fecha);
         const guardarT = () => {
           if (!turno.medicoId) return;
           if (turno.hasta <= turno.desde) return;
@@ -1391,7 +1413,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     api.citas.listar(reprog.fecha).then((r) => { if (vivo) setReprogDia((r || []).map(mapCita)); }).catch(() => { if (vivo) setReprogDia(null); });
     return () => { vivo = false; };
   }, [reprog?.fecha]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { recargarSaldos(); recargarBloqueos(); if (conectado) { api.clinica.get().then((r) => setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] })).catch(() => {}); api.espera.listar().then((r) => setEsperaResumen(r || [])).catch(() => {}); } }, []); // eslint-disable-line
+  const [horCargado, setHorCargado] = useState(false);   // con sesión: ya respondió GET /clinica
+  useEffect(() => { recargarSaldos(); recargarBloqueos(); if (conectado) { api.clinica.get().then((r) => { setHorarioClinica({ horario: (r?.horario && typeof r.horario === "object") ? r.horario : {}, feriados: Array.isArray(r?.feriados) ? r.feriados : [] }); setHorCargado(true); }).catch(() => {}); api.espera.listar().then((r) => setEsperaResumen(r || [])).catch(() => {}); } }, []); // eslint-disable-line
   useEffect(() => {
     if (!agendarDesdeFicha) return;
     setAgendar(agendarDesdeFicha);
@@ -1683,6 +1706,16 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           {puedeAgendar && <Btn onClick={() => setAgendar(vista !== "calendario" && diaVer > hoyISO ? { fecha: diaVer } : true)}><Plus size={16} strokeWidth={1.75} /> Agendar cita</Btn>}
         </div>
       </div></EnCabecera>
+      {/* Con sesión no se asume horario ni sillones de ejemplo: si faltan, se dice. */}
+      {conectado && ((horCargado && !horarioConfigurado(horarioClinica.horario)) || (reglasAg.listo && !(reglasAg.sillones || []).length)) && (
+        <div role="status" style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "10px 14px", marginBottom: 12, borderRadius: "var(--dc-r-md)", background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", fontSize: 13 }}>
+          <Info size={15} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            {horCargado && !horarioConfigurado(horarioClinica.horario) && <>Configura el horario de atención de la clínica en Configuración › Horario de atención: mientras tanto la agenda no marca horas cerradas. </>}
+            {reglasAg.listo && !(reglasAg.sillones || []).length && <>No hay sillones configurados: créalos en Configuración › Sillones para poder agendar citas.</>}
+          </span>
+        </div>
+      )}
       {agendar && <AgendarRecepcionModal rol={rol} base={typeof agendar === "object" ? agendar : undefined} onClose={() => setAgendar(false)} onCreada={() => { setAgendar(false); recargar(); recargarAll(); }} notify={notify} />}
       {asignarBase && <AgendarRecepcionModal rol={rol} base={asignarBase} notify={notify} onClose={() => setAsignarBase(null)}
         onCreada={() => { const eid = asignarBase._esperaId; setAsignarBase(null); recargar(); recargarAll();
@@ -2132,7 +2165,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       // está marcada o la primera del usuario.
       const sedeReg = (form.sedeRegistroId && sedesForm.find((s) => mismaSede(s, form.sedeRegistroId)) != null ? form.sedeRegistroId : null)
         ?? sedesForm.find((s) => mismaSede(s, sedeAlta)) ?? sedesForm.find(esMiaPac) ?? sedesForm[0];
-      const payload = { nombre: form.nombre.trim(), dni: form.dni.trim(), telefono: (form.telefono || "").replace(/\D/g, "").replace(/^51/, "").slice(-9) || null, email: (form.email || "").trim() || null, fechaNacimiento: form.nacimiento || null, genero: form.genero || null, distrito: form.distrito || null, canal: form.canal || null, aseguradora: form.aseguradora || null, marketing: !!form.marketing, comentario: form.comentario || null, tags: form.tags || [], sedeRegistroId: sedeApiUuid(sedeReg),
+      const payload = { nombre: form.nombre.trim(), dni: form.dni.trim(), telefono: (form.telefono || "").replace(/\D/g, "").replace(/^51/, "").slice(-9) || null, email: (form.email || "").trim() || null, fechaNacimiento: form.nacimiento || null, genero: form.genero || null, distrito: form.distrito || null, canal: form.canal || null, aseguradora: form.aseguradora || null, marketing: !!form.marketing, comentario: form.comentario || null, tags: form.tags || [], sedeRegistroId: sedeApiUuid(sedeReg), sedeIds: sedesForm.map(sedeApiUuid).filter(Boolean),
         // Se manda "" y no null para poder BORRAR el apoderado (el backend ignora los nulos).
         apoderadoNombre: form.apoderadoNombre || "", apoderadoParentesco: form.apoderadoParentesco || "",
         apoderadoDni: form.apoderadoDni || "", apoderadoTelefono: form.apoderadoTelefono || "" };
@@ -2266,10 +2299,13 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const canalMax = Math.max(1, ...canalTop.map((c) => c[1]));
   const canalCol = { "Recomendación": "#16A36A", "Instagram": "#E0487A", "Facebook": "#2F6FDE", "Google": "#F2A93B", "TikTok": "#1F3A40", "Volante": "#D97706", "Pasó por el local": "#0E9199", "Convenio empresa": "#6D4FD1", "Sin registrar": "#B7C8CB" };
   const segmentos = [
-    { k: "cumple", label: "Cumpleaños este mes", sub: "Saludo con descuento", n: cumpleMes, color: "#E0487A", icon: <Sparkles size={16} strokeWidth={1.75} />,
-      plantilla: "¡Feliz cumpleaños, {nombre}! 🎉 Queremos celebrar contigo: este mes tienes 20% de descuento en tu limpieza dental. Escríbenos para agendar." },
+    // Con sesión las plantillas no prometen descuentos de ejemplo: la clínica escribe los suyos.
+    { k: "cumple", label: "Cumpleaños este mes", sub: conectado ? "Saludo de cumpleaños" : "Saludo con descuento", n: cumpleMes, color: "#E0487A", icon: <Sparkles size={16} strokeWidth={1.75} />,
+      plantilla: conectado ? "¡Feliz cumpleaños, {nombre}! 🎉 Todo el equipo te desea un gran día. Escríbenos si quieres agendar tu control."
+        : "¡Feliz cumpleaños, {nombre}! 🎉 Queremos celebrar contigo: este mes tienes 20% de descuento en tu limpieza dental. Escríbenos para agendar." },
     { k: "react", label: "Para reactivar", sub: "Más de 6 meses sin venir", n: reactivar, color: "#D97706", icon: <BellRing size={16} strokeWidth={1.75} />,
-      plantilla: "Hola {nombre}, ¡te extrañamos! Hace más de 6 meses de tu última visita. Reserva tu control con 15% de descuento este mes. Tu sonrisa lo agradecerá 😁" },
+      plantilla: conectado ? "Hola {nombre}, ¡te extrañamos! Hace más de 6 meses de tu última visita. Escríbenos para reservar tu control."
+        : "Hola {nombre}, ¡te extrañamos! Hace más de 6 meses de tu última visita. Reserva tu control con 15% de descuento este mes. Tu sonrisa lo agradecerá 😁" },
     { k: "opt", label: "Aceptan campañas", sub: "Dieron su consentimiento", n: optIn, color: "#0E9199", icon: <Megaphone size={16} strokeWidth={1.75} />,
       plantilla: "Hola {nombre}, tenemos una promoción especial para ti este mes. Escríbenos y agenda tu cita con beneficios exclusivos. ¡Te esperamos!" },
   ];
@@ -2279,6 +2315,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     : k === "opt" ? (p.marketing || (!conectado && (Number(p.id) || 0) % 3 !== 0)) : false));
   const enviarCamp = async () => {
     const canalTxt = camp.canal === "ambos" ? "WhatsApp y email" : camp.canal === "email" ? "email" : "WhatsApp";
+    // El envío por email todavía no existe en el servidor: con sesión no se finge.
+    if (conectado && camp.canal !== "whatsapp") { notify("El envío por email estará disponible cuando el servidor lo soporte. Elige WhatsApp."); return; }
     // Envío REAL por WhatsApp (salvo canal solo-email, que aún no está integrado).
     if (conectado && camp.canal !== "email") {
       const objetivo = segmentoPac(camp.k);
@@ -2396,7 +2434,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       )}
       {camp && (() => {
         const canales = [["whatsapp", "WhatsApp", <MessageSquare size={15} strokeWidth={1.75} />], ["email", "Email", <Mail size={15} strokeWidth={1.75} />], ["ambos", "Ambos", <Send size={15} strokeWidth={1.75} />]];
-        const preview = (camp.msg || "").replace(/\{nombre\}/g, lista.find((p) => p.marketing)?.nombre?.split(" ")[0] || "Ana");
+        const preview = (camp.msg || "").replace(/\{nombre\}/g, lista.find((p) => p.marketing)?.nombre?.split(" ")[0] || (conectado ? "(nombre)" : "Ana"));
         return (
           <Modal icon={<Megaphone size={20} strokeWidth={1.75} />} titulo="Nueva campaña de marketing" sub={`Segmento: ${camp.label} – ${camp.n} destinatario(s)`} onClose={() => setCamp(null)} maxW={600}
             footer={<><Btn small kind="ghost" onClick={() => setCamp(null)}>Cancelar</Btn><Btn small onClick={enviarCamp}><Send size={15} strokeWidth={1.75} /> Enviar a {camp.n}</Btn></>}>
@@ -2407,7 +2445,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 7 }}>Canal de envío</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
               {canales.map(([k, l, ic]) => { const on = camp.canal === k; return (
-                <button key={k} onClick={() => setCamp({ ...camp, canal: k })} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${TEAL}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-accent-soft)" : "#fff", color: on ? "var(--dc-brand-600)" : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{ic} {l}</button>
+                <button key={k} onClick={() => setCamp({ ...camp, canal: k })} disabled={conectado && k !== "whatsapp"} title={conectado && k !== "whatsapp" ? "Disponible cuando el servidor lo soporte" : undefined} style={{ ...(conectado && k !== "whatsapp" ? { opacity: 0.5, cursor: "not-allowed" } : {}), flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${TEAL}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-accent-soft)" : "#fff", color: on ? "var(--dc-brand-600)" : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{ic} {l}</button>
               ); })}
             </div>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 7 }}>Mensaje <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– usa {"{nombre}"} para personalizar</span></label>
@@ -3788,7 +3826,22 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
     const ss = sedesDe(MEDICOS.find((m) => m.nombre === x.medico));
     return ss.length === 1 ? ss[0] : null;
   };
-  const medicosDeSede = (sid) => MEDICOS.filter((m) => sedesDe(m).some((x) => mismaSede(x, sid)));
+  // Con sesión: pacientes, especialidades y doctores del servidor (nunca los de ejemplo).
+  const [pacApi, setPacApi] = useState([]);
+  const [espsApi, setEspsApi] = useState([]);
+  const [medsApi, setMedsApi] = useState([]);
+  useEffect(() => {
+    if (!conectado) return;
+    api.pacientes.listar().then((r) => setPacApi(Array.isArray(r) ? r : [])).catch(() => {});
+    api.catalogo.especialidades().then((r) => setEspsApi((Array.isArray(r) ? r : []).filter((e) => e.activo !== false))).catch(() => {});
+    api.catalogo.medicos().then((r) => setMedsApi((Array.isArray(r) ? r : []).filter((m) => m.activo !== false))).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const pacBusca = conectado ? pacApi.filter((p) => enSede(p.sedeIds ?? p.sedeRegistroId)) : pacientes;
+  const espsLista = conectado ? espsApi : ESPECIALIDADES;
+  const sedesMedApi = (m) => [].concat(m?.sedes ?? m?.sedeIds ?? m?.sedeId ?? []).map((v) => (v && typeof v === "object" ? v.id : v));
+  const medicosDeSede = (sid) => (conectado
+    ? medsApi.filter((m) => { const ss = sedesMedApi(m); return !ss.length || ss.some((x) => mismaSede(x, sid)); })
+    : MEDICOS.filter((m) => sedesDe(m).some((x) => mismaSede(x, sid))));
   const mapEsp = (r) => {
     const creado = r.creadoEn || r.creado_en || null;
     let desde = "—";
@@ -3812,9 +3865,13 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
   const esp = (conectado ? (remoto || []) : (espProp || [])).filter((x) => enSede(sedeDeEntrada(x)));
   const ordenada = [...esp].sort((a, b) => ({ alta: 0, media: 1, baja: 2 }[a.urg] - { alta: 0, media: 1, baja: 2 }[b.urg]));
 
+  // Ofrecer el cupo por WhatsApp: el servidor todavía no tiene cómo enviarlo, así que con
+  // sesión el botón queda deshabilitado (antes avisaba «enviada» sin enviar nada).
+  const SIN_OFERTA = "Disponible cuando el servidor lo soporte";
   const ofrecer = (p) => {
+    if (conectado) { notify(`Ofrecer cupo por WhatsApp: ${SIN_OFERTA.toLowerCase()}. Usa «Asignar cupo» o llama al paciente.`); return; }
     notify(`Oferta de cupo enviada a ${p.n} por WhatsApp. Esperando respuesta.`);
-    if (!conectado) setEsp((e) => e.map((x) => x.id === p.id ? { ...x, ofrecido: [...x.ofrecido, `Cupo ofrecido hoy`] } : x));
+    setEsp((e) => e.map((x) => x.id === p.id ? { ...x, ofrecido: [...x.ofrecido, `Cupo ofrecido hoy`] } : x));
   };
   // "Asignar": en Agenda lo maneja el padre (onAsignar). Aquí abre el agendado real en la sede
   // de la entrada (también en la demostración) y, al confirmar la cita, la retira de la lista.
@@ -3826,14 +3883,14 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
     const med = MEDICOS.find((m) => m.nombre === p.medico && (!espId || espsDe(m).includes(espId)) && sedesDe(m).some((x) => mismaSede(x, sedeP)));
     setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), _esperaId: p.id });
   };
-  const nuevoEspera = () => { setBusca(""); setAbrePac(false); setNuevoEsp({ pacienteId: null, n: "", tel: "", dni: "", e: "Odontología general", medico: "Cualquiera", pref: "Indiferente", urg: "media", esNuevo: false, sede: (SEDES.find((x) => mismaSede(x.id, activa)) || {}).id ?? activa }); };
+  const nuevoEspera = () => { setBusca(""); setAbrePac(false); setNuevoEsp({ pacienteId: null, n: "", tel: "", dni: "", e: conectado ? (espsLista[0]?.nombre || "") : "Odontología general", medico: "Cualquiera", pref: "Indiferente", urg: "media", esNuevo: false, sede: (SEDES.find((x) => mismaSede(x.id, activa)) || {}).id ?? activa }); };
   const elegirPac = (p) => { setNuevoEsp((f) => ({ ...f, pacienteId: p.id, n: p.nombre, tel: p.telefono || p.tel || "", dni: p.dni || "", esNuevo: false })); setAbrePac(false); setBusca(""); };
   const modoNuevoPac = () => { setNuevoEsp((f) => ({ ...f, pacienteId: null, esNuevo: true, n: (busca || f.n || "") })); setAbrePac(false); };
   const guardarEsp = () => {
     if (!nuevoEsp.n.trim()) { notify("Elige un paciente registrado o registra uno nuevo."); return; }
     const sedeAlta = nuevoEsp.sede ?? activa;
     const finalizar = (pacienteId) => {
-      if (conectado) { api.espera.crear({ paciente: nuevoEsp.n, telefono: nuevoEsp.tel, especialidad: nuevoEsp.e, medico: nuevoEsp.medico, preferenciaHorario: nuevoEsp.pref, urgencia: nuevoEsp.urg, pacienteId, sedeId: sedeApiUuid(sedeAlta) }).then(() => { notify(`${nuevoEsp.n} agregado a la lista de espera.`); recargar(); }).catch(() => notify("Error al agregar a espera.")); setNuevoEsp(null); return; }
+      if (conectado) { const espO = espsLista.find((x) => x.nombre === nuevoEsp.e); const medO = medsApi.find((m) => m.nombre === nuevoEsp.medico); api.espera.crear({ paciente: nuevoEsp.n, telefono: nuevoEsp.tel, especialidad: nuevoEsp.e, especialidadId: espO?.id ?? null, medico: nuevoEsp.medico, medicoId: medO?.id ?? null, preferenciaHorario: nuevoEsp.pref, urgencia: nuevoEsp.urg, pacienteId, sedeId: sedeApiUuid(sedeAlta) }).then(() => { notify(`${nuevoEsp.n} agregado a la lista de espera.`); recargar(); }).catch(() => notify("Error al agregar a espera.")); setNuevoEsp(null); return; }
       setEsp((e) => [...(e || []), { id: Date.now(), n: nuevoEsp.n, tel: nuevoEsp.tel, e: nuevoEsp.e, medico: nuevoEsp.medico, pref: nuevoEsp.pref, urg: nuevoEsp.urg, desde: "Hoy", ofrecido: [], pacienteId, sede: sedeAlta }]);
       notify(`${nuevoEsp.n} agregado a la lista de espera${pacienteId ? " (ligado a su ficha)" : ""}.`); setNuevoEsp(null);
     };
@@ -3848,7 +3905,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
     }
     finalizar(nuevoEsp.pacienteId || null);
   };
-  const pacF = (busca.trim() ? pacientes.filter((p) => (p.nombre || "").toLowerCase().includes(busca.toLowerCase()) || String(p.dni || "").includes(busca.trim())) : pacientes).slice(0, 6);
+  const pacF = (busca.trim() ? pacBusca.filter((p) => (p.nombre || "").toLowerCase().includes(busca.toLowerCase()) || String(p.dni || "").includes(busca.trim())) : pacBusca).slice(0, 6);
 
   return (
     <div style={{ overflowX: "auto", maxWidth: "100%", width: "100%" }}>
@@ -3857,7 +3914,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
         <section className="dc-esp-hero">
           <div className="dc-esp-hero__txt">
             <div className="dc-esp-hero__num"><b>{esp.length}</b><span>en espera</span></div>
-            <p title="Si se libera un cupo, se ofrece por WhatsApp al primero compatible; si no responde en 15 min, pasa al siguiente.">Ordenados por urgencia – oferta automática por WhatsApp</p>
+            {conectado ? <p>Ordenados por urgencia</p> : <p title="Si se libera un cupo, se ofrece por WhatsApp al primero compatible; si no responde en 15 min, pasa al siguiente.">Ordenados por urgencia – oferta automática por WhatsApp</p>}
           </div>
           <div className="dc-esp-hero__cifras">
             <div><b>{nAlta}</b><span>Urgentes</span></div>
@@ -3868,7 +3925,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
             <div className="dc-esp-hero__prox">
               <span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: "rgba(255,255,255,.18)", color: "#fff" }}>{iniciales(top.n)}</span>
               <div className="dc-esp-hero__prox-txt"><span><Sparkles size={11} strokeWidth={2} /> Próximo cupo</span><b>{top.n}</b></div>
-              <button type="button" className="dc-esp-hero__btn" onClick={() => ofrecer(top)}><Bell size={14} strokeWidth={1.75} /> Ofrecer</button>
+              <button type="button" className="dc-esp-hero__btn" onClick={() => ofrecer(top)} disabled={conectado} title={conectado ? SIN_OFERTA : undefined} style={conectado ? { opacity: 0.55, cursor: "not-allowed" } : undefined}><Bell size={14} strokeWidth={1.75} /> Ofrecer</button>
             </div>
           )}
           <button type="button" className="dc-esp-hero__agregar" onClick={nuevoEspera}><Plus size={15} strokeWidth={2} /> Agregar</button>
@@ -3884,7 +3941,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
         { key: "medico", label: "Médico", w: "minmax(112px,1fr)", a: "left", get: (p) => p.medico, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p.medico}</span> },
         { key: "pref", label: "Preferencia", w: "minmax(92px,0.9fr)", a: "center", get: (p) => p.pref, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{p.pref}</span> },
         { key: "desde", label: "Espera", w: "minmax(80px,0.7fr)", a: "center", get: (p) => p.desde, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.desde}</span> },
-        { key: "acc", label: "Acciones", w: "176px", a: "center", noFilter: true, noSort: true, cell: (p) => <div className="dc-esp-acc"><button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} title="Ofrecer cupo por WhatsApp" aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button><Btn small onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn></div> },
+        { key: "acc", label: "Acciones", w: "176px", a: "center", noFilter: true, noSort: true, cell: (p) => <div className="dc-esp-acc"><button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} disabled={conectado} style={conectado ? { opacity: 0.45, cursor: "not-allowed" } : undefined} title={conectado ? `Ofrecer cupo por WhatsApp: ${SIN_OFERTA.toLowerCase()}` : "Ofrecer cupo por WhatsApp"} aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button><Btn small onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn></div> },
       ]} />
       ) : (
         <Card className="dc-esp-tablero">
@@ -3908,7 +3965,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
                       </ul>
                       {p.ofrecido.length > 0 && <div className="dc-esp-card__oferta"><Bell size={12} strokeWidth={1.75} /> {p.ofrecido.length === 1 ? "1 oferta enviada" : `${p.ofrecido.length} ofertas enviadas`}{p.ofrecido[p.ofrecido.length - 1] ? ` – ${p.ofrecido[p.ofrecido.length - 1]}` : ""}</div>}
                       <div className="dc-esp-card__acc">
-                        <button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} title="Ofrecer cupo por WhatsApp" aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button>
+                        <button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} disabled={conectado} style={conectado ? { opacity: 0.45, cursor: "not-allowed" } : undefined} title={conectado ? `Ofrecer cupo por WhatsApp: ${SIN_OFERTA.toLowerCase()}` : "Ofrecer cupo por WhatsApp"} aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button>
                         <Btn small kind={sug ? undefined : "ghost"} onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn>
                       </div>
                     </article>
@@ -3980,7 +4037,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
             </div>}
             <div>
               <label style={lblSty}>Especialidad</label>
-              <Select value={nuevoEsp.e} onChange={(v) => setNuevoEsp({ ...nuevoEsp, e: v })} options={ESPECIALIDADES.map((x) => ({ value: x.nombre, label: x.nombre }))} />
+              <Select value={nuevoEsp.e} onChange={(v) => setNuevoEsp({ ...nuevoEsp, e: v })} placeholder={espsLista.length ? undefined : "Sin especialidades registradas"} options={espsLista.map((x) => ({ value: x.nombre, label: x.nombre }))} />
             </div>
             <div>
               <label style={lblSty}>Médico preferido</label>
@@ -6761,12 +6818,26 @@ function Auditoria() {
 }
 
 /* ---- Recetas médicas con firma electrónica (paridad con Doctocliq) ---- */
+// Estado de la receta: «Firmada» solo si consta; si no, «Emitida».
+const EstadoRx = ({ r }) => (r.firmada
+  ? <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
+  : <span className="dc-pill"><FileText size={12} strokeWidth={2} /> Emitida</span>);
 function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   const conectado = !!auth.token;
   const sedeCx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
   // sedeRegistroId se guarda para limitar el selector y la lista a las sedes que se ven.
-  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, sedeRegistroId: p.sedeRegistroId || null })))).catch(() => {}); }, []); // eslint-disable-line
+  // Las alergias vienen del servidor: el cruce de seguridad de la receta depende de ellas
+  // (antes se perdían aquí y, con sesión, se cruzaba contra las fichas de ejemplo).
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", sedeRegistroId: p.sedeRegistroId || null, alergias: p.alergias, alergiasCargadas: p.alergias !== undefined && p.alergias !== null })))).catch(() => {}); }, []); // eslint-disable-line
+  // Médicos del servidor: nombre y COP para la firma de la receta, y quién prescribe.
+  const [medRemoto, setMedRemoto] = useState([]);
+  useEffect(() => { if (conectado) api.catalogo.medicos().then((r) => setMedRemoto(Array.isArray(r) ? r : [])).catch(() => {}); }, []); // eslint-disable-line
+  const medicosRx = conectado ? medRemoto : MEDICOS;
+  // Alergias del paciente: con sesión, las de GET /pacientes; en la demo, las de su ficha.
+  const alergiasDe = (p) => (conectado ? listaAlergias(p?.alergias) : [...listaAlergias(fichas?.[p?.id]?.alergias), ...listaAlergias(p?.alergias)]);
+  // Con sesión, la ficha 360 confirma las alergias si el padrón no las trajo.
+  const [al360, setAl360] = useState({});
   const pacientes = conectado ? (pacRemoto || []).filter((p) => sedeCx.enSede(p.sedeRegistroId)) : pacProp;
   const nombrePac = (id) => (pacRemoto || []).find((p) => p.id === id)?.nombre || "—";
   // Demostración: las recetas salen de la historia de cada paciente (la misma fuente que
@@ -6784,14 +6855,16 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   }, [fichas, pacProp]);
   const [recetasRem, setRecetasRem] = useState([]);
-  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; } return { id: r.id, pacienteId: r.pacienteId, paciente: nombrePac(r.pacienteId), fecha: r.fecha, indic: r.indicaciones || "", firmada: true, items: Array.isArray(its) ? its : [] }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
-  useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto]); // eslint-disable-line
+  // «Firmada» solo si el servidor lo dice (antes todas se marcaban firmadas por defecto).
+  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { let its = []; try { its = typeof r.items === "string" ? JSON.parse(r.items || "[]") : (r.items || []); } catch { its = []; } const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, indic: r.indicaciones || "", firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop: r.cop || med?.cop || "", items: Array.isArray(its) ? its : [] }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
+  useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto, medRemoto]); // eslint-disable-line
   // GET /recetas trae las de toda la organización: se muestran solo las de pacientes visibles.
   const recetas = conectado ? recetasRem.filter((r) => pacientes.some((p) => String(p.id) === String(r.pacienteId))) : recetasDemo;
   // Receta para imprimir o guardar en PDF, con el membrete de la sede y la firma con COP.
   const imprimirReceta = (r) => {
     const esc2 = (x) => String(x ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-    const med = MEDICOS.find((m) => m.nombre === r.medico);
+    // COP del médico que firma: con sesión, el de GET /medicos (nunca el de los médicos de ejemplo).
+    const med = r.cop ? { cop: r.cop } : medicosRx.find((m) => (r.medicoId != null && String(m.id) === String(r.medicoId)) || m.nombre === r.medico);
     const ok = abrirDocumento({
       titulo: "Receta médica", tituloVentana: `Receta - ${r.paciente}`, sub: `Fecha: ${fechaLegible(r.fecha)}`,
       datos: !conectado && r.sede != null ? datosDemo(numSede(r.sede)) : undefined,
@@ -6805,23 +6878,37 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   };
   const [form, setForm] = useState(null);
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
-  const nuevo = () => setForm({ paciente: pacientes[0]?.nombre || "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
+  // Quien prescribe: si el usuario es médico, él mismo (por su nombre en GET /medicos).
+  const miMedico = sedeCx.rol === "medico" ? medicosRx.find((m) => m.nombre === sedeCx.nombre) : null;
+  const nuevo = () => setForm({ paciente: pacientes[0]?.nombre || "", medicoId: miMedico ? String(miMedico.id) : "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
+  // Con sesión, si el padrón no trajo el campo alergias se piden a la ficha 360 del paciente.
+  const pacForm = form ? (pacientes.find((p) => p.nombre === form.paciente) || null) : null;
+  useEffect(() => {
+    if (!conectado || !pacForm || pacForm.alergiasCargadas || al360[pacForm.id] !== undefined) return;
+    api.pacientes.ficha360(pacForm.id).then((f) => { const a = f?.paciente?.alergias ?? f?.alergias; setAl360((m) => ({ ...m, [pacForm.id]: a === undefined || a === null ? null : listaAlergias(a) })); }).catch(() => setAl360((m) => ({ ...m, [pacForm.id]: null })));
+  }, [pacForm?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const alergiasForm = (p) => { if (!p) return []; const a = alergiasDe(p); return conectado && !p.alergiasCargadas ? [...a, ...(al360[p.id] || [])] : a; };
+  // Con sesión y sin poder confirmar las alergias, no se emite a ciegas.
+  const alergiasDesconocidas = (p) => conectado && !!p && !p.alergiasCargadas && !Array.isArray(al360[p.id]);
   const setItem = (i, k, v) => setForm((f) => ({ ...f, alerta: null, forzar: false, items: f.items.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
   const emitir = () => {
     const items = form.items.filter((x) => x.med.trim());
     if (!items.length) { notify("Agrega al menos un medicamento."); return; }
     // Seguridad: mismo cruce con las alergias que la receta de la ficha. Con alerta, hay que
     // confirmar a propósito (segundo clic) para emitir.
-    const pAl = pacientes.find((p) => p.nombre === form.paciente) || {};
-    const alergiasPac = [...(fichas?.[pAl.id]?.alergias || []), ...(pAl.alergias || [])];
+    const pAl = pacientes.find((p) => p.nombre === form.paciente) || null;
+    if (alergiasDesconocidas(pAl)) { notify("No se pudieron confirmar las alergias del paciente: la receta no se emite sin ese control."); return; }
+    const alergiasPac = alergiasForm(pAl);
     const avisos = cruceAlergias(alergiasPac, items.map((x) => x.med));
     if (avisos.length && !form.forzar) { setForm((f) => ({ ...f, alerta: avisos, forzar: true })); notify("Alergia detectada: revisa el aviso antes de emitir."); return; }
     if (conectado) {
       const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
       if (!pid) { notify("Selecciona un paciente válido."); return; }
+      if (!form.medicoId) { notify("Elige el médico que prescribe."); return; }
       const itemsBk = items.map((x) => ({ med: `${x.med}${x.dosis ? " " + x.dosis : ""}`, detalle: [x.frec, x.dur].filter(Boolean).join(" – ") }));
-      api.recetas.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), fecha: fmt(hoy), indicaciones: form.indic, items: JSON.stringify(itemsBk) })
-        .then(() => { notify("Receta emitida y firmada. Queda en la ficha del paciente."); recargarRecetas(); setForm(null); })
+      // Si se emitió pese a la alerta de alergia, el servidor recibe el aviso aceptado (auditoría).
+      api.recetas.crear({ pacienteId: pid, medicoId: form.medicoId, sedeId: sedeApiUuid(sedeCx.activa), fecha: fmt(hoy), indicaciones: form.indic, items: JSON.stringify(itemsBk), ...(avisos.length ? { alertaAlergia: JSON.stringify(avisos), overrideAlergia: true } : {}) })
+        .then(() => { notify("Receta emitida. Queda en la ficha del paciente."); recargarRecetas(); setForm(null); })
         .catch(() => notify("No se pudo emitir la receta."));
       return;
     }
@@ -6840,7 +6927,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
         <section className="dc-esp-hero dc-rx-hero">
           <div className="dc-esp-hero__txt">
             <div className="dc-esp-hero__num"><b>{total}</b><span>{total === 1 ? "receta emitida" : "recetas emitidas"}</span></div>
-            <p>Firmadas digitalmente y guardadas en la historia del paciente</p>
+            <p>{conectado ? "Guardadas en la historia del paciente" : "Firmadas digitalmente y guardadas en la historia del paciente"}</p>
           </div>
           <div className="dc-esp-hero__cifras">
             <div><b>{firmadas}</b><span>Con firma</span></div>
@@ -6857,6 +6944,12 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br />
             <div style={{ maxWidth: 320 }}><Select value={form.paciente} onChange={(v) => setForm({ ...form, paciente: v, alerta: null, forzar: false })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></div>
           </label>
+          {conectado && (
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginTop: 12 }}>Médico que prescribe<br />
+              <div style={{ maxWidth: 320 }}><Select value={form.medicoId || ""} onChange={(v) => setForm({ ...form, medicoId: v })} placeholder="— Selecciona —"
+                options={[{ value: "", label: medicosRx.length ? "— Selecciona —" : "Sin médicos registrados", disabled: true }, ...medicosRx.filter((m) => m.activo !== false).map((m) => ({ value: String(m.id), label: `${m.nombre}${m.cop ? ` · COP ${m.cop}` : ""}` }))]} /></div>
+            </label>
+          )}
           <div style={{ margin: "16px 0 8px", fontSize: 13, fontWeight: 500, color: NAVY }}>Medicamentos</div>
           <div style={{ display: "grid", gap: 8 }}>
             {form.items.map((it, i) => (
@@ -6871,7 +6964,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
           </div>
           <button onClick={() => setForm((f) => ({ ...f, items: [...f.items, { med: "", dosis: "", frec: "", dur: "" }] }))} style={{ marginTop: 8, background: "none", border: "none", color: DS.c.primary, fontWeight: 500, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><Plus size={14} strokeWidth={1.75} /> Agregar medicamento</button>
           <div style={{ marginTop: 14 }}><label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Indicaciones<br /><textarea className="dc-premium-inp" value={form.indic} onChange={(e) => setForm({ ...form, indic: e.target.value })} rows={2} placeholder="Tomar después de las comidas, no manejar..." style={{ ...inp, marginTop: 4, resize: "vertical" }} /></label></div>
-          {(() => { const pA = pacientes.find((p) => p.nombre === form.paciente) || {}; const al = [...(fichas?.[pA.id]?.alergias || []), ...(pA.alergias || [])]; return al.length ? <div className="fm-aviso-edad is-mal" style={{ marginTop: 12 }}><AlertTriangle size={15} strokeWidth={2} /><span><b>Alergias del paciente:</b> {[...new Set(al)].join(", ")}. Se validan al emitir.</span></div> : null; })()}
+          {(() => { const pA = pacientes.find((p) => p.nombre === form.paciente) || null; if (alergiasDesconocidas(pA)) return <div className="fm-aviso-edad is-mal" style={{ marginTop: 12 }}><AlertTriangle size={15} strokeWidth={2} /><span><b>Alergias sin confirmar:</b> {al360[pA.id] === null ? "no se pudo leer la ficha del paciente" : "consultando la ficha del paciente"}; no se emite hasta tenerlas.</span></div>; const al = alergiasForm(pA); return al.length ? <div className="fm-aviso-edad is-mal" style={{ marginTop: 12 }}><AlertTriangle size={15} strokeWidth={2} /><span><b>Alergias del paciente:</b> {[...new Set(al)].join(", ")}. Se validan al emitir.</span></div> : null; })()}
           {form.alerta?.length > 0 && <div className="fm-aviso-edad is-mal" style={{ marginTop: 10 }}><AlertTriangle size={15} strokeWidth={2} /><span><b>Alergia detectada:</b> {form.alerta.join("; ")}. Cambia el medicamento o pulsa «Emitir de todos modos» si lo indicas a sabiendas.</span></div>}
           <div style={{ marginTop: 16, display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small kind={form.alerta?.length ? "red" : undefined} onClick={emitir}><Check size={15} strokeWidth={1.75} /> {form.alerta?.length ? "Emitir de todos modos" : "Firmar y emitir"}</Btn></div>
         </Card>
@@ -6886,7 +6979,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
               { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__sub">{fechaLegible(r.fecha)}</span> },
               { key: "med", label: "Medicamentos", w: "minmax(260px,2.2fr)", cell: (r) => <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div> },
               ...(recetas.some((r) => r.indic) ? [{ key: "indic", label: "Indicaciones", w: "minmax(140px,1fr)", get: (r) => r.indic || "—" }] : []),
-              { key: "estado", label: "Estado", w: "110px", a: "right", cell: () => <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span> },
+              { key: "estado", label: "Estado", w: "110px", a: "right", cell: (r) => <EstadoRx r={r} /> },
             ] }} cols={[
             { key: "paciente", label: "Paciente", get: (r) => r.paciente || "" },
             { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
@@ -6899,7 +6992,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                 <header>
                   {av(r.paciente)}
                   <div><b>{r.paciente}</b><span><Calendar size={12} strokeWidth={1.9} /> {fechaLegible(r.fecha)}{r.medico ? ` · ${r.medico}` : ""}</span></div>
-                  <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
+                  <EstadoRx r={r} />
                 </header>
                 <ul>
                   {(r.items || []).map((it, k) => <li key={k}><span className="dc-rx2__rx">℞</span><div><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div></li>)}
@@ -6916,7 +7009,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                     <div className="dc-rx2__quien"><b>{r.paciente}</b><span>{fechaLegible(r.fecha)}</span></div>
                     <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div>
                     <span className="dc-rx2__n">{(r.items || []).length} {(r.items || []).length === 1 ? "medicamento" : "medicamentos"}</span>
-                    <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
+                    <EstadoRx r={r} />
                     <button type="button" className="dc-mini-btn" aria-label={`Imprimir receta de ${r.paciente}`} title="Imprimir / PDF" onClick={() => imprimirReceta(r)}><Printer size={13} strokeWidth={2} /></button>
                   </div>
                 ))}
@@ -6971,7 +7064,7 @@ function FirmaModal({ doc, onClose, onConfirm, esMenor = false, firmante, setFir
   const limpiar = () => { const c = cvs.current; if (c) c.getContext("2d").clearRect(0, 0, c.width, c.height); setDib(false); };
   return (
     <Modal icon={<Pencil size={20} strokeWidth={1.75} />} titulo={esMenor ? `Firma del apoderado – ${doc.tipo}` : `Firma del paciente – ${doc.tipo}`} sub={doc.paciente} onClose={onClose} maxW={520}
-      footer={<><Btn small kind="ghost" onClick={limpiar}>Limpiar</Btn><Btn small onClick={onConfirm} disabled={!dib || (esMenor && !(firmante?.nombre || "").trim())}><ShieldCheck size={15} strokeWidth={1.75} /> Confirmar firma</Btn></>}>
+      footer={<><Btn small kind="ghost" onClick={limpiar}>Limpiar</Btn><Btn small onClick={() => { let img = null; try { img = cvs.current ? cvs.current.toDataURL("image/png") : null; } catch (e) { img = null; } onConfirm(img); }} disabled={!dib || (esMenor && !(firmante?.nombre || "").trim())}><ShieldCheck size={15} strokeWidth={1.75} /> Confirmar firma</Btn></>}>
       {/* Un menor no consiente por si mismo: firma su padre, madre o tutor, y el
           documento debe decir quien fue. Se precarga con el apoderado de su ficha. */}
       {esMenor && (
@@ -7044,16 +7137,18 @@ function Consentimientos({ pacientes: pacProp, notify }) {
     if (conectado) {
       const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
       if (!pid) { notify("Selecciona un paciente válido."); return; }
+      // El servidor registra el consentimiento; todavía no envía el enlace de firma al
+      // paciente, así que no se avisa «enviado»: queda por firmar en consultorio.
       api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo })
-        .then(() => { notify("Consentimiento enviado al paciente para firma en línea."); recargarDocs(); setForm(null); })
-        .catch(() => notify("No se pudo enviar el consentimiento."));
+        .then(() => { notify("Consentimiento registrado: queda por firmar en consultorio."); recargarDocs(); setForm(null); })
+        .catch(() => notify("No se pudo registrar el consentimiento."));
       return;
     }
     const pac = pacientes.find((p) => p.nombre === form.paciente);
     if (!pac) { notify("Selecciona un paciente válido."); return; }
     setDocs((d) => [{ id: Date.now(), pacienteId: pac.id, paciente: pac.nombre, sede: sedeCx.activa ?? undefined, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...d]); notify("Consentimiento enviado al paciente para firma en línea."); setForm(null);
   };
-  const confirmarFirma = () => {
+  const confirmarFirma = (firmaImg) => {
     // Un menor no consiente por si mismo: sin quien firme, no se archiva.
     // El backend lo valida igual; esto solo evita el viaje y explica antes.
     if (firmaEsDeMenor && !firmante.nombre.trim()) {
@@ -7061,7 +7156,9 @@ function Consentimientos({ pacientes: pacProp, notify }) {
       return;
     }
     if (conectado) {
-      api.consentimientos.firmar(firmaDoc.id, "firma://" + firmaDoc.id,
+      // Se guarda la firma dibujada (imagen PNG), no un enlace simulado.
+      if (!firmaImg) { notify("No se pudo leer la firma dibujada. Vuelve a firmar."); return; }
+      api.consentimientos.firmar(firmaDoc.id, firmaImg,
         firmaEsDeMenor ? { firmanteNombre: firmante.nombre, firmanteDni: firmante.dni, firmanteRelacion: firmante.relacion } : null)
         .then(() => { notify("Consentimiento firmado digitalmente y archivado con fecha y hora."); recargarDocs(); setFirmaDoc(null); })
         .catch(() => notify("No se pudo registrar la firma."));
@@ -7076,7 +7173,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
         <section className="dc-esp-hero dc-form-hero">
           <div className="dc-esp-hero__txt">
             <div className="dc-esp-hero__num"><b>{pct}%</b><span>firmados</span></div>
-            <p>El paciente firma en línea y queda archivado con fecha y hora</p>
+            <p>{conectado ? "Se firma en consultorio y queda archivado con fecha y hora" : "El paciente firma en línea y queda archivado con fecha y hora"}</p>
           </div>
           <div className="dc-esp-hero__cifras">
             <div><b>{nF}</b><span>Firmados</span></div>
@@ -7084,15 +7181,18 @@ function Consentimientos({ pacientes: pacProp, notify }) {
             <div><b>{docs.length}</b><span>Documentos</span></div>
           </div>
           <div className="dc-form-hero__barra" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
-          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ paciente: pacientes[0]?.nombre || "", tipo: CONSENT_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> Enviar consentimiento</button>
+          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ paciente: pacientes[0]?.nombre || "", tipo: CONSENT_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo consentimiento" : "Enviar consentimiento"}</button>
         </section>
       ); })()}
       {form && (
-        <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo="Enviar consentimiento" sub="El paciente lo firma en línea con fecha registrada" onClose={() => setForm(null)} maxW={540} footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={15} strokeWidth={1.75} /> Enviar al paciente</Btn></>}>
+        <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo={conectado ? "Nuevo consentimiento" : "Enviar consentimiento"} sub={conectado ? "Queda por firmar en consultorio, con fecha registrada" : "El paciente lo firma en línea con fecha registrada"} onClose={() => setForm(null)} maxW={540} footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={15} strokeWidth={1.75} /> {conectado ? "Registrar" : "Enviar al paciente"}</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={form.paciente} onChange={(v) => setForm({ ...form, paciente: v })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Tipo<br /><Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={CONSENT_TIPOS.map((t) => ({ value: t, label: t }))} /></label>
           </div>
+          {conectado ? (
+            <div style={{ marginTop: 16, fontSize: 13, color: "var(--dc-ink-500)", lineHeight: 1.5 }}>El envío del enlace para firmar desde el celular estará disponible cuando el servidor lo soporte. Por ahora el paciente firma en consultorio con «Firmar».</div>
+          ) : (
           <div style={{ marginTop: 16, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-info-soft)", borderRadius: "var(--dc-r-lg)", padding: "13px 15px" }}>
             <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: ".05em", textTransform: "uppercase", color: DS.c.primary, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} /> Así lo recibe el paciente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 13, color: "var(--dc-brand-600)" }}>
@@ -7101,6 +7201,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
               <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><ShieldCheck size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Queda archivado con <strong>fecha y hora registrada</strong>.</span>
             </div>
           </div>
+          )}
         </Modal>
       )}
       {(() => {
@@ -8332,7 +8433,10 @@ function Resenas({ notify, citas = [], can }) {
     if (!conectadoR) { notify("Solicitud de reseña enviada por WhatsApp a pacientes recientes."); return; }
     const hoyISO = fmt(hoy);
     const desde = fmt(new Date(Date.now() - 30 * 86400000));
-    const ids = [...new Set(citas.filter((c) => c.estado === "atendida" && c.fecha >= desde && c.fecha <= hoyISO && c.pacienteId).map((c) => c.pacienteId))];
+    // Con sesión, los atendidos salen de GET /citas del último mes (no del estado local).
+    let citasMes = [];
+    try { citasMes = await api.citas.listar(null, desde, hoyISO); } catch (e) { notify("No se pudieron leer las citas del último mes."); return; }
+    const ids = [...new Set((citasMes || []).filter((c) => c.estado === "atendida" && String(c.fecha).slice(0, 10) >= desde && String(c.fecha).slice(0, 10) <= hoyISO && c.pacienteId && sedeRes.enSede(c.sedeId ?? c.sede)).map((c) => c.pacienteId))];
     if (!ids.length) { notify("No hay pacientes atendidos en los últimos 30 días para solicitar reseña."); return; }
     if (!confirm(`Se enviará una solicitud de reseña por WhatsApp a ${ids.length} paciente(s) atendidos recientemente. ¿Continuar?`)) return;
     setSolicitando(true);
@@ -8343,15 +8447,16 @@ function Resenas({ notify, citas = [], can }) {
     } catch (e) { notify("No se pudo enviar la solicitud."); }
     setSolicitando(false);
   };
-  const encuestasAuto = citas.filter((c) => c.estado === "atendida").length; // P2-3: NPS automático tras atención
+  // P2-3: NPS automático tras atención. Con sesión no hay endpoint de encuestas: no se muestra la cifra.
+  const encuestasAuto = conectadoR ? null : citas.filter((c) => c.estado === "atendida").length;
   // Las reseñas son de cada local (la ficha de Google es por sede): se guardan todas y se
   // muestran solo las de las sedes que se ven. Sin sede (datos viejos) cuentan como visibles.
   const sedeRes = useSede();
-  const [todasReviews, setReviews] = useState(RESENAS_SEED);
+  const [todasReviews, setReviews] = useState(() => (conectadoR ? [] : RESENAS_SEED));
   const reviews = todasReviews.filter((r) => sedeRes.enSede(r.sede));
   const variasSedes = !sedeRes.ids || sedeRes.ids.length > 1;
   const conectado = !!auth.token;
-  const mapRev = (r) => ({ id: r.id, nombre: r.paciente || "Paciente", estrellas: r.calificacion || 0, fecha: r.fecha, texto: r.comentario || "", resp: r.respondida ? "Respondida" : "", sede: r.sedeId ?? null, origen: r.origen || "google" });
+  const mapRev = (r) => ({ id: r.id, nombre: r.paciente || "Paciente", estrellas: r.calificacion || 0, fecha: r.fecha, texto: r.comentario || "", resp: r.respondida ? (r.respuesta || "Marcada como respondida.") : "", sede: r.sedeId ?? null, origen: r.origen || "google" });
   const sedesApiRes = sedeRes.sede === "all" && sedeRes.global ? null : (sedeRes.ids || []).map((x) => sedeApiUuid(x));
   const recargar = () => { if (conectado) api.resenas.listar(sedesApiRes).then((r) => setReviews((r || []).map(mapRev))).catch(() => notify("No se pudo cargar reseñas.")); };
   useEffect(() => { recargar(); }, [sedesApiRes ? sedesApiRes.join(",") : "todas"]); // eslint-disable-line
@@ -8361,7 +8466,9 @@ function Resenas({ notify, citas = [], can }) {
   const prom = reviews.length ? (reviews.reduce((a, r) => a + r.estrellas, 0) / reviews.length).toFixed(1) : "0";
   const dist = [5, 4, 3, 2, 1].map((s) => ({ s, n: reviews.filter((r) => r.estrellas === s).length }));
   const sinResp = reviews.filter((r) => !r.resp).length;
-  const responder = (id) => { const t = (resp[id] || "").trim(); if (conectado) { api.resenas.marcar(id, true).then(() => { notify("Reseña marcada como respondida."); recargar(); }).catch(() => notify("Error al responder.")); setResp((s) => ({ ...s, [id]: "" })); return; } if (!t) return; setReviews((rs) => rs.map((r) => r.id === id ? { ...r, resp: t } : r)); setResp((s) => ({ ...s, [id]: "" })); notify("Respuesta publicada."); };
+  // Con sesión el servidor solo guarda «respondida» (no publica texto en Google ni en el
+  // portal): se marca, sin pedir un texto que se perdería.
+  const responder = (id) => { const t = (resp[id] || "").trim(); if (conectado) { api.resenas.marcar(id, true).then(() => { notify("Reseña marcada como respondida."); recargar(); }).catch(() => notify("No se pudo marcar la reseña.")); setResp((s) => ({ ...s, [id]: "" })); return; } if (!t) return; setReviews((rs) => rs.map((r) => r.id === id ? { ...r, resp: t } : r)); setResp((s) => ({ ...s, [id]: "" })); notify("Respuesta publicada."); };
   const estrellas = (n, size = 15) => [1, 2, 3, 4, 5].map((i) => <Star key={i} className={i <= n ? "is-on" : ""} size={size} strokeWidth={1.75} color="var(--dc-warn)" fill={i <= n ? "var(--dc-warn)" : "none"} />);
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -8378,7 +8485,7 @@ function Resenas({ notify, citas = [], can }) {
         </div>
         <div className="dc-esp-hero__cifras dc-res-hero__cifras">
           <div><b>{sinResp}</b><span>Por responder</span></div>
-          <div><b>{encuestasAuto}</b><span>Encuestas</span></div>
+          {encuestasAuto != null && <div><b>{encuestasAuto}</b><span>Encuestas</span></div>}
         </div>
         {puedeResponder && <button type="button" className="dc-esp-hero__btn" onClick={solicitarResenas} disabled={solicitando}><Send size={14} strokeWidth={1.75} /> {solicitando ? "Enviando…" : "Solicitar reseñas"}</button>}
       </section>
@@ -8415,7 +8522,7 @@ function Resenas({ notify, citas = [], can }) {
                 <figcaption>
                   <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.nombre)}</span>
                   <div><b>{r.nombre}</b>{r.resp ? <span className="dc-res-card__ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-res-card__pend">Esperando respuesta</span>}</div>
-                  {!r.resp && puedeResponder ? <button type="button" className="dc-accion" onClick={(e) => { e.stopPropagation(); setSel(r); }}>{r.origen === "portal" ? "Responder en portal" : "Responder en Google"}</button> : <button type="button" className="dc-accion is-sutil" onClick={(e) => { e.stopPropagation(); setSel(r); }}>Ver</button>}
+                  {!r.resp && puedeResponder ? <button type="button" className="dc-accion" onClick={(e) => { e.stopPropagation(); setSel(r); }}>{conectado ? "Marcar respondida" : r.origen === "portal" ? "Responder en portal" : "Responder en Google"}</button> : <button type="button" className="dc-accion is-sutil" onClick={(e) => { e.stopPropagation(); setSel(r); }}>Ver</button>}
                 </figcaption>
               </figure>
             ); })}
@@ -8425,14 +8532,16 @@ function Resenas({ notify, citas = [], can }) {
       </Card>
       {sel && (() => { const r = todasReviews.find((x) => x.id === sel.id) || sel; const col = colorDe(r.nombre); return (
         <Modal icon={<Star size={20} strokeWidth={1.75} />} titulo={r.nombre} sub={`${fechaLegible(r.fecha)} – reseña en ${r.origen === "portal" ? "el portal del paciente" : "Google"}${r.sede != null ? ` – ${nombreSede(r.sede)}` : ""}`} onClose={() => setSel(null)} maxW={520}
-          footer={r.resp ? <Btn small kind="ghost" onClick={() => setSel(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setSel(null)}>Cancelar</Btn><Btn small onClick={() => { responder(r.id); setSel(null); }}><Send size={15} strokeWidth={1.75} /> {r.origen === "portal" ? "Responder en el portal" : "Responder en Google"}</Btn></>}>
+          footer={r.resp || !puedeResponder ? <Btn small kind="ghost" onClick={() => setSel(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setSel(null)}>Cancelar</Btn><Btn small onClick={() => { responder(r.id); setSel(null); }}>{conectado ? <><CheckCircle2 size={15} strokeWidth={1.75} /> Marcar como respondida</> : <><Send size={15} strokeWidth={1.75} /> {r.origen === "portal" ? "Responder en el portal" : "Responder en Google"}</>}</Btn></>}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 14, flexShrink: 0 }}>{r.nombre[0]}</div>
             <div><div style={{ display: "flex", gap: 1 }}>{estrellas(r.estrellas, 17)}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{r.estrellas} de 5 estrellas</div></div>
           </div>
           <div style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "13px 15px", fontSize: 14, color: "var(--dc-ink-700)", lineHeight: 1.55 }}>{r.texto}</div>
           {r.resp ? (
-            <div style={{ marginTop: 14, background: "var(--dc-ok-soft)", border: "1px solid var(--dc-green-soft)", borderRadius: "var(--dc-r-md)", padding: "13px 15px" }}><div style={{ fontWeight: 500, color: "var(--dc-ok-700)", fontSize: 12, marginBottom: 3 }}>Clínica Sonríe+ respondió</div><span style={{ color: "var(--dc-ok-700)", fontSize: 13 }}>{r.resp}</span></div>
+            <div style={{ marginTop: 14, background: "var(--dc-ok-soft)", border: "1px solid var(--dc-green-soft)", borderRadius: "var(--dc-r-md)", padding: "13px 15px" }}><div style={{ fontWeight: 500, color: "var(--dc-ok-700)", fontSize: 12, marginBottom: 3 }}>{conectado ? "Respondida" : "Clínica Sonríe+ respondió"}</div><span style={{ color: "var(--dc-ok-700)", fontSize: 13 }}>{r.resp}</span></div>
+          ) : conectado ? (
+            <div style={{ marginTop: 14, fontSize: 13, color: "var(--dc-ink-500)", lineHeight: 1.5 }}>Publicar la respuesta desde aquí estará disponible cuando el servidor lo soporte. Responde en {r.origen === "portal" ? "el portal" : "Google"} y márcala como respondida para llevar el control.</div>
           ) : (
             <div style={{ marginTop: 14 }}>
               <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Tu respuesta pública</label>
@@ -8618,32 +8727,81 @@ const FORM_TIPOS = ["Ficha de admisión", "Anamnesis / historia médica", "Decla
    Un solo flujo para consentimientos y formularios: se envían por enlace, el paciente
    firma o completa, y el estado es el mismo en la ficha y en la bandeja de Pendientes.
    pacienteFijo: dentro de la ficha. Sin él: bandeja de todos los pendientes. */
+/* Con sesión, los documentos del paciente son los del servidor: consentimientos
+   (GET /consentimientos) y formularios enviados (GET /formularios/envios), en la misma forma
+   que la demostración. pacienteId null = todos (se filtra por los pacientes visibles). */
+function useDocumentosApi(pacienteId) {
+  const conectado = !!auth.token;
+  const [docs, setDocs] = useState(null);
+  const recargar = () => {
+    if (!conectado) return;
+    Promise.allSettled([api.consentimientos.listar(pacienteId ?? undefined), api.formularios.envios()]).then(([c, f]) => {
+      const cs = c.status === "fulfilled" && Array.isArray(c.value) ? c.value : [];
+      const fs = f.status === "fulfilled" && Array.isArray(f.value) ? f.value : [];
+      setDocs([
+        ...cs.map((x) => ({ id: x.id, clase: "consentimiento", pacienteId: x.pacienteId, tipo: x.tipo || x.titulo || "Consentimiento", fecha: String(x.fechaFirma || x.creadoEn || "").slice(0, 10), estado: x.firmado ? "firmado" : "pendiente" })),
+        ...fs.map((e) => ({ id: e.id, clase: "formulario", pacienteId: e.pacienteId ?? null, paciente: e.paciente || "", tipo: e.tipo, fecha: String(e.enviadoEn || "").slice(0, 10), estado: e.estado === "completado" ? "completado" : "pendiente" })),
+      ].filter((d) => pacienteId == null || String(d.pacienteId) === String(pacienteId)));
+    });
+  };
+  useEffect(() => { recargar(); }, [pacienteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { docs, recargar };
+}
 function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () => {}, soloPendientes = false, onAbrirPaciente = null }) {
+  const conectado = !!auth.token;
   const db = useContext(DatosDemoCtx);
-  const docsAll = db?.documentos || [];
+  const { docs: docsApi, recargar: recargarApi } = useDocumentosApi(pacienteFijo);
+  const docsAll = conectado ? (docsApi || []) : (db?.documentos || []);
   const setDocs = db?.setDocumentos || (() => {});
   // Solo pacientes visibles (sus sedes y el filtro de arriba): la semilla completa
   // (PACIENTES_INIT) dejaba ver y firmar documentos de pacientes de otra sede.
   const sedeCx = useSede();
-  const visibles = sedeCx.pacientes || pacientes;
-  const pacDe = (id) => pacientes.find((p) => String(p.id) === String(id)) || visibles.find((p) => String(p.id) === String(id)) || null;
+  // Con sesión, el padrón del servidor (nombre, nacimiento y apoderado para firmar por un menor).
+  const [pacApi, setPacApi] = useState([]);
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacApi((Array.isArray(r) ? r : []).map((p) => ({ ...p, nacimiento: p.fechaNacimiento ?? p.nacimiento })))).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const visibles = conectado ? pacApi.filter((p) => sedeCx.enSede(p.sedeIds ?? p.sedeRegistroId)) : (sedeCx.pacientes || pacientes);
+  const pacDe = (id) => (conectado ? pacApi : pacientes).find((p) => String(p.id) === String(id)) || visibles.find((p) => String(p.id) === String(id)) || null;
   const docs = docsAll.filter((d) => (pacienteFijo == null ? visibles.some((p) => String(p.id) === String(d.pacienteId)) : String(d.pacienteId) === String(pacienteFijo)) && (!soloPendientes || d.estado === "pendiente"));
   const [form, setForm] = useState(null);
   const [firmaDoc, setFirmaDoc] = useState(null);
   const [firmante, setFirmante] = useState({ nombre: "", dni: "", relacion: "" });
   const hecho = (d) => d.estado === "firmado" || d.estado === "completado";
   const etiquetaPend = (d) => (d.clase === "consentimiento" ? "Por firmar" : "Por completar");
-  const reenviar = (d) => { setDocs((xs) => xs.map((x) => (x.id === d.id ? { ...x, reenviadoEn: fmt(hoy) } : x))); notify(`Enlace reenviado por WhatsApp a ${pacDe(d.pacienteId)?.nombre || "el paciente"}.`); };
+  const reenviar = (d) => {
+    if (conectado) {
+      // Solo el formulario tiene recordatorio en el servidor (PATCH /formularios/envios/{id}/recordar).
+      if (d.clase !== "formulario") { notify("Reenviar el enlace de un consentimiento: disponible cuando el servidor lo soporte."); return; }
+      api.formularios.recordar(d.id).then(() => notify(`Recordatorio enviado a ${pacDe(d.pacienteId)?.nombre || d.paciente || "el paciente"}.`)).catch(() => notify("No se pudo enviar el recordatorio."));
+      return;
+    }
+    setDocs((xs) => xs.map((x) => (x.id === d.id ? { ...x, reenviadoEn: fmt(hoy) } : x))); notify(`Enlace reenviado por WhatsApp a ${pacDe(d.pacienteId)?.nombre || "el paciente"}.`);
+  };
   const abrirFirma = (d) => { const pac = pacDe(d.pacienteId); setFirmante({ nombre: pac?.apoderadoNombre || "", dni: pac?.apoderadoDni || "", relacion: pac?.apoderadoParentesco || "" }); setFirmaDoc(d); };
   const esMenorDoc = firmaDoc ? esPediatrico(pacDe(firmaDoc.pacienteId)?.nacimiento) : false;
-  const confirmarFirma = () => {
+  const confirmarFirma = (firmaImg) => {
     if (esMenorDoc && !firmante.nombre.trim()) { notify("El paciente es menor: escribe quién firma (padre, madre o tutor)."); return; }
+    if (conectado) {
+      if (!firmaImg) { notify("No se pudo leer la firma dibujada. Vuelve a firmar."); return; }
+      api.consentimientos.firmar(firmaDoc.id, firmaImg, esMenorDoc ? { firmanteNombre: firmante.nombre, firmanteDni: firmante.dni, firmanteRelacion: firmante.relacion } : null)
+        .then(() => { notify("Consentimiento firmado en consultorio y archivado con fecha y hora."); setFirmaDoc(null); recargarApi(); })
+        .catch(() => notify("No se pudo registrar la firma."));
+      return;
+    }
     setDocs((xs) => xs.map((x) => (x.id === firmaDoc.id ? { ...x, estado: "firmado", fecha: fmt(hoy), firmanteNombre: esMenorDoc ? firmante.nombre : undefined } : x)));
     notify("Consentimiento firmado en consultorio y archivado con fecha y hora."); setFirmaDoc(null);
   };
   const enviar = () => {
     const pid = pacienteFijo ?? form.pacienteId;
     if (!pid) { notify("Elige el paciente."); return; }
+    if (conectado) {
+      // Consentimiento: el servidor lo registra (sin enlace de firma todavía). Formulario: se envía por WhatsApp.
+      const req = form.clase === "consentimiento"
+        ? api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo })
+        : api.formularios.enviar({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, canal: "whatsapp" });
+      req.then(() => { notify(form.clase === "consentimiento" ? "Consentimiento registrado: queda por firmar en consultorio." : "Formulario enviado al paciente por WhatsApp."); setForm(null); recargarApi(); })
+        .catch(() => notify(form.clase === "consentimiento" ? "No se pudo registrar el consentimiento." : "No se pudo enviar el formulario."));
+      return;
+    }
     setDocs((xs) => [{ id: `${form.clase[0]}${Date.now()}`, clase: form.clase, pacienteId: pid, sede: sedeCx.activa ?? undefined, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...xs]);
     notify(form.clase === "consentimiento" ? "Consentimiento enviado al paciente para firma en línea." : "Formulario enviado al paciente."); setForm(null);
   };
@@ -8652,11 +8810,11 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
     <Card className="dc-docs">
       <div className="dc-docs__cab">
         <div><h3>{soloPendientes ? "Documentos por firmar o completar" : "Documentos"}</h3><span>Consentimientos y formularios{nPend ? ` · ${nPend} pendiente${nPend > 1 ? "s" : ""}` : ""}</span></div>
-        {!soloPendientes && <Btn small onClick={() => setForm({ clase: "consentimiento", tipo: CONSENT_TIPOS[0], pacienteId: pacienteFijo || pacientes[0]?.id || null })}><Send size={14} strokeWidth={1.75} /> Enviar documento</Btn>}
+        {!soloPendientes && <Btn small onClick={() => setForm({ clase: "consentimiento", tipo: CONSENT_TIPOS[0], pacienteId: pacienteFijo || (conectado ? visibles : pacientes)[0]?.id || null })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo documento" : "Enviar documento"}</Btn>}
       </div>
       {docs.length === 0 ? <Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo={soloPendientes ? "Nada pendiente" : "Sin documentos"} sub={soloPendientes ? "Todos los consentimientos y formularios están firmados o completados." : "Envía un consentimiento o un formulario para que el paciente lo firme o complete."} /> : (
         <DataTable bare minWidth={0} sub="documentos" exportar={false} rows={docs} defaultSort={{ key: "fecha", dir: "desc" }} cols={[
-          ...(pacienteFijo == null ? [{ key: "pac", label: "Paciente", w: "minmax(150px,1.1fr)", a: "left", get: (d) => pacDe(d.pacienteId)?.nombre || "—", cell: (d) => onAbrirPaciente ? <button type="button" className="dc-link" onClick={() => onAbrirPaciente(d.pacienteId)}>{pacDe(d.pacienteId)?.nombre || "—"}</button> : <span>{pacDe(d.pacienteId)?.nombre || "—"}</span> }] : []),
+          ...(pacienteFijo == null ? [{ key: "pac", label: "Paciente", w: "minmax(150px,1.1fr)", a: "left", get: (d) => pacDe(d.pacienteId)?.nombre || d.paciente || "—", cell: (d) => onAbrirPaciente ? <button type="button" className="dc-link" onClick={() => onAbrirPaciente(d.pacienteId)}>{pacDe(d.pacienteId)?.nombre || d.paciente || "—"}</button> : <span>{pacDe(d.pacienteId)?.nombre || d.paciente || "—"}</span> }] : []),
           { key: "tipo", label: "Documento", w: "minmax(180px,1.4fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span className="dc-doc-tipo"><span>{d.clase === "consentimiento" ? <Shield size={14} strokeWidth={1.9} /> : <FileText size={14} strokeWidth={1.9} />}</span>{d.tipo}</span> },
           { key: "clase", label: "Tipo", w: "120px", a: "left", get: (d) => (d.clase === "consentimiento" ? "Consentimiento" : "Formulario") },
           { key: "fecha", label: "Fecha", w: "110px", a: "left", get: (d) => d.fecha, cell: (d) => <span className="dc-tp__sub">{fechaLegible(d.fecha)}</span> },
@@ -8664,16 +8822,16 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
           { key: "acc", label: "Acciones", w: "220px", a: "right", noSort: true, noFilter: true, cell: (d) => hecho(d)
             ? <span className="dc-tp__sub">{d.clase === "consentimiento" ? "Archivado con fecha y hora" : "Respuestas guardadas"}</span>
             : <span style={{ display: "inline-flex", gap: 6 }}>
-                <Btn small kind="ghost" onClick={() => reenviar(d)}><Send size={13} strokeWidth={1.9} /> Reenviar enlace</Btn>
+                {(!conectado || d.clase === "formulario") && <Btn small kind="ghost" onClick={() => reenviar(d)}><Send size={13} strokeWidth={1.9} /> {conectado ? "Recordar" : "Reenviar enlace"}</Btn>}
                 {d.clase === "consentimiento" && <Btn small onClick={() => abrirFirma(d)}><Pencil size={13} strokeWidth={1.9} /> Firmar en consultorio</Btn>}
               </span> },
         ]} />
       )}
       {form && (
-        <Modal icon={<Send size={20} strokeWidth={1.75} />} titulo="Enviar documento" sub="El paciente lo firma o completa desde su celular" onClose={() => setForm(null)} maxW={540}
+        <Modal icon={<Send size={20} strokeWidth={1.75} />} titulo={conectado ? "Nuevo documento" : "Enviar documento"} sub={conectado ? (form.clase === "consentimiento" ? "Queda por firmar en consultorio (el enlace de firma estará disponible cuando el servidor lo soporte)" : "Llega al paciente por WhatsApp para completarlo desde su celular") : "El paciente lo firma o completa desde su celular"} onClose={() => setForm(null)} maxW={540}
           footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={14} strokeWidth={1.75} /> Enviar</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: pacienteFijo == null ? "1fr 1fr" : "1fr", gap: 14 }}>
-            {pacienteFijo == null && <label className="dc-campo-lbl">Paciente<Select value={form.pacienteId} onChange={(v) => setForm({ ...form, pacienteId: v })} options={pacientes.map((p) => ({ value: p.id, label: p.nombre }))} /></label>}
+            {pacienteFijo == null && <label className="dc-campo-lbl">Paciente<Select value={form.pacienteId} onChange={(v) => setForm({ ...form, pacienteId: v })} options={(conectado ? visibles : pacientes).map((p) => ({ value: p.id, label: p.nombre }))} /></label>}
             <label className="dc-campo-lbl">Clase<Select value={form.clase} onChange={(v) => setForm({ ...form, clase: v, tipo: v === "consentimiento" ? CONSENT_TIPOS[0] : FORM_TIPOS[0] })} options={[{ value: "consentimiento", label: "Consentimiento" }, { value: "formulario", label: "Formulario" }]} /></label>
             <label className="dc-campo-lbl">Documento<Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={(form.clase === "consentimiento" ? CONSENT_TIPOS : FORM_TIPOS).map((t) => ({ value: t, label: t }))} /></label>
           </div>
@@ -8689,10 +8847,20 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
    mismas listas que las bandejas transversales. */
 function ArchivosPaciente({ pid, sub = null, pacientes = [], notify, can, sedeActiva = 1, misSedes = SEDE_IDS, onIrLaboratorio }) {
   const db = useContext(DatosDemoCtx);
+  const conectado = !!auth.token;
   const [t, setT] = useState(sub || "rx");
   useEffect(() => { if (sub) setT(sub); }, [sub]);
-  const casos = (db?.labCasos || []).filter((c) => String(c.pacienteId) === String(pid));
-  const docsPend = (db?.documentos || []).filter((d) => String(d.pacienteId) === String(pid) && d.estado === "pendiente").length;
+  // Con sesión: casos de laboratorio y documentos del paciente desde el servidor.
+  const [casosApi, setCasosApi] = useState([]);
+  const fE = { solicitado: "enviado", en_proceso: "en_proceso", listo: "recibido", entregado: "entregado" };
+  useEffect(() => {
+    if (!conectado || pid == null) return;
+    api.laboratorio.listar(pid).then((r) => setCasosApi((Array.isArray(r) ? r : []).filter((o) => String(o.pacienteId) === String(pid))
+      .map((o) => ({ id: o.id, pacienteId: o.pacienteId, trabajo: o.tipoTrabajo || o.trabajo || "—", lab: o.laboratorio || o.lab || "—", enviado: o.fechaEnvio, entrega: o.fechaEstimada || o.entrega, estado: fE[o.estado] || o.estado || "enviado" })))).catch(() => setCasosApi([]));
+  }, [pid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { docs: docsApi } = useDocumentosApi(conectado ? pid : null);
+  const casos = conectado ? casosApi : (db?.labCasos || []).filter((c) => String(c.pacienteId) === String(pid));
+  const docsPend = (conectado ? (docsApi || []) : (db?.documentos || [])).filter((d) => String(d.pacienteId) === String(pid) && d.estado === "pendiente").length;
   const hoyISO = fmt(hoy);
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -9706,7 +9874,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Contexto de sede para los módulos que no reciben props (modal de agendar, WhatsApp, etc.).
   // Doctores que atienden en las sedes que se ven (Agenda, Consolidado, asignar cupos).
-  const medicosSede = useMemo(() => MEDICOS.filter((m) => { const ss = sedesDe(m).map(String); return !ss.length || idsSede.map(String).some((x) => ss.includes(x)); }), [idsSede]);
+  // Con sesión, los doctores son los de GET /medicos (sus sedes llegan como UUID: se comparan
+  // con mismaSede, que entiende el número corto del registro y el UUID).
+  const [medicosApi, setMedicosApi] = useState([]);
+  useEffect(() => { if (auth.token) api.catalogo.medicos().then((r) => setMedicosApi(Array.isArray(r) ? r : [])).catch(() => setMedicosApi([])); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const medicosSede = useMemo(() => (auth.token ? medicosApi : MEDICOS).filter((m) => { const ss = [].concat(m?.sedes ?? m?.sedeIds ?? m?.sedeId ?? m?.sede ?? []).map((v) => (v && typeof v === "object" ? v.id : v)); return !ss.length || idsSede.some((x) => ss.some((s) => mismaSede(s, x))); }), [idsSede, medicosApi]);
   const sedeCtx = useMemo(() => ({ sede, ids: idsSede, mias: misSedes, activa: sedeActiva, pacientes: pf, citas: cf, global: usuario.sedes === "all", rol, nombre: usuario.nombre }), [sede, idsSede, misSedes.join(","), sedeActiva, pf, cf, usuario.sedes, rol, usuario.nombre]); // eslint-disable-line react-hooks/exhaustive-deps
   // Membrete de los documentos: la empresa es una sola; dirección, teléfonos y horario
   // son los de la sede desde donde se emite (la activa). Ver util/membrete.js.
@@ -9731,8 +9903,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   // P1-1: iniciar atención → abre el espacio clínico del paciente de esa cita.
   const atenderCita = (cita) => {
-    const pac = pacientes.find((p) => p.dni === cita.dni) || pacientes.find((p) => p.nombre === cita.paciente);
-    if (pac) setPacienteActivo(pac.id);
+    // El paciente de la cita por su id; solo en la demo (citas antiguas sin id) se busca por DNI o nombre.
+    const pid = cita.pacienteId ?? (auth.token ? null : (pacientes.find((p) => p.dni && p.dni === cita.dni) || pacientes.find((p) => p.nombre === cita.paciente) || {}).id);
+    if (pid != null) setPacienteActivo(pid);
     setVista("odontograma");
     notify(`Atención iniciada con ${cita.paciente}.`);
   };

@@ -1930,8 +1930,10 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
       </Card>
     );
   }
-  const alergias = (Array.isArray(p.alergias) && p.alergias.length)
-    ? p.alergias
+  // Con sesión, solo las alergias que manda el servidor (nunca las fichas de ejemplo).
+  const alAPI = Array.isArray(p.alergias) ? p.alergias : (typeof p.alergias === "string" ? p.alergias.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean) : []);
+  const alergias = alAPI.length || conSesion()
+    ? alAPI
     : ((typeof FICHA_CLINICA !== "undefined" && FICHA_CLINICA[p.id]?.alergias) || []);
   // API lista trae sedeRegistroId (UUID); demo trae sedes/sede. sedeLabel = sede activa del shell.
   const sedeTxt = (() => {
@@ -1960,7 +1962,7 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
             {p.ultima && <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-400)", background: "var(--dc-bg)" }}><Clock size={11} strokeWidth={1.75} /> Última visita {/^\d{4}-\d{2}-\d{2}/.test(String(p.ultima)) ? fechaLegible(String(p.ultima).slice(0, 10)) : p.ultima}</span>}
             {alergias.length > 0
               ? <span className="dc-chip is-alerta" style={{ ...chip, color: "var(--dc-danger-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-fee)" }}><AlertTriangle size={11} strokeWidth={1.75} /> {alergias.join(", ")}</span>
-              : <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-500)", background: "var(--dc-bg)" }}>Sin alergias</span>}
+              : (conSesion() && p.alergias == null ? null : <span className="dc-chip" style={{ ...chip, color: "var(--dc-ink-500)", background: "var(--dc-bg)" }}>Sin alergias</span>)}
           </div>
         </div>
         {extra && <div className="dc-pbar__extra">{extra}</div>}
@@ -1989,6 +1991,19 @@ export const HORARIO_DEF = {
   "5": { abre: "09:00", cierra: "19:00" }, "6": { abre: "09:00", cierra: "13:00" },
   "0": { cerrado: true },
 };
+
+/* Con sesión no se asume el horario de ejemplo (L–V 9–19): si la clínica configuró algún
+   día, el que falta está cerrado; si no configuró ninguno, el día queda «sin configurar»
+   (sin restricción de horas) y la Agenda avisa que hay que configurarlo. */
+const conSesion = () => { try { return !!localStorage.getItem("dc_token"); } catch (e) { return false; } };
+const tieneDias = (h) => !!h && Object.keys(h).some((k) => /^[0-6]$/.test(k) && h[k]);
+const diaHorario = (horario, k) => {
+  if (horario && horario[k]) return horario[k];
+  if (!conSesion()) return HORARIO_DEF[k] || { cerrado: true };
+  return tieneDias(horario) ? { cerrado: true } : { abre: "06:00", cierra: "22:00", sinConfigurar: true };
+};
+/** ¿Hay horario de atención cargado? (sin sesión siempre: vale el de la demostración). */
+export const horarioConfigurado = (horario) => !conSesion() || tieneDias(horario);
 
 /**
  * Horario efectivo de una sede: el suyo si lo tiene, y si no el general de la clínica.
@@ -2024,13 +2039,13 @@ export function jornadaClinica(horario, feriados, fechaISO) {
   if (exc) return exc.cerrado ? { abierta: false, feriado: true, nota: exc.nota || "" }
     : { abierta: true, abre: exc.abre || "09:00", cierra: exc.cierra || "13:00", feriado: true, nota: exc.nota || "" };
   const k = String(new Date(fechaISO + "T00:00:00").getDay());
-  const d = (horario && horario[k]) || HORARIO_DEF[k] || { cerrado: true };
+  const d = diaHorario(horario, k);
   return d.cerrado ? { abierta: false } : { abierta: true, abre: d.abre || "09:00", cierra: d.cierra || "19:00" };
 }
 
 /** ¿Abre ese día de la semana? (0 domingo … 6 sábado) */
 export function abreDiaSemana(horario, dow) {
-  const d = (horario && horario[String(dow)]) || HORARIO_DEF[String(dow)] || { cerrado: true };
+  const d = diaHorario(horario, String(dow));
   return !d.cerrado;
 }
 
@@ -2046,7 +2061,7 @@ export const horasEntre = (abre, cierra) => {
 export function horasSemana(horario) {
   let ini = 24, fin = 0;
   for (let d = 0; d <= 6; d++) {
-    const c = (horario && horario[String(d)]) || HORARIO_DEF[String(d)] || { cerrado: true };
+    const c = diaHorario(horario, String(d));
     if (c.cerrado) continue;
     ini = Math.min(ini, parseInt(c.abre || "09:00", 10));
     fin = Math.max(fin, parseInt(c.cierra || "19:00", 10));

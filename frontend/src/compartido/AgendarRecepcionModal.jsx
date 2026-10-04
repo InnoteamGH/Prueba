@@ -214,7 +214,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const ctxReglas = { ...reglas, citas: demo ? (demoDb.citas || []) : citasDia, medicos: (reglas.medicos && reglas.medicos.length) ? reglas.medicos : meds, especialidades: (reglas.especialidades && reglas.especialidades.length) ? reglas.especialidades : esps };
   const sillonesSede = (() => {
     const l = sillonesDeSede(reglas.sillones, f.sedeId || null);
-    return l.length ? l : [1, 2, 3, 4].map((n) => ({ id: `x${n}`, sede: f.sedeId, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true }));
+    // Con sesión no se inventan sillones: si la sede no tiene, se avisa que hay que configurarlos.
+    if (l.length || !demo) return l;
+    return [1, 2, 3, 4].map((n) => ({ id: `x${n}`, sede: f.sedeId, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true }));
   })();
   const ctxSede = { ...ctxReglas, sillones: sillonesSede };
   const medSel = (ctxReglas.medicos || []).find((m) => String(m.id) === String(f.medicoId));
@@ -622,6 +624,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           </div>
           <div>
             <span style={lbl}>Sillón{req}{f.sillon && sillonAuto && <em className="dc-agm__auto">propuesto</em>}</span>
+            {!demo && reglas.listo && !sillonesSede.length && <p className="dc-agm__val is-avi" style={{ margin: "4px 0 8px", fontSize: 12.5, color: "var(--dc-warn-700)" }}><Info size={13} strokeWidth={2.2} /> Esta sede no tiene sillones configurados. Configúralos en Configuración › Sillones para poder agendar.</p>}
             <div className="dc-agm__sils" role="radiogroup" aria-label="Sillón">
               {estSil.map(({ s: x, estado, regla, ocupante }) => { const on = String(f.sillon) === String(x.numero); const bloq = estado === "no" || estado === "ocupado"; const et = etiquetaUso(x, ctxReglas); return (
                 <button key={x.id} type="button" role="radio" aria-checked={on} disabled={bloq} className={`is-${estado}${on ? " is-on" : ""}`}

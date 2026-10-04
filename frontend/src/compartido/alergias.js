@@ -25,3 +25,10 @@ export function cruceAlergias(alergias, meds) {
   });
   return [...msgs];
 }
+
+/** Alergias como lista, vengan como arreglo (API/demo) o como texto separado por comas. */
+export function listaAlergias(x) {
+  if (Array.isArray(x)) return x.map((a) => String(a ?? "").trim()).filter(Boolean);
+  if (typeof x === "string") return x.split(/[,;\n]/).map((a) => a.trim()).filter(Boolean);
+  return [];
+}

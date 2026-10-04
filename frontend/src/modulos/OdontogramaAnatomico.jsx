@@ -15,7 +15,8 @@ function profesionalDoc(medicoTratante) {
   const u2 = u || auth.sesion || {};
   const esMedico = /medico|odont/i.test(String(u2.rol || ""));
   const nombre = (esMedico ? u2.nombre : "") || medicoTratante || "";
-  const m = MEDICOS.find((x) => (u2.medicoId != null && x.id === u2.medicoId) || (nombre && x.nombre === nombre));
+  // Con sesión no se toma el COP de los médicos de ejemplo: solo el del usuario (o ninguno).
+  const m = auth.token ? null : MEDICOS.find((x) => (u2.medicoId != null && x.id === u2.medicoId) || (nombre && x.nombre === nombre));
   const cop = String((esMedico && u2.cop) || (m && m.cop) || "").replace(/^\s*COP\s*/i, "");
   return { nombre: nombre || (m && m.nombre) || "", cop, impreso: u2.nombre || "" };
 }

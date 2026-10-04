@@ -150,10 +150,12 @@ function WhatsAppInbox({ notify = () => {} }) {
   // Sedes y servicios de ESTA clínica, para las respuestas rápidas de recepción.
   const [sedesReales, setSedesReales] = useState([]);
   const [espsReales, setEspsReales] = useState([]);
+  const [horarioApi, setHorarioApi] = useState(null);   // con sesión: horario de GET /clinica
   useEffect(() => {
     if (!conectado) return;
     api.sedes.listar().then((x) => setSedesReales(Array.isArray(x) ? x : [])).catch(() => {});
     api.catalogo.especialidades().then((x) => setEspsReales(Array.isArray(x) ? x : [])).catch(() => {});
+    api.clinica.get().then((r) => setHorarioApi(r?.horario && typeof r.horario === "object" ? r.horario : {})).catch(() => setHorarioApi({}));
   }, []); // eslint-disable-line
   /**
    * Horario de atención en una línea ("lunes a sábado de 09:00 a 19:00"), leído de donde
@@ -162,12 +164,14 @@ function WhatsAppInbox({ notify = () => {} }) {
    */
   const horarioTexto = () => {
     let h = null;
-    try { h = (JSON.parse(localStorage.getItem("dc_data_v1_clinica_horario") || "null") || {}).horario; } catch { h = null; }
+    if (conectado) h = horarioApi;
+    else { try { h = (JSON.parse(localStorage.getItem("dc_data_v1_clinica_horario") || "null") || {}).horario; } catch { h = null; } }
     if (!h || !Object.keys(h).length) return "";
     const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
     const tramos = [];
     for (const d of [1, 2, 3, 4, 5, 6, 0]) {
-      const j = h[String(d)] || HORARIO_DEF[String(d)];
+      // Con sesión, un día que la clínica no cargó está cerrado (no se completa con el de ejemplo).
+      const j = h[String(d)] || (conectado ? null : HORARIO_DEF[String(d)]);
       if (!j || j.cerrado) continue;
       const franja = `de ${(j.abre || "").slice(0, 5)} a ${(j.cierra || "").slice(0, 5)}`;
       const ult = tramos[tramos.length - 1];
@@ -215,6 +219,13 @@ function WhatsAppInbox({ notify = () => {} }) {
   const chat = chats.find((c) => c.id === activo);
   const dbWa = useContext(DatosDemoCtx);
   const soloDig = (t) => String(t || "").replace(/\D/g, "").slice(-9);
+  // Con sesión, el contexto del paciente del chat (próxima cita y saldo) sale de su ficha 360.
+  const [ctx360, setCtx360] = useState({});
+  const pidChatApi = conectado && chat ? (chat.pacienteId || (chat.pacientes?.length === 1 ? chat.pacientes[0].id : null)) : null;
+  useEffect(() => {
+    if (!pidChatApi || ctx360[pidChatApi] !== undefined) return;
+    api.pacientes.ficha360(pidChatApi).then((r) => setCtx360((m) => ({ ...m, [pidChatApi]: r || null }))).catch(() => setCtx360((m) => ({ ...m, [pidChatApi]: null })));
+  }, [pidChatApi]); // eslint-disable-line react-hooks/exhaustive-deps
   const pacDeChat = (c) => { if (!c) return null; const lista = dbWa?.pacientes || []; return lista.find((p) => (c.pacienteId && p.id === c.pacienteId) || (soloDig(p.telefono) && soloDig(p.telefono) === soloDig(c.tel)) || p.nombre === c.nombre) || null; };
   // ¿El paciente es de las sedes que ve el usuario? (sin filtro de sede, sí)
   const pacVisible = (p) => !pacVisibles || pacVisibles.some((x) => String(x.id) === String(p.id));
@@ -622,7 +633,20 @@ function WhatsAppInbox({ notify = () => {} }) {
             </div>
           </div>
           {/* WSP-01: contexto del paciente siempre visible en el hilo (no depende del panel). */}
-          {(() => { const pac = pacDeChat(chat); if (!pac) return null;
+          {conectado && (() => { const f = pidChatApi ? ctx360[pidChatApi] : null; if (!f) return null;
+            const p = f.paciente || {}; const hoyI = fmt(hoy);
+            const prox = (f.citas || []).filter((c) => String(c.fecha).slice(0, 10) >= hoyI && !["cancelada", "no_show", "reprogramada", "cerrada_sistema", "atendida"].includes(c.estado))
+              .sort((a, b) => `${a.fecha} ${a.hora || ""}`.localeCompare(`${b.fecha} ${b.hora || ""}`))[0];
+            const saldo = Number(f.resumen?.saldo) || 0; const al = Array.isArray(p.alergias) ? p.alergias : [];
+            return (
+            <div className="wa-ctx">
+              <button type="button" className="wa-ctx__ficha" onClick={() => { window.location.hash = `#/pacientes/${pidChatApi}`; }}>Ver ficha de {String(p.nombre || chat.nombre || "paciente").split(" ")[0]}</button>
+              <span>Próxima cita: <b>{prox ? `${String(prox.fecha).slice(0, 10) === hoyI ? "hoy" : new Date(String(prox.fecha).slice(0, 10) + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })} ${String(prox.hora || "").slice(0, 5)}` : "sin agendar"}</b></span>
+              {f.resumen && <span>Saldo: <b className={saldo > 0 ? "is-debe" : ""}>{saldo > 0 ? `S/ ${saldo.toLocaleString("es-PE")}` : "al día"}</b></span>}
+              {al.length > 0 && <span>Alergias: <b className="is-debe">{al.join(", ")}</b></span>}
+            </div>
+          ); })()}
+          {!conectado && (() => { const pac = pacDeChat(chat); if (!pac) return null;
             // De otra sede: se identifica, pero sin ficha, citas ni saldo (son datos de esa sede).
             if (!pacVisible(pac)) return <div className="wa-ctx"><span>Paciente de otra sede: su ficha, citas y saldo los ve esa sede.</span></div>;
             const prox = proximaCita(pac, citasVisibles || dbWa?.citas || []); const cta = cuentaPaciente(fichaDeSede((dbWa?.fichas || {})[pac.id], pac, (x) => sedeEnLista(x, sedesWa))); return (
@@ -787,7 +811,7 @@ function WhatsAppInbox({ notify = () => {} }) {
                       <div style={secTit}><IconBox><Building2 size={16} strokeWidth={2} /></IconBox> Identidad de la clínica</div>
                       <div style={{ fontSize: 13, color: DS.c.muted, marginBottom: 16 }}>El agente lo mencionará con naturalidad.</div>
                       <label style={lbl}>Nombre comercial</label>
-                      <input className="dc-premium-inp" style={{...inp, height: 44}} value={perfil.nombreComercial} onChange={(e) => setPerfil({ ...perfil, nombreComercial: e.target.value })} placeholder="Ej. Odonto Sonrisa" />
+                      <input className="dc-premium-inp" style={{...inp, height: 44}} value={perfil.nombreComercial} onChange={(e) => setPerfil({ ...perfil, nombreComercial: e.target.value })} placeholder="Nombre que ven tus pacientes" />
                     </div>
                     <div style={secCard}>
                       <div style={secTit}><IconBox><Sparkles size={16} strokeWidth={2} /></IconBox> Personalidad</div>
