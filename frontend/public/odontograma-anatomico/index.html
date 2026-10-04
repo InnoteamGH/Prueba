@@ -2181,10 +2181,25 @@ function recorrer(fn){
   });
 }
 /* el plan: sólo lo que está en mal estado, que es lo que pidió la doctora */
+/* Procedimientos que ya están en «Plan y cuenta» del sistema (con sesión): entran al plan
+   de inversión con su importe, y los hallazgos de esa pieza no se cotizan otra vez. Antes
+   el plan solo salía del dibujo y, con el presupuesto armado en Plan y cuenta, el
+   documento decía «Total S/ 0». */
+let PLAN_SRV=[];
+function aplicarPlanSrv(d){
+  try{
+    PLAN_SRV=(Array.isArray(d&&d.fases)?d.fases:[]).filter(function(f){return f&&f.t;}).map(function(f){
+      return {id:f.id, t:String(f.t), v:(+f.v||0), pz:(f.pz==null||f.pz===''?null:+f.pz), cara:f.cara?String(f.cara):''};});
+    if(typeof presupuesto==='function') presupuesto();
+    if(typeof DOCU!=='undefined'&&DOCU&&!DOCU.hidden&&typeof pintarDocu==='function') pintarDocu();
+  }catch(e){}
+}
 function planLineas(){
   const lineas=[], faltan=[];
+  const enPlan={}; PLAN_SRV.forEach(function(f){ if(f.pz) enPlan[f.pz]=1; });
   recorrer((m,pz,ubic)=>{
     if(m.c!=='r') return;
+    if(enPlan[pz]) return;
     const h=POR_ID[m.h]; if(!h) return;
     const b=TARIFA[m.h]; if(!b) {faltan.push({pz:pz,q:h.nom,ubic:ubic,por:'no tiene tratamiento asociado'});return;}
     const base=b.res?b.res(pz):b;
@@ -2210,6 +2225,10 @@ function planLineas(){
     const uds=(x.cant||1)*((d.porMax&&max==='ambos')?2:1);
     lineas.push({pz:x.pz||null,max:max,cod:d.cod,t:d.t,v:d.v,cant:uds,
       ubic:ubic,q:'Añadido en recepción',det:d.t,suelto:1,src:x});
+  });
+  PLAN_SRV.forEach(function(f){
+    lineas.push({pz:f.pz, cod:'plan:'+f.id, t:f.t+(f.cara?' ('+f.cara+')':''), v:f.v, cant:1,
+      ubic:(f.pz?'pieza '+fdi(f.pz):'—'), q:'En Plan y cuenta', det:'En Plan y cuenta', plan:1});
   });
   /* Se agrupa por pieza y tratamiento: dos caries en la misma pieza son una línea con
      cantidad 2. Lo pidió la clínica al quitar la columna de cara —dos filas idénticas
@@ -2319,7 +2338,7 @@ function presupuesto(){
     lineas.forEach(L=>{
       const c=L.cant||1, sub=L.v*c; tot+=sub;
       const tr=document.createElement('tr'); if(L.pz)tr.setAttribute('data-pz',L.pz);
-      const det = L.suelto ? L.det
+      const det = (L.suelto||L.plan) ? L.det
                 : (c>1 ? L.q+' – '+c+' superficies' : L.q+' – '+L.ubics[0]);
       const varios = L.opts && L.opts.length>1;
       tr.innerHTML='<td class="pz">'+esc(ambitoRot(L))+'</td>'+
@@ -3312,6 +3331,7 @@ construir(); panel();
     if(d.type==='dento-odontograma-profesional') applyProfesional(d.profesional);
     if(d.type==='dento-odontograma-clinica') applyClinica(d.clinica);
     if(d.type==='dento-odontograma-tarifa' && typeof aplicarTarifa==='function') aplicarTarifa(d);
+    if(d.type==='dento-odontograma-plan' && typeof aplicarPlanSrv==='function') aplicarPlanSrv(d);
     if(d.type==='dento-odontograma-documento' && typeof abrirDocumento==='function'){ try{ window.scrollTo(0,0); abrirDocumento(d.que||'plan'); }catch(e){} }
   });
   window.__dentoBridge={snapshot:snapshot,notify:notify,hydrate:hydrate,exportPng:exportPng,applyZoom:applyZoom,applyPaciente:applyPaciente,applyClinica:applyClinica,applyProfesional:applyProfesional};

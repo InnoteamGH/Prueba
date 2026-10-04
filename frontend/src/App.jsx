@@ -4413,7 +4413,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     // lista se recorta igual en el cliente a las sedes que se ven.
     const sid = sedeUuid();
     api.cajaApertura.historial({ sedeId: sid || undefined, desde: histCajaRango.desde, hasta: histCajaRango.hasta })
-      .then((rows) => setHistCaja(Array.isArray(rows) ? rows.map((r) => ({ ...r, ...mapJornada(r) })) : []))
+      // Una jornada sin cierre registrado sigue abierta aunque el servidor no mande «abierta»:
+      // la de un día anterior sin cerrar salía «Cerrada».
+      .then((rows) => setHistCaja(Array.isArray(rows) ? rows.map((r) => ({ ...r, ...mapJornada(r), abierta: r.abierta === true || (r.abierta !== false && !r.cerradaEn) })) : []))
       .catch(() => { setHistCaja([]); notify("No se pudo cargar el historial de caja."); });
   };
   // Al cambiar de caja no se arrastra la apertura de la anterior mientras llega la nueva.
@@ -5509,7 +5511,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </Card>
           )}
           {(() => {
-            const js = (histCaja || []).filter((r) => deCaja(r.sedeId));
+            const js = (histCaja || []).filter((r) => deCaja(r.sedeId)).map((r) => (!r.abierta && jornadaAbiertaPrevia?.id && String(r.id) === String(jornadaAbiertaPrevia.id) ? { ...r, abierta: true } : r));
             // C8: faltantes y sobrantes por separado (−5 y +5 no son «S/ 0.00»); los dólares aparte.
             const rs = resumenDiferencias(js), ru = resumenDiferencias(js, "diferenciaUsd");
             // Resultado de un cierre en una moneda: abierta, cerrada sin arqueo, cuadra, falta o sobra.
@@ -9338,6 +9340,8 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   const [subiendo, setSubiendo] = useState(null); // { url, tipo, nota, nombre, piezas, vista, momento }
   const onFile = (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
+    // Sin paciente no hay a quién anexar el estudio (con sesión se subía sin paciente).
+    if (!pid) { notify("Elige primero el paciente."); e.target.value = ""; return; }
     if (!f.type.startsWith("image/")) { notify("Selecciona una imagen (JPG o PNG)."); e.target.value = ""; return; }
     if (f.size > 8 * 1024 * 1024) { notify("La imagen supera 8 MB. Usa una más liviana."); e.target.value = ""; return; }
     // Se reduce antes de guardar: una foto de celular sin reducir llenaba el almacenamiento.
@@ -9402,7 +9406,7 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
           {opcionesSede.length > 1 && <label className="dc-rx-sede" title="Sede donde se registra">
             <MapPin size={14} strokeWidth={1.9} />
             <span>Registrar en</span>
-            <Select small width={170} ariaLabel="Sede" value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: nombreSede(s) }))} />
+            <Select small width={170} ariaLabel="Sede" disabled={!pid} value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: nombreSede(s) }))} />
           </label>}
           <button type="button" className="dc-esp-hero__btn" disabled={!pid} title={pid ? undefined : "Elige primero el paciente"} style={pid ? undefined : { opacity: 0.55, cursor: "not-allowed" }} onClick={() => { if (!pid) { notify("Elige primero el paciente."); return; } if (fileRef.current) fileRef.current.click(); }}>{esFotos ? <Camera size={14} strokeWidth={1.9} /> : <Upload size={14} strokeWidth={1.9} />} {esFotos ? "Subir foto" : "Subir radiografía"}</button>
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
@@ -10176,6 +10180,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     // El paciente de la cita por su id; solo en la demo (citas antiguas sin id) se busca por DNI o nombre.
     const pid = cita.pacienteId ?? (auth.token ? null : (pacientes.find((p) => p.dni && p.dni === cita.dni) || pacientes.find((p) => p.nombre === cita.paciente) || {}).id);
     if (pid != null) setPacienteActivo(pid);
+    // La evolución que se escriba después en la historia queda ligada a esta cita (citaId).
+    try { if (pid != null && cita.id != null) sessionStorage.setItem("dc_cita_atencion", JSON.stringify({ pacienteId: String(pid), citaId: String(cita.id) })); } catch { /* sin almacenamiento */ }
     setVista("odontograma");
     notify(`Atención iniciada con ${cita.paciente}.`);
   };

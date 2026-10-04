@@ -1210,11 +1210,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const citasEvo = arr(d?.citas).filter((c) => c.id != null && c.fecha === hoyLima && !conEvo.has(String(c.id)) && !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(String(c.estado)));
   const citasEvoKey = citasEvo.map((c) => `${c.id}:${c.estado}`).join("|");
   useEffect(() => {
-    // La cita desde la que se abrió (#/pacientes/…?cita=) o, si no, la que está en atención
-    // o ya atendida hoy; con una sola cita del día, esa.
+    // La cita que se inició desde la agenda («Iniciar» guarda cuál) o, si no, la que está en
+    // atención o ya atendida hoy; con una sola cita del día, esa.
     if (evoCitaId && citasEvo.some((c) => String(c.id) === String(evoCitaId))) return;
     let pedida = null;
-    try { pedida = new URLSearchParams(String(window.location.hash || "").split("?")[1] || "").get("cita"); } catch { pedida = null; }
+    try { const x = JSON.parse(sessionStorage.getItem("dc_cita_atencion") || "null"); pedida = x && String(x.pacienteId) === String(pacienteId) ? x.citaId : null; } catch { pedida = null; }
     const elegida = (pedida && citasEvo.find((c) => String(c.id) === String(pedida)))
       || citasEvo.find((c) => c.estado === "en_atencion")
       || citasEvo.find((c) => /atend|complet/i.test(String(c.estado)))
@@ -1341,6 +1341,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const completarDraft = (id) => {
     const v = draftEdit[id] || {};
     if (!(v.diagnostico || "").trim() && !(v.detalle || "").trim()) { notify("Escribe el diagnóstico o la evolución."); return; }
+    if (/_{3,}/.test(`${v.diagnostico || ""} ${v.detalle || ""}`)) { notify("Completa los espacios «___» de la plantilla (pieza, cara) antes de guardar."); return; }
     api.historia.actualizar(id, { ...parseDiagnostico(v.diagnostico || ""), detalle: v.detalle || null, signosVitales: v.signosVitales || null, medicoId: v.medicoId || null })
       .then(() => { notify("Evolución completada."); setDraftEdit((s) => { const n = { ...s }; delete n[id]; return n; }); cargar(); })
       .catch(() => notify("No se pudo guardar la evolución."));
@@ -1359,6 +1360,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const guardarEdit = () => {
     const v = editEvo; if (!v) return;
     if (!(v.diagnostico || "").trim() && !(v.detalle || "").trim()) { notify("Escribe el diagnóstico o la evolución."); return; }
+    if (/_{3,}/.test(`${v.diagnostico || ""} ${v.detalle || ""}`)) { notify("Completa los espacios «___» de la plantilla (pieza, cara) antes de guardar."); return; }
     if (v.locked && !conectado) {
       const med = medicosTodos.find((m) => String(m.id) === String(v.medicoId));
       const ahora = new Date();

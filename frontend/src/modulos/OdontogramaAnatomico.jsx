@@ -7,6 +7,7 @@ import { useDatosImpresion } from "../util/membrete";
 import { MEDICOS, useSede } from "../comun";
 import { useCatalogoApi, useMedicosApi, medicoEn, tarifaDibujoDesdeCatalogo } from "../compartido/catalogoApi";
 import { precioEnSede } from "../compartido/cajaSede";
+import { copNumero } from "../util/cop";
 
 /* Profesional que firma los documentos del odontograma: el odontólogo que tiene la
    sesión abierta; si imprime otra persona (recepción), el médico tratante del
@@ -21,11 +22,11 @@ function profesionalDoc(medicoTratante, medicosApi = null) {
   const nombre = (esMedico ? u2.nombre : "") || medicoTratante || "";
   if (auth.token) {
     const m = medicoEn(medicosApi, { id: esMedico ? u2.medicoId : null, nombre });
-    const cop = String((m && m.cop) || (esMedico && u2.cop) || "").replace(/^\s*COP\s*/i, "");
+    const cop = copNumero((m && m.cop) || (esMedico && u2.cop) || "");
     return { nombre: (m && m.nombre) || nombre, cop, impreso: u2.nombre || "" };
   }
   const m = MEDICOS.find((x) => (u2.medicoId != null && x.id === u2.medicoId) || (nombre && x.nombre === nombre));
-  const cop = String((esMedico && u2.cop) || (m && m.cop) || "").replace(/^\s*COP\s*/i, "");
+  const cop = copNumero((esMedico && u2.cop) || (m && m.cop) || "");
   return { nombre: nombre || (m && m.nombre) || "", cop, impreso: u2.nombre || "" };
 }
 
@@ -256,6 +257,21 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   const sedeCx = useSede();
   const sedeTarifa = sedePrecio ?? sedeCx.activa;
   const tarifaDibujo = useMemo(() => (auth.token && catApi ? tarifaDibujoDesdeCatalogo(catApi, (s) => precioEnSede(s, sedeTarifa)) : null), [catApi, sedeTarifa]);
+  // Procedimientos de «Plan y cuenta» (GET /tratamientos): el plan de inversión del dibujo
+  // los incluye con su importe, así no sale «Total S/ 0» cuando el plan ya está armado.
+  const [planSrv, setPlanSrv] = useState(null);
+  useEffect(() => {
+    setPlanSrv(null);
+    if (!auth.token || !pacienteId || soloLectura) return undefined;
+    let vivo = true;
+    api.tratamientos.porPaciente(pacienteId).then((ps) => {
+      if (!vivo) return;
+      const fs = [];
+      (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && !/anulad/i.test(String(f.estado || ""))) fs.push({ id: f.id, t: f.nombre || "Procedimiento", v: Number(f.costo) || 0, pz: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || "" }); }));
+      setPlanSrv(fs);
+    }).catch(() => {});
+    return () => { vivo = false; };
+  }, [pacienteId, soloLectura]);
   const syncChrome = useCallback(() => {
     postToIframe({ type: "dento-odontograma-zoom", zoom });
     postToIframe({
@@ -272,6 +288,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     postToIframe({ type: "dento-odontograma-profesional", profesional: profesionalDoc(medicoTratante, medsApi) });
     // Tarifa del plan de inversión del dibujo: la del catálogo de la clínica en la sede.
     if (tarifaDibujo) postToIframe({ type: "dento-odontograma-tarifa", tarifa: tarifaDibujo, sueltos: [] });
+    if (planSrv) postToIframe({ type: "dento-odontograma-plan", fases: planSrv });
     // Membrete de los documentos del odontograma (resumen y plan de inversión): los
     // mismos datos de empresa y de la sede activa que el resto del sistema.
     postToIframe({
@@ -283,7 +300,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         horario: datosDoc.sede.horario, correo: datosDoc.sede.correo, serie: datosDoc.sede.serieDocumento,
       },
     });
-  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante, medsApi, tarifaDibujo, denticion]);
+  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante, medsApi, tarifaDibujo, denticion, planSrv]);
 
   const persistir = useCallback(async (payload) => {
     if (!editable || !pacienteId || !payload?.datos || !auth.token) return;
