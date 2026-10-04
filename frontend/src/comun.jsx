@@ -11,6 +11,7 @@
    ============================================================================ */
 import { abrirDocumento, datosImpresion } from "./util/membrete";
 import { estadoInfo, ESTADOS } from "./compartido/estados.js";
+import { registrarSedes, sedesRegistradas, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {Printer, AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2, Download, FileSpreadsheet, FileText} from "lucide-react";
@@ -279,6 +280,17 @@ export const minutosViaje = (sedeA, sedeB, hora = "12:00") => {
    `sedes` acepta "all" (toda la cuenta) o un arreglo de ids. Se mantiene
    compatibilidad con los campos antiguos `sede`/`sedeFija`. */
 export const SEDE_IDS = SEDES.map((s) => s.id);
+/* Con sesión, SEDES y SEDE_IDS pasan a ser las sedes reales del servidor (GET /sedes), con
+   el número corto que les da el registro. Se reescriben en su lugar para que todo lo que ya
+   los importa (nombreSede, normSedes("all"), selectores) vea las sedes reales. */
+const volcarRegistro = () => {
+  const r = sedesRegistradas();
+  if (!r.length) return;
+  SEDES.splice(0, SEDES.length, ...r.map((x) => ({ id: x.n, uuid: x.uuid, nombre: x.nombre, dir: x.direccion || "" })));
+  SEDE_IDS.splice(0, SEDE_IDS.length, ...SEDES.map((x) => x.id));
+};
+volcarRegistro();
+export function aplicarSedesApi(lista) { registrarSedes(lista); volcarRegistro(); return SEDES; }
 export const normSedes = (v) => {
   if (v === "all") return SEDE_IDS;
   if (Array.isArray(v)) return v;
@@ -301,7 +313,7 @@ export const nombreSede = (id) => {
   if (id == null || id === "" || id === "all") return "—";
   const hit = SEDES_CATALOGO.find((s) => String(s.id) === String(id));
   if (hit?.nombre) return hit.nombre;
-  return SEDES.find((s) => String(s.id) === String(id))?.nombre || "—";
+  return SEDES.find((s) => String(s.id) === String(id) || (s.uuid && String(s.uuid).toLowerCase() === String(id).toLowerCase()))?.nombre || "—";
 };
 export const cortaSede = (id) => nombreSede(id).replace(/^Sede /, "");
 export const etiquetaSedes = (v) => {
@@ -1434,7 +1446,13 @@ export function useEmiteCobros(can) {
 }
 /** Id de sede comparable: en la demo 1/2; con API llega un UUID que el resto del frontend
     ya traduce a 1/2 al iniciar sesión (sedeInt en App.jsx). Misma regla aquí. */
-export const sedeNum = (x) => (x == null || x === "" ? null : /^\d+$/.test(String(x)) ? Number(x) : (String(x).endsWith("a2") ? 2 : 1));
+export const sedeNum = (x) => {
+  if (x == null || x === "") return null;
+  if (/^\d+$/.test(String(x))) return Number(x);
+  // Con sesión: el número que el registro dio a ese UUID; uno desconocido no se confunde con otro.
+  if (hayRegistroSedes()) return idxDeUuid(x) ?? String(x);
+  return String(x).endsWith("a2") ? 2 : 1;   // demostración: UUID de la semilla
+};
 /** ¿Son la misma sede? Acepta id numérico de la demo o UUID del servidor. */
 export const mismaSede = (a, b) => a != null && b != null && (String(a) === String(b) || sedeNum(a) === sedeNum(b));
 /** Sede con la que se cotiza a un paciente: la elegida en el menú; con «Todas», la del

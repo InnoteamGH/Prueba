@@ -9,6 +9,7 @@
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/$/, "");
 const TOKEN_KEY = "dc_token";
+import { limpiarRegistroSedes } from "../compartido/sedesRegistro";
 const CLINICAL_KEYS = ["dc_data_v1_pacientes", "dc_data_v1_fichas", "dc_data_v1_citas"];
 /** NEW-59 / ODO-01: forma UUID 8-4-4-4-12 (incluye seeds nil v0). Rechaza demo `"1"` / `1`. */
 const UUID_PACIENTE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -21,6 +22,20 @@ export function limpiarCacheClinicaLocal() {
   for (const k of CLINICAL_KEYS) {
     try { localStorage.removeItem(k); } catch { /* */ }
   }
+}
+
+/** Con sesión real no debe quedar nada de la demostración ni de otra cuenta: se borran
+    todas las claves dc_* del navegador (datos, emisor, tipo de cambio, correlativos, cajas,
+    tomas del odontograma…) salvo la sesión y las preferencias de pantalla. */
+const CONSERVAR = /^dc_(token|sesion|sesion_msg|usuario|entro|vista_|fm_tab|wa_info_oculta)/;
+export function limpiarDatosLocales({ conservarSedes = false } = {}) {
+  try {
+    Object.keys(localStorage).forEach((k) => {
+      if (!k.startsWith("dc_") || CONSERVAR.test(k)) return;
+      if (conservarSedes && k === "dc_sedes_registro") return;
+      localStorage.removeItem(k);
+    });
+  } catch { /* sin almacenamiento */ }
 }
 
 /** Verifica si un token JWT está expirado (BUG-113). */
@@ -64,7 +79,7 @@ export const auth = {
     const eraReal = !!this.token;
     this.token = null;
     this.sesion = null;
-    if (eraReal) limpiarCacheClinicaLocal();
+    if (eraReal) { limpiarCacheClinicaLocal(); limpiarDatosLocales(); limpiarRegistroSedes(); }
     emitirCierreSesion();
   },
 };
@@ -212,7 +227,8 @@ export const api = {
     auth.token = r.token;
     // C23: extraer campo sedes del JWT (admin="all", otros=CSV de UUIDs)
     const payload = parseJwt(r.token);
-    const sedes = payload?.sedes || "all";
+    // Sin el claim no se asume «todas»: decide el rol en App (falla cerrado).
+    const sedes = payload?.sedes || null;
     auth.sesion = { 
       nombre: r.nombre, 
       rol: r.rol, 

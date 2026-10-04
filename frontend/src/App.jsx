@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
 import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
-import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt } from "./api/client";
+import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales } from "./api/client";
+import { limpiarRegistroSedes, hayRegistroSedes } from "./compartido/sedesRegistro";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
 const FichaMedica = React.lazy(() => import("./FichaMedica"));
@@ -28,7 +29,7 @@ import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/Facturacio
 import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, sedeEnLista, sedePrincipal, uuidSede } from "./compartido/cajaSede";
 // Soles y dólares en caja, montos escritos y la boleta de un cobro (compartido/cajaMoneda.js).
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
-import { sedeNum as numSede } from "./comun";
+import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./util/fechaLima";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
@@ -87,8 +88,8 @@ function Login({ onLogin }) {
   const demoLoginOk = MODO_DEMO;
 
   const [cargando, setCargando] = useState(false);
-  // Convierte UUID de sede a número (1 o 2) para compatibilidad con el resto del frontend
-  const sedeInt = (uuid) => (uuid && String(uuid).endsWith("a2")) ? 2 : 1;
+  // UUID de sede → número corto del registro de sedes (GET /sedes), el que usa el frontend.
+  const sedeInt = (uuid) => numSede(uuid);
   
   const entrar = async () => {
     const id = user.trim();
@@ -97,12 +98,21 @@ function Login({ onLogin }) {
       setCargando(true); setError("");
       try {
         const r = await api.login(id.toLowerCase(), pass);
+        // Las sedes reales de la clínica se registran antes de traducir las del usuario: sin
+        // eso todas las sedes pasaban a ser la «1» y se mezclaban.
+        limpiarRegistroSedes();
+        try { aplicarSedesApi(await api.sedes.listar()); } catch { /* sin /sedes: se registran las del usuario */ }
+        // Sedes del usuario: las de la respuesta o, si no vienen, las del claim `sedes` del JWT.
+        const jwtSedes = parseJwt(r.token)?.sedes;
+        const sedesUsr = Array.isArray(r.sedes) && r.sedes.length ? r.sedes
+          : jwtSedes === "all" ? "all" : (typeof jwtSedes === "string" && jwtSedes ? jwtSedes.split(",").map((x) => x.trim()).filter(Boolean) : Array.isArray(jwtSedes) ? jwtSedes : null);
+        aplicarSedesApi([...(Array.isArray(sedesUsr) ? sedesUsr : []), r.sedeId].filter(Boolean).map((u) => ({ id: u })));
         setCargando(false);
         // BUGFIX BUG-101: Convertir sedeId (UUID) a número para que coincida con el filtro de pacientes
         const sedeNum = r.sedeId ? sedeInt(r.sedeId) : null;
         // Sin sede en la respuesta solo los roles de toda la clínica ven todas; el resto
         // queda sin sede (falla cerrado) en vez de ver todas.
-        const listaSedes = Array.isArray(r.sedes) && r.sedes.length ? r.sedes.map(sedeInt) : sedeNum ? [sedeNum] : (ROLES_GLOBALES.includes(r.rol) ? "all" : []);
+        const listaSedes = Array.isArray(sedesUsr) && sedesUsr.length ? sedesUsr.map(sedeInt) : sedesUsr === "all" && ROLES_GLOBALES.includes(r.rol) ? "all" : sedeNum ? [sedeNum] : (ROLES_GLOBALES.includes(r.rol) ? "all" : []);
         onLogin({ rol: r.rol, nombre: r.nombre, sedes: listaSedes,
                   organizacionId: r.organizacionId, sedeId: sedeNum, conectado: true,
                   permisos: r.permisos || null });
@@ -429,7 +439,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // salía con seis días en cero y recepción nunca veía la tarea de confirmar las de
   // mañana. Se pide el rango que la pantalla necesita: seis días atrás y uno adelante.
   // NEW-37/47: sede siempre (default 1 si falta UUID) + ultima desde creadoEn; luego se enriquece con citas.
-  const sedeDash = (uuid) => (uuid && String(uuid).endsWith("a2")) ? 2 : 1;
+  const sedeDash = (uuid) => numSede(uuid);
   const cargarDash = () => {
     if (!conectado) return;
     // NEW-48: TI no tiene agenda:ver — no pedir citas (evita 403 en consola/cartel).
@@ -502,10 +512,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const pagosEnSedeActiva = (lista) => {
     if (!lista) return [];
     if (sedeActiva === "all") return lista;
-    const want = Number(sedeActiva) === 2 ? "a2" : "a1";
-    const uuidHard = sedeApiUuid(sedeActiva);
-    const uuidApi = sedesDash.find((s) => String(s.id).endsWith(want))?.id || sedesDash[Number(sedeActiva) - 1]?.id;
-    const sid = uuidApi || uuidHard;
+    const sid = sedeApiUuid(sedeActiva);
     const nom = sedesDash.find((s) => s.id === sid)?.nombre || nombreSede(sedeActiva);
     const corta = cortaSede(sedeActiva);
     return lista.filter((p) => {
@@ -1910,7 +1917,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const sedeCx = useSede();
   // Sedes que el usuario gestiona (las de su cuenta, no solo las del filtro de arriba).
   const esMiaPac = (s) => misSedes.some((m) => mismaSede(m, s));
-  const sedeInt = (uuid) => (uuid && String(uuid).endsWith("a2")) ? 2 : 1;
+  const sedeInt = (uuid) => numSede(uuid);
   // sedeRegistroId se conserva: con él se filtra el padrón por la sede elegida arriba.
   const mapPac = (p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", sede: sedeInt(p.sedeRegistroId), sedes: [sedeInt(p.sedeRegistroId)], sedeRegistroId: p.sedeRegistroId || null, ultima: p.ultimaVisita || null, nacimiento: p.fechaNacimiento || "", creadoEn: p.creadoEn || null, alergias: p.alergias || [], genero: p.genero || "", distrito: p.distrito || "", aseguradora: p.aseguradora || "", comentario: p.comentario || "", tags: Array.isArray(p.tags) ? p.tags : [], marketing: p.marketing === true, canal: p.canal || null,
     // El backend los devuelve (PacienteController 56-59) y aqui se descartaban: al editar
@@ -9407,6 +9414,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     }).catch(() => { /* sin respuesta se conserva lo que hubiera */ });
     api.sedes.listar().then((s) => {
       const list = s || [];
+      aplicarSedesApi(list);   // sedes nuevas o renombradas entran al registro
       setSedesOrg(list);
       setSedesCatalogo(list);
     }).catch(() => { setSedesOrg([]); setSedesCatalogo([]); });
@@ -12208,8 +12216,13 @@ export default function App() {
     // C23: extraer sedes del JWT al refrescar
     const payload = parseJwt(token);
     // Sin el claim `sedes` solo los roles de toda la clínica quedan con "all" (falla cerrado).
-    const sedesFromJwt = payload?.sedes || (ROLES_GLOBALES.includes(payload?.rol || usuario?.rol) ? "all" : (usuario?.sedes ?? []));
-    api.me().then((r) => {
+    const sedesJwtRaw = payload?.sedes || (ROLES_GLOBALES.includes(payload?.rol || usuario?.rol) ? "all" : (usuario?.sedes ?? []));
+    // UUID del JWT → número del registro (el mismo que en el login; antes, al recargar,
+    // quedaban UUID y la app se comportaba distinto que tras iniciar sesión).
+    const aNumeros = (v) => (v === "all" ? "all" : normSedes(v).map((x) => numSede(x)));
+    const sedesListas = hayRegistroSedes() ? Promise.resolve() : api.sedes.listar().then((ss) => aplicarSedesApi(ss)).catch(() => {});
+    sedesListas.then(() => api.me()).then((r) => {
+      const sedesFromJwt = aNumeros(sedesJwtRaw);
       if (!r?.permisos) return;
       setUsuario((u) => {
         if (!u || u.rol === "paciente") return u;
@@ -12230,12 +12243,8 @@ export default function App() {
   const handleLogin = (u) => {
     // Si es login conectado (tiene organizacionId o conectado=true), limpiar datos demo
     if (u && (u.organizacionId || u.conectado)) {
-      // Limpiar todos los datos demo de localStorage
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("dc_data_")) {
-          localStorage.removeItem(key);
-        }
-      });
+      // Todo lo dc_* de la demo u otra cuenta (datos, emisor, TC, correlativos, cajas…).
+      limpiarDatosLocales({ conservarSedes: true });
     }
     setUsuario(u);
   };

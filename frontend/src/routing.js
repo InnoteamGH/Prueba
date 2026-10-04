@@ -1,3 +1,4 @@
+import { hayRegistroSedes, uuidDeIdx } from "./compartido/sedesRegistro";
 /** Rutas hash (#/modulo) — sincroniza navegación con la URL sin recargar la SPA. */
 
 const DEFAULT = "dashboard";
@@ -22,11 +23,13 @@ const MOD_IDS = new Set([
   "caja_apertura", "caja_cierre", "caja_historial", "caja_movimientos", "caja_links", "caja_sunat", "satisfaccion", "reportes_ocs", "reportes_mas",
 ]);
 
-/** UUID de sede demo/prod (backend Supabase). Si ya es UUID, se respeta. */
+/** UUID de sede para la API. Si ya es UUID, se respeta; con sesión sale del registro de sedes. */
 export const sedeApiUuid = (id) => {
   if (id == null || id === "" || id === "all") return null;
   const s = String(id);
   if (/^[0-9a-f-]{36}$/i.test(s)) return s;
+  // Con sesión, el UUID real que el registro asoció a ese número (nunca uno inventado).
+  if (hayRegistroSedes()) return uuidDeIdx(s);
   if (id === 2 || id === "2") return "00000000-0000-0000-0000-0000000000a2";
   if (id === 1 || id === "1") return "00000000-0000-0000-0000-0000000000a1";
   return s;

@@ -122,15 +122,9 @@ function citaFueraDeHorario(fecha, hora, duracionMin, horario, feriados, sedeIdN
   return { fuera: false, msg: "" };
 }
 
-function sedeNumDeUuid(seds, uuid, fallbackIdx = 0) {
-  if (!uuid || !seds.length) return fallbackIdx === 1 ? 2 : 1;
-  const hit = seds.find((s) => s.id === uuid);
-  if (!hit) return fallbackIdx === 1 ? 2 : 1;
-  if (typeof hit.id === "number") return hit.id;
-  const n = Number(hit.numero ?? hit.codigo);
-  if (n === 2) return 2;
-  if (String(hit.id).endsWith("a2")) return 2;
-  return 1;
+function sedeNumDeUuid(seds, uuid) {
+  // Número de la sede en el registro (GET /sedes); las claves del horario por sede usan ese número.
+  return uuid ? sedeNum(uuid) : null;
 }
 
 /* ---- Agendar cita (Recepción): registra el canal de origen (llamada / WhatsApp / presencial) ---- */
