@@ -4,17 +4,26 @@ import { snapshotAGuardados } from "../util/odontogramaBridge.js";
 import { apiRowsAHtmlDatos } from "../util/odontogramaHydrate.js";
 import { pedirAnexoAlIframe } from "../util/odontogramaAnexo.js";
 import { useDatosImpresion } from "../util/membrete";
-import { MEDICOS } from "../comun";
+import { MEDICOS, useSede } from "../comun";
+import { useCatalogoApi, useMedicosApi, medicoEn, tarifaDibujoDesdeCatalogo } from "../compartido/catalogoApi";
+import { precioEnSede } from "../compartido/cajaSede";
 
 /* Profesional que firma los documentos del odontograma: el odontólogo que tiene la
    sesión abierta; si imprime otra persona (recepción), el médico tratante del
-   paciente. El COP sale del registro del médico. Quien imprime queda en la traza. */
-function profesionalDoc(medicoTratante) {
+   paciente. El COP sale del registro del médico. Quien imprime queda en la traza.
+   Con sesión el registro es el del servidor (GET /medicos): nunca la lista de ejemplo;
+   si el médico no figura ahí, el COP queda vacío en vez de inventarse. */
+function profesionalDoc(medicoTratante, medicosApi = null) {
   let u = null;
   try { u = JSON.parse(localStorage.getItem("dc_usuario") || "null"); } catch { u = null; }
   const u2 = u || auth.sesion || {};
   const esMedico = /medico|odont/i.test(String(u2.rol || ""));
   const nombre = (esMedico ? u2.nombre : "") || medicoTratante || "";
+  if (auth.token) {
+    const m = medicoEn(medicosApi, { id: esMedico ? u2.medicoId : null, nombre });
+    const cop = String((m && m.cop) || (esMedico && u2.cop) || "").replace(/^\s*COP\s*/i, "");
+    return { nombre: (m && m.nombre) || nombre, cop, impreso: u2.nombre || "" };
+  }
   const m = MEDICOS.find((x) => (u2.medicoId != null && x.id === u2.medicoId) || (nombre && x.nombre === nombre));
   const cop = String((esMedico && u2.cop) || (m && m.cop) || "").replace(/^\s*COP\s*/i, "");
   return { nombre: nombre || (m && m.nombre) || "", cop, impreso: u2.nombre || "" };
@@ -122,6 +131,8 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   onDemoCambio = null,
   /** Dentro del sistema el presupuesto se arma en «Plan y cuenta» (ODO-02): se oculta el del iframe. */
   ocultarPlanPropio = true,
+  /** Sede cuyo precio lleva el plan de inversión del dibujo (con sesión). Por defecto, la activa. */
+  sedePrecio = null,
 }, ref) {
   const iframeRef = useRef(null);
   const [syncState, setSyncState] = useState("idle");
@@ -138,6 +149,8 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     // No incluir capa en la URL: al cambiar Inicial/Evolución/Alta el iframe
     // no debe remountarse (parpadeaba y volvía a inicial).
     q.set("bridge", "1");
+    // Con sesión el dibujo arranca sin la clínica, la doctora ni la tarifa de ejemplo.
+    if (auth.token) q.set("sesion", "1");
     if (pacienteNombre) q.set("nombre", pacienteNombre);
     if (pacienteDni) q.set("dni", String(pacienteDni));
     if (pacienteEdad != null && pacienteEdad !== "") q.set("edad", String(pacienteEdad));
@@ -209,6 +222,12 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   }, [pacienteId, capa, postToIframe, measureIframe, demoEstados, demoDatos]);
 
   const datosDoc = useDatosImpresion();
+  // Con sesión: catálogo y médicos del servidor para la tarifa y el profesional del dibujo.
+  const catApi = useCatalogoApi();
+  const medsApi = useMedicosApi();
+  const sedeCx = useSede();
+  const sedeTarifa = sedePrecio ?? sedeCx.activa;
+  const tarifaDibujo = useMemo(() => (auth.token && catApi ? tarifaDibujoDesdeCatalogo(catApi, (s) => precioEnSede(s, sedeTarifa)) : null), [catApi, sedeTarifa]);
   const syncChrome = useCallback(() => {
     postToIframe({ type: "dento-odontograma-zoom", zoom });
     postToIframe({
@@ -221,7 +240,9 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         sede: pacienteSede || "",
       },
     });
-    postToIframe({ type: "dento-odontograma-profesional", profesional: profesionalDoc(medicoTratante) });
+    postToIframe({ type: "dento-odontograma-profesional", profesional: profesionalDoc(medicoTratante, medsApi) });
+    // Tarifa del plan de inversión del dibujo: la del catálogo de la clínica en la sede.
+    if (tarifaDibujo) postToIframe({ type: "dento-odontograma-tarifa", tarifa: tarifaDibujo, sueltos: [] });
     // Membrete de los documentos del odontograma (resumen y plan de inversión): los
     // mismos datos de empresa y de la sede activa que el resto del sistema.
     postToIframe({
@@ -233,7 +254,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         horario: datosDoc.sede.horario, correo: datosDoc.sede.correo, serie: datosDoc.sede.serieDocumento,
       },
     });
-  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante]);
+  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante, medsApi, tarifaDibujo]);
 
   const persistir = useCallback(async (payload) => {
     if (!editable || !pacienteId || !payload?.datos || !auth.token) return;

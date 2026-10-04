@@ -27,6 +27,8 @@ import { estadoCita, estadoInfo, labAtrasado, textoConteo } from "./compartido/e
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
 import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, sedeEnLista, sedePrincipal, uuidSede } from "./compartido/cajaSede";
+import { useCatalogoApi, HALLAZGO_IFRAME } from "./compartido/catalogoApi";
+import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 // Soles y dólares en caja, montos escritos y la boleta de un cobro (compartido/cajaMoneda.js).
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
@@ -2754,6 +2756,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     sede: p.sedeRegistroId || p.sedeId || p.sede || null,
     sedeRegistroId: p.sedeRegistroId || null,
     sedeNombre: p.sedeNombre || null,
+    medico: p.medicoNombre || p.medico || "",
   })))).catch(() => {}); }, []); // eslint-disable-line
   // Con sesión el padrón llega completo: se limita a las sedes que se ven (como pf en demo).
   const sedeCx = useSede();
@@ -2806,7 +2809,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     if (conectado) {
       try {
         const planes = await api.tratamientos.porPaciente(pacienteId);
-        items = (planes || []).flatMap((pl) => (pl.fases || []).map((f) => ({ nombre: f.nombre || f.descripcion, costo: Number(f.costo) || 0, estado: f.estado, pieza: f.pieza })));
+        items = (planes || []).flatMap((pl) => (pl.fases || []).map((f) => ({ nombre: f.nombre || f.descripcion, costo: Number(f.costo) || 0, estado: f.estado, pieza: f.piezaNumero ?? f.pieza, cara: f.cara || "" })));
         pagos = await api.pagos.listar(pacienteId).catch(() => []);
       } catch { notify("No se pudo leer el plan del paciente."); return; }
     }
@@ -2910,12 +2913,15 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   const tomaKey = (pid) => `dc_odonto_tomas_${pid}`;
   const [tomas, setTomas] = useState([]);
   const [tomaSel, setTomaSel] = useState("");
+  // Con sesión las tomas no se leen del navegador (podrían ser de otra cuenta): el servidor
+  // todavía no las guarda (falta GET/POST /odontograma/{pacienteId}/tomas).
   useEffect(() => {
-    if (!pacienteId) { setTomas([]); return; }
+    if (!pacienteId || conectado) { setTomas([]); return; }
     try { setTomas(JSON.parse(localStorage.getItem(tomaKey(pacienteId)) || "[]")); } catch { setTomas([]); }
-  }, [pacienteId]);
+  }, [pacienteId, conectado]);
   const guardarToma = () => {
     if (!pacienteId) return;
+    if (conectado) { notify("Las tomas con fecha todavía no se guardan en el servidor. Cada fase (inicial, evolución, alta) ya queda guardada."); return; }
     const etiqueta = prompt("Nombre de la toma (ej. Control 6 meses)", `Toma ${fmt(hoy)}`);
     if (etiqueta == null) return;
     const snap = { id: "t" + Date.now(), fecha: fmt(hoy), etiqueta: (etiqueta.trim() || `Toma ${fmt(hoy)}`), fase, denticion, estados: JSON.parse(JSON.stringify(estados)), notas: { ...notas } };
@@ -3023,14 +3029,54 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   });
   // P0-2: del hallazgo al plan de tratamiento (misma ficha).
   // ODO-02 / ODO-03: del hallazgo al presupuesto único, solo con servicios del catálogo.
-  const catalogoOdo = (demoDbOdo?.catalogo || CATALOGO_SEED);
+  // Con sesión el catálogo es el del servidor (GET /especialidades): nunca la semilla.
+  const catApiOdo = useCatalogoApi();
+  const catalogoOdo = conectado ? (catApiOdo || []) : (demoDbOdo?.catalogo || CATALOGO_SEED);
+  // Con sesión el presupuesto del paciente es su plan del servidor (GET /tratamientos).
+  const [planOdo, setPlanOdo] = useState({ cargado: false, planId: null, fases: [], error: false });
+  const pacPlanRef = useRef(pacienteId);
+  pacPlanRef.current = pacienteId;
+  const recargarPlanOdo = () => {
+    if (!conectado || !pacienteId) { setPlanOdo({ cargado: false, planId: null, fases: [], error: false }); return; }
+    const pid = pacienteId;
+    api.tratamientos.porPaciente(pid).then((planes) => {
+      if (pacPlanRef.current !== pid) return;
+      const ps = planes || [];
+      const fs = [];
+      ps.forEach((pl) => (pl.fases || []).forEach((f) => fs.push({ id: f.id, nombre: f.nombre || f.descripcion || "", costo: Number(f.costo) || 0, estado: f.estado, servicioId: f.servicioId ?? null, pieza: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || null, origen: f.origen || null })));
+      setPlanOdo({ cargado: true, planId: ps[0]?.plan?.id ?? ps[0]?.id ?? null, fases: fs, error: false });
+    }).catch(() => { if (pacPlanRef.current === pid) setPlanOdo({ cargado: true, planId: null, fases: [], error: true }); });
+  };
+  useEffect(() => { recargarPlanOdo(); }, [pacienteId, conectado]); // eslint-disable-line react-hooks/exhaustive-deps
+  const itemsPlanOdo = conectado ? planOdo.fases : (fichas[pacienteId]?.tratamiento || []);
   // Precio de la sede donde se atiende: la elegida arriba; con «Todas», la del paciente si
   // es una sola de las del usuario; si no, la activa. MainApp nunca pasa "all" en sedeActiva,
   // por eso el filtro se lee de useSede(). Se devuelve el id 1/2 con el que el catálogo
   // guarda preciosSede (con sesión el filtro o el paciente pueden venir como UUID).
   const sedePrecioOdo = sedeDePrecio(sedeCx, paciente, sedeActiva);
-  const yaItem = (servId, pieza) => (fichas[pacienteId]?.tratamiento || []).some((f) => f.estado !== "anulado" && String(f.servicioId) === String(servId) && String(f.pieza) === String(pieza));
-  const agregarItems = (lineas) => {
+  const yaItem = (servId, pieza) => itemsPlanOdo.some((f) => f.estado !== "anulado" && String(f.servicioId) === String(servId) && String(f.pieza) === String(pieza));
+  const agregarItems = (lineas, extra = "") => {
+    if (conectado) {
+      // Con sesión: POST /tratamientos (si el paciente aún no tiene plan) y una fase por
+      // ítem con el precio del catálogo en la sede donde se atiende.
+      if (planOdo.error) { notify && notify("No se pudo leer el plan del paciente. No se agregó nada al presupuesto."); return; }
+      if (!planOdo.cargado) { notify && notify("Todavía se está leyendo el plan del paciente. Inténtalo en un momento."); return; }
+      const sedeUuid = sedeApiUuid(sedePrecioOdo);
+      const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l) => ({ nombre: nombreItem(l.serv, l.pieza, l.cara), costo: precioEnSede(l.serv, sedePrecioOdo), servicioId: l.serv.id, piezaNumero: Number(l.pieza), ...(l.cara ? { cara: l.cara } : {}), ...(sedeUuid ? { sedeId: sedeUuid } : {}), origen: "odontograma" }));
+      if (!nuevos.length) { notify && notify("Los hallazgos por hacer ya están en el presupuesto."); return; }
+      const conPlan = planOdo.planId != null ? Promise.resolve(planOdo.planId)
+        : api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento", ...(sedeUuid ? { sedeId: sedeUuid } : {}) }).then((pl) => pl?.id ?? pl?.plan?.id);
+      conPlan.then((planId) => {
+        if (planId == null) throw new Error("sin plan");
+        return Promise.allSettled(nuevos.map((f) => api.tratamientos.agregarFase(planId, f)));
+      }).then((rs) => {
+        const ok = rs.filter((r) => r.status === "fulfilled").length;
+        if (ok === nuevos.length) notify && notify(`${ok === 1 ? "Se agregó 1 ítem" : `Se agregaron ${ok} ítems`} al presupuesto (Plan y cuenta).${extra}`);
+        else notify && notify(ok ? `Solo se agregaron ${ok} de ${nuevos.length} ítems al presupuesto. Revisa Plan y cuenta.` : "No se pudo agregar al presupuesto.");
+        recargarPlanOdo();
+      }).catch(() => notify && notify("No se pudo crear el plan del paciente. No se agregó nada al presupuesto."));
+      return;
+    }
     const nuevos = lineas.filter((l) => !yaItem(l.serv.id, l.pieza)).map((l, i) => ({ id: Date.now() + i, servicioId: l.serv.id, pieza: Number(l.pieza), cara: l.cara || undefined, nombre: nombreItem(l.serv, l.pieza, l.cara), costo: precioServicio(l.serv, sedePrecioOdo), sede: sedePrecioOdo ?? undefined, estado: "pendiente", origen: "odontograma" }));
     if (!nuevos.length) { notify && notify("Los hallazgos por hacer ya están en el presupuesto."); return; }
     updFicha(pacienteId, (cur) => ({ ...cur, tratamiento: [...(cur.tratamiento || []), ...nuevos] }));
@@ -3038,31 +3084,40 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
   };
   const agregarAlPlan = (n) => {
     const d = estados[n]; const ests = d.whole ? [d.whole] : Object.values(d.caras || {});
+    if (conectado && !catApiOdo) { notify && notify("Todavía se está leyendo el catálogo de servicios."); return; }
     const serv = ests.map((e) => servicioPorHallazgo(catalogoOdo, e)).find(Boolean);
     if (!serv) { notify && notify("Este hallazgo no tiene un servicio en el catálogo."); return; }
     const caras = d.whole ? "" : Object.entries(d.caras || {}).filter(([, e]) => servicioPorHallazgo(catalogoOdo, e)?.id === serv.id).map(([k]) => CARA_LETRA[k] || "").join("");
     agregarItems([{ serv, pieza: n, cara: caras }]);
   };
   // Vista anatómica: los hallazgos en rojo (por hacer) del dibujo guardado.
-  const HALLAZGO_IFRAME = { coronaT: "corona", extraccion: "extraer", rr: "extraer", fractR: "extraer", absceso: "endodoncia", periapic: "endodoncia" };
-  const pasarHallazgos = () => {
-    const datos = (fichas[pacienteId]?.odoHtml || {})[fase] || {};
+  // (El cruce hallazgo del dibujo → hallazgo del catálogo es el mismo que usa la tarifa del dibujo.)
+  const servDeHallazgo = (h) => (HALLAZGO_IFRAME[h] ? (servicioPorHallazgo(catalogoOdo, HALLAZGO_IFRAME[h]) || servicioPorHallazgo(catalogoOdo, h)) : servicioPorHallazgo(catalogoOdo, h));
+  const pasarHallazgos = async () => {
+    let datos = (fichas[pacienteId]?.odoHtml || {})[fase] || {};
+    if (conectado) {
+      // Con sesión el dibujo vive en el servidor: se lee lo guardado de esta fase.
+      if (!catApiOdo) { notify && notify("Todavía se está leyendo el catálogo de servicios."); return; }
+      try { datos = apiRowsAHtmlDatos(await api.odontograma.porPaciente(pacienteId, fase)); }
+      catch { notify && notify("No se pudo leer el odontograma guardado del paciente."); return; }
+    }
     const lineas = [];
+    let sinServ = 0;
     for (const [pz, row] of Object.entries(datos)) {
       const porServ = {};
-      const add = (h, cara) => { const serv = servicioPorHallazgo(catalogoOdo, HALLAZGO_IFRAME[h] || h); if (!serv) return; porServ[serv.id] = porServ[serv.id] || { serv, caras: "" }; if (cara) porServ[serv.id].caras += cara; };
+      const add = (h, cara) => { const serv = servDeHallazgo(h); if (!serv) { sinServ++; return; } porServ[serv.id] = porServ[serv.id] || { serv, caras: "" }; if (cara) porServ[serv.id].caras += cara; };
       for (const [cara, m] of Object.entries(row?.caras || {})) if (m?.c === "r") add(m.h, cara);
       for (const m of row?.pieza || []) if (m?.c === "r") add(m.h, "");
       Object.values(porServ).forEach((x) => lineas.push({ serv: x.serv, pieza: pz, cara: x.caras }));
     }
-    if (!lineas.length) { notify && notify("No hay hallazgos por hacer (en rojo) con servicio en el catálogo."); return; }
-    agregarItems(lineas);
+    if (!lineas.length) { notify && notify(conectado && !catalogoOdo.some((x) => (x.hallazgos || []).length) ? "Ningún servicio del catálogo de la clínica tiene hallazgos del odontograma asignados: no hay precio que proponer." : "No hay hallazgos por hacer (en rojo) con servicio en el catálogo."); return; }
+    agregarItems(lineas, conectado && sinServ ? ` ${sinServ === 1 ? "1 hallazgo no tiene" : `${sinServ} hallazgos no tienen`} servicio en el catálogo de la clínica y no se pasó.` : "");
   };
 
   const totalPiezas = [...filas.sup, ...filas.inf].reduce((n, f) => n + f.length, 0);
   const afectadas = piezasAfectadas.length;
   const atencionCount = piezasAfectadas.filter((n) => { const d = estados[n]; const ests = d.whole ? [d.whole] : Object.values(d.caras || {}); return ests.some((e) => ATENCION.includes(e)); }).length;
-  const enPlan = (fichas[pacienteId]?.tratamiento || []).filter((f) => f.origen === "odontograma").length;
+  const enPlan = itemsPlanOdo.filter((f) => f.origen === "odontograma" && f.estado !== "anulado").length;
   /**
    * Indice de caries de la OMS. Cuenta PIEZAS (no caras): cariadas + perdidas por
    * caries + obturadas. Se escribe CPO-D en dientes permanentes y ceo-d, en
@@ -3216,7 +3271,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               pacienteEdad={edadPac != null ? edadPac : ""}
               pacienteHc={(() => { const px = pacientes.find((x) => x.id === pacienteId) || {}; return px.numeroHistoria || px.nroHistoria || px.dni || ""; })()}
               pacienteSede={sedeLabelOdo}
-              medicoTratante={(() => { const px = pacientes.find((x) => x.id === pacienteId) || {}; return px.medico || (MEDICOS.find((m) => m.id === px.medicoId) || {}).nombre || ""; })()}
+              medicoTratante={(() => { const px = pacientes.find((x) => x.id === pacienteId) || {}; return px.medico || (conectado ? "" : (MEDICOS.find((m) => m.id === px.medicoId) || {}).nombre) || ""; })()}
+              sedePrecio={sedePrecioOdo}
               capa={fase}
               denticion={denticionApi(denticion)}
               zoom={zoom}
@@ -3236,7 +3292,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
             />
           </div>
           {pacienteId && (() => {
-            const items = (fichas[pacienteId]?.tratamiento || []).filter((f) => f.estado !== "anulado");
+            const items = itemsPlanOdo.filter((f) => f.estado !== "anulado");
             const total = items.reduce((a, f) => a + (Number(f.costo) || 0), 0);
             return (
               <section className="dc-odo-ppto" aria-label="Presupuesto del paciente">
@@ -3245,9 +3301,9 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                     <h3>Presupuesto del paciente</h3>
                     <p>Un solo presupuesto: lo que marques <b>por hacer</b> (en rojo) pasa aquí con el precio del catálogo de servicios.</p>
                   </div>
-                  {vistaOdo === "anatomico" && !conectado && <button className="dc-btn dc-btn--primary" onClick={pasarHallazgos}>Pasar hallazgos por hacer al presupuesto</button>}
+                  {vistaOdo === "anatomico" && (!conectado || !pacienteFijo) && <button className="dc-btn dc-btn--primary" onClick={pasarHallazgos}>Pasar hallazgos por hacer al presupuesto</button>}
                 </header>
-                {items.length === 0 ? <p className="dc-odo-ppto__vacio">Aún no hay procedimientos en el presupuesto.</p> : (
+                {conectado && planOdo.error ? <p className="dc-odo-ppto__vacio">No se pudo leer el plan del paciente.</p> : items.length === 0 ? <p className="dc-odo-ppto__vacio">Aún no hay procedimientos en el presupuesto.</p> : (
                   <table className="dc-odo-ppto__t">
                     <thead><tr><th>Procedimiento</th><th>Estado</th><th className="num">Precio</th></tr></thead>
                     <tbody>
@@ -3474,7 +3530,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   // Pacientes) y se recorta a las sedes que se ven. CAJA-08: el catálogo y sus precios por
   // sede salen de /especialidades, no del catálogo de demostración del navegador.
   useEffect(() => { if (conectado) {
-    api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => { const ss = Array.isArray(p.sedes) && p.sedes.length ? p.sedes.map((x) => x?.id ?? x) : (p.sedeRegistroId ? [p.sedeRegistroId] : []); return { id: p.id, nombre: p.nombre, sede: ss[0] ?? null, sedes: ss }; }))).catch(() => {});
+    api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => { const ss = Array.isArray(p.sedes) && p.sedes.length ? p.sedes.map((x) => x?.id ?? x) : (p.sedeRegistroId ? [p.sedeRegistroId] : []); return { id: p.id, nombre: p.nombre, dni: p.dni || "", email: p.email || "", direccion: p.direccion || "", sede: ss[0] ?? null, sedes: ss }; }))).catch(() => {});
     api.sedes.listar().then((s) => setSedes(s || [])).catch(() => {});
     api.catalogo.especialidades().then((r) => setSrvApi((r || []).map((e) => ({ id: e.id, nombre: e.nombre, precio: Number(e.precioBase) || 0, preciosSede: e.preciosSede || {}, activo: e.activo !== false })).filter((x) => x.activo))).catch(() => {});
   } }, []); // eslint-disable-line
@@ -3571,12 +3627,24 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     seguir();
   };
   const cobrarFase = (f) => conCajasAbiertas([sedeFase(f)], () => cobrarFaseYa(f));
+  // Con sesión el cobro se hace en el modal de cobro de Caja: quien cobra elige el medio de
+  // pago (efectivo, tarjeta, Yape/Plin, transferencia o mixto) y el monto; nada se registra
+  // como «efectivo» sin preguntar.
+  const [cobroTr, setCobroTr] = useState(null); // { monto, sedeId, faseIds, concepto, items }
+  const itemBoleta = (f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 });
+  const aprobadoTr = (res) => {
+    const c = cobroTr;
+    setCobroTr(null);
+    if (!c) return;
+    const cobrado = res?.montoCobrado != null ? Number(res.montoCobrado) : c.monto;
+    const fin = () => { notify(`${res?.parcial ? "Abono registrado" : "Cobrado"}: ${c.concepto} — S/ ${M.sol2(cobrado)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); };
+    // Un abono parcial no salda los procedimientos: el saldo se recalcula con los pagos.
+    if (res?.parcial) { fin(); return; }
+    Promise.allSettled(c.faseIds.map((id) => api.tratamientos.actualizarFase(id, { estado: "atendida" }))).then(fin);
+  };
   const cobrarFaseYa = (f) => {
     if (conectado) {
-      api.tratamientos.actualizarFase(f.id, { estado: "atendida" })
-        .then(() => api.pagos.registrar({ pacienteId, sedeId: sedePago(f), faseId: f.id, concepto: f.nombre, monto: f.costo, metodo: "efectivo" }))
-        .then(() => { notify(`Cobrado: ${f.nombre} — S/ ${M.sol2(f.costo)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); })
-        .catch((err) => notify((err && err.message) || "No se pudo cobrar el procedimiento. Verifica el consentimiento firmado."));
+      setCobroTr({ monto: f.costo, sedeId: sedePago(f), faseIds: [f.id], concepto: f.nombre, items: [itemBoleta(f)] });
       return;
     }
     if (esInvasivo(f.nombre)) {
@@ -3594,7 +3662,14 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     const porSede = new Map();
     pend.forEach((f) => { const sd = sedeFase(f); const k = String(sd); const g = porSede.get(k) || { sede: sd, fases: [], monto: 0 }; g.fases.push(f); g.monto += f.costo; porSede.set(k, g); });
     const grupos = [...porSede.values()];
-    if (conectado) { Promise.all(pend.map((f) => api.tratamientos.actualizarFase(f.id, { estado: "atendida" }))).then(() => Promise.all(grupos.map((g) => api.pagos.registrar({ pacienteId, sedeId: uuidSede(sedes, g.sede), concepto: "Saldo del plan de tratamiento", monto: g.monto, metodo: "efectivo" })))).then(() => { notify(`Pago registrado: S/ ${M.sol2(saldo)}. Comprobante registrado (todavía no se envía a SUNAT).`); recargarTrat(); }).catch(() => notify("Error al cobrar el saldo.")); return; }
+    if (conectado) {
+      // Un cobro por caja: si el saldo tiene ítems de varias sedes, se cobra primero el de la
+      // sede donde se trabaja y el resto queda pendiente para su propia caja.
+      const g = grupos.find((x) => mismaSede(x.sede, sedeTrab)) || grupos[0];
+      if (grupos.length > 1) notify(`El saldo tiene ítems de ${grupos.length} sedes: se cobra ahora lo de ${nombreSedeEn(sedes, g.sede)}; el resto se cobra en la caja de su sede.`);
+      setCobroTr({ monto: g.monto, sedeId: uuidSede(sedes, g.sede), faseIds: g.fases.map((f) => f.id), concepto: "Saldo del plan de tratamiento", items: g.fases.map(itemBoleta) });
+      return;
+    }
     pend.forEach((f) => f.estado !== "terminada" && consumirInsumos && consumirInsumos(f.nombre, sedeFase(f)));
     const ids = new Set(pend.map((f) => f.id));
     setTrat((t) => t.map((x) => ids.has(x.id) ? { ...x, estado: "atendida" } : x));
@@ -3723,6 +3798,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
           </div>
         </Modal>
       ); })()}
+      {cobroTr && <ModalCobro monto={cobroTr.monto} pacienteId={pacienteId} sedeId={cobroTr.sedeId} paciente={paciente.nombre} dni={pacSel?.dni || ""} email={pacSel?.email || ""} direccion={pacSel?.direccion || ""} items={cobroTr.items} faseIds={cobroTr.faseIds} concepto={cobroTr.concepto} conceptoAbono="Abono al plan de tratamiento" onClose={() => setCobroTr(null)} onAprobado={aprobadoTr} notify={notify} />}
     </div>
     </div>
   );
