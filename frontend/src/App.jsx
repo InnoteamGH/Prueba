@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
 import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
-import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales } from "./api/client";
+import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales, esSinPermiso, msgServidor } from "./api/client";
 import { limpiarRegistroSedes, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
@@ -17,13 +17,13 @@ const Metas = React.lazy(() => import("./modulos/Metas"));
 const ReportesClinica = React.lazy(() => import("./modulos/ReportesClinica"));
 import OdontogramaFotos from "./modulos/OdontogramaFotos";
 const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones"));
-import { AgendarRecepcionModal, BtnReniec, reniecLookup } from "./compartido/AgendarRecepcionModal";
+import { AgendarRecepcionModal, BtnReniec, reniecLookup, CamposPacienteRapido, validarPacienteRapido, registrarPacienteRapido, celular9 } from "./compartido/AgendarRecepcionModal";
 import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia, yaPaso } from "./compartido/sillones";
-import { useReglasAgenda } from "./compartido/useReglasAgenda";
+import { useReglasAgenda, sillonesPorSede } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
-import { estadoCita, estadoInfo, labAtrasado, textoConteo } from "./compartido/estados";
+import { estadoCita, estadoInfo, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
 import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, sedeEnLista, sedePrincipal, uuidSede } from "./compartido/cajaSede";
@@ -66,7 +66,7 @@ import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto } from "./compartido/presupuestoDoc";
 import { cruceAlergias, listaAlergias } from "./compartido/alergias";
 import { horasSemana, horarioConfigurado } from "./comun";
-import {BotonPDF, SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {BotonPDF, SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -461,7 +461,8 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     }
     if (conectado && !esTI) {
       // Sillones activos: la capacidad del día sale de ellos (antes eran 4 cupos por hora fijos).
-      api.sillones.listar().then((r) => setSilDash(Array.isArray(r) ? r : [])).catch(() => setSilDash(null));
+      // Por sede: GET /sillones sin sedeId solo trae los de una.
+      sillonesPorSede(sedesMiasApiDash()).then((r) => setSilDash(Array.isArray(r) ? r : [])).catch(() => setSilDash(null));
       // Última visita y próxima cita por paciente (la misma fuente que el directorio).
       api.pacientes.resumenCitas().then((r) => { const m = {}; (Array.isArray(r) ? r : []).forEach((x) => { if (x && x.pacienteId) m[x.pacienteId] = x; }); setResCitas(m); }).catch(() => setResCitas(null));
       // Tareas de laboratorio, seguros y documentos: de sus propios módulos en el servidor.
@@ -507,7 +508,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
         const s = sedeDash(p.sedeRegistroId);
         return { id: p.id, nombre: p.nombre, dni: p.dni || "", ultima: null, sede: s, sedes: [s], sedeRegistroId: p.sedeRegistroId || null };
       }))).catch(() => {});
-      api.evolucionesPendientes(sedesApiDash()).then(setPendEvo).catch(() => {});
+      if (esMed) api.evolucionesPendientes(sedesApiDash()).then(setPendEvo).catch(() => {});
     }
   };
   useEffect(() => { cargarDash(); }, []); // eslint-disable-line
@@ -518,7 +519,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const primeraSedeDash = useRef(true);
   useEffect(() => {
     if (primeraSedeDash.current) { primeraSedeDash.current = false; return; }
-    if (conectado && !esTI) api.evolucionesPendientes(sedesApiDash()).then(setPendEvo).catch(() => {});
+    if (conectado && esMed) api.evolucionesPendientes(sedesApiDash()).then(setPendEvo).catch(() => {});
   }, [sedesKeyDash]); // eslint-disable-line react-hooks/exhaustive-deps
   const citas = conectado ? (remC || []).filter((c) => sedeCxD.enSede(c.sede)) : citasProp;
   const pacientesAllRaw = conectado ? (remP || []) : pacProp;
@@ -704,11 +705,10 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const manana = addDays(1);
   const mananaSinConf = citasMed.filter((c) => c.fecha === manana && c.estado === "pendiente");
   const sinConfHoy = ch.filter((c) => c.estado === "pendiente");
-  const mesesDesde = (iso) => { if (!iso) return 0; const d = new Date(iso + "T00:00:00"); return (hoy.getFullYear() - d.getFullYear()) * 12 + (hoy.getMonth() - d.getMonth()); };
   // INI-01..05: cada tarea es una consulta viva sobre la misma fuente que su módulo
   // (compartido/metricas.js). Nada de cifras escritas a mano.
   // Con sesión: última visita > 6 meses y sin próxima cita (GET /pacientes/resumen-citas).
-  const porReactivar = conectado ? (resCitas ? pacientes.filter((p) => p.ultima && mesesDesde(p.ultima) >= 6 && !p.proxima) : []) : M.porReactivar(pacientes, citas);
+  const porReactivar = conectado ? (resCitas ? pacientes.filter((p) => M.esPorReactivar(p.ultima, p.proxima)) : []) : M.porReactivar(pacientes, citas);
   const carteraDemo = conectado ? null : M.cartera(dbDash?.fichas || {}, pacientes, { sede: sedeActiva });
   const deudores = conectado
     // Solo los de la sede que se mira (antes, con Surco elegido, salían los deudores de toda la clínica).
@@ -739,7 +739,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const tareas = [
     esTI && INTEGRACIONES_TI.some(([, e]) => e === "pendiente") && { id: "tiPend", tono: "info", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length, "integración por activar", "integraciones por activar")}`, detalle: INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").map(([n]) => n).join(", ") + ".", accion: "Ver integraciones", ir: () => onIr("integraciones") },
     esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: "Revisa el estado y reconecta antes de que afecte a la atención.", accion: "Ver integraciones", ir: () => onIr("integraciones") },
-    nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => { const primer = (pendEvo.items || [])[0]; if (primer?.pacienteId) onIr("pacientes", { pacienteId: primer.pacienteId }); else onIr("pacientes"); } },
+    // Completar la evolución es trabajo del doctor: recepción y administración no pueden
+    // hacerlo, así que no se les muestra una tarea con un botón que no les sirve.
+    esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => { const primer = (pendEvo.items || [])[0]; if (primer?.pacienteId) onIr("pacientes", { pacienteId: primer.pacienteId }); else onIr("pacientes"); } },
     // INI-04: una sola tarjeta de confirmaciones (hoy + mañana) con una sola acción.
     !esTI && (sinConfHoy.length + (esMed ? 0 : mananaSinConf.length)) > 0 && { id: "conf", tono: sinConfHoy.length ? "aviso" : "info", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `Confirmaciones pendientes · hoy ${sinConfHoy.length}${esMed ? "" : ` · mañana ${mananaSinConf.length}`}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))) || "Las de hoy ya están confirmadas.", accion: esMed ? "Ir a la agenda" : "Enviar confirmaciones", ir: esMed ? () => onIr("agenda") : () => { if (conectado) enviarConfMañana(); else notify(`Confirmaciones enviadas por WhatsApp a ${sinConfHoy.length + mananaSinConf.length} pacientes.`); } },
     verCaja && deudores.length > 0 && { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") },
@@ -848,7 +850,7 @@ const sillonDe = (c) => {
   return null;
 };
 
-function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null, onAsignar = null, onQuitarAsignacion = null, modoFijo = null, sedeFiltro = "all" }) {
+function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null, onAsignar = null, onQuitarAsignacion = null, modoFijo = null, sedeFiltro = "all", medicoFijo = null, soloConCitas = false }) {
   const [modoLoc, setModo] = useState("semana");
   // NAV-04: el selector de vista vive arriba de la Agenda; aquí solo se dibuja.
   const modo = modoFijo || modoLoc;   // mes | semana | dia | sillon
@@ -865,12 +867,16 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const [turno, setTurno] = useState(null);      // modal de turno del sillón: { s, fecha, medicoId, desde, hasta }
   // Sillones con su uso (flexible / de un doctor / de una especialidad), por sede.
   // Con sesión no se inventan sillones: sin sillones configurados la vista por sillón queda vacía con aviso.
-  const silTodos = (reglas && reglas.sillones && reglas.sillones.length) ? reglas.sillones : (auth.token ? [] : SILLONES_CAL.map((n) => ({ id: `x${n}`, sede: null, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true })));
+  // Solo los sillones de las sedes que se miran (con una sede elegida en el menú, los de esa).
+  const silTodos0 = (reglas && reglas.sillones && reglas.sillones.length) ? reglas.sillones : (auth.token ? [] : SILLONES_CAL.map((n) => ({ id: `x${n}`, sede: null, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true })));
+  const silTodos = sedeFiltro !== "all" && sedeFiltro != null ? silTodos0.filter((x) => x.sede == null || mismaSede(x.sede, sedeFiltro)) : silTodos0;
   const sedesSil = [...new Set(silTodos.map((x) => String(x.sede)))];
-  const nombreSedeCal = (id) => (citas.find((c) => String(c.sede) === String(id) && c.sedeNombre && c.sedeNombre !== "—") || {}).sedeNombre || (id !== "null" && nombreSede(Number(id))) || "Clínica";
-  const [sedeSil, setSedeSil] = useState(() => (sedeInicial != null && sedesSil.includes(String(sedeInicial)) ? String(sedeInicial) : sedesSil[0]));
+  const nombreSedeCal = (id) => (citas.find((c) => String(c.sede) === String(id) && c.sedeNombre && c.sedeNombre !== "—") || {}).sedeNombre || (id !== "null" && nombreSede(numSede(id))) || "Clínica";
+  // La sede activa llega como número del registro y los sillones con UUID: se comparan como sede.
+  const sedeSilDe = (x) => (x == null ? null : sedesSil.find((v) => mismaSede(v, x)) ?? null);
+  const [sedeSil, setSedeSil] = useState(() => sedeSilDe(sedeInicial) ?? sedesSil[0]);
   // Si se cambia la sede activa (menú lateral) el calendario por sillón la sigue.
-  useEffect(() => { if (sedeInicial != null && sedesSil.includes(String(sedeInicial))) setSedeSil(String(sedeInicial)); }, [sedeInicial]); // eslint-disable-line
+  useEffect(() => { const v = sedeSilDe(sedeFiltro !== "all" ? sedeFiltro : sedeInicial); if (v != null) setSedeSil(v); }, [sedeInicial, sedeFiltro, sedesSil.join(",")]); // eslint-disable-line
   const sedeSilEf = sedesSil.includes(String(sedeSil)) ? String(sedeSil) : sedesSil[0];
   const sillonesCat = silTodos.filter((x) => String(x.sede) === sedeSilEf).sort((a, b) => a.numero - b.numero);
   const [ahora, setAhora] = useState(() => new Date());
@@ -890,14 +896,21 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const MESc = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
+  // Doctores de la agenda: los del catálogo de las sedes que se miran más los que tengan
+  // citas cargadas. Así Día, Semana y Mes listan los mismos (antes salían solo los que
+  // tenían citas en lo cargado, que cambia con la vista: Semana listaba 6 y Mes 4).
   const docs = (() => {
     const map = new Map();
-    for (const c of citas) { const k = c.medicoId || c.medico || "sin"; if (!map.has(k)) map.set(k, c.medico || "Sin asignar"); }
+    // El doctor que mira su propia agenda solo se ve a sí mismo (con sesión el servidor ya
+    // le manda solo sus citas: se listan las de esas citas).
+    if (!soloConCitas) for (const m of ((reglas && reglas.medicos) || [])) { if (m && m.id != null && m.activo !== false && m.nombre && (medicoFijo == null || String(m.id) === String(medicoFijo))) map.set(m.id, m.nombre); }
+    const yaEsta = (k) => map.has(k) || [...map.keys()].some((x) => String(x) === String(k));
+    for (const c of citas) { const k = c.medicoId || c.medico || "sin"; if (!yaEsta(k)) map.set(k, c.medico || "Sin asignar"); }
     const arr = [...map.entries()].map(([key, nombre]) => ({ key, nombre }));
     arr.sort((a, b) => a.nombre.localeCompare(b.nombre));
     return arr.map((d, i) => ({ ...d, color: DOC_PAL[i % DOC_PAL.length] }));
   })();
-  const colorDe = (c) => (docs.find((d) => d.key === (c.medicoId || c.medico || "sin")) || {}).color || "var(--dc-ink-200)";
+  const colorDe = (c) => (docs.find((d) => String(d.key) === String(c.medicoId || c.medico || "sin")) || {}).color || "var(--dc-ink-200)";
   const sedesCal = [...new Set(citas.map((c) => c.sedeNombre || c.sede).filter(Boolean).map(String))];
   const visible = (c) => !oculto.has(c.medicoId || c.medico || "sin") && (estadoF === "all" || c.estado === estadoF) && (sedeF === "all" || String(c.sedeNombre || c.sede) === sedeF);
   const toggle = (key) => setOculto((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -932,8 +945,8 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     return r;
   };
   const estadoDiaCal = (d) => {
-    const fer = (feriados || []).find((x) => x && x.fecha === iso(d));
-    if (fer) return fer.cerrado ? { cerrado: true } : { cerrado: false, abre: hhNum(fer.abre), cierra: hhNum(fer.cierra) };
+    const fer = (feriados || []).find((x) => x && String(x.fecha || "").slice(0, 10) === iso(d));
+    if (fer) return feriadoCerrado(fer) ? { cerrado: true } : { cerrado: false, abre: hhNum(fer.abre), cierra: hhNum(fer.cierra) };
     const cfg = horarioCal && horarioCal[String(d.getDay())];
     if (cfg) return cfg.cerrado ? { cerrado: true } : { cerrado: false, abre: hhNum(cfg.abre), cierra: hhNum(cfg.cierra) };
     return { cerrado: false, abre: null, cierra: null };
@@ -988,7 +1001,15 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     : `${NOML[(diaSel.getDay() + 6) % 7]} ${diaSel.getDate()} ${MESc[diaSel.getMonth()]} ${diaSel.getFullYear()}`;
 
   // Columnas de la grilla horaria según el modo
-  const docsVis = docs.filter((d) => !oculto.has(d.key));
+  // Las columnas de «Por doctor» sí se limitan al día: quien tiene citas o turno ese día
+  // (para poder arrastrarle una cita aunque aún no tenga ninguna).
+  const docsEnVista = (() => {
+    if (modo !== "doctores") return docs;
+    const ks = new Set(citas.filter((c) => c.fecha === iso(diaSel)).map((c) => String(c.medicoId || c.medico || "sin")));
+    const l = docs.filter((d) => ks.has(String(d.key)) || turnosDoc(d.key, iso(diaSel)).length > 0);
+    return l.length ? l : docs;
+  })();
+  const docsVis = docsEnVista.filter((d) => !oculto.has(d.key));
   const columnas = modo === "sillon"
     ? [
         ...sillonesCat.map((s) => ({ key: "s" + s.numero, label: s.nombre || `Sillón ${s.numero}`, sub: null, on: false, sil: s.numero, silObj: s, dISO: iso(diaSel), date: diaSel })),
@@ -1001,9 +1022,17 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     : modo === "doctores" ? enCelda(colDef.dISO, h).filter((c) => (c.medicoId || c.medico || "sin") === colDef.medKey)
     : enCelda(colDef.dISO, h);
   // La cita nueva lleva siempre la sede: la del sillón, o la del filtro del menú.
-  const patchDe = (colDef, h) => modo === "sillon" ? { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, sillon: colDef.sil, ...(colDef.silObj && colDef.silObj.sede != null ? { sede: colDef.silObj.sede } : {}) }
-    : modo === "doctores" ? { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, medicoId: colDef.medKey, ...(sedeCal != null ? { sede: sedeCal } : {}) }
-    : { fecha: colDef.dISO, hora: `${String(h).padStart(2, "0")}:00`, ...(sedeCal != null ? { sede: sedeCal } : {}) };
+  // Al arrastrar (c = cita movida) se respeta su franja: una cita de las 10:30 llevada a la
+  // fila de las 11 queda a las 11:30, no a las 11:00. Y la sede se compara como sede (UUID o
+  // número del registro): si la cita ya es de la sede que se mira se conserva su id tal cual.
+  const patchDe = (colDef, h, c = null) => {
+    const mm = c && /^\d{1,2}:\d{2}/.test(String(c.hora || "")) ? String(c.hora).slice(-2) : "00";
+    const hora = `${String(h).padStart(2, "0")}:${mm}`;
+    const sedeP = sedeCal == null ? null : (c && c.sede != null && mismaSede(c.sede, sedeCal) ? c.sede : sedeCal);
+    return modo === "sillon" ? { fecha: colDef.dISO, hora, sillon: colDef.sil, ...(colDef.silObj && colDef.silObj.sede != null ? { sede: c && c.sede != null && mismaSede(c.sede, colDef.silObj.sede) ? c.sede : colDef.silObj.sede } : {}) }
+      : modo === "doctores" ? { fecha: colDef.dISO, hora, medicoId: colDef.medKey, ...(sedeP != null ? { sede: sedeP } : {}) }
+      : { fecha: colDef.dISO, hora, ...(sedeP != null ? { sede: sedeP } : {}) };
+  };
   const gcols = `52px repeat(${columnas.length},minmax(0,1fr))`;
   const minW = modo === "dia" ? 420 : modo === "sillon" ? Math.max(620, columnas.length * 140) : modo === "doctores" ? Math.max(620, columnas.length * 170) : 900;
 
@@ -1043,7 +1072,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: conteoRango, columnas: COLS_CAL, filas });
   };
 
-  const Bloque = ({ c }) => { const col = colorDe(c); const cancel = c.estado === "cancelada"; const arrastrable = !!onReagendar && !cancel; const horaLbl = (modo === "dia" || modo === "sillon") ? `${c.hora}–${finCita(c)}` : c.hora;
+  const Bloque = ({ c }) => { const col = colorDe(c); const cancel = c.estado === "cancelada"; const arrastrable = !!onReagendar && !cancel && c.estado !== "cerrada_sistema"; const horaLbl = (modo === "dia" || modo === "sillon") ? `${c.hora}–${finCita(c)}` : c.hora;
     // El alto refleja la duración en Día/Sillón (30 min ≈ 26px): más largo = bloque más alto.
     const alto = (modo === "dia" || modo === "sillon") ? Math.max(26, Math.round((Number(c.duracionMin) || 30) / 30 * 26)) : undefined; return (
     <div draggable={arrastrable} onDragStart={(e) => { setDrag(c); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setDrag(null); setOver(null); }}
@@ -1101,15 +1130,15 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
       </div>
 
       {/* Filtro de doctores (chips) */}
-      {docs.length > 0 && (
+      {docsEnVista.length > 0 && (
         <div style={{ padding: "10px 18px", borderBottom: "1px solid var(--dc-bg)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".05em", marginRight: 2 }}>Agendas</span>
-          {docs.map((d) => { const on = !oculto.has(d.key); return (
+          {docsEnVista.map((d) => { const on = !oculto.has(d.key); return (
             <button key={d.key} onClick={() => toggle(d.key)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "5px 11px", borderRadius: "var(--dc-r-full)", border: `1px solid ${on ? tint(d.color, 0.314) : "var(--dc-line)"}`, background: on ? tint(d.color, 0.063) : "var(--dc-bg)", color: on ? d.color : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
               <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", background: on ? d.color : "var(--dc-line-alt2)" }} />{d.nombre}
             </button>
           ); })}
-          {docs.length > 1 && <button onClick={() => setOculto(oculto.size ? new Set() : new Set(docs.map((d) => d.key)))} style={{ marginLeft: "auto", fontSize: 12, fontWeight: 500, color: DS.c.primary, background: "none", border: "none", cursor: "pointer" }}>{oculto.size ? "Ver todas" : "Ocultar todas"}</button>}
+          {docsEnVista.length > 1 && <button onClick={() => setOculto(oculto.size ? new Set() : new Set(docs.map((d) => d.key)))} style={{ marginLeft: "auto", fontSize: 12, fontWeight: 500, color: DS.c.primary, background: "none", border: "none", cursor: "pointer" }}>{oculto.size ? "Ver todas" : "Ocultar todas"}</button>}
         </div>
       )}
 
@@ -1233,9 +1262,9 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                   <div key={i} className={`dc-cal__cel${modo === "semana" && col.dISO === hoyISO ? " is-hoy" : ""}${libre ? " is-libre" : ""}${noAt ? " is-noat" : ""}${fueraServ ? " is-fs" : ""}${isOver ? (malo ? " is-drop-no" : " is-drop") : ""}`}
                     title={malo ? overOk.motivo : blk ? `Bloqueado: ${blk.motivo || "no disponible"}` : cerr ? "Fuera del horario de atención" : fueraServ ? `${col.silObj.nombre} fuera de servicio` : noAt ? "El doctor no atiende a esta hora" : (libre ? "Clic para agendar aquí" : undefined)}
                     onClick={libre ? () => onNuevo(patchDe(col, h)) : undefined}
-                    onDragOver={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); if (over !== overKey) { setOver(overKey); if (validar) { const r = validar(drag, patchDe(col, h)); setOverOk({ ok: r.errores.length === 0, motivo: r.errores[0] || "" }); } } } } : undefined}
+                    onDragOver={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); if (over !== overKey) { setOver(overKey); if (validar) { const r = validar(drag, patchDe(col, h, drag)); setOverOk({ ok: r.errores.length === 0, motivo: r.errores[0] || "" }); } } } } : undefined}
                     onDragLeave={onReagendar ? () => { if (over === overKey) { setOver(null); setOverOk(null); } } : undefined}
-                    onDrop={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); onReagendar(drag.id, patchDe(col, h)); setDrag(null); setOver(null); setOverOk(null); } } : undefined}
+                    onDrop={onReagendar && !blk ? (e) => { if (drag) { e.preventDefault(); onReagendar(drag.id, patchDe(col, h, drag)); setDrag(null); setOver(null); setOverOk(null); } } : undefined}
                     style={{ borderLeft: "1px solid rgba(15,23,42,0.04)", padding: 3, display: "flex", flexDirection: "column", gap: 3, position: "relative", cursor: libre ? "pointer" : "default", background: isOver ? (malo ? "#FEF3F2" : tint(DS.c.primary, 0.071)) : blk ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-fee) 6px,var(--dc-fee) 12px)" : (cerr ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-bg) 6px,var(--dc-bg) 12px)" : undefined), outline: isOver ? `2px dashed ${malo ? "#D92D20" : DS.c.primary}` : "none", outlineOffset: -2 }}>
                     {esAhora && <span className="dc-cal__now" style={{ top: `${nowPct}%` }} aria-hidden="true" />}
                     {blk && cs.length === 0 && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", opacity: .8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{blk.motivo || "Bloqueado"}</span>}
@@ -1301,7 +1330,7 @@ function SalaTV({ onClose, citasDemo = [], sede = null }) {
   const fuente = conectado ? citas : citasDemo.map((c) => ({ id: c.id, paciente: c.paciente, medico: (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre, sede: nombreSede(c.sede), hora: c.hora, estado: c.estado, llegada: c.llegada }));
   const corto = (n) => { const p = (n || "").trim().split(" ").filter(Boolean); return p.length > 1 ? `${p[0]} ${p[1][0]}.` : (n || "—"); };
   const enAtencion = fuente.filter((c) => c.estado === "en_atencion");
-  const enEspera = fuente.filter((c) => c.llegada && c.estado !== "en_atencion" && c.estado !== "atendida" && c.estado !== "cancelada").sort((a, b) => a.hora.localeCompare(b.hora));
+  const enEspera = fuente.filter((c) => c.llegada && c.estado !== "en_atencion" && c.estado !== "atendida" && !CITA_INACTIVA.includes(c.estado)).sort((a, b) => a.hora.localeCompare(b.hora));
   const hh = reloj.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
   const fecha = reloj.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
   return (
@@ -1392,7 +1421,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // (antes el aviso del cupo tapaba al de la cancelación).
   const cancelarConMotivo = (c, motivo) => {
     const cupo = () => (ofrecerCupo ? ofrecerCupo(c) || "" : "");
-    if (conectado) { api.citas.cambiarEstado(c.id, "cancelada", motivo).then(() => { notify(`Cita de ${c.paciente} cancelada.${cupo()}`); recargar(); recargarAll(); }).catch(() => notify("Error al cancelar.")); }
+    if (conectado) { api.citas.cambiarEstado(c.id, "cancelada", motivo).then(() => { notify(`Cita de ${c.paciente} cancelada.${cupo()}`); recargar(); recargarAll(); }).catch((e) => { const m = msgServidor(e); notify(m ? `No se pudo cancelar: ${m}` : "No se pudo cancelar la cita."); }); }
     else { setCitas((cs) => cs.map((x) => x.id === c.id ? { ...x, estado: "cancelada" } : x)); notify(`Cita de ${c.paciente} cancelada.${cupo()}`); }
     setCancelCita(null);
   };
@@ -1491,8 +1520,18 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const presentesHoy = citasHoyActivas.filter(esPresenteHoy);
   const porLlegarHoy = citasHoyActivas.filter((c) => !esPresenteHoy(c));
   const nom = (id) => medicos.find((m) => m.id === id)?.nombre || "—";
-  const set = (id, estado, msg) => { if (conectado) { api.citas.cambiarEstado(id, estado).then(() => { msg && notify(msg); recargar(); recargarAll(); }).catch(() => notify("Error al cambiar el estado.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, estado } : c)); msg && notify(msg); };
-  const checkIn = (id) => { if (conectado) { api.citas.checkin(id).then(() => { notify("Check-in registrado."); recargar(); recargarAll(); }).catch(() => notify("Error en el check-in.")); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, llegada: true, estado: c.estado === "pendiente" ? "confirmada" : c.estado } : c)); notify("Check-in registrado."); };
+  // despues() corre solo si el servidor aceptó el cambio; si lo rechaza se muestra su motivo
+  // (p. ej. «la cita ya fue atendida») en vez de un error genérico, y no se sigue.
+  const set = (id, estado, msg, despues) => {
+    if (conectado) {
+      api.citas.cambiarEstado(id, estado)
+        .then(() => { msg && notify(msg); recargar(); recargarAll(); despues && despues(); })
+        .catch((e) => { const m = msgServidor(e); notify(m ? `No se pudo cambiar el estado: ${m}` : "No se pudo cambiar el estado de la cita."); recargar(); recargarAll(); });
+      return;
+    }
+    setCitas((cs) => cs.map((c) => c.id === id ? { ...c, estado } : c)); msg && notify(msg); despues && despues();
+  };
+  const checkIn = (id) => { if (conectado) { api.citas.checkin(id).then(() => { notify("Check-in registrado."); recargar(); recargarAll(); }).catch((e) => { const m = msgServidor(e); notify(m ? `No se pudo registrar el check-in: ${m}` : "No se pudo registrar el check-in."); }); return; } setCitas((cs) => cs.map((c) => c.id === id ? { ...c, llegada: true, estado: c.estado === "pendiente" ? "confirmada" : c.estado } : c)); notify("Check-in registrado."); };
   // Todas las citas que este componente conoce (día, calendario o demo), para buscar una por id.
   const citasConocidas = () => (conectado ? [...(remoto || []), ...(remotoAll || [])] : citasProp);
   const buscarCita = (id) => citasConocidas().find((x) => String(x.id) === String(id));
@@ -1504,8 +1543,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     const enSillon = c.sillon != null && otros.find((x) => String(x.sillon) === String(c.sillon) && (x.sede == null || c.sede == null || mismaSede(x.sede, c.sede)));
     if (enSillon) { notify(`${nombreSillon(c) || "El sillón"} sigue ocupado: ${enSillon.paciente} está en atención${enSillon.medicoId != null ? ` con ${enSillon.medico && enSillon.medico !== "—" ? enSillon.medico : nom(enSillon.medicoId)}` : ""}. Finaliza esa atención antes de pasar a ${c.paciente}.`); return; }
     const mismoDoc = otros.find((x) => String(x.medicoId) === String(c.medicoId));
-    set(c.id, "en_atencion", (msg || `${c.paciente} pasa al sillón.`) + (mismoDoc ? ` Ojo: ${mismoDoc.medico && mismoDoc.medico !== "—" ? mismoDoc.medico : nom(mismoDoc.medicoId)} también tiene en atención a ${mismoDoc.paciente}${mismoDoc.sillon ? ` (${nombreSillon(mismoDoc)})` : ""}.` : ""));
-    despues && despues();
+    // Se pasa a la ficha / odontograma solo si el servidor aceptó el inicio de la atención.
+    set(c.id, "en_atencion", (msg || `${c.paciente} pasa al sillón.`) + (mismoDoc ? ` Ojo: ${mismoDoc.medico && mismoDoc.medico !== "—" ? mismoDoc.medico : nom(mismoDoc.medicoId)} también tiene en atención a ${mismoDoc.paciente}${mismoDoc.sillon ? ` (${nombreSillon(mismoDoc)})` : ""}.` : ""), despues);
   };
   // Reprogramar (drag en el calendario): cambia fecha/hora (y sillón o doctor si aplica).
   // Antes se movía sin mirar nada; ahora pasa por las mismas reglas que agendar:
@@ -1537,7 +1576,12 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       if (r.nuevoSillon != null) extra = ` Pasa al sillón ${r.nuevoSillon}.`;
       if (r.avisos.length) extra += ` ${r.avisos[0]}`;
     }
-    if (conectado) { api.put(`/citas/${id}`, patch).then(() => { notify("Cita reprogramada."); recargar(); recargarAll(); onOk && onOk(); }).catch((e) => notify(`No se pudo reprogramar${e?.message ? `: ${e.message}` : "."}`)); return true; }
+    if (conectado) {
+      // Al servidor la sede va como sedeId (UUID) y solo si cambia: el número del registro
+      // (1, 2…) que usa la agenda no le sirve.
+      const { sede: sedeP, ...resto } = patch;
+      const body = sedeP != null && !(c0 && c0.sede != null && mismaSede(c0.sede, sedeP)) && sedeApiUuid(sedeP) ? { ...resto, sedeId: sedeApiUuid(sedeP) } : resto;
+      api.put(`/citas/${id}`, body).then(() => { notify("Cita reprogramada."); recargar(); recargarAll(); onOk && onOk(); }).catch((e) => notify(`No se pudo reprogramar${e?.message ? `: ${e.message}` : "."}`)); return true; }
     setCitas((cs) => cs.map((c) => c.id === id ? { ...c, ...patch, ...(patch.medicoId != null ? { medico: undefined } : {}) } : c));
     notify(`Cita reprogramada a ${patch.hora}${patch.fecha ? " – " + fechaLegible(patch.fecha) : ""}`.replace(/\.?$/, ".") + extra);
     onOk && onOk();
@@ -1548,7 +1592,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const asignarDeEspera = (p) => {
     // Conectado: abre el modal real de agendado (crea la cita en el backend) y recuerda la fila de espera a retirar.
     if (conectado) {
-      setAsignarBase({ pacienteId: p.pacienteId || "", motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", _esperaId: p.id });
+      setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n && p.n !== "—" ? p.n : "", telefono: p.pacienteId ? undefined : (p.tel || undefined), especialidadId: p.especialidadId ?? undefined, especialidadNombre: p.e && p.e !== "—" ? p.e : undefined, ...(p.sede != null ? { sedeId: p.sede } : {}), motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", _esperaId: p.id });
       return;
     }
     // Demo (sin backend): flujo ligero con datos de ejemplo.
@@ -1621,14 +1665,14 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       if (est === "pendiente" && futura) principal = A("Confirmar", confirmar, DS.c.primary);
       else if ((est === "pendiente" || est === "confirmada") && esHoy) principal = A("Marcar llegada", llegada, "var(--dc-ok-700)");
       else if (est === "en_sala") principal = A("Iniciar", () => pasarAtencion(c, `Atención de ${c.paciente} iniciada.`, () => onAtender && onAtender(c)), DS.c.primary);
-      else if (est === "en_atencion") principal = A("Finalizar", () => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`); abrirFichaCita(c, "historia"); }, "var(--dc-ok-700)");
+      else if (est === "en_atencion") principal = A("Finalizar", () => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`, () => abrirFichaCita(c, "historia")); }, "var(--dc-ok-700)");
       else if (est === "atendida") principal = A("Evolución", () => abrirFichaCita(c, "historia"), DS.c.primary, { subtle: true });
     } else if (puedeOperarAgenda) {
       // AGE-04: flujo lineal con verbo explícito según el estado de la cita.
       if (est === "pendiente" && c.fecha >= hoyISO) principal = A("Confirmar", confirmar, DS.c.primary);
       else if (est === "confirmada" && esHoy) principal = A("Marcar llegada", llegada, "var(--dc-ok-700)");
       else if (est === "en_sala") principal = A("Pasar a sillón", () => pasarAtencion(c), "var(--dc-warn-600)");
-      else if (est === "en_atencion") principal = A("Finalizar y cobrar", () => { set(c.id, "atendida", `Atención de ${c.paciente} finalizada. Cóbrala en Caja.`); window.location.hash = "#/caja"; }, "var(--dc-ok-700)");
+      else if (est === "en_atencion") principal = A("Finalizar y cobrar", () => { set(c.id, "atendida", `Atención de ${c.paciente} finalizada. Cóbrala en Caja.`, () => { window.location.hash = "#/caja"; }); }, "var(--dc-ok-700)");
     }
     if (!principal && rol !== "medico" && !supervisaAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0) principal = A(`Cobrar S/ ${saldos[c.pacienteId].toFixed(0)}`, () => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede }), DS.c.primary);
     const opciones = puedeOperarAgenda && abierta ? [
@@ -1644,35 +1688,38 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const [citaVer, setCitaVer] = useState(null);   // id de la cita abierta en el panel (clic en el calendario)
   const COLS_AGENDA = [
     { key: "hora", label: "Hora", get: (c) => c.hora, w: "74px", a: "center",
-      cell: (c) => { const e = EST[c.estado] || EST.pendiente; const esProx = proxima && c.id === proxima.id; const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
+      cell: (c) => { const e = EST[c.estado] || EST.pendiente; const esProx = proxima && c.id === proxima.id; const pasada = c.estado === "atendida" || c.estado === "cancelada" || c.estado === "cerrada_sistema"; return (
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontVariantNumeric: "tabular-nums" }}>{c.hora}</div>
           {c.id === nuevaCita ? <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", letterSpacing: .4 }}><CheckCircle2 size={9} strokeWidth={1.75} /> NUEVA</span> : esProx && !pasada ? <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 500, color: e.c, letterSpacing: .4 }}><span style={{ width: 5, height: 5, borderRadius: "var(--dc-r-full)", background: e.c, animation: "dcBlink 1.6s ease-in-out infinite" }} /> PRÓXIMA</span> : null}
         </div>); } },
-    { key: "paciente", label: "Paciente", get: (c) => c.paciente, w: "minmax(150px,1.4fr)", a: "left",
-      cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada"; return (
+    // Paciente y sede pasan a dos líneas si no caben (antes se cortaban: «Zoila Quis…»).
+    { key: "paciente", label: "Paciente", get: (c) => c.paciente, w: "minmax(150px,1.5fr)", a: "left",
+      cell: (c) => { const pasada = c.estado === "atendida" || c.estado === "cancelada" || c.estado === "cerrada_sistema"; return (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 11, minWidth: 0 }}>
           <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : tint(colorDe(c.paciente), 0.14), color: pasada ? "var(--dc-ink-400)" : colorDe(c.paciente), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0, boxShadow: pasada ? "none" : `inset 0 0 0 1.5px ${tint(colorDe(c.paciente), 0.25)}` }}>{iniciales(c.paciente)}</div>
           <div style={{ minWidth: 0 }}>
-            <span style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{c.paciente}{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
+            <span title={c.paciente} style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, minWidth: 0, lineHeight: 1.3 }}><span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{c.paciente}</span>{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
             {c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> Agendada por IA</span>}
           </div>
         </div>); } },
-    { key: "dni", label: "DNI", get: (c) => c.dni || "", w: "84px", a: "left", cell: (c) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{c.dni || "—"}</span> },
-    { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(140px,1.3fr)", a: "left",
-      cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
-    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "78px", a: "left", noSort: true,
-      cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sedeNombre || cortaSede(c.sede)}</span> },
-    { key: "sillon", label: "Sillón", get: (c) => nombreSillon(c) || "", w: "70px", a: "left", noSort: true,
+    { key: "dni", label: "DNI", get: (c) => c.dni || "", w: "80px", a: "left", cell: (c) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{c.dni || "—"}</span> },
+    { key: "medico", label: "Odontólogo", get: (c) => c.medico || nom(c.medicoId), w: "minmax(120px,1.3fr)", a: "left",
+      cell: (c) => { const med = medicos.find((m) => m.id === c.medicoId); return <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 7, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: "var(--dc-r-full)", background: med?.color || NAVY, flexShrink: 0 }} /><span title={c.medico || nom(c.medicoId)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.medico || nom(c.medicoId)}</span></div>; } },
+    // Más ancha y con el nombre completo al pasar el ratón: los nombres reales de sede
+    // («Sede Miraflores…») no cabían en 78 px.
+    { key: "sede", label: "Sede", get: (c) => c.sedeNombre || nombreSede(c.sede), w: "minmax(100px,.8fr)", a: "left", noSort: true,
+      cell: (c) => { const n = c.sedeNombre && c.sedeNombre !== "—" ? c.sedeNombre : nombreSede(c.sede); return <span title={n} style={{ fontSize: 13, color: "var(--dc-ink-700)", minWidth: 0, display: "block", lineHeight: 1.3, overflowWrap: "anywhere" }}>{c.sedeNombre && c.sedeNombre !== "—" ? c.sedeNombre : cortaSede(c.sede)}</span>; } },
+    { key: "sillon", label: "Sillón", get: (c) => nombreSillon(c) || "", w: "64px", a: "left", noSort: true,
       cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{nombreSillon(c) || "—"}</span> },
-    { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(110px,1.2fr)", a: "left",
+    { key: "motivo", label: "Motivo", get: (c) => c.motivo, w: "minmax(100px,1.2fr)", a: "left",
       cell: (c) => { const base = c.motivo.replace(/\s*\([^)]*\)\s*/g, " ").trim(); const hasDet = base !== c.motivo; return (
         <div style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "flex", alignItems: "center", gap: 6, minWidth: 0 }} title={c.motivo}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{base}</span>
           {hasDet && <Info size={13} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} />}
         </div>); } },
     // La llegada se muestra en el mismo estado («En sala») en vez de una columna aparte.
-    { key: "estado", label: "Estado", get: (c) => estadoInfo("cita", estadoCita(c)).label, w: "124px", a: "center",
+    { key: "estado", label: "Estado", get: (c) => estadoInfo("cita", estadoCita(c)).label, w: "120px", a: "center",
       cell: (c) => <div style={{ display: "flex", justifyContent: "center" }}><EstadoPill entidad="cita" estado={estadoCita(c)} /></div> },
     // Ancho fijo: cada fila es su propia rejilla, así que un ancho "según contenido"
     // descuadraba la columna de una fila a otra.
@@ -1692,7 +1739,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const fechaRaw = new Date(diaVer + "T00:00:00").toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", ...(diaVer.slice(0, 4) !== hoyISO.slice(0, 4) ? { year: "numeric" } : {}) });
   const fechaLarga = fechaRaw.charAt(0).toUpperCase() + fechaRaw.slice(1);
   const ahora = new Date(); const ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
-  const activa = (c) => c.estado !== "atendida" && c.estado !== "cancelada";
+  // Ni la atendida ni las cerradas (cancelada, no asistió, reprogramada, cerrada por sistema).
+  const activa = (c) => c.estado !== "atendida" && !CITA_INACTIVA.includes(c.estado);
   // «Próxima» solo tiene sentido hoy.
   const proxima = !esHoyVer ? null : lista.filter(activa).find((c) => toMin(c.hora) >= ahoraMin) || lista.filter(activa)[0];
   // Navegación de la vista Día: anterior / siguiente / hoy / elegir fecha.
@@ -1707,6 +1755,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     { l: "Canceladas", c: EST.cancelada.c, n: todasHoy.filter((c) => c.estado === "cancelada").length },
     { l: "No asistió", c: EST.no_show.c, n: todasHoy.filter((c) => c.estado === "no_show").length },
     { l: "Reprogramadas", c: EST.reprogramada.c, n: todasHoy.filter((c) => c.estado === "reprogramada").length },
+    // Aparte de las canceladas, como en el Consolidado: el sistema la cerró, nadie la anuló.
+    { l: "Cerradas por sistema", c: EST.cerrada_sistema.c, n: todasHoy.filter((c) => c.estado === "cerrada_sistema").length },
   ].filter((x) => x.n > 0);
   const lbl = { fontSize: 12, fontWeight: 500, letterSpacing: .7, textTransform: "uppercase", color: "var(--dc-ink-500)" };
   const soft = DS.card;
@@ -1804,6 +1854,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           { l: "En atención", c: "#C4B5FD", n: cnt("en_atencion") },
           { l: "Atendidas", c: "#6EE7A8", n: cnt("atendida") },
           { l: "No asistió / canceladas", c: "#F59A8D", n: cnt("no_show") + cnt("cancelada") },
+          { l: "Cerradas por sistema", c: "rgba(255,255,255,.3)", n: cnt("cerrada_sistema") },
         ].filter((x) => x.n > 0);
         // Una sola franja: tres cifras principales y el desglose por estado. Antes eran
         // ocho tarjetas en dos filas que repetían los mismos números.
@@ -1854,11 +1905,11 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       {/* El contador de la tabla cuenta filas (también las canceladas): «en la lista», para
           no chocar con «4 citas hoy · 2 canceladas» de la cabecera. */}
       <DataTable titulo={esHoyVer ? "Citas de hoy" : `Citas del ${fechaLegible(diaVer)}`} sub="en la lista" minWidth={980} rows={lista} defaultSort={{ key: "hora", dir: "asc" }}
-        rowClassName={(c) => `dc-ag-fila${proxima && c.id === proxima.id && c.estado !== "atendida" ? " is-prox" : ""}${c.estado === "cancelada" || c.estado === "atendida" ? " is-pasada" : ""}`}
+        rowClassName={(c) => `dc-ag-fila${proxima && c.id === proxima.id && c.estado !== "atendida" ? " is-prox" : ""}${c.estado === "cancelada" || c.estado === "cerrada_sistema" || c.estado === "atendida" ? " is-pasada" : ""}`}
         onRowClick={(c) => abrirFichaCita(c)}
         empty={<Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub={esHoyVer ? "Tu agenda para hoy está libre." : "No hay citas para ese día."} />}
         cols={COLS_AGENDA} />
-      </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} onCita={(c) => setCitaVer(c.id)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
+      </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} medicoFijo={miId} soloConCitas={rol === "medico"} onCita={(c) => setCitaVer(c.id)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
         onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
         onQuitarAsignacion={puedeAgendar ? (id) => { if (conectado) { api.sillones.quitarAsignacion(id).then(() => notify("Turno quitado.")).catch(() => notify("No se pudo quitar.")); return; } demoDb?.setAsignaciones((xs) => (xs || []).filter((x) => x.id !== id)); notify("Turno quitado."); } : null} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
 
@@ -2070,7 +2121,16 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       .then((r) => { const m = {}; (r || []).forEach((x) => { if (x.pacienteId) m[x.pacienteId] = x; }); setResumenCitas(m); })
       .catch(() => setResumenCitas({}));
   }, []); // eslint-disable-line
-  const listaBase = conectado ? (remoto || []) : pacientes;
+  // Pacientes traídos uno por uno (respuesta del POST de alta o GET /pacientes/{id} de un
+  // enlace o de la Agenda): el servidor a veces no los incluye aún en GET /pacientes, y sin
+  // esto la ficha recién creada no se abría. Pasan por el mismo filtro de sede que el padrón.
+  const [pacSueltos, setPacSueltos] = useState({});   // id -> paciente mapeado | false (no existe)
+  const listaBase = useMemo(() => {
+    if (!conectado) return pacientes;
+    const base = remoto || [];
+    const extra = Object.values(pacSueltos).filter((p) => p && !base.some((x) => String(x.id) === String(p.id)));
+    return extra.length ? [...base, ...extra] : base;
+  }, [conectado, pacientes, remoto, pacSueltos]);
   const lista = useMemo(() => {
     // Conectado: GET /pacientes trae la org completa; se limita a las sedes que se ven con
     // la sede de registro (mismaSede acepta UUID o id 1/2). Sin sede registrada se muestra.
@@ -2101,7 +2161,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       return x && x.proximaFecha ? { fecha: x.proximaFecha, hora: x.proximaHora || "" } : null;
     }
     const mias = citasSrc.filter((c) => (c.pacienteId && p.id && c.pacienteId === p.id) || (c.dni && p.dni && c.dni === p.dni) || (!conectado && c.paciente === p.nombre));
-    const fut = mias.filter((c) => c.fecha >= hoyISO && c.estado !== "cancelada" && c.estado !== "atendida").sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+    const fut = mias.filter((c) => c.fecha >= hoyISO && !CITA_INACTIVA.includes(c.estado) && c.estado !== "atendida").sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
     return fut[0] || null;
   };
   const relFecha = (iso, futuro) => { const d = Math.round((new Date(iso + "T00:00:00") - new Date(hoyISO + "T00:00:00")) / 86400000); const n = Math.abs(d); const txt = n === 0 ? "Hoy" : n < 30 ? `${n} día${n > 1 ? "s" : ""}` : n < 365 ? `${Math.round(n / 30)} mes${Math.round(n / 30) > 1 ? "es" : ""}` : `${Math.round(n / 365)} año${Math.round(n / 365) > 1 ? "s" : ""}`; return futuro ? (n === 0 ? "Hoy" : `En ${txt}`) : (n === 0 ? "Hoy" : `Hace ${txt}`); };
@@ -2137,11 +2197,23 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   // sin esto se abría la historia de un paciente de otra sede. Con sesión se espera al padrón.
   // Mientras llega el padrón no se monta la ficha (se vería la historia antes de comprobar
   // la sede); si el padrón falla, no se abre.
-  const esperandoPadron = conectado && fmId != null && remoto == null && !listaError;
+  const enPadron = fmId != null && listaBase.some((p) => String(p.id) === String(fmId));
+  // Ya llegó el padrón y el paciente no figura: se pide suelto (GET /pacientes/{id}).
+  const pidiendoSuelto = conectado && fmId != null && (remoto != null || listaError) && !enPadron && pacSueltos[String(fmId)] === undefined;
+  useEffect(() => {
+    if (!pidiendoSuelto) return;
+    const id = String(fmId);
+    let vivo = true;
+    api.pacientes.ver(id)
+      .then((r) => { if (vivo) setPacSueltos((m) => ({ ...m, [id]: r && r.id != null ? mapPac(r) : false })); })
+      .catch(() => { if (vivo) setPacSueltos((m) => ({ ...m, [id]: false })); });
+    return () => { vivo = false; };
+  }, [pidiendoSuelto, fmId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const esperandoPadron = conectado && fmId != null && ((remoto == null && !listaError) || pidiendoSuelto);
   const fmPermitido = fmId == null || (!esperandoPadron && lista.some((p) => String(p.id) === String(fmId)));
   useEffect(() => {
     if (fmPermitido || esperandoPadron) return;
-    notify("Ese paciente no se atiende en la sede elegida. Cambia la sede arriba si también es tuya.");
+    notify(conectado && pacSueltos[String(fmId)] === false && !enPadron ? "No se encontró ese paciente o no tienes acceso a su ficha." : "Ese paciente no se atiende en la sede elegida. Cambia la sede arriba si también es tuya.");
     cerrarFm();
   }, [fmPermitido, esperandoPadron]); // eslint-disable-line react-hooks/exhaustive-deps
   // Una sola historia clínica: la Ficha médica, que es la que guarda en el servidor
@@ -2206,7 +2278,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         apoderadoDni: form.apoderadoDni || "", apoderadoTelefono: form.apoderadoTelefono || "" };
       try {
         if (form.id) await api.pacientes.actualizar(form.id, payload);
-        else { const r = await api.pacientes.crear(payload); if (r?.id != null) abrirTrasAlta.current = r.id; }
+        else {
+          const r = await api.pacientes.crear(payload);
+          // Se abre con la respuesta del POST, sin esperar a que GET /pacientes lo incluya.
+          if (r?.id != null) { setPacSueltos((m) => ({ ...m, [String(r.id)]: mapPac({ ...payload, ...r, sedeRegistroId: r.sedeRegistroId ?? payload.sedeRegistroId }) })); abrirTrasAlta.current = r.id; }
+        }
         notify(form.id ? "Paciente actualizado." : `${form.nombre} registrado. Se abre su historia clínica.`);
         setForm(null); recargar();
       } catch (e) {
@@ -2284,7 +2360,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const [enviandoRec, setEnviandoRec] = useState(false);
   const enviarRecordatoriosReactivar = async () => {
     if (!conectado) { notify(`Recordatorio de control enviado por WhatsApp a ${reactivar} pacientes.`); return; }
-    const objetivo = lista.filter((p) => mesesSinVenir(p) >= 6 && diasDesdeAlta(p) > 30 && p.telefono && p.telefono.trim());
+    const objetivo = reactivarLista.filter((p) => p.telefono && String(p.telefono).trim());
     if (!objetivo.length) { notify("No hay pacientes con teléfono para recordar."); return; }
     if (!confirm(`Se enviará un recordatorio de control por WhatsApp a ${pluralEs(objetivo.length, "paciente", "pacientes")}. ¿Continuar?`)) return;
     setEnviandoRec(true);
@@ -2306,7 +2382,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   };
   // Antes: 7 recorridos completos de la lista de pacientes en CADA render (5 filter + reduce + sort).
   // Ahora: una sola pasada, y solo cuando cambian los pacientes o sus últimas visitas.
-  const { activos, reactivar: reactivarLoc, nuevos: nuevosLoc, cumpleMes, optIn, canalTop } = useMemo(() => {
+  const { activos, nuevos: nuevosLoc, cumpleMes, optIn, canalTop } = useMemo(() => {
     let activos = 0, reactivar = 0, nuevos = 0, cumpleMes = 0, optIn = 0;
     const canalCount = {};
     const mesHoy = hoy.getMonth();
@@ -2328,8 +2404,13 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
              canalTop: Object.entries(canalCount).sort((a, b) => b[1] - a[1]).slice(0, 8) };
   }, [lista, ultimaVisita]); // eslint-disable-line
   // M-08 / M-09: mismas definiciones que Recordatorios y Panel gerencial.
-  const reactivarLista = conectado ? null : M.porReactivar(lista, citasSrc);
-  const reactivar = conectado ? reactivarLoc : reactivarLista.length;
+  // Con sesión, la misma regla que Recordatorios: última visita atendida hace 6 meses o más
+  // y sin cita futura (quien nunca vino no cuenta). Antes se contaba a todo el que no tenía
+  // visita y Pacientes decía 14 mientras Recordatorios decía «todos al día».
+  const reactivarLista = conectado
+    ? (resumenCitas ? lista.filter((p) => M.esPorReactivar(ultimaDe(p), proxima(p)?.fecha, { hoy: hoyISO })) : [])
+    : M.porReactivar(lista, citasSrc);
+  const reactivar = reactivarLista.length;
   const nuevos = conectado ? nuevosLoc : M.nuevos30(lista, citasSrc).length;
   const canalMax = Math.max(1, ...canalTop.map((c) => c[1]));
   const canalCol = { "Recomendación": "#16A36A", "Instagram": "#E0487A", "Facebook": "#2F6FDE", "Google": "#F2A93B", "TikTok": "#1F3A40", "Volante": "#D97706", "Pasó por el local": "#0E9199", "Convenio empresa": "#6D4FD1", "Sin registrar": "#B7C8CB" };
@@ -3661,7 +3742,9 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   // Pagos del paciente (con sesión) para el «Pagado» del presupuesto impreso.
   const [pagosRem, setPagosRem] = useState(null);
   useEffect(() => { setPagosRem(null); }, [pacienteId, conectado]);
-  const recargarTrat = () => { if (conectado && pacienteId) api.pagos.listar(pacienteId).then((r) => setPagosRem(Array.isArray(r) ? r : [])).catch(() => {}); if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); }).catch(() => {}); };
+  // Sin permiso (403) no se muestra «Presupuesto vacío 0/0»: se dice que no se puede ver.
+  const [tratSinPermiso, setTratSinPermiso] = useState(false);
+  const recargarTrat = () => { if (conectado && pacienteId) api.pagos.listar(pacienteId).then((r) => setPagosRem(Array.isArray(r) ? r : [])).catch(() => {}); if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); setTratSinPermiso(false); }).catch((e) => { if (esSinPermiso(e)) { setFasesRem([]); setTratSinPermiso(true); } }); };
   useEffect(() => { if (pacienteId) recargarTrat(); else setFasesRem([]); }, [pacienteId, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => p.id === pacienteId) || { id: pacienteId, nombre: "Selecciona un paciente" };
   // Para mostrar, solo los ítems de las sedes que se ven: cada sede presupuesta y cobra lo
@@ -3816,7 +3899,8 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
             </div>
           </div>
         )}
-        {fases.length === 0 && !nueva && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub="Agrega el primer procedimiento o pásalos desde el odontograma." />}
+        {tratSinPermiso && conectado && <Vacio icon={<Lock size={24} strokeWidth={1.75} />} titulo="Sin permiso para ver el plan y la cuenta" sub="Tu rol no tiene acceso al plan de tratamiento de este paciente." />}
+        {fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub="Agrega el primer procedimiento o pásalos desde el odontograma." />}
         {fases.length > 0 && (
           <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="procedimientos" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
             vistas={[{ id: "recorrido", label: "Recorrido", icon: Route }]}
@@ -3964,7 +4048,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
         desde = dias === 0 ? "Hoy" : pluralEs(dias, "día", "días");
       }
     }
-    return { id: r.id, n: r.paciente || "—", tel: r.telefono || "", e: r.especialidad || "—", medico: r.medico || "Cualquiera", pref: r.preferenciaHorario || "Indiferente", urg: r.urgencia || "media", desde, creadoEn: creado, ofrecido: (() => { try { return JSON.parse(r.ofertas || "[]"); } catch { return []; } })(), pacienteId: r.pacienteId || null, sede: r.sedeId ?? r.sede ?? null };
+    return { id: r.id, n: r.paciente || "—", tel: r.telefono || "", e: r.especialidad || "—", medico: r.medico || "Cualquiera", pref: r.preferenciaHorario || "Indiferente", urg: r.urgencia || "media", desde, creadoEn: creado, ofrecido: (() => { try { return JSON.parse(r.ofertas || "[]"); } catch { return []; } })(), pacienteId: r.pacienteId || null, especialidadId: r.especialidadId ?? null, sede: r.sedeId ?? r.sede ?? null };
   };
   const [remoto, setRemoto] = useState(null);
   const [asignarBase, setAsignarBase] = useState(null); // prefill del modal real de agendado (standalone)
@@ -3993,25 +4077,46 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
     const espId = ESPECIALIDADES.find((x) => x.nombre === p.e)?.id;
     // El preferido solo si atiende en esa sede y hace ese servicio.
     const med = MEDICOS.find((m) => m.nombre === p.medico && (!espId || espsDe(m).includes(espId)) && sedesDe(m).some((x) => mismaSede(x, sedeP)));
-    setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), _esperaId: p.id });
+    setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), ...(conectado ? { especialidadId: p.especialidadId ?? undefined, especialidadNombre: p.e && p.e !== "—" ? p.e : undefined } : {}), _esperaId: p.id });
   };
   const nuevoEspera = () => { setBusca(""); setAbrePac(false); setNuevoEsp({ pacienteId: null, n: "", tel: "", dni: "", e: conectado ? (espsLista[0]?.nombre || "") : "Odontología general", medico: "Cualquiera", pref: "Indiferente", urg: "media", esNuevo: false, sede: (SEDES.find((x) => mismaSede(x.id, activa)) || {}).id ?? activa }); };
   const elegirPac = (p) => { setNuevoEsp((f) => ({ ...f, pacienteId: p.id, n: p.nombre, tel: p.telefono || p.tel || "", dni: p.dni || "", esNuevo: false })); setAbrePac(false); setBusca(""); };
-  const modoNuevoPac = () => { setNuevoEsp((f) => ({ ...f, pacienteId: null, esNuevo: true, n: (busca || f.n || "") })); setAbrePac(false); };
+  const modoNuevoPac = () => { setErrNuevo({}); setNuevoEsp((f) => { const b = (busca || "").trim(); const esDni = /^\d{8}$/.test(b); return { ...f, pacienteId: null, esNuevo: true, n: esDni ? (f.n || "") : (b || f.n || ""), dni: esDni ? b : (f.dni || ""), nacimiento: f.nacimiento || "", apoderadoNombre: "", apoderadoParentesco: "", apoderadoDni: "", apoderadoTelefono: "" }; }); setAbrePac(false); };
+  // Alta del paciente nuevo: los mismos campos y la misma validación que el alta rápida de
+  // Agendar cita (DNI de 8 dígitos, celular de 9, fecha de nacimiento y apoderado si es menor).
+  const [errNuevo, setErrNuevo] = useState({});
+  const vNuevo = nuevoEsp ? { nombre: nuevoEsp.n || "", dni: nuevoEsp.dni || "", telefono: nuevoEsp.tel || "", nacimiento: nuevoEsp.nacimiento || "", apoderadoNombre: nuevoEsp.apoderadoNombre || "", apoderadoParentesco: nuevoEsp.apoderadoParentesco || "", apoderadoDni: nuevoEsp.apoderadoDni || "", apoderadoTelefono: nuevoEsp.apoderadoTelefono || "" } : null;
+  const setVNuevo = (parcial) => {
+    const m = { nombre: "n", telefono: "tel" };
+    setNuevoEsp((f) => { const x = { ...f }; Object.entries(parcial).forEach(([k, v]) => { x[m[k] || k] = v; }); return x; });
+    setErrNuevo((e) => { const n = { ...e }; Object.keys(parcial).forEach((k) => delete n[k]); return n; });
+  };
+  const dniExistente = nuevoEsp && nuevoEsp.esNuevo && /^\d{8}$/.test(nuevoEsp.dni || "") ? ((conectado ? pacApi : (demoDb?.pacientes || pacientes)).find((p) => String(p.dni || "") === nuevoEsp.dni) || null) : null;
   const guardarEsp = () => {
     if (!nuevoEsp.n.trim()) { notify("Elige un paciente registrado o registra uno nuevo."); return; }
+    if (nuevoEsp.esNuevo && !nuevoEsp.pacienteId) {
+      if (dniExistente) { notify(`El DNI ${nuevoEsp.dni} ya es de ${dniExistente.nombre}. Usa su ficha.`); setErrNuevo({ dni: `Ya registrado: ${dniExistente.nombre}` }); return; }
+      const v = validarPacienteRapido(vNuevo);
+      if (!v.ok) { setErrNuevo(v.errors); notify(v.errors[v.first] || "Revisa los datos del paciente."); return; }
+    }
     const sedeAlta = nuevoEsp.sede ?? activa;
     const finalizar = (pacienteId) => {
-      if (conectado) { const espO = espsLista.find((x) => x.nombre === nuevoEsp.e); const medO = medsApi.find((m) => m.nombre === nuevoEsp.medico); api.espera.crear({ paciente: nuevoEsp.n, telefono: nuevoEsp.tel, especialidad: nuevoEsp.e, especialidadId: espO?.id ?? null, medico: nuevoEsp.medico, medicoId: medO?.id ?? null, preferenciaHorario: nuevoEsp.pref, urgencia: nuevoEsp.urg, pacienteId, sedeId: sedeApiUuid(sedeAlta) }).then(() => { notify(`${nuevoEsp.n} agregado a la lista de espera.`); recargar(); }).catch(() => notify("Error al agregar a espera.")); setNuevoEsp(null); return; }
+      if (conectado) { const espO = espsLista.find((x) => x.nombre === nuevoEsp.e); const medO = medsApi.find((m) => m.nombre === nuevoEsp.medico); api.espera.crear({ paciente: nuevoEsp.n, telefono: nuevoEsp.tel, especialidad: nuevoEsp.e, especialidadId: espO?.id ?? null, medico: nuevoEsp.medico, medicoId: medO?.id ?? null, preferenciaHorario: nuevoEsp.pref, urgencia: nuevoEsp.urg, pacienteId, sedeId: sedeApiUuid(sedeAlta) }).then(() => { notify(`${nuevoEsp.n} agregado a la lista de espera.`); recargar(); }).catch((e) => { const m = msgServidor(e); notify(m ? `No se pudo agregar a la lista de espera: ${m}` : "No se pudo agregar a la lista de espera."); }); setNuevoEsp(null); return; }
       setEsp((e) => [...(e || []), { id: Date.now(), n: nuevoEsp.n, tel: nuevoEsp.tel, e: nuevoEsp.e, medico: nuevoEsp.medico, pref: nuevoEsp.pref, urg: nuevoEsp.urg, desde: "Hoy", ofrecido: [], pacienteId, sede: sedeAlta }]);
       notify(`${nuevoEsp.n} agregado a la lista de espera${pacienteId ? " (ligado a su ficha)" : ""}.`); setNuevoEsp(null);
     };
     // Paciente no registrado → se registra primero y queda ligado
     if (nuevoEsp.esNuevo && !nuevoEsp.pacienteId) {
-      if (conectado) { api.pacientes.crear({ nombre: nuevoEsp.n, dni: nuevoEsp.dni, telefono: nuevoEsp.tel, sedeRegistroId: sedeApiUuid(sedeAlta) }).then((p) => finalizar(p?.id || null)).catch(() => notify("No se pudo registrar el paciente.")); return; }
+      if (conectado) {
+        registrarPacienteRapido(vNuevo, { sede: sedeAlta })
+          .then((p) => { if (p?.id == null) { notify("El servidor no devolvió el paciente creado. Búscalo en Pacientes antes de volver a registrarlo."); return; } setPacApi((xs) => [...xs, { ...p, sedeRegistroId: p.sedeRegistroId ?? sedeApiUuid(sedeAlta) }]); finalizar(p.id); })
+          .catch((e) => { const m = msgServidor(e); notify(m ? `No se pudo registrar el paciente: ${m}` : "No se pudo registrar el paciente."); });
+        return;
+      }
       // El id se calcula sobre TODOS los pacientes (no solo los de esta sede) para no repetirlo.
       const nid = Math.max(0, ...(demoDb?.pacientes || pacientes).map((p) => Number(p.id) || 0)) + 1;
-      setPacientes((ps) => [...ps, { id: nid, nombre: nuevoEsp.n, dni: nuevoEsp.dni, telefono: nuevoEsp.tel, sede: sedeAlta, sedes: [sedeAlta], ultima: null }]);
+      const apod = { apoderadoNombre: (nuevoEsp.apoderadoNombre || "").trim(), apoderadoParentesco: nuevoEsp.apoderadoParentesco || "", apoderadoDni: (nuevoEsp.apoderadoDni || "").trim(), apoderadoTelefono: nuevoEsp.apoderadoTelefono ? celular9(nuevoEsp.apoderadoTelefono) : "" };
+      setPacientes((ps) => [...ps, { id: nid, nombre: nuevoEsp.n.trim(), dni: nuevoEsp.dni, telefono: celular9(nuevoEsp.tel), nacimiento: nuevoEsp.nacimiento || "", sede: sedeAlta, sedes: [sedeAlta], ultima: null, ...apod }]);
       notify(`${nuevoEsp.n} registrado como paciente nuevo.`);
       finalizar(nid); return;
     }
@@ -4109,19 +4214,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
             ) : nuevoEsp.esNuevo ? (
               <div style={{ background: "var(--dc-white)", border: "1px solid var(--dc-danger-mid)", borderRadius: "var(--dc-r-md)", padding: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><UserPlus size={13} strokeWidth={1.75} /> Registrar paciente nuevo</div>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div>
-                    <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>DNI <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– consulta RENIEC</span></label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input className="dc-premium-inp" value={nuevoEsp.dni} onChange={(e) => setNuevoEsp({ ...nuevoEsp, dni: e.target.value.replace(/[^\d]/g, "").slice(0, 8) })} placeholder="45678901" style={{ flex: 1, minWidth: 0, padding: "11px 12px", background: "var(--dc-bg)", border: "1.5px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontVariantNumeric: "tabular-nums" }} />
-                      <BtnReniec dni={nuevoEsp.dni} onNombre={(n) => setNuevoEsp((x) => ({ ...x, n }))} notify={notify} />
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
-                    <Field label="Nombre completo" value={nuevoEsp.n} onChange={(v) => setNuevoEsp({ ...nuevoEsp, n: v })} placeholder="Ej. Ana Torres" />
-                    <Field label="Teléfono" value={nuevoEsp.tel} onChange={(v) => setNuevoEsp({ ...nuevoEsp, tel: v })} placeholder="999 888 777" icon={<Phone size={15} strokeWidth={1.75} />} />
-                  </div>
-                </div>
+                <CamposPacienteRapido v={vNuevo} set={setVNuevo} err={errNuevo} notify={notify} existente={dniExistente} onUsarExistente={dniExistente ? () => { setErrNuevo({}); elegirPac(dniExistente); } : undefined} />
                 <button onClick={() => setNuevoEsp({ ...nuevoEsp, esNuevo: false })} style={{ marginTop: 8, background: "none", border: "none", color: DS.c.primary, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>← Buscar registrado</button>
               </div>
             ) : (
@@ -4656,7 +4749,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // Para mostrar: solo los egresos de la sede de la caja (o de las sedes que se ven). Se
   // escribe siempre sobre la lista completa con actualización funcional (CAJA-04).
   const egresosVis = egresos.filter((e) => deCaja(sedeDeEgreso(e)));
-  const recargarEgresos = () => { if (conectado) api.egresos.listar({ sedeIds: sedesApi }).then((r) => setEgresos((r || []).map((e) => ({ id: e.id, sede: e.sedeId ?? e.sede ?? null, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo", moneda: e.moneda || "PEN", tipoCambio: Number(e.tipoCambio) > 0 ? Number(e.tipoCambio) : null, cajaSesion: e.aperturaId || null, creadoEn: e.creadoEn || e.createdAt || null })))).catch(() => {}); };
+  const [egresosSinPermiso, setEgresosSinPermiso] = useState(false);
+  const recargarEgresos = () => { if (conectado) api.egresos.listar({ sedeIds: sedesApi }).then((r) => setEgresosSinPermiso(false) || setEgresos((r || []).map((e) => ({ id: e.id, sede: e.sedeId ?? e.sede ?? null, fecha: (e.fecha || "").slice(0, 10), concepto: e.concepto, categoria: e.categoria || "Otros", monto: Number(e.monto) || 0, metodo: e.metodo || "efectivo", moneda: e.moneda || "PEN", tipoCambio: Number(e.tipoCambio) > 0 ? Number(e.tipoCambio) : null, cajaSesion: e.aperturaId || null, creadoEn: e.creadoEn || e.createdAt || null })))).catch((e) => { if (esSinPermiso(e)) setEgresosSinPermiso(true); }); };
   // TC de referencia: el de la clínica (con sesión) o el último usado al cobrar en esta caja.
   // Propone el TC de un egreso en dólares y convierte los egresos viejos que no guardaron TC.
   const [tcClinica, setTcClinica] = useState(null);
@@ -4713,8 +4807,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       setCaja(c || { porCobrar: [], boletasHoy: [], montoPorCobrar: 0, montoHoy: 0 });
       setCajaError(false);
     })
-      .catch(() => { setCaja({ porCobrar: [], boletasHoy: [], montoPorCobrar: 0, montoHoy: 0 }); setCajaError(true); });
+      .catch(() => { setCaja({ porCobrar: [], boletasHoy: [], montoPorCobrar: 0, montoHoy: 0 }); setCajaError(true); })
+      .finally(() => setCajaCargada(true));
   };
+  // «Cobrar» desde la ficha o el directorio espera a que llegue /caja: antes miraba la lista
+  // vacía del primer render y decía «no tiene saldo pendiente» aunque lo tuviera.
+  const [cajaCargada, setCajaCargada] = useState(false);
   const recargarHist = () => {
     if (!conectado) return;
     setHistError(false);
@@ -4738,13 +4836,21 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   useEffect(() => { if (conectado) { recargarCaja(); recargarHist(); recargarCierre(); recargarEgresos(); } }, [claveVer]); // eslint-disable-line
   const pacsHoy = new Set(citasHoyApi.filter((c) => deCaja(c.sedeId ?? c.sede)).map((c) => c.pacienteId).filter(Boolean));
   useEffect(() => {
-    if (!conectado || !cobroDesdeFicha?.pid) return;
-    const hit = (caja.porCobrar || []).filter((r) => r.sedeId == null || deCaja(r.sedeId)).find((r) => r.pacienteId === cobroDesdeFicha.pid);
-    const saldo = hit ? Number(hit.saldo) || 0 : 0;
-    if (saldo > 0.5) intentarCobrar({ pid: cobroDesdeFicha.pid, nombre: cobroDesdeFicha.nombre, monto: saldo });
-    else notify(`${cobroDesdeFicha.nombre} no tiene saldo pendiente en caja.`);
+    if (!conectado || !cobroDesdeFicha?.pid || !cajaCargada) return;
+    const { pid, nombre } = cobroDesdeFicha;
     onCobroDesdeFichaDone();
-  }, [cobroDesdeFicha, conectado, caja.porCobrar?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    const hit = (caja.porCobrar || []).filter((r) => r.sedeId == null || deCaja(r.sedeId)).find((r) => String(r.pacienteId) === String(pid));
+    const saldo = hit ? Number(hit.saldo) || 0 : 0;
+    if (saldo > 0.5) { intentarCobrar({ pid, nombre, monto: saldo }); return; }
+    // Sin fila en /caja se mira la misma cuenta que muestran la ficha y el directorio
+    // (resumen financiero del paciente en las sedes de esta caja) antes de decir que no debe.
+    api.pacientes.resumenFinanciero(sedesApi && sedesApi.length ? sedesApi : null).then((rows) => {
+      const r = (rows || []).find((x) => String(x.pacienteId) === String(pid));
+      const s2 = r ? Math.round(((Number(r.total) || 0) - (Number(r.pagado) || 0)) * 100) / 100 : 0;
+      if (s2 > 0.5) intentarCobrar({ pid, nombre, monto: s2 });
+      else notify(`${nombre} no tiene saldo pendiente en esta caja.`);
+    }).catch(() => notify(cajaError ? "No se pudieron cargar los saldos de caja. Reintenta." : `${nombre} no tiene saldo pendiente en esta caja.`));
+  }, [cobroDesdeFicha, conectado, cajaCargada]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (conectado && tab === "cierre") recargarCierre(); }, [tab, apertura?.id, apertura?.abierta]); // eslint-disable-line
   // Cuenta única del paciente (M-06/M-07): la misma que leen Pendientes, Panel y la ficha,
   // recortada a la sede de la caja (CAJA-03): un paciente de dos sedes no arrastra aquí lo
@@ -5646,7 +5752,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   <div><h3>{tit}</h3><span>{sub} – {lista.length} {lista.length === 1 ? "movimiento" : "movimientos"}{totUsd[t] ? ` · incluye ${usd2(totUsd[t])} al TC de cada uno` : ""}</span></div>
                   <b>{t === "ingreso" ? "+" : "−"} S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
                 </header>
-                {lista.length === 0 ? (
+                {t === "egreso" && egresosSinPermiso ? (
+                  <div className="dc-flujo__vacio">Sin permiso para ver los egresos de esta caja.</div>
+                ) : lista.length === 0 ? (
                   <div className="dc-flujo__vacio">{t === "ingreso" ? "Aún no hay cobros hoy." : "Sin gastos registrados hoy."}
                     {t === "egreso" && puedeRegistrarEgreso && <button type="button" onClick={nuevoEgreso}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
                   </div>
@@ -5687,7 +5795,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   </div>
                 </div>
                 {otros && otros.items.length > 0 && <div className="fm-aviso-edad is-info" style={{ margin: "0 0 12px" }}><Tag size={15} strokeWidth={2} /><span><b>{otros.items.length} {otros.items.length === 1 ? "egreso" : "egresos"} en «Otros».</b> Revísalos y asígnales una categoría para que el reporte del mes sea útil.</span></div>}
-                {grupos.length === 0 ? <Vacio icon={<Tag size={22} strokeWidth={1.75} />} titulo="Sin egresos en el periodo" sub="Los gastos que registres aparecerán agrupados aquí." /> : (
+                {egresosSinPermiso ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin permiso para ver los egresos" sub="Tu rol no tiene acceso a los gastos de caja." /> : grupos.length === 0 ? <Vacio icon={<Tag size={22} strokeWidth={1.75} />} titulo="Sin egresos en el periodo" sub="Los gastos que registres aparecerán agrupados aquí." /> : (
                   <ul className="dc-egcat__lista">
                     {grupos.map((g) => { const col = CAT_COL[g.cat] || "#64748B"; const abierta = catAbierta === g.cat; const pct = Math.round((g.soles / totSoles) * 100); return (
                       <li key={g.cat} className={abierta ? "is-open" : ""} style={{ "--c": col }}>
@@ -9001,9 +9109,11 @@ const FORM_TIPOS = ["Ficha de admisión", "Anamnesis / historia médica", "Decla
 function useDocumentosApi(pacienteId) {
   const conectado = !!auth.token;
   const [docs, setDocs] = useState(null);
+  const [sinPermiso, setSinPermiso] = useState(false);   // las dos listas respondieron 403
   const recargar = () => {
     if (!conectado) return;
     Promise.allSettled([api.consentimientos.listar(pacienteId ?? undefined), api.formularios.envios()]).then(([c, f]) => {
+      setSinPermiso(c.status === "rejected" && f.status === "rejected" && (esSinPermiso(c.reason) || esSinPermiso(f.reason)));
       const cs = c.status === "fulfilled" && Array.isArray(c.value) ? c.value : [];
       const fs = f.status === "fulfilled" && Array.isArray(f.value) ? f.value : [];
       setDocs([
@@ -9013,12 +9123,12 @@ function useDocumentosApi(pacienteId) {
     });
   };
   useEffect(() => { recargar(); }, [pacienteId]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { docs, recargar };
+  return { docs, recargar, sinPermiso };
 }
 function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () => {}, soloPendientes = false, onAbrirPaciente = null }) {
   const conectado = !!auth.token;
   const db = useContext(DatosDemoCtx);
-  const { docs: docsApi, recargar: recargarApi } = useDocumentosApi(pacienteFijo);
+  const { docs: docsApi, recargar: recargarApi, sinPermiso: docsSinPermiso } = useDocumentosApi(pacienteFijo);
   const docsAll = conectado ? (docsApi || []) : (db?.documentos || []);
   const setDocs = db?.setDocumentos || (() => {});
   // Solo pacientes visibles (sus sedes y el filtro de arriba): la semilla completa
@@ -9080,7 +9190,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
         <div><h3>{soloPendientes ? "Documentos por firmar o completar" : "Documentos"}</h3><span>Consentimientos y formularios{nPend ? ` · ${nPend} pendiente${nPend > 1 ? "s" : ""}` : ""}</span></div>
         {!soloPendientes && <Btn small onClick={() => setForm({ clase: "consentimiento", tipo: CONSENT_TIPOS[0], pacienteId: pacienteFijo || (conectado ? visibles : pacientes)[0]?.id || null })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo documento" : "Enviar documento"}</Btn>}
       </div>
-      {docs.length === 0 ? <Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo={soloPendientes ? "Nada pendiente" : "Sin documentos"} sub={soloPendientes ? "Todos los consentimientos y formularios están firmados o completados." : "Envía un consentimiento o un formulario para que el paciente lo firme o complete."} /> : (
+      {conectado && docsSinPermiso ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin permiso para ver los documentos" sub="Tu rol no tiene acceso a los consentimientos ni a los formularios." /> : docs.length === 0 ? <Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo={soloPendientes ? "Nada pendiente" : "Sin documentos"} sub={soloPendientes ? "Todos los consentimientos y formularios están firmados o completados." : "Envía un consentimiento o un formulario para que el paciente lo firme o complete."} /> : (
         <DataTable bare minWidth={0} sub="documentos" exportar={false} rows={docs} defaultSort={{ key: "fecha", dir: "desc" }} cols={[
           ...(pacienteFijo == null ? [{ key: "pac", label: "Paciente", w: "minmax(150px,1.1fr)", a: "left", get: (d) => pacDe(d.pacienteId)?.nombre || d.paciente || "—", cell: (d) => onAbrirPaciente ? <button type="button" className="dc-link" onClick={() => onAbrirPaciente(d.pacienteId)}>{pacDe(d.pacienteId)?.nombre || d.paciente || "—"}</button> : <span>{pacDe(d.pacienteId)?.nombre || d.paciente || "—"}</span> }] : []),
           { key: "tipo", label: "Documento", w: "minmax(180px,1.4fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span className="dc-doc-tipo"><span>{d.clase === "consentimiento" ? <Shield size={14} strokeWidth={1.9} /> : <FileText size={14} strokeWidth={1.9} />}</span>{d.tipo}</span> },
@@ -9120,11 +9230,12 @@ function ArchivosPaciente({ pid, sub = null, pacientes = [], notify, can, sedeAc
   useEffect(() => { if (sub) setT(sub); }, [sub]);
   // Con sesión: casos de laboratorio y documentos del paciente desde el servidor.
   const [casosApi, setCasosApi] = useState([]);
+  const [labSinPermiso, setLabSinPermiso] = useState(false);
   const fE = { solicitado: "enviado", en_proceso: "en_proceso", listo: "recibido", entregado: "entregado" };
   useEffect(() => {
     if (!conectado || pid == null) return;
     api.laboratorio.listar(pid).then((r) => setCasosApi((Array.isArray(r) ? r : []).filter((o) => String(o.pacienteId) === String(pid))
-      .map((o) => ({ id: o.id, pacienteId: o.pacienteId, trabajo: o.tipoTrabajo || o.trabajo || "—", lab: o.laboratorio || o.lab || "—", enviado: o.fechaEnvio, entrega: o.fechaEstimada || o.entrega, estado: fE[o.estado] || o.estado || "enviado" })))).catch(() => setCasosApi([]));
+      .map((o) => ({ id: o.id, pacienteId: o.pacienteId, trabajo: o.tipoTrabajo || o.trabajo || "—", lab: o.laboratorio || o.lab || "—", enviado: o.fechaEnvio, entrega: o.fechaEstimada || o.entrega, estado: fE[o.estado] || o.estado || "enviado" })))).then(() => setLabSinPermiso(false)).catch((e) => { setCasosApi([]); setLabSinPermiso(esSinPermiso(e)); });
   }, [pid]); // eslint-disable-line react-hooks/exhaustive-deps
   const { docs: docsApi } = useDocumentosApi(conectado ? pid : null);
   const casos = conectado ? casosApi : (db?.labCasos || []).filter((c) => String(c.pacienteId) === String(pid));
@@ -9144,7 +9255,7 @@ function ArchivosPaciente({ pid, sub = null, pacientes = [], notify, can, sedeAc
       {t === "lab" && (
         <Card className="dc-docs">
           <div className="dc-docs__cab"><div><h3>Casos de laboratorio</h3><span>Trabajos enviados para este paciente</span></div>{onIrLaboratorio && <Btn small kind="ghost" onClick={onIrLaboratorio}><FlaskConical size={14} strokeWidth={1.75} /> Ir a Laboratorio</Btn>}</div>
-          {casos.length === 0 ? <Vacio icon={<FlaskConical size={22} strokeWidth={1.75} />} titulo="Sin trabajos de laboratorio" sub="Los casos enviados al laboratorio para este paciente aparecerán aquí." /> : (
+          {conectado && labSinPermiso ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin permiso para ver los trabajos de laboratorio" sub="Tu rol no tiene acceso al módulo de laboratorio." /> : casos.length === 0 ? <Vacio icon={<FlaskConical size={22} strokeWidth={1.75} />} titulo="Sin trabajos de laboratorio" sub="Los casos enviados al laboratorio para este paciente aparecerán aquí." /> : (
             <DataTable bare minWidth={0} sub="casos" exportar={false} rows={casos} cols={[
               { key: "trabajo", label: "Trabajo", w: "minmax(180px,1.4fr)", a: "left", get: (c) => c.trabajo },
               { key: "lab", label: "Laboratorio", w: "minmax(140px,1fr)", a: "left", get: (c) => c.lab },
@@ -9324,7 +9435,8 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   };
   const [rxRem, setRxRem] = useState([]);
   // La sede del estudio es la que devuelve el servidor (sin una fija: todo salía «San Isidro»).
-  const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: r.sedeId ?? r.sede ?? null, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).catch(() => {}); else setRxRem([]); };
+  const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: r.sedeId ?? r.sede ?? null, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).then(() => setRxSinPermiso(false)).catch((e) => { if (esSinPermiso(e)) { setRxRem([]); setRxSinPermiso(true); } }); else setRxRem([]); };
+  const [rxSinPermiso, setRxSinPermiso] = useState(false);
   useEffect(() => { recargarRx(); }, [pid, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => String(p.id) === String(pid)) || { id: pid, nombre: "Selecciona un paciente" };
   const lista = conectado ? rxRem : (estudios[pid] || []);
@@ -9428,7 +9540,9 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
       )}
 
       <Card className="dc-env dc-gal">
-        {base.length === 0 ? (
+        {conectado && rxSinPermiso ? (
+          <Vacio icon={<Lock size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin permiso para ver las fotos" : "Sin permiso para ver las radiografías"} sub="Tu rol no tiene acceso a las imágenes de este paciente." />
+        ) : base.length === 0 ? (
           <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin fotos" : "Sin radiografías"} sub={esFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía de este paciente."} />
         ) : (
           <ListaFiltrable rows={base} sub={esFotos ? "fotos" : "estudios"} className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave={esFotos ? "fotos" : "radiografias"}

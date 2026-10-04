@@ -21,6 +21,7 @@ import { horarioConfigurado, horaDecimal } from "../compartido/horarioReal";
 import { leerCatalogo, precioCita } from "../compartido/catalogo";
 import { medicoEnSedes } from "../compartido/medicosSede";
 import { SILLONES_DEMO } from "../compartido/sillones";
+import { sillonesPorSede } from "../compartido/useReglasAgenda";
 import * as M from "../compartido/metricas";
 import { labAtrasado } from "../compartido/estados";
 import "./panelGerencial.css";
@@ -914,7 +915,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       }
       setInventarioValorizado(ok ? total : null);
     }).catch(() => setInventarioValorizado(null));
-    api.sillones.listar().then((rows) => {
+    sillonesPorSede(null).then((rows) => {
       setNSillones(Array.isArray(rows) ? rows.filter((x) => deSede({ sedeId: x.sedeId ?? x.sede })).length : null);
     }).catch(() => setNSillones(null));
     api.sedes.listar().then((rows) => {
@@ -988,7 +989,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const tratSorted = [...tratList].sort((a, b) => (Number(b.importeTotal) || 0) - (Number(a.importeTotal) || 0));
 
   const cartera = ind?.cartera || {};
-  const pacs = pacResumen || [];
+  const pacs = Array.isArray(pacResumen) ? pacResumen : [];
   const conSaldo = pacs.filter((p) => Number(p.saldo) > 0);
   // Ejes del cubo a la medida de los pacientes que se dibujan.
   const escCubo = useMemo(() => (conectado ? escalaCubo(pacs) : ESCALA_CUBO_DEF), [pacs, conectado]);

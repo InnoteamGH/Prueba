@@ -1,10 +1,10 @@
 /* Módulo Recall. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useContext, useState, useEffect } from "react";
 import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
-import api, { auth } from "../api/client";
+import api, { auth, msgServidor } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import {DatosDemoCtx, usePersist, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, Modal, NAVY, Vacio, addDays, colorDe, fechaLegible, fmt, hoy, iniciales, nombreSede, tint, useSede, PersonaCelda} from "../comun";
-import { porReactivar } from "../compartido/metricas";
+import { porReactivar, esPorReactivar } from "../compartido/metricas";
 
 function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
@@ -55,7 +55,20 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
     if (!conectado) return;
     api.automatizaciones.listar().then((r) => { if (r?.automatizaciones) setReglas(mapReglas(r.automatizaciones)); setResumen(r?.resumen || null); }).catch(() => {});
     api.automatizaciones.historial(sedesQ).then((h) => setHistReal((h || []).filter(deSedeApi))).catch(() => setHistReal([]));
-    api.automatizaciones.recallPendientes(sedesQ).then((r) => setCola((r || []).filter(deSedeApi).map((x) => ({ id: x.id, nombre: x.nombre, ultima: x.ultimaVisita, telefono: x.telefono, estado: x.contactado ? "enviado" : "por_contactar" })))).catch(() => {});
+    // «Por reactivar» con la misma regla que Pacientes e Inicio (M-08): última visita atendida
+    // hace 6 meses o más y sin cita futura, sobre el padrón de las sedes que se ven. De
+    // recall-pendientes se toma solo si ya se le contactó.
+    const pendQ = api.automatizaciones.recallPendientes(sedesQ).catch(() => null);
+    Promise.all([api.pacientes.listar(), api.pacientes.resumenCitas(), pendQ]).then(([ps, rc, pend]) => {
+      const res = {}; (rc || []).forEach((x) => { if (x && x.pacienteId) res[x.pacienteId] = x; });
+      const contactado = new Set((pend || []).filter((x) => x.contactado).map((x) => String(x.id)));
+      const lista = (ps || []).filter(deSedeApi).map((p) => ({ p, ultima: p.ultimaVisita || res[p.id]?.ultimaVisita || null, prox: res[p.id]?.proximaFecha || null }))
+        .filter(({ ultima, prox }) => esPorReactivar(ultima, prox))
+        .map(({ p, ultima }) => ({ id: p.id, nombre: p.nombre, ultima, telefono: p.telefono || "", sedeId: p.sedeRegistroId || null }));
+      setCola((prev) => lista.map((x) => ({ ...x, estado: contactado.has(String(x.id)) ? "enviado" : ((prev.find((y) => String(y.id) === String(x.id)) || {}).estado || "por_contactar") })));
+    }).catch(() => {
+      pendQ.then((r) => { if (r) setCola((r || []).filter(deSedeApi).map((x) => ({ id: x.id, nombre: x.nombre, ultima: x.ultimaVisita, telefono: x.telefono, estado: x.contactado ? "enviado" : "por_contactar" }))); });
+    });
     api.resenas.listar(sedesQ).then((rs) => setResenasNps((rs || []).filter(deSedeApi))).catch(() => setResenasNps([]));
   };
   // Al cambiar la sede del menú se vuelve a pedir todo (cola, historial y reseñas).
@@ -109,8 +122,15 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
     else notify(`(Demo) Se enviaría a ${tel}: ${previewMsg(cfgMsg).slice(0, 40)}…`);
   };
   const guardarCfg = () => {
-    if (conectado && cfg) api.automatizaciones.actualizar(cfg.clave, { plantilla: cfgMsg, hsmNombre: cfgHsm }).then(() => { notify(`"${cfg.l}" actualizado.`); cargar(); }).catch(() => notify("No se pudo guardar."));
-    else { setReglas((rs) => rs.map((x) => (x.clave === cfg?.clave ? { ...x, plantilla: cfgMsg } : x))); ajustar(cfg?.clave, { plantilla: cfgMsg }); notify(`"${cfg?.l}" actualizado.`); }
+    // Una plantilla vacía dejaría a la automatización mandando un WhatsApp en blanco.
+    if (!String(cfgMsg || "").trim()) { notify("Escribe el mensaje: la plantilla no puede quedar vacía."); return; }
+    if (conectado && cfg) {
+      // El modal se cierra solo si el servidor lo guardó; si falla, el texto sigue ahí.
+      api.automatizaciones.actualizar(cfg.clave, { plantilla: cfgMsg.trim(), hsmNombre: cfgHsm }).then(() => { notify(`"${cfg.l}" actualizado.`); setCfg(null); cargar(); })
+        .catch((e) => notify(`No se pudo guardar${msgServidor(e) ? `: ${msgServidor(e)}` : "."}`));
+      return;
+    }
+    setReglas((rs) => rs.map((x) => (x.clave === cfg?.clave ? { ...x, plantilla: cfgMsg.trim() } : x))); ajustar(cfg?.clave, { plantilla: cfgMsg.trim() }); notify(`"${cfg?.l}" actualizado.`);
     setCfg(null);
   };
   const probarHsm = () => {
@@ -385,7 +405,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
       </>)}
       {cfg && (() => { const Ic = cfg.icon; return (
         <Modal icon={<Ic size={20} strokeWidth={1.75} />} titulo={cfg.l} sub={`Automatización – se envía ${cfg.timing.toLowerCase()}`} onClose={() => setCfg(null)} maxW={520}
-          footer={<><Btn small kind="ghost" onClick={() => setCfg(null)}>Cancelar</Btn><Btn small onClick={guardarCfg}><Check size={15} strokeWidth={1.75} /> Guardar mensaje</Btn></>}>
+          footer={<><Btn small kind="ghost" onClick={() => setCfg(null)}>Cancelar</Btn><Btn small onClick={guardarCfg} disabled={!String(cfgMsg || "").trim()} title={String(cfgMsg || "").trim() ? undefined : "Escribe el mensaje antes de guardar"}><Check size={15} strokeWidth={1.75} /> Guardar mensaje</Btn></>}>
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Cuándo se envía</div><div style={{ fontSize: 14, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.timing}</div></div>
             <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Canal</div><div style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}><MessageSquare size={14} strokeWidth={1.75} /> WhatsApp</div></div>

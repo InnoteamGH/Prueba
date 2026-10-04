@@ -2033,11 +2033,22 @@ export function diasAbiertosDe(horario, sedes) {
   return abiertos;
 }
 
+/** ¿El feriado cierra la clínica? El servidor manda los feriados como {fecha, nombre}, sin
+ *  horario: un feriado sin horario explícito es día cerrado. Solo abre si se marcó
+ *  cerrado:false o trae su propio horario (abre/cierra). */
+export function feriadoCerrado(exc) {
+  if (!exc) return false;
+  if (exc.cerrado === true) return true;
+  if (exc.cerrado === false) return false;
+  return !(exc.abre && exc.cierra);
+}
+
 /** Jornada de un día concreto: el feriado manda sobre el horario semanal. */
 export function jornadaClinica(horario, feriados, fechaISO) {
-  const exc = (feriados || []).find((x) => x && x.fecha === fechaISO);
-  if (exc) return exc.cerrado ? { abierta: false, feriado: true, nota: exc.nota || "" }
-    : { abierta: true, abre: exc.abre || "09:00", cierra: exc.cierra || "13:00", feriado: true, nota: exc.nota || "" };
+  const exc = (feriados || []).find((x) => x && String(x.fecha || "").slice(0, 10) === fechaISO);
+  const nota = exc ? (exc.nota || exc.nombre || "") : "";
+  if (exc) return feriadoCerrado(exc) ? { abierta: false, feriado: true, nota }
+    : { abierta: true, abre: exc.abre || "09:00", cierra: exc.cierra || "13:00", feriado: true, nota };
   const k = String(new Date(fechaISO + "T00:00:00").getDay());
   const d = diaHorario(horario, k);
   return d.cerrado ? { abierta: false } : { abierta: true, abre: d.abre || "09:00", cierra: d.cierra || "19:00" };

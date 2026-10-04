@@ -1045,6 +1045,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const [upTipo, setUpTipo] = useState(TIPOS_ARCHIVO[0]);
   const [upNota, setUpNota] = useState("");
   const [labOrdenes, setLabOrdenes] = useState([]);
+  const [labSinPermiso, setLabSinPermiso] = useState(false);   // 403: no es «sin trabajos»
   const [consentimientos, setConsentimientos] = useState([]);
   const [regSrv, setRegSrv] = useState(null);          // filas de auditoría del servidor (null = sin cargar)
   const [regLocal, setRegLocal] = useState([]);        // lo hecho en esta sesión (demo)
@@ -1131,7 +1132,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       if (mine) setEvoMedico(String(mine.id));
     }).catch(() => { });
     if (conectado && pacienteId) {
-      api.laboratorio.listar(pacienteId).then((r) => setLabOrdenes(r || [])).catch(() => setLabOrdenes([]));
+      api.laboratorio.listar(pacienteId).then((r) => { setLabOrdenes(r || []); setLabSinPermiso(false); }).catch((e) => { setLabOrdenes([]); setLabSinPermiso(!!e && (e.status === 403 || e._httpStatus === 403)); });
       api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])).catch(() => setConsentimientos([]));
     }
   }, [pacienteId]); // eslint-disable-line
@@ -1942,7 +1943,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   </div>
                   {/* FIC-03: en la demostración, los mismos casos que Laboratorio (contexto). */}
                   {(() => { const labsV = !conectado && demoDb ? (demoDb.labCasos || []).filter((c) => String(c.pacienteId) === String(pacienteId)).map((c) => ({ ...c, tipoTrabajo: c.trabajo, laboratorio: c.lab, estado: estadoLabel("laboratorio", c.estado) })) : labOrdenes; return labsV.length === 0
-                    ? <div style={{ fontSize: 13, color: MUTED }}>Sin trabajos de laboratorio registrados para este paciente.</div>
+                    ? <div style={{ fontSize: 13, color: MUTED }}>{conectado && labSinPermiso ? "Sin permiso para ver los trabajos de laboratorio." : "Sin trabajos de laboratorio registrados para este paciente."}</div>
                     : <div style={{ display: "grid", gap: 8 }}>
                         {labsV.map((o) => (
                           <div key={o.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "8px 0", borderTop: "1px solid var(--dc-line)" }}>
@@ -2394,7 +2395,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   <div style={{ ...secTitle, marginBottom: 0 }}>Laboratorio</div>
                 </div>
                 {labOrdenes.length === 0
-                  ? <div style={{ fontSize: 13, color: MUTED }}>Sin trabajos de laboratorio registrados para este paciente.</div>
+                  ? <div style={{ fontSize: 13, color: MUTED }}>{labSinPermiso ? "Sin permiso para ver los trabajos de laboratorio." : "Sin trabajos de laboratorio registrados para este paciente."}</div>
                   : <div style={{ display: "grid", gap: 8 }}>
                       {labOrdenes.map((o) => (
                         <div key={o.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "8px 0", borderTop: "1px solid var(--dc-line)" }}>

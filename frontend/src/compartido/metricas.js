@@ -160,6 +160,13 @@ export function proximaCita(p, citas, { hoy = hoyISO() } = {}) {
 }
 
 /* ── M-08 · Por reactivar: última visita > 6 meses y sin cita futura ── */
+/** La misma regla con los datos ya resueltos (con sesión: /pacientes/resumen-citas). Quien
+    nunca vino (sin visita atendida) no es «por reactivar». Pacientes, Recordatorios e Inicio
+    la usan igual para que no digan cifras distintas. */
+export function esPorReactivar(ultima, proximaFecha, { hoy = hoyISO(), meses = MESES_REACTIVAR } = {}) {
+  return !!ultima && mesesEntre(String(ultima).slice(0, 10), hoy) >= meses && !proximaFecha;
+}
+
 export function porReactivar(pacientes, citas, { hoy = hoyISO(), meses = MESES_REACTIVAR } = {}) {
   return (pacientes || []).map((p) => ({ p, ultima: ultimaVisita(p, citas) }))
     .filter(({ p, ultima }) => ultima && mesesEntre(ultima, hoy) >= meses && !proximaCita(p, citas, { hoy }))
