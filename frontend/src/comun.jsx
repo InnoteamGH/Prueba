@@ -12,6 +12,7 @@
 import { abrirDocumento, datosImpresion } from "./util/membrete";
 import { estadoInfo, ESTADOS } from "./compartido/estados.js";
 import { registrarSedes, sedesRegistradas, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
+import { ymdLima } from "./util/fechaLima";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {Printer, AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2, Download, FileSpreadsheet, FileText} from "lucide-react";
@@ -599,7 +600,9 @@ export function BotonExportar({ titulo, cols, filas, sub = "registros" }) {
     return rows;
   };
   const nombre = String(titulo || sub || "reporte").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-  const fecha = new Date().toISOString().slice(0, 10);
+  // H-15: el día del nombre del archivo es el de Lima (con toISOString() era el UTC y de
+  // noche el Excel salía con fecha de mañana).
+  const fecha = ymdLima(new Date()) || new Date().toISOString().slice(0, 10);
   const excel = async () => { setAbierto(false); await exportarExcel({ nombreArchivo: `${nombre}_${fecha}.xlsx`, hoja: titulo || "Datos", titulo, subtitulo: "", columnas, filas: await datos() }); };
   const pdf = async () => { setAbierto(false); const filasPdf = await datos(); exportarPDF({ titulo, subtitulo: `${(filas || []).length} ${sub}`, columnas, filas: filasPdf }); };
   return (
@@ -1759,17 +1762,19 @@ export function anchoElastico(c, w) {
   const m = /^(\d+)px$/.exec(String(w).trim());
   return m ? `minmax(${m[1]}px, ${(Number(m[1]) / 100).toFixed(2)}fr)` : w;
 }
-export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true, exportar = true, exportTitulo = "" }) {
+export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empty, minWidth = 720, bare = false, defaultSort, accion, pageSize = 25, maxHeight, rowClassName, buscar = true, exportar = true, exportTitulo = "", buscarPlaceholder = "" }) {
   // Columnas con `soloExport` no se pintan: van solo en el Excel/PDF (p. ej. base e IGV).
   const cols = colsTodas.filter((c) => !c.soloExport);
   const { lista, anyF, limpiar, st } = useFiltroTabla(rows, cols, defaultSort);
   const { sortCol, sortDir, colFilters, q, setQ } = st;
   // Mismo patrón que las listas: un buscador para toda la tabla y el orden en el encabezado.
-  const conBuscar = false; // las tablas filtran escribiendo en el nombre de cada columna
+  // Las tablas filtran escribiendo en el nombre de cada columna. Un directorio largo (el de
+  // pacientes) pide además un buscador a la vista: se activa con buscar="siempre".
+  const conBuscar = buscar === "siempre";
   const cajaBuscar = conBuscar ? (
     <label className="dc-fcab__buscar dc-dt__buscar">
       <Search size={14} strokeWidth={2} />
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${sub || "la tabla"}…`} aria-label={`Buscar en ${sub || "la tabla"}`} onKeyDown={(e) => { if (e.key === "Escape" && q) { e.preventDefault(); setQ(""); } }} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={buscarPlaceholder || `Buscar en ${sub || "la tabla"}…`} aria-label={buscarPlaceholder || `Buscar en ${sub || "la tabla"}`} onKeyDown={(e) => { if (e.key === "Escape" && q) { e.preventDefault(); setQ(""); } }} />
       {q && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setQ("")}><X size={13} strokeWidth={2.2} /></button>}
     </label>
   ) : null;

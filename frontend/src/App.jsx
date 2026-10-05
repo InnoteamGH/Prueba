@@ -66,6 +66,7 @@ import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto } from "./compartido/presupuestoDoc";
 import { cruceAlergias, listaAlergias } from "./compartido/alergias";
 import { horasSemana, horarioConfigurado } from "./comun";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario } from "./compartido/recetaItems";
 import {BotonPDF, SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
@@ -1664,7 +1665,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       // Flujo del doctor: Confirmar (futura) → Marcar llegada (hoy) → Iniciar → Finalizar → Evolución.
       if (est === "pendiente" && futura) principal = A("Confirmar", confirmar, DS.c.primary);
       else if ((est === "pendiente" || est === "confirmada") && esHoy) principal = A("Marcar llegada", llegada, "var(--dc-ok-700)");
-      else if (est === "en_sala") principal = A("Iniciar", () => pasarAtencion(c, `Atención de ${c.paciente} iniciada.`, () => onAtender && onAtender(c)), DS.c.primary);
+      // Una cita de otro día no se inicia hoy (el QA pudo iniciar y finalizar una de dentro de 5 días).
+      else if (est === "en_sala" && !futura) principal = A("Iniciar", () => pasarAtencion(c, `Atención de ${c.paciente} iniciada.`, () => onAtender && onAtender(c)), DS.c.primary);
       else if (est === "en_atencion") principal = A("Finalizar", () => { set(c.id, "atendida", `Consulta de ${c.paciente} finalizada. Registra la evolución.`, () => abrirFichaCita(c, "historia")); }, "var(--dc-ok-700)");
       else if (est === "atendida") principal = A("Evolución", () => abrirFichaCita(c, "historia"), DS.c.primary, { subtle: true });
     } else if (puedeOperarAgenda) {
@@ -1682,7 +1684,13 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       // «No asistió» solo para hoy o días pasados: una cita futura todavía puede llegar.
       !c.llegada && est !== "en_atencion" && c.fecha <= hoyISO && { label: "Marcar no asistió", onClick: () => set(c.id, "no_show", `${c.paciente}: marcada como no asistió.`) },
       { label: "Cancelar cita", peligro: true, onClick: () => setCancelCita(c) },
-    ].filter(Boolean) : [];
+    ].filter(Boolean)
+      // El doctor no opera la agenda (reprogramar o cancelar es de recepción), pero sí cambia
+      // el estado de sus citas (Iniciar, Finalizar): puede dejar constancia de que el
+      // paciente no vino, hoy o en un día pasado, si nadie marcó su llegada.
+      : (rol === "medico" && abierta && !c.llegada && est !== "en_sala" && est !== "en_atencion" && c.fecha <= hoyISO && (!can || can("agenda", "ver")))
+        ? [{ label: "Marcar no asistió", onClick: () => set(c.id, "no_show", `${c.paciente}: marcada como no asistió.`) }]
+        : [];
     return { principal, opciones };
   };
   const [citaVer, setCitaVer] = useState(null);   // id de la cita abierta en el panel (clic en el calendario)
@@ -2505,7 +2513,9 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       <div className="dc-ficha-pagina">
         <button type="button" className="dc-volver" onClick={cerrarFm}><ChevronRight size={15} strokeWidth={2} style={{ transform: "rotate(180deg)" }} /> Pacientes</button>
         <React.Suspense fallback={<Card style={{ padding: 24 }}>Cargando ficha…</Card>}>
-          <FichaMedica pagina slots={slotsFicha} pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
+          {/* key: cada paciente monta su ficha desde cero; si no, con ficha360 caída quedaba
+              en la cabecera el nombre y el DNI del paciente abierto antes (H-05). */}
+          <FichaMedica key={`fm-${fmId}`} pagina slots={slotsFicha} pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
             pacienteDemo={conectado ? null : lista.find((x) => String(x.id) === String(fmId))}
             sedeId={sedeApiUuid(sedeActiva)}
             initialTab={fmTab}
@@ -2537,10 +2547,10 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         ) : <span />}
         {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
       </section>
-      <DataTable titulo="Directorio de pacientes" sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
+      <DataTable titulo="Directorio de pacientes" buscar="siempre" buscarPlaceholder="Buscar por nombre, DNI o teléfono…" sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
       {fmId && fmPermitido && (
         <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
-          <FichaMedica pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
+          <FichaMedica key={`fm-${fmId}`} pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
             pacienteDemo={conectado ? null : lista.find((x) => String(x.id) === String(fmId))}
             sedeId={sedeApiUuid(sedeActiva)}
             initialTab={fmTab}
@@ -3680,6 +3690,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
     {fmOpen && pacienteId && (
       <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
         <FichaMedica
+          key={`fm-${pacienteId}`}
           pacienteId={pacienteId}
           pacienteDemo={conectado ? null : pacientes.find((p) => String(p.id) === String(pacienteId)) || null}
           onClose={cerrarFichaOdo}
@@ -3739,13 +3750,47 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const [detF, setDetF] = useState(null); // fase abierta en modal de detalle
   const [planId, setPlanId] = useState(null);
   const [fasesRem, setFasesRem] = useState([]);
-  // Pagos del paciente (con sesión) para el «Pagado» del presupuesto impreso.
+  // Pagos del paciente (con sesión) para el «Pagado» del presupuesto impreso. Quien no ve
+  // Caja (el doctor) no los pide: era un 403 en cada apertura del plan.
+  const verPagos = !can || can("facturacion", "ver");
   const [pagosRem, setPagosRem] = useState(null);
   useEffect(() => { setPagosRem(null); }, [pacienteId, conectado]);
   // Sin permiso (403) no se muestra «Presupuesto vacío 0/0»: se dice que no se puede ver.
   const [tratSinPermiso, setTratSinPermiso] = useState(false);
-  const recargarTrat = () => { if (conectado && pacienteId) api.pagos.listar(pacienteId).then((r) => setPagosRem(Array.isArray(r) ? r : [])).catch(() => {}); if (conectado && pacienteId) api.tratamientos.porPaciente(pacienteId).then((planes) => { const ps = planes || []; setPlanId(ps[0]?.plan?.id || null); const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null }))); setFasesRem(fs); setTratSinPermiso(false); }).catch((e) => { if (esSinPermiso(e)) { setFasesRem([]); setTratSinPermiso(true); } }); };
-  useEffect(() => { if (pacienteId) recargarTrat(); else setFasesRem([]); }, [pacienteId, conectado]); // eslint-disable-line
+  // H-02 / H-06: si la lectura del plan falla (500) NO es un plan vacío. Antes se pintaba
+  // «Presupuesto vacío» y al agregar un procedimiento se creaba OTRO plan, huérfano. Mientras
+  // no se lea el plan de este paciente no se escribe en él.
+  const [tratError, setTratError] = useState(null);       // mensaje del fallo de lectura
+  const [tratCargado, setTratCargado] = useState(false);  // el plan de este paciente se leyó bien
+  const [tratLeyendo, setTratLeyendo] = useState(false);
+  const pidTrat = useRef(null);                            // paciente de la última lectura pedida
+  const recargarTrat = () => {
+    if (!conectado || !pacienteId) return;
+    const pid = pacienteId;
+    pidTrat.current = pid;
+    if (verPagos) api.pagos.listar(pid).then((r) => { if (pidTrat.current === pid) setPagosRem(Array.isArray(r) ? r : []); }).catch(() => {});
+    setTratLeyendo(true);
+    api.tratamientos.porPaciente(pid).then((planes) => {
+      if (pidTrat.current !== pid) return;
+      const ps = planes || []; setPlanId(ps[0]?.plan?.id || null);
+      const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null })));
+      setFasesRem(fs); setTratSinPermiso(false); setTratError(null); setTratCargado(true); setTratLeyendo(false);
+    }).catch((e) => {
+      if (pidTrat.current !== pid) return;
+      setTratLeyendo(false); setTratCargado(false); setPlanId(null);
+      if (esSinPermiso(e)) { setFasesRem([]); setTratSinPermiso(true); setTratError(null); return; }
+      // Sin la lectura no se muestran partidas (podrían estar desactualizadas) ni «vacío».
+      setFasesRem([]);
+      setTratError(msgServidor(e, "error del servidor"));
+    });
+  };
+  useEffect(() => {
+    // Otro paciente: nada del plan anterior (ni su id) sirve para este.
+    setPlanId(null); setFasesRem([]); setTratError(null); setTratCargado(false); setTratSinPermiso(false); setNueva(null);
+    if (pacienteId) recargarTrat();
+  }, [pacienteId, conectado]); // eslint-disable-line
+  // Con sesión, agregar exige el plan leído: sin eso no se sabe si ya existe uno.
+  const planListo = !conectado || (tratCargado && !tratError);
   const paciente = pacientes.find((p) => p.id === pacienteId) || { id: pacienteId, nombre: "Selecciona un paciente" };
   // Para mostrar, solo los ítems de las sedes que se ven: cada sede presupuesta y cobra lo
   // suyo. Se escribe siempre sobre la ficha completa (setTrat con la lista de la ficha).
@@ -3766,6 +3811,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const addPago = (concepto, monto, sede) => updFicha(pacienteId, (cur) => ({ ...cur, pagos: [...(cur.pagos || []), { fecha: fmt(hoy), sede: sede ?? sedeTrab, concepto, monto, metodo: "Caja" }] }));
   const agregarFase = () => {
     if (!nueva.nombre.trim()) { notify("Indica el procedimiento."); return; }
+    if (conectado && !planListo) { notify("No se pudo leer el plan del paciente: no se agrega nada hasta poder leerlo. Pulsa «Reintentar»."); return; }
     if (conectado) {
       const payload = { nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0, sedeId: uuidSede(sedes, sedeTrab) };
       if (nueva.servicioId) payload.servicioId = nueva.servicioId;
@@ -3882,7 +3928,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span></h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && <BotonPDF chico onClick={() => { if (conectado && pagosRem == null) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? pagosRem : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}<Btn small onClick={() => setNueva({ nombre: "", costo: "", pieza: "", cara: "" })}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan {planListo && <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span>}</h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && planListo && <BotonPDF chico onClick={() => { if (conectado && verPagos && pagosRem == null) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}<Btn small disabled={!planListo || !pacienteId} title={planListo ? undefined : (tratLeyendo ? "Leyendo el plan del paciente…" : "Se habilita cuando se pueda leer el plan del paciente")} onClick={() => { if (!planListo) return; setNueva({ nombre: "", costo: "", pieza: "", cara: "" }); }}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -3900,7 +3946,15 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
           </div>
         )}
         {tratSinPermiso && conectado && <Vacio icon={<Lock size={24} strokeWidth={1.75} />} titulo="Sin permiso para ver el plan y la cuenta" sub="Tu rol no tiene acceso al plan de tratamiento de este paciente." />}
-        {fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub="Agrega el primer procedimiento o pásalos desde el odontograma." />}
+        {conectado && tratError && pacienteId && (
+          <div role="alert" style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: 16, padding: "12px 14px", borderRadius: "var(--dc-r-md)", background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)", color: "var(--dc-danger-700)", fontSize: 13, lineHeight: 1.5 }}>
+            <AlertTriangle size={17} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1, minWidth: 0 }}><b>No se pudo leer el plan del paciente.</b> No es un presupuesto vacío: el servidor respondió con un error ({tratError}). No se puede agregar ni cobrar procedimientos hasta leerlo.</div>
+            <Btn small kind="ghost" onClick={recargarTrat} disabled={tratLeyendo}>{tratLeyendo ? "Reintentando…" : "Reintentar"}</Btn>
+          </div>
+        )}
+        {conectado && !tratCargado && !tratError && !tratSinPermiso && pacienteId && <div style={{ padding: 20, fontSize: 13, color: "var(--dc-ink-500)" }}>Leyendo el plan del paciente…</div>}
+        {fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && planListo && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub="Agrega el primer procedimiento o pásalos desde el odontograma." />}
         {fases.length > 0 && (
           <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="procedimientos" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
             vistas={[{ id: "recorrido", label: "Recorrido", icon: Route }]}
@@ -6278,6 +6332,8 @@ function MiProduccion({ usuario, citas, sedes = null }) {
           <h3 style={{ margin: "0 0 4px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>¿De dónde vienen tus ingresos?</h3>
           <p style={{ fontSize: 13, color: "var(--dc-ink-500)", margin: "0 0 16px" }}>Producción del mes por tipo de tratamiento.</p>
           <div style={{ display: "grid", gap: 13 }}>
+            {/* Sin producción por tipo en el mes, se dice; antes quedaba la tarjeta en blanco. */}
+            {porTrat.length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Aún no hay producción registrada este mes por tipo de tratamiento.</div>}
             {porTrat.map((t) => { const p = Math.round((t.v / totalTrat) * 100); return (
               <div key={t.n}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}><span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontWeight: 500 }}><span style={{ width: 10, height: 10, borderRadius: "var(--dc-r-sm)", background: t.c }} /> {t.n}</span><span style={{ fontWeight: 500, color: NAVY }}>S/ {t.v.toLocaleString()} <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– {p}%</span></span></div>
@@ -7153,15 +7209,17 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     Object.entries(fichas || FICHA_CLINICA).forEach(([pid, f]) => (f.recetas || []).forEach((r, i) => {
       const p = (pacProp || []).find((x) => String(x.id) === String(pid));
       if (!p) return;
-      let its = []; try { its = JSON.parse(r.items || "[]"); } catch { its = []; }
-      const items = its.length ? its.map((x) => ({ med: [x.medicamento || x.med, x.presentacion, x.dosis].filter(Boolean).join(" "), detalle: [x.frecuencia, x.duracion, x.detalle].filter(Boolean).join(" – ") })) : [{ med: r.texto || "", detalle: "" }];
+      // H-08: los dos formatos de ítem (ficha y módulo) se leen con la misma función.
+      const items = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) }));
       out.push({ id: pid + "-" + i, paciente: p.nombre, dni: p.dni || "", fecha: r.fecha, items, indic: r.indicaciones || "", firmada: true, medico: r.medico || "", sede: r.sede });
     }));
     return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   }, [fichas, pacProp]);
   const [recetasRem, setRecetasRem] = useState([]);
   // «Firmada» solo si el servidor lo dice (antes todas se marcaban firmadas por defecto).
-  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { let its = []; try { its = typeof r.items === "string" ? JSON.parse(r.items || "[]") : (r.items || []); } catch { its = []; } const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, indic: r.indicaciones || "", firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop: r.cop || med?.cop || "", items: Array.isArray(its) ? its : [] }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
+  // H-08: la receta de la ficha ({ medicamento, presentacion, dosis… }) salía aquí solo con
+  // «℞» porque se leía { med, detalle }. Se leen los dos formatos con la misma función.
+  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { const its = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) })); const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, indic: r.indicaciones || "", firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop: r.cop || med?.cop || "", items: its }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
   useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto, medRemoto]); // eslint-disable-line
   // GET /recetas trae las de toda la organización: se muestran solo las de pacientes visibles.
   const recetas = conectado ? recetasRem.filter((r) => pacientes.some((p) => String(p.id) === String(r.pacienteId))) : recetasDemo;
@@ -7174,7 +7232,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       titulo: "Receta médica", tituloVentana: `Receta - ${r.paciente}`, sub: `Fecha: ${fechaLegible(r.fecha)}`,
       datos: !conectado && r.sede != null ? datosDemo(numSede(r.sede)) : undefined,
       css: `.rx-m{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:12px;margin:6px 0 14px}.rx-i{padding:8px 0;border-bottom:1px solid #E4DED5;font-size:13px}.rx-i small{display:block;color:#6b635a}.rx-f{margin-top:50px;text-align:center;font-size:12px}.rx-f div{display:inline-block;border-top:1px solid #1B1614;padding-top:6px;min-width:260px}`,
-      cuerpo: `<div class="rx-m"><span><b>Paciente:</b> ${esc2(r.paciente)}</span>${r.dni ? `<span><b>DNI:</b> ${esc2(r.dni)}</span>` : ""}<span><b>Fecha:</b> ${esc2(fechaLegible(r.fecha))}</span></div><h3>Rp/</h3>`
+      cuerpo: `<div class="rx-m"><span><b>Paciente:</b> ${esc2(r.paciente)}</span>${r.dni ? `<span><b>DNI:</b> ${esc2(r.dni)}</span>` : ""}</div><h3>Rp/</h3>`
         + (r.items || []).map((it) => `<div class="rx-i"><b>${esc2(it.med)}</b>${it.detalle ? `<small>${esc2(it.detalle)}</small>` : ""}</div>`).join("")
         + (r.indic ? `<h3>Indicaciones</h3><p>${esc2(r.indic)}</p>` : "")
         + `<div class="rx-f"><div>${esc2(r.medico || "Firma y sello del profesional")}${conCop(med?.cop) ? ` · ${esc2(conCop(med.cop))}` : ""}</div></div>`,
@@ -7185,7 +7243,9 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
   // Quien prescribe: si el usuario es médico, él mismo (por su nombre en GET /medicos).
   const miMedico = sedeCx.rol === "medico" ? medicosRx.find((m) => m.nombre === sedeCx.nombre) : null;
-  const nuevo = () => setForm({ paciente: pacientes[0]?.nombre || "", medicoId: miMedico ? String(miMedico.id) : "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
+  // Sin paciente preelegido: con el primero (o el último visto) puesto por defecto era fácil
+  // recetar al paciente equivocado. Se elige siempre a propósito.
+  const nuevo = () => setForm({ paciente: "", medicoId: miMedico ? String(miMedico.id) : "", items: [{ med: "", dosis: "", frec: "", dur: "" }], indic: "" });
   // Con sesión, si el padrón no trajo el campo alergias se piden a la ficha 360 del paciente.
   const pacForm = form ? (pacientes.find((p) => p.nombre === form.paciente) || null) : null;
   useEffect(() => {
@@ -7198,6 +7258,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   const setItem = (i, k, v) => setForm((f) => ({ ...f, alerta: null, forzar: false, items: f.items.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
   const emitir = () => {
     const items = form.items.filter((x) => x.med.trim());
+    if (!form.paciente) { notify("Elige el paciente."); return; }
     if (!items.length) { notify("Agrega al menos un medicamento."); return; }
     // Seguridad: mismo cruce con las alergias que la receta de la ficha. Con alerta, hay que
     // confirmar a propósito (segundo clic) para emitir.
@@ -7210,9 +7271,10 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
       if (!pid) { notify("Selecciona un paciente válido."); return; }
       if (!form.medicoId) { notify("Elige el médico que prescribe."); return; }
-      const itemsBk = items.map((x) => ({ med: `${x.med}${x.dosis ? " " + x.dosis : ""}`, detalle: [x.frec, x.dur].filter(Boolean).join(" – ") }));
+      // Mismo esquema que la receta de la ficha (H-08).
+      const itemsBk = items.map(itemRecetaDesdeFormulario);
       // Si se emitió pese a la alerta de alergia, el servidor recibe el aviso aceptado (auditoría).
-      api.recetas.crear({ pacienteId: pid, medicoId: form.medicoId, sedeId: sedeApiUuid(sedeCx.activa), fecha: fmt(hoy), indicaciones: form.indic, items: JSON.stringify(itemsBk), ...(avisos.length ? { alertaAlergia: JSON.stringify(avisos), overrideAlergia: true } : {}) })
+      api.recetas.crear({ pacienteId: pid, medicoId: form.medicoId, sedeId: sedeApiUuid(sedeCx.activa), fecha: ymdLima(new Date()) || fmt(hoy), indicaciones: form.indic, items: JSON.stringify(itemsBk), ...(avisos.length ? { alertaAlergia: JSON.stringify(avisos), overrideAlergia: true } : {}) })
         .then(() => { notify("Receta emitida. Queda en la ficha del paciente."); recargarRecetas(); setForm(null); })
         .catch(() => notify("No se pudo emitir la receta."));
       return;
@@ -7222,7 +7284,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     const pid = pacientes.find((p) => p.nombre === form.paciente)?.id;
     if (!pid) { notify("Selecciona un paciente válido."); return; }
     const texto = items.map((x) => `${x.med}${x.dosis ? " " + x.dosis : ""}${x.frec ? " " + x.frec : ""}${x.dur ? " por " + x.dur : ""}`).join("; ");
-    if (updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), sede: sedeCx.activa ?? undefined, medico: sedeCx.rol === "medico" ? (sedeCx.nombre || "") : "", texto, indicaciones: form.indic || "", items: JSON.stringify(items.map((x) => ({ medicamento: x.med, dosis: x.dosis, frecuencia: x.frec, duracion: x.dur }))) }, ...(cur.recetas || [])] }));
+    if (updFicha) updFicha(pid, (cur) => ({ ...cur, recetas: [{ fecha: fmt(hoy), sede: sedeCx.activa ?? undefined, medico: sedeCx.rol === "medico" ? (sedeCx.nombre || "") : "", texto, indicaciones: form.indic || "", items: JSON.stringify(items.map(itemRecetaDesdeFormulario)) }, ...(cur.recetas || [])] }));
     notify("Receta emitida y firmada. Queda en la ficha del paciente y se envía por WhatsApp/correo.");
     setForm(null);
   };
@@ -7247,7 +7309,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
         <Card style={{ padding: 20 }}>
           <div style={{ fontWeight: 600, color: NAVY, marginBottom: 14, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 8 }}><FileText size={16} strokeWidth={1.75} color={DS.c.primary} /> Nueva receta</div>
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br />
-            <div style={{ maxWidth: 320 }}><Select value={form.paciente} onChange={(v) => setForm({ ...form, paciente: v, alerta: null, forzar: false })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></div>
+            <div style={{ maxWidth: 320 }}><Select value={form.paciente} placeholder="— Elige el paciente —" onChange={(v) => setForm({ ...form, paciente: v, alerta: null, forzar: false })} options={[{ value: "", label: "— Elige el paciente —", disabled: true }, ...pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))]} /></div>
           </label>
           {conectado && (
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginTop: 12 }}>Médico que prescribe<br />
@@ -7512,7 +7574,13 @@ function Consentimientos({ pacientes: pacProp, notify }) {
       {(() => {
         const verPdf = (d) => {
               const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-              const firma = d.firmaUrl ? `<div class="cs-firma"><div class="cs-l">${d.firmanteNombre ? "Firma del apoderado" : "Firma del paciente"}</div><img src="${esc(d.firmaUrl)}" alt="Firma">${d.firmanteNombre ? `<div class="cs-rep">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteRelacion ? ` (${esc(d.firmanteRelacion.toLowerCase())})` : ""}${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}, en representación del paciente por ser menor de edad.</div>` : ""}</div>` : "";
+              // H-14: el servidor guarda firmanteNombre también cuando firma el propio paciente.
+              // «Apoderado / menor de edad» solo si el paciente es menor por su fecha de
+              // nacimiento (y quien firma no es él mismo).
+              const pacDoc = pacientes.find((p) => (d.pacienteId != null ? String(p.id) === String(d.pacienteId) : p.nombre === d.paciente)) || null;
+              const norm = (x) => String(x || "").trim().toLowerCase();
+              const porApoderado = !!d.firmanteNombre && !!pacDoc && esPediatrico(pacDoc.nacimiento) && norm(d.firmanteNombre) !== norm(pacDoc.nombre);
+              const firma = d.firmaUrl ? `<div class="cs-firma"><div class="cs-l">${porApoderado ? "Firma del apoderado" : "Firma del paciente"}</div><img src="${esc(d.firmaUrl)}" alt="Firma">${porApoderado ? `<div class="cs-rep">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteRelacion ? ` (${esc(d.firmanteRelacion.toLowerCase())})` : ""}${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}, en representación del paciente por ser menor de edad.</div>` : d.firmanteNombre ? `<div class="cs-rep">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}.</div>` : ""}</div>` : "";
               const ok = abrirDocumento({
                 titulo: d.tipo, tituloVentana: `${d.tipo} - ${d.paciente}`,
                 sub: `Consentimiento informado · ${d.estado}`,
@@ -7796,7 +7864,8 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         { key: "monto", label: sedesLista.length > 1 ? "Total base" : sedeUnica && multiSede ? `Total ${cortaSede(sedeUnica.id)}` : "Total", w: "128px", a: "right", get: (s) => precioVista(s), cell: (s) => { const heredado = sedeUnica && multiSede && !propioEn(s, sedeUnica.id); return <span className="dc-money" title={sedeUnica && multiSede ? (heredado ? `${sedeUnica.nombre} cobra el precio base` : `Precio propio de ${sedeUnica.nombre} · base S/ ${M.sol2(Number(s.monto))}`) : undefined} style={{ fontWeight: heredado ? 500 : 600, color: heredado ? "var(--dc-ink-500)" : NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioVista(s))}</span>; } },
         ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "130px", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={`${propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} · sin IGV S/ ${M.sol2(desgloseIgv(precioServicio({ ...s, precio: s.monto }, sd.id)).base)}`} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
         // SRV-02: la columna Margen solo aparece cuando hay algún costo cargado.
-        ...(items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen", w: "140px", a: "right", get: (s) => margenCatalogo({ ...s, monto: precioVista(s) }) ?? -1, cell: (s) => { const m = margenCatalogo({ ...s, monto: precioVista(s) }); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {m.toFixed(0)}</span>; } }] : []),
+        // El costo y el margen son internos: quien solo consulta el catálogo (el doctor) no los ve.
+        ...(puedeGestionar && items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen", w: "140px", a: "right", get: (s) => margenCatalogo({ ...s, monto: precioVista(s) }) ?? -1, cell: (s) => { const m = margenCatalogo({ ...s, monto: precioVista(s) }); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {m.toFixed(0)}</span>; } }] : []),
         // Estado: la mayoría está activa; solo se marca el inactivo junto al nombre.
         { key: "estado", label: "Estado", soloExport: true, get: (s) => s.activo === false ? "Inactivo" : "Activo" },
         // Sin columna de lápiz: toda la fila abre la edición del servicio.
@@ -7920,6 +7989,10 @@ const CONSUMO_DEMO = [
 ];
 
 function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can, tabInicial = "productos", onTab }) {
+  // Quien solo consulta (el doctor) no abre el formulario de edición: veía «Editar insumo»
+  // con Guardar y Eliminar, que el servidor luego rechazaba con 403.
+  const puedeEditarInv = can ? (can("inventario", "editar") || can("inventario", "crear")) : true;
+  const puedeEliminarInv = can ? can("inventario", "eliminar") : true;
   // Quien solo puede ver entra a saber si queda material, no a comprarlo. Sin permiso
   // de gestión: nada de valor del almacén, compras, proveedores ni altas de insumo.
   const puedeGestionar = can ? can("inventario", "crear") : true;
@@ -8301,7 +8374,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           </div>
         </section>
       ); })()}
-      <DataTable titulo="Insumos" sub="insumos" minWidth={variasSedes ? 1150 : 1040} rows={items} defaultSort={{ key: "estado", dir: "asc" }} onRowClick={(it) => editar(it)} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub={variasSedes ? "Agrega tu primer insumo para controlar stock y cobertura." : `${nombreSede(verSedes[0])} aún no tiene insumos. Agrégalos para controlar su stock y cobertura.`} />} cols={[
+      <DataTable titulo="Insumos" sub="insumos" minWidth={variasSedes ? 1150 : 1040} rows={items} defaultSort={{ key: "estado", dir: "asc" }} onRowClick={puedeEditarInv ? (it) => editar(it) : undefined} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub={variasSedes ? "Agrega tu primer insumo para controlar stock y cobertura." : `${nombreSede(verSedes[0])} aún no tiene insumos. Agrégalos para controlar su stock y cobertura.`} />} cols={[
         { key: "insumo", label: "Insumo", w: "minmax(180px,1.5fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div></div></div>; } },
         // Con «Todas las sedes» el mismo insumo sale una vez por almacén: la sede dice cuál es.
         ...colSede,
@@ -8328,8 +8401,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         ...(puedeGestionar ? [{ key: "acc", label: "Ajustar", w: "120px", a: "center", noFilter: true, noSort: true, sticky: false, fijo: true, cell: (it) => <span className="dc-inv__step" onClick={(e) => e.stopPropagation()}><button type="button" aria-label={`Usar 1 de ${it.nombre}`} title="Usar una unidad" onClick={() => ajustar(it.id, -1)}><Minus size={14} strokeWidth={2} /></button><b>{it.stock}</b><button type="button" aria-label={`Ingresar 1 de ${it.nombre}`} title="Ingresar una unidad" onClick={() => ajustar(it.id, 1)}><Plus size={14} strokeWidth={2} /></button></span> }] : []),
       ]} />
       </>)}
-      {form && <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar insumo" : "Nuevo insumo"} sub={form.id ? `Almacén de ${nomSede(form.sede)}` : "Agrega un insumo al almacén de una sede"} onClose={() => setForm(null)} size="corto" maxW={560}
-        footer={<>{form.id && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar" : "Crear"}</Btn></>}>
+      {form && <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar insumo" : "Nuevo insumo"} sub={form.id ? (form.sede == null || form.sede === "" ? "Insumo sin almacén de sede asignado" : `Almacén de ${nomSede(form.sede)}`) : "Agrega un insumo al almacén de una sede"} onClose={() => setForm(null)} size="corto" maxW={560}
+        footer={<>{form.id && puedeEliminarInv && <span style={{ marginRight: "auto" }}><Btn small kind="ghost" onClick={eliminar}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar" : "Crear"}</Btn></>}>
         {(() => { const st = Number(form.stock) || 0, mn = Number(form.min) || 0; const e = st === 0 ? "agotado" : st <= mn ? "bajo" : "ok"; return (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 14px", marginBottom: 16 }}>
             <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontWeight: 500 }}>Con {st} {form.unidad || "unid"} (mín. {mn}) el estado será</span>
@@ -8470,6 +8543,8 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
     setCasos((cs) => cs.map((c) => { if (c.id !== id) return c; const i = LAB_FLUJO.indexOf(c.estado); const n = LAB_FLUJO[Math.min(LAB_FLUJO.length - 1, i + 1)]; notify(`${c.paciente}: ${LAB_INFO[n].l}.`); return { ...c, estado: n }; }));
   };
   const [detalle, setDetalle] = useState(null);
+  // El detalle abierto sigue al caso: tras «Avanzar» mostraba el estado anterior.
+  useEffect(() => { if (!detalle) return; const c = casos.find((x) => x.id === detalle.id); if (c && c !== detalle) setDetalle(c); }, [casos]); // eslint-disable-line react-hooks/exhaustive-deps
   const crear = () => { if (!nuevo.paciente) { notify("Elige el paciente."); return; } if (!nuevo.trabajo.trim()) { notify("Describe el trabajo."); return; } if (!nuevo.sede) { notify("Elige la sede que envía el caso."); return; } if (conectado) {
     // POST /laboratorio con el contrato que devuelve la lista (mapCaso al revés).
     const pid = pidDe(nuevo.paciente);
@@ -8540,7 +8615,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
         ...(variasSedes ? [{ key: "sede", label: "Sede", w: "120px", a: "center", get: (c) => cortaSede(sedeDelCaso(c)), cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{cortaSede(sedeDelCaso(c))}</span> }] : []),
         { key: "entrega", label: "Entrega", w: "minmax(160px,1.1fr)", a: "center", get: (c) => c.entrega, cell: (c) => { const d = faltanDias(c); const done = c.estado === "entregado" || c.estado === "recibido"; const atr = labAtrasado(c, fmt(hoy)); const lbl = done ? (c.estado === "recibido" ? "Recibido" : "Entregado") : atr ? `Atrasado ${Math.abs(d)} d` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : d < 0 ? "Vencido" : `Faltan ${d} d`; const col = done ? "var(--dc-ok-700)" : atr ? "var(--dc-red)" : d <= 2 ? "var(--dc-warn-600)" : DS.c.primary; return <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}><span style={{ fontSize: 13, fontWeight: 500, color: col, background: tint(col, 0.078), padding: "3px 11px", borderRadius: "var(--dc-r-full)" }}>{lbl}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{fechaLegible(c.entrega)}</span></div>; } },
         { key: "estado", label: "Estado", w: "130px", a: "center", get: (c) => (LAB_INFO[c.estado] || { l: c.estado || "—" }).l, cell: (c) => { const I = LAB_INFO[c.estado] || { l: c.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; return <span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>; } },
-        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? (puedeAvanzar ? <Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{LAB_INFO[c.estado]?.l || c.estado}</span>) : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Entregado</span> },
+        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? (puedeAvanzar ? <span onClick={(e) => e.stopPropagation()}><Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn></span> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{LAB_INFO[c.estado]?.l || c.estado}</span>) : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Entregado</span> },
       ]} />
       {detalle && (() => { const I = LAB_INFO[detalle.estado] || { l: detalle.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; const atrasado = labAtrasado(detalle, fmt(hoy)); return (
         <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detalle.trabajo} sub={detalle.paciente} onClose={() => setDetalle(null)} maxW={520} footer={detalle.estado !== "entregado" && puedeAvanzar ? <Btn small onClick={() => { avanzar(detalle.id); setDetalle(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
@@ -8836,7 +8911,8 @@ function Resenas({ notify, citas = [], can }) {
             { key: "n", label: "Paciente", w: "minmax(160px,1fr)", cell: (r) => <PersonaCelda nombre={r.nombre} /> },
             { key: "f", label: "Fecha", w: "110px", cell: (r) => <span className="dc-tp__num">{fechaLegible(r.fecha)}</span> },
             ...(variasSedes ? [{ key: "sd", label: "Sede", w: "110px", get: (r) => cortaSede(r.sede) }] : []),
-            { key: "s", label: "Calificación", w: "120px", cell: (r) => <span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span> },
+            // get: en el Excel y el PDF las estrellas (íconos) salían vacías; va el número.
+            { key: "s", label: "Calificación", w: "120px", get: (r) => `${r.estrellas || 0} de 5`, sortVal: (r) => Number(r.estrellas) || 0, cell: (r) => <span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span> },
             { key: "t", label: "Comentario", w: "minmax(240px,2.2fr)", get: (r) => r.texto || "" },
             { key: "e", label: "Estado", w: "140px", a: "right", cell: (r) => r.resp ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-pill is-aviso">Por responder</span> },
           ] }} cols={[
@@ -9622,7 +9698,7 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
 
       {visor && (() => { const esFoto = visor.tipo === "foto"; return (
         <Modal icon={esFoto ? <Camera size={20} strokeWidth={1.75} /> : <Scan size={20} strokeWidth={1.75} />} titulo={tituloDe(visor)} sub={`${paciente.nombre} – ${fechaLegible(visor.fecha)}${visor.sede ? " – " + nombreSede(visor.sede) : ""}`} onClose={() => setVisor(null)} maxW={esFoto ? 640 : 760}
-          footer={<><Btn small kind="ghost" onClick={() => setVisor(null)}>Cerrar</Btn><Btn small onClick={() => { if (visor.url) { const a = document.createElement("a"); a.href = visor.url; a.download = `${tituloDe(visor).replace(/\s+/g, "_")}_${visor.fecha || ""}.jpg`; document.body.appendChild(a); a.click(); a.remove(); } else notify("Imagen de demostración: no hay archivo para descargar."); }}><Download size={15} strokeWidth={1.75} /> Descargar</Btn></>}>
+          footer={<><Btn small kind="ghost" onClick={() => setVisor(null)}>Cerrar</Btn><Btn small onClick={() => { if (visor.url) { const a = document.createElement("a"); a.href = visor.url; a.download = `${tituloDe(visor).replace(/\s+/g, "_")}_${visor.fecha || ""}.${({ jpeg: "jpg", "svg+xml": "svg" })[(/^data:image\/([\w+.-]+)/i.exec(String(visor.url)) || [])[1]] || (/^data:image\/([\w]+)/i.exec(String(visor.url)) || [])[1] || "jpg"}`; document.body.appendChild(a); a.click(); a.remove(); } else notify("Imagen de demostración: no hay archivo para descargar."); }}><Download size={15} strokeWidth={1.75} /> Descargar</Btn></>}>
           {esFoto ? (
             <div className="dc-im__visor is-foto">
               {visor.url ? <img src={visor.url} alt={tituloDe(visor)} /> : <Smile size={60} strokeWidth={1.2} />}
@@ -10455,7 +10531,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "formularios": return <Formularios pacientes={pf} notify={notify} />;
       case "pacientes": return <PacientesView consumirInsumos={consumirInsumos} sedeActiva={sedeActiva} misSedes={misSedes} onIr={setVista} pacientes={pf} setPacientes={setPacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} rol={rol} sedeIds={sede === "all" ? misSedes : [sede]} crearIntent={crearIntent === "paciente"} onIntentDone={() => setCrearIntent(null)}
         onAgendarPaciente={can("agenda", "crear") ? (pac) => { setAgendarDesdeFicha({ pacienteId: pac.id, motivo: "Consulta", sedeId: sedeActiva }); setVista("agenda"); } : undefined}
-        onCobrarPaciente={(pac) => { setCobroDesdeFicha({ pid: pac.id, nombre: pac.nombre }); setVista("caja"); }} />;
+        // H-11: «Cobrar» solo a quien cobra en Caja. El doctor lo veía y acababa en 6 llamadas
+        // 403 y de vuelta al inicio.
+        onCobrarPaciente={can("facturacion", "crear") ? (pac) => { setCobroDesdeFicha({ pid: pac.id, nombre: pac.nombre }); setVista("caja"); } : undefined} />;
       case "inventario": return <Inventario key="inv-productos" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_compras": return <Inventario key="inv-compras" tabInicial="compras" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
       case "inventario_consumo": return <Inventario key="inv-consumo" tabInicial="consumo" notify={notify} can={can} items={inventario} setItems={setInventario} onTab={irInventario} />;
@@ -10465,9 +10543,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "recall_hist": return <Recall pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="historial" />;
       // Satisfacción y reseñas (NAV-05): un destino con dos pestañas.
       case "satisfaccion": case "recall_sat": case "resenas": {
-        const t = vista === "recall_sat" ? "encuestas" : "resenas";
+        // H-17: las encuestas viven en Recordatorios (permiso «recall»). Sin ese permiso la
+        // pestaña llevaba en silencio al inicio: no se ofrece.
+        const verEncuestas = mods.includes("recall");
+        const t = vista === "recall_sat" && verEncuestas ? "encuestas" : "resenas";
         return (<div style={{ display: "grid", gap: 14 }}>
-          <Pestanas etiqueta="Satisfacción y reseñas" valor={t} onChange={(x) => setVista(x === "encuestas" ? "recall_sat" : "satisfaccion")} opciones={[{ id: "resenas", label: "Reseñas públicas", icon: Star }, { id: "encuestas", label: "Encuestas (NPS)", icon: Smile }]} />
+          {verEncuestas && <Pestanas etiqueta="Satisfacción y reseñas" valor={t} onChange={(x) => setVista(x === "encuestas" ? "recall_sat" : "satisfaccion")} opciones={[{ id: "resenas", label: "Reseñas públicas", icon: Star }, { id: "encuestas", label: "Encuestas (NPS)", icon: Smile }]} />}
           {t === "encuestas" ? <Recall key="sat" pacientes={pf} notify={notify} can={can} setCitas={setCitas} sedeActiva={sedeActiva} tab="satisfaccion" /> : <Resenas notify={notify} can={can} citas={cf} />}
         </div>);
       }

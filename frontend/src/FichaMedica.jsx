@@ -2,7 +2,7 @@ import { abrirDocumento } from "./util/membrete";
 import * as M from "./compartido/metricas";
 import { estadoLabel } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
-import api, { auth } from "./api/client";
+import api, { auth, msgServidor } from "./api/client";
 import { buscarCie10 } from "./cie10";
 import {BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
 import {
@@ -20,7 +20,8 @@ import { fichaDeSede, sedeEnLista } from "./compartido/cajaSede";
 import { puedeEscribirClinico as puedeEscribirClinicoDe } from "./util/clinicoWrite";
 import { formatearFDI } from "./util/formatearFDI";
 import { conCop } from "./util/cop";
-import { ymdLima } from "./util/fechaLima";
+import { ymdLima, resumenDispositivo } from "./util/fechaLima";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta } from "./compartido/recetaItems";
 import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
 import { medicoEn } from "./compartido/catalogoApi";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
@@ -492,7 +493,7 @@ const APARATOS = ["Brackets metálicos", "Brackets estéticos", "Autoligado", "O
 function Ortodoncia({ pacienteId, notify }) {
   const conectado = !!auth.token;
   const [rows, setRows] = useState([]);
-  const [f, setF] = useState({ fecha: new Date().toISOString().slice(0, 10), aparato: "Brackets metálicos", actividad: "", nota: "", proximoControl: "" });
+  const [f, setF] = useState({ fecha: ymdLima(new Date()), aparato: "Brackets metálicos", actividad: "", nota: "", proximoControl: "" });
   const cargar = () => { if (conectado && pacienteId) api.ortodoncia.porPaciente(pacienteId).then((r) => setRows(r || [])).catch(() => { }); };
   useEffect(() => { cargar(); }, [pacienteId]); // eslint-disable-line
   const guardar = () => {
@@ -538,7 +539,7 @@ function Ortodoncia({ pacienteId, notify }) {
 
 /* ── Receta médica ── */
 const ITEM_VACIO = () => ({ medicamento: "", presentacion: "", dosis: "", frecuencia: "", duracion: "" });
-function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medicos = [] }) {
+function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medicos = [], sedeId = null, recetasError = false }) {
   const demoDb = useContext(DatosDemoCtx);
   const sedeRx = useSede();   // médico de la sesión: firma la receta en la demo
   const conectado = !!auth.token;
@@ -641,8 +642,12 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medi
   const [alergiaPend, setAlergiaPend] = useState(null);
   const emitirReceta = (validos, alertas) => {
     const yo = sedeRx.rol === "medico" ? medicosRx.find((m) => m.nombre === sedeRx.nombre) : null;
+    // H-06: la fecha de emisión es la de Lima. Sin «fecha», el servidor ponía el día UTC y
+    // una receta de las 23:00 salía con fecha del día siguiente.
     const body = {
       pacienteId,
+      fecha: ymdLima(new Date()),
+      ...(sedeId ? { sedeId } : {}),
       ...(conectado && yo ? { medicoId: yo.id } : {}),
       indicaciones: indicaciones || null,
       items: JSON.stringify(validos),
@@ -654,7 +659,7 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medi
     }
     if (!auth.token) {
       // Demostración: la receta queda en la historia del paciente (y en el módulo Recetas).
-      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, recetas: [{ fecha: new Date().toISOString().slice(0, 10), medico: sedeRx.rol === "medico" ? (sedeRx.nombre || "") : "", sede: sedeRx.activa ?? undefined, items: body.items, indicaciones: body.indicaciones, texto: validos.map((x) => [x.medicamento, x.presentacion, x.dosis].filter(Boolean).join(" ")).join("; ") }, ...(cur.recetas || [])] }));
+      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, recetas: [{ fecha: body.fecha, medico: sedeRx.rol === "medico" ? (sedeRx.nombre || "") : "", sede: sedeRx.activa ?? undefined, items: body.items, indicaciones: body.indicaciones, texto: validos.map((x) => [x.medicamento, x.presentacion, x.dosis].filter(Boolean).join(" ")).join("; ") }, ...(cur.recetas || [])] }));
       notify(alertas.length ? "Receta emitida (alerta de alergia registrada)." : "Receta emitida.");
       limpiar(); setAlergiaPend(null); onChange && onChange();
       return;
@@ -676,8 +681,9 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medi
     emitirReceta(validos, alertas);
   };
   const printReceta = (r) => {
-    const its = arr(parseJson(r.items, []));
-    const filas = its.map((x) => `<div class="rx-item"><b>${esc(x.medicamento)}</b>${x.presentacion ? " — " + esc(x.presentacion) : ""}<div class="muted">${esc([x.dosis && ("Dosis: " + x.dosis), x.frecuencia && ("Frecuencia: " + x.frecuencia), x.duracion && ("Duración: " + x.duracion)].filter(Boolean).join("  –  "))}</div></div>`).join("");
+    // H-08: lee el esquema de la ficha y el antiguo del módulo Recetas ({ med, detalle }).
+    const its = itemsDeReceta(r);
+    const filas = its.map((x) => `<div class="rx-item"><b>${esc(x.medicamento)}</b>${x.presentacion ? " — " + esc(x.presentacion) : ""}<div class="muted">${esc([x.dosis && ("Dosis: " + x.dosis), x.frecuencia && ("Frecuencia: " + x.frecuencia), x.duracion && ("Duración: " + x.duracion), x.detalle].filter(Boolean).join("  –  "))}</div></div>`).join("");
     const edad = edadDe(paciente?.fechaNacimiento);
     imprimir("Receta médica", `
       <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha ? String(r.fecha).slice(0, 10).split("-").reverse().join("/") : "")}</div></div>
@@ -768,14 +774,14 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medi
       </div>
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Recetas emitidas ({arr(recetas).length})</div>
-        {arr(recetas).length === 0 && <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Aún no hay recetas emitidas.</div>}
+        {arr(recetas).length === 0 && <div style={{ padding: 16, fontSize: 13, color: recetasError ? "var(--dc-danger-700)" : MUTED }}>{recetasError ? "No se pudieron leer las recetas emitidas. Puedes emitir una nueva; reintenta para ver las anteriores." : "Aún no hay recetas emitidas."}</div>}
         {arr(recetas).map((r, i) => {
-          const its = arr(parseJson(r.items, []));
+          const its = itemsDeReceta(r);
           return (
             <div key={r.id || i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 16px", borderTop: `1px solid ${LINE}` }}>
               <div style={{ minWidth: 82 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{M.fechaCorta(r.fecha)}</div><div style={{ fontSize: 12, color: MUTED }}>{r.medico}</div></div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{its.length ? its.map((x) => x.medicamento).filter(Boolean).join(", ") : "Receta"}</div>
+                <div style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{its.length ? its.map(nombreItemReceta).filter(Boolean).join(", ") : "Receta"}</div>
                 {r.indicaciones && <div style={{ fontSize: 12, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.indicaciones}</div>}
                 {r.overrideAlergia && (
                   <div style={{ marginTop: 4, fontSize: 12, color: "var(--dc-danger-700)", fontWeight: 500 }}>
@@ -856,12 +862,15 @@ const tipoRegistro = (accion) => {
   if (/CREA|REGISTR|POST|NUEV|ALTA|SUB/.test(a)) return "crear";
   return "editar";
 };
-const ACCION_LEGIBLE = { HC_ACCESO: "Abrió la historia clínica", HC_ACTUALIZAR: "Modificó la historia clínica", HC_IMPRIMIR: "Imprimió la historia clínica" };
-/** Filas del servidor → formato del registro. Solo las que son de este paciente. */
-function registroDesdeServidor(list, pac) {
-  const id = String(pac?.id ?? ""), dni = String(pac?.dni || "");
+const ACCION_LEGIBLE = { HC_ACCESO: "Abrió la historia clínica", HC_ACTUALIZAR: "Modificó la historia clínica", HC_IMPRIMIR: "Imprimió la historia clínica", HC_EDITAR: "Modificó la historia clínica" };
+/** Filas del servidor → formato del registro. Solo las que son de este paciente.
+    H-12: GET /auditoria devuelve { tabla: "paciente", registroId, accion: "HC_ACCESO",
+    datosDespues, creadoEn, ip, userAgent, usuario, rol, detalle }; el paciente viene en
+    registroId (no en pacienteId), así que todas se descartaban y el registro salía vacío. */
+function registroDesdeServidor(list, pac, pacienteId = null) {
+  const id = String(pac?.id ?? pacienteId ?? ""), dni = String(pac?.dni || "");
   return (Array.isArray(list) ? list : []).filter((a) => {
-    const ref = [a.pacienteId, a.entidadId, a.recursoId].map((x) => (x == null ? "" : String(x)));
+    const ref = [a.pacienteId, a.entidadId, a.recursoId, a.registroId].map((x) => (x == null ? "" : String(x)));
     if (id && ref.includes(id)) return true;
     const det = String(a.detalle || "");
     return (id && det.includes(id)) || (dni && det.includes(dni));
@@ -872,8 +881,9 @@ function registroDesdeServidor(list, pac) {
     rol: a.rol || "",
     tipo: tipoRegistro(a.accion),
     accion: ACCION_LEGIBLE[a.accion] || a.accion || "Actividad",
-    detalle: a.detalle && a.detalle !== "—" ? a.detalle : "",
-    origen: [a.ip && a.ip !== "—" ? a.ip : "", a.dispositivo || ""].filter(Boolean).join(" · "),
+    // «Abrió la historia de X» repite la acción: con el acceso basta la acción.
+    detalle: a.detalle && a.detalle !== "—" && !(a.accion === "HC_ACCESO" && /^abri[oó] la historia/i.test(a.detalle)) ? a.detalle : "",
+    origen: [a.ip && a.ip !== "—" ? a.ip : "", a.dispositivo || (a.userAgent && a.userAgent !== "—" ? resumenDispositivo(a.userAgent) : "")].filter(Boolean).join(" · "),
   }));
 }
 /** Reconstruye el registro con lo que ya trae autor y fecha (evoluciones, recetas, archivos, consentimientos). */
@@ -958,6 +968,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // NEW-46 / coherencia matriz: escritura clínica = can(odontograma, editar).
   // Fallback roles solo offline (sin sesión API).
   const puedeEscribirClinico = puedeEscribirClinicoDe({ conectado, can, rol });
+  // Facturación: «Registrar cobro» solo a quien cobra (antes se miraba solo el rol médico).
+  const puedeCobrarFicha = !conectado || !can || can("facturacion", "crear");
   const tabMod = (mod) => !conectado || !can || can(mod, "ver");
   const puedeRecetar = !conectado || (can ? can("recetas", "ver") : ["admin", "medico"].includes(rol));
   const puedePerio = !conectado || (can ? can("perio", "ver") : ["admin", "medico"].includes(rol));
@@ -1060,6 +1072,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const [cargandoFicha, setCargandoFicha] = useState(true);
   const [errorFicha, setErrorFicha] = useState(null);
   const [fueraSede, setFueraSede] = useState(false);  // demo: el paciente no está entre los visibles
+  const pidCargado = useRef(null);   // paciente cuyos datos están en pantalla
+  const turnoCarga = useRef(0);      // última petición de la ficha (las anteriores se ignoran)
   const cargar = () => {
     // Modo demostración: arma la ficha con los datos de ejemplo del paciente, para
     // que la pantalla se pueda revisar sin backend.
@@ -1103,22 +1117,73 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       return;
     }
     if (!conectado || !pacienteId) return;
+    // Otro paciente: se descarta lo del anterior antes de pedir nada. Si la ficha nueva
+    // fallaba, la cabecera seguía con el nombre y el DNI del paciente anterior (H-05).
+    const pid = pacienteId;
+    if (String(pidCargado.current) !== String(pid)) { pidCargado.current = pid; setD(null); setFil(null); setFc(null); }
+    const turno = ++turnoCarga.current;   // una respuesta tardía de otro paciente no pisa esta
+    const vigente = () => turno === turnoCarga.current && String(pidCargado.current) === String(pid);
     setCargandoFicha(true);
     setErrorFicha(null);
-    api.pacientes.ficha360(pacienteId).then((r) => {
-      setD(r);
-      const rp = r?.paciente || {};
+    const aplicarPaciente = (rp) => {
       setFil({ nombre: rp.nombre || "", dni: rp.dni || "", telefono: rp.telefono || "", email: rp.email || "", fechaNacimiento: rp.fechaNacimiento || "", genero: rp.genero || "", distrito: rp.distrito || "", aseguradora: rp.aseguradora || "",
         apoderadoNombre: rp.apoderadoNombre || "", apoderadoParentesco: rp.apoderadoParentesco || "", apoderadoDni: rp.apoderadoDni || "", apoderadoTelefono: rp.apoderadoTelefono || "" });
-      setFc(parseJson(r?.paciente?.fichaClinica, {}) || {});
+      setFc(parseJson(rp.fichaClinica, {}) || {});
+    };
+    api.pacientes.ficha360(pid).then((r) => {
+      if (!vigente()) return;
+      setD(r);
+      aplicarPaciente(r?.paciente || {});
       setCargandoFicha(false);
     }).catch((err) => {
-      setErrorFicha(err?.message || "No se pudo cargar la ficha médica.");
-      setCargandoFicha(false);
-      notify("No se pudo cargar la ficha.");
+      if (!vigente()) return;
+      const st = err?.status ?? err?._httpStatus;
+      const fallo = (e2) => {
+        if (!vigente()) return;
+        setD(null);
+        setErrorFicha((e2 || err)?.message || "No se pudo cargar la ficha médica.");
+        setCargandoFicha(false);
+        notify("No se pudo cargar la ficha.");
+      };
+      // Sin acceso o sin paciente no hay nada que rescatar por otras rutas.
+      if (st === 401 || st === 403 || st === 404) { fallo(err); return; }
+      // H-01 / H-05: ficha360 falla (500) en cuanto el paciente tiene un plan, aunque el
+      // paciente, su historia y sus recetas sí se leen por su propia ruta. Se arma una ficha
+      // parcial con eso, para no dejar al doctor sin historia ni evoluciones; lo que solo
+      // viene en ficha360 (citas, plan, pagos, saldo) no se muestra y se avisa.
+      api.pacientes.ver(pid).then((rp) => {
+        if (!vigente()) return;
+        if (!rp || rp.id == null) { fallo(err); return; }
+        const leer = (prom) => prom.then((x) => ({ ok: true, v: Array.isArray(x) ? x : [] })).catch(() => ({ ok: false, v: [] }));
+        return Promise.all([leer(api.historia.porPaciente(pid)), leer(api.recetas.listar(pid))]).then(([hist, recs]) => {
+          if (!vigente()) return;
+          const desc = (a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || String(b.hora || b.creadoEn || "").localeCompare(String(a.hora || a.creadoEn || ""));
+          setD({
+            paciente: rp,
+            historia: [...hist.v].sort(desc),
+            // GET /recetas puede devolver las de toda la clínica: solo las de este paciente.
+            recetas: recs.v.filter((x) => x && (x.pacienteId == null || String(x.pacienteId) === String(pid))).sort(desc),
+            citas: [], tratamientos: [], pagos: [], odontograma: [],
+            parcial: {
+              motivo: msgServidor(err, "error del servidor"),
+              historia: hist.ok,
+              recetas: recs.ok,
+              // Sin estos campos, guardar la anamnesis o las alergias pisaría lo que hay.
+              fichaClinica: Object.prototype.hasOwnProperty.call(rp, "fichaClinica"),
+              alergias: Object.prototype.hasOwnProperty.call(rp, "alergias") && rp.alergias != null,
+            },
+          });
+          aplicarPaciente(rp);
+          setCargandoFicha(false);
+          notify("No se pudo cargar la ficha completa. Se muestran los datos que sí se pudieron leer.");
+        });
+      }).catch((e2) => fallo(e2));
     });
   };
   useEffect(() => {
+    // Lo cargado aparte (archivos, laboratorio, consentimientos, registro) también era del
+    // paciente anterior hasta que llegaba lo nuevo.
+    if (conectado) { setRx([]); setLabOrdenes([]); setConsentimientos([]); setRegSrv(null); }
     cargar();
     if (conectado && pacienteId) api.radiografias.porPaciente(pacienteId).then((r) => setRx(r || [])).catch(() => { });
     // Tomas del odontograma para el PDF de la historia clínica (las tres fases).
@@ -1141,12 +1206,17 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     if (!conectado || !pacienteId) return;
     api.auditoria({ pacienteId }).then((list) => setRegSrv(list || [])).catch(() => setRegSrv([]));
   };
-  useEffect(() => { if (tab === "datos" && regSrv == null) cargarRegistro(); }, [tab]); // eslint-disable-line
+  useEffect(() => { if (tab === "datos" && regSrv == null) cargarRegistro(); }, [tab, pacienteId]); // eslint-disable-line
   // Lo hecho en esta sesión queda en el registro al instante (en demostración es la única fuente).
   const anotar = (tipo, accion, detalle = "") => setRegLocal((cur) => [{ id: `loc-${Date.now()}-${cur.length}`, ts: new Date().toISOString(), usuario: auth.sesion?.nombre || "Tú", rol: auth.sesion?.rol || "", tipo, accion, detalle, origen: "Esta sesión" }, ...cur]);
 
   const p = d?.paciente || {};
   const r = d?.resumen || {};
+  // Ficha parcial (ficha360 falló): qué se pudo leer por su propia ruta.
+  const parcial = d?.parcial || null;
+  const sinFichaClinica = !!parcial && !parcial.fichaClinica;   // no se guarda la anamnesis a ciegas
+  const sinAlergias = !!parcial && !parcial.alergias;           // ni las alergias
+  const avisoParcial = () => notify("No se puede guardar: no se pudo leer la ficha completa del paciente. Pulsa «Reintentar».");
   // NEW-28: saldo negativo = crédito; no mostrar «por pagar» en negativo.
   const saldoNum = Number(r.saldo) || 0;
   const porPagar = Math.max(0, saldoNum);
@@ -1183,7 +1253,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const verPediatrico = esPed || pedConDatos;
   const anteced = arr(p.antecedentes);
   const vitalesActivos = [...(esPed ? VITALES_NINO : VITALES), ...(esPed ? VITALES_PED : [])];
-  const hoy = new Date().toISOString().slice(0, 10);
+  // «Hoy» es el día de Lima: con toISOString() era el día UTC y desde las 19:00 la ficha
+  // ya vivía en el día siguiente (H-15 / H-16).
+  const hoy = ymdLima(new Date()) || new Date().toISOString().slice(0, 10);
 
   // ── Línea de tiempo unificada: se arma de lo que YA existe en el sistema (sin doble captura) ──
   const eventos = () => {
@@ -1224,14 +1296,17 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   }, [citasEvoKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Resumen: última visita atendida y próxima cita programada.
   const citasArr = arr(d?.citas);
-  const atendidas = citasArr.filter((c) => c.fecha && c.fecha <= hoy && /atend|complet|lleg/i.test(String(c.estado)));
+  // H-16: solo citas atendidas y ya pasadas, la más reciente primero (antes caía en
+  // cualquier cita, también una cancelada, y la fecha de «hoy» era la UTC).
+  const atendidas = citasArr.filter((c) => c.fecha && c.fecha <= hoy && /atend|complet/i.test(String(c.estado)))
+    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || String(b.hora || "").localeCompare(String(a.hora || "")));
   // FIC-06 / M-10: en la demostración, las mismas definiciones que Pacientes y el Panel
   // (última cita Atendida; próxima = la de hoy o futura no atendida más cercana).
   const pacM = { ...(pacienteDemo || {}), ...p, id: pacienteId };
   const ultFechaM = !conectado && demoCitas ? M.ultimaVisita(pacM, demoCitas) : null;
   const ultimaVisita = !conectado && demoCitas
     ? (ultFechaM ? { fecha: ultFechaM, especialidad: (demoCitas.find((c) => c.fecha === ultFechaM && M.citaDePaciente(c, pacM)) || {}).motivo || "—" } : null)
-    : (atendidas[0] || citasArr.filter((c) => c.fecha && c.fecha <= hoy)[0] || null);
+    : (atendidas[0] || null);
   const futuras = citasArr.filter((c) => c.fecha && c.fecha >= hoy && /program|confirm|pend/i.test(String(c.estado))).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
   const proximaCita = !conectado && demoCitas ? M.proximaCita(pacM, demoCitas) : (futuras[0] || null);
 
@@ -1255,6 +1330,13 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     // Dirección, ocupación, contacto de emergencia…: viajan dentro de la ficha clínica,
     // que el servidor ya guarda como JSON, así no hace falta tocar el esquema del paciente.
     const nextFc = { ...(fc || {}), filiacion: { ...((fc || {}).filiacion || {}) } };
+    // Sin la ficha clínica leída, solo se guardan los datos personales: mandar la ficha
+    // a medio cargar borraría la anamnesis guardada.
+    if (conectado && sinFichaClinica) {
+      anotar("editar", "Modificó la filiación", "Datos personales y de contacto");
+      api.pacientes.actualizar(pacienteId, payload).then(() => { notify("Filiación guardada (sin dirección ni contacto de emergencia: reintenta la ficha para editarlos)."); cargar(); }).catch(() => notify("No se pudo guardar."));
+      return;
+    }
     anotar("editar", "Modificó la filiación", "Datos personales y de contacto");
     if (!conectado) { setD((cur) => ({ ...cur, paciente: { ...cur.paciente, ...payload } })); setFc(nextFc); guardarDemo({ ...payload, fichaClinica: nextFc }); notify("Filiación guardada."); return; }
     api.pacientes.actualizar(pacienteId, { ...payload, fichaClinica: JSON.stringify(nextFc) }).then(() => { notify("Filiación guardada."); cargar(); }).catch(() => notify("No se pudo guardar."));
@@ -1274,10 +1356,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   };
   const addTag = () => { const t = tagIn.trim(); if (!t) return; const cur = arr(p.tags); if (!cur.includes(t)) savePac({ tags: [...cur, t] }); setTagIn(""); };
   const delTag = (t) => savePac({ tags: arr(p.tags).filter((x) => x !== t) });
-  const addAlergia = () => { const a = alergIn.trim(); if (!a) return; const cur = arr(p.alergias); if (!cur.includes(a)) { savePac({ alergias: [...cur, a] }); anotar("editar", "Registró una alergia", a); } setAlergIn(""); };
-  const delAlergia = (a) => { savePac({ alergias: arr(p.alergias).filter((x) => x !== a) }); anotar("eliminar", "Quitó una alergia", a); };
+  const addAlergia = () => { const a = alergIn.trim(); if (!a) return; if (conectado && sinAlergias) { avisoParcial(); return; } const cur = arr(p.alergias); if (!cur.includes(a)) { savePac({ alergias: [...cur, a] }); anotar("editar", "Registró una alergia", a); } setAlergIn(""); };
+  const delAlergia = (a) => { if (conectado && sinAlergias) { avisoParcial(); return; } savePac({ alergias: arr(p.alergias).filter((x) => x !== a) }); anotar("eliminar", "Quitó una alergia", a); };
   const toggleAntecedente = (c) => {
     if (!puedeEscribirClinico) return;
+    if (conectado && parcial && !Object.prototype.hasOwnProperty.call(p, "antecedentes")) { avisoParcial(); return; }
     const cur = arr(p.antecedentes); const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c];
     anotar("editar", "Modificó los antecedentes", `${cur.includes(c) ? "Quitó" : "Agregó"} «${c}»`);
     if (!conectado) { setD((x) => ({ ...x, paciente: { ...x.paciente, antecedentes: next } })); guardarDemo({ antecedentes: next }); return; }
@@ -1287,6 +1370,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // ── Ficha clínica estructurada (anamnesis + examen) ──
   const saveFc = (next) => {
     if (!puedeEscribirClinico) return;
+    if (conectado && sinFichaClinica) { avisoParcial(); return; }
     if (conectado) api.pacientes.actualizar(pacienteId, { fichaClinica: JSON.stringify(next) }).catch(() => notify("No se pudo guardar la ficha."));
     else guardarDemo({ fichaClinica: next });
   };
@@ -1334,7 +1418,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       const borrador = evoCitaId ? pendientes.find((h) => String(h.citaId || "") === String(evoCitaId)) : null;
       const cuerpo = { ...parseDiagnostico(evo.diagnostico), detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || null };
       if (borrador) await api.historia.actualizar(borrador.id, { ...cuerpo, citaId: evoCitaId });
-      else await api.historia.crear({ pacienteId, sedeId: sedeId || null, titulo: "Evolución", ...cuerpo, ...(evoCitaId ? { citaId: evoCitaId } : {}) });
+      // H-06: con su fecha de Lima; sin ella el servidor ponía el día UTC (de noche, mañana).
+      else await api.historia.crear({ pacienteId, sedeId: sedeId || null, fecha: hoy, titulo: "Evolución", ...cuerpo, ...(evoCitaId ? { citaId: evoCitaId } : {}) });
       if (evoFile) { try { const url = await leerArchivo(evoFile); await crearArchivo(url, "Foto intraoral", "Anexo de evolución" + (evo.diagnostico ? " – " + evo.diagnostico : "")); } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); } }
       setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); setEvoCitaId(""); notify("Evolución registrada y firmada."); cargar(); recargarRx();
     } catch { notify("No se pudo guardar la evolución."); }
@@ -1374,6 +1459,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       const ref = v.fecha ? `del ${v.fecha}` : (v.id ? `#${String(v.id).slice(0, 8)}` : "");
       api.historia.crear({
         pacienteId,
+        fecha: hoy,
         titulo: "Adenda",
         adendaDe: v.id || null,
         ...parseDiagnostico(v.diagnostico || ""),
@@ -1441,7 +1527,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     api.radiografias.borrar(id).then(() => { notify("Archivo eliminado."); recargarRx(); }).catch(() => notify("No se pudo eliminar.")); };
 
   // ── Imprimir historia clínica completa ──
+  // H-07: la historia clínica es un documento legal; sin el paciente identificado (la
+  // ficha no cargó) no se emite. Con la ficha parcial sale, pero sin la historia leída no.
+  const hcLista = !!d && !errorFicha && !!String(p.nombre || "").trim() && (!parcial || parcial.historia);
   const imprimirHC = () => {
+    if (!hcLista) { notify("La historia clínica no se puede imprimir hasta que cargue la ficha del paciente."); return; }
     const seccion = (t, v) => (v ? `<h2>${esc(t)}</h2><div class="box">${esc(v)}</div>` : "");
     const chips = (label, list) => (arr(list).length ? `<h2>${esc(label)}</h2><div>${arr(list).map((x) => `<span class="pill">${esc(x)}</span>`).join("")}</div>` : "");
     const ex = F.examen || {}, pn = F.perinatales || {};
@@ -1506,12 +1596,22 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   ].filter(([k]) => (k !== "archivos" || puedeArchivos || puedeConsent || puedeLab)
                  && (k !== "odontograma" || puedeOdontograma)
                  && (k !== "perio" || (puedePerio && etapa !== "pediatrico"))
-                 && (k !== "recetas" || puedeRecetar));
+                 && (k !== "recetas" || puedeRecetar)
+                 // Ficha parcial: fuera lo que solo llega en ficha360 (resumen con citas y
+                 // saldo; el plan sin su módulo) y lo que no se pudo leer por su ruta.
+                 && (!parcial || ((k !== "resumen") && (k !== "historia" || parcial.historia) && (k !== "cuenta" || !!slots?.plan))));
   // Sub-vistas del odontograma (FIC-08): Periodontograma y Ortodoncia solo si el paciente
   // tiene un plan de ese tipo, o si alguien las inicia desde aquí.
   const planTxt = arr(demoFicha?.tratamiento || d?.tratamientos).map((t) => String(t.nombre || "")).join(" ").toLowerCase();
   const tieneOrto = /ortodon|bracket|alineador/.test(planTxt);
   const [subExtra, setSubExtra] = useState({});
+  // Con la ficha parcial la pestaña pedida puede no estar (p. ej. Resumen): se abre la
+  // primera disponible, la historia clínica si se pudo leer.
+  const navKeys = NAV.map(([k]) => k).join("|");
+  useEffect(() => {
+    if (!parcial || !NAV.length || NAV.some(([k]) => k === tab)) return;
+    setTabState(NAV.some(([k]) => k === "historia") ? "historia" : NAV[0][0]);
+  }, [!!parcial, tab, navKeys]); // eslint-disable-line react-hooks/exhaustive-deps
   const subOdoOpc = [
     ["odo", "Odontograma"],
     puedeOrto && (tieneOrto || subExtra.orto || subOdo === "orto") && ["orto", "Ortodoncia"],
@@ -1523,16 +1623,18 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const btn = (kind) => ({ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: kind === "ghost" ? `1.5px solid ${LINE}` : "none", background: kind === "ghost" ? "var(--dc-white)" : TEAL, color: kind === "ghost" ? TEXT : "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer" });
   const chipRO = (label) => <span key={label} style={{ display: "inline-flex", alignItems: "center", padding: "5px 11px", borderRadius: "var(--dc-r-full)", background: "var(--dc-bg)", color: NAVY, fontSize: 12, fontWeight: 500 }}>{label}</span>;
   // NEW-56: anamnesis/examen solo lectura sin escritura clínica (recepción).
+  // Con la ficha parcial sin la ficha clínica leída, la anamnesis se ve pero no se edita.
+  const fcEditable = puedeEscribirClinico && !(conectado && sinFichaClinica);
   const ta = (grupo, k, ph, rows = 2) => {
     const val = grupo ? ((F[grupo] || {})[k] || "") : (F[k] || "");
-    if (!puedeEscribirClinico) {
+    if (!fcEditable) {
       return <textarea style={{ ...inp, resize: "vertical", cursor: "default" }} rows={rows} placeholder={ph} value={val} readOnly disabled />;
     }
     return grupo
       ? <textarea style={{ ...inp, resize: "vertical" }} rows={rows} placeholder={ph} value={val} onChange={(e) => setFcNested(grupo, k, e.target.value)} onBlur={(e) => blurFcNested(grupo, k, e.target.value)} />
       : <textarea style={{ ...inp, resize: "vertical" }} rows={rows} placeholder={ph} value={val} onChange={(e) => setFcField(k, e.target.value)} onBlur={(e) => blurFc(k, e.target.value)} />;
   };
-  const chip = (on, onClick, label) => puedeEscribirClinico
+  const chip = (on, onClick, label) => fcEditable
     ? <button key={label} className={on ? "" : "fm-chip"} onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-full)", border: on ? `1.5px solid ${TEAL}` : `1px solid ${SOFT}`, background: on ? tint(TEAL, 0.078) : "var(--dc-white)", color: on ? TEAL : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{on ? <Check size={13} strokeWidth={1.75} /> : <Plus size={13} strokeWidth={1.75} />} {label}</button>
     : (on ? chipRO(label) : null);
   // Sección colapsable (llamada como función, no como componente, para no perder foco al re-render).
@@ -1593,7 +1695,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     if (e.k === "cita") { const c = e.c; titulo = (c.especialidad && c.especialidad !== "—" ? c.especialidad : "Cita") + (c.estado && c.estado !== "—" ? " – " + (ESTADO_CITA[c.estado] || c.estado) : ""); sub = [c.motivo, c.medico && c.medico !== "—" ? rotuloMedico(c.medico) : "", c.hora].filter(Boolean).join(" – "); }
     else if (e.k === "evolucion") { const h = e.h; const vacia = !(h.diagnostico && String(h.diagnostico).trim()) && !(h.detalle && String(h.detalle).trim()); titulo = vacia ? "Evolución (pendiente de llenar)" : (h.diagnostico || h.titulo || "Evolución"); sub = [h.detalle, h.signosVitales ? "Signos: " + h.signosVitales : ""].filter(Boolean).join(" – "); editable = puedeEscribirClinico && !!h.id && !vacia; }
     else if (e.k === "pago") { const g = e.g; titulo = g.concepto || "Pago"; right = money(g.monto); }
-    else if (e.k === "receta") { const r2 = e.r; const its = arr(parseJson(r2.items, [])); titulo = "Receta" + (its.length ? ": " + its.map((x) => x.medicamento).filter(Boolean).join(", ") : ""); sub = r2.indicaciones || (r2.medico && r2.medico !== "—" ? rotuloMedico(r2.medico) : ""); }
+    else if (e.k === "receta") { const r2 = e.r; const its = itemsDeReceta(r2); titulo = "Receta" + (its.length ? ": " + its.map((x) => x.medicamento).filter(Boolean).join(", ") : ""); sub = r2.indicaciones || (r2.medico && r2.medico !== "—" ? rotuloMedico(r2.medico) : ""); }
     else if (e.k === "archivo") { const x = e.x; titulo = x.tipo || "Archivo"; sub = x.nota || ""; }
     return (
       <div key={e.k + i} className="fm-ev" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -1633,8 +1735,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       procs: arr(d?.tratamientos).filter((t) => [t.fecha, t.completadaEn, t.terminadaEn, t.atendidaEn].some((f) => fechaDe(f) === fecha)),
     };
   };
-  const itemsReceta = (r2) => { const its = arr(parseJson(r2.items, [])).filter((x) => x && x.medicamento); return its.length ? its : (r2.texto ? [{ medicamento: r2.texto }] : []); };
-  const lineaMed = (x) => [x.medicamento, x.presentacion, x.dosis, x.frecuencia, x.duracion].filter((v) => v && String(v).trim()).join(" · ");
+  const itemsReceta = itemsDeReceta;
+  const lineaMed = (x) => [nombreItemReceta(x), indicacionItemReceta(x)].filter(Boolean).join(" · ");
   const medicosDe = (a) => [...new Set([...a.evos.map((h) => h.medico), ...a.citas.map((c) => c.medico), ...a.recetas.map((r2) => r2.medico)].filter((n) => n && n !== "—"))];
   const resumenAtencion = (a) => {
     const ev = a.evos.find((h) => String(h.diagnostico || h.titulo || "").trim());
@@ -1792,14 +1894,16 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div className="fm-top__nom">{p.nombre || "Ficha médica"}</div>
               <div className="fm-top__chips">
                 {[p.fechaNacimiento && edad != null ? `${edad} años` : null, p.dni ? `DNI ${p.dni}` : null].filter(Boolean).map((t) => <span key={t}>{t}</span>)}
-                {!errorFicha && <span className={debe ? "is-debe" : "is-ok"}>{money(montoSaldoUi)} {saldoAFavor > 0.005 ? "a favor" : debe ? "saldo del plan" : "al día"}</span>}
-                {!errorFicha && Number(r.saldoOtras) > 0.5 && <span title="Saldo de tratamientos hechos en otra sede: se cobra allá" style={{ fontSize: 12, color: MUTED }}>+ {money(r.saldoOtras)} en otra sede</span>}
-                {!errorFicha && arr(p.alergias).map((a) => <ChipAlergia key={a}>⚠ {a}</ChipAlergia>)}
-                {!errorFicha && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias</span>}
+                {!errorFicha && !parcial && <span className={debe ? "is-debe" : "is-ok"}>{money(montoSaldoUi)} {saldoAFavor > 0.005 ? "a favor" : debe ? "saldo del plan" : "al día"}</span>}
+                {!errorFicha && !parcial && Number(r.saldoOtras) > 0.5 && <span title="Saldo de tratamientos hechos en otra sede: se cobra allá" style={{ fontSize: 12, color: MUTED }}>+ {money(r.saldoOtras)} en otra sede</span>}
+                {!errorFicha && !sinAlergias && arr(p.alergias).map((a) => <ChipAlergia key={a}>⚠ {a}</ChipAlergia>)}
+                {!errorFicha && !sinAlergias && arr(p.alergias).length === 0 && <span className="is-ok">Sin alergias</span>}
+                {!errorFicha && sinAlergias && <span className="is-debe">Alergias sin confirmar</span>}
                 {esPed && (p.apoderadoNombre ? <span>Apoderado: {p.apoderadoNombre}</span> : <span className="is-debe">Menor sin apoderado</span>)}
                 {/* GLO-08: la próxima cita vive en el encabezado único del paciente. */}
-                {!errorFicha && proximaCita && <span className="is-info">Próxima cita: {proximaCita.fecha === M.hoyISO() ? "hoy" : new Date(proximaCita.fecha + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })}{proximaCita.hora ? ` · ${String(proximaCita.hora).slice(0, 5)}` : ""}</span>}
+                {!errorFicha && !parcial && proximaCita && <span className="is-info">Próxima cita: {proximaCita.fecha === M.hoyISO() ? "hoy" : new Date(proximaCita.fecha + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })}{proximaCita.hora ? ` · ${String(proximaCita.hora).slice(0, 5)}` : ""}</span>}
                 {errorFicha && <span className="is-debe">{fueraSede ? "Paciente de otra sede" : "Error al consultar datos clínicos"}</span>}
+                {!errorFicha && parcial && <span className="is-debe">Ficha incompleta</span>}
               </div>
             </div>
             {(p.telefono || p.email) && (
@@ -1811,9 +1915,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {onAgendar && (!can || can("agenda", "crear")) && <button onClick={() => onAgendar(p)} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
-            {onCobrar && debe && rol !== "medico" && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
-            {puedeEscribirClinico && <BotonPDF onClick={() => { anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }}>Historia clínica</BotonPDF>}
+            {/* El id va siempre: con la ficha caída «Agendar» abría el modal sin el paciente. */}
+            {onAgendar && (!can || can("agenda", "crear")) && <button onClick={() => onAgendar({ ...p, id: p.id ?? pacienteId })} style={btn("ghost")} title="Agendar cita"><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
+            {onCobrar && debe && rol !== "medico" && puedeCobrarFicha && !parcial && <button onClick={() => onCobrar(p)} style={btn("ghost")} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Registrar cobro</button>}
+            {puedeEscribirClinico && <BotonPDF disabled={!hcLista} title={hcLista ? undefined : "Se habilita cuando carga la ficha del paciente"} style={hcLista ? undefined : { opacity: 0.5, cursor: "not-allowed" }} onClick={() => { if (!hcLista) return; anotar("imprimir", "Imprimió la historia clínica"); imprimirHC(); }}>Historia clínica</BotonPDF>}
             {pagina ? null : <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); pedirCerrar(); }} title="Cerrar" aria-label="Cerrar expediente" className="dc-icon-btn" style={{ width: 44, height: 44, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", border: "none", cursor: "pointer", color: MUTED, display: "grid", placeItems: "center" }}><X size={20} strokeWidth={1.75} /></button>}
           </div>
         </div>
@@ -1823,6 +1928,17 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <button key={k2} type="button" className={`fm-tab${tab === k2 ? " is-on" : ""}`} aria-current={tab === k2 ? "page" : undefined} onClick={() => setTab(k2)}><Ic size={15} strokeWidth={1.9} /> {l}</button>
             ))}
           </nav>
+        )}
+        {!errorFicha && parcial && (
+          <div role="alert" className="fm-parcial" style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "12px 22px 0", padding: "11px 14px", borderRadius: "var(--dc-r-md)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", color: "var(--dc-warn-ink)", fontSize: 13, lineHeight: 1.5 }}>
+            <AlertTriangle size={17} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} color="var(--dc-warn-600)" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <b>No se pudo cargar la ficha completa</b> ({parcial.motivo}). Se muestran los datos del paciente y las secciones que se leen por separado
+              {[!parcial.historia && "la historia clínica", !parcial.recetas && "las recetas"].filter(Boolean).length ? ` (no se pudo leer ${[!parcial.historia && "la historia clínica", !parcial.recetas && "las recetas"].filter(Boolean).join(" ni ")})` : ""}.
+              {" "}No se muestran el resumen, las citas ni el saldo{sinFichaClinica ? "; la anamnesis queda en solo lectura" : ""}.
+            </div>
+            <button type="button" onClick={cargar} disabled={cargandoFicha} style={{ ...btn("ghost"), padding: "6px 12px", fontSize: 13, flexShrink: 0 }}>{cargandoFicha ? "Reintentando…" : "Reintentar"}</button>
+          </div>
         )}
         {errorFicha && fueraSede ? (
           <div style={{ padding: 48, textAlign: "center", display: "grid", gap: 14, justifyItems: "center", background: "var(--dc-white)", flex: 1 }}>
@@ -1839,7 +1955,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <div style={{ fontSize: 14, color: "var(--dc-ink-500)", maxWidth: 440 }}>
               Ocurrió un error al consultar el expediente clínico en el servidor. Puede reintentar la operación ahora.
             </div>
-            <button onClick={cargar} style={{ ...btn("teal"), fontSize: 14, padding: "9px 20px" }}>Reintentar</button>
+            <button onClick={cargar} disabled={cargandoFicha} style={{ ...btn("teal"), fontSize: 14, padding: "9px 20px" }}>{cargandoFicha ? "Reintentando…" : "Reintentar"}</button>
           </div>
         ) : (
         <div className={`fm-cols${tab !== "resumen" ? " is-ancho" : ""}`} style={{ display: "grid", gridTemplateColumns: tab === "resumen" ? "minmax(0,1fr) 300px" : "minmax(0,1fr)", gap: 0, flex: 1, minHeight: 0 }}>
@@ -1999,7 +2115,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   <div className="fm-fil__hc">
                     <span className="fm-fil__ico"><FileText size={18} strokeWidth={1.9} /></span>
                     <div><small>N.º de historia clínica</small><b>{nroHC}</b>{!(p.numeroHistoria || p.nroHistoria) && p.dni && <em>Se usa el DNI como número de historia</em>}</div>
-                    {(p.creadoEn || p.fechaRegistro) && <div><small>Apertura de la historia</small><b>{fmtFecha(String(p.creadoEn || p.fechaRegistro).slice(0, 10))}</b></div>}
+                    {(p.creadoEn || p.fechaRegistro) && <div><small>Apertura de la historia</small><b>{fmtFecha(/T\d/.test(String(p.creadoEn || p.fechaRegistro)) ? ymdLima(p.creadoEn || p.fechaRegistro) : String(p.creadoEn || p.fechaRegistro).slice(0, 10))}</b></div>}
                     <div><small>Edad</small><b>{edad != null ? `${edad} años` : "Sin fecha de nacimiento"}</b></div>
                   </div>
                   <section style={card}>
@@ -2248,7 +2364,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   const docs = [...new Set(linea.map(docDe).filter((n) => n && n !== "—"))].sort();
                   const MESES = { "3m": 3, "6m": 6, "12m": 12 };
                   let cutoff = null;
-                  if (MESES[rango]) { const dd = new Date(); dd.setMonth(dd.getMonth() - MESES[rango]); cutoff = dd.toISOString().slice(0, 10); }
+                  if (MESES[rango]) { const dd = new Date(); dd.setMonth(dd.getMonth() - MESES[rango]); cutoff = ymdLima(dd); }
                   const q = busqueda.trim().toLowerCase();
                   let filtrada = filtroTL === "todo" ? linea : linea.filter((e) => e.k === filtroTL);
                   if (filtroMed) filtrada = filtrada.filter((e) => docDe(e) === filtroMed);
@@ -2287,7 +2403,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             )}
 
             {tab === "datos" && puedeRegistro && (() => {
-              const fuenteSrv = conectado && Array.isArray(regSrv) ? registroDesdeServidor(regSrv, p) : [];
+              const fuenteSrv = conectado && Array.isArray(regSrv) ? registroDesdeServidor(regSrv, p, pacienteId) : [];
               const usaSrv = fuenteSrv.length > 0;
               const base = !conectado ? registroDemo(p) : usaSrv ? fuenteSrv : [];
               const todos = [...regLocal, ...base, ...(usaSrv ? [] : registroDesdeFicha(d, rx, consentimientos))]
@@ -2296,7 +2412,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               const lista = todos.filter((e) => (regFiltro === "todo" || (regFiltro === "cambios" ? e.tipo !== "acceso" : e.tipo === regFiltro)) && (!q || [e.usuario, e.accion, e.detalle, e.rol].join(" ").toLowerCase().includes(q)));
               const accesos = todos.filter((e) => e.tipo === "acceso");
               const personas = new Set(todos.map((e) => e.usuario).filter((u) => u && u !== "—")).size;
-              const fh = (ts) => { const x = new Date(ts); return isNaN(x) ? { dia: String(ts).slice(0, 10), hora: "" } : { dia: x.toISOString().slice(0, 10), hora: x.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) }; };
+              const fh = (ts) => { const x = new Date(ts); return isNaN(x) ? { dia: String(ts).slice(0, 10), hora: "" } : { dia: ymdLima(x), hora: x.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }) }; };
               const ultimo = accesos[0] ? fh(accesos[0].ts) : null;
               const grupos = [];
               lista.forEach((e) => { const { dia } = fh(e.ts); const g = grupos.find((x) => x.dia === dia); if (g) g.items.push(e); else grupos.push({ dia, items: [e] }); });
@@ -2384,7 +2500,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <PeriodontogramaClinico pacienteId={pacienteId} pacienteNombre={p.nombre || ""} paciente={p} notify={notify} soloLectura />
             </div>}
 
-            {tab === "recetas" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} onChange={cargar} notify={notify} medicos={medicosTodos} />}
+            {tab === "recetas" && puedeRecetar && <Receta pacienteId={pacienteId} clinica={clinica} paciente={p} recetas={d?.recetas} recetasError={!!parcial && !parcial.recetas} sedeId={sedeId} onChange={cargar} notify={notify} medicos={medicosTodos} />}
 
             {tab === "odontograma" && subOdo === "orto" && <Ortodoncia pacienteId={pacienteId} notify={notify} />}
 
@@ -2417,7 +2533,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             {tab === "cuenta" && !slots?.plan && (
               <>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: -4 }}>
-                  {onCobrar && debe && rol !== "medico" && (
+                  {onCobrar && debe && rol !== "medico" && puedeCobrarFicha && (
                     <button onClick={() => onCobrar(p)} style={btn()} title="Registrar cobro"><CreditCard size={15} strokeWidth={1.75} /> Cobrar</button>
                   )}
                 </div>

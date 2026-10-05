@@ -7,6 +7,7 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Keyboard, Printer, Redo2, Undo2, X } from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
+import { idxDeUuid } from "../compartido/sedesRegistro";
 import { SUP, INF, piezaVacia, desdeApi, aApi, metricas, clasificacion, ordenVisual, esMolar, esSuperior, tipoDiente, nic, demoPerio } from "../util/periodontal";
 import { CATALOGO_PERIO, FASES_PERIO, abrirInformePerio, guardarPrecio, sugerirPlan, totalesPlan } from "../util/perioPlan";
 import { DatosDemoCtx, SEDE_IDS, mismaSede, nombreSede, sedeDePrecio, sedeNum, sedesDe, useSede } from "../comun";
@@ -351,14 +352,21 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
     // Cada partida lleva la sede donde se cobra (UUID real): la de precio; si no se puede
     // traducir, la del paciente o la activa. Sin sede la partida no se ve en Caja ni en
     // Plan y cuenta de esa sede, así que no se manda sin ella.
-    const uuidOk = (x) => { const u = sedeApiUuid(x); return u && /^[0-9a-f-]{36}$/i.test(u) && !UUID_DEMO.test(u) ? u : null; };
-    const sedeOk = uuidOk(sedePrecio) || uuidOk(sedeId) || [paciente?.sedeRegistroId, ...sedesDe(paciente || {})].map(uuidOk).find(Boolean) || uuidOk(sedeCx.activa);
-    if (!sedeOk) { notify("Elige la sede de atención en el selector de sede antes de pasar las partidas al presupuesto."); return; }
+    // H-09: un UUID de la forma de la semilla (…000a1) es real si el servidor lo devolvió en
+    // GET /sedes (en producción las sedes tienen justo esos UUID). Antes se descartaba siempre
+    // y el doctor con sede fija, que no tiene selector, nunca podía pasar la proforma.
+    const uuidOk = (x) => { const u = sedeApiUuid(x); return u && /^[0-9a-f-]{36}$/i.test(u) && (!UUID_DEMO.test(u) || idxDeUuid(u) != null) ? u : null; };
+    const sedeOk = uuidOk(sedePrecio) || uuidOk(sedeId) || [paciente?.sedeRegistroId, ...sedesDe(paciente || {})].map(uuidOk).find(Boolean) || uuidOk(sedeCx.activa)
+      // Sede fija del usuario (una sola): es la de atención aunque no haya selector.
+      || ((sedeCx.mias || []).length === 1 ? uuidOk(sedeCx.mias[0]) : null);
+    if (!sedeOk) { notify((sedeCx.mias || []).length > 1 ? "Elige la sede de atención en el selector de sede antes de pasar las partidas al presupuesto." : "No se pudo determinar la sede de atención. Vuelve a iniciar sesión e inténtalo de nuevo."); return; }
+    // Si el plan no se puede leer no se crea otro: quedaría un plan duplicado (H-02).
+    let planLeido = false;
     api.tratamientos.porPaciente(pacienteId)
-      .then((planes) => planes?.[0]?.plan?.id || api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento", sedeId: sedeOk }).then((pl) => pl.id))
+      .then((planes) => { planLeido = true; return planes?.[0]?.plan?.id || api.tratamientos.crearPlan({ pacienteId, nombre: "Plan de tratamiento", sedeId: sedeOk }).then((pl) => pl.id); })
       .then((planId) => Promise.all(items.map((it) => api.tratamientos.agregarFase(planId, { nombre: it.nombre, costo: it.costo, origen: "periodontograma", sedeId: sedeOk, ...(it.servicioId ? { servicioId: it.servicioId } : {}) }))))
       .then(() => { notify("Partidas agregadas al presupuesto del paciente."); setPf(null); })
-      .catch(() => notify("No se pudo agregar al presupuesto."));
+      .catch(() => notify(planLeido ? "No se pudo agregar al presupuesto." : "No se pudo leer el plan del paciente. No se agregó nada al presupuesto."));
   };
   const emitir = (ok) => { if (!ok) notify("Permite las ventanas emergentes para ver el documento."); };
   const informe = () => emitir(abrirInformePerio({

@@ -8,7 +8,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const sol = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ESTADO = { pendiente: "Por hacer", aprobada: "Por hacer", en_proceso: "En curso", terminada: "Hecho · por cobrar", atendida: "Hecho · pagado" };
 
-/** items = ficha.tratamiento; pagos = ficha.pagos; sede = id de la sede (demo 1/2) o null. */
+/** items = ficha.tratamiento; pagos = ficha.pagos (null = sin acceso a los pagos); sede = id de la sede (demo 1/2) o null. */
 export function imprimirPresupuesto({ paciente = {}, items = [], pagos = [], sede = null, doctor = "", datos = null }) {
   const vivos = (items || []).filter((f) => f && f.estado !== "anulado" && f.estado !== "anulada");
   const total = vivos.reduce((a, f) => a + (Number(f.costo) || 0), 0);
@@ -34,7 +34,8 @@ export function imprimirPresupuesto({ paciente = {}, items = [], pagos = [], sed
     cuerpo: `<div class="pr-meta"><span><b>Paciente:</b> ${esc(paciente.nombre || "—")}</span>${paciente.dni ? `<span><b>DNI:</b> ${esc(paciente.dni)}</span>` : ""}${doctor ? `<span><b>Odontólogo:</b> ${esc(doctor)}</span>` : ""}</div>`
       + (vivos.length ? `<table class="pr-t"><thead><tr><th class="c">N.º</th><th>Procedimiento</th><th class="c">Pieza (cara)</th><th>Estado</th><th class="r">Importe</th></tr></thead><tbody>${filas}</tbody></table>` : `<p>No hay procedimientos en el plan.</p>`)
       + `<div class="pr-tot"><div><span>Valor de venta</span><b>${sol(base)}</b></div><div><span>IGV (18 %)</span><b>${sol(igv)}</b></div><div class="is-g"><span>Total del plan</span><span>${sol(total)}</span></div>`
-      + `<div><span>Pagado</span><b>${sol(pagado)}</b></div><div><span>Saldo</span><b>${sol(saldo)}</b></div></div>`
+      // pagos === null: quien imprime no ve los pagos (p. ej. el doctor); no se inventa «Pagado S/ 0».
+      + (pagos === null ? "" : `<div><span>Pagado</span><b>${sol(pagado)}</b></div><div><span>Saldo</span><b>${sol(saldo)}</b></div>`) + `</div>`
       + `<p class="pr-nota">Precios con IGV de la sede de atención. Presupuesto referencial válido por 30 días; puede variar si cambia el diagnóstico durante el tratamiento.</p>`,
   });
 }
