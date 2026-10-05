@@ -2,7 +2,7 @@
  *
  * Con sesión nada sale de las semillas de demostración: el catálogo (nombre, código,
  * precio base, precio por sede y hallazgos del odontograma que proponen el servicio) es
- * el de GET /especialidades, y el profesional que firma con su COP es el de GET /medicos.
+ * el de GET /servicios, y el profesional que firma con su COP es el de GET /medicos.
  * Una sola petición por pantalla: la respuesta se comparte unos segundos entre módulos
  * (Odontograma, Periodontograma, Plan de inversión) y se descarta al cambiar de token.
  * Sin sesión los hooks devuelven null y cada módulo sigue con sus datos de ejemplo. */
@@ -38,7 +38,7 @@ export function servicioDeApi(e) {
 }
 
 /** Lista del catálogo del servidor (promesa). */
-export const catalogoApi = () => pedir("esp", () => api.catalogo.especialidades()).then((r) => r.map(servicioDeApi));
+export const catalogoApi = () => pedir("esp", () => api.catalogo.servicios()).then((r) => r.map(servicioDeApi));
 /** Médicos del servidor (promesa). */
 export const medicosApi = () => pedir("med", () => api.catalogo.medicos());
 

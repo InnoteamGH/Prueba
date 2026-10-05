@@ -3715,7 +3715,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   useEffect(() => { if (conectado) {
     api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => { const ss = Array.isArray(p.sedes) && p.sedes.length ? p.sedes.map((x) => x?.id ?? x) : (p.sedeRegistroId ? [p.sedeRegistroId] : []); return { id: p.id, nombre: p.nombre, dni: p.dni || "", email: p.email || "", direccion: p.direccion || "", sede: ss[0] ?? null, sedes: ss }; }))).catch(() => {});
     api.sedes.listar().then((s) => setSedes(s || [])).catch(() => {});
-    api.catalogo.especialidades().then((r) => setSrvApi((r || []).map((e) => ({ id: e.id, nombre: e.nombre, precio: Number(e.precioBase) || 0, preciosSede: e.preciosSede || {}, activo: e.activo !== false })).filter((x) => x.activo))).catch(() => {});
+    api.catalogo.servicios().then((r) => setSrvApi((r || []).map((e) => ({ id: e.id, nombre: e.nombre, precio: Number(e.precioBase) || 0, preciosSede: e.preciosSede || {}, activo: e.activo !== false })).filter((x) => x.activo))).catch(() => {});
   } }, []); // eslint-disable-line
   const pacientes = conectado ? (pacRemoto || []).filter((p) => sx.enSede(p.sedes)) : pacProp;
   const servicios = conectado ? (srvApi || []) : getServicios();
@@ -7665,7 +7665,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
   const [srv, setSrv] = useState([]);
   const cargar = () => {
     if (!conectado) return;
-    api.catalogo.especialidades()
+    api.catalogo.servicios()
       .then((r) => setSrv((r || []).map(mapApi)))
       .catch(() => {});
   };

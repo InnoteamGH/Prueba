@@ -154,7 +154,7 @@ function WhatsAppInbox({ notify = () => {} }) {
   useEffect(() => {
     if (!conectado) return;
     api.sedes.listar().then((x) => setSedesReales(Array.isArray(x) ? x : [])).catch(() => {});
-    api.catalogo.especialidades().then((x) => setEspsReales(Array.isArray(x) ? x : [])).catch(() => {});
+    api.catalogo.servicios().then((x) => setEspsReales(Array.isArray(x) ? x : [])).catch(() => {});
     api.clinica.get().then((r) => setHorarioApi(r?.horario && typeof r.horario === "object" ? r.horario : {})).catch(() => setHorarioApi({}));
   }, []); // eslint-disable-line
   /**

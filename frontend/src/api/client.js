@@ -359,6 +359,9 @@ export const api = {
   },
   catalogo: {
     especialidades: () => request("GET", "/especialidades"),
+    // Catálogo completo de servicios con precio (GET /especialidades solo trae las 5
+    // especialidades). Si el servidor aún no tiene la ruta, cae a /especialidades.
+    servicios: () => request("GET", "/servicios").catch((e) => { if (e?.status === 404 || e?.status === 405) return request("GET", "/especialidades"); throw e; }),
     medicos: (especialidadId) => request("GET", `/medicos${especialidadId ? `?especialidadId=${especialidadId}` : ""}`),
     crearEspecialidad: (e) => request("POST", "/especialidades", e),
     actualizarEspecialidad: (id, e) => request("PUT", `/especialidades/${id}`, e),
