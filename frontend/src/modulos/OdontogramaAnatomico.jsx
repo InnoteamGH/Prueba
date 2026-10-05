@@ -269,7 +269,9 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       const fs = [];
       (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && !/anulad/i.test(String(f.estado || ""))) fs.push({ id: f.id, t: f.nombre || "Procedimiento", v: Number(f.costo) || 0, pz: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || "" }); }));
       setPlanSrv(fs);
-    }).catch(() => {});
+    // H-10: si el plan no se puede leer, el documento lo dice; antes salía una «Propuesta»
+    // armada solo con los hallazgos, como si el paciente no tuviera nada en su plan.
+    }).catch(() => { if (vivo) setPlanSrv({ error: true }); });
     return () => { vivo = false; };
   }, [pacienteId, soloLectura]);
   const syncChrome = useCallback(() => {
@@ -288,7 +290,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     postToIframe({ type: "dento-odontograma-profesional", profesional: profesionalDoc(medicoTratante, medsApi) });
     // Tarifa del plan de inversión del dibujo: la del catálogo de la clínica en la sede.
     if (tarifaDibujo) postToIframe({ type: "dento-odontograma-tarifa", tarifa: tarifaDibujo, sueltos: [] });
-    if (planSrv) postToIframe({ type: "dento-odontograma-plan", fases: planSrv });
+    if (planSrv) postToIframe(Array.isArray(planSrv) ? { type: "dento-odontograma-plan", fases: planSrv } : { type: "dento-odontograma-plan", fases: [], error: true });
     // Membrete de los documentos del odontograma (resumen y plan de inversión): los
     // mismos datos de empresa y de la sede activa que el resto del sistema.
     postToIframe({

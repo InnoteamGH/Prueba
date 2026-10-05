@@ -2186,8 +2186,11 @@ function recorrer(fn){
    el plan solo salía del dibujo y, con el presupuesto armado en Plan y cuenta, el
    documento decía «Total S/ 0». */
 let PLAN_SRV=[];
+/* el plan del sistema no se pudo leer: el documento lo avisa en vez de pasar por completo */
+let PLAN_SRV_ERROR=false;
 function aplicarPlanSrv(d){
   try{
+    PLAN_SRV_ERROR=!!(d&&d.error);
     PLAN_SRV=(Array.isArray(d&&d.fases)?d.fases:[]).filter(function(f){return f&&f.t;}).map(function(f){
       return {id:f.id, t:String(f.t), v:(+f.v||0), pz:(f.pz==null||f.pz===''?null:+f.pz), cara:f.cara?String(f.cara):''};});
     if(typeof presupuesto==='function') presupuesto();
@@ -2726,6 +2729,11 @@ function hojaPlan(){
     metaFranja([['Documento',NUM_DOC],['Emitido',fechaCorta(new Date())],
                 ['Válido hasta',fechaCorta(vence)],['Estado','Propuesta – sin aceptar']])+
     fichaPaciente()+
+    (PLAN_SRV_ERROR
+      ? '<div style="border:1.5px solid #B42318;background:#FEF3F2;color:#7A271A;border-radius:6px;padding:8px 12px;margin:8px 0 4px;font-size:12px">'+
+        '<b>Propuesta incompleta.</b> No se pudo leer el plan de tratamiento del paciente: este documento solo '+
+        'incluye los hallazgos del odontograma, no los procedimientos ya registrados en su plan.</div>'
+      : '')+
     '<h2 class="doc-h2">1 &nbsp;–&nbsp; Tratamientos propuestos</h2>'+
     '<table class="doc"><thead><tr><th style="width:88px">Pieza</th><th>Tratamiento</th>'+
     '<th style="width:46px">Cant</th><th style="width:92px">P. unit. S/</th>'+
