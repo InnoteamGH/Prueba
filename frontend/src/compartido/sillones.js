@@ -64,6 +64,8 @@ const numSede = (x) => {
 const mismaSedeS = (a, b) => a != null && b != null && (String(a) === String(b) || numSede(a) === numSede(b));
 const sedeDe = (c) => c.sede ?? c.sedeId;
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+// Plural para «no atiende los …» (H-18: decía «los domingo»; sábado y domingo llevan «s»).
+const DIAS_PL = ["domingos", "lunes", "martes", "miércoles", "jueves", "viernes", "sábados"];
 const diaDe = (fecha) => new Date(`${fecha}T00:00:00`).getDay();
 
 /** ¿La cita empezaría antes de ahora? Se compara con la hora del navegador (Lima) al
@@ -153,9 +155,9 @@ export function medicoAtiende(disp, { medicoId, fecha, hora, duracionMin, sede }
   if (!todos.length) return { ok: true, sinHorario: true, motivo: "" };
   const ini = aMin(hora), fin = ini + (Number(duracionMin) || 30);
   const delDia = (disp || []).filter((d) => mismo(d.medicoId, medicoId) && Number(d.diaSemana) === diaDe(fecha) && d.activo !== false);
-  if (!delDia.length) return { ok: false, motivo: `${nombre} no atiende los ${DIAS[diaDe(fecha)]}.` };
+  if (!delDia.length) return { ok: false, motivo: `${nombre} no atiende los ${DIAS_PL[diaDe(fecha)]}.` };
   const enSede = delDia.filter((d) => sede == null || (d.sede ?? d.sedeId) == null || mismaSedeS(d.sede ?? d.sedeId, sede));
-  if (!enSede.length) return { ok: false, motivo: `${nombre} no atiende en esta sede los ${DIAS[diaDe(fecha)]} (está en otra sede: ${txtTurnos(delDia)}).` };
+  if (!enSede.length) return { ok: false, motivo: `${nombre} no atiende en esta sede los ${DIAS_PL[diaDe(fecha)]} (está en otra sede: ${txtTurnos(delDia)}).` };
   if (enSede.some((d) => aMin(d.horaInicio) <= ini && fin <= aMin(d.horaFin))) return { ok: true, motivo: "" };
   return { ok: false, motivo: `${nombre} atiende ese día de ${txtTurnos(enSede)}; ${aHora(ini)}–${aHora(fin)} queda fuera.` };
 }

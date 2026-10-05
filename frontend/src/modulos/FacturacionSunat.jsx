@@ -121,12 +121,32 @@ function simular(pagos, cfg, overrides) {
   return lista.sort((a, b) => (b.fecha + b.id).localeCompare(a.fecha + a.id));
 }
 
+/* H-25: con sesión, los cobros de Caja que ya tienen boleta (serie y número) y que el
+   registro de facturación electrónica todavía no devuelve se listan igual, «Por enviar»,
+   para que Caja › Hoy y esta pestaña no se contradigan («0 boletas» frente a 3 emitidas). */
+function desdeCobros(cobros, cfg) {
+  return (cobros || []).filter((p) => p && p.comprobanteSerie && p.comprobanteNumero != null && !p.anulado).map((p) => {
+    const serie = String(p.comprobanteSerie);
+    const esFactura = /^F/i.test(serie) || /factura/i.test(String(p.comprobanteTipo || ""));
+    const moneda = p.moneda === "USD" ? "USD" : "PEN";
+    const total = moneda === "USD" && Number(p.montoOriginal) > 0 ? Number(p.montoOriginal) : (Number(p.monto) || 0);
+    const base = cfg.afectacion === "gravado" ? Math.round((total / 1.18) * 100) / 100 : total;
+    const estado = { aceptado: "aceptado", observado: "observado", rechazado: "rechazado" }[String(p.sunatEstado || "").toLowerCase()] || "pendiente";
+    return {
+      id: `${serie}-${num8(p.comprobanteNumero)}`, tipo: esFactura ? "Factura" : "Boleta", serie, numero: Number(p.comprobanteNumero), fecha: String(p.fecha || fmt(hoy)).slice(0, 10),
+      cliente: p.paciente || "Cliente", docTipo: p.dni ? "DNI" : "—", docNum: p.dni || "", paciente: p.paciente || "", concepto: p.concepto || "Atención odontológica",
+      moneda, base, igv: Math.round((total - base) * 100) / 100, total, tipoCambio: p.tipoCambio ?? null, metodo: p.metodo || "", sedeId: p.sedeId ?? null, sede: p.sedeId ?? p.sede ?? null,
+      estado, mensaje: p.sunatMensaje || "", pago: p, origen: "caja",
+    };
+  });
+}
+
 const EstadoChip = ({ e, msg }) => { const x = ESTADO[e] || ESTADO.pendiente; const I = x.ic; return <span className={`dc-fe__chip ${x.c}`} title={msg || x.l}><I size={12} strokeWidth={2.4} /> {x.l}</span>; };
 
 /* ───────────────────────── Caja › Facturación ───────────────────────── */
 /* pagos: los cobros de toda la clínica (con su sede) para numerar igual en cualquier filtro;
    verSedes: sedes que se muestran (null = todas); consulta: { sedeIds } para el servidor. */
-export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = null, consulta = null, notify = () => {}, abrirBoleta = () => {}, onIntegraciones = null, puedeEmitir = true }) {
+export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sedes = [], verSedes = null, consulta = null, notify = () => {}, abrirBoleta = () => {}, onIntegraciones = null, puedeEmitir = true }) {
   const conectado = !!auth.token;
   const listaSedes = sedes.length ? sedes : sedesPorDefecto();
   const seVe = (sd) => !verSedes || sd == null || sd === "" || verSedes.some((v) => mismaSede(sd, v));
@@ -146,7 +166,14 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
 
   // Primero se simulan (o llegan) todos; después se recortan a las sedes que se ven, con las
   // notas de crédito incluidas (cada NC lleva la sede del comprobante que anula).
-  const comprobantes = useMemo(() => (conectado ? (remoto?.comprobantes || []) : simular(pagos, cfg, overrides)).filter((c) => seVe(c.sedeId ?? c.sede)), [conectado, remoto, pagos, cfg, overrides, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const comprobantes = useMemo(() => {
+    if (!conectado) return simular(pagos, cfg, overrides).filter((c) => seVe(c.sedeId ?? c.sede));
+    const srv = remoto?.comprobantes || [];
+    const ya = new Set(srv.map((c) => String(c.id || `${c.serie}-${num8(c.numero)}`)));
+    const deCaja = desdeCobros(cobrosServidor, cfg).filter((c) => !ya.has(c.id) && (ya.add(c.id), true));
+    return [...srv, ...deCaja].filter((c) => seVe(c.sedeId ?? c.sede));
+  }, [conectado, remoto, pagos, cobrosServidor, cfg, overrides, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const deCajaN = comprobantes.filter((c) => c.origen === "caja").length;
   const cuenta = (e) => comprobantes.filter((c) => c.estado === e).length;
   const atender = comprobantes.filter((c) => c.estado === "observado" || c.estado === "rechazado");
   const FILTROS = [
@@ -199,10 +226,10 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
                   montoOriginal (US$) y su TC; así la boleta es la misma que la del cobro. */}
               <button type="button" title="Ver comprobante" aria-label={`Ver ${c.id}`} onClick={(e) => { e.stopPropagation(); abrirBoleta({ ...(c.pago || {}), paciente: c.cliente, comprobanteSerie: c.serie, comprobanteNumero: c.numero, fecha: c.fecha, ...(c.moneda === "USD" ? { monto: Number(c.pago?.monto) || null, montoOriginal: Math.abs(c.total), tipoCambio: c.tipoCambio ?? c.pago?.tipoCambio ?? null } : { monto: Math.abs(c.total) }), moneda: c.moneda, concepto: c.concepto, metodo: c.metodo, tipo: c.tipo, docTipo: c.docTipo, docNum: c.docNum, refComprobante: c.ref }); }}><FileText size={14} strokeWidth={2} /></button>
               {(c.estado === "rechazado" || c.estado === "observado" || c.estado === "pendiente")
-                ? puedeEmitir && <button type="button" title="Reenviar a SUNAT" aria-label={`Reenviar ${c.id}`} onClick={(e) => { e.stopPropagation(); reenviar(c); }}><RefreshCw size={14} strokeWidth={2} /></button>
+                ? puedeEmitir && c.origen !== "caja" && <button type="button" title="Reenviar a SUNAT" aria-label={`Reenviar ${c.id}`} onClick={(e) => { e.stopPropagation(); reenviar(c); }}><RefreshCw size={14} strokeWidth={2} /></button>
                 : null}
               <MenuAcciones opciones={[
-                puedeEmitir && c.estado === "aceptado" && c.total > 0 && { label: "Anular con nota de crédito", peligro: true, onClick: () => setNc({ c, tipo: "Anulación de la operación", motivo: "" }) },
+                puedeEmitir && c.origen !== "caja" && c.estado === "aceptado" && c.total > 0 && { label: "Anular con nota de crédito", peligro: true, onClick: () => setNc({ c, tipo: "Anulación de la operación", motivo: "" }) },
                 // Con sesión solo se ofrece si el servidor manda el enlace del archivo (xmlUrl / cdrUrl).
                 (!conectado || c.xmlUrl) && { label: "Descargar XML", onClick: () => (conectado ? window.open(c.xmlUrl, "_blank", "noopener") : notify("El XML se descarga cuando el envío a SUNAT esté activo.")) },
                 c.estado === "aceptado" && (!conectado || c.cdrUrl) && { label: "Descargar constancia (CDR)", onClick: () => (conectado ? window.open(c.cdrUrl, "_blank", "noopener") : notify("La constancia de SUNAT se descarga cuando el envío esté activo.")) },
@@ -211,7 +238,7 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
           ) },
   ];
 
-  if (conectado && remoto?.error) {
+  if (conectado && remoto?.error && !deCajaN) {
     return (
       <section className="dc-fe">
         <div className="dc-fe__aviso-sin"><PlugZap size={18} strokeWidth={2} /><div><b>La facturación electrónica aún no está activa</b><span>Las boletas se emiten en el sistema sin envío a SUNAT. La conexión la configura TI en Administración › Integraciones.</span></div></div>
@@ -237,6 +264,9 @@ export default function FacturacionSunat({ pagos = [], sedes = [], verSedes = nu
         <BotonExportar titulo="Comprobantes electrónicos" cols={cols} filas={visibles} sub="comprobantes" />
       </div>
 
+      {conectado && deCajaN > 0 && (
+        <div className="dc-fe__aviso-sin"><Receipt size={18} strokeWidth={2} /><div><b>{deCajaN} {deCajaN === 1 ? "comprobante emitido" : "comprobantes emitidos"} en Caja aún sin registro electrónico</b><span>Son las boletas de los cobros: se muestran aquí con su serie y número hasta que el servidor las registre para el envío a SUNAT.</span></div></div>
+      )}
       {!cfg.proveedor && (
         <div className="dc-fe__aviso-sin"><PlugZap size={18} strokeWidth={2} /><div><b>Sin proveedor de facturación electrónica</b><span>Los comprobantes se emiten en el sistema y quedan «Sin enviar» hasta conectar un proveedor (OSE/PSE).</span></div>{onIntegraciones && <button type="button" className="dc-fe__btn" onClick={onIntegraciones}>Ir a Integraciones</button>}</div>
       )}

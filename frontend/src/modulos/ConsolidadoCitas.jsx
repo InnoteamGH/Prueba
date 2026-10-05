@@ -131,7 +131,10 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       {/* AGE-07: la vista Lista es solo filtros, conteo y tabla. Citas por doctor está en
           el Panel y la Ocupación de sillones en Reportes. */}
 
-      {filasF.length === 0 ? (
+      {/* H-28: con «Hasta» antes que «Desde» (escrito a mano) se avisa en vez de «Sin citas». */}
+      {rango.desde && rango.hasta && rango.hasta < rango.desde ? (
+        <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo="Rango de fechas inválido" sub="La fecha «Hasta» es anterior a «Desde». Corrígela para ver las citas." /></Card>
+      ) : filasF.length === 0 ? (
         <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : filas.length ? "Ninguna cita con estos filtros" : "Sin citas en el rango"} sub={filas.length ? "Cambia el doctor o el estado." : "Cambia las fechas para ver otro periodo."} /></Card>
       ) : (
         <ListaFiltrable rows={filasF} sub="citas" vistaClave="citas_consolidado" alfabetico={false}

@@ -7,7 +7,14 @@ import { comisionSede, guardarMetaSedeDemo, medicoEnSedes, metaSede, sedesMed } 
 import { sedeApiUuid } from "../routing";
 import { conCop } from "../util/cop";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
+import { sillonesPorSede } from "../compartido/useReglasAgenda";
 import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda, useSede, mismaSede, sedeNum, nombreSede} from "../comun";
+
+/* H-08 (admin): un 405/404 de POST /disponibilidad es que el servidor no tiene la ruta, no
+   que las horas estén mal; el aviso lo dice para no mandar a revisar lo que está bien. */
+const msgAgregarHorario = (e) => (e?.status === 405 || e?.status === 404
+  ? "El servidor todavía no permite agregar horarios desde aquí (POST /disponibilidad no disponible)."
+  : e?.status === 400 || e?.status === 409 || e?.status === 422 ? `No se pudo agregar: ${String(e?.message || "revisa las horas").replace(/\.$/, "")}.` : "No se pudo agregar el horario.");
 
 const BANCOS_PE = [
   { id: "bcp", nombre: "BCP — Banco de Crédito", cuenta: [14] },
@@ -98,7 +105,7 @@ function OnboardingWizard({ onClose, onDone = () => {}, notify = () => {}, sedeV
     setBusy(true);
     api.disponibilidad.crear({ medicoId: medHor, sedeId: sedeHor ? sedeApiUuid(sedeHor) : null, diaSemana: Number(fHor.diaSemana), horaInicio: fHor.horaInicio, horaFin: fHor.horaFin, activo: true })
       .then(() => { api.disponibilidad.listar(medHor).then((r) => setDisp(r || [])); onDone(); notify("Horario agregado."); })
-      .catch(() => notify("No se pudo agregar (revisa las horas).")).finally(() => setBusy(false));
+      .catch((e) => notify(msgAgregarHorario(e))).finally(() => setBusy(false));
   };
 
   // Sedes y servicios son de toda la clínica: el usuario de sede solo configura sus doctores y horarios.
@@ -248,7 +255,15 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   const sillones = (conectado ? silRemoto : (demoDb?.sillones || SILLONES_DEMO).map(normSillon)).filter((x) => sedeVisible(x.sede ?? x.sedeId));
   const [citasHoySil, setCitasHoySil] = useState([]);
   useEffect(() => { if (conectado && tab === "sillones") api.citas.listar(fmt(new Date())).then((r) => setCitasHoySil(r || [])).catch(() => setCitasHoySil([])); }, [tab]); // eslint-disable-line
-  const cargarSillones = () => { if (conectado) api.sillones.listar().then((r) => setSilRemoto((r || []).map(normSillon))).catch(() => setSilRemoto([])); };
+  // H-10: GET /sillones sin sedeId devuelve solo los de una sede («Sede Surco: 0 sillones»
+  // aunque tiene 4): se piden por cada sede (?sedeId=), igual que Agenda y Ocupación.
+  const sedesRef = useRef([]); sedesRef.current = sedesTodas;
+  const cargarSillones = () => {
+    if (!conectado) return;
+    const uuids = sedesRef.current.map((x) => sedeApiUuid(x.id) || x.id).filter(Boolean);
+    sillonesPorSede(uuids).then((r) => setSilRemoto((r || []).map(normSillon))).catch(() => setSilRemoto([]));
+  };
+  useEffect(() => { if (conectado && sedesTodas.length) cargarSillones(); }, [sedesTodas.map((x) => x.id).join(",")]); // eslint-disable-line
   // Cada promoción es de una sede (el precio cambia por sede); sin sede = toda la clínica.
   const [promos, setPromos] = useState(() => (auth.token ? [] : [
     { id: "p1", titulo: "Blanqueamiento con 20% de descuento", descripcion: "Solo pacientes con limpieza reciente", descuento: "20%", activa: true, desde: "", hasta: "", sedeId: 2 },
@@ -559,7 +574,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
       notify("Horario agregado."); return;
     }
     api.disponibilidad.crear({ medicoId: medHor, sedeId: h.sedeId ? sedeApiUuid(h.sedeId) : null, diaSemana: h.diaSemana, horaInicio: h.horaInicio, horaFin: h.horaFin, activo: true })
-      .then(() => { notify("Horario agregado."); cargarDisp(medHor); }).catch(() => notify("No se pudo agregar (revisa las horas)."));
+      .then(() => { notify("Horario agregado."); cargarDisp(medHor); }).catch((e) => notify(msgAgregarHorario(e)));
   };
   const delHorario = (d) => {
     if (!bloqueEditable(d)) { notify(d.sedeId ? "Ese bloque es de otra sede." : "Ese bloque vale para todas las sedes: lo quita la administración general."); return; }

@@ -28,6 +28,10 @@ function rango(id, hoy = M.hoyISO()) {
 }
 const enRango = (f, r) => { const x = String(f || "").slice(0, 10); return x && x >= r.desde && x <= r.hasta; };
 const soles = (n) => `S/ ${M.sol0(n)}`;
+// H-20: los montos de las tablas y del Excel van con céntimos (311.25, no 311) y con su
+// signo pegado al número, para que el Excel los lea como números y se puedan sumar.
+const soles2 = (n) => `S/ ${M.sol2(n)}`;
+const solesExp = (n) => (n == null ? "" : `${Number(n) < 0 ? "-" : ""}S/ ${Math.abs(Number(n) || 0).toFixed(2)}`);
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const mesTxt = (ym) => { const [y, m] = ym.split("-"); return `${MESES[Number(m) - 1]} ${y.slice(2)}`; };
 const servicioBase = (nombre) => String(nombre || "Procedimiento").split(" · ")[0];
@@ -75,7 +79,9 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     if (rep === "procedimientos") {
       api.tratamientos.resumen(r.desde, r.hasta, { sedeIds: sedesApi }).then((t) => ok({ trat: lista(t) })).catch(fallo);
     } else if (rep === "saldo") {
-      Promise.all([api.pacientes.listar(), api.pacientes.resumenFinanciero(sedesApi)]).then(([p, f]) => ok({ pac: lista(p), fin: lista(f) })).catch(fallo);
+      // «Hecho sin pagar» por paciente: el mismo saldo de trabajo terminado que usan Caja y
+      // Pendientes de hoy (GET /caja → porCobrar), mientras el resumen financiero no lo traiga.
+      Promise.all([api.pacientes.listar(), api.pacientes.resumenFinanciero(sedesApi), api.caja({ sedeIds: sedesApi }).catch(() => null)]).then(([p, f, c]) => ok({ pac: lista(p), fin: lista(f), caja: c ? lista(c.porCobrar) : null })).catch(fallo);
     } else if (rep === "recuperar") {
       Promise.all([api.pacientes.listar(), api.pacientes.resumenCitas()]).then(([p, c]) => ok({ pac: lista(p), res: lista(c) })).catch(fallo);
     } else if (rep === "pacientes") {
@@ -101,11 +107,17 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     if (rep === "saldo") {
       // GET /pacientes/resumen-financiero da plan total y pagado por paciente; lo hecho sin
       // pagar y lo vencido necesitan el detalle por ítem, que el servidor aún no resume.
-      const filas = dSrv.fin.map((x) => ({ id: x.pacienteId, paciente: x.paciente || nombreDe(x.pacienteId), saldoPlan: Math.max(0, (Number(x.total) || 0) - (Number(x.pagado) || 0)), porCobrar: x.porCobrar != null ? Number(x.porCobrar) || 0 : null, vencido: x.vencido != null ? Number(x.vencido) || 0 : null, dias: x.diasSinPagar != null ? Number(x.diasSinPagar) || 0 : null }))
+      const cajaPc = new Map();
+      (dSrv.caja || []).filter((r) => deSedeApi(r.sedeId) || r.sedeId == null).forEach((r) => { const k = String(r.pacienteId); cajaPc.set(k, (cajaPc.get(k) || 0) + (Number(r.saldo) || 0)); });
+      const conCaja = Array.isArray(dSrv.caja);
+      const filas = dSrv.fin.map((x) => ({ id: x.pacienteId, paciente: x.paciente || nombreDe(x.pacienteId), saldoPlan: Math.max(0, Math.round(((Number(x.total) || 0) - (Number(x.pagado) || 0)) * 100) / 100),
+        porCobrar: x.porCobrar != null ? Number(x.porCobrar) || 0 : (conCaja ? Math.round((cajaPc.get(String(x.pacienteId)) || 0) * 100) / 100 : null),
+        vencido: x.vencido != null ? Number(x.vencido) || 0 : null, dias: x.diasSinPagar != null ? Number(x.diasSinPagar) || 0 : null }))
         .filter((f) => f.saldoPlan > 0 || f.porCobrar > 0).sort((a, b) => b.saldoPlan - a.saldoPlan);
       const sum = (k) => filas.reduce((a, f) => a + (Number(f[k]) || 0), 0);
       const conDetalle = filas.some((f) => f.porCobrar != null);
-      return { filas, kpis: [["Pacientes", String(filas.length)], ["Hecho sin pagar", conDetalle ? soles(sum("porCobrar")) : "—"], ["Vencido (+30 días)", conDetalle ? soles(sum("vencido")) : "—"], ["Saldo de planes", soles(sum("saldoPlan"))]], cifra: soles(conDetalle ? sum("porCobrar") : sum("saldoPlan")), etiqueta: conDetalle ? "por cobrar de trabajo ya hecho" : "de saldo en planes de tratamiento", sinDetalle: !conDetalle && filas.length > 0 };
+      const conVencido = filas.some((f) => f.vencido != null);
+      return { filas, kpis: [["Pacientes", String(filas.length)], ["Hecho sin pagar", conDetalle ? soles2(sum("porCobrar")) : "—"], ["Vencido (+30 días)", conVencido ? soles2(sum("vencido")) : "—"], ["Saldo de planes", soles2(sum("saldoPlan"))]], cifra: soles2(conDetalle ? sum("porCobrar") : sum("saldoPlan")), etiqueta: conDetalle ? "por cobrar de trabajo ya hecho" : "de saldo en planes de tratamiento", sinDetalle: !conVencido && filas.length > 0, sinPorCobrar: !conDetalle };
     }
     if (rep === "recuperar") {
       const res = new Map(dSrv.res.map((x) => [String(x.pacienteId), x]));
@@ -155,7 +167,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
   // Aviso honesto de lo que el servidor todavía no informa.
   const avisoSrv = !datosSrv ? null
     : datosSrv.error ? "No se pudieron obtener los datos del servidor para este reporte."
-    : datosSrv.sinDetalle ? "El servidor informa el saldo de cada plan; «hecho sin pagar», «vencido» y «días sin pagar» estarán cuando lo resuma por ítem."
+    : datosSrv.sinDetalle ? (datosSrv.sinPorCobrar ? "El servidor informa el saldo de cada plan; «hecho sin pagar», «vencido» y «días sin pagar» estarán cuando lo resuma por ítem." : "«Vencido» y «días sin pagar» estarán cuando el servidor resuma la deuda por ítem; por eso esas columnas no se muestran.")
     : datosSrv.sinPrimera ? "Para separar pacientes nuevos de recurrentes el servidor debe informar la primera visita de cada paciente."
     : null;
 
@@ -222,17 +234,17 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     procedimientos: [
       { key: "nombre", label: "Procedimiento", w: "minmax(220px,1.6fr)", a: "left", get: (x) => x.nombre, cell: (x) => <b style={{ color: "var(--dc-navy)" }}>{x.nombre}</b> },
       { key: "cantidad", label: "Cantidad", w: "110px", a: "right", get: (x) => x.cantidad },
-      { key: "promedio", label: "Precio promedio", w: "150px", a: "right", get: (x) => Math.round(x.promedio), cell: (x) => soles(x.promedio) },
-      { key: "importe", label: "Importe", w: "140px", a: "right", get: (x) => x.importe, cell: (x) => <b>{soles(x.importe)}</b> },
+      { key: "promedio", label: "Precio promedio", w: "150px", a: "right", get: (x) => Math.round(x.promedio), cell: (x) => soles(x.promedio), exportar: (x) => solesExp(x.promedio) },
+      { key: "importe", label: "Importe", w: "140px", a: "right", get: (x) => x.importe, cell: (x) => <b>{soles(x.importe)}</b>, exportar: (x) => solesExp(x.importe) },
       { key: "parte", label: "Parte del total", w: "minmax(160px,1fr)", get: (x) => Math.round(x.parte), cell: (x) => <span className="dc-rcx__bar"><i style={{ width: `${x.parte}%` }} /><em>{x.parte.toFixed(1)}%</em></span> },
     ],
     saldo: [
       { key: "paciente", label: "Paciente", w: "minmax(200px,1.5fr)", a: "left", get: (x) => x.paciente, cell: (x) => <b style={{ color: "var(--dc-navy)" }}>{x.paciente}</b> },
-      { key: "porCobrar", label: "Hecho sin pagar", w: "150px", a: "right", get: (x) => x.porCobrar, cell: (x) => (x.porCobrar == null ? "—" : <b style={{ color: x.porCobrar ? "var(--dc-danger-700)" : undefined }}>{soles(x.porCobrar)}</b>) },
-      { key: "vencido", label: "Vencido", w: "120px", a: "right", get: (x) => x.vencido, cell: (x) => (x.vencido == null ? "—" : soles(x.vencido)) },
-      { key: "dias", label: "Días sin pagar", w: "130px", a: "right", get: (x) => x.dias, cell: (x) => (x.porCobrar && x.dias != null ? `${x.dias} d` : "—") },
-      { key: "saldoPlan", label: "Saldo del plan", w: "140px", a: "right", get: (x) => x.saldoPlan, cell: (x) => soles(x.saldoPlan) },
-    ],
+      { key: "porCobrar", label: "Hecho sin pagar", w: "150px", a: "right", get: (x) => x.porCobrar, cell: (x) => (x.porCobrar == null ? "—" : <b style={{ color: x.porCobrar ? "var(--dc-danger-700)" : undefined }}>{soles2(x.porCobrar)}</b>), exportar: (x) => solesExp(x.porCobrar) },
+      { key: "vencido", label: "Vencido", w: "120px", a: "right", get: (x) => x.vencido, cell: (x) => (x.vencido == null ? "—" : soles2(x.vencido)), exportar: (x) => solesExp(x.vencido) },
+      { key: "dias", label: "Días sin pagar", w: "130px", a: "right", get: (x) => x.dias, cell: (x) => (x.porCobrar && x.dias != null ? `${x.dias} d` : "—"), exportar: (x) => (x.porCobrar && x.dias != null ? x.dias : "") },
+      { key: "saldoPlan", label: "Saldo del plan", w: "140px", a: "right", get: (x) => x.saldoPlan, cell: (x) => soles2(x.saldoPlan), exportar: (x) => solesExp(x.saldoPlan) },
+    ].filter((c) => !(conectado && (c.key === "vencido" || c.key === "dias") && datos.filas.length && datos.filas.every((f) => f[c.key] == null))),
     recuperar: [
       { key: "paciente", label: "Paciente", w: "minmax(200px,1.5fr)", a: "left", get: (x) => x.paciente, cell: (x) => <b style={{ color: "var(--dc-navy)" }}>{x.paciente}</b> },
       { key: "ultima", label: "Última visita", w: "150px", a: "left", get: (x) => x.ultima, cell: (x) => M.fechaDoc(x.ultima) },
@@ -244,11 +256,12 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       { key: "atendidos", label: "Atendidos", w: "130px", a: "right", get: (x) => x.atendidos },
       { key: "nuevos", label: "Nuevos", w: "130px", a: "right", get: (x) => x.nuevos, cell: (x) => (x.nuevos == null ? "—" : <b style={{ color: "var(--dc-ok-700)" }}>{x.nuevos}</b>) },
       { key: "recurrentes", label: "Recurrentes", w: "130px", a: "right", get: (x) => x.recurrentes, cell: (x) => (x.recurrentes == null ? "—" : x.recurrentes) },
-    ],
+    // Sin la primera visita del servidor (H-19) esas dos columnas no se muestran ni se exportan vacías.
+    ].filter((c) => !(conectado && (c.key === "nuevos" || c.key === "recurrentes") && datos.filas.length && datos.filas.every((f) => f[c.key] == null))),
     caja: [
       { key: "tipo", label: "Tipo", w: "120px", a: "left", get: (x) => x.tipo, cell: (x) => <span className={`dc-pill ${x.tipo === "Ingreso" ? "is-ok" : ""}`} style={x.tipo === "Ingreso" ? undefined : { "--c": "#E0694F" }}><i /> {x.tipo}</span> },
       { key: "concepto", label: "Concepto", w: "minmax(200px,1.5fr)", a: "left", get: (x) => x.concepto },
-      { key: "monto", label: "Monto", w: "150px", a: "right", get: (x) => x.monto, cell: (x) => <b style={{ color: x.monto < 0 ? "var(--dc-danger-700)" : "var(--dc-ok-700)" }}>{x.monto < 0 ? "− " : ""}{soles(Math.abs(x.monto))}</b> },
+      { key: "monto", label: "Monto", w: "150px", a: "right", get: (x) => x.monto, cell: (x) => <b style={{ color: x.monto < 0 ? "var(--dc-danger-700)" : "var(--dc-ok-700)" }}>{x.monto < 0 ? "− " : ""}{soles(Math.abs(x.monto))}</b>, exportar: (x) => solesExp(x.monto) },
     ],
   }[rep];
   const R = REPORTES.find((x) => x.id === rep);

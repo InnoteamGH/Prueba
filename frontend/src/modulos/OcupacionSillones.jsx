@@ -4,7 +4,7 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Armchair, ChevronLeft, ChevronRight, Clock, Info, Send } from "lucide-react";
 import api, { auth } from "../api/client";
-import { DatosDemoCtx, ESPECIALIDADES, MEDICOS, fmt, horarioDeSede, jornadaClinica, mismaSede, nombreSede, toMin } from "../comun";
+import { BotonExportar, DatosDemoCtx, ESPECIALIDADES, MEDICOS, fmt, horarioDeSede, jornadaClinica, mismaSede, nombreSede, toMin } from "../comun";
 import { useReglasAgenda } from "../compartido/useReglasAgenda";
 import { horarioConfigurado } from "../compartido/horarioReal";
 import { etiquetaUso } from "../compartido/sillones";
@@ -87,6 +87,18 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
     .filter((h) => h.fecha >= hoyF && h.libres > 0).sort((a, b) => b.libres - a.libres).slice(0, 3);
   if (!sillones.length) return conectado ? <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>No hay sillones activos registrados en las sedes que se ven. Se dan de alta en Configuración › Sillones.</p></section> : null;
   if (sinHorario) return <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>La clínica todavía no tiene cargado su horario de atención: sin él no se puede calcular la ocupación. Se configura en Configuración › Horarios.</p></section>;
+  // H-29: la misma exportación Excel/PDF que el resto de reportes: un sillón por fila, el %
+  // de cada día y el total de la semana (números, para poder sumarlos en el Excel).
+  const pctExp = (p) => (p == null ? "Cerrado" : `${p}%`);
+  const colsExp = [
+    ...(sedes.length > 1 ? [{ key: "sede", label: "Sede", get: (f) => nomSede(f.s.sede) }] : []),
+    { key: "sillon", label: "Sillón", get: (f) => f.s.nombre },
+    { key: "uso", label: "Uso", get: (f) => usoTxt(f.s) },
+    ...dias.map((fecha, i) => ({ key: `d${i}`, label: `${DIAS[i]} ${fecha.slice(8)}/${fecha.slice(5, 7)}`, get: (f) => pctExp(f.celdas[i].pct) })),
+    { key: "semana", label: "Semana", get: (f) => pctExp(f.pct) },
+    { key: "agendadas", label: "Horas agendadas", get: (f) => Math.round((f.min / 60) * 10) / 10 },
+    { key: "libres", label: "Horas libres", get: (f) => Math.round(((f.cap - f.min) / 60) * 10) / 10 },
+  ];
   const tonoCelda = (p) => (p == null ? "is-na" : p === 0 ? "is-cero" : p >= 85 ? "is-full" : p >= 60 ? "is-alta" : p >= 30 ? "is-media" : "is-baja");
   return (
     <section className="dc-ocs dc-ocs--rep" aria-label="Ocupación de sillones">
@@ -102,11 +114,14 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
           {diaLleno && <div><b>{DIAS[datos.porDia.indexOf(diaLleno)]} {diaLleno.fecha.slice(8)}</b><span>Día más lleno · {diaLleno.pct}%</span></div>}
         </div>
         <span />
+        <div className="dc-hero-acc">
         <div className="dc-ocs__nav dc-ocs__nav--hero">
           <button type="button" aria-label="Semana anterior" onClick={() => setOff(off - 1)}><ChevronLeft size={15} strokeWidth={2} /></button>
           {/* Dice qué semana se ve; fuera de la actual, un clic vuelve a esta semana. */}
           <button type="button" className={off === 0 ? "is-on" : "is-otra"} onClick={() => setOff(0)} title={off === 0 ? "Semana actual" : "Volver a esta semana"}>{off === 0 ? "Esta semana" : <>{rango}<small>Volver a hoy</small></>}</button>
           <button type="button" aria-label="Semana siguiente" onClick={() => setOff(off + 1)}><ChevronRight size={15} strokeWidth={2} /></button>
+        </div>
+        <BotonExportar titulo={`Ocupación de sillones · ${rango}`} cols={colsExp} filas={datos.filas} sub="sillones" />
         </div>
       </section>
 
