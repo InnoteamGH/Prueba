@@ -639,7 +639,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const prodRows = cobrosHoyRows || ch.filter((c) => c.estado === "atendida" || c.estado === "en_atencion").map((c) => ({ izq: c.paciente, der: `S/ ${precio(c)}` }));
   const pacRows = [...pacientes].sort((a, b) => (b.ultima || "").localeCompare(a.ultima || "")).slice(0, 30).map((p) => ({ izq: p.nombre, der: p.ultima ? (fechaLegible(p.ultima) || p.ultima) : "—" }));
   const kpis = esMed ? [
-    ["Mis citas hoy", ch.length, Calendar, NAVY, rowsCitas(ch)],
+    ["Mis citas hoy", citasHoyKpi.length, Calendar, NAVY, rowsCitas(citasHoyKpi)],
     ["Atendidas", ch.filter((c) => c.estado === "atendida").length, CheckCircle2, "var(--dc-ok-700)", rowsCitas(ch.filter((c) => c.estado === "atendida"))],
     ["En atención", ch.filter((c) => c.estado === "en_atencion").length, Activity, "var(--dc-purple)", rowsCitas(ch.filter((c) => c.estado === "en_atencion"))],
     ["Producción de hoy", `S/ ${(ingresos ?? 0).toLocaleString()}`, Wallet, RED, prodRows],
@@ -665,7 +665,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     ? (silDash || []).map((r) => { const x = normSillon(r); return { ...x, sede: numSede(r.sedeId ?? r.sede) }; }).filter((x) => x.activo && sedeCxD.enSede(x.sede))
     : null;
   const cuposLibres = conectado
-    ? (sinHorarioReal || !silDash || !silsDash.length ? null : M.cuposLibres({ citas: ch, sillones: silsDash, fecha: fmt(hoy), sede: null, jornadaDe: jornadaDeDash }).cupos30)
+    ? (sinHorarioReal || !silDash || !silsDash.length ? null : M.cuposLibres({ citas: citasHoyKpi, sillones: silsDash, fecha: fmt(hoy), sede: null, jornadaDe: jornadaDeDash }).cupos30)
     : M.cuposLibres({ citas, sillones: dbDash?.sillones || [], fecha: fmt(hoy), sede: sedeActiva, jornadaDe: jornadaDeDash }).cupos30;
   const num = (v) => Number(v || 0).toLocaleString();
   const bloque = (valor, color, pie) => (
@@ -686,8 +686,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const miNombre = (auth.sesion && String(auth.sesion.nombre || "").replace(/^(?:\s*(?:dr\(a\)\.?|dra\.?|dr\.?)\s+)+/i, "").split(" ")[0]) || "";
   const atendidasHoy = ch.filter((c) => c.estado === "atendida").length;
   const sinConfirmar = ch.filter((c) => c.estado === "pendiente").length;
+  // H-17: la frase cuenta las citas vigentes (sin canceladas ni reprogramadas), igual que el
+  // KPI «Citas hoy»: decía «3 citas hoy» con las 3 canceladas y el KPI en 0.
+  const nHoy = citasHoyKpi.length;
   const frase = esMed
-    ? (ch.length === 0 ? "Hoy no tienes pacientes agendados." : `Hoy atiendes a ${pluralEs(ch.length, "paciente", "pacientes")}. Llevas ${atendidasHoy}.`)
+    ? (nHoy === 0 ? "Hoy no tienes pacientes agendados." : `Hoy atiendes a ${pluralEs(nHoy, "paciente", "pacientes")}. Llevas ${atendidasHoy}.`)
     : esTI
       // Decía "Todo operativo" incluso con la incidencia de SUNAT abierta en la tarjeta
       // de abajo. Cuenta las que hay, sobre la misma lista que pinta esa tarjeta.
@@ -697,9 +700,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
           ? "Todo operativo. Sin incidencias en las integraciones."
           : `${incidenciasTI} integración(es) con incidencia. Revísalas antes que nada.`)
       : esGer
-        ? (ch.length === 0 ? "Hoy no hay citas agendadas en la clínica." : cuposLibres == null ? `La clínica tiene ${pluralEs(ch.length, "cita", "citas")} hoy.` : `La clínica tiene ${pluralEs(ch.length, "cita", "citas")} hoy y ${pluralEs(cuposLibres, "cupo sin vender", "cupos sin vender")}.`)
-        : (ch.length === 0 ? "Hoy no hay citas agendadas." : `${pluralEs(ch.length, "cita", "citas")} hoy${sinConfirmar ? `, ${pluralEs(sinConfirmar, "sin confirmar", "sin confirmar")}` : ""}.${cuposLibres == null ? "" : ` Quedan ${pluralEs(cuposLibres, "cupo libre", "cupos libres")}.`}`);
-  const avance = ch.length ? Math.round((atendidasHoy / ch.length) * 100) : 0;
+        ? (nHoy === 0 ? "Hoy no hay citas agendadas en la clínica." : cuposLibres == null ? `La clínica tiene ${pluralEs(nHoy, "cita", "citas")} hoy.` : `La clínica tiene ${pluralEs(nHoy, "cita", "citas")} hoy y ${pluralEs(cuposLibres, "cupo sin vender", "cupos sin vender")}.`)
+        : (nHoy === 0 ? "Hoy no hay citas agendadas." : `${pluralEs(nHoy, "cita", "citas")} hoy${sinConfirmar ? `, ${pluralEs(sinConfirmar, "sin confirmar", "sin confirmar")}` : ""}.${cuposLibres == null ? "" : ` Quedan ${pluralEs(cuposLibres, "cupo libre", "cupos libres")}.`}`);
+  const avance = nHoy ? Math.round((atendidasHoy / nHoy) * 100) : 0;
 
   // ======================================================================
   // PENDIENTES DE HOY — bandeja de tareas accionables. Sustituye al lienzo de
@@ -1456,6 +1459,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const [horarioClinica, setHorarioClinica] = useState({ horario: {}, feriados: [] }); // para sombrear cerrado/feriados en el calendario
   const [bloqueos, setBloqueos] = useState([]);         // bloqueos de agenda (almuerzo/ausencia/mantenimiento)
   const [bloqForm, setBloqForm] = useState(null);       // modal para crear bloqueo
+  const [verBloqueos, setVerBloqueos] = useState(false); // H-12: lista de bloqueos de la sede para quitarlos
   const [esperaResumen, setEsperaResumen] = useState([]); // resumen de la lista de espera (el gestor vive en su submódulo)
   const recargarBloqueos = () => { if (conectado) api.bloqueos.listar().then((r) => setBloqueos(r || [])).catch(() => {}); };
   const demoDb = useContext(DatosDemoCtx);
@@ -1797,7 +1801,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           {/* Action Icons (el calendario trae su propio botón Descargar) */}
           {/* GLO-04: se exporta desde la barra de la tabla (lo filtrado). */}
           {/* AGE-05 / GLO-10: acciones secundarias con texto, en el menú ⋯. */}
-          {puedeAgendar && <MenuAcciones etiqueta="Más acciones de la agenda" opciones={[{ label: "Bloquear horario", onClick: () => setBloqForm({ tipo: "dia", fecha: vista !== "calendario" && diaVer > hoyISO ? diaVer : hoyISO, diaSemana: String(new Date((vista !== "calendario" && diaVer > hoyISO ? diaVer : hoyISO) + "T00:00:00").getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" }) }, { label: "Pantalla de sala de espera", onClick: () => setTv(true) }]} />}
+          {puedeAgendar && <MenuAcciones etiqueta="Más acciones de la agenda" opciones={[{ label: "Bloqueos de la sede", onClick: () => { recargarBloqueos(); setVerBloqueos(true); } }, { label: "Bloquear horario", onClick: () => setBloqForm({ tipo: "dia", fecha: vista !== "calendario" && diaVer > hoyISO ? diaVer : hoyISO, diaSemana: String(new Date((vista !== "calendario" && diaVer > hoyISO ? diaVer : hoyISO) + "T00:00:00").getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" }) }, { label: "Pantalla de sala de espera", onClick: () => setTv(true) }]} />}
           {/* Mirando un día futuro en la vista Día, la cita nueva propone ese día. */}
           {puedeAgendar && <Btn onClick={() => setAgendar(vista !== "calendario" && diaVer > hoyISO ? { fecha: diaVer } : true)}><Plus size={16} strokeWidth={1.75} /> Agendar cita</Btn>}
         </div>
@@ -1962,7 +1966,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         const DIAS_B = [["1", "Lunes"], ["2", "Martes"], ["3", "Miércoles"], ["4", "Jueves"], ["5", "Viernes"], ["6", "Sábado"], ["0", "Domingo"]];
         const guardarBloq = () => {
           if (bloqForm.horaFin <= bloqForm.horaInicio) { notify("La hora de fin debe ser mayor que la de inicio."); return; }
-          const payload = { horaInicio: bloqForm.horaInicio, horaFin: bloqForm.horaFin, motivo: bloqForm.motivo || "Bloqueado",
+          // H-12: con «Otro» se puede escribir el motivo (p. ej. «Fumigación»).
+          const motivoTxt = bloqForm.motivo === "Otro" && (bloqForm.motivoOtro || "").trim() ? bloqForm.motivoOtro.trim() : bloqForm.motivo;
+          const payload = { horaInicio: bloqForm.horaInicio, horaFin: bloqForm.horaFin, motivo: motivoTxt || "Bloqueado",
             fecha: bloqForm.tipo === "dia" ? bloqForm.fecha : null, diaSemana: bloqForm.tipo === "semanal" ? Number(bloqForm.diaSemana) : null,
             // Toda la agenda y un doctor se bloquean en la sede activa (en la otra sede sigue libre).
             ...(bloqForm.aplica !== "sillon" ? { sede: conectado ? sedeApiUuid(sedeActiva) : sedeActiva } : {}),
@@ -1997,9 +2003,44 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
             <div><label style={lblSty}>Motivo</label>
               <Select value={bloqForm.motivo} onChange={(v) => setBloqForm({ ...bloqForm, motivo: v })}
                       options={["Almuerzo", "Reunión", "Ausencia del doctor", "Mantenimiento de sillón", "Capacitación", "Otro"].map((m) => ({ value: m, label: m }))} />
+              {bloqForm.motivo === "Otro" && <input className="dc-premium-inp" aria-label="Detalle del motivo" maxLength={80} value={bloqForm.motivoOtro || ""} onChange={(e) => setBloqForm({ ...bloqForm, motivoOtro: e.target.value })} placeholder="Escribe el motivo (opcional)" style={{ ...selSty, cursor: "text", marginTop: 8 }} />}
             </div>
           </div>
         </Modal>
+        );
+      })()}
+      {verBloqueos && (() => {
+        // H-12: recepción y administración crean bloqueos desde la agenda; aquí los ven y
+        // quitan. Solo los de la sede que se ve y de hoy en adelante (los semanales siempre).
+        const hm5 = (h) => String(h || "").slice(0, 5);
+        const DIAS_N = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+        const lista = (bloqueosEf || [])
+          .filter((b) => (b.sede ?? b.sedeId) == null ? sedeCx.global : sedeCx.enSede(b.sede ?? b.sedeId))
+          .filter((b) => !b.fecha || String(b.fecha).slice(0, 10) >= hoyISO)
+          .sort((a, b) => String(a.fecha || "9").localeCompare(String(b.fecha || "9")) || hm5(a.horaInicio).localeCompare(hm5(b.horaInicio)));
+        const quitar = (b) => {
+          if (!window.confirm(`¿Quitar el bloqueo «${b.motivo || "Bloqueo"}» ${b.fecha ? `del ${fechaLegible(String(b.fecha).slice(0, 10))}` : `de cada ${DIAS_N[Number(b.diaSemana)] || "semana"}`} (${hm5(b.horaInicio)}–${hm5(b.horaFin)})?`)) return;
+          if (!conectado) { demoDb?.setBloqueos((bs) => (bs || []).filter((x) => x.id !== b.id)); notify("Bloqueo quitado."); return; }
+          api.bloqueos.eliminar(b.id).then(() => { notify("Bloqueo quitado."); recargarBloqueos(); }).catch((e) => notify(esSinPermiso(e) ? "Tu rol no puede quitar bloqueos." : "No se pudo quitar el bloqueo."));
+        };
+        const medNom = (id) => (reglasAg.medicos || []).find((m) => String(m.id) === String(id))?.nombre || "Doctor";
+        return (
+          <Modal icon={<Lock size={20} strokeWidth={1.75} />} titulo="Bloqueos de la sede" sub="Horarios bloqueados de hoy en adelante. Quita los que ya no apliquen." onClose={() => setVerBloqueos(false)} maxW={560}
+            footer={<><Btn small kind="ghost" onClick={() => setVerBloqueos(false)}>Cerrar</Btn>{puedeAgendar && <Btn small onClick={() => { setVerBloqueos(false); setBloqForm({ tipo: "dia", fecha: hoyISO, diaSemana: String(new Date(hoyISO + "T00:00:00").getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" }); }}><Plus size={15} strokeWidth={1.75} /> Nuevo bloqueo</Btn>}</>}>
+            {lista.length === 0 ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin bloqueos" sub="No hay horarios bloqueados en esta sede." /> : (
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+                {lista.map((b) => (
+                  <li key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <b style={{ fontSize: 13.5 }}>{b.fecha ? fechaLegible(String(b.fecha).slice(0, 10)) : `Cada ${DIAS_N[Number(b.diaSemana)] || "semana"}`} · {hm5(b.horaInicio)}–{hm5(b.horaFin)}</b>
+                      <div style={{ fontSize: 12.5, color: "var(--dc-ink-500)" }}>{b.motivo || "Bloqueo"}{b.medicoId ? ` · ${medNom(b.medicoId)}` : ""}{b.sillon ? ` · Sillón ${b.sillon}` : ""}{!b.medicoId && !b.sillon ? " · Toda la agenda" : ""}</div>
+                    </div>
+                    {puedeAgendar && <button type="button" className="dc-mini-btn is-mal" aria-label={`Quitar bloqueo ${b.motivo || ""}`} title="Quitar bloqueo" onClick={() => quitar(b)}><Trash2 size={13} strokeWidth={2.2} /></button>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Modal>
         );
       })()}
       {reprog && (() => {
@@ -2619,7 +2660,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
           </div>
           <div>
             <label style={lblSty}>Fecha de nacimiento <span style={{ color: RED }}>*</span> {edad != null && <span style={{ color: TEAL, fontWeight: 500 }}>– {edad} años</span>}</label>
-            <input className="dc-premium-inp" type="date" max={hoyISO} value={form.nacimiento} onChange={(e) => updateField('nacimiento', e.target.value)} style={{ ...selSty, backgroundImage: "none", cursor: "text", borderColor: formErr.nacimiento ? RED : "var(--dc-line)" }} />
+            <input className="dc-premium-inp" type="date" min={`${Number(hoyISO.slice(0, 4)) - 120}${hoyISO.slice(4)}`} max={hoyISO} value={form.nacimiento} onChange={(e) => updateField('nacimiento', e.target.value)} style={{ ...selSty, backgroundImage: "none", cursor: "text", borderColor: formErr.nacimiento ? RED : "var(--dc-line)" }} />
             {formErr.nacimiento && <div style={errSty}>{formErr.nacimiento}</div>}
           </div>
           <div>
@@ -4140,6 +4181,11 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
     const med = MEDICOS.find((m) => m.nombre === p.medico && (!espId || espsDe(m).includes(espId)) && sedesDe(m).some((x) => mismaSede(x, sedeP)));
     setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), ...(conectado ? { especialidadId: p.especialidadId ?? undefined, especialidadNombre: p.e && p.e !== "—" ? p.e : undefined } : {}), _esperaId: p.id });
   };
+  const quitarEspera = (p) => {
+    if (!window.confirm(`¿Quitar a ${p.n} de la lista de espera?`)) return;
+    if (conectado) { api.espera.resolver(p.id).then(() => { notify(`${p.n} salió de la lista de espera.`); recargar(); }).catch((e) => notify(esSinPermiso(e) ? "Tu rol no puede quitar pacientes de la lista de espera." : "No se pudo quitar de la lista de espera.")); return; }
+    setEsp((e) => (e || []).filter((x) => x.id !== p.id)); notify(`${p.n} salió de la lista de espera.`);
+  };
   const nuevoEspera = () => { setBusca(""); setAbrePac(false); setNuevoEsp({ pacienteId: null, n: "", tel: "", dni: "", e: conectado ? (espsLista[0]?.nombre || "") : "Odontología general", medico: "Cualquiera", pref: "Indiferente", urg: "media", esNuevo: false, sede: (SEDES.find((x) => mismaSede(x.id, activa)) || {}).id ?? activa }); };
   const elegirPac = (p) => { setNuevoEsp((f) => ({ ...f, pacienteId: p.id, n: p.nombre, tel: p.telefono || p.tel || "", dni: p.dni || "", esNuevo: false })); setAbrePac(false); setBusca(""); };
   const modoNuevoPac = () => { setErrNuevo({}); setNuevoEsp((f) => { const b = (busca || "").trim(); const esDni = /^\d{8}$/.test(b); return { ...f, pacienteId: null, esNuevo: true, n: esDni ? (f.n || "") : (b || f.n || ""), dni: esDni ? b : (f.dni || ""), nacimiento: f.nacimiento || "", apoderadoNombre: "", apoderadoParentesco: "", apoderadoDni: "", apoderadoTelefono: "" }; }); setAbrePac(false); };
@@ -4239,12 +4285,14 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
                       <ul className="dc-esp-card__meta">
                         <li><Stethoscope size={13} strokeWidth={1.75} /> {p.e}</li>
                         <li><User size={13} strokeWidth={1.75} /> {p.medico}</li>
-                        <li><Clock size={13} strokeWidth={1.75} /> Espera {String(p.desde).toLowerCase()} – {p.pref}</li>
+                        <li><Clock size={13} strokeWidth={1.75} /> Espera {String(p.desde).toLowerCase()} – {String(p.pref || "").toLowerCase() === "indiferente" ? "horario indiferente" : `prefiere ${String(p.pref || "").toLowerCase()}`}</li>
                       </ul>
                       {p.ofrecido.length > 0 && <div className="dc-esp-card__oferta"><Bell size={12} strokeWidth={1.75} /> {p.ofrecido.length === 1 ? "1 oferta enviada" : `${p.ofrecido.length} ofertas enviadas`}{p.ofrecido[p.ofrecido.length - 1] ? ` – ${p.ofrecido[p.ofrecido.length - 1]}` : ""}</div>}
                       <div className="dc-esp-card__acc">
                         <button type="button" className="dc-esp-ofrecer" onClick={() => ofrecer(p)} disabled={conectado} style={conectado ? { opacity: 0.45, cursor: "not-allowed" } : undefined} title={conectado ? `Ofrecer cupo por WhatsApp: ${SIN_OFERTA.toLowerCase()}` : "Ofrecer cupo por WhatsApp"} aria-label={`Ofrecer cupo a ${p.n} por WhatsApp`}><Bell size={15} strokeWidth={1.75} /></button>
                         <Btn small kind={sug ? undefined : "ghost"} onClick={() => asignar(p)}><CheckCircle2 size={14} strokeWidth={1.75} /> Asignar cupo</Btn>
+                        {/* H-23: quitar de la lista a quien ya no espera (DELETE /espera/:id). */}
+                        <button type="button" className="dc-mini-btn is-mal" title="Quitar de la lista" aria-label={`Quitar a ${p.n} de la lista de espera`} onClick={() => quitarEspera(p)}><X size={13} strokeWidth={2.2} /></button>
                       </div>
                     </article>
                   ); })}
@@ -4801,7 +4849,18 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const [cierre, setCierre] = useState(null);
   // Cierre del día de la caja que se ve (CAJA-05): el servidor recibe las sedes y, con la caja
   // abierta, la sesión (aperturaId) para contar solo lo posterior a esa apertura (C7).
-  const recargarCierre = () => { if (conectado) api.pagos.cierre(undefined, { sedeIds: sedesApi, aperturaId: apertura?.abierta ? apertura.id : null }).then(setCierre).catch(() => {}); };
+  // H-03: la respuesta lleva la sesión que se pidió (`_aperturaId`) y se descarta si ya se
+  // pidió otra: antes la del día completo (pedida antes de leer la apertura) podía llegar
+  // después que la de la sesión y pisarla, y el arqueo mezclaba los dos.
+  const cierrePedidoRef = useRef(0);
+  const recargarCierre = () => {
+    if (!conectado) return;
+    const aperturaId = apertura?.abierta ? apertura.id : null;
+    const n = ++cierrePedidoRef.current;
+    api.pagos.cierre(undefined, { sedeIds: sedesApi, aperturaId })
+      .then((r) => { if (n === cierrePedidoRef.current) setCierre(r ? { ...r, _aperturaId: aperturaId } : r); })
+      .catch(() => {});
+  };
   const demoDb = useContext(DatosDemoCtx) || {};
   const { egresos: egresosDemo, setEgresos: setEgresosDemo } = demoDb;
   const [egresosApi, setEgresosApi] = useState([]);
@@ -5104,10 +5163,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const enSesionCaja = (x, clave = null) => {
     if (!cajaAbierta || !apertura) return true;
     const ses = x?.cajaSesion ?? x?.aperturaId;
-    if (ses != null && ses !== "") return String(ses) === String(apertura.id);
-    if (Array.isArray(apertura.previos)) return !(clave && yaContados.has(clave));
     const t = x?.creadoEn ? new Date(x.creadoEn).getTime() : NaN;
     const ab = apertura.abiertaEn ? new Date(apertura.abiertaEn).getTime() : NaN;
+    // H-03/H-04: al reabrir, el servidor puede reutilizar el mismo id de apertura; lo que se
+    // registró antes de la reapertura no es de esta sesión aunque traiga el mismo aperturaId.
+    if (ses != null && ses !== "") return String(ses) === String(apertura.id) && (Number.isNaN(t) || Number.isNaN(ab) || t >= ab - 1000);
+    if (Array.isArray(apertura.previos)) return !(clave && yaContados.has(clave));
     if (!Number.isNaN(t) && !Number.isNaN(ab)) return t >= ab;
     if (/^\d{2}:\d{2}/.test(x?.hora || "") && apertura.abiertaEn) return String(x.hora).slice(0, 5) >= horaLima(apertura.abiertaEn);
     return true;
@@ -5225,6 +5286,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {tab === "sunat" && <FacturacionSunat puedeEmitir={puedeAbrirCaja} onIntegraciones={() => { window.location.hash = "#/integraciones"; }} notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
         sedes={(conectado && sedes.length ? sedes : SEDES).map((x) => ({ id: x.id, nombre: x.nombre || nombreSede(x.id) }))}
         verSedes={limiteSedes} consulta={{ sedeIds: sedesApi }}
+        cobrosServidor={conectado ? [...boletasHoy, ...hist.filter(pagoEnSedeActiva)] : []}
         pagos={(demoDb.pacientes || pacientes).flatMap((p) => (fichas[p.id]?.pagos || []).map((pg) => ({ ...pg, paciente: p.nombre, dni: p.dni || "", sede: sedeDeRegistro(pg, p) })))} />}
 
       {tab === "hoy" && !cajaAbierta && (() => {
@@ -5425,8 +5487,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {tab === "cierre" && (() => {
         // Con sesión, si el servidor aún no recorta por sede, el cierre se rehace con los
         // movimientos de la sede de la caja (los que traen sedeId) (CAJA-05).
+        // H-03: con la caja abierta solo vale el cierre pedido para esta sesión; el del día
+        // completo (o el de otra apertura) no se mezcla mientras llega el de la sesión.
+        const cierreVigente = cierre && (!cajaAbierta || String(cierre._aperturaId ?? "") === String(apertura?.id ?? "")) ? cierre : null;
         const cierreSede = (() => {
-          if (!cierre) return null;
+          if (!cierreVigente) return null;
+          const cierre = cierreVigente;
           const movs = cierre.movimientos || [];
           // C7: también se recortan a la sesión abierta si el servidor aún no filtra por aperturaId.
           const quedan = movs.filter((m) => deCaja(m.sedeId) && enSesionCaja(m));
@@ -5454,10 +5520,29 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         // Dólares: se cuentan en una gaveta aparte. El backend puede mandar `usd: { efectivo }`
         // (en US$) y entonces `porMetodo` trae solo soles; si no, se deduce de los cobros del día.
         // Todo de la sesión de caja abierta (C7): cobros y egresos posteriores a la apertura.
-        const boletasUsdEf = boletasSesion.filter((b) => b.moneda === "USD" && efectivoCobro(b).usd > 0);
-        const cobradoEfectivoUsd = c.usd ? Number(c.usd.efectivo) || 0 : red2(efSesion.usd);
-        const usdEnSolesDelBackend = conectado && !c.usd ? boletasUsdEf.reduce((s, b) => s + b.monto, 0) : 0;
-        const cobradoEfectivo = (Number((c.porMetodo || {}).efectivo) || 0) - usdEnSolesDelBackend;
+        // H-03: con sesión, el efectivo por moneda sale de los movimientos de ESTA sesión que
+        // devuelve el servidor (cada uno con su moneda y su monto en US$), no de los cobros del
+        // día: así un cobro en dólares de una sesión anterior no entra en la gaveta de hoy.
+        const movsSrv = conectado && cierreSede ? (c.movimientos || []) : [];
+        const movsConMoneda = movsSrv.length > 0 && movsSrv.every((m) => m.moneda != null);
+        const efDeMovs = movsConMoneda ? movsSrv.reduce((a, m) => {
+          if (medioKey(m.metodo || "efectivo") !== "efectivo") return a;
+          const soles = Number(m.monto) || 0;
+          if (m.moneda !== "USD") return { pen: a.pen + soles, usd: a.usd, usdSoles: a.usdSoles };
+          const tc = Number(m.tipoCambio) > 0 ? Number(m.tipoCambio) : tcRef;
+          const enUsd = Number(m.montoOriginal) > 0 ? Number(m.montoOriginal) : (tc ? red2(soles / tc) : 0);
+          return { pen: a.pen, usd: a.usd + enUsd, usdSoles: a.usdSoles + soles };
+        }, { pen: 0, usd: 0, usdSoles: 0 }) : null;
+        const boletasUsdEf = efDeMovs ? movsSrv.filter((m) => m.moneda === "USD" && medioKey(m.metodo || "efectivo") === "efectivo") : boletasSesion.filter((b) => b.moneda === "USD" && efectivoCobro(b).usd > 0);
+        const cobradoEfectivoUsd = efDeMovs ? red2(efDeMovs.usd) : c.usd ? Number(c.usd.efectivo) || 0 : conectado && cierreSede && !movsSrv.length ? 0 : red2(efSesion.usd);
+        // ¿`porMetodo.efectivo` incluye los dólares? Solo si los medios suman el total (si no,
+        // el servidor ya los dejó fuera y no hay que restarlos otra vez).
+        const pmSuma = Object.values(c.porMetodo || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+        const pmIncluyeUsd = !("efectivo_usd" in (c.porMetodo || {})) && Math.abs(pmSuma - (Number(c.total) || 0)) < 0.01;
+        const usdEnSolesDelBackend = !efDeMovs && conectado && !c.usd && pmIncluyeUsd ? boletasUsdEf.reduce((s, b) => s + b.monto, 0) : 0;
+        // Nunca negativo: si el servidor ya trae solo soles en `porMetodo.efectivo`, restarle
+        // los dólares daba «+ − S/ 17.75».
+        const cobradoEfectivo = efDeMovs ? red2(efDeMovs.pen) : Math.max(0, red2((Number((c.porMetodo || {}).efectivo) || 0) - usdEnSolesDelBackend));
         const egresosEfectivo = egresosSesion.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda !== "USD").reduce((s, e) => s + e.monto, 0);
         const egresosEfectivoUsd = egresosSesion.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda === "USD").reduce((s, e) => s + e.monto, 0);
         const fondoUsd = Number(apertura?.fondoUsd) || 0;
@@ -5478,6 +5563,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           ? Math.round((contadoNum - esperadoEfectivo) * 100) / 100
           : null;
         const nfmt = (n) => (Number(n) < 0 ? "− " : "") + "S/ " + Math.abs(Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // Línea del libro con su signo: «+ S/ 1.00» / «− S/ 1.00» (nunca «+ − S/ …») (H-03).
+        const conSigno = (n, signo) => { const v = Number(n) || 0; return (v < 0 ? (signo === "+" ? "− " : "+ ") : signo + " ") + nfmt(Math.abs(v)); };
         const semaforo = diffNum == null ? null : Math.abs(diffNum) < 0.01 ? "cuadra" : diffNum > 0 ? "sobra" : "falta";
         return (
           <div style={{ display: "grid", gap: 16 }}>
@@ -5501,8 +5588,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     sub: `${fechaLegible(fmt(hoy))}${apertura?.abiertaPorNombre ? ` · Abierta por ${apertura.abiertaPorNombre}` : ""}`,
                     css: ".num{text-align:right;white-space:nowrap}.fz td{font-weight:700;background:#F4F1EA!important}h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 4px}.firmas{display:flex;justify-content:space-between;gap:40px;margin-top:60px}.firmas div{flex:1;border-top:1px solid #1B1614;padding-top:6px;text-align:center;font-size:11px}",
                     cuerpo: `<h2>Efectivo en soles</h2><table class="doc-tabla"><thead><tr><th>Concepto</th><th class="num">Monto</th></tr></thead><tbody>`
-                      + fila("Fondo inicial", cajaAbierta ? nfmt(fondoIni) : "—") + fila("Cobros en efectivo", "+ " + nfmt(cobradoEfectivo))
-                      + fila("Egresos en efectivo", "− " + nfmt(egresosEfectivo)) + fila("Retiros e ingresos", (netoMovsCaja < 0 ? "− " : "+ ") + nfmt(Math.abs(netoMovsCaja)))
+                      + fila("Fondo inicial", cajaAbierta ? nfmt(fondoIni) : "—") + fila("Cobros en efectivo", conSigno(cobradoEfectivo, "+"))
+                      + fila("Egresos en efectivo", conSigno(egresosEfectivo, "−")) + fila("Retiros e ingresos", (netoMovsCaja < 0 ? "− " : "+ ") + nfmt(Math.abs(netoMovsCaja)))
                       + fila("Efectivo esperado", esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo), true)
                       + fila("Efectivo contado", contadoNum == null ? "—" : nfmt(contadoNum)) + fila("Diferencia", diffNum == null ? "—" : nfmt(diffNum), true)
                       + `</tbody></table>`
@@ -5522,8 +5609,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   <div className="dc-cz__cab"><span className="dc-cz__cico" style={{ "--t": "#0E9199" }}><Vault size={20} strokeWidth={1.9} /></span><div><h3>Efectivo que debería haber</h3><span>Fondo + cobros en efectivo − egresos ± movimientos</span></div></div>
                   <ul className="dc-cz__libro">
                     <li style={{ "--t": "#0E9199" }}><span className="dc-cz__lico"><Wallet size={16} strokeWidth={2} /></span><div><b>Fondo inicial</b><small>Con el que abriste la caja</small></div><em>{cajaAbierta ? nfmt(fondoIni) : "—"}</em></li>
-                    <li style={{ "--t": "#16A36A" }}><span className="dc-cz__lico"><Banknote size={16} strokeWidth={2} /></span><div><b>Cobros en efectivo</b><small>Pagos recibidos en la gaveta</small></div><em>+ {nfmt(cobradoEfectivo)}</em></li>
-                    <li style={{ "--t": "#E0694F" }}><span className="dc-cz__lico"><ArrowUpRight size={16} strokeWidth={2} /></span><div><b>Egresos en efectivo</b><small>Gastos pagados desde caja</small></div><em>− {nfmt(egresosEfectivo)}</em></li>
+                    <li style={{ "--t": "#16A36A" }}><span className="dc-cz__lico"><Banknote size={16} strokeWidth={2} /></span><div><b>Cobros en efectivo</b><small>Pagos recibidos en la gaveta</small></div><em>{conSigno(cobradoEfectivo, "+")}</em></li>
+                    <li style={{ "--t": "#E0694F" }}><span className="dc-cz__lico"><ArrowUpRight size={16} strokeWidth={2} /></span><div><b>Egresos en efectivo</b><small>Gastos pagados desde caja</small></div><em>{conSigno(egresosEfectivo, "−")}</em></li>
                     <li style={{ "--t": "#6D4FD1" }}><span className="dc-cz__lico"><ArrowUpDown size={16} strokeWidth={2} /></span><div><b>Retiros e ingresos</b><small>Movimientos intermedios</small></div><em>{netoMovsCaja < 0 ? "− " : "+ "}{nfmt(Math.abs(netoMovsCaja))}</em></li>
                   </ul>
                   <div className="dc-cz__esp"><div><small>Efectivo esperado</small><span>{cajaAbierta ? "Compáralo con lo que cuentes" : "Se calcula al abrir la caja"}</span></div><b>{esperadoEfectivo == null ? "—" : nfmt(esperadoEfectivo)}</b></div>
@@ -5749,7 +5836,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-jor__res">
                   {/* Con dólares, un resultado por moneda, cada uno con su color. */}
                   <span className="dc-jor__dif" style={conUsd ? { ...COL_EST[est], whiteSpace: "normal", textAlign: "right" } : undefined}>{conUsd && !r.abierta ? `Soles: ${txtSol.charAt(0).toLowerCase()}${txtSol.slice(1)}` : txtSol}</span>
-                  {!r.abierta && conUsd && <span className="dc-jor__dif" style={{ ...COL_EST[estU], whiteSpace: "normal", textAlign: "right" }}>{dU == null ? "Dólares sin contar" : estU === "cuadra" ? "Dólares: cuadra" : `Dólares: ${estU === "falta" ? "faltan" : "sobran"} ${usd2(Math.abs(dU))}`}</span>}
+                  {!r.abierta && conUsd && <span className="dc-jor__dif" style={{ ...COL_EST[estU], whiteSpace: "normal", textAlign: "right" }}>{dU == null ? (r.efectivoContadoUsd != null ? "Dólares: sin esperado registrado" : "Dólares sin contar") : estU === "cuadra" ? "Dólares: cuadra" : `Dólares: ${estU === "falta" ? "faltan" : "sobran"} ${usd2(Math.abs(dU))}`}</span>}
                   {r.abierta && puedeAbrirCaja && r.fecha !== hoyLima && <button type="button" onClick={() => { setCierreAdmin({ id: r.id, fecha: r.fecha, sedeId: r.sedeId, fondo: Number(r.fondo) || 0 }); setCierreAdminForm({ contado: String(Number(r.fondo) || 0), justificacion: "" }); }}>Cerrar jornada</button>}
                   {r.abierta && r.fecha === hoyLima && <button type="button" onClick={() => setTab("cierre")}>Ir a cierre</button>}
                 </div>
@@ -5817,6 +5904,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   <div className="dc-flujo__vacio">Sin permiso para ver los egresos de esta caja.</div>
                 ) : lista.length === 0 ? (
                   <div className="dc-flujo__vacio">{t === "ingreso" ? "Aún no hay cobros hoy." : "Sin gastos registrados hoy."}
+                    {/* H-20: si hay egresos de otros días del mes, se dice para que no parezca que
+                        «Egresos por categoría · Este mes» contradice esta lista (que es solo de hoy). */}
+                    {t === "egreso" && (() => { const ym = fmt(hoy).slice(0, 7); const n = egresosVis.filter((e) => (e.fecha || "").slice(0, 7) === ym && e.fecha !== fmt(hoy)).length; return n > 0 ? <small style={{ display: "block", marginTop: 4 }}>{n} {n === 1 ? "egreso" : "egresos"} de días anteriores de este mes: míralos en «Egresos por categoría · Este mes».</small> : null; })()}
                     {t === "egreso" && puedeRegistrarEgreso && <button type="button" onClick={nuevoEgreso}><Plus size={13} strokeWidth={2} /> Registrar egreso</button>}
                   </div>
                 ) : (
@@ -5850,7 +5940,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             return (
               <Card className="dc-egcat">
                 <div className="dc-egcat__cab">
-                  <div><h3>Egresos por categoría</h3><span>Revisa en qué se va el dinero y corrige la categoría si un gasto quedó mal clasificado.</span></div>
+                  <div><h3>Egresos por categoría · {catPeriodo === "hoy" ? "Hoy" : "Este mes"}</h3><span>Revisa en qué se va el dinero y corrige la categoría si un gasto quedó mal clasificado.</span></div>
                   <div className="dc-moneda-sel" role="radiogroup" aria-label="Periodo">
                     {[["hoy", "Hoy"], ["mes", "Este mes"]].map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={catPeriodo === k} className={catPeriodo === k ? "is-on" : ""} onClick={() => setCatPeriodo(k)}>{l}</button>)}
                   </div>
@@ -6612,7 +6702,11 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     }
     setForm(null);
   };
-  const toggle = (u) => { if (!editable(u)) { notify("Solo la administración general puede cambiar a este usuario."); return; } if (conectado) { (u.activo ? api.usuarios.desactivar(u.id) : api.usuarios.actualizar(u.id, { activo: true })).then(() => { notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); recargar(); }).catch(() => notify("Error al cambiar el estado.")); return; } setStaff((s) => s.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x)); notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); };
+  // H-15: dar de baja o reactivar (DELETE /usuarios/:id) exige el permiso «eliminar» de
+  // usuarios; el administrador de sede no lo tiene y el servidor respondía 403 con un toast
+  // genérico. Sin permiso, el botón no se muestra.
+  const puedeBaja = !can || can("usuarios", "eliminar");
+  const toggle = (u) => { if (!editable(u)) { notify("Solo la administración general puede cambiar a este usuario."); return; } if (!puedeBaja) { notify("Tu rol no puede desactivar usuarios: pídeselo a la administración general."); return; } if (conectado) { (u.activo ? api.usuarios.desactivar(u.id) : api.usuarios.actualizar(u.id, { activo: true })).then(() => { notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); recargar(); }).catch(() => notify("Error al cambiar el estado.")); return; } setStaff((s) => s.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x)); notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); };
   const eliminar = (u) => {
     if (!editable(u)) { notify("Solo la administración general puede dar de baja a este usuario."); return; }
     if (!confirm(`¿Dar de baja a ${u.nombre}? Perderá el acceso a la clínica de inmediato.`)) return;
@@ -7131,7 +7225,8 @@ function Auditoria() {
           dia: creado && !isNaN(creado) ? ymdLima(creado) : "",
           usuario: a.usuario || "—",
           rol: a.rol || "—",
-          accion: accion === "HC_ACCESO" ? "Acceso a historia clínica" : accion === "LOGIN" ? "Inicio de sesión" : accion,
+          // H-12 (admin): los códigos del servidor se muestran con su nombre, no en crudo.
+          accion: ({ HC_ACCESO: "Acceso a historia clínica", LOGIN: "Inicio de sesión", LOGOUT: "Cierre de sesión", PAGO: "Cobro registrado", PAGO_ANULADO: "Cobro anulado", CAJA_APERTURA: "Apertura de caja", CAJA_CIERRE: "Cierre de caja", EGRESO: "Egreso de caja" })[accion] || accion,
           nivel: "ok",
           dispositivo: base.dispositivo || resumenDispositivo(base.userAgent),
         };
@@ -7545,10 +7640,13 @@ function Consentimientos({ pacientes: pacProp, notify }) {
     setFirmaDoc(d);
   };
   const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box", cursor: "pointer" };
+  // H-18: el paciente se elige siempre (antes venía el primero de la lista y «Registrar»
+  // sin mirar creaba el documento a otra persona). Se identifica por id, no por nombre.
+  const pacForm = form ? pacientes.find((p) => String(p.id) === String(form.pacienteId)) || null : null;
   const enviar = () => {
+    if (!pacForm) { notify("Elige el paciente."); return; }
     if (conectado) {
-      const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
-      if (!pid) { notify("Selecciona un paciente válido."); return; }
+      const pid = pacForm.id;
       // El servidor registra el consentimiento; todavía no envía el enlace de firma al
       // paciente, así que no se avisa «enviado»: queda por firmar en consultorio.
       api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo })
@@ -7556,8 +7654,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
         .catch(() => notify("No se pudo registrar el consentimiento."));
       return;
     }
-    const pac = pacientes.find((p) => p.nombre === form.paciente);
-    if (!pac) { notify("Selecciona un paciente válido."); return; }
+    const pac = pacForm;
     setDocs((d) => [{ id: Date.now(), pacienteId: pac.id, paciente: pac.nombre, sede: sedeCx.activa ?? undefined, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...d]); notify("Consentimiento enviado al paciente para firma en línea."); setForm(null);
   };
   const confirmarFirma = (firmaImg) => {
@@ -7593,13 +7690,13 @@ function Consentimientos({ pacientes: pacProp, notify }) {
             <div><b>{docs.length}</b><span>Documentos</span></div>
           </div>
           <div className="dc-form-hero__barra" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
-          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ paciente: pacientes[0]?.nombre || "", tipo: CONSENT_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo consentimiento" : "Enviar consentimiento"}</button>
+          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ pacienteId: "", tipo: CONSENT_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo consentimiento" : "Enviar consentimiento"}</button>
         </section>
       ); })()}
       {form && (
         <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo={conectado ? "Nuevo consentimiento" : "Enviar consentimiento"} sub={conectado ? "Queda por firmar en consultorio, con fecha registrada" : "El paciente lo firma en línea con fecha registrada"} onClose={() => setForm(null)} maxW={540} footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={15} strokeWidth={1.75} /> {conectado ? "Registrar" : "Enviar al paciente"}</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={form.paciente} onChange={(v) => setForm({ ...form, paciente: v })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={form.pacienteId || ""} placeholder="— Elige el paciente —" onChange={(v) => setForm({ ...form, pacienteId: v })} options={pacientes.map((p) => ({ value: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : undefined }))} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Tipo<br /><Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={CONSENT_TIPOS.map((t) => ({ value: t, label: t }))} /></label>
           </div>
           {conectado ? (
@@ -7608,7 +7705,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
           <div style={{ marginTop: 16, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-info-soft)", borderRadius: "var(--dc-r-lg)", padding: "13px 15px" }}>
             <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: ".05em", textTransform: "uppercase", color: DS.c.primary, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} /> Así lo recibe el paciente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 13, color: "var(--dc-brand-600)" }}>
-              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Llega un enlace por WhatsApp a <strong>{form.paciente || "el paciente"}</strong>.</span>
+              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Llega un enlace por WhatsApp a <strong>{pacForm?.nombre || "el paciente"}</strong>.</span>
               <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Pencil size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Lee el documento y firma con el dedo en su celular.</span>
               <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><ShieldCheck size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Queda archivado con <strong>fecha y hora registrada</strong>.</span>
             </div>
@@ -7776,14 +7873,19 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     return next.map(({ monto, cat, ...x }) => ({ ...x, precio: Number(monto) || 0, esp: x.esp || (ESPECIALIDADES.find((e) => e.nombre === (x.especialidad || cat)) || {}).id || 1, codigo: x.codigo || `S${String(x.id).padStart(2, "0")}`, activo: x.activo !== false }));
   });
   const [srv, setSrv] = useState([]);
+  // H-13: los servicios desactivados se pueden ver y reactivar. Se piden también los inactivos
+  // (?incluirInactivos=true); si el servidor no los devuelve, quedan al menos los que se
+  // desactivaron en esta sesión, para poder deshacerlo.
+  const [inactivosSesion, setInactivosSesion] = useState([]);
+  const [verInactivos, setVerInactivos] = useState(false);
   const cargar = () => {
     if (!conectado) return;
-    api.catalogo.servicios()
+    api.catalogo.servicios({ incluirInactivos: true })
       .then((r) => setSrv((r || []).map(mapApi)))
       .catch(() => {});
   };
   useEffect(() => { cargar(); }, []); // eslint-disable-line
-  const items = conectado ? srv : demoItems.map((row) => ({
+  const itemsTodos = conectado ? [...srv, ...inactivosSesion.filter((x) => !srv.some((y) => String(y.id) === String(x.id)))] : demoItems.map((row) => ({
     ...row,
     duracionMin: row.duracionMin ?? 30,
     especialidad: row.especialidad ?? row.cat ?? row.nombre,
@@ -7791,6 +7893,8 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     coste: row.coste ?? 0,
     activo: row.activo !== false,
   }));
+  const inactivos = itemsTodos.filter((s) => s.activo === false);
+  const items = verInactivos ? inactivos : itemsTodos.filter((s) => s.activo !== false);
   const setItems = setDemoItems;
   const [form, setForm] = useState(null);
   useEffect(() => {
@@ -7800,13 +7904,17 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     onIntentDone();
   }, [crearIntent]); // eslint-disable-line
   const [cat, setCat] = useState("all");
-  const cats = [...new Set(items.map((s) => s.categoria || s.cat).filter(Boolean))];
-  const filtrados = cat === "all" ? items : items.filter((s) => (s.categoria || s.cat) === cat);
+  // H-22: el filtro «Todas las especialidades» filtra por la columna Especialidad (antes
+  // usaba la categoría: Estética, Prótesis, «Especialidad»…).
+  const espDe = (s) => s.especialidad || s.cat || "";
+  const cats = [...new Set(items.map(espDe).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  const filtrados = cat === "all" || !cats.includes(cat) ? items : items.filter((s) => espDe(s) === cat);
   // Precio que se muestra: el de la sede a la vista o, con varias, el base.
   const precioEn = (s, sedeId) => precioServicio({ ...s, precio: s.monto }, sedeId);
   const propioEn = (s, sedeId) => s.preciosSede?.[sedeId] != null && s.preciosSede[sedeId] !== "";
   const precioVista = (s) => (sedeUnica ? precioEn(s, sedeUnica.id) : Number(s.monto) || 0);
-  const itemsVista = items.map((s) => ({ ...s, monto: precioVista(s) }));
+  const activosTodos = itemsTodos.filter((s) => s.activo !== false);
+  const itemsVista = activosTodos.map((s) => ({ ...s, monto: precioVista(s) }));
   const { media: ticket, n: nConPrecio } = precioMedioCatalogo(itemsVista);
   const blank = () => ({ nombre: "", especialidad: "Odontología general", categoria: "Preventivo", monto: "", duracionMin: "30", coste: "", seguro: false, activo: true });
   const nuevo = () => setForm(blank());
@@ -7837,9 +7945,21 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         areaClinica: fields.especialidad,
         preciosSede: aApi(fields.preciosSede),
       };
+      const antes = form.id ? itemsTodos.find((x) => String(x.id) === String(form.id)) : null;
       (form.id ? api.catalogo.actualizarEspecialidad(form.id, payload) : api.catalogo.crearEspecialidad(payload))
         .then(() => {
-          notify(form.id ? "Servicio actualizado. El nuevo precio ya se aplica a las próximas citas." : `Servicio «${form.nombre}» creado.`);
+          // H-22: el aviso dice lo que pasó (antes hablaba de «nuevo precio» al desactivar).
+          const nom = form.nombre.trim();
+          const desactivado = antes && antes.activo !== false && !fields.activo;
+          const reactivado = antes && antes.activo === false && fields.activo;
+          const cambioPrecio = antes && (Number(antes.monto) !== Number(form.monto) || JSON.stringify(antes.preciosSede || {}) !== JSON.stringify(fields.preciosSede || {}));
+          notify(!form.id ? `Servicio «${nom}» creado.`
+            : desactivado ? `Servicio «${nom}» desactivado: ya no se ofrece en citas ni presupuestos. Lo reactivas desde «Ver inactivos».`
+            : reactivado ? `Servicio «${nom}» reactivado: vuelve a ofrecerse en citas y presupuestos.`
+            : cambioPrecio ? "Servicio actualizado. El nuevo precio ya se aplica a las próximas citas."
+            : "Servicio actualizado.");
+          if (desactivado) setInactivosSesion((xs) => [...xs.filter((x) => String(x.id) !== String(form.id)), { ...antes, ...fields, nombre: nom, monto: Number(form.monto) || 0, activo: false }]);
+          if (reactivado) setInactivosSesion((xs) => xs.filter((x) => String(x.id) !== String(form.id)));
           setForm(null); cargar();
         })
         .catch(() => notify("No se pudo guardar el servicio."));
@@ -7848,10 +7968,23 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     const clean = { nombre: form.nombre, cat: form.categoria, monto: Number(form.monto) || 0, ...fields };
     if (form.id) { setItems((it) => it.map((x) => x.id === form.id ? { ...x, ...clean } : x)); }
     else {
-      const id = Math.max(0, ...items.map((x) => Number(x.id) || 0)) + 1;
+      const id = Math.max(0, ...itemsTodos.map((x) => Number(x.id) || 0)) + 1;
       setItems((it) => [...it, { id, ...clean }]);
     }
     notify(form.id ? "Servicio actualizado." : `Servicio «${form.nombre}» creado.`); setForm(null);
+  };
+  // H-13: reactivar un servicio inactivo sin tocar el resto de sus datos.
+  const reactivar = (x) => {
+    if (!puedeCatalogo) return;
+    if (conectado) {
+      const payload = { nombre: x.nombre, precioBase: Number(x.monto) || 0, duracionMin: Number(x.duracionMin) || 30, categoria: x.categoria || "General", costeDirecto: x.coste != null && x.coste > 0 ? x.coste : null, activo: true, areaClinica: x.especialidad, preciosSede: aApi(x.preciosSede || {}) };
+      api.catalogo.actualizarEspecialidad(x.id, payload)
+        .then(() => { notify(`Servicio «${x.nombre}» reactivado: vuelve a ofrecerse en citas y presupuestos.`); setInactivosSesion((xs) => xs.filter((y) => String(y.id) !== String(x.id))); cargar(); })
+        .catch(() => notify("No se pudo reactivar el servicio."));
+      return;
+    }
+    setItems((it) => it.map((y) => (y.id === x.id ? { ...y, activo: true } : y)));
+    notify(`Servicio «${x.nombre}» reactivado.`);
   };
   const eliminar = () => {
     if (!puedeCatalogo) return;
@@ -7869,7 +8002,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
       propios[sd.id] = Number(v);
     }
     const mezclar = (ps) => { const o = { ...(ps || {}) }; Object.entries(propios).forEach(([k, v]) => { if (v == null) delete o[k]; else o[k] = v; }); return o; };
-    const orig = items.find((x) => x.id === form.id);
+    const orig = itemsTodos.find((x) => x.id === form.id);
     if (!orig) { setForm(null); return; }
     const aviso = sedesEditables.length === 1 ? `Precio de ${sedesEditables[0].nombre} guardado. Las próximas citas y cobros de la sede lo usan.` : "Precios de tus sedes guardados.";
     if (conectado) {
@@ -7884,7 +8017,7 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     <div style={{ display: "grid", gap: 16 }}>
       <section className="dc-esp-hero dc-serv-hero">
         <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>{items.filter((s) => s.activo !== false).length}</b><span>servicios activos</span></div>
+          <div className="dc-esp-hero__num"><b>{activosTodos.length}</b><span>servicios activos</span></div>
           <p>{sedeUnica
             ? `${puedeGestionar ? "Precios" : "Precios de consulta"} de ${sedeUnica.nombre}, con IGV${soloSede && puedeGestionar ? " · ábrelo para fijar el de tu sede" : multiSede ? " · en gris, precio base" : ""}`
             : puedeGestionar ? "Precios con IGV incluido; la tabla muestra el desglose y el total por sede" : "Catálogo de consulta (precios con IGV)"}</p>
@@ -7897,7 +8030,11 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         <span />
         {puedeCatalogo && <button type="button" className="dc-esp-hero__btn" onClick={nuevo}><Plus size={14} strokeWidth={2} /> Nuevo servicio</button>}
       </section>
-      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1120 : 880} rows={filtrados} accion={cats.length > 1 ? <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => (x.categoria || x.cat) === c).length})` }))]} /> : null} onRowClick={puedeGestionar ? (s) => editar(s) : undefined} defaultSort={{ key: "servicio", dir: "asc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
+      <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1120 : 880} rows={filtrados} accion={<span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {cats.length > 1 && <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => espDe(x) === c).length})` }))]} />}
+          {puedeCatalogo && (verInactivos || inactivos.length > 0) && <Btn small kind="ghost" onClick={() => { setVerInactivos(!verInactivos); setCat("all"); }}>{verInactivos ? "Ver activos" : `Ver inactivos (${inactivos.length})`}</Btn>}
+        </span>} onRowClick={puedeGestionar ? (s) => editar(s) : undefined} defaultSort={{ key: "servicio", dir: "asc" }} empty={verInactivos ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios inactivos" sub="Los servicios que desactives aparecerán aquí para reactivarlos." /> : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
+        ...(verInactivos && puedeCatalogo ? [{ key: "reactivar", label: "", w: "120px", a: "center", noFilter: true, noSort: true, noExport: true, cell: (s) => <Btn small kind="ghost" onClick={(e) => { e.stopPropagation(); reactivar(s); }}><Repeat size={13} strokeWidth={2} /> Reactivar</Btn> }] : []),
         { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span>{s.activo === false && <span className="dc-pill" style={{ "--c": "#8A9CA1", flexShrink: 0 }}><i /> Inactivo</span>}</span>; } },
         { key: "esp", label: "Especialidad", w: "minmax(140px,1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
         { key: "dur", label: "Duración", w: "104px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
@@ -8172,7 +8309,17 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
   const cobertura = (i) => coberturaDias(i);
   const pedir = (i) => sugeridoPedir(i);
   const covColor = (d) => (d <= 7 ? "var(--dc-red)" : d <= 14 ? "var(--dc-warn-600)" : "var(--dc-ok-700)");
-  const ajustar = (id, d) => { if (conectado) { const it = items.find((x) => x.id === id); if (!it) return; api.inventario.actualizar(id, { stock: Math.max(0, it.stock + d) }).then(recargar).catch(() => notify("Error al ajustar stock.")); return; } setItems((it) => it.map((x) => x.id === id ? { ...x, stock: Math.max(0, x.stock + d) } : x)); };
+  // H-24: cada ajuste avisa con un toast. El API no tiene un endpoint de movimiento de stock
+  // (api/client.js solo trae PUT /inventario/:id con el stock absoluto): mientras no exista
+  // (p. ej. POST /inventario/:id/movimientos { cantidad, tipo }), dos personas ajustando a la
+  // vez pueden pisarse. Pendiente de backend.
+  const ajustar = (id, d) => {
+    const it = items.find((x) => x.id === id); if (!it) return;
+    const nuevo = Math.max(0, (Number(it.stock) || 0) + d);
+    const txt = `${d > 0 ? "Ingresó" : "Se usó"} 1 ${it.unidad || "unid"} de ${it.nombre}: quedan ${nuevo}.`;
+    if (conectado) { api.inventario.actualizar(id, { stock: nuevo }).then(() => { notify(txt); recargar(); }).catch((e) => notify(esSinPermiso(e) ? "Tu rol no puede ajustar el stock de este insumo." : "Error al ajustar stock.")); return; }
+    setItems((xs) => xs.map((x) => x.id === id ? { ...x, stock: nuevo } : x)); notify(txt);
+  };
   const requieren = requierenCompra(items);
   const agotadosN = items.filter((i) => estado(i) === "agotado").length;
   const bajosN = items.filter((i) => estado(i) === "bajo").length;
@@ -8237,8 +8384,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
   };
   const eliminar = () => {
     if (!confirm(`¿Eliminar «${form.nombre || "este insumo"}» del inventario? Se pierde su stock y su historial de consumo.`)) return;
-    if (conectado) { api.inventario.borrar(form.id).then(recargar).catch(() => notify("No se pudo eliminar el insumo.")); setForm(null); return; }
-    setItems((it) => it.filter((x) => x.id !== form.id)); setForm(null);
+    const nom = form.nombre || "El insumo";
+    if (conectado) { api.inventario.borrar(form.id).then(() => { notify(`${nom} eliminado del inventario.`); recargar(); }).catch((e) => notify(esSinPermiso(e) ? "Tu rol no puede eliminar insumos." : "No se pudo eliminar el insumo.")); setForm(null); return; }
+    setItems((it) => it.filter((x) => x.id !== form.id)); setForm(null); notify(`${nom} eliminado del inventario.`);
   };
   // Sede de cada fila en las tablas: solo con más de una sede a la vista.
   const chipSede = (s) => (s == null || s === ""
@@ -8555,11 +8703,12 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
   const [casosRem, setCasosRem] = useState([]);
   // Cada caso es de la sede que lo envió. Los casos viejos sin sede se atribuyen a la
   // sede principal del paciente (del padrón completo: la lista visible ya viene filtrada).
-  const padron = dbLab?.pacientes || PACIENTES_INIT;
+  // Con sesión, el padrón del servidor (antes caía en los pacientes de ejemplo).
+  const padron = conectado ? pacientes : (dbLab?.pacientes || PACIENTES_INIT);
   const sedeDelCaso = (c) => {
     if (c.sede != null && c.sede !== "") return c.sede;
     const p = padron.find((x) => String(x.id) === String(c.pacienteId)) || padron.find((x) => x.nombre === c.paciente);
-    return p ? (p.sede ?? sedesDe(p)[0] ?? null) : null;
+    return p ? (p.sede ?? p.sedeRegistroId ?? sedesDe(p)[0] ?? null) : null;
   };
   const casoVisible = (c) => {
     const sd = sedeDelCaso(c);
@@ -8568,7 +8717,10 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
     if (c.pacienteId != null) return pacientes.some((p) => String(p.id) === String(c.pacienteId));
     return sedeLab.global && sedeLab.sede === "all";
   };
-  const casos = (conectado ? casosRem : (dbLab?.labCasos || [])).filter(casoVisible);
+  // H-11: la sede elegida al enviar viaja en el POST (sedeId). Si el servidor la descarta, se
+  // recuerda en esta sesión la del caso recién creado para que la columna Sede no salga «—».
+  const [sedeEnviada, setSedeEnviada] = useState({});
+  const casos = (conectado ? casosRem.map((c) => (c.sede == null && sedeEnviada[c.id] != null ? { ...c, sede: sedeEnviada[c.id] } : c)) : (dbLab?.labCasos || [])).filter(casoVisible);
   const setCasos = conectado ? setCasosRem : (dbLab?.setLabCasos || (() => {}));
   // Sedes donde puede registrar un envío: las que se ven ahora (la activa primero).
   const sedesEnvio = SEDES.filter((x) => sedeLab.enSede(x.id) && sedeLab.esMia(x.id));
@@ -8595,7 +8747,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
     const pid = pidDe(nuevo.paciente);
     if (!pid) { notify("Elige un paciente del padrón."); return; }
     api.laboratorio.crear({ pacienteId: pid, paciente: nuevo.paciente, sedeId: sedeApiUuid(nuevo.sede), tipoTrabajo: nuevo.trabajo.trim(), laboratorio: (nuevo.lab || "").trim() || null, fechaEnvio: fmt(hoy), fechaEstimada: nuevo.entrega || null, estado: bE.enviado })
-      .then(() => { notify("Caso enviado a laboratorio."); setNuevo(null); recargar(); })
+      .then((r) => { if (r?.id && r.sedeId == null) setSedeEnviada((m) => ({ ...m, [r.id]: nuevo.sede })); notify("Caso enviado a laboratorio."); setNuevo(null); recargar(); })
       .catch((e) => notify(e?.message || "No se pudo registrar el envío."));
     return;
   } const id = Date.now(); const caso = { id, pacienteId: pidDe(nuevo.paciente) || null, paciente: nuevo.paciente, sede: Number(nuevo.sede), trabajo: nuevo.trabajo, lab: nuevo.lab, enviado: fmt(hoy), entrega: nuevo.entrega, estado: "enviado" }; setCasos((cs) => [caso, ...cs]); notify("Caso enviado a laboratorio. Ya aparece en la ficha del paciente (Archivos › Laboratorio)."); setNuevo(null); };
@@ -8733,10 +8885,13 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
       api.sedes.listar().catch(() => null),
       api.usuarios.listar().catch(() => null),
       pidePac ? api.pacientes.listar().catch(() => null) : Promise.resolve(null),
-    ]).then(([sd, us, pa]) => setConsumoReal({
+      // H-26: los odontólogos del plan son los doctores activos (GET /medicos), no los
+      // usuarios con rol médico (había 6 doctores y decía 4).
+      api.catalogo.medicos().catch(() => null),
+    ]).then(([sd, us, pa, md]) => setConsumoReal({
       sedes: Array.isArray(sd) ? sd.length : null,
       staff: Array.isArray(us) ? us.length : null,
-      medicos: Array.isArray(us) ? us.filter((u) => u.rol === "medico").length : null,
+      medicos: Array.isArray(md) ? md.filter((m) => m && m.activo !== false).length : Array.isArray(us) ? us.filter((u) => u.rol === "medico" && u.activo !== false).length : null,
       pacientes: Array.isArray(pa) ? pa.length : (pidePac ? null : undefined),
     }));
   }, []); // eslint-disable-line
@@ -9309,7 +9464,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
     <Card className="dc-docs">
       <div className="dc-docs__cab">
         <div><h3>{soloPendientes ? "Documentos por firmar o completar" : "Documentos"}</h3><span>Consentimientos y formularios{nPend ? ` · ${nPend} pendiente${nPend > 1 ? "s" : ""}` : ""}</span></div>
-        {!soloPendientes && <Btn small onClick={() => setForm({ clase: "consentimiento", tipo: CONSENT_TIPOS[0], pacienteId: pacienteFijo || (conectado ? visibles : pacientes)[0]?.id || null })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo documento" : "Enviar documento"}</Btn>}
+        {!soloPendientes && <Btn small onClick={() => setForm({ clase: "consentimiento", tipo: CONSENT_TIPOS[0], pacienteId: pacienteFijo || null })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo documento" : "Enviar documento"}</Btn>}
       </div>
       {conectado && docsSinPermiso ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin permiso para ver los documentos" sub="Tu rol no tiene acceso a los consentimientos ni a los formularios." /> : docs.length === 0 ? <Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo={soloPendientes ? "Nada pendiente" : "Sin documentos"} sub={soloPendientes ? "Todos los consentimientos y formularios están firmados o completados." : "Envía un consentimiento o un formulario para que el paciente lo firme o complete."} /> : (
         <DataTable bare minWidth={0} sub="documentos" exportar={false} rows={docs} defaultSort={{ key: "fecha", dir: "desc" }} cols={[
@@ -9330,7 +9485,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
         <Modal icon={<Send size={20} strokeWidth={1.75} />} titulo={conectado ? "Nuevo documento" : "Enviar documento"} sub={conectado ? (form.clase === "consentimiento" ? "Queda por firmar en consultorio (el enlace de firma estará disponible cuando el servidor lo soporte)" : "Llega al paciente por WhatsApp para completarlo desde su celular") : "El paciente lo firma o completa desde su celular"} onClose={() => setForm(null)} maxW={540}
           footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={14} strokeWidth={1.75} /> Enviar</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: pacienteFijo == null ? "1fr 1fr" : "1fr", gap: 14 }}>
-            {pacienteFijo == null && <label className="dc-campo-lbl">Paciente<Select value={form.pacienteId} onChange={(v) => setForm({ ...form, pacienteId: v })} options={(conectado ? visibles : pacientes).map((p) => ({ value: p.id, label: p.nombre }))} /></label>}
+            {pacienteFijo == null && <label className="dc-campo-lbl">Paciente<Select value={form.pacienteId || ""} placeholder="— Elige el paciente —" onChange={(v) => setForm({ ...form, pacienteId: v })} options={(conectado ? visibles : pacientes).map((p) => ({ value: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : undefined }))} /></label>}
             <label className="dc-campo-lbl">Clase<Select value={form.clase} onChange={(v) => setForm({ ...form, clase: v, tipo: v === "consentimiento" ? CONSENT_TIPOS[0] : FORM_TIPOS[0] })} options={[{ value: "consentimiento", label: "Consentimiento" }, { value: "formulario", label: "Formulario" }]} /></label>
             <label className="dc-campo-lbl">Documento<Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={(form.clase === "consentimiento" ? CONSENT_TIPOS : FORM_TIPOS).map((t) => ({ value: t, label: t }))} /></label>
           </div>
@@ -9412,17 +9567,18 @@ function Formularios({ pacientes: pacProp, notify }) {
   const setDocs = setDocsDemo;
   const [form, setForm] = useState(null);
   const inp = { width: "100%", padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box", cursor: "pointer" };
+  // H-18: sin paciente preseleccionado (antes «Enviar» mandaba WhatsApp al primero de la lista).
+  const pacForm = form ? pacientes.find((p) => String(p.id) === String(form.pacienteId)) || null : null;
   const enviar = () => {
+    if (!pacForm) { notify("Elige el paciente."); return; }
     if (conectado) {
-      const pid = (pacientes.find((p) => p.nombre === form.paciente) || {}).id;
-      if (!pid) { notify("Selecciona un paciente válido."); return; }
+      const pid = pacForm.id;
       api.formularios.enviar({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, canal: "whatsapp" })
         .then(() => { notify("Formulario enviado al paciente por WhatsApp."); recargarEnvios(); setForm(null); })
         .catch(() => notify("No se pudo enviar el formulario."));
       return;
     }
-    const pac = pacientes.find((p) => p.nombre === form.paciente);
-    if (!pac) { notify("Selecciona un paciente válido."); return; }
+    const pac = pacForm;
     setDocs((d) => [{ id: Date.now(), pacienteId: pac.id, paciente: pac.nombre, sede: sedeCx.activa ?? undefined, tipo: form.tipo, estado: "pendiente", fecha: fmt(hoy) }, ...d]); notify("Formulario enviado al paciente por WhatsApp."); setForm(null);
   };
   const kpis = [["Completados", docs.filter((d) => d.estado === "completado").length, "var(--dc-ok-700)", <CheckCircle2 size={18} strokeWidth={1.75} />], ["Pendientes", docs.filter((d) => d.estado === "pendiente").length, "var(--dc-warn-600)", <Clock size={18} strokeWidth={1.75} />], ["Total", docs.length, NAVY, <ClipboardList size={18} strokeWidth={1.75} />]];
@@ -9440,19 +9596,19 @@ function Formularios({ pacientes: pacProp, notify }) {
             <div><b>{docs.length}</b><span>Enviados</span></div>
           </div>
           <div className="dc-form-hero__barra" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
-          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ paciente: pacientes[0]?.nombre || "", tipo: FORM_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> Enviar formulario</button>
+          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ pacienteId: "", tipo: FORM_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> Enviar formulario</button>
         </section>
       ); })()}
       {form && (
         <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo="Enviar formulario" sub="El paciente lo llena desde su celular" onClose={() => setForm(null)} maxW={540} footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={15} strokeWidth={1.75} /> Enviar</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={form.paciente} onChange={(v) => setForm({ ...form, paciente: v })} options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={form.pacienteId || ""} placeholder="— Elige el paciente —" onChange={(v) => setForm({ ...form, pacienteId: v })} options={pacientes.map((p) => ({ value: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : undefined }))} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Formulario<br /><Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={FORM_TIPOS.map((t) => ({ value: t, label: t }))} /></label>
           </div>
           <div style={{ marginTop: 16, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-info-soft)", borderRadius: "var(--dc-r-lg)", padding: "13px 15px" }}>
             <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: ".05em", textTransform: "uppercase", color: DS.c.primary, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} /> Así lo recibe el paciente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 13, color: "var(--dc-brand-600)" }}>
-              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Llega un enlace por WhatsApp a <strong>{form.paciente || "el paciente"}</strong> antes de su cita.</span>
+              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Llega un enlace por WhatsApp a <strong>{pacForm?.nombre || "el paciente"}</strong> antes de su cita.</span>
               <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><ClipboardList size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Completa <strong>{form.tipo}</strong> desde su celular en 2 minutos.</span>
               <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>{/* Decía "llega lista a la ficha, sin transcribir a mano": la respuesta se guarda en
                   el envío y ahí se queda; nadie la vuelca sobre la ficha del paciente. */}
@@ -9506,6 +9662,8 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   // Borrar del expediente es irreversible: se pide el permiso explicito de eliminar,
   // no basta con poder subir. El backend lo exige igual (radiografias.eliminar).
   const puedeBorrarRx = can ? can("radiografias", "eliminar") : true;
+  // H-27 (recepción): con permiso solo de «ver» no se ofrece subir estudios ni fotos.
+  const puedeSubirRx = can ? can("radiografias", "crear") || can("radiografias", "editar") : true;
   const conectado = !!auth.token;
   const esFotos = !!soloFotos;
   const sedeCx = useSede();
@@ -9641,7 +9799,7 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
             <span>Registrar en</span>
             <Select small width={170} ariaLabel="Sede" disabled={!pid} value={sedeReg} onChange={(v) => setSedeReg(Number(v))} options={opcionesSede.map((s) => ({ value: s, label: nombreSede(s) }))} />
           </label>}
-          <button type="button" className="dc-esp-hero__btn" disabled={!pid} title={pid ? undefined : "Elige primero el paciente"} style={pid ? undefined : { opacity: 0.55, cursor: "not-allowed" }} onClick={() => { if (!pid) { notify("Elige primero el paciente."); return; } if (fileRef.current) fileRef.current.click(); }}>{esFotos ? <Camera size={14} strokeWidth={1.9} /> : <Upload size={14} strokeWidth={1.9} />} {esFotos ? "Subir foto" : "Subir radiografía"}</button>
+          {puedeSubirRx && <button type="button" className="dc-esp-hero__btn" disabled={!pid} title={pid ? undefined : "Elige primero el paciente"} style={pid ? undefined : { opacity: 0.55, cursor: "not-allowed" }} onClick={() => { if (!pid) { notify("Elige primero el paciente."); return; } if (fileRef.current) fileRef.current.click(); }}>{esFotos ? <Camera size={14} strokeWidth={1.9} /> : <Upload size={14} strokeWidth={1.9} />} {esFotos ? "Subir foto" : "Subir radiografía"}</button>}
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
       } />

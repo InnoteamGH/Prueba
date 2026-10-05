@@ -94,7 +94,7 @@ export function CamposPacienteRapido({ v, set, err = {}, notify, existente = nul
       <div><input className="dc-premium-inp" value={v.nombre} aria-label="Nombre completo" aria-invalid={!!err.nombre} onChange={(e) => set({ nombre: e.target.value })} placeholder="Nombre completo" style={inpR(err.nombre)} />{msg("nombre")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
         <label><span style={lblR}>Celular</span><input className="dc-premium-inp" value={v.telefono} inputMode="tel" aria-invalid={!!err.telefono} onChange={(e) => set({ telefono: e.target.value.replace(/[^\d+\s]/g, "").slice(0, 16) })} placeholder="9 dígitos" style={inpR(err.telefono)} />{msg("telefono")}</label>
-        <label><span style={lblR}>Fecha de nacimiento</span><input className="dc-premium-inp" type="date" max={fmt(hoy)} value={v.nacimiento} aria-invalid={!!err.nacimiento} onChange={(e) => set({ nacimiento: e.target.value })} style={inpR(err.nacimiento)} />{msg("nacimiento")}</label>
+        <label><span style={lblR}>Fecha de nacimiento</span><input className="dc-premium-inp" type="date" min={`${Number(fmt(hoy).slice(0, 4)) - 120}${fmt(hoy).slice(4)}`} max={fmt(hoy)} value={v.nacimiento} aria-invalid={!!err.nacimiento} onChange={(e) => set({ nacimiento: e.target.value })} style={inpR(err.nacimiento)} />{msg("nacimiento")}</label>
       </div>
       {menor && <div style={{ display: "grid", gap: 8, padding: 10, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg-soft, #F7FAFB)", border: "1px solid var(--dc-line)" }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-700)" }}>Menor de edad ({edad} años): datos del apoderado</span>
@@ -251,6 +251,11 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const [abrePac, setAbrePac] = useState(false);
   const [busca, setBusca] = useState("");
   const [horaAuto, setHoraAuto] = useState(!base?.hora);
+  // H-09: la hora que la persona escribió (o la de la cita de origen) se respeta aunque
+  // después elija doctor, sede o fecha; solo se propone la primera libre si no eligió hora.
+  // Si con ese doctor no está libre, se avisa abajo con la opción de usar la primera libre.
+  const [horaElegida, setHoraElegida] = useState(!!base?.hora);
+  const horaAutoSiNoEligio = () => setHoraAuto(!horaElegida);
   // DC-51: primera hora libre al abrir / cambiar fecha.
   useEffect(() => {
     if (!horaAuto || !f.fecha) return;
@@ -369,12 +374,14 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     setHuecos(res);
   };
   const usarHueco = (h) => {
-    setHoraAuto(false); setSillonAuto(false);
+    setHoraAuto(false); setHoraElegida(true); setSillonAuto(false);
     const sedeL = (seds.find((x) => mismaSede(x.id, h.sede)) || {}).id ?? h.sede;
     setF((x) => ({ ...x, medicoId: h.medicoId, sedeId: sedeL, fecha: h.fecha, hora: h.hora, sillon: String(h.sillon) }));
     setHuecos(null);
   };
   const evaluacion = f.medicoId && f.sedeId ? evaluarCita(ctxSede, citaBorrador()) : { errores: [], avisos: [] };
+  // H-09: ¿la hora elegida choca con el doctor (turno, otra cita, bloqueo)? Sin mirar el sillón.
+  const errHora = f.medicoId && f.sedeId ? (evaluarCita(ctxSede, citaBorrador({ sillon: null })).errores[0] || "") : "";
   const estSil = f.medicoId && f.sedeId ? estadoSillones(ctxSede, citaBorrador()) : sillonesSede.map((x) => ({ s: x, estado: x.activo ? "libre" : "no", regla: {} }));
   const turnosHoy = f.medicoId ? turnosDelDia(ctxReglas.disp, f.medicoId, f.fecha) : [];
   const tieneHorario = f.medicoId && (ctxReglas.disp || []).some((d) => String(d.medicoId) === String(f.medicoId));
@@ -586,7 +593,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           {/* La sede va primero: define qué doctores atienden, sus sillones y el precio. */}
           <div className="dc-agm__paso"><i>2</i>Sede, servicio y doctor</div>
           <label><span style={lbl}>Sede{req}</span>
-            <Select value={f.sedeId} disabled={seds.length < 2} onChange={(v) => { setSillonAuto(true); setHoraAuto(true); const m = meds.find((x) => String(x.id) === String(f.medicoId)); setF({ ...f, sedeId: v, sillon: "", medicoId: f.medicoId && !atiendeEn(m, v) ? "" : f.medicoId }); }} placeholder="Seleccionar sede"
+            <Select value={f.sedeId} disabled={seds.length < 2} onChange={(v) => { setSillonAuto(true); horaAutoSiNoEligio(); const m = meds.find((x) => String(x.id) === String(f.medicoId)); setF({ ...f, sedeId: v, sillon: "", medicoId: f.medicoId && !atiendeEn(m, v) ? "" : f.medicoId }); }} placeholder="Seleccionar sede"
                     options={seds.map((s) => ({ value: s.id, label: s.nombre }))} />
           </label>
           <label><span style={lbl}>Servicio{req}</span>
@@ -595,7 +602,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             {precioSede != null && <small className="dc-agm__precio">Precio en {nombreSedeSel}: <b>S/ {Number(precioSede).toFixed(2)}</b></small>}
           </label>
           <label><span style={lbl}>Doctor{req}</span>
-            <Select value={f.medicoId} onChange={(v) => { setSillonAuto(true); setHoraAuto(true); setF({ ...f, medicoId: v }); }} placeholder="Seleccionar"
+            <Select value={f.medicoId} onChange={(v) => { setSillonAuto(true); horaAutoSiNoEligio(); setF({ ...f, medicoId: v }); }} placeholder="Seleccionar"
                     options={medsF.map((m) => { const ts = turnosDelDia(ctxReglas.disp, m.id, f.fecha, f.sedeId || null); const conH = (ctxReglas.disp || []).some((d) => String(d.medicoId) === String(m.id)); return { value: m.id, label: m.nombre, sub: !conH ? "Sin horario configurado" : ts.length ? `Atiende ${ts.map((t) => `${String(t.horaInicio).slice(0, 5)}–${String(t.horaFin).slice(0, 5)}`).join(" · ")}` : "No atiende ese día en esta sede" }; })} />
           </label>
           {f.especialidadId && f.sedeId && !medsF.length && <div className="dc-agm__turno is-no">
@@ -624,10 +631,16 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, border: `1.5px solid ${pasada ? "var(--dc-red)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
               <Clock size={16} strokeWidth={1.75} color={pasada ? "var(--dc-red)" : "var(--dc-ink-400)"} style={{ flexShrink: 0 }} />
-              <input className="dc-premium-inp" type="date" min={fmt(hoy)} aria-label="Fecha de la cita" value={f.fecha} onChange={(e) => { setHoraAuto(true); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
-              <input className="dc-premium-inp" type="time" aria-label="Hora de la cita" value={f.hora} onChange={(e) => { setHoraAuto(false); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
+              <input className="dc-premium-inp" type="date" min={fmt(hoy)} aria-label="Fecha de la cita" value={f.fecha} onChange={(e) => { horaAutoSiNoEligio(); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
+              <input className="dc-premium-inp" type="time" aria-label="Hora de la cita" value={f.hora} onChange={(e) => { setHoraAuto(false); setHoraElegida(true); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
             </div>
             {pasada && <div role="alert" style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>{msgPasada}</div>}
+            {!pasada && horaElegida && !horaAuto && errHora && (
+              <div role="alert" className="dc-agm__val is-avi" style={{ fontSize: 12.5, color: "var(--dc-warn-700)", marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <Info size={13} strokeWidth={2.2} /><span>Las {f.hora} no están libres con este doctor: {errHora}</span>
+                <button type="button" className="dc-link" onClick={() => { setHoraElegida(false); setHoraAuto(true); }}>Usar la primera hora libre</button>
+              </div>
+            )}
           </div>
           <div className="dc-agm__paso"><i>4</i>Detalles</div>
           <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>

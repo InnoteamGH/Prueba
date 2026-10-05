@@ -525,12 +525,22 @@ async function exportarExcelMembrete({ archivo, hoja, titulo, subtitulo, columna
   // Números como números (montos con dos decimales) para que se puedan sumar.
   const aNumero = (v) => {
     if (typeof v === "number") return v;
-    const t = String(v ?? "").trim();
-    if (/^-?(S\/|US\$)?\s?-?[\d,]+(\.\d+)?%?$/.test(t) && !/^0\d/.test(t.replace(/^(S\/|US\$)\s?/, ""))) {
-      const num = Number(t.replace(/^(S\/|US\$)\s?/, "").replace(/,/g, "").replace(/%$/, ""));
+    let t = String(v ?? "").trim();
+    // H-20: «− S/ 50» (signo menos tipográfico, a veces separado del monto) también es un
+    // número: antes los egresos salían como texto y no se podían sumar.
+    let neg = false;
+    const sig = t.match(/^[-−–]\s*/);
+    if (sig && /\d/.test(t)) { neg = true; t = t.slice(sig[0].length); }
+    const mon = t.match(/^(S\/|US\$)\s?/);
+    const moneda = mon ? mon[1] : null;
+    let cuerpo = mon ? t.slice(mon[0].length) : t;
+    const sig2 = cuerpo.match(/^[-−–]\s*/);
+    if (sig2) { neg = !neg; cuerpo = cuerpo.slice(sig2[0].length); }
+    if (/^[\d,]+(\.\d+)?%?$/.test(cuerpo) && !/^0\d/.test(cuerpo)) {
+      const num = Number(cuerpo.replace(/,/g, "").replace(/%$/, ""));
       // DNI, teléfonos y códigos (enteros largos sin formato) se quedan como texto.
-      const plano = /^\d+$/.test(t);
-      if (Number.isFinite(num) && t.replace(/[^\d]/g, "").length < 12 && !(plano && t.length > 6)) return { num, moneda: /^S\//.test(t) ? "S/" : /^US\$/.test(t) ? "US$" : null, pct: /%$/.test(t), dec: /\.\d/.test(t) };
+      const plano = !neg && !moneda && /^\d+$/.test(cuerpo);
+      if (Number.isFinite(num) && cuerpo.replace(/[^\d]/g, "").length < 12 && !(plano && cuerpo.length > 6)) return { num: neg ? -num : num, moneda, pct: /%$/.test(cuerpo), dec: /\.\d/.test(cuerpo) };
     }
     return null;
   };
@@ -545,7 +555,7 @@ async function exportarExcelMembrete({ archivo, hoja, titulo, subtitulo, columna
         cell.numFmt = nv.pct ? "0%" : nv.moneda ? `"${nv.moneda} "#,##0.00` : nv.dec ? "#,##0.00" : "0";
         cell.alignment = { horizontal: "right", vertical: "top" };
       } else if (typeof nv === "number") {
-        cell.value = nv; cell.alignment = { horizontal: "right", vertical: "top" };
+        cell.value = nv; cell.numFmt = Number.isInteger(nv) ? "0" : "#,##0.00"; cell.alignment = { horizontal: "right", vertical: "top" };
       } else {
         cell.value = raw == null ? "" : String(raw);
         cell.alignment = { vertical: "top", wrapText: String(raw ?? "").length > 40 };
@@ -684,6 +694,8 @@ export const validarFormPaciente = (form, hoyISO) => {
   if (telRaw) {
     const tel = telRaw.replace(/\D/g, "");
     if (!/^\d{9}$/.test(tel) && !/^51\d{9}$/.test(tel)) errors.telefono = "Celular: 9 dígitos (ej. 999888777).";
+    // H-14: los celulares del Perú empiezan con 9 (812345678 no es un celular).
+    else if (!/^9/.test(tel.replace(/^51(?=\d{9}$)/, ""))) errors.telefono = "El celular debe empezar con 9 (ej. 999888777).";
   }
 
   const email = (form.email || "").trim();
@@ -691,6 +703,8 @@ export const validarFormPaciente = (form, hoyISO) => {
 
   if (!form.nacimiento) errors.nacimiento = "La fecha de nacimiento es obligatoria.";
   else if (form.nacimiento > hoyISO) errors.nacimiento = "No puede ser una fecha futura.";
+  // H-14: edad máxima 120 años (1890 era un error de tipeo y se aceptaba).
+  else if (String(form.nacimiento).slice(0, 10) < `${Number(String(hoyISO).slice(0, 4)) - 120}${String(hoyISO).slice(4, 10)}`) errors.nacimiento = "Revisa la fecha: la edad no puede pasar de 120 años.";
 
   // M-3: menor de 18 requiere apoderado completo
   if (form.nacimiento && !errors.nacimiento) {

@@ -363,7 +363,9 @@ export const api = {
     especialidades: () => request("GET", "/especialidades"),
     // Catálogo completo de servicios con precio (GET /especialidades solo trae las 5
     // especialidades). Si el servidor aún no tiene la ruta, cae a /especialidades.
-    servicios: () => request("GET", "/servicios").catch((e) => { if (e?.status === 404 || e?.status === 405) return request("GET", "/especialidades"); throw e; }),
+    // q opcional: { incluirInactivos: true } para la pantalla de Servicios (H-13); el resto de
+    // pantallas pide solo los activos.
+    servicios: (q) => request("GET", `/servicios${conQuery(q || {})}`).catch((e) => { if (e?.status === 404 || e?.status === 405) return request("GET", `/especialidades${conQuery(q || {})}`); throw e; }),
     medicos: (especialidadId) => request("GET", `/medicos${especialidadId ? `?especialidadId=${especialidadId}` : ""}`),
     crearEspecialidad: (e) => request("POST", "/especialidades", e),
     actualizarEspecialidad: (id, e) => request("PUT", `/especialidades/${id}`, e),
