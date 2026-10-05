@@ -8,6 +8,9 @@ import {
   metaEstado,
   moneyFmt,
   filtraMicro,
+  totalResumen,
+  especialidadDeItem,
+  produccionPorEspecialidad,
 } from "./panelGerencialUtil.js";
 
 describe("panelGerencialUtil — barras (total-scale, zero no bar)", () => {
@@ -78,5 +81,33 @@ describe("panelGerencialUtil — moneyFmt y micro", () => {
     );
     assert.equal(out.length, 1);
     assert.equal(out[0][0], "Ticket");
+  });
+});
+
+describe("H-G3/H-G4: facturado y especialidad desde /tratamientos/resumen", () => {
+  const cat = [
+    { id: "s1", nombre: "Endodoncia", especialidad: "Endodoncia" },
+    { id: "s2", nombre: "Endodoncia (unirradicular)", especialidad: "Endodoncia" },
+    { id: "s3", nombre: "Instrucción de higiene oral y control de placa", especialidad: "Periodoncia" },
+  ];
+  const resumen = [
+    { servicioId: null, nombre: "QA Endodoncia molar", numeroDeVentas: 1, importeTotal: 220 },
+    { servicioId: null, nombre: "Instrucción de higiene oral y control de placa · Técnica de cepillado", numeroDeVentas: 1, importeTotal: 120 },
+  ];
+  it("el total es la suma del resumen (mismo número que el Top)", () => {
+    assert.equal(totalResumen(resumen), 340);
+    assert.equal(totalResumen(null), 0);
+  });
+  it("reconoce la especialidad por servicioId o por nombre del catálogo", () => {
+    assert.equal(especialidadDeItem({ servicioId: "s3", nombre: "x" }, cat), "Periodoncia");
+    assert.equal(especialidadDeItem(resumen[0], cat), "Endodoncia");
+    assert.equal(especialidadDeItem(resumen[1], cat), "Periodoncia");
+    assert.equal(especialidadDeItem({ nombre: "Otra cosa" }, cat), null);
+  });
+  it("producción por especialidad suma lo mismo que el facturado", () => {
+    const esp = produccionPorEspecialidad(resumen, cat);
+    assert.deepEqual(esp, [{ nombre: "Endodoncia", valor: 220 }, { nombre: "Periodoncia", valor: 120 }]);
+    assert.equal(esp.reduce((a, e) => a + e.valor, 0), totalResumen(resumen));
+    assert.equal(produccionPorEspecialidad([{ nombre: "Rara", importeTotal: 50 }], cat)[0].nombre, "Sin especialidad en el catálogo");
   });
 });

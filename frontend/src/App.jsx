@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
 import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales, esSinPermiso, msgServidor } from "./api/client";
 import { limpiarRegistroSedes, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
+import { fijarPermisosSesion, guardarPermisosServidor, permisosServidorGuardados } from "./compartido/permisos";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
 const FichaMedica = React.lazy(() => import("./FichaMedica"));
@@ -22,7 +23,7 @@ import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, s
 import { useReglasAgenda, sillonesPorSede } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
-import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva } from "./compartido/integraciones";
+import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat } from "./compartido/integraciones";
 import { estadoCita, estadoInfo, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
@@ -615,8 +616,10 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // SUNAT (GET /facturacion-electronica/config). Pasarela, respaldo y correo no tienen
   // endpoint de estado, así que no se muestran (antes eran textos fijos «hace 2 min», «03:00»).
   const INTEGRACIONES_TI = conectado ? [
-    saludWa && (() => { const sem = saludWa.semaforo || (saludWa.ok ? "verde" : "rojo"); const fallos = Number(saludWa.fallos24h) || 0;
-      return ["WhatsApp Business API (Meta)", sem === "verde" ? "operativo" : sem === "gris" ? "pendiente" : "incidencia", sem === "verde" ? (fallos ? `${fallos} fallo(s) en 24 h` : "Conexión correcta") : (saludWa.mensaje && !/quarkus|endpoint|WHATSAPP_|OPENAI_/i.test(saludWa.mensaje) ? saludWa.mensaje : "Sin conexión")]; })(),
+    // H-T4: mismo estado que Integraciones y WhatsApp + IA (compartido/integraciones.js).
+    saludWa && (() => { const w = estadoWhatsApp(saludWa); return ["WhatsApp Business API (Meta)", w.estado, w.detalle]; })(),
+    // El motor de IA también se lista: Integraciones lo cuenta entre las activas.
+    saludWa && iaConectada(saludWa) !== undefined && ["API de OpenAI (asistente IA)", iaConectada(saludWa) ? "operativo" : "pendiente", iaConectada(saludWa) ? "Clave cargada" : "Sin clave: responde el motor de reglas"],
     cfgSunat && (cfgSunat.proveedor ? ["Facturación electrónica (SUNAT)", "operativo", "Proveedor conectado"] : ["Facturación electrónica (SUNAT)", "pendiente", "Sin proveedor: comprobantes «Sin enviar»"]),
   ].filter(Boolean) : [["WhatsApp Business API (Meta)", "operativo", "Última sync hace 2 min"],
                             (() => { const pa = pasarelaActiva(); return [`Pasarela de pago${pa ? ` (${pa.n})` : ""}`, pa ? "operativo" : "pendiente", pa ? "Transacciones OK" : "Sin conectar"]; })(),
@@ -738,7 +741,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const nombres = (arr, k = "paciente") => arr.slice(0, 3).map((x) => x[k]).join(", ") + (arr.length > 3 ? ` y ${arr.length - 3} más` : "");
   const tareas = [
     esTI && INTEGRACIONES_TI.some(([, e]) => e === "pendiente") && { id: "tiPend", tono: "info", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length, "integración por activar", "integraciones por activar")}`, detalle: INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").map(([n]) => n).join(", ") + ".", accion: "Ver integraciones", ir: () => onIr("integraciones") },
-    esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: "Revisa el estado y reconecta antes de que afecte a la atención.", accion: "Ver integraciones", ir: () => onIr("integraciones") },
+    esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: `${INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").map(([n, , d]) => `${n}: ${d}`).join(" ")} Revisa el estado antes de que afecte a la atención.`, accion: "Ver integraciones", ir: () => onIr("integraciones") },
     // Completar la evolución es trabajo del doctor: recepción y administración no pueden
     // hacerlo, así que no se les muestra una tarea con un botón que no les sirve.
     esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => { const primer = (pendEvo.items || [])[0]; if (primer?.pacienteId) onIr("pacientes", { pacienteId: primer.pacienteId }); else onIr("pacientes"); } },
@@ -2925,6 +2928,10 @@ function DienteSVG({ n, data, onCara, onWhole }) {
 function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, sedeActiva = 1, can, rol, pacienteFijo = null }) {
   const demoDbOdo = useContext(DatosDemoCtx);
   const conectado = !!auth.token;
+  // H-G8: gerencia (odontograma y tratamientos solo «ver») no marca piezas ni pasa
+  // hallazgos al presupuesto: lo ve en lectura, como lo ve la API.
+  const puedeEditarOdo = can ? can("odontograma", "editar") : true;
+  const puedePresupuestar = can ? can("tratamientos", "crear") || can("tratamientos", "editar") : true;
   const [pacRemoto, setPacRemoto] = useState(null);
   // Hace falta el nacimiento: sin el no se puede saber que denticion le toca.
   // El género viaja también: dos líneas más abajo se pinta el color pediátrico con él, y
@@ -3460,8 +3467,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               denticion={denticionApi(denticion)}
               zoom={zoom}
               notify={notify}
-              editable={conectado && !pacienteFijo}
-              soloLectura={!!pacienteFijo}
+              editable={conectado && !pacienteFijo && puedeEditarOdo}
+              soloLectura={!!pacienteFijo || !puedeEditarOdo}
               conExpediente={false}
               onFaseChange={(f) => { if (f && f !== fase) setFase(f); }}
               onNavTab={(tab) => {
@@ -3484,7 +3491,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                     <h3>Presupuesto del paciente</h3>
                     <p>Un solo presupuesto: lo que marques <b>por hacer</b> (en rojo) pasa aquí con el precio del catálogo de servicios.</p>
                   </div>
-                  {vistaOdo === "anatomico" && (!conectado || !pacienteFijo) && <button className="dc-btn dc-btn--primary" onClick={pasarHallazgos}>Pasar hallazgos por hacer al presupuesto</button>}
+                  {vistaOdo === "anatomico" && (!conectado || !pacienteFijo) && puedePresupuestar && puedeEditarOdo && <button className="dc-btn dc-btn--primary" onClick={pasarHallazgos}>Pasar hallazgos por hacer al presupuesto</button>}
                 </header>
                 {conectado && planOdo.error ? <p className="dc-odo-ppto__vacio">No se pudo leer el plan del paciente.</p> : items.length === 0 ? <p className="dc-odo-ppto__vacio">Aún no hay procedimientos en el presupuesto.</p> : (
                   <table className="dc-odo-ppto__t">
@@ -6320,19 +6327,29 @@ function Integraciones({ notify }) {
   // Con sesión el estado de WhatsApp y del motor de IA sale de GET /whatsapp/salud; nada
   // se marca «conectado» de antemano. null = consultando; { error } = no respondió.
   const [salud, setSalud] = useState(null);
-  useEffect(() => { if (conectado) api.agente.salud().then((r) => setSalud(r || {})).catch(() => setSalud({ error: true })); }, []); // eslint-disable-line
-  const estWa = !conectado ? "conectado" : !salud ? "pendiente" : (salud.ok && !salud.demo ? "conectado" : "pendiente");
-  const iaInfo = salud && [salud.iaReal, salud.ia, salud.openai, salud.iaConectada].find((x) => typeof x === "boolean");
+  // SUNAT: el proveedor de GET /facturacion-electronica/config (lo mismo que lee el inicio
+  // de TI); antes se leía antes de que ConexionSunat lo cargara y salía «pendiente».
+  const [provSunat, setProvSunat] = useState(() => proveedorSunat());
+  useEffect(() => {
+    if (!conectado) return;
+    api.agente.salud().then((r) => setSalud(r || {})).catch(() => setSalud({ error: true }));
+    api.sunat.config().then((c) => { const p = (c && typeof c === "object" && !Array.isArray(c) && c.proveedor) || ""; fijarProveedorSunat(p); setProvSunat(p); }).catch(() => {});
+  }, []); // eslint-disable-line
+  // H-T4: WhatsApp con fallos en 24 h ya no sale «Conectado» a secas: el estado es el mismo
+  // que muestran el inicio de TI y WhatsApp + IA (estadoWhatsApp).
+  const wa = estadoWhatsApp(conectado ? salud : { ok: true, semaforo: "verde" });
+  const estWa = !conectado ? "conectado" : wa.estado === "operativo" ? "conectado" : wa.estado;
+  const iaInfo = iaConectada(salud);
   const estIa = !conectado ? "conectado" : iaInfo === true ? "conectado" : "pendiente";
   const cats = [
     { cat: "Pagos en línea y POS", ic: CreditCard, c: "#2F6FDE", items: [
       ...PASARELAS.map((pa) => ({ n: pa.n, d: pa.d, rec: pa.rec, estado: pasarelaActiva()?.id === pa.id ? "conectado" : "disponible" })),
     ] },
     { cat: "Facturación electrónica", ic: Receipt, c: "#B45309", items: [
-      { n: "Proveedor OSE / PSE (SUNAT)", d: proveedorSunat() ? "Firma y envía a SUNAT las boletas y facturas que emite Caja." : "Sin proveedor conectado: Caja emite los comprobantes y quedan «Sin enviar». Se configura en Caja › Comprobantes SUNAT.", estado: proveedorSunat() ? "conectado" : "pendiente" },
+      { n: "Proveedor OSE / PSE (SUNAT)", d: provSunat ? "Firma y envía a SUNAT las boletas y facturas que emite Caja." : "Sin proveedor conectado: Caja emite los comprobantes y quedan «Sin enviar». Se configura en Caja › Comprobantes SUNAT.", estado: provSunat ? "conectado" : "pendiente" },
     ] },
     { cat: "Mensajería e IA", ic: MessageSquare, c: "#16A36A", items: [
-      { n: "WhatsApp Cloud API (Meta)", d: !conectado || estWa === "conectado" ? "Canal oficial para el agente IA. Más económico a escala que intermediarios." : !salud ? "Consultando el estado de WhatsApp en el servidor…" : salud.error ? "No se pudo consultar el estado de WhatsApp en el servidor." : `WhatsApp aún no está operativo${salud.mensaje && !/quarkus|endpoint|WHATSAPP_|OPENAI_/i.test(String(salud.mensaje)) ? `: ${salud.mensaje}` : ""}. Lo activa soporte.`, estado: estWa, rec: true },
+      { n: "WhatsApp Cloud API (Meta)", d: !conectado || estWa === "conectado" ? "Canal oficial para el agente IA. Más económico a escala que intermediarios." : estWa === "incidencia" ? `${wa.detalle}${salud?.ultimoEnvioOk ? ` Último envío correcto: ${new Date(salud.ultimoEnvioOk).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }).replace(/\.$/, "")}.` : ""} Revísalo en WhatsApp + IA › Conexión WhatsApp.` : wa.detalle, estado: estWa, etiqueta: wa.etiqueta, rec: true },
       // Aquí figuraba otro proveedor del que la aplicación no depende. El motor real es
       // OpenAI (application.yml: openai.base-url), y solo con OPENAI_API_KEY cargada:
       // sin ella el asistente cae al motor de reglas.
@@ -6343,11 +6360,13 @@ function Integraciones({ notify }) {
     ] },
   ];
   const its = cats.flatMap((c) => c.items);
-  const conectadas = its.filter((i) => i.estado === "conectado").length;
+  // Activas = conectadas, con o sin fallos; las que fallan se cuentan aparte (como el inicio de TI).
+  const conectadas = its.filter((i) => i.estado === "conectado" || i.estado === "incidencia").length;
+  const incidenciasInt = its.filter((i) => i.estado === "incidencia").length;
   const pendientesInt = its.filter((i) => i.estado === "pendiente").length;
   const [detInt, setDetInt] = useState(null);
   const [catSel, setCatSel] = useState("todas");
-  const EST_INT = { conectado: ["Conectado", "is-ok"], pendiente: ["Pendiente", "is-warn"], disponible: ["Disponible", ""] };
+  const EST_INT = { conectado: ["Conectado", "is-ok"], incidencia: ["Con fallos", "is-warn"], pendiente: ["Pendiente", "is-warn"], disponible: ["Disponible", ""] };
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <section className="dc-esp-hero">
@@ -6356,6 +6375,7 @@ function Integraciones({ notify }) {
           <p>Proveedores reales del mercado peruano para tu clínica</p>
         </div>
         <div className="dc-esp-hero__cifras">
+          {incidenciasInt > 0 && <div><b style={{ color: "var(--dc-warn-600)" }}>{incidenciasInt}</b><span>Con incidencia</span></div>}
           <div><b>{pendientesInt}</b><span>Por activar</span></div>
           <div><b>{its.length - conectadas - pendientesInt}</b><span>Disponibles</span></div>
           <div><b>{its.filter((i) => i.rec).length}</b><span>Recomendadas</span></div>
@@ -6371,7 +6391,7 @@ function Integraciones({ notify }) {
         {cats.map((c) => { const CI = c.ic; return <button key={c.cat} type="button" role="tab" aria-selected={catSel === c.cat} className={catSel === c.cat ? "is-on" : ""} style={{ "--c": c.c }} onClick={() => setCatSel(c.cat)}><CI size={13} strokeWidth={2} /> {c.cat} <i>{c.items.length}</i></button>; })}
       </div>
       {(() => {
-        const ORD = { conectado: 0, pendiente: 1, disponible: 2 };
+        const ORD = { incidencia: 0, conectado: 1, pendiente: 2, disponible: 3 };
         const lista = cats.filter((c) => catSel === "todas" || catSel === c.cat).flatMap((c) => c.items.map((it) => ({ ...it, cat: c.cat, cc: c.c, CI: c.ic }))).sort((x, y) => (ORD[x.estado] ?? 3) - (ORD[y.estado] ?? 3));
         return (
           <div className="dc-int2">
@@ -6382,8 +6402,8 @@ function Integraciones({ notify }) {
                   <b>{it.n}{it.rec && <Star size={11} strokeWidth={2.4} className="dc-int2__rec" aria-label="Recomendado" />}</b>
                   <small style={{ "--c": it.cc }}><CI size={11} strokeWidth={2.2} /> {it.cat}</small>
                 </div>
-                {it.estado === "conectado"
-                  ? <span className={`dc-int__est ${ec}`}><i />{el}</span>
+                {it.estado === "conectado" || it.estado === "incidencia"
+                  ? <span className={`dc-int__est ${ec}`}><i />{it.etiqueta || el}</span>
                   : <button type="button" className={it.estado === "pendiente" ? "is-warn" : ""} onClick={(e) => { e.stopPropagation(); setDetInt(it); }}>{it.estado === "pendiente" ? "Terminar" : "Conectar"}</button>}
               </article>
             ); })}
@@ -6392,10 +6412,10 @@ function Integraciones({ notify }) {
       })()}
       {its.length === 0 && <Card style={{ padding: 0 }}><Vacio icon={<Plug size={22} strokeWidth={1.75} />} titulo="Sin integraciones" sub="No hay conectores disponibles por ahora." /></Card>}
       {detInt && <Modal icon={<Plug size={20} strokeWidth={1.75} />} tone={detInt.estado === "conectado" ? "var(--dc-ok-700)" : NAVY} titulo={detInt.n} sub={detInt.cat} onClose={() => setDetInt(null)} maxW={480}
-        footer={detInt.estado === "conectado" || conectado ? <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn>{conectado && detInt.estado !== "conectado" && <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{/SUNAT/.test(detInt.n) ? "Se configura arriba, en Facturación electrónica." : "Esta conexión la activa soporte; aún no se configura desde aquí."}</span>}</> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { const pa = PASARELAS.find((x) => x.n === detInt.n); if (pa) { setPasarelaActiva(pa.id); notify(`${pa.n} es ahora la pasarela de pago. Links de pago ya la usa.`); } else notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
+        footer={detInt.estado === "conectado" || conectado ? <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cerrar</Btn>{conectado && detInt.estado !== "conectado" && detInt.estado !== "incidencia" && <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{/SUNAT/.test(detInt.n) ? "Se configura arriba, en Facturación electrónica." : "Esta conexión la activa soporte; aún no se configura desde aquí."}</span>}</> : <><Btn small kind="ghost" onClick={() => setDetInt(null)}>Cancelar</Btn><Btn small onClick={() => { const pa = PASARELAS.find((x) => x.n === detInt.n); if (pa) { setPasarelaActiva(pa.id); notify(`${pa.n} es ahora la pasarela de pago. Links de pago ya la usa.`); } else notify(`Integración con ${detInt.n} iniciada (demo).`); setDetInt(null); }}><Plug size={15} strokeWidth={1.75} /> Conectar</Btn></>}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           {detInt.rec && <span style={{ fontSize: 12, fontWeight: 500, background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", padding: "3px 9px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 4 }}><Star size={10} strokeWidth={1.75} /> Recomendado</span>}
-          {detInt.estado === "conectado" ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={14} strokeWidth={1.75} /> Conectado</span> : <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={13} strokeWidth={1.75} /> Disponible</span>}
+          {detInt.estado === "conectado" ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", display: "inline-flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={14} strokeWidth={1.75} /> Conectado</span> : detInt.estado === "incidencia" ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><AlertTriangle size={14} strokeWidth={1.75} /> {detInt.etiqueta || "Con fallos"}</span> : <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={13} strokeWidth={1.75} /> Disponible</span>}
         </div>
         <div style={{ fontSize: 14, color: "var(--dc-ink-700)", lineHeight: 1.6, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "13px 15px" }}>{detInt.d}</div>
       </Modal>}
@@ -6487,6 +6507,11 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
   // la clínica ni a quien también trabaja en otra sede).
   const editable = (u) => actorGlobal || (u.sedes !== "all" && normSedes(u.sedes).length > 0 && normSedes(u.sedes).every((x) => sedeUs.esMia(x)) && rolesAsignables.includes(u.rol));
   const cargaFallida = conectado && !!usuariosError;
+  // H-G6: cada botón según los permisos del servidor (gerencia tiene usuarios:["ver"] y la
+  // API le rechazaba Nuevo, Editar, Activar y Desactivar con 403).
+  const puedeCrearUs = can ? can("usuarios", "crear") : true;
+  const puedeEditarUs = can ? can("usuarios", "editar") : true;
+  const puedeBajaUs = can ? can("usuarios", "eliminar") : true;
   const [q, setQ] = useState("");
   const [filtroRol, setFiltroRol] = useState("todos");
   const [form, setForm] = useState(null); // null = cerrado
@@ -6555,7 +6580,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           <div><b>{cargaFallida ? "—" : porRol.filter((x) => x.n > 0).length}</b><span>Roles en uso</span></div>
         </div>
         <span />
-        <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={nuevo}><UserPlus size={14} strokeWidth={2} /> Nuevo usuario</button></div>
+        {puedeCrearUs && <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={nuevo}><UserPlus size={14} strokeWidth={2} /> Nuevo usuario</button></div>}
       </section>
       {cargaFallida && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span><b>Usuarios sin API.</b> {usuariosError} No es un padrón vacío: el listado no pudo cargarse.</span></div>}
       <div className="dc-us__barra">
@@ -6571,7 +6596,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         {/* Formulario alta/edición */}
         {form && (
           <Modal icon={form.id ? <Pencil size={20} strokeWidth={1.75} /> : <UserPlus size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar usuario" : "Nuevo usuario"} sub={form.id ? "Actualiza sus datos, rol y sedes" : "Crea la cuenta y asigna su rol y sedes"} onClose={() => setForm(null)} maxW={620}
-            footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}>{!conectado && <Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn>}<Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn></span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
+            footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}>{!conectado && <Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn>}{puedeBajaUs && form.activo !== false && <Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> {conectado ? "Dar de baja" : "Eliminar"}</Btn>}</span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
               <Field label="Nombre completo" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Ana Torres" />
               <Field label="Usuario" value={form.user} onChange={(v) => setForm({ ...form, user: v })} placeholder="atorres" icon={<UserCheck size={15} strokeWidth={1.75} />} />
@@ -6631,7 +6656,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         )}
         {claveNueva && (
           <Modal icon={<KeyRound size={20} strokeWidth={1.75} />} titulo="Usuario creado" sub={`Clave temporal de ${claveNueva.nombre}`} onClose={() => setClaveNueva(null)} maxW={480}
-            footer={<><Btn small kind="ghost" onClick={() => { try { navigator.clipboard?.writeText(claveNueva.clave); notify("Clave copiada."); } catch { notify("No se pudo copiar: anótala."); } }}><Copy size={15} strokeWidth={1.75} /> Copiar clave</Btn><Btn small onClick={() => setClaveNueva(null)}><Check size={15} strokeWidth={1.75} /> Ya la entregué</Btn></>}>
+            footer={<><Btn small kind="ghost" onClick={() => { const no = () => notify("No se pudo copiar: anótala."); try { const pr = navigator.clipboard?.writeText(claveNueva.clave); if (!pr) { no(); return; } pr.then(() => notify("Clave copiada."), no); } catch { no(); } }}><Copy size={15} strokeWidth={1.75} /> Copiar clave</Btn><Btn small onClick={() => setClaveNueva(null)}><Check size={15} strokeWidth={1.75} /> Ya la entregué</Btn></>}>
             <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.5 }}>Entrega esta clave a <b>{claveNueva.nombre}</b> ({claveNueva.email}) por un canal seguro. <b>Solo se muestra esta vez</b>: al cerrar ya no se puede volver a ver. Debe cambiarla en su primer ingreso.</p>
             <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 20, letterSpacing: 1, textAlign: "center", padding: "14px 12px", border: "1.5px dashed var(--dc-line)", borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", color: NAVY, userSelect: "all" }}>{claveNueva.clave}</div>
           </Modal>
@@ -6652,7 +6677,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? "Sin sede" : etiquetaSedes(u.sedes)), cell: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>Sin sede</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span>) },
           { key: "ultimo", label: "Acceso", w: "104px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
           { key: "estado", label: "Estado", w: "96px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
-          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc"><button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button><button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button><button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button></div> },
+          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !(puedeEditarUs || puedeBajaUs) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Tu rol puede ver los usuarios, pero no cambiarlos.">Solo lectura</span> : !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc">{puedeEditarUs && <button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button>}{/* Desactivar es DELETE (baja); reactivar es PUT (editar). */}{(u.activo ? puedeBajaUs : puedeEditarUs) && <button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button>}{/* H-T6: con sesión «Eliminar» hacía el mismo DELETE que Desactivar (no borra): queda solo Desactivar. */}{!conectado && puedeBajaUs && <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button>}</div> },
         ]} />
     </div>
   );
@@ -7027,10 +7052,15 @@ function Auditoria() {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   const hoyLima = ymdLima(new Date());
+  // H-T2: rango de fechas. Se manda al servidor (desde/hasta) y además se filtra aquí,
+  // porque hoy GET /auditoria los ignora y devuelve solo los 500 últimos eventos.
+  const [audDesde, setAudDesde] = useState("");
+  const [audHasta, setAudHasta] = useState("");
+  const [totalSrv, setTotalSrv] = useState(0);
   useEffect(() => {
     if (!conectado) return;
     let cancelled = false;
-    api.auditoria().then((list) => {
+    api.auditoria({ desde: audDesde || null, hasta: audHasta || null }).then((list) => {
       if (cancelled) return;
       const mapped = mapAuditoriaApiRows(list).map((base) => {
         const a = base.raw || {};
@@ -7042,6 +7072,7 @@ function Auditoria() {
         return {
           ...base,
           fecha,
+          dia: creado && !isNaN(creado) ? ymdLima(creado) : "",
           usuario: a.usuario || "—",
           rol: a.rol || "—",
           accion: accion === "HC_ACCESO" ? "Acceso a historia clínica" : accion === "LOGIN" ? "Inicio de sesión" : accion,
@@ -7050,6 +7081,7 @@ function Auditoria() {
         };
       });
       setRows(mapped);
+      setTotalSrv(Array.isArray(list) ? list.length : 0);
       setErr(null);
     }).catch(() => {
       if (cancelled) return;
@@ -7057,7 +7089,7 @@ function Auditoria() {
       setErr("No se pudo cargar el registro de auditoría.");
     });
     return () => { cancelled = true; };
-  }, [conectado]);
+  }, [conectado, audDesde, audHasta]);
   if (!conectado) {
     const alertas = AUDITORIA.filter((a) => a.nivel === "warn").length;
     const usuarios = new Set(AUDITORIA.filter((a) => a.usuario !== "—").map((a) => a.usuario)).size;
@@ -7094,7 +7126,13 @@ function Auditoria() {
     return <Card style={{ padding: 22, color: "var(--dc-ink-500)" }}>Cargando auditoría…</Card>;
   }
   const hoyN = contarEventosHoy(rows, hoyLima);
-  const usuarios = new Set(rows.map((a) => a.usuario).filter((u) => u && u !== "—")).size;
+  const enRango = rows.filter((a) => (!audDesde || (a.dia && a.dia >= audDesde)) && (!audHasta || (a.dia && a.dia <= audHasta)));
+  const diasCon = rows.map((a) => a.dia).filter(Boolean).sort();
+  const masAntiguo = diasCon[0] || "";
+  // El servidor corta en 500 eventos (sin paginación): se avisa desde qué fecha hay datos.
+  const recortado = totalSrv >= 500;
+  const usuarios = new Set(enRango.map((a) => a.usuario).filter((u) => u && u !== "—")).size;
+  const fechaCorta = (d) => (d ? d.split("-").reverse().join("/") : "");
   const cols = [
     { key: "fecha", label: "Fecha", w: "minmax(130px,0.9fr)", a: "left", get: (a) => a.orden, cell: (a) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontWeight: 500, whiteSpace: "nowrap" }}>{a.fecha}</span> },
     { key: "usuario", label: "Usuario", w: "minmax(150px,1.2fr)", a: "left", get: (a) => a.usuario + " " + (ROLES[a.rol]?.label || a.rol), cell: (a) => { const R = ROLES[a.rol]; return <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.usuario}</div><div style={{ fontSize: 12, color: R?.color || "var(--dc-ink-500)", fontWeight: 500 }}>{R?.label || a.rol}</div></div>; } },
@@ -7107,7 +7145,14 @@ function Auditoria() {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       {err && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span>{err}</span></div>}
-      <AuditoriaVista rows={rows} hoyN={hoyN} usuarios={usuarios} alertas={rows.filter((r) => r.nivel === "warn").length} sub="Inicios de sesión y aperturas de historia clínica (Ley 29733)" onDet={setDet} niv={niv} />
+      <div className="dc-us__barra" style={{ alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+        <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Desde<input type="date" className="dc-premium-inp" value={audDesde} max={audHasta || hoyLima} onChange={(e) => setAudDesde(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
+        <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Hasta<input type="date" className="dc-premium-inp" value={audHasta} min={audDesde || undefined} max={hoyLima} onChange={(e) => setAudHasta(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
+        {(audDesde || audHasta) && <Btn small kind="ghost" onClick={() => { setAudDesde(""); setAudHasta(""); }}>Quitar fechas</Btn>}
+        <span style={{ fontSize: 12, color: "var(--dc-ink-500)", alignSelf: "center" }}>{enRango.length} de {rows.length} eventos{masAntiguo ? ` · hay datos desde el ${fechaCorta(masAntiguo)}` : ""}</span>
+      </div>
+      {recortado && <div className="fm-aviso-edad is-info"><AlertTriangle size={15} strokeWidth={2} /><span>El servidor entrega solo los <b>{totalSrv} eventos más recientes</b>{masAntiguo ? ` (desde el ${fechaCorta(masAntiguo)})` : ""}. Lo anterior no se puede consultar desde aquí hasta que GET /auditoria acepte fechas o páginas.</span></div>}
+      <AuditoriaVista key={`${audDesde}|${audHasta}`} rows={enRango} hoyN={hoyN} usuarios={usuarios} alertas={enRango.filter((r) => r.nivel === "warn").length} sub="Inicios de sesión y aperturas de historia clínica (Ley 29733)" onDet={setDet} niv={niv} />
       {det && (() => { const R = ROLES[det.rol]; const N = niv[det.nivel]; return (
         <Modal icon={<ShieldCheck size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={det.accion} sub={`${det.fecha} – ${det.usuario}`} onClose={() => setDet(null)} maxW={480} footer={<Btn small kind="ghost" onClick={() => setDet(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gap: 10 }}>
@@ -10043,12 +10088,28 @@ function MainApp({ usuario, setUsuario, onLogout }) {
 
   // Permisos EFECTIVOS: en modo conectado manda el mapa del login/API (no localStorage).
   const conectado = !!auth.token || !!usuario?.conectado || !!usuario?.organizacionId;
+  // Con sesión NUNCA se usa la matriz local editable (dc_data_v1_permisos_v2): no coincide
+  // con la del servidor y mostraba botones que la API rechaza (H-G6). Orden: permisos del
+  // login o de /auth/me; si no llegaron, los módulos de GET /roles con las acciones de
+  // accionesRol (el espejo en código de Permisos.accionesRol del backend; un módulo que
+  // el espejo no conoce queda en «ver»); mientras tanto, ese mismo espejo.
+  const [permsRoles, setPermsRoles] = useState(null);
+  const servPerms = usuario?.permisos && typeof usuario.permisos === "object" && Object.keys(usuario.permisos).length ? usuario.permisos : null;
+  useEffect(() => {
+    if (!conectado || servPerms || permisosServidorGuardados() || !usuario?.rol) return;
+    api.permisos.roles().then((rs) => {
+      const r = (Array.isArray(rs) ? rs : []).find((x) => x?.id === usuario.rol);
+      if (r && Array.isArray(r.modulos)) setPermsRoles(Object.fromEntries(r.modulos.map((m) => [m, (ROL_PERMS[usuario.rol] || {})[m] || ["ver"]])));
+    }).catch(() => {});
+  }, [conectado, !!servPerms, usuario?.rol]); // eslint-disable-line
   const effPerms = useMemo(() => {
-    if (conectado && usuario?.permisos && typeof usuario.permisos === "object") {
-      return usuario.permisos;
-    }
-    return permisosEfectivos(usuario, rolePerms);
-  }, [usuario, rolePerms, conectado]);
+    const p = conectado
+      ? (servPerms || permisosServidorGuardados() || permsRoles || ROL_PERMS[usuario?.rol] || {})
+      : permisosEfectivos(usuario, rolePerms);
+    // Helper central (compartido/permisos.js): los módulos sin `can` preguntan ahí.
+    fijarPermisosSesion(p);
+    return p;
+  }, [usuario, rolePerms, conectado, servPerms, permsRoles]);
   // Módulos visibles = los que tienen la acción "ver" habilitada.
   const mods = useMemo(() => modulosVisibles(effPerms), [effPerms]);
   useEffect(() => {
@@ -10094,6 +10155,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     if (!auth.token) return Promise.resolve();
     return api.me().then((r) => {
       if (!r?.permisos) return;
+      guardarPermisosServidor(r.permisos);
       setUsuario((u) => (u ? { ...u, nombre: r.nombre || u.nombre, rol: r.rol || u.rol, permisos: r.permisos, conectado: true } : u));
     }).catch(() => {});
   };
@@ -12893,6 +12955,7 @@ export default function App() {
     sedesListas.then(() => api.me()).then((r) => {
       const sedesFromJwt = aNumeros(sedesJwtRaw);
       if (!r?.permisos) return;
+      guardarPermisosServidor(r.permisos);
       setUsuario((u) => {
         if (!u || u.rol === "paciente") return u;
         return {

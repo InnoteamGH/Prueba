@@ -185,3 +185,47 @@ export function ausentismoPorOdontologo(citas, medicos = [], ticketMedio = null)
 }
 
 export { layoutProgreso, moneyFmt, pctOfTotal };
+
+/* H-G5: periodo de Producción y comisiones. Antes la pantalla pedía /comisiones sin fechas
+   (el servidor usaba mayo–octubre sin decirlo) y comparaba esos 5 meses con UNA meta
+   mensual («360 % de la meta»). Ahora el periodo se elige, se rotula y la meta se escala
+   a los meses del periodo. */
+const ymdP = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+export const PERIODOS_COMISIONES = [["mes", "Este mes"], ["anterior", "Mes anterior"], ["6m", "Últimos 6 meses"]];
+
+/** { desde, hasta } (YYYY-MM-DD) del periodo elegido. «6m» = del día 1 de hace 5 meses a hoy
+ *  (lo mismo que usaba el servidor por defecto). */
+export function rangoPeriodo(clave, hoy = new Date()) {
+  const y = hoy.getFullYear(), m = hoy.getMonth();
+  if (clave === "anterior") return { desde: ymdP(new Date(y, m - 1, 1)), hasta: ymdP(new Date(y, m, 0)) };
+  if (clave === "6m") return { desde: ymdP(new Date(y, m - 5, 1)), hasta: ymdP(hoy) };
+  return { desde: ymdP(new Date(y, m, 1)), hasta: ymdP(hoy) };
+}
+
+/** Meses calendario que toca el periodo (inclusive): mayo–octubre = 6. */
+export function mesesDelPeriodo(desde, hasta) {
+  if (!desde || !hasta) return 1;
+  const [ya, ma] = String(desde).slice(0, 7).split("-").map(Number);
+  const [yb, mb] = String(hasta).slice(0, 7).split("-").map(Number);
+  const n = (yb - ya) * 12 + (mb - ma) + 1;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/** Ritmo esperado (%) a la fecha: días transcurridos del periodo ÷ días de sus meses
+ *  completos. Un mes ya cerrado vale 100. */
+export function ritmoDelPeriodo(desde, hasta, hoy = new Date()) {
+  if (!desde || !hasta) return 100;
+  const ini = new Date(`${String(desde).slice(0, 10)}T00:00:00`);
+  const finP = new Date(`${String(hasta).slice(0, 10)}T00:00:00`);
+  const finMes = new Date(finP.getFullYear(), finP.getMonth() + 1, 0);
+  const corte = hoy < finMes ? hoy : finMes;
+  const total = Math.round((finMes - ini) / 86400000) + 1;
+  const pasados = Math.round((new Date(corte.getFullYear(), corte.getMonth(), corte.getDate()) - ini) / 86400000) + 1;
+  if (!(total > 0)) return 100;
+  return Math.max(0, Math.min(100, (pasados / total) * 100));
+}
+
+/** «del 01/05/2026 al 05/10/2026». */
+export const rotuloPeriodo = (desde, hasta) => (desde && hasta
+  ? `del ${String(desde).slice(0, 10).split("-").reverse().join("/")} al ${String(hasta).slice(0, 10).split("-").reverse().join("/")}`
+  : "");

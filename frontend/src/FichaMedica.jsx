@@ -1120,7 +1120,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   };
   useEffect(() => {
     cargar();
-    if (conectado && pacienteId) api.radiografias.porPaciente(pacienteId).then((r) => setRx(r || [])).catch(() => { });
+    // H-G7: sin permiso de radiografías/consentimientos no se piden (daban 403 en consola a gerencia).
+    if (conectado && pacienteId && puedeArchivos) api.radiografias.porPaciente(pacienteId).then((r) => setRx(r || [])).catch(() => { });
     // Tomas del odontograma para el PDF de la historia clínica (las tres fases).
     setOdoHC(null);
     if (conectado && pacienteId) Promise.all(["inicial", "evolucion", "alta"].map((f) => api.odontograma.porPaciente(pacienteId, f).catch(() => null)))
@@ -1133,7 +1134,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     }).catch(() => { });
     if (conectado && pacienteId) {
       api.laboratorio.listar(pacienteId).then((r) => { setLabOrdenes(r || []); setLabSinPermiso(false); }).catch((e) => { setLabOrdenes([]); setLabSinPermiso(!!e && (e.status === 403 || e._httpStatus === 403)); });
-      api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])).catch(() => setConsentimientos([]));
+      if (puedeConsent) api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])).catch(() => setConsentimientos([]));
     }
   }, [pacienteId]); // eslint-disable-line
 
@@ -1503,7 +1504,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     ["cuenta", "Plan y cuenta", CreditCard],
     ["archivos", "Archivos", Image],
     ["datos", "Datos", User],
-  ].filter(([k]) => (k !== "archivos" || puedeArchivos || puedeConsent || puedeLab)
+  // H-G7: Archivos son radiografías, fotos y consentimientos; quien no tiene ninguno (gerencia)
+  // no ve la pestaña. Sus órdenes de laboratorio siguen en el módulo Laboratorio.
+  ].filter(([k]) => (k !== "archivos" || puedeArchivos || puedeConsent)
                  && (k !== "odontograma" || puedeOdontograma)
                  && (k !== "perio" || (puedePerio && etapa !== "pediatrico"))
                  && (k !== "recetas" || puedeRecetar));

@@ -45,6 +45,11 @@ function datosDemo(sedes = null) {
 import { filtraMicro, inicialesDe, layoutProgreso } from "./panelGerencialUtil";
 import {
   UMBRAL_AUSENTISMO,
+  PERIODOS_COMISIONES,
+  rangoPeriodo,
+  mesesDelPeriodo,
+  ritmoDelPeriodo,
+  rotuloPeriodo,
   ESCALA_AUSENTISMO_MAX,
   acumularCobros,
   ausentismoPorOdontologo,
@@ -789,6 +794,9 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   };
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
+  // H-G5: periodo explícito (antes /comisiones sin fechas = mayo–octubre sin rotular).
+  const [periodo, setPeriodo] = useState("6m");
+  const rango = rangoPeriodo(periodo);
   const [ficha, setFicha] = useState(null);
   const [animReady, setAnimReady] = useState(false);
 
@@ -798,10 +806,10 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   const cargar = useCallback(() => {
     setErr(null);
     if (!auth.token) { setData(datosDemo(sedes)); return; }
-    api.comisiones(null, null, sedesApi)
+    api.comisiones(rango.desde, rango.hasta, sedesApi)
       .then((r) => setData(r && !Array.isArray(r) ? r : {}))
       .catch((e) => setErr(e?.message || "No se pudo cargar comisiones"));
-  }, [sedes && sedes.join(","), claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
+  }, [sedes && sedes.join(","), claveSedes, periodo]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
 
   useEffect(() => { cargar(); }, [cargar]);
   useEffect(() => {
@@ -828,6 +836,11 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   const filasEjemplo = porMedico.filter((m) => m.ejemplo).length;
   const quieto = prefersReducedMotion();
 
+  // El periodo que de verdad usó el servidor (desde/hasta de la respuesta) o el pedido.
+  const perDesde = conectado ? (data?.desde || rango.desde) : null;
+  const perHasta = conectado ? (data?.hasta || rango.hasta) : null;
+  const mesesPer = conectado ? mesesDelPeriodo(perDesde, perHasta) : 1;
+  const ritmoPer = conectado ? ritmoDelPeriodo(perDesde, perHasta) : null;
   const rangoLabel = useMemo(() => {
     if (!cobros.length) return "Últimos 6 meses";
     const a = cobros[0]?.mesLargo || cobros[0]?.mes;
@@ -878,6 +891,16 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
         />
       ) : (
         <>
+          {conectado && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+              <div className="dc-us__roles" role="tablist" aria-label="Periodo">
+                {PERIODOS_COMISIONES.map(([k, l]) => (
+                  <button key={k} type="button" role="tab" aria-selected={periodo === k} className={periodo === k ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setPeriodo(k)}>{l}</button>
+                ))}
+              </div>
+              <span className="dc-nota" style={{ margin: 0 }}>Periodo: <b>{rotuloPeriodo(perDesde, perHasta)}</b>{mesesPer > 1 ? ` (${mesesPer} meses: la meta se cuenta ${mesesPer} veces)` : ""}</span>
+            </div>
+          )}
           <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores del periodo">
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Producción del periodo",
@@ -918,8 +941,9 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
             {/* Avance contra la meta de cada odontólogo (la meta se edita en Metas y comisiones). */}
             {(() => {
               const hoyD = new Date();
-              const ritmoM = (hoyD.getDate() / new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0).getDate()) * 100;
-              const conMeta = porMedico.map((m) => { const md = conectado ? null : MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const meta = Number(m.meta ?? (conectado ? metaSrv(m) : md ? medicoEnSedes(md, sedes).meta : 0)) || 0; return { ...m, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
+              // Con sesión: meta mensual × meses del periodo y ritmo sobre el mismo periodo.
+              const ritmoM = ritmoPer != null ? ritmoPer : (hoyD.getDate() / new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0).getDate()) * 100;
+              const conMeta = porMedico.map((m) => { const md = conectado ? null : MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const metaMes = Number(m.meta ?? (conectado ? metaSrv(m) : md ? medicoEnSedes(md, sedes).meta : 0)) || 0; const meta = metaMes * mesesPer; return { ...m, metaMes, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
               const alRitmo = conMeta.filter((m) => m.pct >= ritmoM).length;
               const metaTot = conMeta.reduce((a, m) => a + m.meta, 0);
               return (
@@ -927,8 +951,10 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                   t: "Cumplimiento de metas",
                   s: `Ritmo esperado a hoy: ${Math.round(ritmoM)}% de la meta`,
                   cifra: `${alRitmo} de ${conMeta.length}`,
-                  como: "Producción del odontólogo ÷ su meta mensual. Está al ritmo si su avance es igual o mayor al porcentaje del mes que ya pasó.",
-                  cols: [["Odontólogo"], ["Producción", "n"], ["Meta", "n"], ["Avance", "n"]],
+                  como: mesesPer > 1
+                    ? `Producción del odontólogo en el periodo ÷ (su meta mensual × ${mesesPer} meses). Está al ritmo si su avance es igual o mayor a la parte del periodo que ya pasó.`
+                    : "Producción del odontólogo ÷ su meta mensual. Está al ritmo si su avance es igual o mayor al porcentaje del mes que ya pasó.",
+                  cols: [["Odontólogo"], ["Producción", "n"], [mesesPer > 1 ? `Meta (${mesesPer} meses)` : "Meta", "n"], ["Avance", "n"]],
                   filas: conMeta.map((m) => [m.nombre, moneyFmt(m.produccion), moneyFmt(m.meta), `${Math.round(m.pct)}%`]),
                   vacio: "Sin metas definidas: se fijan en Metas y comisiones.",
                   tono: "cian",
@@ -937,7 +963,8 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                   <div className="dc-kpi__body">
                     <div className="dc-kpi__label">Al ritmo de su meta</div>
                     <div className="dc-kpi__value">{alRitmo} de {conMeta.length}</div>
-                    <div className="dc-kpi__sub">{metaTot ? `${Math.round((totalProd / metaTot) * 100)}% de la meta del equipo` : "Sin metas definidas"}</div>
+                    {/* Producción de quien tiene meta ÷ su meta del mismo periodo (antes: la producción de todo el equipo ÷ una sola meta mensual). */}
+                    <div className="dc-kpi__sub">{metaTot ? `${Math.round((conMeta.reduce((a, m) => a + (Number(m.produccion) || 0), 0) / metaTot) * 100)}% de la meta del ${mesesPer > 1 ? "periodo" : "mes"}` : "Sin metas definidas"}</div>
                   </div>
                 </button>
               );

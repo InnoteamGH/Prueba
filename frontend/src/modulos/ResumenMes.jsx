@@ -1,7 +1,11 @@
 /* Resumen del mes para gerencia: facturado, salidas, meta, equipo vs meta y top de tratamientos.
  *
  * Conectado (sin endpoints nuevos):
- *   - Facturado del mes y meta: GET /gerencial/kpis → ingresosMes, metaMensualClinica, ranking[{ nombre, produccion, meta }]
+ *   - Meta y equipo: GET /gerencial/kpis → metaMensualClinica, ranking[{ nombre, produccion, meta }]
+ *   - Facturado del mes (H-G3): la suma de GET /tratamientos/resumen del mes, la MISMA lista
+ *     del Top de tratamientos (y de Producción por especialidad del panel). Antes era
+ *     kpis.ingresosMes (citas atendidas), que daba S/ 0 con S/ 340 en el Top de al lado.
+ *     El mes anterior se compara con el mismo tramo de días.
  *   - Salidas del mes: GET /egresos (se filtran las del mes; las de dólares se muestran aparte)
  *   - Top de tratamientos: GET /tratamientos/resumen?desde&hasta → [{ nombre, numeroDeVentas, importeTotal }]
  * Demo: cifras de ejemplo coherentes con el equipo de demostración.
@@ -12,6 +16,7 @@ import api, { auth } from "../api/client";
 import { DatosDemoCtx, MEDICOS, mismaSede } from "../comun";
 import { salidasMes } from "../compartido/metricas";
 import { medicoEnSedes } from "../compartido/medicosSede";
+import { totalResumen } from "./panelGerencialUtil";
 
 const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -40,6 +45,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const hasta = ymd(hoy);
   const [egresos, setEgresos] = useState(null);
   const [top, setTop] = useState(null);
+  const [topAnt, setTopAnt] = useState(null);
   // Un 403 (o un fallo) no es «cero»: se muestra «sin permiso / no disponible», no S/ 0.
   const [egErr, setEgErr] = useState(null);
   const [topErr, setTopErr] = useState(null);
@@ -52,6 +58,10 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
     // Solo las sedes que se ven (sedesApi = UUID; null = todas las del usuario).
     api.egresos.listar({ sedeIds: sedesApi }).then((r) => { setEgErr(null); setEgresos(Array.isArray(r) ? r : []); }).catch((e) => { setEgErr(motivo(e)); setEgresos([]); });
     api.tratamientos.resumen(desde, hasta, { sedeIds: sedesApi }).then((r) => { setTopErr(null); setTop(Array.isArray(r) ? r : []); }).catch((e) => { setTopErr(motivo(e)); setTop([]); });
+    // Mismo tramo del mes anterior (del 1 al mismo día, o a fin de mes si es más corto).
+    const finAnt = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+    const hastaAnt = ymd(new Date(finAnt.getFullYear(), finAnt.getMonth(), Math.min(hoy.getDate(), finAnt.getDate())));
+    api.tratamientos.resumen(ymd(new Date(finAnt.getFullYear(), finAnt.getMonth(), 1)), hastaAnt, { sedeIds: sedesApi }).then((r) => setTopAnt(Array.isArray(r) ? r : [])).catch(() => setTopAnt(null));
   }, [conectado, desde, hasta, sedesApi && sedesApi.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const d = useMemo(() => {
@@ -79,8 +89,8 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
     const cat = {};
     pen.forEach((e) => { const k = e.categoria || "Otros"; cat[k] = (cat[k] || 0) + (Number(e.monto) || 0); });
     return {
-      facturado: Number(kd?.ingresosMes) || 0,
-      anterior: kd?.ingresosMesAnterior != null ? Number(kd.ingresosMesAnterior) : null,
+      facturado: totalResumen(top),
+      anterior: topAnt ? totalResumen(topAnt) : null,
       meta: Number(kd?.metaMensualClinica) || 0,
       equipo: (kd?.ranking || []).map((r) => ({ nombre: r.nombre || r.medico || "—", prod: Number(r.produccion) || 0, meta: Number(r.meta) || 0 })),
       salidas: pen.reduce((a, e) => a + (Number(e.monto) || 0), 0),
@@ -88,13 +98,14 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
       salidasCat: Object.entries(cat).sort((a, b) => b[1] - a[1]),
       top: (top || []).map((t) => ({ nombre: t.nombre || "—", ventas: Number(t.numeroDeVentas) || 0, importe: Number(t.importeTotal) || 0 })).sort((a, b) => b.importe - a.importe).slice(0, 6),
     };
-  }, [conectado, kd, egresos, top, desde, db?.egresos, sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, kd, egresos, top, topAnt, desde, db?.egresos, sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
   const ritmo = (hoy.getDate() / diasMes) * 100;
   const avance = d.meta > 0 ? (d.facturado / d.meta) * 100 : 0;
   const proyeccion = hoy.getDate() ? Math.round((d.facturado / hoy.getDate()) * diasMes) : 0;
   const sinSalidas = conectado && !!egErr;
+  const sinFacturado = conectado && !!topErr;
   const neto = d.facturado - d.salidas;
   const delta = d.anterior ? ((d.facturado - d.anterior) / d.anterior) * 100 : null;
   const maxTop = Math.max(1, ...d.top.map((t) => t.importe));
@@ -113,8 +124,8 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         <article className="dc-rm__kpi" style={{ "--c": "#0E9199" }}>
           <span className="dc-rm__ico"><ArrowDownRight size={18} strokeWidth={2.2} /></span>
           <small>Facturado del mes</small>
-          <b>{soles(d.facturado)}</b>
-          <em>{delta == null ? "Sin mes anterior para comparar" : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%</i> vs. mes anterior</>}</em>
+          <b>{sinFacturado ? "—" : soles(d.facturado)}</b>
+          <em>{sinFacturado ? "Ventas por tratamiento no disponibles" : delta == null ? (conectado ? "Suma del Top de tratamientos; sin mes anterior para comparar" : "Sin mes anterior para comparar") : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%</i> vs. mes anterior</>}</em>
         </article>
         <article className="dc-rm__kpi" style={{ "--c": "#E0694F" }}>
           <span className="dc-rm__ico"><ArrowUpRight size={18} strokeWidth={2.2} /></span>
@@ -125,8 +136,8 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#0B6C78" : "#D0563F" }}>
           <span className="dc-rm__ico"><Wallet size={18} strokeWidth={2.2} /></span>
           <small>Resultado del mes</small>
-          <b>{sinSalidas ? "—" : <>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</>}</b>
-          <em>{sinSalidas ? "No se calcula sin los egresos" : <>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
+          <b>{sinSalidas || sinFacturado ? "—" : <>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</>}</b>
+          <em>{sinSalidas ? "No se calcula sin los egresos" : sinFacturado ? "No se calcula sin el facturado" : <>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
         </article>
         <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#C98A12" }}>
           <span className="dc-rm__ico"><Target size={18} strokeWidth={2.2} /></span>

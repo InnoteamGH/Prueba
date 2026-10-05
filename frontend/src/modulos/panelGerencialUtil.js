@@ -135,3 +135,68 @@ export function diaDelMesRitmo(date = new Date()) {
   const dias = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   return { dia: d, diasMes: dias, ritmoPct: (d / dias) * 100 };
 }
+
+/* H-G3 / H-G4: «Facturado del mes», «Producción por especialidad» y «Top de tratamientos»
+   salen de la MISMA lista (GET /tratamientos/resumen del mes). Antes Facturado usaba
+   kpis.ingresosMes (citas atendidas × precio) y Especialidad indicadores.porEspecialidad
+   (citas, aunque estuvieran canceladas o fueran futuras): tres cifras distintas de
+   «facturado» en la misma pantalla. */
+
+/** Total de una lista de /tratamientos/resumen ([{ importeTotal }]). */
+export function totalResumen(lista) {
+  return (Array.isArray(lista) ? lista : []).reduce((s, t) => s + (Number(t?.importeTotal) || 0), 0);
+}
+
+const normNom = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+
+/** Especialidad del ítem del resumen: por servicioId; si no viene (hoy llega null), por el
+ *  nombre del servicio del catálogo (exacto, el ítem empieza por él o lo contiene; gana el
+ *  nombre más largo). Sin coincidencia: null. */
+export function especialidadDeItem(item, servicios) {
+  const cat = Array.isArray(servicios) ? servicios : [];
+  const esp = (s) => (s && (s.especialidad || s.areaClinica || s.categoria)) || null;
+  if (item?.servicioId != null) {
+    const s = cat.find((x) => String(x.id) === String(item.servicioId));
+    if (esp(s)) return esp(s);
+  }
+  const n = normNom(item?.nombre);
+  if (!n) return null;
+  let mejor = null;
+  for (const s of cat) {
+    const sn = normNom(s?.nombre);
+    if (!sn || !esp(s)) continue;
+    const pega = n === sn ? 3 : n.startsWith(sn) ? 2 : n.includes(sn) ? 1 : 0;
+    if (!pega) continue;
+    if (!mejor || pega > mejor.pega || (pega === mejor.pega && sn.length > mejor.len)) mejor = { pega, len: sn.length, esp: esp(s) };
+  }
+  return mejor ? mejor.esp : null;
+}
+
+/* H-G14: la cartera del panel cuenta con la MISMA regla que el directorio de Pacientes:
+   total = pacientes de GET /pacientes (los que se ven); nuevos 30 d = última visita
+   (GET /pacientes/resumen-citas) o alta (creadoEn) de hace 30 días o menos. Antes eran
+   /pacientes/resumen (46) frente al directorio (47) e indicadores.cartera.nuevos (20 frente a 17). */
+export function carteraComoDirectorio(pacientes, ultimaPorId = {}, hoyIso) {
+  const lista = Array.isArray(pacientes) ? pacientes : [];
+  const t0 = new Date(`${hoyIso}T00:00:00`).getTime();
+  const diasDesde = (f) => {
+    if (!f) return 999;
+    const t = new Date(`${String(f).slice(0, 10)}T00:00:00`).getTime();
+    return Number.isFinite(t) ? Math.max(0, Math.round((t0 - t) / 86400000)) : 999;
+  };
+  const nuevos = lista.filter((p) => diasDesde(ultimaPorId[p.id]) <= 30 || diasDesde(p.creadoEn) <= 30).length;
+  return { total: lista.length, nuevos30: nuevos };
+}
+
+/** Producción por especialidad a partir del resumen de tratamientos y el catálogo:
+ *  [{ nombre, valor }] de mayor a menor. Lo que no se reconoce va a «Sin especialidad». */
+export function produccionPorEspecialidad(lista, servicios, sinEsp = "Sin especialidad en el catálogo") {
+  const acc = new Map();
+  for (const t of Array.isArray(lista) ? lista : []) {
+    const v = Number(t?.importeTotal) || 0;
+    if (v <= 0) continue;
+    const k = especialidadDeItem(t, servicios) || sinEsp;
+    acc.set(k, (acc.get(k) || 0) + v);
+  }
+  return [...acc.entries()].map(([nombre, valor]) => ({ nombre, valor })).sort((a, b) => b.valor - a.valor);
+}

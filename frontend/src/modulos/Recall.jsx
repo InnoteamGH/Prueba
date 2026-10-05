@@ -10,6 +10,9 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
   // Es una acción que sale de la clínica: quien solo consulta no la lanza.
   const puedeEnviar = can ? can("recall", "crear") : true;
+  // H-G6: pausar/activar y guardar la plantilla son PUT /automatizaciones (permiso «editar»
+  // en recall). Gerencia solo tiene «ver»: la API se lo rechazaba con 403.
+  const puedeEditar = can ? can("recall", "editar") : true;
   const conectado = !!auth.token;
   // Sede: cola, historial y NPS son de las sedes que se ven con el filtro del menú.
   const { sede: sedeFiltro, ids: sedesVer, enSede, global, activa, rol: rolSes, nombre: nombreSes } = useSede();
@@ -340,7 +343,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
         <div className="dc-rec__cab">
           <div className="dc-rec__tit">
             <h3><span className="dc-rec__sello"><Sparkles size={16} strokeWidth={1.75} /></span> Recorrido automático del paciente</h3>
-            <p>Cada paso se envía solo por WhatsApp. Toca uno para editar su mensaje.</p>
+            <p>Cada paso se envía solo por WhatsApp. Toca uno para {puedeEditar ? "editar" : "ver"} su mensaje.</p>
           </div>
           <div className="dc-rec__cifras">
             <div><b>{activas}/{reglas.length}</b><span>Activas</span></div>
@@ -354,11 +357,11 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
             <section key={tit} className="dc-rec__fase">
               <h4 className={antes ? "is-antes" : "is-despues"}><FIc size={13} strokeWidth={2} /> {tit}</h4>
               {reglas.filter((r) => !!r.antes === antes).map((r) => { const Ic = r.icon || (AUT_META[r.clave] || {}).icon || Zap; const color = r.color || (AUT_META[r.clave] || {}).color || DS.c.primary; return (
-                <div key={r.clave} className={`dc-rec__paso${r.on ? " is-on" : ""}`} style={{ "--paso": color }} onClick={() => abrirCfg(r)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") abrirCfg(r); }} title="Editar mensaje">
+                <div key={r.clave} className={`dc-rec__paso${r.on ? " is-on" : ""}`} style={{ "--paso": color }} onClick={() => abrirCfg(r)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") abrirCfg(r); }} title={puedeEditar ? "Editar mensaje" : "Ver mensaje"}>
                   <span className="dc-rec__ico" style={{ background: tint(color, 0.12), color }}><Ic size={16} strokeWidth={1.75} /></span>
                   <div className="dc-rec__txt"><b>{r.l}</b><span>{!r.on ? "Pausado" : r.stat === "por WhatsApp" ? "Activo" : r.stat}<em className="dc-rec__cuando-m"> – {r.timing}</em></span></div>
                   <span className="dc-rec__cuando">{r.timing}</span>
-                  <button type="button" className={`dc-rec__switch${r.on ? " is-on" : ""}`} role="switch" aria-checked={r.on} aria-label={`${r.on ? "Pausar" : "Activar"} ${r.l}`} aria-busy={guardandoClave === r.clave} disabled={!!guardandoClave} onClick={(e) => { e.stopPropagation(); toggle(r.clave); }}><i /></button>
+                  {puedeEditar && <button type="button" className={`dc-rec__switch${r.on ? " is-on" : ""}`} role="switch" aria-checked={r.on} aria-label={`${r.on ? "Pausar" : "Activar"} ${r.l}`} aria-busy={guardandoClave === r.clave} disabled={!!guardandoClave} onClick={(e) => { e.stopPropagation(); toggle(r.clave); }}><i /></button>}
                 </div>
               ); })}
             </section>
@@ -378,7 +381,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
             { key: "t", label: "Teléfono", w: "minmax(120px,0.8fr)", get: (p) => p.telefono ? String(p.telefono).replace(/\D/g, "").replace(/^(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3") : "—" },
             { key: "m", label: "Sin venir", w: "110px", a: "center", cell: (p) => { const f = p.ultima ? new Date(String(p.ultima).slice(0, 10) + "T00:00:00") : null; const m = f && !isNaN(f) ? Math.max(0, Math.round((hoy - f) / 2629800000)) : null; return <span className="dc-tp__sub">{m == null ? "—" : `${m} ${m === 1 ? "mes" : "meses"}`}</span>; } },
             { key: "u", label: "Última visita", w: "130px", cell: (p) => <span className="dc-tp__sub">{p.ultima ? fechaLegible(String(p.ultima).slice(0, 10)) : "—"}</span> },
-            { key: "e", label: "", w: "140px", a: "right", cell: (p) => p.estado === "enviado" ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Enviado</span> : <button type="button" className="dc-rec__recordar" onClick={() => enviar(p.id)}><Send size={14} strokeWidth={1.75} /> Recordar</button> },
+            { key: "e", label: "", w: "140px", a: "right", cell: (p) => p.estado === "enviado" ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Enviado</span> : puedeEnviar ? <button type="button" className="dc-rec__recordar" onClick={() => enviar(p.id)}><Send size={14} strokeWidth={1.75} /> Recordar</button> : <span className="dc-tp__sub">Por contactar</span> },
           ] }} cols={[
             { key: "nombre", label: "Paciente", get: (p) => p.nombre || "" },
             { key: "ultima", label: "Última visita", get: (p) => String(p.ultima || "").slice(0, 10) },
@@ -394,7 +397,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
                 </div>
                 {p.estado === "enviado"
                   ? <span className="dc-rec__ok"><CheckCircle2 size={14} strokeWidth={1.75} /> Enviado</span>
-                  : <button type="button" className="dc-rec__recordar" onClick={() => enviar(p.id)}><Send size={14} strokeWidth={1.75} /> Recordar</button>}
+                  : puedeEnviar ? <button type="button" className="dc-rec__recordar" onClick={() => enviar(p.id)}><Send size={14} strokeWidth={1.75} /> Recordar</button> : <span className="dc-tp__sub">Por contactar</span>}
               </div>
             ); })}
           </div>
@@ -405,14 +408,14 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
       </>)}
       {cfg && (() => { const Ic = cfg.icon; return (
         <Modal icon={<Ic size={20} strokeWidth={1.75} />} titulo={cfg.l} sub={`Automatización – se envía ${cfg.timing.toLowerCase()}`} onClose={() => setCfg(null)} maxW={520}
-          footer={<><Btn small kind="ghost" onClick={() => setCfg(null)}>Cancelar</Btn><Btn small onClick={guardarCfg} disabled={!String(cfgMsg || "").trim()} title={String(cfgMsg || "").trim() ? undefined : "Escribe el mensaje antes de guardar"}><Check size={15} strokeWidth={1.75} /> Guardar mensaje</Btn></>}>
+          footer={!puedeEditar ? <Btn small kind="ghost" onClick={() => setCfg(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setCfg(null)}>Cancelar</Btn><Btn small onClick={guardarCfg} disabled={!String(cfgMsg || "").trim()} title={String(cfgMsg || "").trim() ? undefined : "Escribe el mensaje antes de guardar"}><Check size={15} strokeWidth={1.75} /> Guardar mensaje</Btn></>}>
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Cuándo se envía</div><div style={{ fontSize: 14, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.timing}</div></div>
             <div style={{ flex: 1, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Canal</div><div style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-ok-700)", fontFamily: DISPLAY_FONT, marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}><MessageSquare size={14} strokeWidth={1.75} /> WhatsApp</div></div>
             <div style={{ flex: 1, background: cfg.on ? "var(--dc-ok-soft)" : "var(--dc-bg)", border: `1px solid ${cfg.on ? "var(--dc-green-soft)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "11px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Estado</div><div style={{ fontSize: 14, fontWeight: 600, color: cfg.on ? "var(--dc-ok-700)" : "var(--dc-ink-500)", fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cfg.on ? "Activo" : "Pausado"}</div></div>
           </div>
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 7 }}>Mensaje <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– {"{nombre}"}, {"{fecha}"}, {"{hora}"}, {"{doctor}"}, {"{sede}"} se reemplazan solos</span></label>
-          <textarea className="dc-premium-inp" value={cfgMsg} onChange={(e) => setCfgMsg(e.target.value)} rows={4} style={{ width: "100%", padding: "11px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }} />
+          <textarea className="dc-premium-inp" value={cfgMsg} readOnly={!puedeEditar} onChange={(e) => setCfgMsg(e.target.value)} rows={4} style={{ width: "100%", padding: "11px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: 14, color: INK, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }} />
           {/* Vista previa tipo burbuja de WhatsApp */}
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} color="var(--dc-ok-700)" /> Vista previa (así le llega al paciente)</div>
@@ -423,7 +426,8 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
               </div>
             </div>
           </div>
-          {/* Probar ahora */}
+          {/* Probar ahora: manda un WhatsApp real, solo quien puede enviar y editar */}
+          {puedeEnviar && puedeEditar && <>
           <div style={{ marginTop: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 13px" }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 7 }}>Probar ahora <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– envíate este mensaje a un número real</span></div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -440,7 +444,8 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
               <Btn small kind="ghost" onClick={probarHsm}><Send size={14} strokeWidth={1.75} /> Probar plantilla</Btn>
             </div>
           </div>
-          {puedeEnviar && <button aria-label="Activar o desactivar" onClick={() => { toggle(cfg.clave); setCfg({ ...cfg, on: !cfg.on }); }} style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 9, background: cfg.on ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", border: "none", borderRadius: "var(--dc-r-md)", padding: "9px 13px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: cfg.on ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}>{cfg.on ? <><Power size={15} strokeWidth={1.75} /> Pausar automatización</> : <><Zap size={15} strokeWidth={1.75} /> Activar automatización</>}</button>}
+          </>}
+          {puedeEditar && <button aria-label="Activar o desactivar" onClick={() => { toggle(cfg.clave); setCfg({ ...cfg, on: !cfg.on }); }} style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 9, background: cfg.on ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", border: "none", borderRadius: "var(--dc-r-md)", padding: "9px 13px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: cfg.on ? "var(--dc-warn-600)" : "var(--dc-ok-700)" }}>{cfg.on ? <><Power size={15} strokeWidth={1.75} /> Pausar automatización</> : <><Zap size={15} strokeWidth={1.75} /> Activar automatización</>}</button>}
         </Modal>
       ); })()}
     </div>

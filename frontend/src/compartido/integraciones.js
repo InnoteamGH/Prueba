@@ -36,3 +36,25 @@ export function proveedorSunat() {
   if (conSesion()) return proveedorServidor;
   try { return (JSON.parse(localStorage.getItem(SUNAT_CFG_KEY) || "{}") || {}).proveedor || ""; } catch (e) { return ""; }
 }
+
+/* Estado de WhatsApp a partir de GET /whatsapp/salud. Integraciones, el inicio de TI y
+   WhatsApp + IA lo leen de aquí (H-T4): antes Integraciones decía «Conectado» sin fallos,
+   el inicio «incidencia» y WhatsApp «Con fallos – 2 en 24 h» con el mismo dato.
+   estado: "operativo" | "incidencia" | "pendiente". */
+export function estadoWhatsApp(s) {
+  if (!s) return { estado: "pendiente", etiqueta: "Comprobando…", detalle: "Consultando el estado de WhatsApp en el servidor…", fallos: 0 };
+  if (s.error) return { estado: "pendiente", etiqueta: "Sin datos", detalle: "No se pudo consultar el estado de WhatsApp en el servidor.", fallos: 0 };
+  const fallos = Number(s.fallos24h) || 0;
+  const msg = s.mensaje && !/quarkus|endpoint|WHATSAPP_|OPENAI_/i.test(String(s.mensaje)) ? String(s.mensaje) : "";
+  if (s.demo) return { estado: "pendiente", etiqueta: "Modo demo", detalle: "WhatsApp está en modo demo: no envía mensajes reales. Lo activa soporte.", fallos };
+  const sem = s.semaforo || (s.ok ? (fallos ? "ambar" : "verde") : "rojo");
+  if (s.ok && sem === "verde" && !fallos) return { estado: "operativo", etiqueta: "Conectado", detalle: "Conexión correcta, sin fallos de envío en 24 h.", fallos };
+  if (s.ok) return { estado: "incidencia", etiqueta: "Con fallos", detalle: `Conectado, pero con ${fallos || "algunos"} ${fallos === 1 ? "envío fallido" : "envíos fallidos"} en las últimas 24 h.`, fallos };
+  if (sem === "gris") return { estado: "pendiente", etiqueta: "Por activar", detalle: msg || "WhatsApp aún no está configurado. Lo activa soporte.", fallos };
+  return { estado: "incidencia", etiqueta: "Desconectado", detalle: msg || "Sin conexión con WhatsApp.", fallos };
+}
+
+/* ¿El servidor dice que el motor de IA (OpenAI) tiene clave? true | false | undefined. */
+export function iaConectada(s) {
+  return s ? [s.iaReal, s.ia, s.openai, s.iaConectada].find((x) => typeof x === "boolean") : undefined;
+}

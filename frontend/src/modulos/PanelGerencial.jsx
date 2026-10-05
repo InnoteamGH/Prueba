@@ -15,7 +15,28 @@ import {
   layoutProgreso,
   metaEstado,
   moneyFmt,
+  totalResumen,
+  produccionPorEspecialidad,
+  carteraComoDirectorio,
 } from "./panelGerencialUtil";
+import { tienePermiso } from "../compartido/permisos";
+
+/* H-G9: el chip de cada asunto de «Requiere acción» lleva a la pantalla donde se resuelve
+   (antes era un <span> sin acción). Solo si el rol puede ver ese módulo. */
+const DESTINOS_ALERTA = [
+  [/stock|insumo|inventario/i, "inventario", "#/inventario", "Ver inventario"],
+  [/laboratorio/i, "laboratorio", "#/laboratorio", "Ver laboratorio"],
+  [/liquidaci|seguro|eps/i, "seguros", "#/seguros", "Ver seguros"],
+  [/saldo|vencid|deuda|cobr/i, "facturacion", "#/caja", "Ver en Caja"],
+  [/caja/i, "facturacion", "#/caja", "Ver caja"],
+  [/evoluci/i, "pacientes", "#/pacientes", "Ver pacientes"],
+  [/cita|agenda|confirm/i, "agenda", "#/agenda", "Ver agenda"],
+];
+export function destinoAlerta(a, puedeVer = (m) => tienePermiso(m, "ver")) {
+  const txt = `${a?.titulo || ""} ${a?.tipo || ""} ${a?.detalle || ""}`;
+  const d = DESTINOS_ALERTA.find(([re]) => re.test(txt));
+  return d && puedeVer(d[1]) ? { hash: d[2], label: d[3] } : null;
+}
 import { pluralEs, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES, sedesDe, mismaSede, useSede, jornadaClinica, horarioDeSede, horasEntre } from "../comun";
 import { horarioConfigurado, horaDecimal } from "../compartido/horarioReal";
 import { leerCatalogo, precioCita } from "../compartido/catalogo";
@@ -798,6 +819,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const [actividad, setActividad] = useState(null);
   const [tratResumen, setTratResumen] = useState(null);
   const [pacResumen, setPacResumen] = useState([]);
+  const [servicios, setServicios] = useState(null);       // catálogo (especialidad de cada servicio)
+  const [dirPac, setDirPac] = useState(null);             // { total, nuevos30 } con la regla del directorio
   const [ficha, setFicha] = useState(null);
   const [metaEdit, setMetaEdit] = useState(null);
   const [metaVal, setMetaVal] = useState("");
@@ -899,6 +922,12 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       .then((r) => setTratResumen(r || []))
       .catch(() => setTratResumen([]));
     api.pacientes.resumen().then((r) => setPacResumen(r || [])).catch(() => setPacResumen([]));
+    api.catalogo.servicios().then((r) => setServicios(Array.isArray(r) ? r : [])).catch(() => setServicios([]));
+    Promise.all([api.pacientes.listar(), api.pacientes.resumenCitas().catch(() => [])]).then(([ps, rc]) => {
+      const ult = {}; (Array.isArray(rc) ? rc : []).forEach((x) => { if (x && x.pacienteId) ult[x.pacienteId] = x.ultimaVisita || null; });
+      const visibles = (Array.isArray(ps) ? ps : []).filter((p) => deSede({ sedeId: p.sedeRegistroId ?? null }));
+      setDirPac({ ...carteraComoDirectorio(visibles, ult, fecha), ids: new Set(visibles.map((p) => String(p.id))) });
+    }).catch(() => setDirPac(null));
     api.inventario.listar(sedesApi).then((rows) => {
       // Solo el almacén de las sedes que se ven.
       const list = (Array.isArray(rows) ? rows : []).filter((it) => deSede({ sedeId: it.sedeId ?? it.sede }));
@@ -942,7 +971,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
 
 
   const meta = metaEstado(kd?.hayMeta, kd?.metaMensualClinica);
-  const prodMes = Number(kd?.ingresosMes) || 0;
+  // H-G3: con sesión, lo mismo que «Facturado del mes» y el Top de tratamientos.
+  const prodMes = conectado ? totalResumen(tratResumen) : (Number(kd?.ingresosMes) || 0);
   const prodDia = Number(kd?.produccionDia) || 0;
   const atendidosApi = kd?.pacientesAtendidosHoy;
   const atendidos = atendidosApi != null
@@ -978,10 +1008,15 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const rechazado = Number(conv.rechazado) || 0;
   const pendiente = Number(conv.pendiente) || 0;
   const propuesto = aceptado + rechazado + pendiente;
-  const espRaw = (ind?.porEspecialidad || []).map((e) => ({
-    nombre: e.nombre || e.especialidad || "—",
-    valor: Number(e.produccion ?? e.ingresos ?? e.monto ?? 0) || 0,
-  }));
+  // H-G4: con sesión, el resumen de tratamientos del mes repartido por la especialidad de
+  // cada servicio del catálogo: suma lo mismo que «Facturado» y que «Producción por
+  // tratamiento». indicadores.porEspecialidad contaba citas (canceladas y futuras incluidas).
+  const espRaw = conectado
+    ? produccionPorEspecialidad(tratResumen, servicios || [])
+    : (ind?.porEspecialidad || []).map((e) => ({
+      nombre: e.nombre || e.especialidad || "—",
+      valor: Number(e.produccion ?? e.ingresos ?? e.monto ?? 0) || 0,
+    }));
   const espTotal = espRaw.reduce((s, e) => s + e.valor, 0);
 
   const tratList = Array.isArray(tratResumen) ? tratResumen : [];
@@ -1018,8 +1053,11 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const sillonesLibres = nSillones != null
     ? Math.max(0, nSillones - enSillon)
     : null;
-  const alDia = Math.max(0, (pacs.length || 0) - conSaldo.length);
-  const nuevos30 = Number(cartera.nuevos ?? cartera.sinAtender) || pacs.filter((p) => {
+  // H-G14: con sesión el total y los nuevos salen como en el directorio de Pacientes.
+  const totalCartera = conectado && dirPac ? dirPac.total : pacs.length;
+  const conSaldoCartera = conectado && dirPac ? conSaldo.filter((p) => dirPac.ids.has(String(p.pacienteId ?? p.id))) : conSaldo;
+  const alDia = Math.max(0, (totalCartera || 0) - conSaldoCartera.length);
+  const nuevos30 = conectado && dirPac ? dirPac.nuevos30 : Number(cartera.nuevos ?? cartera.sinAtender) || pacs.filter((p) => {
     const u = p.ultimaCita || p.creadoEn || p.fechaAlta;
     if (!u) return false;
     const t = new Date(String(u).slice(0, 10)).getTime();
@@ -1264,9 +1302,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                       <h3>{a.titulo || a.tipo || "Asunto"}</h3>
                       <p>{a.detalle || a.mensaje || ""}</p>
                     </div>
-                    <span className={`dc-chip ${riesgo ? "dc-chip--riesgo" : "dc-chip--aviso"}`}>
-                      {a.monto != null ? moneyFmt(a.monto) : (a.cantidad ?? a.chip ?? "Ver")}
-                    </span>
+                    {(() => { const dest = destinoAlerta(a); const txt = a.monto != null ? moneyFmt(a.monto) : (a.cantidad ?? a.chip ?? "Ver"); return dest
+                      ? <button type="button" className={`dc-chip ${riesgo ? "dc-chip--riesgo" : "dc-chip--aviso"}`} style={{ cursor: "pointer", border: "none", font: "inherit" }} title={dest.label} aria-label={`${dest.label}: ${a.titulo || a.tipo || "asunto"}`} onClick={(e) => { e.stopPropagation(); window.location.hash = dest.hash; }}>{txt === "Ver" ? dest.label : txt} →</button>
+                      : <span className={`dc-chip ${riesgo ? "dc-chip--riesgo" : "dc-chip--aviso"}`}>{txt}</span>; })()}
                   </div>
                 );
               })}
@@ -1315,7 +1353,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                 t: "Producción por especialidad",
                 s: "Cada barra es su parte del total",
                 cifra: moneyFmt(espTotal),
-                como: "Se cruza la cita (con su especialidad) con lo facturado.",
+                como: conectado
+                  ? "Los procedimientos del mes (la misma lista del Top de tratamientos) agrupados por la especialidad de su servicio en el catálogo. Suma lo mismo que «Facturado del mes»."
+                  : "Se cruza la cita (con su especialidad) con lo facturado.",
                 cols: [["Especialidad"], ["Importe", "n"], ["%", "n"]],
                 filas: espRaw.map((e) => {
                   const lay = layoutProgreso(e.valor, espTotal);
@@ -1412,7 +1452,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <button type="button" className="dc-info" aria-label="Tratamientos"
             onClick={() => abrir({
               t: "Por tratamiento",
-              s: "Desglose de odontología general",
+              s: conectado ? "Desglose del mes por tratamiento" : "Desglose de odontología general",
               cifra: tratTotal > 0 ? moneyFmt(tratTotal) : "—",
               como: "Agrupa las ventas por el servicio del catálogo vinculado a cada fase.",
               cols: [["Tratamiento"], ["Ventas", "n"], ["Importe", "n"]],
@@ -1580,12 +1620,12 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g3)" }} />
             <h2>Cartera de pacientes</h2>
-            <span className="dc-card__meta">{pacs.length || cartera.activos || 0} pacientes</span>
+            <span className="dc-card__meta">{totalCartera || cartera.activos || 0} pacientes</span>
             <button type="button" className="dc-info" aria-label="Cartera"
               onClick={() => abrir({
                 t: "Cartera de pacientes",
                 s: "Color = estado – tamaño = saldo",
-                cifra: String(pacs.length || 0),
+                cifra: String(totalCartera || 0),
                 micro: [
                   ["Al día", String(alDia)],
                   ["Nuevos 30 d", String(nuevos30)],
@@ -1601,7 +1641,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__body">
             <div className="dc-split" style={{ gridTemplateColumns: "236px 1fr" }}>
               <dl className="dc-cifras">
-                <div className="dc-cifra"><dt>Total</dt><dd>{pacs.length || "—"}</dd></div>
+                <div className="dc-cifra"><dt>Total</dt><dd>{totalCartera || "—"}</dd></div>
                 <div className="dc-cifra"><dt>Al día</dt><dd style={{ color: "var(--dc-ok-700)" }}>{alDia}</dd></div>
                 <div className="dc-cifra"><dt>Nuevos 30 d</dt><dd style={{ color: "var(--g1)" }}>{nuevos30}</dd></div>
                 <div className="dc-cifra"><dt>Con saldo</dt><dd style={{ color: "var(--dc-danger-700)" }}>{conSaldo.length}</dd></div>

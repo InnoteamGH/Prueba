@@ -287,7 +287,9 @@ export const api = {
       rol: r.rol, 
       organizacionId: r.organizacionId, 
       sedeId: r.sedeId,
-      sedes  // C23: agregar sedes del JWT
+      sedes,  // C23: agregar sedes del JWT
+      // Permisos del servidor: deciden qué acciones se muestran (compartido/permisos.js).
+      ...(r.permisos && typeof r.permisos === "object" ? { permisos: r.permisos } : {}),
     };
     limpiarCacheClinicaLocal();
     return r;

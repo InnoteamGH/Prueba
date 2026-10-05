@@ -4,13 +4,14 @@ import React, { useContext, useState, useEffect, useRef } from "react";
 import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
-import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, HORARIO_DEF, INK, Modal, NAVY, RED, ROL_PERMS, hoy, nombreSede, puede, tint, useSede} from "../comun";
+import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, HORARIO_DEF, INK, Modal, NAVY, RED, hoy, nombreSede, tint, useSede} from "../comun";
 import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 import { AgendarRecepcionModal, CamposPacienteRapido, PAC_RAPIDO_VACIO, celular9, registrarPacienteRapido, validarPacienteRapido } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
 import { proximaCita, cuentaPaciente } from "../compartido/metricas";
 import { fichaDeSede, sedeEnLista } from "../compartido/cajaSede";
 import { datosImpresion } from "../util/membrete";
+import { tienePermiso } from "../compartido/permisos";
 import "./whatsappInbox.css";
 
 function respuestaAgente(texto, ctx) {
@@ -117,16 +118,28 @@ function WhatsAppInbox({ notify = () => {} }) {
   const modoDemo = conectado && !!salud?.demo;
   const [probando, setProbando] = useState(false);
   const [probarResultado, setProbarResultado] = useState(null); // { ok: boolean, texto: string }
-  const permsWa = auth.sesion?.permisos || ROL_PERMS[auth.sesion?.rol] || {};
-  const puedeConfigurarWa = puede(permsWa, "whatsapp", "configurar") || ["admin", "ti"].includes(auth.sesion?.rol);
+  // H-T8: cada acción según los permisos del servidor (helper central). Antes se leía la
+  // matriz local y a TI se le daba «configurar» por su rol: con whatsapp:["ver"] veía
+  // «Tomar control», «Eliminar chat», «Agendar cita» y «Configurar IA», y la API los
+  // rechazaba con 403.
+  const puedeConfigurarWa = tienePermiso("whatsapp", "configurar");
+  const puedeOperarWa = tienePermiso("whatsapp", "editar");          // tomar control / devolver a IA
+  const puedeResponderWa = tienePermiso("whatsapp", "crear");        // escribir al paciente
+  const puedeBorrarWa = tienePermiso("whatsapp", "eliminar");
+  const puedeAgendarWa = tienePermiso("agenda", "crear");
+  const puedeRegistrarWa = tienePermiso("pacientes", "crear");
+  // La ficha de conexión es solo lectura (GET /whatsapp/conexion): también la ve quien
+  // administra integraciones (TI).
+  const puedeVerConexion = puedeConfigurarWa || tienePermiso("integraciones", "ver");
   const mensajeSaludUi = (s) => {
     const raw = (s?.mensaje || "").toString();
     if (!raw) return "WhatsApp no está conectado. Avisa a soporte.";
     if (/quarkus|endpoint|WHATSAPP_|OPENAI_/i.test(raw)) return "WhatsApp no está conectado. Avisa a soporte.";
     return raw;
   };
+  const fechaHoraWa = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }); };
   const cargarSalud = () => { if (!conectado) return; api.agente.salud().then(setSalud).catch(() => {}); };
-  const cargarConexion = () => { if (!conectado || !puedeConfigurarWa) return; api.agente.conexion().then(setConexion).catch(() => {}); };
+  const cargarConexion = () => { if (!conectado || !puedeVerConexion) return; api.agente.conexion().then(setConexion).catch(() => {}); };
   const probarConexion = () => {
     setProbando(true);
     setProbarResultado(null);
@@ -135,10 +148,12 @@ function WhatsAppInbox({ notify = () => {} }) {
       const fallos = Number(s?.fallos24h) || 0;
       const ok = !!s?.ok;
       let texto;
+      // H-T3: con fallos en 24 h el servidor igual manda «Conexión con WhatsApp correcta.»;
+      // el resultado de la prueba los dice y queda en ámbar, no en verde.
       if (ok && fallos === 0) texto = "Conexión con WhatsApp correcta.";
-      else if (ok && fallos > 0) texto = mensajeSaludUi(s) || `Hay ${fallos} fallo(s) en 24 h.`;
+      else if (ok && fallos > 0) texto = `Conectado, pero con ${fallos} ${fallos === 1 ? "envío fallido" : "envíos fallidos"} en las últimas 24 h${s?.ultimoFallo ? ` (último: ${fechaHoraWa(s.ultimoFallo)})` : ""}.${s?.ultimoEnvioOk ? ` Último envío correcto: ${fechaHoraWa(s.ultimoEnvioOk).replace(/\.$/, "")}.` : ""}`;
       else texto = mensajeSaludUi(s);
-      setProbarResultado({ ok, texto });
+      setProbarResultado({ ok: ok && fallos === 0, aviso: ok && fallos > 0, texto });
       notify(texto);
       cargarConexion();
     }).catch(() => {
@@ -522,10 +537,10 @@ function WhatsAppInbox({ notify = () => {} }) {
       {conectado && (Number(salud?.fallos24h) > 0 || probarResultado) && (
         <div className="wa-avisos">
           {Number(salud?.fallos24h) > 0 && <span className="wa-aviso is-aviso"><AlertTriangle size={14} strokeWidth={2} /> Con fallos – {salud.fallos24h} en 24 h</span>}
-          {probarResultado && <span className={`wa-aviso ${probarResultado.ok ? "is-ok" : "is-error"}`}>{probarResultado.texto}</span>}
+          {probarResultado && <span className={`wa-aviso ${probarResultado.ok ? "is-ok" : probarResultado.aviso ? "is-aviso" : "is-error"}`}>{probarResultado.texto}</span>}
         </div>
       )}
-      {conectado && puedeConfigurarWa && conexionOpen && (
+      {conectado && puedeVerConexion && conexionOpen && (
         <div className="dc-inbox-conexion">
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <strong style={{ color: NAVY }}>Conexión WhatsApp</strong>
@@ -535,10 +550,11 @@ function WhatsAppInbox({ notify = () => {} }) {
             </div>
           </div>
           <div><b>Número:</b> {conexion?.numero || salud?.numero || "—"}</div>
-          <div><b>Estado:</b> {conexion?.estado || salud?.estado || "—"} – {mensajeSaludUi(conexion || salud)}</div>
-          {(Number(salud?.fallos24h) > 0 || Number(conexion?.fallos24h) > 0) && (
-            <div><b>Fallos 24 h:</b> {salud?.fallos24h ?? conexion?.fallos24h}</div>
-          )}
+          {(() => { const f = Number(salud?.fallos24h ?? conexion?.fallos24h) || 0; return (<>
+          <div><b>Estado:</b> {conexion?.estado || salud?.estado || "—"} – {f > 0 ? `con ${f} ${f === 1 ? "fallo" : "fallos"} de envío en 24 h` : mensajeSaludUi(conexion || salud)}</div>
+          {f > 0 && <div><b>Fallos 24 h:</b> {f}{salud?.ultimoFallo ? ` – último ${fechaHoraWa(salud.ultimoFallo)}` : ""}</div>}
+          {salud?.ultimoEnvioOk && <div><b>Último envío correcto:</b> {fechaHoraWa(salud.ultimoEnvioOk)}</div>}
+          </>); })()}
         </div>
       )}
       {conectado && listError && (
@@ -561,8 +577,8 @@ function WhatsAppInbox({ notify = () => {} }) {
                   <button type="button" className="wa-lista__btn" aria-label="Actualizar" onClick={cargarConversaciones} title="Actualizar"><Repeat size={14} strokeWidth={1.75} /></button>
                   <MenuAcciones etiqueta="Opciones de WhatsApp" opciones={[
                     { label: probando ? "Probando…" : "Probar conexión", onClick: probarConexion },
-                    puedeConfigurarWa && { label: "Conexión WhatsApp", onClick: () => { setConexionOpen(true); cargarConexion(); } },
-                    { label: "Configurar IA", onClick: abrirInstrucciones },
+                    puedeVerConexion && { label: "Conexión WhatsApp", onClick: () => { setConexionOpen(true); cargarConexion(); } },
+                    puedeConfigurarWa && { label: "Configurar IA", onClick: abrirInstrucciones },
                   ]} />
                 </div>
               )}
@@ -623,13 +639,13 @@ function WhatsAppInbox({ notify = () => {} }) {
             <button type="button" className="wa-volver" aria-label="Volver a los chats" onClick={() => setEnHilo(false)}><ArrowLeft size={18} strokeWidth={2} /></button>
             <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` – ${chat.pacientes.length} pacientes` : ""}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
-              <Btn small onClick={() => abrirAgendar()}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>
+              {puedeAgendarWa && <Btn small onClick={() => abrirAgendar()}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
               {/* Un solo botón: oculta el panel del contacto y, al pulsarlo otra vez, lo muestra. */}
               {(() => { const abierto = window.innerWidth > PANEL_FIJO ? !ocultarInfo : verInfo; return (
                 <button type="button" className="wa-info" aria-label={abierto ? "Ocultar datos del contacto" : "Mostrar datos del contacto"} title={abierto ? "Ocultar datos del contacto" : "Mostrar datos del contacto"} aria-expanded={abierto} onClick={alternarInfo}>
                   {abierto ? <PanelRightClose size={18} strokeWidth={1.8} /> : <PanelRightOpen size={18} strokeWidth={1.8} />}
                 </button>); })()}
-              <Btn small kind={chat.modo === "ia" ? "primary" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>
+              {puedeOperarWa && <Btn small kind={chat.modo === "ia" ? "primary" : "ghost"} onClick={tomar}>{chat.modo === "ia" ? <><UserCheck size={15} strokeWidth={1.75} /> Tomar control</> : <><Bot size={15} strokeWidth={1.75} /> Devolver a IA</>}</Btn>}
             </div>
           </div>
           {/* WSP-01: contexto del paciente siempre visible en el hilo (no depende del panel). */}
@@ -658,7 +674,11 @@ function WhatsAppInbox({ notify = () => {} }) {
           ); })()}
           <div ref={scrollRef} className="wa-hilo" onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }}>{hilo(chat.msgs)}</div>
           {!atBottom && <button type="button" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" className="wa-bajar"><ChevronDown size={20} strokeWidth={1.75} /></button>}
-          {chat.modo === "ia" && conectado && !modoDemo ? (
+          {conectado && !modoDemo && !(puedeOperarWa && puedeResponderWa) ? (
+            <div className="wa-pie wa-pie--nota">
+              <Bot size={14} strokeWidth={1.75} /> {chat.modo === "ia" ? "El asistente IA responde automáticamente por WhatsApp." : "Esta conversación la atiende recepción."} Tu rol puede leer las conversaciones, pero no responder.
+            </div>
+          ) : chat.modo === "ia" && conectado && !modoDemo ? (
             <div className="wa-pie wa-pie--nota">
               <Bot size={14} strokeWidth={1.75} /> El asistente IA responde automáticamente por WhatsApp. Usa <b>&nbsp;Tomar control&nbsp;</b> para responder tú.
             </div>
@@ -717,10 +737,10 @@ function WhatsAppInbox({ notify = () => {} }) {
               </div>
             )}
             <div style={{ display: "grid", gap: 10, marginTop: 4 }}>
-              <button onClick={() => abrirAgendar()} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 16px", borderRadius: "var(--dc-r-md)", border: "none", background: DS.c.primary, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", boxShadow: "0 2px 6px " + tint(DS.c.primary, 0.376), transition: "transform .1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "none"} onMouseLeave={e => e.currentTarget.style.transform = "none"}><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>
+              {puedeAgendarWa && <button onClick={() => abrirAgendar()} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 16px", borderRadius: "var(--dc-r-md)", border: "none", background: DS.c.primary, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", boxShadow: "0 2px 6px " + tint(DS.c.primary, 0.376), transition: "transform .1s" }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"} onMouseUp={e => e.currentTarget.style.transform = "none"} onMouseLeave={e => e.currentTarget.style.transform = "none"}><Calendar size={15} strokeWidth={1.75} /> Agendar cita</button>}
               {/* Solo para contactos que aún no son pacientes (en la demo se reconoce por celular o nombre). */}
-              {!(conectado ? chat.esPaciente : pacDeChat(chat)) && <Btn small kind="ghost" full onClick={abrirRegistro}><UserPlus size={15} strokeWidth={1.75} /> Registrar como paciente</Btn>}
-              <button onClick={() => eliminarChat(chat.id)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", padding: "10px 16px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-fee)", background: "var(--dc-white)", color: RED, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background .15s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--dc-danger-soft)"} onMouseLeave={e => e.currentTarget.style.background = "var(--dc-white)"}><Trash2 size={14} strokeWidth={1.75} /> Eliminar chat</button>
+              {puedeRegistrarWa && !(conectado ? chat.esPaciente : pacDeChat(chat)) && <Btn small kind="ghost" full onClick={abrirRegistro}><UserPlus size={15} strokeWidth={1.75} /> Registrar como paciente</Btn>}
+              {puedeBorrarWa && <button onClick={() => eliminarChat(chat.id)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", padding: "10px 16px", borderRadius: "var(--dc-r-md)", border: "1px solid var(--dc-fee)", background: "var(--dc-white)", color: RED, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background .15s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--dc-danger-soft)"} onMouseLeave={e => e.currentTarget.style.background = "var(--dc-white)"}><Trash2 size={14} strokeWidth={1.75} /> Eliminar chat</button>}
             </div>
           </div>
         </div>

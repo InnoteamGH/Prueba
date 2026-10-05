@@ -208,7 +208,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
                     </span>
                     <span role="cell"><Monto value={draft[key]?.meta} disabled={!puedeEditar} label={`Meta mensual de ${m.nombre} en ${nomSede(g.sede)}`} onChange={(v) => set(key, "meta", v)} /></span>
                     <span role="cell"><Porcentaje value={draft[key]?.com} disabled={!puedeEditar} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>
-                    <span role="cell" className="dc-mtz__gana">{met && pc != null ? <><b>{soles((met * pc) / 100)}</b><small>{pc}% de {soles(met)}</small></> : <small>Define meta y %</small>}</span>
+                    <span role="cell" className="dc-mtz__gana">{/* H-G10: pide solo lo que falta (antes decía «Define meta y %» con el % ya en 40). */}{met && pc != null ? <><b>{soles((met * pc) / 100)}</b><small>{pc}% de {soles(met)}</small></> : <small>{!met && pc == null ? "Define meta y %" : !met ? `Define la meta (comisión ${pc}%)` : `Define el % (meta ${soles(met)})`}</small>}</span>
                     <span role="cell" className="dc-mtz__parte"><i><u style={{ width: `${parte}%`, background: col }} /></i><b>{parte ? `${parte}%` : "—"}</b></span>
                   </div>
                 );

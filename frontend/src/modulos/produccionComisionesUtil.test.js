@@ -11,6 +11,10 @@ import {
   resumenAusentismoClinica,
   techoRinde,
   UMBRAL_AUSENTISMO,
+  rangoPeriodo,
+  mesesDelPeriodo,
+  ritmoDelPeriodo,
+  rotuloPeriodo,
 } from "./produccionComisionesUtil.js";
 import { layoutProgreso } from "./panelGerencialUtil.js";
 
@@ -150,5 +154,26 @@ describe("entrega_2 ausentismo DEV-10/11/12", () => {
     assert.ok(pc.includes("Cancelada") && pc.includes("No asistió"));
     assert.ok(pc.includes("Ausentismo por odontólogo"));
     assert.ok(pc.includes("Dato real de la agenda") || pc.includes("sin reparto de ejemplo"));
+  });
+});
+
+describe("H-G5: periodo de Producción y comisiones", () => {
+  const hoy = new Date(2026, 9, 5); // 05/10/2026
+  it("rangos de cada periodo", () => {
+    assert.deepEqual(rangoPeriodo("mes", hoy), { desde: "2026-10-01", hasta: "2026-10-05" });
+    assert.deepEqual(rangoPeriodo("anterior", hoy), { desde: "2026-09-01", hasta: "2026-09-30" });
+    assert.deepEqual(rangoPeriodo("6m", hoy), { desde: "2026-05-01", hasta: "2026-10-05" });
+  });
+  it("la meta se cuenta una vez por mes del periodo", () => {
+    assert.equal(mesesDelPeriodo("2026-05-01", "2026-10-05"), 6);
+    assert.equal(mesesDelPeriodo("2026-10-01", "2026-10-05"), 1);
+    assert.equal(mesesDelPeriodo("2025-12-01", "2026-01-31"), 2);
+  });
+  it("ritmo: un mes cerrado vale 100; el mes en curso, la parte que pasó", () => {
+    assert.equal(ritmoDelPeriodo("2026-09-01", "2026-09-30", hoy), 100);
+    assert.equal(Math.round(ritmoDelPeriodo("2026-10-01", "2026-10-05", hoy)), Math.round((5 / 31) * 100));
+  });
+  it("rótulo legible", () => {
+    assert.equal(rotuloPeriodo("2026-05-01", "2026-10-05"), "del 01/05/2026 al 05/10/2026");
   });
 });
