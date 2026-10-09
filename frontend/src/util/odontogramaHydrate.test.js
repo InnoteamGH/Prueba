@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { apiRowsAHtmlDatos, tomaHashDeRows } from "./odontogramaHydrate.js";
+import { apiRowsAHtmlDatos, leerAnidado, tomaHashDeRows } from "./odontogramaHydrate.js";
 import { snapshotAGuardados } from "./odontogramaBridge.js";
 
 describe("apiRowsAHtmlDatos", () => {
@@ -45,5 +45,19 @@ describe("tomaHashDeRows", () => {
     const a = tomaHashDeRows([{ numeroPieza: 11, estadoPieza: "caries", estadosCara: "{}" }]);
     const b = tomaHashDeRows([{ numeroPieza: 11, estadoPieza: "extraer", estadosCara: "{}" }]);
     assert.notEqual(a, b);
+  });
+});
+
+describe("estadosCara con mapas guardados como texto de Java (M4-04)", () => {
+  it("lee _colores, _coloresRaiz y _piezas en formato {k=v} / [{h=x, c=y}]", () => {
+    const d = apiRowsAHtmlDatos([{ numeroPieza: 26, estadosCara: { O: "restaur", _colores: "{O=a}", raices: "{0=endodoncia}", _coloresRaiz: "{0=a}", _piezas: "[{h=corona, c=a}]" } }]);
+    assert.deepEqual(d["26"].caras.O, { h: "restaur", c: "a" });
+    assert.equal(d["26"].raices["0"].c, "a");
+    assert.deepEqual(d["26"].pieza, [{ h: "corona", c: "a" }]);
+  });
+  it("leerAnidado acepta JSON y texto de Java", () => {
+    assert.deepEqual(leerAnidado('{"O":"a"}'), { O: "a" });
+    assert.deepEqual(leerAnidado("{O=a, V=r}"), { O: "a", V: "r" });
+    assert.deepEqual(leerAnidado("[{h=extraccion, c=r}]"), [{ h: "extraccion", c: "r" }]);
   });
 });

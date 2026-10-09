@@ -1,6 +1,44 @@
 /**
  * API rows ↔ estado del HTML anatómico de referencia.
  */
+/* M4-04: el servidor guarda los mapas anidados de estadosCara (_colores, _coloresRaiz, _piezas,
+   raices) con el texto de Java (Map.toString), p. ej. "{O=a, V=r}" o "[{h=extraccion, c=a}]",
+   en vez de JSON. Sin leerlo, «Buen estado» volvía como «por hacer» al recargar. Se lee ese
+   formato (y JSON) para no perder el color mientras el backend no lo corrija. */
+export function leerAnidado(v) {
+  if (v == null || typeof v !== "string") return v;
+  const s = v.trim();
+  if (!s) return undefined;
+  try { return JSON.parse(s); } catch { /* no es JSON: texto de Java */ }
+  let i = 0;
+  const esp = () => { while (i < s.length && s[i] === " ") i++; };
+  const valor = () => {
+    esp();
+    if (s[i] === "{") return mapa();
+    if (s[i] === "[") return lista();
+    let j = i;
+    while (j < s.length && s[j] !== "," && s[j] !== "}" && s[j] !== "]") j++;
+    const tok = s.slice(i, j).trim(); i = j;
+    return tok === "null" ? null : tok;
+  };
+  const mapa = () => {
+    const o = {}; i++; esp();
+    while (i < s.length && s[i] !== "}") {
+      const eq = s.indexOf("=", i); if (eq < 0) break;
+      const k = s.slice(i, eq).trim(); i = eq + 1;
+      o[k] = valor(); esp();
+      if (s[i] === ",") { i++; esp(); }
+    }
+    i++; return o;
+  };
+  const lista = () => {
+    const a = []; i++; esp();
+    while (i < s.length && s[i] !== "]") { a.push(valor()); esp(); if (s[i] === ",") { i++; esp(); } }
+    i++; return a;
+  };
+  try { return s[0] === "{" || s[0] === "[" ? valor() : v; } catch { return undefined; }
+}
+
 export function apiRowsAHtmlDatos(rows = []) {
   const datos = {};
   for (const r of rows || []) {
@@ -11,7 +49,8 @@ export function apiRowsAHtmlDatos(rows = []) {
     if (typeof carasRaw === "string") {
       try { carasRaw = JSON.parse(carasRaw || "{}") || {}; } catch { carasRaw = {}; }
     }
-    carasRaw = carasRaw || {};
+    carasRaw = { ...(carasRaw || {}) };
+    ["_colores", "_coloresRaiz", "_piezas", "raices"].forEach((k) => { if (typeof carasRaw[k] === "string") carasRaw[k] = leerAnidado(carasRaw[k]); });
     const colores = (carasRaw._colores && typeof carasRaw._colores === "object") ? carasRaw._colores : {};
     const coloresRaiz = (carasRaw._coloresRaiz && typeof carasRaw._coloresRaiz === "object") ? carasRaw._coloresRaiz : {};
     const caras = {};
