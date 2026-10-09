@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { Calendar, Check, ChevronRight, Clock, MessageSquare, Phone, Plus, Search, User, AlertTriangle, Armchair, Info, Lock, Star } from "lucide-react";
 import { estadoSillones, evaluarCita, sugerirSillon, turnosDelDia, sillonesDeSede, etiquetaUso, yaPaso, motivoPasado } from "./sillones";
-import { useReglasAgenda } from "./useReglasAgenda";
+import { useReglasAgenda, conSedesDeHorario, horarioDefineSede } from "./useReglasAgenda";
 import { CATALOGO_SEED, precioCita, precioServicio } from "./catalogo";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
@@ -135,9 +135,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   // Sede: la cita se registra en una de las sedes que el usuario ve ahora (filtro del menú).
   // Por defecto la de la cita de origen o la sede activa, nunca la primera de la lista:
   // así el admin de Surco no deja citas en San Isidro sin darse cuenta.
-  const { ids: sedesVer, activa: sedeActivaCtx, pacientes: pacSede } = useSede();
+  const { ids: sedesVer, activa: sedeActivaCtx, pacientes: pacSede, global: sedeGlobal } = useSede();
   const sedePermitida = (id) => !sedesVer || sedesVer.some((w) => mismaSede(id, w));
-  const [pac, setPac] = useState([]); const [meds, setMeds] = useState([]); const [esps, setEsps] = useState([]); const [seds, setSeds] = useState([]);
+  const [pac, setPac] = useState([]); const [medsLista, setMeds] = useState([]); const [esps, setEsps] = useState([]); const [seds, setSeds] = useState([]);
   const [pacTodos, setPacTodos] = useState([]);   // todas las sedes: solo para hallar un DNI exacto y no duplicar fichas
   const [nuevo, setNuevo] = useState(null);         // alta rápida de paciente (formulario abierto)
   const [nuevoErr, setNuevoErr] = useState({});
@@ -220,6 +220,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   }, [esps]); // eslint-disable-line react-hooks/exhaustive-deps
   // Reglas de la agenda: sillones (con su uso), horario de cada doctor y bloqueos.
   const reglas = useReglasAgenda();
+  // R-12: /medicos trae las sedes vacías; la de cada doctor sale de su horario. Para quien es
+  // de algunas sedes, el doctor sin horario en ellas no se ofrece (trabaja en otra sede).
+  const meds = demo ? medsLista : conSedesDeHorario(medsLista, reglas.disp, horarioDefineSede({ global: sedeGlobal, disp: reglas.disp }));
   const [citasDia, setCitasDia] = useState([]);   // con sesión: las citas del día elegido
   const [sillonAuto, setSillonAuto] = useState(!base?.sillon);
   useEffect(() => {
@@ -241,8 +244,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     if (fijas.length) return fijas;
     return [...new Set((ctxReglas.disp || []).filter((d) => String(d.medicoId) === String(m?.id)).map((d) => d.sede ?? d.sedeId).filter((x) => x != null))];
   };
-  /** ¿El doctor atiende en esa sede? Sin dato de sede no se restringe. */
-  const atiendeEn = (m, sid) => { if (!m || sid == null || sid === "") return true; const ss = sedesMed(m); return !ss.length || ss.some((x) => mismaSede(x, sid)); };
+  /** ¿El doctor atiende en esa sede? Sin dato de sede no se restringe, salvo que su horario
+      diga que trabaja en otra (R-12: fueraDeSede). */
+  const atiendeEn = (m, sid) => { if (!m) return true; if (m.fueraDeSede) return false; if (sid == null || sid === "") return true; const ss = sedesMed(m); return !ss.length || ss.some((x) => mismaSede(x, sid)); };
   // Especialidades del doctor: la principal y las demás que tenga (p. ej. general y periodoncia).
   const espsMed = (m) => [m.especialidadId, m.esp, ...(m.esps || [])].filter((x) => x != null).map(String);
   const citaBorrador = (extra = {}) => ({ medicoId: f.medicoId, esp: f.especialidadId || (medSel ? (medSel.esp ?? medSel.especialidadId) : null), sede: f.sedeId, fecha: f.fecha, hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: f.sillon ? Number(f.sillon) : null, pacienteId: f.pacienteId || null, ...extra });
@@ -255,10 +259,16 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   // después elija doctor, sede o fecha; solo se propone la primera libre si no eligió hora.
   // Si con ese doctor no está libre, se avisa abajo con la opción de usar la primera libre.
   const [horaElegida, setHoraElegida] = useState(!!base?.hora);
-  const horaAutoSiNoEligio = () => setHoraAuto(!horaElegida);
+  // R-05: la propuesta de la primera hora libre espera a GET /citas del día (unos 3 s). Si en
+  // ese tiempo la persona escribía la hora, la respuesta tardía la pisaba con 08:00 sin aviso.
+  // La elección se guarda también en un ref, que la respuesta mira al llegar.
+  const horaElegidaRef = useRef(!!base?.hora);
+  const elegirHora = (si) => { horaElegidaRef.current = si; setHoraElegida(si); setHoraAuto(!si); };
+  const horaAutoSiNoEligio = () => setHoraAuto(!horaElegidaRef.current);
   // DC-51: primera hora libre al abrir / cambiar fecha.
   useEffect(() => {
     if (!horaAuto || !f.fecha) return;
+    let vigente = true;   // una respuesta de una corrida anterior (otra fecha, hora ya elegida) no aplica
     const ocupadas = new Set();
     // Con doctor elegido cuenta cualquier cita suya (no puede estar en dos sedes a la vez);
     // sin doctor, solo las de la sede elegida: una cita en otra sede no ocupa estos sillones.
@@ -273,7 +283,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       const reglasOk = (h) => !f.medicoId || (evaluarCita(ctxSede, citaBorrador({ hora: h, sillon: null })).errores.length === 0 && sugerirSillon(ctxSede, citaBorrador({ hora: h })) != null);
       const valida = (h) => !ocupadas.has(h) && !citaFueraDeHorario(f.fecha, h, f.duracionMin, horarioClinica.horario, horarioClinica.feriados, sedeN).fuera && (!esHoy || toMin(h) > ahoraMin) && reglasOk(h);
       const libre = HORAS_SEL.find(valida) || HORAS_SEL.find((h) => !ocupadas.has(h) && !citaFueraDeHorario(f.fecha, h, f.duracionMin, horarioClinica.horario, horarioClinica.feriados, sedeN).fuera) || HORAS_SEL[8] || "10:00";
-      setF((x) => (x.hora === libre ? x : { ...x, hora: libre }));
+      // Nunca sobre una hora que la persona eligió mientras se esperaba la respuesta.
+      setF((x) => (horaElegidaRef.current || x.hora === libre ? x : { ...x, hora: libre }));
     };
     if (!auth.token) {
       (demoDb?.citas || []).forEach((c) => {
@@ -283,9 +294,10 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
         if (["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(c.estado)) return;
         ocupadas.add(String(c.hora || "").slice(0, 5));
       });
-      apply(); return;
+      apply(); return undefined;
     }
     api.citas.listar(f.fecha).then((rows) => {
+      if (!vigente) return;
       (rows || []).forEach((c) => {
         if (f.medicoId && c.medicoId && String(c.medicoId) !== String(f.medicoId)) return;
         if (!deLaSede(c)) return;
@@ -294,7 +306,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
         if (h) ocupadas.add(h);
       });
       apply();
-    }).catch(() => apply());
+    }).catch(() => { if (vigente) apply(); });
+    return () => { vigente = false; };
   }, [f.fecha, f.medicoId, horaAuto, horarioClinica, f.sedeId, seds.length, f.duracionMin, citasDia, reglas.listo]); // eslint-disable-line
   // Si el doctor ese día solo atiende en otra sede, la sede se cambia a esa.
   useEffect(() => {
@@ -335,7 +348,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const buscarHuecos = async () => {
     setHuecos("buscando");
     // Sin doctor: los de la especialidad que atienden en alguna de las sedes que ve el usuario.
-    const candidatos = f.medicoId ? meds.filter((m) => String(m.id) === String(f.medicoId)) : medsEsp.filter((m) => { const ss = sedesMed(m); return !ss.length || ss.some(sedePermitida); });
+    const candidatos = f.medicoId ? meds.filter((m) => String(m.id) === String(f.medicoId)) : medsEsp.filter((m) => { if (m.fueraDeSede) return false; const ss = sedesMed(m); return !ss.length || ss.some(sedePermitida); });
     const desdeD = new Date(fmt(hoy) + "T00:00:00");
     const dias = [...Array(14)].map((_, i) => { const d = new Date(desdeD); d.setDate(d.getDate() + i); return fmt(d); });
     let citasRango = demo ? (demoDb.citas || []) : [];
@@ -374,7 +387,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     setHuecos(res);
   };
   const usarHueco = (h) => {
-    setHoraAuto(false); setHoraElegida(true); setSillonAuto(false);
+    elegirHora(true); setSillonAuto(false);
     const sedeL = (seds.find((x) => mismaSede(x.id, h.sede)) || {}).id ?? h.sede;
     setF((x) => ({ ...x, medicoId: h.medicoId, sedeId: sedeL, fecha: h.fecha, hora: h.hora, sillon: String(h.sillon) }));
     setHuecos(null);
@@ -632,13 +645,13 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             <div style={{ display: "flex", alignItems: "center", gap: 8, border: `1.5px solid ${pasada ? "var(--dc-red)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
               <Clock size={16} strokeWidth={1.75} color={pasada ? "var(--dc-red)" : "var(--dc-ink-400)"} style={{ flexShrink: 0 }} />
               <input className="dc-premium-inp" type="date" min={fmt(hoy)} aria-label="Fecha de la cita" value={f.fecha} onChange={(e) => { horaAutoSiNoEligio(); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
-              <input className="dc-premium-inp" type="time" aria-label="Hora de la cita" value={f.hora} onChange={(e) => { setHoraAuto(false); setHoraElegida(true); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
+              <input className="dc-premium-inp" type="time" aria-label="Hora de la cita" value={f.hora} onChange={(e) => { elegirHora(true); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
             </div>
             {pasada && <div role="alert" style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>{msgPasada}</div>}
             {!pasada && horaElegida && !horaAuto && errHora && (
               <div role="alert" className="dc-agm__val is-avi" style={{ fontSize: 12.5, color: "var(--dc-warn-700)", marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <Info size={13} strokeWidth={2.2} /><span>Las {f.hora} no están libres con este doctor: {errHora}</span>
-                <button type="button" className="dc-link" onClick={() => { setHoraElegida(false); setHoraAuto(true); }}>Usar la primera hora libre</button>
+                <button type="button" className="dc-link" onClick={() => { elegirHora(false); }}>Usar la primera hora libre</button>
               </div>
             )}
           </div>

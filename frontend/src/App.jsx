@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
 import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales, esSinPermiso, msgServidor } from "./api/client";
 import { limpiarRegistroSedes, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
-import { fijarPermisosSesion, guardarPermisosServidor, permisosServidorGuardados } from "./compartido/permisos";
+import { fijarPermisosSesion, guardarPermisosServidor, permisosServidorGuardados, tienePermiso } from "./compartido/permisos";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
 const FichaMedica = React.lazy(() => import("./FichaMedica"));
@@ -19,8 +19,8 @@ const ReportesClinica = React.lazy(() => import("./modulos/ReportesClinica"));
 import OdontogramaFotos from "./modulos/OdontogramaFotos";
 const OcupacionSillones = React.lazy(() => import("./modulos/OcupacionSillones"));
 import { AgendarRecepcionModal, BtnReniec, reniecLookup, CamposPacienteRapido, validarPacienteRapido, registrarPacienteRapido, celular9 } from "./compartido/AgendarRecepcionModal";
-import { DISP_DEMO, SILLONES_DEMO, completarSillones, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia, yaPaso } from "./compartido/sillones";
-import { useReglasAgenda, sillonesPorSede } from "./compartido/useReglasAgenda";
+import { DISP_DEMO, SILLONES_DEMO, completarSillones, normBloqueo, normSillon, evaluarCita, sugerirSillon, estadoSillones, etiquetaUso, sillonesDeSede, turnosDelDia, yaPaso } from "./compartido/sillones";
+import { useReglasAgenda, sillonesPorSede, conSedesDeHorario, horarioDefineSede } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat } from "./compartido/integraciones";
@@ -67,7 +67,9 @@ import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto } from "./compartido/presupuestoDoc";
 import { cruceAlergias, listaAlergias } from "./compartido/alergias";
 import { horasSemana, horarioConfigurado } from "./comun";
-import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario } from "./compartido/recetaItems";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, textoIndicaciones } from "./compartido/recetaItems";
+import { imprimirReceta as imprimirRecetaDoc } from "./util/recetaDoc";
+import { textoConsentimiento } from "./compartido/consentimientoTexto";
 import {BotonPDF, SedeCtx, useSede, useEmiteCobros, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
@@ -565,7 +567,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // Demo: precio del catálogo en la sede de la cita (el mismo que cobra Caja).
   const precio = (c) => (c.valor != null ? Number(c.valor) || 0
     : conectado ? 0 : (precioCita(dbDash?.catalogo || leerCatalogo(), c.esp, c.sede) ?? ESPECIALIDADES.find((e) => e.id === c.esp)?.precio ?? 0));
-  const produccionDia = ch.filter((c) => c.estado === "atendida" || c.estado === "en_atencion").reduce((s, c) => s + precio(c), 0);
+  // M4-13: la producción del doctor cuenta la atención terminada, como dice su tarea («La
+  // producción cuenta cuando las completas»): cita atendida y con la evolución escrita. Una
+  // consulta en curso o con la evolución pendiente todavía no suma.
+  const citasEvoPend = new Set(((pendEvo && pendEvo.items) || []).map((x) => String(x.citaId)).filter((x) => x && x !== "undefined"));
+  const produccionDia = ch.filter((c) => c.estado === "atendida" && !(esMed && citasEvoPend.has(String(c.id)))).reduce((s, c) => s + precio(c), 0);
   // NEW-29/30: filtrar pagos como Caja (sede activa del selector).
   const pagosEnSedeActiva = (lista) => {
     if (!lista) return [];
@@ -636,7 +642,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     { k: "pendiente", c: "var(--dc-warn)" }, { k: "confirmada", c: DS.c.primary }, { k: "en_atencion", c: "var(--dc-purple)" }, { k: "atendida", c: "var(--dc-ok-700)" }, { k: "cancelada", c: "var(--dc-red)" },
   ].map((e) => ({ ...e, v: ch.filter((c) => c.estado === e.k).length })).filter((e) => e.v > 0);
   const totalEstados = estados.reduce((s, e) => s + e.v, 0) || 1;
-  const prodRows = cobrosHoyRows || ch.filter((c) => c.estado === "atendida" || c.estado === "en_atencion").map((c) => ({ izq: c.paciente, der: `S/ ${precio(c)}` }));
+  const prodRows = cobrosHoyRows || ch.filter((c) => c.estado === "atendida" || c.estado === "en_atencion").map((c) => ({ izq: c.paciente, der: c.estado !== "atendida" ? "En atención" : esMed && citasEvoPend.has(String(c.id)) ? `S/ ${precio(c)} · falta la evolución` : `S/ ${precio(c)}` }));
   const pacRows = [...pacientes].sort((a, b) => (b.ultima || "").localeCompare(a.ultima || "")).slice(0, 30).map((p) => ({ izq: p.nombre, der: p.ultima ? (fechaLegible(p.ultima) || p.ultima) : "—" }));
   const kpis = esMed ? [
     ["Mis citas hoy", citasHoyKpi.length, Calendar, NAVY, rowsCitas(citasHoyKpi)],
@@ -748,7 +754,14 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: `${INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").map(([n, , d]) => `${n}: ${d}`).join(" ")} Revisa el estado antes de que afecte a la atención.`, accion: "Ver integraciones", ir: () => onIr("integraciones") },
     // Completar la evolución es trabajo del doctor: recepción y administración no pueden
     // hacerlo, así que no se les muestra una tarea con un botón que no les sirve.
-    esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => { const primer = (pendEvo.items || [])[0]; if (primer?.pacienteId) onIr("pacientes", { pacienteId: primer.pacienteId }); else onIr("pacientes"); } },
+    esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => {
+      // M4-10: abre la Historia clínica (donde se escribe la evolución), no el Resumen, con la
+      // cita pendiente ya elegida en «Cita» (la ficha la lee de dc_cita_atencion).
+      const primer = (pendEvo.items || [])[0];
+      if (!primer?.pacienteId) { onIr("pacientes"); return; }
+      if (primer.citaId) { try { sessionStorage.setItem("dc_cita_atencion", JSON.stringify({ pacienteId: primer.pacienteId, citaId: primer.citaId })); } catch { /* sin almacenamiento */ } }
+      onIr("pacientes", { pacienteId: primer.pacienteId, tab: "historia" });
+    } },
     // INI-04: una sola tarjeta de confirmaciones (hoy + mañana) con una sola acción.
     !esTI && (sinConfHoy.length + (esMed ? 0 : mananaSinConf.length)) > 0 && { id: "conf", tono: sinConfHoy.length ? "aviso" : "info", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `Confirmaciones pendientes · hoy ${sinConfHoy.length}${esMed ? "" : ` · mañana ${mananaSinConf.length}`}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))) || "Las de hoy ya están confirmadas.", accion: esMed ? "Ir a la agenda" : "Enviar confirmaciones", ir: esMed ? () => onIr("agenda") : () => { if (conectado) enviarConfMañana(); else notify(`Confirmaciones enviadas por WhatsApp a ${sinConfHoy.length + mananaSinConf.length} pacientes.`); } },
     verCaja && deudores.length > 0 && { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") },
@@ -764,9 +777,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // INI-05: solo las próximas 5 aún no atendidas ni en sillón.
   const proximas = activasHoy.filter((c) => !["atendida", "en_atencion"].includes(estadoCita(c)) && (c.hora >= ahoraHM || estadoCita(c) === "en_sala")).slice(0, 5);
   const fechaHoy = (() => { const f = hoy.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" }); return f.charAt(0).toUpperCase() + f.slice(1); })();
+  // R-17: cada cifra lleva a su módulo (antes no eran clicables). Solo si el rol lo ve.
+  const irSiVe = (mod) => (tienePermiso(mod, "ver") ? () => onIr(mod) : null);
   const cifras = esTI
-    ? [["Integraciones operativas", `${INTEGRACIONES_TI.filter(([, e]) => e === "operativo").length}/${INTEGRACIONES_TI.length}`], ["Con incidencia", incidenciasTI], ["Por activar", INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length], ["Usuarios", usrTiDash ? usrTiDash.length : conectado ? "…" : STAFF_INIT.length]]
-    : [["Citas hoy", citasHoyKpi.length], ["Atendidas", atendidasHoy], ["Por confirmar", sinConfirmar], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE")}`]];
+    ? [["Integraciones operativas", `${INTEGRACIONES_TI.filter(([, e]) => e === "operativo").length}/${INTEGRACIONES_TI.length}`, irSiVe("integraciones")], ["Con incidencia", incidenciasTI, irSiVe("integraciones")], ["Por activar", INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length, irSiVe("integraciones")], ["Usuarios", usrTiDash ? usrTiDash.length : conectado ? "…" : STAFF_INIT.length, irSiVe("usuarios")]]
+    : [["Citas hoy", citasHoyKpi.length, irSiVe("agenda")], ["Atendidas", atendidasHoy, irSiVe("agenda")], ["Por confirmar", sinConfirmar, irSiVe("agenda")], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE")}`, esMed ? irSiVe("miproduccion") : irSiVe("facturacion")]];
   return (
     <div className="dc-hoy">
       <section className="dc-hero">
@@ -776,7 +791,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
           <p>{frase}</p>
         </div>
         <div className="dc-hero__cifras">
-          {cifras.map(([l, v]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}
+          {cifras.map(([l, v, ir]) => (ir
+            ? <div key={l} role="button" tabIndex={0} className="is-link" title={`Ver ${l.toLowerCase()}`} onClick={ir} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); } }}><b>{v}</b><span>{l}</span></div>
+            : <div key={l}><b>{v}</b><span>{l}</span></div>))}
         </div>
         {!esTI && <button type="button" className="dc-hero__btn" onClick={() => onIr("agenda")}><Calendar size={15} strokeWidth={1.75} /> Ver agenda</button>}
       </section>
@@ -969,9 +986,11 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
       const aplica = (b.fecha && String(b.fecha).slice(0, 10) === isoD) || (!b.fecha && Number(b.diaSemana) === dow);
       if (!aplica) return false;
       if (b.medicoId != null && !(modo === "doctores" && String(col.medKey) === String(b.medicoId))) return false;
-      // Un bloqueo de toda la agenda o de un doctor vale solo en su sede.
-      if (b.sillon == null && b.sede != null && sedeCal != null && String(b.sede) !== String(sedeCal)) return false;
-      if (b.sillon != null && !(modo === "sillon" && col.silObj && String(col.silObj.numero) === String(b.sillon) && (b.sede == null || String(col.silObj.sede) === String(b.sede)))) return false;
+      // Un bloqueo de toda la agenda o de un doctor vale solo en su sede. La sede se compara
+      // como sede (UUID del servidor o número del registro), no como texto (R-02).
+      const sedeB = b.sede ?? b.sedeId ?? null;
+      if (b.sillon == null && sedeB != null && sedeCal != null && !mismaSede(sedeB, sedeCal)) return false;
+      if (b.sillon != null && !(modo === "sillon" && col.silObj && String(col.silObj.numero) === String(b.sillon) && (sedeB == null || mismaSede(col.silObj.sede, sedeB)))) return false;
       const ini = (b.horaInicio || "").slice(0, 2), fin = (b.horaFin || "").slice(0, 2);
       return hh >= ini && hh < fin;
     }) || null;
@@ -1075,7 +1094,12 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
     setDlOpen(false);
     const filas = rangoCitas.map((c) => ({ fecha: c.fecha, hora: c.hora, paciente: c.paciente, medico: c.medico || "—", estado: EST_LABEL[estadoCita(c)] || c.estado }));
     if (!filas.length) return;
-    if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${modo}_${iso(hoyD)}.xlsx`, hoja: "Agenda", titulo: `Agenda — ${titulo}`, columnas: COLS_CAL, filas });
+    // R-17: el archivo se llama por el rango que se descarga, no por el día de hoy
+    // (la semana del 12 al 18/10 salía «agenda_semana_2026-10-09»).
+    const rangoArchivo = modo === "mes" ? iso(mesRef).slice(0, 7)
+      : (modo === "semana" || modo === "tabla") ? `${iso(semana[0])}_a_${iso(semana[6])}`
+      : iso(diaSel);
+    if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${modo}_${rangoArchivo}.xlsx`, hoja: "Agenda", titulo: `Agenda — ${titulo}`, columnas: COLS_CAL, filas });
     else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: conteoRango, columnas: COLS_CAL, filas });
   };
 
@@ -1460,8 +1484,13 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const [bloqueos, setBloqueos] = useState([]);         // bloqueos de agenda (almuerzo/ausencia/mantenimiento)
   const [bloqForm, setBloqForm] = useState(null);       // modal para crear bloqueo
   const [verBloqueos, setVerBloqueos] = useState(false); // H-12: lista de bloqueos de la sede para quitarlos
+  // R-17: el formulario abierto desde «Bloqueos de la sede» vuelve a esa lista al guardar o
+  // cancelar (antes se cerraba todo y había que abrir la lista otra vez para ver el nuevo).
+  const cerrarBloqForm = () => { const volver = !!bloqForm?.desdeLista; setBloqForm(null); if (volver) setVerBloqueos(true); };
   const [esperaResumen, setEsperaResumen] = useState([]); // resumen de la lista de espera (el gestor vive en su submódulo)
-  const recargarBloqueos = () => { if (conectado) api.bloqueos.listar().then((r) => setBloqueos(r || [])).catch(() => {}); };
+  // R-02: con su sede normalizada (el servidor la manda como sedeId): un bloqueo de otra sede
+  // no pinta ni bloquea la grilla de esta.
+  const recargarBloqueos = () => { if (conectado) api.bloqueos.listar().then((r) => setBloqueos((r || []).map(normBloqueo))).catch(() => {}); };
   const demoDb = useContext(DatosDemoCtx);
   const reglasAg = useReglasAgenda();
   const bloqueosEf = conectado ? bloqueos : (demoDb?.bloqueos || []);
@@ -1474,7 +1503,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     ...reglasAg,
     sillones: (reglasAg.sillones || []).filter((x) => sedeCx.enSede(x.sede)),
     asignaciones: (reglasAg.asignaciones || []).filter((a) => a.sede == null || sedeCx.enSede(a.sede)),
-    medicos: (reglasAg.medicos || []).filter((m) => sedeCx.enSede(sedesDe(m))),
+    // R-12: las sedes del doctor salen de su horario cuando /medicos no las trae; el que no
+    // tiene horario en las sedes del usuario no sale en sus chips ni en sus listas.
+    medicos: (reglasAg.medicos || []).filter((m) => !m.fueraDeSede && sedeCx.enSede(sedesDe(m))),
   }), [reglasAg, (sedeCx.ids || []).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const citasTodas = conectado ? (remotoAll || []) : (demoDb?.citas || citasProp);
   useEffect(() => { recargar(); }, [diaVer]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1971,17 +2002,18 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           const payload = { horaInicio: bloqForm.horaInicio, horaFin: bloqForm.horaFin, motivo: motivoTxt || "Bloqueado",
             fecha: bloqForm.tipo === "dia" ? bloqForm.fecha : null, diaSemana: bloqForm.tipo === "semanal" ? Number(bloqForm.diaSemana) : null,
             // Toda la agenda y un doctor se bloquean en la sede activa (en la otra sede sigue libre).
-            ...(bloqForm.aplica !== "sillon" ? { sede: conectado ? sedeApiUuid(sedeActiva) : sedeActiva } : {}),
+            // Con sesión la sede va también como sedeId, que es como el servidor la guarda y la devuelve.
+            ...(bloqForm.aplica !== "sillon" ? (conectado ? { sede: sedeApiUuid(sedeActiva), sedeId: sedeApiUuid(sedeActiva) } : { sede: sedeActiva }) : {}),
             ...(bloqForm.aplica === "doctor" ? { medicoId: conectado ? bloqForm.medicoId : Number(bloqForm.medicoId) } : {}),
-            ...(bloqForm.aplica === "sillon" ? (() => { const [sd, n] = String(bloqForm.sillonKey || "").split("|"); return { sede: conectado ? sd : Number(sd), sillon: Number(n) }; })() : {}) };
+            ...(bloqForm.aplica === "sillon" ? (() => { const [sd, n] = String(bloqForm.sillonKey || "").split("|"); return conectado ? { sede: sd, sedeId: sd, sillon: Number(n) } : { sede: Number(sd), sillon: Number(n) }; })() : {}) };
           if (bloqForm.aplica === "doctor" && !bloqForm.medicoId) { notify("Elige el doctor."); return; }
           if (bloqForm.aplica === "sillon" && !bloqForm.sillonKey) { notify("Elige el sillón."); return; }
-          if (!conectado) { demoDb?.setBloqueos((bs) => [...(bs || []), { ...payload, id: `b${Date.now()}` }]); notify("Horario bloqueado."); setBloqForm(null); return; }
-          api.bloqueos.crear(payload).then(() => { notify("Horario bloqueado."); setBloqForm(null); recargarBloqueos(); }).catch(() => notify("No se pudo crear el bloqueo."));
+          if (!conectado) { demoDb?.setBloqueos((bs) => [...(bs || []), { ...payload, id: `b${Date.now()}` }]); notify("Horario bloqueado."); cerrarBloqForm(); return; }
+          api.bloqueos.crear(payload).then(() => { notify("Horario bloqueado."); cerrarBloqForm(); recargarBloqueos(); }).catch(() => notify("No se pudo crear el bloqueo."));
         };
         return (
-        <Modal icon={<Lock size={20} strokeWidth={1.75} />} titulo="Bloquear horario" sub="Almuerzo, ausencia o mantenimiento — no se podrá agendar en ese rango" onClose={() => setBloqForm(null)} maxW={480}
-          footer={<><Btn small kind="ghost" onClick={() => setBloqForm(null)}>Cancelar</Btn><Btn small kind="red" onClick={guardarBloq}><Lock size={15} strokeWidth={1.75} /> Bloquear</Btn></>}>
+        <Modal icon={<Lock size={20} strokeWidth={1.75} />} titulo="Bloquear horario" sub="Almuerzo, ausencia o mantenimiento — no se podrá agendar en ese rango" onClose={cerrarBloqForm} maxW={480}
+          footer={<><Btn small kind="ghost" onClick={cerrarBloqForm}>Cancelar</Btn><Btn small kind="red" onClick={guardarBloq}><Lock size={15} strokeWidth={1.75} /> Bloquear</Btn></>}>
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ display: "inline-flex", background: "var(--dc-bg-alt)", borderRadius: "var(--dc-r-md)", padding: 3 }}>
               {[["dia", "Un día"], ["semanal", "Cada semana"]].map(([k, l]) => (
@@ -2026,7 +2058,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         const medNom = (id) => (reglasAg.medicos || []).find((m) => String(m.id) === String(id))?.nombre || "Doctor";
         return (
           <Modal icon={<Lock size={20} strokeWidth={1.75} />} titulo="Bloqueos de la sede" sub="Horarios bloqueados de hoy en adelante. Quita los que ya no apliquen." onClose={() => setVerBloqueos(false)} maxW={560}
-            footer={<><Btn small kind="ghost" onClick={() => setVerBloqueos(false)}>Cerrar</Btn>{puedeAgendar && <Btn small onClick={() => { setVerBloqueos(false); setBloqForm({ tipo: "dia", fecha: hoyISO, diaSemana: String(new Date(hoyISO + "T00:00:00").getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo" }); }}><Plus size={15} strokeWidth={1.75} /> Nuevo bloqueo</Btn>}</>}>
+            footer={<><Btn small kind="ghost" onClick={() => setVerBloqueos(false)}>Cerrar</Btn>{puedeAgendar && <Btn small onClick={() => { setVerBloqueos(false); setBloqForm({ tipo: "dia", fecha: hoyISO, diaSemana: String(new Date(hoyISO + "T00:00:00").getDay()), horaInicio: "13:00", horaFin: "14:00", motivo: "Almuerzo", desdeLista: true }); }}><Plus size={15} strokeWidth={1.75} /> Nuevo bloqueo</Btn>}</>}>
             {lista.length === 0 ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin bloqueos" sub="No hay horarios bloqueados en esta sede." /> : (
               <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
                 {lista.map((b) => (
@@ -2548,7 +2580,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // sedeActiva: el precio del procedimiento es el de la sede donde se atiende, no el de la
     // primera sede del paciente (CLINICO-06 / CAJA-07).
     // Plan y cuenta cotiza con la sede de precio del paciente (menú › su única sede › activa).
-    plan: (pid) => <Tratamientos key={`plan-${pid}`} sedeActiva={sedeDePrecio(sedeCx, pacientes.find((x) => String(x.id) === String(pid)), sedeActiva)} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
+    plan: (pid, extra) => <Tratamientos key={`plan-${pid}`} resumenFicha={extra?.resumen || null} sedeActiva={sedeDePrecio(sedeCx, pacientes.find((x) => String(x.id) === String(pid)), sedeActiva)} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
     archivos: (pid, sub) => <ArchivosPaciente key={`arch-${pid}`} pid={pid} sub={sub} pacientes={pacientes} notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} onIrLaboratorio={() => onIr("laboratorio")} />,
   };
   if (fmId && esperandoPadron) return <Card><div style={{ padding: 24, textAlign: "center", color: "var(--dc-ink-500)", fontSize: 14 }}>Cargando ficha…</div></Card>;
@@ -3758,7 +3790,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
 }
 
 /* ---- Tratamientos (plan de tratamiento = fuente de los cargos) ---- */
-function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can, sedeActiva = "all" }) {
+function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can, sedeActiva = "all", resumenFicha = null }) {
   // Cobrar una fase es caja, no plan de tratamiento. Gerencia consulta el plan; el
   // cobro lo hace quien tiene caja (recepción, administración).
   const { puede: puedeCobrar } = useEmiteCobros(can);
@@ -3851,7 +3883,19 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   };
   const caraDeFase = (f) => (f.cara && String(f.cara).trim()) || "—";
   const nombreFaseLimpio = (f) => String(f.nombre || "").replace(/\s*[-–·]?\s*pieza\s*\d+(\s*\([A-Za-z]+\))?/i, "").trim() || f.nombre;
-  const total = fases.reduce((s, f) => s + f.costo, 0), pagado = fases.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0), saldo = total - pagado;
+  // R-10: «Pagado» es lo que abonó el paciente (sus pagos), como la cabecera de la ficha, el
+  // Resumen y Caja. Antes se sumaban solo los procedimientos ya «pagados», así que los abonos
+  // «Cobro de saldo en caja» (sin procedimiento) no contaban: S/ 0.00 aquí y S/ 30.75 en Caja.
+  // Con sesión: GET /pagos del paciente (quien ve Caja) o, si no, lo pagado del resumen de la
+  // ficha; solo si no hay ninguno de los dos, los procedimientos pagados.
+  const sedeDePagoPac = (p) => (conectado ? (p.sedeId ?? p.sede ?? null) : sedeDeRegistro(p, pacSel));
+  const pagosVistos = conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []);
+  const pagadoPagos = pagosVistos
+    ? pagosVistos.filter((p) => !p.anulado && sx.enSede(sedeDePagoPac(p))).reduce((s, p) => s + (Number(p.monto) || 0), 0)
+    : (conectado && resumenFicha && resumenFicha.invertido != null ? Number(resumenFicha.invertido) || 0 : null);
+  const total = fases.reduce((s, f) => s + f.costo, 0);
+  const pagado = Math.round((pagadoPagos != null ? pagadoPagos : fases.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0)) * 100) / 100;
+  const saldo = Math.max(0, Math.round((total - pagado) * 100) / 100);
   const inp = { width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none", boxSizing: "border-box" };
   // CAJA-06: el pago va a la sede del ítem (nunca «la primera sede» del servidor).
   const sedePago = (f) => uuidSede(sedes, f ? sedeFase(f) : sedeTrab);
@@ -3956,7 +4000,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     const ids = new Set(pend.map((f) => f.id));
     setTrat((t) => t.map((x) => ids.has(x.id) ? { ...x, estado: "atendida" } : x));
     grupos.forEach((g) => addPago("Saldo del plan de tratamiento", g.monto, g.sede));
-    notify(`Pago registrado: S/ ${M.sol2(saldo)}. Boleta emitida – insumos descontados.`);
+    notify(`Pago registrado: S/ ${M.sol2(grupos.reduce((a, g) => a + g.monto, 0))}. Boleta emitida – insumos descontados.`);
   };
   const atendidas = fases.filter((f) => f.estado === "atendida").length;
   const avance = fases.length ? Math.round((atendidas / fases.length) * 100) : 0;
@@ -3968,7 +4012,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
         <div className="dc-trat-met dc-trat-met--franja">
           <div className="dc-trat-met__cifras">
             <div><b>S/ {total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Total del plan</span></div>
-            <div><b>S/ {pagado.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Pagado {total ? Math.round((pagado / total) * 100) : 0}%</span></div>
+            <div><b>S/ {pagado.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Pagado {total ? Math.min(100, Math.round((pagado / total) * 100)) : 0}%</span></div>
             <div className={saldo > 0 ? "is-saldo" : ""}><b>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>{saldo > 0 ? "Saldo del plan" : "Al día"}</span></div>
             <div><b>{atendidas + fases.filter((f) => f.estado === "terminada").length}/{fases.length}</b><span>Avance clínico</span></div>
           </div>
@@ -4111,7 +4155,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
   const conectado = !!auth.token;
   // Sede: se ven solo las entradas de las sedes del filtro; el alta va a la sede activa
   // (o a la que se elija si el usuario ve varias) y ofrece los doctores de esa sede.
-  const { ids: sedesVer, activa, enSede } = useSede();
+  const { ids: sedesVer, activa, enSede, global: sedeGlobalEsp } = useSede();
   const sedesKey = (sedesVer || []).join(",");
   const demoDb = useContext(DatosDemoCtx);
   // Sede de una entrada. Las guardadas antes de existir el campo se atribuyen a la sede
@@ -4127,18 +4171,22 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
   // Con sesión: pacientes, especialidades y doctores del servidor (nunca los de ejemplo).
   const [pacApi, setPacApi] = useState([]);
   const [espsApi, setEspsApi] = useState([]);
-  const [medsApi, setMedsApi] = useState([]);
+  const [medsApi0, setMedsApi] = useState([]);
+  const [dispApi, setDispApi] = useState([]);
   useEffect(() => {
     if (!conectado) return;
     api.pacientes.listar().then((r) => setPacApi(Array.isArray(r) ? r : [])).catch(() => {});
     api.catalogo.especialidades().then((r) => setEspsApi((Array.isArray(r) ? r : []).filter((e) => e.activo !== false))).catch(() => {});
     api.catalogo.medicos().then((r) => setMedsApi((Array.isArray(r) ? r : []).filter((m) => m.activo !== false))).catch(() => {});
+    // R-12: el horario dice en qué sede atiende cada doctor (/medicos trae las sedes vacías).
+    api.disponibilidad.listar().then((r) => setDispApi(Array.isArray(r) ? r : [])).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const medsApi = useMemo(() => conSedesDeHorario(medsApi0, dispApi, horarioDefineSede({ global: sedeGlobalEsp, disp: dispApi })), [medsApi0, dispApi, sedeGlobalEsp]);
   const pacBusca = conectado ? pacApi.filter((p) => enSede(p.sedeIds ?? p.sedeRegistroId)) : pacientes;
   const espsLista = conectado ? espsApi : ESPECIALIDADES;
   const sedesMedApi = (m) => [].concat(m?.sedes ?? m?.sedeIds ?? m?.sedeId ?? []).map((v) => (v && typeof v === "object" ? v.id : v));
   const medicosDeSede = (sid) => (conectado
-    ? medsApi.filter((m) => { const ss = sedesMedApi(m); return !ss.length || ss.some((x) => mismaSede(x, sid)); })
+    ? medsApi.filter((m) => { if (m.fueraDeSede) return false; const ss = sedesMedApi(m); return !ss.length || ss.some((x) => mismaSede(x, sid)); })
     : MEDICOS.filter((m) => sedesDe(m).some((x) => mismaSede(x, sid))));
   const mapEsp = (r) => {
     const creado = r.creadoEn || r.creado_en || null;
@@ -5123,6 +5171,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const sedeEg = egForm.sede ?? sedeCaja;
     if (sedeEg == null) { notify("Elige la sede del egreso."); return; }
     const monto = lm.valor;
+    // R-18: un egreso en dólares en efectivo sale de la gaveta de dólares de la sesión. Si es
+    // mayor que lo que debería haber (fondo + cobros − egresos en US$), el arqueo queda en
+    // negativo («Esperado US$ -1.75»): se avisa antes de registrarlo.
+    if (usdEg && (egForm.metodo || "efectivo") === "efectivo" && sedeCaja != null && mismaSede(sedeEg, sedeCaja) && apertura) {
+      const enGaveta = Math.round(((Number(apertura.fondoUsd) || 0) + (efSesion.usd || 0) - egresosSesion.filter((e) => (e.metodo || "efectivo") === "efectivo" && e.moneda === "USD").reduce((s, e) => s + (Number(e.monto) || 0), 0)) * 100) / 100;
+      if (monto > enGaveta + 0.004 && !window.confirm(`En la gaveta de dólares debería haber ${usd2(Math.max(0, enGaveta))} y el egreso es de ${usd2(monto)}: el arqueo quedaría en negativo. ¿Registrarlo igual?`)) return;
+    }
     const txt = `${egForm.concepto} – ${usdEg ? `${usd2(monto)} (TC ${tc})` : `S/ ${M.sol2(monto)}`}`;
     setEgBusy(true);
     // C4: el egreso sale de la gaveta: solo con la caja de esa sede abierta. Queda en la sesión
@@ -6257,6 +6312,24 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   // filtrada por este doctor. Antes salía de otro campo y no cuadraba con Reseñas.
   const [resApi, setResApi] = useState(null);
   useEffect(() => { if (conectado) api.resenas.listar().then((r) => setResApi(Array.isArray(r) ? r : [])).catch(() => setResApi(null)); }, [conectado]);
+  // M4-13: «La producción cuenta cuando completas la evolución» (lo dice Inicio), pero
+  // GET /mi-produccion ya suma la cita atendida con la evolución pendiente. Hasta que el
+  // servidor aplique la misma regla (marca `soloConEvolucion`), aquí se descuentan las
+  // atenciones del mes con la evolución pendiente (su valor sale de GET /citas).
+  const [evoPendMp, setEvoPendMp] = useState(null);   // { items } | null
+  const [citasPendMp, setCitasPendMp] = useState([]);
+  useEffect(() => {
+    if (!conectado) return;
+    const sedesQ = sedes && !(sedeMp.sede === "all" && sedeMp.global) ? sedes.map(sedeApiUuid).filter(Boolean) : null;
+    const mesIni = `${fmt(hoy).slice(0, 7)}-01`;
+    api.evolucionesPendientes(sedesQ).then((r) => {
+      const items = (r && Array.isArray(r.items) ? r.items : []).filter((x) => x && x.citaId && String(x.fecha || "").slice(0, 10) >= mesIni);
+      setEvoPendMp({ items });
+      if (!items.length) { setCitasPendMp([]); return; }
+      const ids = new Set(items.map((x) => String(x.citaId)));
+      api.citas.listar(null, mesIni, fmt(hoy)).then((cs) => setCitasPendMp((cs || []).filter((c) => ids.has(String(c.id)) && c.estado === "atendida"))).catch(() => setCitasPendMp([]));
+    }).catch(() => setEvoPendMp(null));
+  }, [sedes && sedes.join(",")]); // eslint-disable-line
 
   // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1). Solo la demostración
   // usa MEDICOS; con sesión todo sale de GET /mi-produccion.
@@ -6272,17 +6345,27 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   const meta = real && real.esMedico ? (Number(real.meta) || null) : enSedes.meta;
 
   const R = real && real.esMedico ? real : null;
-  const prodHoy = R ? (Number(R.produccionHoy) || 0)
+  // M4-13: lo que aún espera su evolución (solo con sesión y si el servidor no lo descuenta ya).
+  const pendEvoMes = R && !R.soloConEvolucion && evoPendMp ? citasPendMp : [];
+  const valorCita = (c) => Number(c.valor ?? c.precio) || 0;
+  const restaMes = pendEvoMes.reduce((a, c) => a + valorCita(c), 0);
+  const restaHoy = pendEvoMes.filter((c) => String(c.fecha).slice(0, 10) === fmt(hoy)).reduce((a, c) => a + valorCita(c), 0);
+  const red2Mp = (n) => Math.round(n * 100) / 100;
+  const prodHoy = R ? Math.max(0, red2Mp((Number(R.produccionHoy) || 0) - restaHoy))
     // Producción = lo atendido; una consulta en curso todavía no se cuenta.
     : misCitas.filter((c) => c.fecha === fmt(hoy) && c.estado === "atendida").reduce((s, c) => s + precio(c), 0);
-  const mesProd = R ? (Number(R.produccionMes) || 0) : enSedes.prod;
+  const mesProdSrv = R ? (Number(R.produccionMes) || 0) : enSedes.prod;
+  const mesProd = R ? Math.max(0, red2Mp(mesProdSrv - restaMes)) : mesProdSrv;
   // REP-02: sin histórico en la demostración no se inventa el mes anterior.
   const mesAnterior = R ? (Number(R.produccionMesAnterior) || 0) : 0;
   // REP-01 / M-16: un solo % por doctor (su ficha) y comisión = producción × %.
   const pctComision = R ? (R.porcentajeComision != null ? Number(R.porcentajeComision) : null) : enSedes.pct;
-  const comision = R ? (Number(R.comisionMes) || 0) : enSedes.comision;
-  const atenciones = R ? (R.atenciones || 0) : enSedes.citas;
-  const ticket = R ? Math.round(Number(R.ticketPromedio) || 0) : (atenciones ? Math.round(mesProd / atenciones) : 0);
+  const comisionSrv = R ? (Number(R.comisionMes) || 0) : enSedes.comision;
+  const comision = R && restaMes > 0
+    ? (pctComision != null ? red2Mp((mesProd * pctComision) / 100) : (mesProdSrv ? red2Mp(comisionSrv * (mesProd / mesProdSrv)) : 0))
+    : comisionSrv;
+  const atenciones = R ? Math.max(0, (R.atenciones || 0) - pendEvoMes.length) : enSedes.citas;
+  const ticket = R ? (restaMes > 0 ? (atenciones ? Math.round(mesProd / atenciones) : 0) : Math.round(Number(R.ticketPromedio) || 0)) : (atenciones ? Math.round(mesProd / atenciones) : 0);
   // Comparar periodos equivalentes: el mes en curso contra el mismo tramo del anterior. Si el
   // servidor no manda ese tramo, se prorratea el mes anterior al día de hoy, y en los
   // primeros días (mes corto) no se muestra variación: el día 4 salía «−100 %».
@@ -6296,8 +6379,9 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   // DEV-12: sin relleno de tasa inventada; sin dato → null y la UI muestra guion.
   const noShow = R && R.ausentismo != null ? Number(R.ausentismo) : null;
   const pct = meta > 0 ? Math.min(100, Math.round((mesProd / meta) * 100)) : null;
+  const mesActualMp = fmt(hoy).slice(0, 7);
   const tend = R?.tendencia?.length
-    ? R.tendencia.map((t) => Math.round(Number(t.produccion) || 0))
+    ? R.tendencia.map((t, i) => Math.round(Math.max(0, (Number(t.produccion) || 0) - ((t.anioMes ? String(t.anioMes) === mesActualMp : i === R.tendencia.length - 1) ? restaMes : 0))))
     : [];
   // El nombre de cada mes viene con la serie. Estaba rotulado E-F-M-A-M-J fijo, así que
   // en agosto las seis barras decían ser de enero a junio.
@@ -6310,8 +6394,9 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   const citasHoyN = R ? (Number(R.citasHoy) || 0) : misCitas.filter((c) => c.fecha === fmt(hoy)).length;
   const promedio = tend.length ? Math.round(tend.reduce((a, b) => a + b, 0) / tend.length) : 0;
   const PALETA = ["var(--dc-purple)", DS.c.accent, DS.c.primary, "var(--dc-ok-700)", "var(--dc-ink-500)"];
+  const restaEsp = (nom) => pendEvoMes.filter((c) => String(c.especialidad || "").trim().toLowerCase() === String(nom || "").trim().toLowerCase()).reduce((a, c) => a + valorCita(c), 0);
   const porTrat = R?.porEspecialidad?.length
-    ? R.porEspecialidad.slice(0, 5).map((e, i) => ({ n: e.especialidad, v: Math.round(Number(e.produccion) || 0), c: PALETA[i] || "var(--dc-ink-500)" }))
+    ? R.porEspecialidad.map((e) => ({ n: e.especialidad, v: Math.round(Math.max(0, (Number(e.produccion) || 0) - restaEsp(e.especialidad))) })).filter((e) => e.v > 0 || !restaMes).slice(0, 5).map((e, i) => ({ ...e, c: PALETA[i] || "var(--dc-ink-500)" }))
     // REP-02: en la demostración el reparto sale de los servicios de SUS especialidades
     // (catálogo único), no de especialidades ajenas.
     : (() => { const pesos = [0.34, 0.26, 0.18, 0.12, 0.1]; const sv = leerCatalogo().filter((x) => x.activo !== false && espsDe(miMed).includes(x.esp)).slice(0, 5);
@@ -6355,8 +6440,9 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     // no de un 40% escrito a mano: el importe ya se calculaba con el suyo y la etiqueta
     // decía otra cosa.
     { l: pctComision != null ? `Mi comisión (${pctComision}%)` : "Mi comisión", v: `S/ ${comision.toLocaleString()}`, icon: Percent, color: RED, sub: conectado ? undefined : "Se paga el 5 del mes", desc: pctComision != null ? `El ${pctComision}% de tu producción (S/ ${mesProd.toLocaleString()}).${conectado ? "" : " Se liquida el día 5 del mes siguiente."}` : `Sobre una producción de S/ ${mesProd.toLocaleString()}.${conectado ? "" : " Se liquida el día 5 del mes siguiente."} Tu porcentaje lo fija administración.` },
-    { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString()}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: `${citasHoyN} citas hoy`, desc: `Lo facturado en tus atenciones de hoy (${citasHoyN} citas programadas).` },
-    { l: "Promedio por atención", v: `S/ ${ticket}`, icon: CreditCard, color: DS.c.primary, sub: `${atenciones} atenciones del mes`, desc: `Producción del mes dividida entre tus ${atenciones} atenciones. Subirlo con tratamientos de mayor valor mejora tu comisión.` },
+    // M4-12: «1 cita hoy», «1 atención del mes» (decía «1 citas», «1 atenciones»).
+    { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString()}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: restaHoy > 0 ? `S/ ${restaHoy.toLocaleString()} esperan su evolución` : `${pluralEs(citasHoyN, "cita", "citas")} hoy`, desc: `Lo facturado en tus atenciones de hoy (${pluralEs(citasHoyN, "cita programada", "citas programadas")}).${restaHoy > 0 ? ` No suma S/ ${restaHoy.toLocaleString()} de atenciones con la evolución pendiente: cuentan al completarla.` : ""}` },
+    { l: "Promedio por atención", v: `S/ ${ticket}`, icon: CreditCard, color: DS.c.primary, sub: `${pluralEs(atenciones, "atención", "atenciones")} del mes`, desc: `Producción del mes dividida entre ${atenciones === 1 ? "tu única atención" : `tus ${atenciones} atenciones`}. Subirlo con tratamientos de mayor valor mejora tu comisión.` },
     { l: "Tasa de ausentismo", v: noShow != null ? `${noShow}%` : "—", icon: TrendingDown, color: DS.c.primary, sub: "de tus citas", desc: `Porcentaje de citas canceladas o no asistidas sobre tu agenda. Los recordatorios automáticos ayudan a bajarlo.` },
     // La calificación real de este médico (backend: calificacion / resenas). Era un
     // "4.9 ★ – 120 reseñas" escrito a mano: un doctor sin una sola reseña lo veía igual.
@@ -6380,6 +6466,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     <div style={{ display: "grid", gap: 16 }}>
       <Card style={{ padding: 16, background: "linear-gradient(90deg,var(--dc-bg),#fff)", border: "1px solid var(--dc-info-soft)" }}>
         <div style={{ fontSize: 14, color: "var(--dc-info-ink)", display: "flex", alignItems: "center", gap: 9 }}><Shield size={17} strokeWidth={1.75} /> Reporte personal de {usuario.nombre}. Solo tú ves estos números — tus colegas no aparecen aquí.</div>
+        {restaMes > 0 && <div role="note" style={{ fontSize: 13, color: "var(--dc-warn-700)", display: "flex", alignItems: "center", gap: 9, marginTop: 8 }}><ClipboardList size={16} strokeWidth={1.75} /> S/ {restaMes.toLocaleString()} de {pluralEs(pendEvoMes.length, "atención", "atenciones")} con la evolución pendiente todavía no cuentan: suman a tu producción y comisión al completarla.</div>}
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 14 }}>
@@ -7344,7 +7431,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   // sedeRegistroId se guarda para limitar el selector y la lista a las sedes que se ven.
   // Las alergias vienen del servidor: el cruce de seguridad de la receta depende de ellas
   // (antes se perdían aquí y, con sesión, se cruzaba contra las fichas de ejemplo).
-  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", sedeRegistroId: p.sedeRegistroId || null, alergias: p.alergias, alergiasCargadas: p.alergias !== undefined && p.alergias !== null })))).catch(() => {}); }, []); // eslint-disable-line
+  useEffect(() => { if (conectado) api.pacientes.listar().then((r) => setPacRemoto((r || []).map((p) => ({ id: p.id, nombre: p.nombre, dni: p.dni || "", nacimiento: p.fechaNacimiento || "", sedeRegistroId: p.sedeRegistroId || null, alergias: p.alergias, alergiasCargadas: p.alergias !== undefined && p.alergias !== null })))).catch(() => {}); }, []); // eslint-disable-line
   // Médicos del servidor: nombre y COP para la firma de la receta, y quién prescribe.
   const [medRemoto, setMedRemoto] = useState([]);
   useEffect(() => { if (conectado) api.catalogo.medicos().then((r) => setMedRemoto(Array.isArray(r) ? r : [])).catch(() => {}); }, []); // eslint-disable-line
@@ -7365,7 +7452,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       if (!p) return;
       // H-08: los dos formatos de ítem (ficha y módulo) se leen con la misma función.
       const items = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) }));
-      out.push({ id: pid + "-" + i, paciente: p.nombre, dni: p.dni || "", fecha: r.fecha, items, indic: r.indicaciones || "", firmada: true, medico: r.medico || "", sede: r.sede });
+      out.push({ id: pid + "-" + i, pacienteId: p.id, paciente: p.nombre, dni: p.dni || "", fecha: r.fecha, items, itemsRaw: itemsDeReceta(r), indic: textoIndicaciones(r.indicaciones), firmada: true, medico: r.medico || "", sede: r.sede });
     }));
     return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   }, [fichas, pacProp]);
@@ -7373,23 +7460,22 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   // «Firmada» solo si el servidor lo dice (antes todas se marcaban firmadas por defecto).
   // H-08: la receta de la ficha ({ medicamento, presentacion, dosis… }) salía aquí solo con
   // «℞» porque se leía { med, detalle }. Se leen los dos formatos con la misma función.
-  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { const its = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) })); const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, indic: r.indicaciones || "", firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop: r.cop || med?.cop || "", items: its }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
+  const recargarRecetas = () => { if (conectado) api.recetas.listar().then((rows) => setRecetasRem((rows || []).map((r) => { const its = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) })); const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, indic: textoIndicaciones(r.indicaciones), firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop: r.cop || med?.cop || "", items: its, itemsRaw: itemsDeReceta(r) }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")))).catch(() => {}); };
   useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto, medRemoto]); // eslint-disable-line
   // GET /recetas trae las de toda la organización: se muestran solo las de pacientes visibles.
   const recetas = conectado ? recetasRem.filter((r) => pacientes.some((p) => String(p.id) === String(r.pacienteId))) : recetasDemo;
   // Receta para imprimir o guardar en PDF, con el membrete de la sede y la firma con COP.
   const imprimirReceta = (r) => {
-    const esc2 = (x) => String(x ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    // M4-14: la misma plantilla que la ficha del paciente (util/recetaDoc.js): fecha completa,
+    // edad y cada medicamento con su dosis, frecuencia y duración.
     // COP del médico que firma: con sesión, el de GET /medicos (nunca el de los médicos de ejemplo).
     const med = r.cop ? { cop: r.cop } : medicosRx.find((m) => (r.medicoId != null && String(m.id) === String(r.medicoId)) || m.nombre === r.medico);
-    const ok = abrirDocumento({
-      titulo: "Receta médica", tituloVentana: `Receta - ${r.paciente}`, sub: `Fecha: ${fechaLegible(r.fecha)}`,
+    const pac = pacientes.find((p) => (r.pacienteId != null && String(p.id) === String(r.pacienteId)) || p.nombre === r.paciente) || {};
+    const ok = imprimirRecetaDoc({
+      paciente: { nombre: r.paciente, dni: r.dni || pac.dni || "", fechaNacimiento: pac.nacimiento || pac.fechaNacimiento || "" },
+      receta: { fecha: r.fecha, items: r.itemsRaw ?? r.items.map((it) => ({ medicamento: it.med, detalle: it.detalle })), indicaciones: r.indic, medico: r.medico, medicoId: r.medicoId },
+      cop: med?.cop || "",
       datos: !conectado && r.sede != null ? datosDemo(numSede(r.sede)) : undefined,
-      css: `.rx-m{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:12px;margin:6px 0 14px}.rx-i{padding:8px 0;border-bottom:1px solid #E4DED5;font-size:13px}.rx-i small{display:block;color:#6b635a}.rx-f{margin-top:50px;text-align:center;font-size:12px}.rx-f div{display:inline-block;border-top:1px solid #1B1614;padding-top:6px;min-width:260px}`,
-      cuerpo: `<div class="rx-m"><span><b>Paciente:</b> ${esc2(r.paciente)}</span>${r.dni ? `<span><b>DNI:</b> ${esc2(r.dni)}</span>` : ""}</div><h3>Rp/</h3>`
-        + (r.items || []).map((it) => `<div class="rx-i"><b>${esc2(it.med)}</b>${it.detalle ? `<small>${esc2(it.detalle)}</small>` : ""}</div>`).join("")
-        + (r.indic ? `<h3>Indicaciones</h3><p>${esc2(r.indic)}</p>` : "")
-        + `<div class="rx-f"><div>${esc2(r.medico || "Firma y sello del profesional")}${conCop(med?.cop) ? ` · ${esc2(conCop(med.cop))}` : ""}</div></div>`,
     });
     if (!ok) notify("Permite ventanas emergentes para imprimir la receta.");
   };
@@ -7566,6 +7652,23 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
 
 /* ---- Consentimientos informados con firma (paridad con Doctocliq) ---- */
 const CONSENT_TIPOS = ["Consentimiento informado de tratamiento", "Endodoncia", "Exodoncia (extracción)", "Ortodoncia", "Cirugía / implante", "Uso de datos personales (Ley 29733)"];
+/* M4-11: el consentimiento se registra con su texto (procedimiento, beneficios, riesgos,
+   alternativas y declaración; compartido/consentimientoTexto.js). Al crearlo se puede precisar
+   la pieza o la zona y se ve el texto que el paciente leerá y firmará. */
+function CamposConsentimiento({ form, setForm, paciente = "" }) {
+  const texto = textoConsentimiento(form.tipo, { paciente, detalle: form.detalle });
+  return (
+    <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+      <label className="dc-campo-lbl">Pieza, zona o detalle (opcional)
+        <input className="dc-premium-inp" value={form.detalle || ""} maxLength={160} onChange={(e) => setForm({ ...form, detalle: e.target.value })} placeholder="Ej. pieza 26, tercer molar inferior derecho…" style={{ width: "100%", padding: "9px 11px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }} />
+      </label>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", marginBottom: 4 }}>Texto que leerá y firmará el paciente</div>
+        <div data-consentimiento-texto style={{ maxHeight: 170, overflowY: "auto", whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.55, color: "var(--dc-ink-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "10px 12px" }}>{texto}</div>
+      </div>
+    </div>
+  );
+}
 // Pad de firma digital (canvas) dentro de un modal centrado.
 function FirmaModal({ doc, onClose, onConfirm, esMenor = false, firmante, setFirmante }) {
   const cvs = useRef(null);
@@ -7606,6 +7709,8 @@ function FirmaModal({ doc, onClose, onConfirm, esMenor = false, firmante, setFir
           </div>
         </div>
       )}
+      {/* M4-11: lo que se firma se lee antes de firmar (el registrado o, si no tiene, el de su tipo). */}
+      <div data-consentimiento-texto style={{ maxHeight: 160, overflowY: "auto", whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.55, color: "var(--dc-ink-700)", background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "10px 12px", marginBottom: 12 }}>{doc.contenido || textoConsentimiento(doc.tipo, { paciente: doc.paciente })}</div>
       <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginBottom: 10 }}>{esMenor ? "El apoderado" : "El paciente"} dibuja su firma en el recuadro. Al confirmar queda archivada con fecha y hora registrada.</div>
       <canvas ref={cvs} width={460} height={180} style={{ width: "100%", height: 180, border: "1.5px dashed var(--dc-line)", borderRadius: "var(--dc-r-lg)", background: "var(--dc-bg)", touchAction: "none", cursor: "crosshair", display: "block" }} />
       <div style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 8, textAlign: "center" }}>{esMenor ? "Firma aquí el padre, la madre o el tutor" : "Firma aquí con el dedo o el mouse"}</div>
@@ -7663,13 +7768,13 @@ function Consentimientos({ pacientes: pacProp, notify }) {
       const pid = pacForm.id;
       // El servidor registra el consentimiento; todavía no envía el enlace de firma al
       // paciente, así que no se avisa «enviado»: queda por firmar en consultorio.
-      api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo })
+      api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo, contenido: textoConsentimiento(form.tipo, { paciente: pacForm.nombre, detalle: form.detalle }) })
         .then(() => { notify("Consentimiento registrado: queda por firmar en consultorio."); recargarDocs(); setForm(null); })
         .catch(() => notify("No se pudo registrar el consentimiento."));
       return;
     }
     const pac = pacForm;
-    setDocs((d) => [{ id: Date.now(), pacienteId: pac.id, paciente: pac.nombre, sede: sedeCx.activa ?? undefined, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...d]); notify("Consentimiento enviado al paciente para firma en línea."); setForm(null);
+    setDocs((d) => [{ id: Date.now(), pacienteId: pac.id, paciente: pac.nombre, sede: sedeCx.activa ?? undefined, tipo: form.tipo, contenido: textoConsentimiento(form.tipo, { paciente: pac.nombre, detalle: form.detalle }), fecha: fmt(hoy), estado: "pendiente" }, ...d]); notify("Consentimiento enviado al paciente para firma en línea."); setForm(null);
   };
   const confirmarFirma = (firmaImg) => {
     // Un menor no consiente por si mismo: sin quien firme, no se archiva.
@@ -7713,6 +7818,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={form.pacienteId || ""} placeholder="— Elige el paciente —" onChange={(v) => setForm({ ...form, pacienteId: v })} options={pacientes.map((p) => ({ value: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : undefined }))} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Tipo<br /><Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={CONSENT_TIPOS.map((t) => ({ value: t, label: t }))} /></label>
           </div>
+          <CamposConsentimiento form={form} setForm={setForm} paciente={pacForm?.nombre || ""} />
           {conectado ? (
             <div style={{ marginTop: 16, fontSize: 13, color: "var(--dc-ink-500)", lineHeight: 1.5 }}>El envío del enlace para firmar desde el celular estará disponible cuando el servidor lo soporte. Por ahora el paciente firma en consultorio con «Firmar».</div>
           ) : (
@@ -7741,11 +7847,12 @@ function Consentimientos({ pacientes: pacProp, notify }) {
                 titulo: d.tipo, tituloVentana: `${d.tipo} - ${d.paciente}`,
                 sub: `Consentimiento informado · ${d.estado}`,
                 css: `.cs-meta{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:12px;margin:6px 0 14px}
-                  .cs-box{border:1px solid #D9D3CA;border-radius:6px;padding:14px 16px;font-size:12px;line-height:1.7;white-space:pre-wrap}
+                  .cs-box{border:1px solid #D9D3CA;border-radius:6px;padding:14px 16px;font-size:12px;line-height:1.7;white-space:pre-wrap}.cs-nota{margin-top:10px;font-size:10.5px;color:#7d746a;font-style:italic}
                   .cs-firma{margin-top:26px;border-top:1px solid #D9D3CA;padding-top:12px}.cs-l{font-size:11px;color:#7d746a;margin-bottom:6px}
                   .cs-firma img{max-width:260px;border:1px solid #D9D3CA;border-radius:6px}.cs-rep{font-size:12px;margin-top:8px}`,
                 cuerpo: `<div class="cs-meta"><span><b>Paciente:</b> ${esc(d.paciente)}</span><span><b>Fecha:</b> ${esc(d.fecha)}</span><span><b>Estado:</b> ${esc(d.estado)}</span></div>`
-                  + `<div class="cs-box">${d.contenido ? esc(d.contenido) : "El paciente firmó y aceptó este consentimiento informado de forma electrónica."}</div>${firma}`,
+                  // M4-11: el texto registrado; si el consentimiento se creó sin él, el de la plantilla de su tipo (avisado).
+                  + `<div class="cs-box">${d.contenido ? esc(d.contenido) : `${esc(textoConsentimiento(d.tipo, { paciente: d.paciente }))}<div class="cs-nota">Texto de la plantilla de «${esc(d.tipo)}»: este consentimiento se registró sin texto propio.</div>`}</div>${firma}`,
               });
               if (!ok) notify("Permite ventanas emergentes para descargar el PDF.");
             };
@@ -9049,6 +9156,10 @@ function Resenas({ notify, citas = [], can }) {
   const puedeResponder = can ? can("resenas", "crear") : true;
   const conectadoR = !!auth.token;
   const [solicitando, setSolicitando] = useState(false);
+  // R-16: antes de mandar WhatsApp a pacientes reales se muestra a quiénes y con qué mensaje,
+  // y se elige a quién (antes era un confirm() del navegador con solo la cantidad).
+  const MSG_RESENA = "Hola {nombre} 😊 ¿Nos ayudas con una reseña de tu última atención? Cuéntanos cómo te fue y cómo podemos mejorar. ¡Gracias!";
+  const [pedirRes, setPedirRes] = useState(null);   // { destinatarios: [{ id, nombre, fecha }], sel: Set }
   const solicitarResenas = async () => {
     if (!conectadoR) { notify("Solicitud de reseña enviada por WhatsApp a pacientes recientes."); return; }
     const hoyISO = fmt(hoy);
@@ -9056,14 +9167,21 @@ function Resenas({ notify, citas = [], can }) {
     // Con sesión, los atendidos salen de GET /citas del último mes (no del estado local).
     let citasMes = [];
     try { citasMes = await api.citas.listar(null, desde, hoyISO); } catch (e) { notify("No se pudieron leer las citas del último mes."); return; }
-    const ids = [...new Set((citasMes || []).filter((c) => c.estado === "atendida" && String(c.fecha).slice(0, 10) >= desde && String(c.fecha).slice(0, 10) <= hoyISO && c.pacienteId && sedeRes.enSede(c.sedeId ?? c.sede)).map((c) => c.pacienteId))];
-    if (!ids.length) { notify("No hay pacientes atendidos en los últimos 30 días para solicitar reseña."); return; }
-    if (!confirm(`Se enviará una solicitud de reseña por WhatsApp a ${ids.length} paciente(s) atendidos recientemente. ¿Continuar?`)) return;
+    const porPac = new Map();
+    (citasMes || []).filter((c) => c.estado === "atendida" && String(c.fecha).slice(0, 10) >= desde && String(c.fecha).slice(0, 10) <= hoyISO && c.pacienteId && sedeRes.enSede(c.sedeId ?? c.sede))
+      .forEach((c) => { const f = String(c.fecha).slice(0, 10); const x = porPac.get(c.pacienteId); if (!x || f > x.fecha) porPac.set(c.pacienteId, { id: c.pacienteId, nombre: c.paciente || "Paciente", fecha: f }); });
+    const destinatarios = [...porPac.values()].sort((a, b) => b.fecha.localeCompare(a.fecha));
+    if (!destinatarios.length) { notify("No hay pacientes atendidos en los últimos 30 días para solicitar reseña."); return; }
+    setPedirRes({ destinatarios, sel: new Set(destinatarios.map((d) => d.id)) });
+  };
+  const enviarSolicitudResenas = async () => {
+    const ids = pedirRes ? pedirRes.destinatarios.filter((d) => pedirRes.sel.has(d.id)).map((d) => d.id) : [];
+    if (!ids.length) { notify("Elige al menos un paciente."); return; }
     setSolicitando(true);
     try {
-      const msg = "Hola {nombre} 😊 ¿Nos ayudas con una reseña de tu última atención? Cuéntanos cómo te fue y cómo podemos mejorar. ¡Gracias!";
-      const r = await api.pacientes.campana(ids, msg);
-      notify(`Solicitud de reseña enviada a ${r?.enviados ?? 0}/${r?.total ?? ids.length} paciente(s) por WhatsApp.`);
+      const r = await api.pacientes.campana(ids, MSG_RESENA);
+      notify(`Solicitud de reseña enviada a ${r?.enviados ?? 0}/${r?.total ?? ids.length} ${(r?.total ?? ids.length) === 1 ? "paciente" : "pacientes"} por WhatsApp.`);
+      setPedirRes(null);
     } catch (e) { notify("No se pudo enviar la solicitud."); }
     setSolicitando(false);
   };
@@ -9109,6 +9227,37 @@ function Resenas({ notify, citas = [], can }) {
         </div>
         {puedeResponder && <button type="button" className="dc-esp-hero__btn" onClick={solicitarResenas} disabled={solicitando}><Send size={14} strokeWidth={1.75} /> {solicitando ? "Enviando…" : "Solicitar reseñas"}</button>}
       </section>
+      {pedirRes && (() => {
+        const nSel = pedirRes.sel.size, todos = nSel === pedirRes.destinatarios.length;
+        const alternar = (id) => setPedirRes((x) => { const sel = new Set(x.sel); if (sel.has(id)) sel.delete(id); else sel.add(id); return { ...x, sel }; });
+        const primero = pedirRes.destinatarios.find((d) => pedirRes.sel.has(d.id)) || pedirRes.destinatarios[0];
+        return (
+          <Modal icon={<Send size={20} strokeWidth={1.75} />} titulo="Solicitar reseñas" sub="Pacientes atendidos en los últimos 30 días · por WhatsApp" onClose={() => !solicitando && setPedirRes(null)} maxW={540}
+            footer={<><Btn small kind="ghost" onClick={() => setPedirRes(null)} disabled={solicitando}>Cancelar</Btn><Btn small onClick={enviarSolicitudResenas} disabled={solicitando || !nSel}><Send size={14} strokeWidth={1.75} /> {solicitando ? "Enviando…" : `Enviar a ${nSel} ${nSel === 1 ? "paciente" : "pacientes"}`}</Btn></>}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", marginBottom: 4 }}>Así le llega a {primero?.nombre || "cada paciente"}</div>
+                <div data-resena-vista style={{ fontSize: 13, lineHeight: 1.5, color: "var(--dc-ink-700)", background: "var(--dc-ok-soft, #E9F7EF)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "10px 12px" }}>{MSG_RESENA.replace("{nombre}", String(primero?.nombre || "").split(" ")[0] || "")}</div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12.5, color: "var(--dc-ink-500)" }}>{nSel} de {pedirRes.destinatarios.length} elegidos</span>
+                <button type="button" className="dc-link" onClick={() => setPedirRes((x) => ({ ...x, sel: todos ? new Set() : new Set(x.destinatarios.map((d) => d.id)) }))}>{todos ? "Quitar todos" : "Elegir todos"}</button>
+              </div>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 260, overflowY: "auto", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
+                {pedirRes.destinatarios.map((d, i) => (
+                  <li key={d.id} style={{ borderTop: i ? "1px solid var(--dc-line)" : "none" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", cursor: "pointer", fontSize: 13 }}>
+                      <input type="checkbox" checked={pedirRes.sel.has(d.id)} onChange={() => alternar(d.id)} />
+                      <span style={{ flex: 1, minWidth: 0, color: NAVY, fontWeight: 500 }}>{d.nombre}</span>
+                      <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Atendido el {fechaLegible(d.fecha)}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Modal>
+        );
+      })()}
       <Card className="dc-env">
         <div className="dc-env__cab">
           <h3>Reseñas de pacientes</h3>
@@ -9407,7 +9556,7 @@ function useDocumentosApi(pacienteId) {
       const cs = c.status === "fulfilled" && Array.isArray(c.value) ? c.value : [];
       const fs = f.status === "fulfilled" && Array.isArray(f.value) ? f.value : [];
       setDocs([
-        ...cs.map((x) => ({ id: x.id, clase: "consentimiento", pacienteId: x.pacienteId, tipo: x.tipo || x.titulo || "Consentimiento", fecha: String(x.fechaFirma || x.creadoEn || "").slice(0, 10), estado: x.firmado ? "firmado" : "pendiente" })),
+        ...cs.map((x) => ({ id: x.id, clase: "consentimiento", pacienteId: x.pacienteId, tipo: x.tipo || x.titulo || "Consentimiento", contenido: x.contenido || null, fecha: String(x.fechaFirma || x.creadoEn || "").slice(0, 10), estado: x.firmado ? "firmado" : "pendiente" })),
         ...fs.map((e) => ({ id: e.id, clase: "formulario", pacienteId: e.pacienteId ?? null, paciente: e.paciente || "", tipo: e.tipo, fecha: String(e.enviadoEn || "").slice(0, 10), estado: e.estado === "completado" ? "completado" : "pendiente" })),
       ].filter((d) => pacienteId == null || String(d.pacienteId) === String(pacienteId)));
     });
@@ -9464,13 +9613,13 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
     if (conectado) {
       // Consentimiento: el servidor lo registra (sin enlace de firma todavía). Formulario: se envía por WhatsApp.
       const req = form.clase === "consentimiento"
-        ? api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo })
+        ? api.consentimientos.crear({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, titulo: form.tipo, contenido: textoConsentimiento(form.tipo, { paciente: pacDe(pid)?.nombre || "", detalle: form.detalle }) })
         : api.formularios.enviar({ pacienteId: pid, sedeId: sedeApiUuid(sedeCx.activa), tipo: form.tipo, canal: "whatsapp" });
       req.then(() => { notify(form.clase === "consentimiento" ? "Consentimiento registrado: queda por firmar en consultorio." : "Formulario enviado al paciente por WhatsApp."); setForm(null); recargarApi(); })
         .catch(() => notify(form.clase === "consentimiento" ? "No se pudo registrar el consentimiento." : "No se pudo enviar el formulario."));
       return;
     }
-    setDocs((xs) => [{ id: `${form.clase[0]}${Date.now()}`, clase: form.clase, pacienteId: pid, sede: sedeCx.activa ?? undefined, tipo: form.tipo, fecha: fmt(hoy), estado: "pendiente" }, ...xs]);
+    setDocs((xs) => [{ id: `${form.clase[0]}${Date.now()}`, clase: form.clase, pacienteId: pid, sede: sedeCx.activa ?? undefined, tipo: form.tipo, ...(form.clase === "consentimiento" ? { contenido: textoConsentimiento(form.tipo, { paciente: pacDe(pid)?.nombre || "", detalle: form.detalle }) } : {}), fecha: fmt(hoy), estado: "pendiente" }, ...xs]);
     notify(form.clase === "consentimiento" ? "Consentimiento enviado al paciente para firma en línea." : "Formulario enviado al paciente."); setForm(null);
   };
   const nPend = docs.filter((d) => !hecho(d)).length;
@@ -9503,6 +9652,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
             <label className="dc-campo-lbl">Clase<Select value={form.clase} onChange={(v) => setForm({ ...form, clase: v, tipo: v === "consentimiento" ? CONSENT_TIPOS[0] : FORM_TIPOS[0] })} options={[{ value: "consentimiento", label: "Consentimiento" }, { value: "formulario", label: "Formulario" }]} /></label>
             <label className="dc-campo-lbl">Documento<Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={(form.clase === "consentimiento" ? CONSENT_TIPOS : FORM_TIPOS).map((t) => ({ value: t, label: t }))} /></label>
           </div>
+          {form.clase === "consentimiento" && <CamposConsentimiento form={form} setForm={setForm} paciente={pacDe(pacienteFijo ?? form.pacienteId)?.nombre || ""} />}
         </Modal>
       )}
       {firmaDoc && <FirmaModal doc={{ ...firmaDoc, paciente: pacDe(firmaDoc.pacienteId)?.nombre || "" }} onClose={() => setFirmaDoc(null)} onConfirm={confirmarFirma} esMenor={esMenorDoc} firmante={firmante} setFirmante={setFirmante} />}

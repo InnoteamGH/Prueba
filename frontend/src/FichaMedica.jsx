@@ -18,10 +18,12 @@ import {
 import { ChipAlergia } from "./ui";
 import { fichaDeSede, sedeEnLista } from "./compartido/cajaSede";
 import { puedeEscribirClinico as puedeEscribirClinicoDe } from "./util/clinicoWrite";
+import { tienePermiso } from "./compartido/permisos";
 import { formatearFDI } from "./util/formatearFDI";
 import { conCop } from "./util/cop";
 import { ymdLima, resumenDispositivo } from "./util/fechaLima";
-import { itemsDeReceta, nombreItemReceta, indicacionItemReceta } from "./compartido/recetaItems";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, textoIndicaciones } from "./compartido/recetaItems";
+import { imprimirReceta } from "./util/recetaDoc";
 import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
 import { medicoEn } from "./compartido/catalogoApi";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
@@ -681,15 +683,12 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medi
     emitirReceta(validos, alertas);
   };
   const printReceta = (r) => {
-    // H-08: lee el esquema de la ficha y el antiguo del módulo Recetas ({ med, detalle }).
-    const its = itemsDeReceta(r);
-    const filas = its.map((x) => `<div class="rx-item"><b>${esc(x.medicamento)}</b>${x.presentacion ? " — " + esc(x.presentacion) : ""}<div class="muted">${esc([x.dosis && ("Dosis: " + x.dosis), x.frecuencia && ("Frecuencia: " + x.frecuencia), x.duracion && ("Duración: " + x.duracion), x.detalle].filter(Boolean).join("  –  "))}</div></div>`).join("");
-    const edad = edadDe(paciente?.fechaNacimiento);
-    imprimir("Receta médica", `
-      <div class="row"><div><b>Paciente:</b> ${esc(paciente?.nombre || "")}</div>${paciente?.dni ? `<div><b>DNI:</b> ${esc(paciente.dni)}</div>` : ""}${paciente?.fechaNacimiento && edad != null ? `<div><b>Edad:</b> ${edad} años</div>` : ""}<div><b>Fecha:</b> ${esc(r.fecha ? String(r.fecha).slice(0, 10).split("-").reverse().join("/") : "")}</div></div>
-      <h2>Rp/</h2>${filas || '<div class="muted">—</div>'}
-      ${r.indicaciones ? `<h2>Indicaciones</h2><div class="box">${esc(r.indicaciones)}</div>` : ""}
-      <div class="firma"><div>${esc(r.medico && r.medico !== "—" ? r.medico : "Firma y sello del profesional")}${(() => { const m = r.cop ? { cop: r.cop } : medicosRx.find((x) => (r.medicoId != null && String(x.id) === String(r.medicoId)) || x.nombre === r.medico); return m?.cop ? ` · ${esc(conCop(m.cop))}` : ""; })()}</div></div>`, notify);
+    // M4-14: la misma plantilla que el módulo Recetas (util/recetaDoc.js). H-08: lee el
+    // esquema de la ficha y el antiguo del módulo ({ med, detalle }).
+    const m = r.cop ? { cop: r.cop } : medicosRx.find((x) => (r.medicoId != null && String(x.id) === String(r.medicoId)) || x.nombre === r.medico);
+    // El nombre del médico que firma: el de la receta o, si no lo trae, el de su ficha (como el módulo).
+    const ok = imprimirReceta({ paciente: { nombre: paciente?.nombre || "", dni: paciente?.dni || "", fechaNacimiento: paciente?.fechaNacimiento || "" }, receta: { ...r, medico: r.medico && r.medico !== "—" ? r.medico : (m?.nombre || "") }, cop: m?.cop || "" });
+    if (!ok) notify && notify("Permite las ventanas emergentes para imprimir.");
   };
   const card = { border: `1px solid ${SOFT}`, borderRadius: "var(--dc-r-lg)", background: "var(--dc-white)", padding: 18, boxShadow: SHADOW };
   return (
@@ -1130,9 +1129,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         apoderadoNombre: rp.apoderadoNombre || "", apoderadoParentesco: rp.apoderadoParentesco || "", apoderadoDni: rp.apoderadoDni || "", apoderadoTelefono: rp.apoderadoTelefono || "" });
       setFc(parseJson(rp.fichaClinica, {}) || {});
     };
+    // Indicaciones de receta guardadas con escapes JSON («\u2194»): se muestran decodificadas.
+    const conRx = (x) => (x && Array.isArray(x.recetas) ? { ...x, recetas: x.recetas.map((rx) => (rx && rx.indicaciones ? { ...rx, indicaciones: textoIndicaciones(rx.indicaciones) } : rx)) } : x);
     api.pacientes.ficha360(pid).then((r) => {
       if (!vigente()) return;
-      setD(r);
+      setD(conRx(r));
       aplicarPaciente(r?.paciente || {});
       setCargandoFicha(false);
     }).catch((err) => {
@@ -1162,7 +1163,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             paciente: rp,
             historia: [...hist.v].sort(desc),
             // GET /recetas puede devolver las de toda la clínica: solo las de este paciente.
-            recetas: recs.v.filter((x) => x && (x.pacienteId == null || String(x.pacienteId) === String(pid))).sort(desc),
+            recetas: conRx({ recetas: recs.v.filter((x) => x && (x.pacienteId == null || String(x.pacienteId) === String(pid))).sort(desc) }).recetas,
             citas: [], tratamientos: [], pagos: [], odontograma: [],
             parcial: {
               motivo: msgServidor(err, "error del servidor"),
@@ -1188,9 +1189,15 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     // H-G7: sin permiso de radiografías/consentimientos no se piden (daban 403 en consola a gerencia).
     if (conectado && pacienteId && puedeArchivos) api.radiografias.porPaciente(pacienteId).then((r) => setRx(r || [])).catch(() => { });
     // Tomas del odontograma para el PDF de la historia clínica (las tres fases).
+    // R-13: solo si el rol ve el odontograma (recepción no: eran tres 403 por ficha), y si la
+    // primera toma se rechaza (403 u otro error) no se piden las otras dos.
     setOdoHC(null);
-    if (conectado && pacienteId) Promise.all(["inicial", "evolucion", "alta"].map((f) => api.odontograma.porPaciente(pacienteId, f).catch(() => null)))
-      .then(([inicial, evolucion, alta]) => { if (inicial || evolucion || alta) setOdoHC({ inicial: inicial || [], evolucion: evolucion || [], alta: alta || [] }); });
+    if (conectado && pacienteId && puedeOdontograma && tienePermiso("odontograma", "ver")) {
+      const pid = pacienteId;
+      api.odontograma.porPaciente(pid, "inicial").then((inicial) => Promise.all(["evolucion", "alta"].map((f) => api.odontograma.porPaciente(pid, f).catch(() => null)))
+        .then(([evolucion, alta]) => { if (String(pidCargado.current) === String(pid) && (inicial || evolucion || alta)) setOdoHC({ inicial: inicial || [], evolucion: evolucion || [], alta: alta || [] }); }))
+        .catch(() => { /* sin acceso o sin servidor: el PDF usa lo que trae la ficha */ });
+    }
     if (conectado) api.clinica.get().then(setClinica).catch(() => { });
     if (conectado) api.catalogo.medicos().then((ms) => {
       setMedicos(ms || []);
@@ -2532,7 +2539,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               </div>
             )}
 
-            {tab === "cuenta" && slots?.plan && slots.plan(pacienteId)}
+            {/* R-10: el plan recibe el resumen de la ficha (lo pagado), para decir lo mismo que la cabecera. */}
+            {tab === "cuenta" && slots?.plan && slots.plan(pacienteId, { resumen: d?.resumen || null })}
             {tab === "cuenta" && !slots?.plan && (
               <>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: -4 }}>

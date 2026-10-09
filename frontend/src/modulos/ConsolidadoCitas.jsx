@@ -169,7 +169,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
                     <Card key={g} className="dc-cons__grupo">
                       <header>
                         {vista === "doctor" ? <PersonaCelda nombre={g} size={32} /> : <div className="dc-cons__fecha"><b>{fechaLegible(g)}</b>{g === fmt(hoy) && <span>Hoy</span>}</div>}
-                        <span className="dc-cons__gtot"><TrendingUp size={13} strokeWidth={2} /> {items.length} {items.length === 1 ? "cita" : "citas"} · {at} atendidas</span>
+                        <span className="dc-cons__gtot"><TrendingUp size={13} strokeWidth={2} /> {items.length} {items.length === 1 ? "cita" : "citas"} · {at} {at === 1 ? "atendida" : "atendidas"}</span>
                       </header>
                       <ul>
                         {items.map((c) => (

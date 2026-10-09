@@ -45,6 +45,10 @@ export const nombreItemReceta = (it) => [it?.medicamento, it?.presentacion].map(
 /** «1 tableta – c/8 h – 3 días»: cómo tomarlo. */
 export const indicacionItemReceta = (it) => [it?.dosis, it?.frecuencia, it?.duracion, it?.detalle].map(txt).filter(Boolean).join(" – ");
 
+/** Indicaciones para mostrar. Algunas guardadas por el servidor traen la alerta de alergia
+    como JSON escapado («Ibuprofeno ↔ alergia…» con la barra literal): se decodifica. */
+export const textoIndicaciones = (t) => txt(t).replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+
 /** Formulario del módulo Recetas ({ med, dosis, frec, dur }) → esquema único para guardar. */
 export const itemRecetaDesdeFormulario = (x) => ({
   medicamento: txt(x?.med),
