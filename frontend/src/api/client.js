@@ -10,6 +10,7 @@
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").replace(/\/$/, "");
 const TOKEN_KEY = "dc_token";
 import { limpiarRegistroSedes } from "../compartido/sedesRegistro";
+import { estadoFaseUi } from "../compartido/estados";
 const CLINICAL_KEYS = ["dc_data_v1_pacientes", "dc_data_v1_fichas", "dc_data_v1_citas"];
 /** NEW-59 / ODO-01: forma UUID 8-4-4-4-12 (incluye seeds nil v0). Rechaza demo `"1"` / `1`. */
 const UUID_PACIENTE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -402,7 +403,11 @@ export const api = {
   tratamientos: {
     porPaciente: (pacienteId) => {
       if (!esPacienteIdApi(pacienteId)) return Promise.resolve([]);
-      return request("GET", `/tratamientos?pacienteId=${pacienteId}`);
+      // M4-01: el servidor devuelve la fase anulada como «cancelada»; todas las pantallas
+      // (plan, odontograma, perio, presupuesto) la leen como «anulado» y deja de sumar.
+      return request("GET", `/tratamientos?pacienteId=${pacienteId}`).then((planes) => (Array.isArray(planes)
+        ? planes.map((p) => (p && Array.isArray(p.fases) ? { ...p, fases: p.fases.map((f) => (f ? { ...f, estado: estadoFaseUi(f.estado) } : f)) } : p))
+        : planes));
     },
     crearPlan: (p) => request("POST", "/tratamientos", p),
     agregarFase: (planId, f) => request("POST", `/tratamientos/${planId}/fases`, f),

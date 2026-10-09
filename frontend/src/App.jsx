@@ -24,7 +24,7 @@ import { useReglasAgenda, sillonesPorSede } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat } from "./compartido/integraciones";
-import { estadoCita, estadoInfo, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
+import { estadoCita, estadoInfo, estadoFaseUi, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
 import { fichaDeSede, nombreSedeEn, precioEnSede, sedeDeEgreso, sedeDeRegistro, sedeEnLista, sedePrincipal, uuidSede } from "./compartido/cajaSede";
@@ -3821,7 +3821,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     api.tratamientos.porPaciente(pid).then((planes) => {
       if (pidTrat.current !== pid) return;
       const ps = planes || []; setPlanId(ps[0]?.plan?.id || null);
-      const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: f.estado, planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null })));
+      const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: estadoFaseUi(f.estado), planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null })));
       setFasesRem(fs); setTratSinPermiso(false); setTratError(null); setTratCargado(true); setTratLeyendo(false);
     }).catch((e) => {
       if (pidTrat.current !== pid) return;
@@ -4824,7 +4824,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const items = (x.terminadosItems || []);
     if (x.porCobrar > 0 && items.length) {
       if (!cajaAbierta) { intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.porCobrar }); return; }
-      setPago({ pid: x.p.id, nombre: x.p.nombre, monto: x.porCobrar, faseIds: items.map((f) => f.id), items: items.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) });
+      setPago({ pid: x.p.id, nombre: x.p.nombre, monto: x.porCobrar, faseIds: items.map((f) => f.faseId ?? f.id), items: items.map((f) => ({ cant: 1, desc: f.nombre, precio: f.costo, importe: Math.round((f.costo / 1.18) * 100) / 100 })) });
       return;
     }
     intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo });
@@ -4983,16 +4983,30 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // Con sesión el servidor ya recibe la sede; por si aún no filtra, las filas que traen
   // sedeId se recortan aquí y los totales se recalculan con las filas que quedan.
   const porCobrarSrv = caja.porCobrar || [];
-  const porCobrar = conectado
+  const porCobrar0 = conectado
     ? porCobrarSrv.filter((r) => deCaja(r.sedeId)).map((r) => ({ p: { id: r.pacienteId, nombre: r.paciente, dni: "", sedes: "", sedeNombre: r.sede || "" }, total: Number(r.total) || 0, pagado: Number(r.pagado) || 0, saldo: Number(r.saldo) || 0, pend: r.pend || 0 }))
     : pacientes.map((p) => ({ p, ...saldoDe(p.id) })).filter((x) => x.saldo > 0 || x.porCobrar > 0).sort((a, b) => (b.porCobrar - a.porCobrar) || (b.saldo - a.saldo));
-  const porCobrarHoy = conectado ? porCobrar.filter((x) => pacsHoy.has(x.p.id)) : [];
   // Tratamientos que el doctor marcó como terminados: el cobro se genera solo.
   // Conectado: caja.terminados = [{ pacienteId, paciente, faseId, nombre, costo, medico, terminadaEn }].
   const terminados = conectado
-    ? (caja.terminados || []).filter((t) => deCaja(t.sedeId)).map((t) => ({ pid: t.pacienteId, paciente: t.paciente, faseId: t.faseId, nombre: t.nombre, costo: Number(t.costo) || 0, medico: t.medico || "", terminadaEn: t.terminadaEn || null }))
+    ? (caja.terminados || []).filter((t) => deCaja(t.sedeId)).map((t) => ({ pid: t.pacienteId, paciente: t.paciente, faseId: t.faseId, nombre: t.nombre, costo: Number(t.costo) || 0, medico: t.medico || "", terminadaEn: t.terminadaEn || null, sede: t.sede || "" }))
     : pacientes.flatMap((p) => (fichaVis(p.id)?.tratamiento || []).filter((f) => f.estado === "terminada").map((f) => ({ pid: p.id, paciente: p.nombre, faseId: f.id, nombre: f.nombre, costo: Number(f.costo) || 0, medico: f.medico || "", terminadaEn: f.terminadaEn || null })));
   const terminadosPorPac = terminados.reduce((m, t) => { const x = m.get(t.pid) || { pid: t.pid, paciente: t.paciente, fases: [], total: 0 }; x.fases.push(t); x.total += t.costo; m.set(t.pid, x); return m; }, new Map());
+  // M4-03: con sesión, /caja trae los procedimientos terminados aparte (caja.terminados) y la
+  // fila de «Por cobrar» no traía «porCobrar»: la pantalla decía «Listos para cobrar (0)» y
+  // «Por cobrar ahora —» aunque el doctor ya hubiera terminado. Se suman aquí por paciente.
+  const porCobrar = conectado
+    ? (() => {
+      const m = new Map(porCobrar0.map((x) => [String(x.p.id), { ...x, porCobrar: 0, terminadosItems: [] }]));
+      terminadosPorPac.forEach((tp) => {
+        const k = String(tp.pid);
+        const x = m.get(k) || { p: { id: tp.pid, nombre: tp.paciente, dni: "", sedes: "", sedeNombre: tp.fases[0]?.sede || "" }, total: tp.total, pagado: 0, saldo: tp.total, pend: tp.fases.length };
+        m.set(k, { ...x, porCobrar: x.saldo > 0 ? Math.min(tp.total, x.saldo) : tp.total, terminadosItems: tp.fases });
+      });
+      return [...m.values()].sort((a, b) => (b.porCobrar - a.porCobrar) || (b.saldo - a.saldo));
+    })()
+    : porCobrar0;
+  const porCobrarHoy = conectado ? porCobrar.filter((x) => pacsHoy.has(x.p.id)) : [];
   const boletasSrv = caja.boletasHoy || [];
   const boletasHoy = conectado
     ? boletasSrv.filter((b) => deCaja(b.sedeId)).map((b) => ({ id: b.id, sedeId: b.sedeId || null, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null,

@@ -130,3 +130,15 @@ export function labAtrasado(caso, hoyISO) {
   if (!(caso.estado === "enviado" || caso.estado === "en_proceso")) return false;
   return String(caso.entrega) < String(hoyISO);
 }
+
+/** Estado de un procedimiento del servidor → el del frontend. El backend guarda la anulación
+    como «cancelada» (también puede llegar «cancelado» o «anulada»); la pantalla solo conocía
+    «anulado», así que un procedimiento anulado seguía sumando al total, al saldo y al PDF y
+    seguía ofreciendo «Terminar» (M4-01). «terminado» se lee como «terminada». */
+export function estadoFaseUi(e) {
+  const s = String(e || "").toLowerCase();
+  if (s === "cancelada" || s === "cancelado" || s === "anulada" || s === "anulado") return "anulado";
+  if (s === "terminado") return "terminada";
+  if (s === "atendido") return "atendida";
+  return e;
+}
