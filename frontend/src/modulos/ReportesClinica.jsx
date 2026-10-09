@@ -79,9 +79,9 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     if (rep === "procedimientos") {
       api.tratamientos.resumen(r.desde, r.hasta, { sedeIds: sedesApi }).then((t) => ok({ trat: lista(t) })).catch(fallo);
     } else if (rep === "saldo") {
-      // «Hecho sin pagar» por paciente: el mismo saldo de trabajo terminado que usan Caja y
-      // Pendientes de hoy (GET /caja → porCobrar), mientras el resumen financiero no lo traiga.
-      Promise.all([api.pacientes.listar(), api.pacientes.resumenFinanciero(sedesApi), api.caja({ sedeIds: sedesApi }).catch(() => null)]).then(([p, f, c]) => ok({ pac: lista(p), fin: lista(f), caja: c ? lista(c.porCobrar) : null })).catch(fallo);
+      // «Hecho sin pagar» por paciente: los procedimientos terminados sin cobrar de GET /caja
+      // (terminados), los mismos que Caja muestra como «Listo para cobrar» (R4-14).
+      Promise.all([api.pacientes.listar(), api.pacientes.resumenFinanciero(sedesApi), api.caja({ sedeIds: sedesApi }).catch(() => null)]).then(([p, f, c]) => ok({ pac: lista(p), fin: lista(f), caja: c && typeof c === "object" ? c : null })).catch(fallo);
     } else if (rep === "recuperar") {
       Promise.all([api.pacientes.listar(), api.pacientes.resumenCitas()]).then(([p, c]) => ok({ pac: lista(p), res: lista(c) })).catch(fallo);
     } else if (rep === "pacientes") {
@@ -105,19 +105,23 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     }
     const nombreDe = (id) => (dSrv.pac || []).find((p) => String(p.id) === String(id))?.nombre || "Paciente";
     if (rep === "saldo") {
-      // GET /pacientes/resumen-financiero da plan total y pagado por paciente; lo hecho sin
-      // pagar y lo vencido necesitan el detalle por ítem, que el servidor aún no resume.
-      const cajaPc = new Map();
-      (dSrv.caja || []).filter((r) => deSedeApi(r.sedeId) || r.sedeId == null).forEach((r) => { const k = String(r.pacienteId); cajaPc.set(k, (cajaPc.get(k) || 0) + (Number(r.saldo) || 0)); });
-      const conCaja = Array.isArray(dSrv.caja);
-      const filas = dSrv.fin.map((x) => ({ id: x.pacienteId, paciente: x.paciente || nombreDe(x.pacienteId), saldoPlan: Math.max(0, Math.round(((Number(x.total) || 0) - (Number(x.pagado) || 0)) * 100) / 100),
-        porCobrar: x.porCobrar != null ? Number(x.porCobrar) || 0 : (conCaja ? Math.round((cajaPc.get(String(x.pacienteId)) || 0) * 100) / 100 : null),
-        vencido: x.vencido != null ? Number(x.vencido) || 0 : null, dias: x.diasSinPagar != null ? Number(x.diasSinPagar) || 0 : null }))
-        .filter((f) => f.saldoPlan > 0 || f.porCobrar > 0).sort((a, b) => b.saldoPlan - a.saldoPlan);
+      // GET /pacientes/resumen-financiero da plan total y pagado por paciente. R4-14: «Hecho
+      // sin pagar» era el saldo entero del plan (con las fases aún pendientes); ahora sale de
+      // los procedimientos terminados sin cobrar de GET /caja, y de sus fechas el vencido y los
+      // días (M.deudaDeCaja). Si el servidor ya lo resume por paciente, manda su dato.
+      const deuda = M.deudaDeCaja(dSrv.caja, { hoy, incluir: (sid) => sid == null || deSedeApi(sid) });
+      const de = (id) => (deuda ? deuda.porPaciente.get(String(id)) : null);
+      const ids = new Set(dSrv.fin.map((x) => String(x.pacienteId)));
+      const fin = [...dSrv.fin, ...(deuda ? deuda.filas.filter((f) => !ids.has(String(f.pacienteId))).map((f) => ({ pacienteId: f.pacienteId, paciente: f.paciente, total: 0, pagado: 0 })) : [])];
+      const filas = fin.map((x) => ({ id: x.pacienteId, paciente: x.paciente || nombreDe(x.pacienteId), saldoPlan: Math.max(0, Math.round(((Number(x.total) || 0) - (Number(x.pagado) || 0)) * 100) / 100),
+        porCobrar: x.porCobrar != null ? Number(x.porCobrar) || 0 : (deuda ? de(x.pacienteId)?.hecho || 0 : null),
+        vencido: x.vencido != null ? Number(x.vencido) || 0 : (deuda ? de(x.pacienteId)?.vencido || 0 : null),
+        dias: x.diasSinPagar != null ? Number(x.diasSinPagar) || 0 : (deuda ? de(x.pacienteId)?.dias ?? null : null) }))
+        .filter((f) => f.saldoPlan > 0 || f.porCobrar > 0).sort((a, b) => (b.porCobrar || 0) - (a.porCobrar || 0) || b.saldoPlan - a.saldoPlan);
       const sum = (k) => filas.reduce((a, f) => a + (Number(f[k]) || 0), 0);
       const conDetalle = filas.some((f) => f.porCobrar != null);
       const conVencido = filas.some((f) => f.vencido != null);
-      return { filas, kpis: [["Pacientes", String(filas.length)], ["Hecho sin pagar", conDetalle ? soles2(sum("porCobrar")) : "—"], ["Vencido (+30 días)", conVencido ? soles2(sum("vencido")) : "—"], ["Saldo de planes", soles2(sum("saldoPlan"))]], cifra: soles2(conDetalle ? sum("porCobrar") : sum("saldoPlan")), etiqueta: conDetalle ? "por cobrar de trabajo ya hecho" : "de saldo en planes de tratamiento", sinDetalle: !conVencido && filas.length > 0, sinPorCobrar: !conDetalle };
+      return { filas, kpis: [["Pacientes", String(filas.length)], ["Hecho sin pagar", conDetalle ? soles2(sum("porCobrar")) : "—"], ["Vencido (+30 días)", conVencido ? soles2(sum("vencido")) : "—"], ["Saldo de planes", soles2(sum("saldoPlan"))]], cifra: soles2(conDetalle ? sum("porCobrar") : sum("saldoPlan")), etiqueta: conDetalle ? "por cobrar de trabajo ya hecho" : "de saldo en planes de tratamiento", sinDetalle: !conVencido && filas.length > 0, sinPorCobrar: !conDetalle, conDetalle: conDetalle && filas.length > 0 };
     }
     if (rep === "recuperar") {
       const res = new Map(dSrv.res.map((x) => [String(x.pacienteId), x]));
@@ -167,8 +171,12 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
   // Aviso honesto de lo que el servidor todavía no informa.
   const avisoSrv = !datosSrv ? null
     : datosSrv.error ? "No se pudieron obtener los datos del servidor para este reporte."
+    // H-05: /tratamientos/resumen devuelve lo mismo con cualquier sede (el administrador de
+    // sede veía 14 filas de toda la clínica sin saberlo).
+    : rep === "procedimientos" && sedesApi ? "Cifras de toda la clínica: el servidor aún no filtra los procedimientos por sede."
     : datosSrv.sinDetalle ? (datosSrv.sinPorCobrar ? "El servidor informa el saldo de cada plan; «hecho sin pagar», «vencido» y «días sin pagar» estarán cuando lo resuma por ítem." : "«Vencido» y «días sin pagar» estarán cuando el servidor resuma la deuda por ítem; por eso esas columnas no se muestran.")
     : datosSrv.sinPrimera ? "Para separar pacientes nuevos de recurrentes el servidor debe informar la primera visita de cada paciente."
+    : datosSrv.conDetalle ? "«Hecho sin pagar» son los procedimientos terminados que aún no se cobran (en Caja, «Listo para cobrar»); «vencido», la parte terminada hace más de 30 días. El saldo del plan incluye además lo que falta hacer."
     : null;
 
   const datosDemo = useMemo(() => {

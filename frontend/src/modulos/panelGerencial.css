@@ -623,3 +623,6 @@
 .dc-pg .dc-hoy__tv{grid-column:2;grid-row:1 / span 2;font:800 20px/1 var(--dc-font-title);color:var(--dc-navy);font-variant-numeric:tabular-nums}
 /* Tops más compactos */
 .dc-rm__rank li{padding:7px 10px;row-gap:5px}
+/* R4-01: rótulo de los bloques que el servidor aún no filtra por sede (cifras de toda la clínica). */
+.dc-rm__toda,.dc-pg__toda{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#FFF6E3;box-shadow:inset 0 0 0 1px #F6DFA6;color:#946009;font-size:11px;line-height:16px;font-weight:600;font-style:normal;white-space:nowrap;vertical-align:middle}
+.dc-pg__aviso-sede{margin-bottom:var(--dc-sp-4,16px)}

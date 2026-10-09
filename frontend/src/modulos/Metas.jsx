@@ -29,11 +29,11 @@ function Monto({ value, onChange, disabled, label }) {
 }
 
 /* % de comisión con − y + (de 1 en 1) y escribible. */
-function Porcentaje({ value, onChange, disabled, label }) {
+function Porcentaje({ value, onChange, disabled, label, title }) {
   const n = value === "" || value == null ? null : Number(value);
   const paso = (d) => onChange(String(Math.max(0, Math.min(100, (n ?? 0) + d))));
   return (
-    <span className={`dc-mtz__pct${disabled ? " is-off" : ""}`}>
+    <span className={`dc-mtz__pct${disabled ? " is-off" : ""}`} title={title}>
       <button type="button" disabled={disabled || n === 0} onClick={() => paso(-1)} aria-label={`Bajar ${label}`}><Minus size={13} strokeWidth={2.4} /></button>
       <label><input type="text" inputMode="numeric" disabled={disabled} aria-label={label} placeholder="—" value={value ?? ""}
         onChange={(e) => { const v = e.target.value.replace(/[^\d]/g, "").slice(0, 3); onChange(v === "" ? "" : String(Math.min(100, Number(v)))); }} /><em>%</em></label>
@@ -49,6 +49,12 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
   // Con sesión SEDE_IDS son las sedes reales (registro), así que también vale el recuento.
   const esGlobal = sedeSel === "all" && (usuarioGlobal || !mias || mias.length >= SEDE_IDS.length);
   const puedeEditar = can ? can("metas", "editar") : true;
+  // R4-02: el % de una meta de toda la clínica (doctor sin sede) se guarda con PUT
+  // /medicos/{id}, que el servidor autoriza con el permiso de Configuración, no con el de
+  // metas. Gerencia tiene metas pero no config: la meta se guardaba y la comisión daba 403
+  // (guardado a medias). Sin ese permiso el % se ve, pero en solo lectura.
+  const puedeComGlobal = puedeEditar && (can ? can("config", "editar") : true);
+  const puedeCom = (s) => (s === "todas" ? puedeComGlobal : puedeEditar);
   const verSedes = useMemo(() => (sedes && sedes.length ? sedes.map(String) : null), [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [meds, setMeds] = useState([]);
   const [nombres, setNombres] = useState({});   // sedeId → nombre (conectado)
@@ -144,18 +150,54 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
       return;
     }
     setSaving(true);
-    Promise.all(cambiados.map(({ m, s, key }) => {
-      const body = { metaMensual: val(key, "meta"), porcentajeComision: val(key, "com") };
-      if (s !== "todas") return api.catalogo.fijarMetaSede(m.id, sedeApiUuid(s) || s, body);
-      return Promise.all([
-        api.catalogo.fijarMeta(m.id, body.metaMensual),
-        api.catalogo.actualizarMedico(m.id, { nombre: m.nombre, especialidadId: m.especialidadId || null, cop: m.cop || null, activo: m.activo !== false, porcentajeComision: body.porcentajeComision }),
-      ]);
-    }))
-      .then(() => { notify("Metas guardadas."); cargar(); })
-      .catch((e) => notify(e?.message || "No se pudo guardar."))
+    // Una petición por cada cosa que cambió (antes la meta global mandaba siempre también la
+    // comisión, aunque no se hubiera tocado). Si el servidor rechaza una parte, lo demás queda
+    // guardado y se dice qué faltó: nunca un guardado a medias en silencio (R4-02).
+    const tareas = cambiados.flatMap(({ m, s, key }) => {
+      const meta = val(key, "meta"), com = val(key, "com");
+      if (s !== "todas") return [{ key, campos: ["meta", "com"], que: "meta y comisión", nombre: m.nombre, p: api.catalogo.fijarMetaSede(m.id, sedeApiUuid(s) || s, { metaMensual: meta, porcentajeComision: com }) }];
+      const cambioMeta = (draft[key]?.meta ?? "") !== (base[key]?.meta ?? "");
+      const cambioCom = (draft[key]?.com ?? "") !== (base[key]?.com ?? "");
+      return [
+        cambioMeta && { key, campos: ["meta"], que: "meta", nombre: m.nombre, p: api.catalogo.fijarMeta(m.id, meta) },
+        cambioCom && puedeComGlobal && { key, campos: ["com"], que: "comisión", nombre: m.nombre, p: api.catalogo.actualizarMedico(m.id, { nombre: m.nombre, especialidadId: m.especialidadId || null, cop: m.cop || null, activo: m.activo !== false, porcentajeComision: com }) },
+      ].filter(Boolean);
+    });
+    Promise.allSettled(tareas.map((t) => t.p))
+      .then((rs) => {
+        const fallos = tareas.filter((_, i) => rs[i].status === "rejected");
+        if (!fallos.length) { notify("Metas guardadas."); cargar(); return; }
+        const ok = tareas.filter((_, i) => rs[i].status === "fulfilled");
+        // Lo guardado deja de contar como cambio; lo rechazado sigue marcado «sin guardar».
+        setBase((b) => {
+          const nb = { ...b };
+          ok.forEach((t) => { nb[t.key] = { ...(nb[t.key] || {}), ...Object.fromEntries(t.campos.map((c) => [c, draft[t.key]?.[c] ?? ""])) }; });
+          return nb;
+        });
+        const e = rs.find((r) => r.status === "rejected").reason;
+        const motivo = e?.status === 403 ? "tu rol no tiene permiso para guardarlo" : (e?.message || "error del servidor");
+        const lista = fallos.map((t) => `${t.que} de ${t.nombre}`).join(", ");
+        notify(ok.length
+          ? `Se guardó una parte. No se guardó: ${lista} (${motivo}). Sigue marcado como cambio sin guardar.`
+          : `No se guardó: ${lista} (${motivo}).`);
+      })
       .finally(() => setSaving(false));
   };
+  // R4-15: Escape descarta la edición en curso, igual que «Deshacer».
+  const hayCambios = cambiados.length > 0;
+  useEffect(() => {
+    if (!hayCambios || saving) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Un modal abierto encima (p. ej. el buscador) se cierra antes con su propio Escape.
+      if (document.querySelector("[role='dialog'], .dc-modal")) return;
+      setDraft(base);
+      if (document.activeElement && document.activeElement.closest(".dc-mtz")) document.activeElement.blur();
+      notify("Cambios descartados.");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [hayCambios, saving, base]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="dc-mtz" style={{ display: "grid", gap: 14 }}>
@@ -174,6 +216,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
       </section>
       {error && <div className="fm-aviso-edad is-mal"><Target size={15} strokeWidth={2} /><span>{error}</span><button type="button" onClick={cargar}>Reintentar</button></div>}
       {conectado && !error && sinSede.length > 0 && !esGlobal && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>El servidor no indica en qué sede atiende cada doctor: {sinSede.length === 1 ? "este doctor se muestra" : `estos ${sinSede.length} doctores se muestran`} en la sede elegida. Indícalo en Configuración › Doctores.</span></div>}
+      {puedeEditar && !puedeComGlobal && grupos.some((g) => g.sede === "todas") && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>Puedes fijar la meta de cada odontólogo. El <b>% de comisión</b> se ve en solo lectura: lo cambia quien administra Configuración › Doctores.</span></div>}
       {conectado && !error && meds.length === 0 && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>}
 
       {grupos.map((g) => {
@@ -207,7 +250,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
                       <span className="dc-mtz__dn"><b>{m.nombre}{cambio && <em className="dc-mtz__tag">Editado</em>}</b><small>{nomEsp(m)}{m.sinSede && !esGlobal ? <> · <i>sede no indicada por el servidor</i></> : null}{otras.length ? <> · <i>también en {otras.map((s) => nomSede(s).replace(/^Sede\s+/i, "")).join(", ")}</i></> : null}</small></span>
                     </span>
                     <span role="cell"><Monto value={draft[key]?.meta} disabled={!puedeEditar} label={`Meta mensual de ${m.nombre} en ${nomSede(g.sede)}`} onChange={(v) => set(key, "meta", v)} /></span>
-                    <span role="cell"><Porcentaje value={draft[key]?.com} disabled={!puedeEditar} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>
+                    <span role="cell"><Porcentaje value={draft[key]?.com} disabled={!puedeCom(g.sede)} title={puedeEditar && !puedeCom(g.sede) ? "Solo lectura: el % de comisión lo cambia quien administra Configuración › Doctores." : undefined} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>
                     <span role="cell" className="dc-mtz__gana">{/* H-G10: pide solo lo que falta (antes decía «Define meta y %» con el % ya en 40). */}{met && pc != null ? <><b>{soles((met * pc) / 100)}</b><small>{pc}% de {soles(met)}</small></> : <small>{!met && pc == null ? "Define meta y %" : !met ? `Define la meta (comisión ${pc}%)` : `Define el % (meta ${soles(met)})`}</small>}</span>
                     <span role="cell" className="dc-mtz__parte"><i><u style={{ width: `${parte}%`, background: col }} /></i><b>{parte ? `${parte}%` : "—"}</b></span>
                   </div>

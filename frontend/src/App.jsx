@@ -721,6 +721,11 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     // Solo los de la sede que se mira (antes, con Surco elegido, salían los deudores de toda la clínica).
     ? ((cajaDeuda && cajaDeuda.porCobrar) || []).filter((r) => Number(r.saldo) > 0 && (r.sedeId == null || sedeCxD.enSede(r.sedeId))).map((r) => ({ n: r.paciente || "—", v: Number(r.saldo) || 0 }))
     : carteraDemo.conVencido.map((f) => ({ n: f.p.nombre, v: f.vencido }));
+  // R4-12: con sesión, /caja → porCobrar es el saldo de cada plan (incluye lo que falta hacer):
+  // no es «saldo vencido». Lo vencido de verdad es lo terminado sin pagar hace más de 30 días
+  // (/caja → terminados, M.deudaDeCaja), y solo eso pone la tarea en rojo.
+  const deudaCaja = conectado ? M.deudaDeCaja(cajaDeuda, { incluir: (sid) => sid == null || sedeCxD.enSede(sid) }) : null;
+  const vencidoCaja = deudaCaja ? deudaCaja.vencido : 0;
   // Solo lo de los pacientes visibles (sus sedes): el admin de sede no ve avisos de otra sede.
   const deVisible = (pid, nom) => pacientes.some((p) => String(p.id) === String(pid) || (nom && p.nombre === nom));
   // Liquidaciones y laboratorio: por la sede del registro (si no tiene, la principal del paciente), como en Seguros y Laboratorio.
@@ -751,7 +756,10 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => { const primer = (pendEvo.items || [])[0]; if (primer?.pacienteId) onIr("pacientes", { pacienteId: primer.pacienteId }); else onIr("pacientes"); } },
     // INI-04: una sola tarjeta de confirmaciones (hoy + mañana) con una sola acción.
     !esTI && (sinConfHoy.length + (esMed ? 0 : mananaSinConf.length)) > 0 && { id: "conf", tono: sinConfHoy.length ? "aviso" : "info", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `Confirmaciones pendientes · hoy ${sinConfHoy.length}${esMed ? "" : ` · mañana ${mananaSinConf.length}`}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))) || "Las de hoy ya están confirmadas.", accion: esMed ? "Ir a la agenda" : "Enviar confirmaciones", ir: esMed ? () => onIr("agenda") : () => { if (conectado) enviarConfMañana(); else notify(`Confirmaciones enviadas por WhatsApp a ${sinConfHoy.length + mananaSinConf.length} pacientes.`); } },
-    verCaja && deudores.length > 0 && { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") },
+    verCaja && deudores.length > 0 && (conectado
+      ? { id: "deuda", tono: vencidoCaja > 0 ? "peligro" : "aviso", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo por cobrar", "pacientes con saldo por cobrar")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}${vencidoCaja > 0 ? ` · S/ ${vencidoCaja.toLocaleString("es-PE")} vencido` : ""}`,
+        detalle: `${nombres(deudores, "n")}.${vencidoCaja > 0 ? ` Vencido = trabajo terminado hace más de ${M.UMBRAL_VENCIDO_DIAS} días sin pagar.` : deudaCaja && deudaCaja.hecho > 0 ? ` S/ ${deudaCaja.hecho.toLocaleString("es-PE")} de trabajo ya terminado, listo para cobrar.` : ""}`, accion: "Ir a caja", ir: () => onIr("facturacion") }
+      : { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") }),
     (esAdmin || esAdmSede) && liqObs.length > 0 && { id: "seguros", tono: "aviso", icon: <Umbrella size={18} strokeWidth={1.75} />, titulo: `${pluralEs(liqObs.length, "liquidación de seguro observada", "liquidaciones de seguro observadas")}`, detalle: `${liqObs.map((l) => `${l.aseg} (${l.paciente || nomPac(l.pid)})`).join(", ")}${liqBorr.length ? ` · ${pluralEs(liqBorr.length, "borrador", "borradores")} por enviar` : ""}.`, accion: "Ver seguros", ir: () => onIr("seguros") },
     !esTI && !esRec && labAtr.length > 0 && { id: "lab", tono: "aviso", icon: <FlaskConical size={18} strokeWidth={1.75} />, titulo: `${pluralEs(labAtr.length, "caso de laboratorio atrasado", "casos de laboratorio atrasados")}`, detalle: labAtr.map((c) => `${c.trabajo} – ${c.paciente || nomPac(c.pacienteId)}`).slice(0, 3).join(", "), accion: "Ver laboratorio", ir: () => onIr("laboratorio") },
     !esTI && !esGer && docsPend.length > 0 && { id: "docs", tono: "info", icon: <FileCheck size={18} strokeWidth={1.75} />, titulo: `${pluralEs(docsPend.length, "documento sin firmar", "documentos sin firmar")}`, detalle: `${[...new Set(docsPend.map((d) => nomPac(d.pacienteId)))].slice(0, 3).join(", ")}. Envía el enlace o fírmalo en consultorio.`, accion: "Ver pacientes", ir: () => onIr("pacientes") },
@@ -1469,7 +1477,9 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // usa todo (un doctor puede tener citas en otra sede a la misma hora).
   const sedeCx = useSede();
   const enFiltro = (c) => sedeCx.enSede(c.sede ?? c.sedeId);
-  const { supervisor: supervisaAg } = useEmiteCobros(can);
+  // R4-03: «Cobrar S/ …» solo para quien emite cobros (facturacion:crear y no supervisa).
+  // Gerencia (facturación ver/exportar) y TI (ver) abrían el modal de cobro y la API lo rechaza.
+  const { puede: emiteCobroAg } = useEmiteCobros(can);
   const reglasVis = useMemo(() => ({
     ...reglasAg,
     sillones: (reglasAg.sillones || []).filter((x) => sedeCx.enSede(x.sede)),
@@ -1683,7 +1693,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       else if (est === "en_sala") principal = A("Pasar a sillón", () => pasarAtencion(c), "var(--dc-warn-600)");
       else if (est === "en_atencion") principal = A("Finalizar y cobrar", () => { set(c.id, "atendida", `Atención de ${c.paciente} finalizada. Cóbrala en Caja.`, () => { window.location.hash = "#/caja"; }); }, "var(--dc-ok-700)");
     }
-    if (!principal && rol !== "medico" && !supervisaAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0) principal = A(`Cobrar S/ ${saldos[c.pacienteId].toFixed(0)}`, () => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede }), DS.c.primary);
+    if (!principal && rol !== "medico" && emiteCobroAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0) principal = A(`Cobrar S/ ${saldos[c.pacienteId].toFixed(0)}`, () => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede }), DS.c.primary);
     const opciones = puedeOperarAgenda && abierta ? [
       // Llegó sin haber confirmado: se marca la llegada sin pasar antes por «Confirmar».
       esHoy && !c.llegada && (est === "pendiente" || est === "confirmada") && principal?.label !== "Marcar llegada" && { label: "Marcar llegada", onClick: llegada },
@@ -2114,6 +2124,9 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const puedeGestionar = can ? can("pacientes", "crear") : true;
   // Borrar es otro permiso: recepción da de alta y edita, pero no elimina.
   const puedeEliminar = can ? can("pacientes", "eliminar") : true;
+  // R4-04: «Editar datos» abre un formulario con «Guardar cambios»; gerencia solo tiene
+  // pacientes [ver, exportar] y la API le respondía 403 al guardar.
+  const puedeEditarPac = can ? can("pacientes", "editar") : true;
   // Modo conectado (JWT presente): los datos vienen del backend real; si no, demo.
   const conectado = !!auth.token;
   const sedeCx = useSede();
@@ -2533,7 +2546,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
           { label: "Abrir odontograma", onClick: () => abrirOdontograma(p) },
           { label: "Historia clínica", onClick: () => abrirHistoria(p) },
           p.telefono && { label: "WhatsApp", onClick: () => { window.location.hash = "#/whatsapp"; } },
-          { label: "Editar datos", onClick: () => editar(p) },
+          puedeEditarPac && { label: "Editar datos", onClick: () => editar(p) },
           puedeEliminar && { label: "Eliminar paciente", peligro: true, onClick: () => eliminarPaciente(p) },
         ]} />
       </div>
@@ -3763,6 +3776,9 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   // cobro lo hace quien tiene caja (recepción, administración).
   const { puede: puedeCobrar } = useEmiteCobros(can);
   const puedeTerminar = can ? can("tratamientos", "editar") || can("tratamientos", "crear") : true;
+  // R4-04: «+ Procedimiento» hace POST /tratamientos/{plan}/fases, que el servidor exige con
+  // tratamientos:crear. Gerencia (tratamientos ver/exportar) abría el formulario y recibía 403.
+  const puedeAgregarProc = can ? can("tratamientos", "crear") : true;
   const conectado = !!auth.token;
   const sx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
@@ -3976,7 +3992,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan {planListo && <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span>}</h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && planListo && <BotonPDF chico onClick={() => { if (conectado && verPagos && pagosRem == null) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}<Btn small disabled={!planListo || !pacienteId} title={planListo ? undefined : (tratLeyendo ? "Leyendo el plan del paciente…" : "Se habilita cuando se pueda leer el plan del paciente")} onClick={() => { if (!planListo) return; setNueva({ nombre: "", costo: "", pieza: "", cara: "" }); }}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn></div></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan {planListo && <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span>}</h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && planListo && <BotonPDF chico onClick={() => { if (conectado && verPagos && pagosRem == null) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []), sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}{puedeAgregarProc && <Btn small disabled={!planListo || !pacienteId} title={planListo ? undefined : (tratLeyendo ? "Leyendo el plan del paciente…" : "Se habilita cuando se pueda leer el plan del paciente")} onClick={() => { if (!planListo) return; setNueva({ nombre: "", costo: "", pieza: "", cara: "" }); }}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn>}</div></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -6633,7 +6649,10 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     // Todas sus sedes (UUID), no solo la primera. Sin ninguna, solo los roles de toda la
     // clínica quedan con todas (igual que al iniciar sesión); el resto queda "Sin sede".
     const lista = (Array.isArray(u.sedeIds) && u.sedeIds.length ? u.sedeIds : Array.isArray(u.sedes) && u.sedes.length ? u.sedes : u.sedeId ? [u.sedeId] : []).map((x) => x?.id ?? x);
-    return { id: u.id, nombre: u.nombre, user: (u.email || "").split("@")[0], email: u.email, rol: u.rol, sedes: lista.length ? lista : (puedeSerGlobal(u.rol) ? "all" : []), activo: u.activo, ultimo };
+    // Los permisos propios del usuario (si el servidor los tiene) se conservan: editar o
+    // reactivar manda el usuario completo y antes los enviaba en null.
+    const permisos = u.permisos && typeof u.permisos === "object" && Object.keys(u.permisos).length ? u.permisos : null;
+    return { id: u.id, nombre: u.nombre, user: (u.email || "").split("@")[0], email: u.email, rol: u.rol, sedes: lista.length ? lista : (puedeSerGlobal(u.rol) ? "all" : []), activo: u.activo, ultimo, permisos };
   };
   const [remoto, setRemoto] = useState(null);
   const [usuariosError, setUsuariosError] = useState(null);
@@ -6688,8 +6707,15 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
   const nuevo = () => setForm({ nombre: "", user: "", email: "", rol: "recepcion", sedes: sedesIniciales(), activo: true });
   const editar = (u) => { if (!editable(u)) { notify("Este usuario también trabaja fuera de tus sedes: lo edita la administración general."); return; } setForm({ ...u, sedes: u.sedes === "all" ? "all" : normSedes(u.sedes) }); };
   const toggleSedeForm = (id) => setForm((f) => { const a = f.sedes === "all" ? [] : normSedes(f.sedes); return { ...f, sedes: a.some((x) => String(x) === String(id)) ? a.filter((x) => String(x) !== String(id)) : [...a, id] }; });
+  // R4-11: con sesión se entra con el correo; el servidor no tiene un campo «usuario» y el que
+  // se escribía no se enviaba (la lista mostraba otro, sacado del correo). Con sesión se pide
+  // el correo y el campo «Usuario» no se muestra; en la demostración sigue como antes.
+  const correoValido = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || "").trim());
   const guardar = () => {
-    if (!form.nombre.trim() || !form.user.trim()) { notify("Completa nombre y usuario."); return; }
+    if (conectado) {
+      if (!form.nombre.trim() || !String(form.email || "").trim()) { notify("Completa nombre y correo."); return; }
+      if (!correoValido(form.email)) { notify("Escribe un correo válido: es con el que la persona inicia sesión."); return; }
+    } else if (!form.nombre.trim() || !form.user.trim()) { notify("Completa nombre y usuario."); return; }
     if (!rolesAsignables.includes(form.rol)) { notify(`Solo la administración general asigna el rol ${ROLES[form.rol]?.label || form.rol}.`); return; }
     // Sin sede por defecto: un rol de sede necesita al menos una (gerencia puede quedar en "todas").
     const marcadas = form.sedes === "all" ? "all" : normSedes(form.sedes).filter((x) => sedesAsignables.some((o) => mismaSede(o.id, x)));
@@ -6698,7 +6724,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     if (conectado) {
       // sedeIds: todas sus sedes (UUID); sedeId: la principal, para el servidor que aún guarda una sola.
       const sedeIds = sedes === "all" ? [] : sedes.map((x) => sedeApiUuid(x));
-      const payload = { nombre: form.nombre, email: form.email || form.user, rol: form.rol, activo: form.activo !== false, permisos: form.permisos || null, sedeIds, sedeId: sedeIds[0] ?? null };
+      const payload = { nombre: form.nombre.trim(), email: String(form.email).trim(), rol: form.rol, activo: form.activo !== false, permisos: form.permisos || null, sedeIds, sedeId: sedeIds[0] ?? null };
       let clave = null;
       if (!form.id) { try { clave = claveTemporal(); } catch (e) { notify(e.message); return; } }
       (form.id ? api.usuarios.actualizar(form.id, payload) : api.usuarios.crear({ ...payload, password: clave }))
@@ -6716,11 +6742,25 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     }
     setForm(null);
   };
-  // H-15: dar de baja o reactivar (DELETE /usuarios/:id) exige el permiso «eliminar» de
-  // usuarios; el administrador de sede no lo tiene y el servidor respondía 403 con un toast
-  // genérico. Sin permiso, el botón no se muestra.
-  const puedeBaja = !can || can("usuarios", "eliminar");
-  const toggle = (u) => { if (!editable(u)) { notify("Solo la administración general puede cambiar a este usuario."); return; } if (!puedeBaja) { notify("Tu rol no puede desactivar usuarios: pídeselo a la administración general."); return; } if (conectado) { (u.activo ? api.usuarios.desactivar(u.id) : api.usuarios.actualizar(u.id, { activo: true })).then(() => { notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); recargar(); }).catch(() => notify("Error al cambiar el estado.")); return; } setStaff((s) => s.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x)); notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); };
+  // H-15 / R4-07: dar de baja es DELETE /usuarios/:id (permiso «eliminar»); reactivar es
+  // PUT /usuarios/:id (permiso «editar»). Antes los dos pedían «eliminar»: el administrador
+  // de sede (usuarios: ver, crear, editar) veía «Activar» y al pulsarlo salía «no puede
+  // desactivar» sin hacer nada. Sin el permiso de cada acción, su botón no se muestra.
+  const toggle = (u) => {
+    const verbo = u.activo ? "desactivar" : "activar";
+    if (!editable(u)) { notify("Solo la administración general puede cambiar a este usuario."); return; }
+    if (!(u.activo ? puedeBajaUs : puedeEditarUs)) { notify(`Tu rol no puede ${verbo} usuarios: pídeselo a la administración general.`); return; }
+    if (conectado) {
+      // Reactivar manda el usuario completo (como «Editar»), no solo { activo }: un PUT que
+      // reemplaza no debe dejarlo sin nombre, rol ni sedes.
+      const sedeIds = u.sedes === "all" ? [] : normSedes(u.sedes).map((x) => sedeApiUuid(x));
+      (u.activo ? api.usuarios.desactivar(u.id) : api.usuarios.actualizar(u.id, { nombre: u.nombre, email: u.email, rol: u.rol, activo: true, permisos: u.permisos || null, sedeIds, sedeId: sedeIds[0] ?? null }))
+        .then(() => { notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`); recargar(); })
+        .catch((e) => notify(e?.status === 403 ? `No se pudo ${verbo} a ${u.nombre}: tu rol no tiene permiso para hacerlo.` : `No se pudo ${verbo} a ${u.nombre}${e?.message ? `: ${e.message}` : "."}`));
+      return;
+    }
+    setStaff((s) => s.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x)); notify(`${u.nombre} ${u.activo ? "desactivado" : "activado"}.`);
+  };
   const eliminar = (u) => {
     if (!editable(u)) { notify("Solo la administración general puede dar de baja a este usuario."); return; }
     if (!confirm(`¿Dar de baja a ${u.nombre}? Perderá el acceso a la clínica de inmediato.`)) return;
@@ -6748,7 +6788,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
       </section>
       {cargaFallida && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span><b>Usuarios sin API.</b> {usuariosError} No es un padrón vacío: el listado no pudo cargarse.</span></div>}
       <div className="dc-us__barra">
-        <label className="dc-cob__buscar dc-us__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, usuario o correo" aria-label="Buscar usuario" /></label>
+        <label className="dc-cob__buscar dc-us__buscar"><Search size={15} strokeWidth={1.9} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={conectado ? "Buscar por nombre o correo" : "Buscar por nombre, usuario o correo"} aria-label="Buscar usuario" /></label>
         <div className="dc-us__roles" role="tablist" aria-label="Filtrar por rol">
           <button type="button" role="tab" aria-selected={filtroRol === "todos"} className={filtroRol === "todos" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setFiltroRol("todos")}>Todos <i>{staff.length}</i></button>
           {porRol.filter((x) => x.n > 0).map(({ r, n }) => { const R = ROLES[r]; const RIc = R.icon; return (
@@ -6763,8 +6803,8 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
             footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}>{!conectado && <Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn>}{puedeBajaUs && form.activo !== false && <Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> {conectado ? "Dar de baja" : "Eliminar"}</Btn>}</span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
               <Field label="Nombre completo" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Ana Torres" />
-              <Field label="Usuario" value={form.user} onChange={(v) => setForm({ ...form, user: v })} placeholder="atorres" icon={<UserCheck size={15} strokeWidth={1.75} />} />
-              <Field label="Correo" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="nombre@tuclinica.pe" type="email" icon={<Mail size={15} strokeWidth={1.75} />} />
+              {!conectado && <Field label="Usuario" value={form.user} onChange={(v) => setForm({ ...form, user: v })} placeholder="atorres" icon={<UserCheck size={15} strokeWidth={1.75} />} />}
+              <Field label={conectado ? "Correo (para iniciar sesión)" : "Correo"} value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="nombre@tuclinica.pe" type="email" icon={<Mail size={15} strokeWidth={1.75} />} />
               <label style={{ display: "block" }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 }}>Rol</span>
                 <Select value={form.rol} onChange={(v) => setForm({ ...form, rol: v })}
@@ -6835,7 +6875,8 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
 
         <DataTable buscar={false} titulo="Directorio de usuarios" sub="usuarios" minWidth={1060} rows={lista} defaultSort={{ key: "usuario", dir: "asc" }} empty={<Vacio icon={<UserCog size={22} strokeWidth={1.75} />} titulo="Sin usuarios" sub="No hay usuarios que coincidan." />} cols={[
           { key: "usuario", label: "Nombre", w: "minmax(150px,1.2fr)", a: "left", get: (u) => u.nombre, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(R.color, 0.22)}, ${tint(R.color, 0.08)})`, color: R.color, flexShrink: 0 }}>{iniciales(u.nombre.replace(/^Dra?\.\s*/, ""))}</span><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{u.nombre}</div></div></div>; } },
-          { key: "user", label: "Usuario", w: "106px", a: "left", get: (u) => u.user || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>@{u.user}</span> },
+          // Con sesión no hay «usuario»: se entra con el correo (la columna repetía su inicio).
+          ...(conectado ? [] : [{ key: "user", label: "Usuario", w: "106px", a: "left", get: (u) => u.user || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>@{u.user}</span> }]),
           { key: "email", label: "Correo", w: "minmax(160px,1.4fr)", a: "left", get: (u) => u.email || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || "—"}</span> },
           { key: "rol", label: "Rol", w: "132px", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
           { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? "Sin sede" : etiquetaSedes(u.sedes)), cell: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>Sin sede</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span>) },
@@ -7908,6 +7949,9 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
     activo: row.activo !== false,
   }));
   const inactivos = itemsTodos.filter((s) => s.activo === false);
+  // H-13: si el servidor no devuelve ningún inactivo, «Ver inactivos» ya no desaparece: se
+  // muestra y explica que el servidor aún no los lista (solo los desactivados en esta sesión).
+  const srvSinInactivos = conectado && !srv.some((s) => s.activo === false);
   const items = verInactivos ? inactivos : itemsTodos.filter((s) => s.activo !== false);
   const setItems = setDemoItems;
   const [form, setForm] = useState(null);
@@ -8046,8 +8090,10 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
       </section>
       <DataTable titulo="Catálogo de servicios" sub="servicios" minWidth={sedesLista.length > 1 ? 1120 : 880} rows={filtrados} accion={<span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {cats.length > 1 && <Select small width={240} ariaLabel="Filtrar por especialidad" value={cat} onChange={setCat} options={[{ value: "all", label: "Todas las especialidades" }, ...cats.map((c) => ({ value: c, label: `${c} (${items.filter((x) => espDe(x) === c).length})` }))]} />}
-          {puedeCatalogo && (verInactivos || inactivos.length > 0) && <Btn small kind="ghost" onClick={() => { setVerInactivos(!verInactivos); setCat("all"); }}>{verInactivos ? "Ver activos" : `Ver inactivos (${inactivos.length})`}</Btn>}
-        </span>} onRowClick={puedeGestionar ? (s) => editar(s) : undefined} defaultSort={{ key: "servicio", dir: "asc" }} empty={verInactivos ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios inactivos" sub="Los servicios que desactives aparecerán aquí para reactivarlos." /> : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
+          {puedeCatalogo && (verInactivos || inactivos.length > 0 || srvSinInactivos) && <Btn small kind="ghost" title={srvSinInactivos && !verInactivos ? "El servidor aún no devuelve los servicios desactivados" : undefined} onClick={() => { setVerInactivos(!verInactivos); setCat("all"); }}>{verInactivos ? "Ver activos" : `Ver inactivos (${inactivos.length})`}</Btn>}
+        </span>} onRowClick={puedeGestionar ? (s) => editar(s) : undefined} defaultSort={{ key: "servicio", dir: "asc" }} empty={verInactivos ? (srvSinInactivos
+          ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="El servidor aún no lista los servicios inactivos" sub="Los servicios desactivados antes no llegan desde el servidor, así que no se pueden ver ni reactivar desde aquí. Los que desactives ahora sí aparecerán en esta lista hasta que cierres la pantalla." />
+          : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios inactivos" sub="Los servicios que desactives aparecerán aquí para reactivarlos." />) : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
         ...(verInactivos && puedeCatalogo ? [{ key: "reactivar", label: "", w: "120px", a: "center", noFilter: true, noSort: true, noExport: true, cell: (s) => <Btn small kind="ghost" onClick={(e) => { e.stopPropagation(); reactivar(s); }}><Repeat size={13} strokeWidth={2} /> Reactivar</Btn> }] : []),
         { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span>{s.activo === false && <span className="dc-pill" style={{ "--c": "#8A9CA1", flexShrink: 0 }}><i /> Inactivo</span>}</span>; } },
         { key: "esp", label: "Especialidad", w: "minmax(140px,1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
@@ -9194,6 +9240,9 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
   // botones de escritura solo salen con el permiso (matriz de permisos).
   const puedeCrearLiq = can ? can("seguros", "crear") : true;
   const puedeEditarLiq = can ? can("seguros", "editar") : true;
+  // R4-06: borrar es DELETE /seguros/{id}, que el servidor exige con seguros:eliminar.
+  // Antes bastaba «editar» y el administrador de sede veía Eliminar y recibía 403.
+  const puedeBorrarLiq = can ? can("seguros", "eliminar") : true;
   const pacientes = usePacientesServidor(pacientesProp);
   // Los convenios y sus coberturas los pacta cada clínica: estos cinco son el ejemplo.
   // Se enseñaban también con sesión abierta, y alimentaban "Cobertura promedio" y
@@ -9258,7 +9307,8 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
   };
   const borrarLiq = (x) => {
     if (!confirm(`¿Eliminar la liquidación de ${x.paciente} con ${x.aseg}?`)) return;
-    api.seguros.borrar(x.id).then(() => { notify("Liquidación eliminada."); setDetalleLiq(null); recargarLiq(); }).catch(() => notify("No se pudo eliminar la liquidación."));
+    api.seguros.borrar(x.id).then(() => { notify("Liquidación eliminada."); setDetalleLiq(null); recargarLiq(); })
+      .catch((e) => notify(e?.status === 403 ? "No se eliminó: tu rol no puede eliminar liquidaciones. Pídeselo a la administración general." : `No se pudo eliminar la liquidación${e?.message ? `: ${e.message}` : "."}`));
   };
   // El total es lo tratado en la sede de la liquidación: un paciente de dos sedes no suma
   // aquí lo que se le hizo en la otra. Un ítem sin sede cuenta en la sede principal del paciente.
@@ -9268,7 +9318,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
   };
   const nombreDe = (pid) => (pacientes.find((p) => p.id === pid) || PACIENTES_INIT.find((p) => p.id === pid))?.nombre || "—";
   const liqView = conectado ? (remoto || []).filter(liqVisible) : liq.map((l) => { const total = totalDe(l) || 0; const cob = Math.round(total * l.cobPct / 100); return { ...l, sede: sedeDeLiq(l), paciente: nombreDe(l.pid), total, cob, copago: total - cob }; });
-  const avanzar = (id) => { if (conectado) { const it = (remoto || []).find((x) => x.id === id); if (!it) return; const flow = ["por_enviar", "enviado", "en_revision", "pagado"]; const n = flow[Math.min(flow.length - 1, flow.indexOf(it.estadoBE) + 1)]; api.seguros.actualizar(id, { estado: n }).then(() => { notify(`${it.paciente}: liquidación actualizada.`); recargarLiq(); }).catch(() => notify("Error al avanzar la liquidación.")); return; } setLiq((l) => l.map((x) => { if (x.id !== id) return x; const f = ["borrador", "enviado", "aprobado", "pagado"]; const n = x.estado === "observado" ? "enviado" : f[Math.min(3, f.indexOf(x.estado) + 1)]; notify(`${nombreDe(x.pid)}: liquidación ${LI[n].l.toLowerCase()}.`); return { ...x, estado: n }; })); };
+  const avanzar = (id) => { if (conectado) { const it = (remoto || []).find((x) => x.id === id); if (!it) return; const flow = ["por_enviar", "enviado", "en_revision", "pagado"]; const n = flow[Math.min(flow.length - 1, flow.indexOf(it.estadoBE) + 1)]; api.seguros.actualizar(id, { estado: n }).then(() => { notify(`${it.paciente}: liquidación actualizada.`); recargarLiq(); }).catch((e) => notify(e?.status === 403 ? "No se actualizó: tu rol no puede cambiar el estado de esta liquidación." : "Error al avanzar la liquidación.")); return; } setLiq((l) => l.map((x) => { if (x.id !== id) return x; const f = ["borrador", "enviado", "aprobado", "pagado"]; const n = x.estado === "observado" ? "enviado" : f[Math.min(3, f.indexOf(x.estado) + 1)]; notify(`${nombreDe(x.pid)}: liquidación ${LI[n].l.toLowerCase()}.`); return { ...x, estado: n }; })); };
   const porCobrar = liqView.filter((l) => l.estado !== "pagado").reduce((s, l) => s + l.cob, 0);
   const recuperado = liqView.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.cob, 0);
   // DC-43: cobertura promedio + # aseguradoras desde liquidaciones (misma fuente que la tabla).
@@ -9372,13 +9422,18 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
       </div>
       )}</ListaFiltrable>
       {detalleLiq && (() => { const x = detalleLiq; const I = LI[x.estado]; return (
-        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={<>{conectado && (can ? can("seguros", "eliminar") || can("seguros", "editar") : true) && <Btn small kind="ghost" onClick={() => borrarLiq(x)}><Trash2 size={14} strokeWidth={1.75} /> Eliminar</Btn>}{x.estado !== "pagado" && puedeEditarLiq ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>{({ borrador: "Enviar a la aseguradora", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}</>}>
+        <Modal icon={<Umbrella size={20} strokeWidth={1.75} />} titulo={`Liquidación – ${x.paciente}`} sub={x.aseg} onClose={() => setDetalleLiq(null)} maxW={520} footer={<>{conectado && puedeBorrarLiq && <Btn small kind="ghost" onClick={() => borrarLiq(x)}><Trash2 size={14} strokeWidth={1.75} /> Eliminar</Btn>}{x.estado !== "pagado" && puedeEditarLiq ? <Btn small onClick={() => { avanzar(x.id); setDetalleLiq(null); }}>{({ borrador: "Enviar a la aseguradora", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalleLiq(null)}>Cerrar</Btn>}</>}>
           {x.estado === "observado" && x.motivo && <div style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", borderRadius: "var(--dc-r-md)", padding: "10px 12px", fontSize: 13, marginBottom: 12 }}><b>Observación de la aseguradora:</b> {x.motivo}</div>}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
             {[["Total tratamiento", `S/ ${x.total}`, NAVY], ["Cubre seguro", `S/ ${x.cob}`, "var(--dc-ok-700)"], ["Copago paciente", `S/ ${x.copago}`, "var(--dc-warn-600)"]].map(([l, v, col]) => <div key={l} style={{ background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-lg)", padding: "12px 14px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 600, color: col, fontFamily: DISPLAY_FONT, marginTop: 2 }}>{v}</div></div>)}
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Aseguradora</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{x.aseg}{x.cobPct != null ? ` – ${x.cobPct}%` : ""}</span></div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Sede del tratamiento</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{nombreSede(x.sede)}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Sede del tratamiento</span>{x.sede != null || !conectado ? <span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{nombreSede(x.sede)}</span> : (() => {
+            /* R4-09: GET /seguros aún no devuelve la sede aunque el alta la envía. Se dice así,
+               con la sede del paciente como pista, en vez de un «—» que parece un dato vacío. */
+            const sp = pacientes.find((p) => String(p.id) === String(x.pacienteId))?.sede;
+            return <span style={{ fontSize: 12, color: "var(--dc-ink-500)", textAlign: "right" }}>El servidor no la indica{sp != null ? ` · paciente de ${nombreSede(sp)}` : ""}</span>;
+          })()}</div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid var(--dc-line)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Estado</span><span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "4px 12px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span></div>
         </Modal>
       ); })()}

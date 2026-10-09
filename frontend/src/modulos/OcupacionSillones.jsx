@@ -8,6 +8,7 @@ import { BotonExportar, DatosDemoCtx, ESPECIALIDADES, MEDICOS, fmt, horarioDeSed
 import { useReglasAgenda } from "../compartido/useReglasAgenda";
 import { horarioConfigurado } from "../compartido/horarioReal";
 import { etiquetaUso } from "../compartido/sillones";
+import { tienePermiso } from "../compartido/permisos";
 
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const INACTIVAS = ["cancelada", "no_show", "reprogramada", "cerrada_sistema"];
@@ -177,7 +178,8 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
           <section className="dc-ocz__huecos" aria-label="Huecos para llenar">
             <header>
               <div><h3>Huecos para llenar</h3><span>Los sillones con más horas libres de hoy en adelante.</span></div>
-              <button type="button" onClick={() => { window.location.hash = "#/espera"; }}><Send size={13} strokeWidth={2} /> Ofrecer a la lista de espera</button>
+              {/* R4-10: solo quien tiene la Lista de espera; a gerencia la ruta la devolvía al Panel. */}
+              {tienePermiso("espera", "ver") && <button type="button" onClick={() => { window.location.hash = "#/espera"; }}><Send size={13} strokeWidth={2} /> Ofrecer a la lista de espera</button>}
             </header>
             <div className="dc-ocz__hlist">
               {huecos.map((h) => (

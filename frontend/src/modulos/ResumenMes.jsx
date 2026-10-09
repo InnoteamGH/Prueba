@@ -50,6 +50,12 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const [egErr, setEgErr] = useState(null);
   const [topErr, setTopErr] = useState(null);
   const motivo = (e) => (e?.status === 403 ? "sin permiso" : "no disponible");
+  // R4-01: con una sede elegida, /gerencial/kpis y /tratamientos/resumen aún devuelven lo de
+  // toda la clínica. El Top del equipo se rehace con las citas atendidas del mes de la sede
+  // (GET /citas sí filtra; producción = «valor» de cada cita, la misma regla del servidor).
+  // Facturado, Meta y Top de tratamientos llevan el rótulo «toda la clínica».
+  const sedeElegida = conectado && !!(sedesApi && sedesApi.length);
+  const [citasMes, setCitasMes] = useState(null);
   // GER-02: en la demostración las salidas son los egresos que Caja registró (misma lista).
   const db = useContext(DatosDemoCtx);
 
@@ -62,6 +68,8 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
     const finAnt = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
     const hastaAnt = ymd(new Date(finAnt.getFullYear(), finAnt.getMonth(), Math.min(hoy.getDate(), finAnt.getDate())));
     api.tratamientos.resumen(ymd(new Date(finAnt.getFullYear(), finAnt.getMonth(), 1)), hastaAnt, { sedeIds: sedesApi }).then((r) => setTopAnt(Array.isArray(r) ? r : [])).catch(() => setTopAnt(null));
+    setCitasMes(null);
+    if (sedesApi && sedesApi.length) api.citas.listar(null, desde, hasta, sedesApi).then((r) => setCitasMes(Array.isArray(r) ? r : [])).catch(() => setCitasMes(null));
   }, [conectado, desde, hasta, sedesApi && sedesApi.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const d = useMemo(() => {
@@ -88,17 +96,29 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
     const pen = delMes.filter((e) => (e.moneda || "PEN") !== "USD");
     const cat = {};
     pen.forEach((e) => { const k = e.categoria || "Otros"; cat[k] = (cat[k] || 0) + (Number(e.monto) || 0); });
+    // Top del equipo de la sede elegida: solo quien atendió en ella este mes.
+    const equipoSede = () => {
+      const agg = new Map();
+      citasMes.filter((c) => c.estado === "atendida" && (!sedes || sedes.some((v) => mismaSede(v, c.sedeId ?? c.sede)))).forEach((c) => {
+        const k = String(c.medicoId ?? c.medico ?? "—");
+        const a = agg.get(k) || { nombre: c.medico || "—", prod: 0 };
+        a.prod += Number(c.valor ?? c.precio) || 0; agg.set(k, a);
+      });
+      const metaDe = (k) => Number((kd?.ranking || []).find((r) => String(r.medicoId) === k)?.meta) || 0;
+      const nomDe = (k, a) => (kd?.ranking || []).find((r) => String(r.medicoId) === k)?.medico || a.nombre;
+      return [...agg.entries()].map(([k, a]) => ({ nombre: nomDe(k, a), prod: a.prod, meta: metaDe(k) }));
+    };
     return {
       facturado: totalResumen(top),
       anterior: topAnt ? totalResumen(topAnt) : null,
       meta: Number(kd?.metaMensualClinica) || 0,
-      equipo: (kd?.ranking || []).map((r) => ({ nombre: r.nombre || r.medico || "—", prod: Number(r.produccion) || 0, meta: Number(r.meta) || 0 })),
+      equipo: sedeElegida && citasMes ? equipoSede() : (kd?.ranking || []).map((r) => ({ nombre: r.nombre || r.medico || "—", prod: Number(r.produccion) || 0, meta: Number(r.meta) || 0 })),
       salidas: pen.reduce((a, e) => a + (Number(e.monto) || 0), 0),
       salidasUsd: delMes.filter((e) => e.moneda === "USD").reduce((a, e) => a + (Number(e.monto) || 0), 0),
       salidasCat: Object.entries(cat).sort((a, b) => b[1] - a[1]),
       top: (top || []).map((t) => ({ nombre: t.nombre || "—", ventas: Number(t.numeroDeVentas) || 0, importe: Number(t.importeTotal) || 0 })).sort((a, b) => b.importe - a.importe).slice(0, 6),
     };
-  }, [conectado, kd, egresos, top, topAnt, desde, db?.egresos, sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, kd, egresos, top, topAnt, desde, db?.egresos, sedes && sedes.join(","), citasMes, sedeElegida]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
   const ritmo = (hoy.getDate() / diasMes) * 100;
@@ -110,6 +130,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const delta = d.anterior ? ((d.facturado - d.anterior) / d.anterior) * 100 : null;
   const maxTop = Math.max(1, ...d.top.map((t) => t.importe));
   const equipo = [...d.equipo].sort((a, b) => (b.meta ? b.prod / b.meta : 0) - (a.meta ? a.prod / a.meta : 0));
+  const toda = sedeElegida ? <i className="dc-rm__toda" title="Cifra de toda la clínica: el servidor aún no la filtra por sede.">toda la clínica</i> : null;
 
   return (
     <section className="dc-rm" aria-label="Resumen del mes">
@@ -123,7 +144,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
       <div className="dc-rm__kpis">
         <article className="dc-rm__kpi" style={{ "--c": "#0E9199" }}>
           <span className="dc-rm__ico"><ArrowDownRight size={18} strokeWidth={2.2} /></span>
-          <small>Facturado del mes</small>
+          <small>Facturado del mes{toda}</small>
           <b>{sinFacturado ? "—" : soles(d.facturado)}</b>
           <em>{sinFacturado ? "Ventas por tratamiento no disponibles" : delta == null ? (conectado ? "Suma del Top de tratamientos; sin mes anterior para comparar" : "Sin mes anterior para comparar") : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%</i> vs. mes anterior</>}</em>
         </article>
@@ -136,12 +157,12 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#0B6C78" : "#D0563F" }}>
           <span className="dc-rm__ico"><Wallet size={18} strokeWidth={2.2} /></span>
           <small>Resultado del mes</small>
-          <b>{sinSalidas || sinFacturado ? "—" : <>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</>}</b>
-          <em>{sinSalidas ? "No se calcula sin los egresos" : sinFacturado ? "No se calcula sin el facturado" : <>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
+          <b>{sinSalidas || sinFacturado || sedeElegida ? "—" : <>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</>}</b>
+          <em>{sedeElegida ? "No se calcula por sede: el facturado aún es de toda la clínica" : sinSalidas ? "No se calcula sin los egresos" : sinFacturado ? "No se calcula sin el facturado" : <>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
         </article>
         <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#C98A12" }}>
           <span className="dc-rm__ico"><Target size={18} strokeWidth={2.2} /></span>
-          <small>Meta mensual</small>
+          <small>Meta mensual{toda}</small>
           <b>{d.meta ? soles(d.meta) : "Sin meta"}</b>
           {d.meta > 0 ? (
             <>
@@ -156,8 +177,8 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
       {/* Dos rankings con el mismo diseño: posición, nombre, barra y cifra. */}
       <div className="dc-rm__dos">
         <article className="dc-rm__card">
-          <div className="dc-rm__cab"><Users size={16} strokeWidth={2} /><h3>Top del equipo</h3><span>avance a su meta · la raya es el ritmo a hoy</span></div>
-          {equipo.length === 0 ? <p className="dc-rm__vacio">Sin producción del equipo este mes.</p> : (
+          <div className="dc-rm__cab"><Users size={16} strokeWidth={2} /><h3>Top del equipo</h3><span>{sedeElegida && citasMes ? "en esta sede · avance a su meta" : <>{toda ? <>{toda} · </> : null}avance a su meta · la raya es el ritmo a hoy</>}</span></div>
+          {equipo.length === 0 ? <p className="dc-rm__vacio">{sedeElegida && citasMes ? "Nadie atendió en esta sede este mes." : "Sin producción del equipo este mes."}</p> : (
             <ol className="dc-rm__rank">
               {equipo.map((x, i) => { const pct = x.meta ? (x.prod / x.meta) * 100 : 0; const tono = !x.meta ? "sin" : pct >= ritmo ? "ok" : pct >= ritmo * 0.8 ? "cerca" : "bajo"; return (
                 <li key={x.nombre} className={`is-${tono}`}>
@@ -171,7 +192,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
           )}
         </article>
         <article className="dc-rm__card">
-          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>por importe facturado del mes</span></div>
+          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>{toda ? <>{toda} · </> : null}por importe facturado del mes</span></div>
           {conectado && topErr ? <p className="dc-rm__vacio">{topErr === "sin permiso" ? "Sin permiso para ver las ventas por tratamiento." : "Ventas por tratamiento no disponibles."}</p> : d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
             <ol className="dc-rm__rank is-trat">
               {d.top.map((t, i) => (

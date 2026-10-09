@@ -15,7 +15,9 @@ import {
   mesesDelPeriodo,
   ritmoDelPeriodo,
   rotuloPeriodo,
+  comisionesPorSede,
 } from "./produccionComisionesUtil.js";
+import { deudaDeCaja } from "../compartido/metricas.js";
 import { layoutProgreso } from "./panelGerencialUtil.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -175,5 +177,67 @@ describe("H-G5: periodo de Producción y comisiones", () => {
   });
   it("rótulo legible", () => {
     assert.equal(rotuloPeriodo("2026-05-01", "2026-10-05"), "del 01/05/2026 al 05/10/2026");
+  });
+});
+
+describe("H-06: Producción y comisiones con una sede elegida", () => {
+  const srv = {
+    desde: "2026-09-01", hasta: "2026-10-09", totalProduccion: 310, totalCobrado: 999,
+    porMedico: [{ medicoId: "d1", nombre: "Dra. Carla", porcentaje: 40, meta: 500, atendidas: 2, produccion: 160 }, { medicoId: "d2", nombre: "Dr. Luis", porcentaje: 30, meta: null, atendidas: 1, produccion: 150 }],
+    cobrosPorMes: [{ mes: "Set", anioMes: "2026-09", cobrado: 0 }, { mes: "Oct", anioMes: "2026-10", cobrado: 999 }],
+  };
+  const citas = [
+    { medicoId: "d1", medico: "Dra. Carla", estado: "atendida", fecha: "2026-09-10", sedeId: "a2", valor: 80 },
+    { medicoId: "d1", medico: "Dra. Carla", estado: "atendida", fecha: "2026-10-02", sedeId: "a1", valor: 80 },
+    { medicoId: "d2", medico: "Dr. Luis", estado: "atendida", fecha: "2026-09-12", sedeId: "a1", valor: 150 },
+    { medicoId: "d1", medico: "Dra. Carla", estado: "cancelada", fecha: "2026-10-03", sedeId: "a2", valor: 80 },
+  ];
+  const pagos = [{ fecha: "2026-09-10T10:00:00-05:00", sedeId: "a2", monto: 50 }, { fecha: "2026-10-01T10:00:00-05:00", sedeId: "a1", monto: 30 }, { fecha: "2026-09-11", sedeId: "a2", monto: 20, anulado: true }];
+  const enSurco = (sid) => sid === "a2";
+  it("la producción sale de las citas atendidas de la sede, con el % de cada odontólogo", () => {
+    const d = comisionesPorSede(srv, citas, pagos, { desde: "2026-09-01", hasta: "2026-10-09", enSede: enSurco });
+    assert.equal(d.totalProduccion, 80);
+    assert.equal(d.totalCitas, 1);
+    assert.equal(d.totalComision, 32);
+    const carla = d.porMedico.find((m) => m.medicoId === "d1");
+    assert.equal(carla.produccion, 80); assert.equal(carla.atendidas, 1); assert.equal(carla.meta, 500);
+    assert.equal(d.porMedico.find((m) => m.medicoId === "d2").produccion, 0);
+    assert.equal(d.odontologosConProduccion, 1);
+  });
+  it("lo cobrado son los pagos no anulados de la sede, mes a mes", () => {
+    const d = comisionesPorSede(srv, citas, pagos, { desde: "2026-09-01", hasta: "2026-10-09", enSede: enSurco });
+    assert.equal(d.cobrosSede, true);
+    assert.equal(d.totalCobrado, 50);
+    assert.deepEqual(d.cobrosPorMes.map((m) => [m.anioMes, m.cobrado]), [["2026-09", 50], ["2026-10", 0]]);
+    assert.equal(d.descuadre, -30);
+  });
+  it("sin pagos deja lo cobrado como vino y lo marca", () => {
+    const d = comisionesPorSede(srv, citas, null, { desde: "2026-09-01", hasta: "2026-10-09", enSede: enSurco });
+    assert.equal(d.cobrosSede, false);
+    assert.equal(d.totalCobrado, 999);
+  });
+});
+
+describe("R4-12 / R4-14: deuda desde GET /caja", () => {
+  const caja = {
+    porCobrar: [{ pacienteId: "p1", paciente: "Rosa", sedeId: "a1", saldo: 800 }, { pacienteId: "p2", paciente: "QA", sedeId: "a1", saldo: 309.25 }, { pacienteId: "p3", paciente: "Lucía", sedeId: "a2", saldo: 600 }],
+    terminados: [
+      { pacienteId: "p2", paciente: "QA", sedeId: "a1", costo: 220, terminadaEn: "2026-10-05T09:00:00-05:00" },
+      { pacienteId: "p1", paciente: "Rosa", sedeId: "a1", costo: 500, terminadaEn: "2026-08-01T09:00:00-05:00" },
+      { pacienteId: "p1", paciente: "Rosa", sedeId: "a1", costo: 400, terminadaEn: "2026-10-01T09:00:00-05:00" },
+    ],
+  };
+  it("hecho sin pagar = lo terminado sin pasar del saldo; vencido = lo terminado hace más de 30 días", () => {
+    const d = deudaDeCaja(caja, { hoy: "2026-10-09" });
+    const qa = d.porPaciente.get("p2"), rosa = d.porPaciente.get("p1");
+    assert.equal(qa.hecho, 220); assert.equal(qa.vencido, 0); assert.equal(qa.dias, 4);
+    // Rosa: 900 terminado, saldo 800 → 100 ya pagado, imputado a lo más antiguo (500 de agosto).
+    assert.equal(rosa.hecho, 800); assert.equal(rosa.vencido, 400); assert.equal(rosa.dias, 69);
+    assert.equal(d.porPaciente.has("p3"), false);   // saldo del plan sin nada terminado: no es deuda vencida
+    assert.equal(d.vencido, 400);
+  });
+  it("filtra por sede y no inventa el dato si el servidor no manda «terminados»", () => {
+    assert.equal(deudaDeCaja(caja, { hoy: "2026-10-09", incluir: (s) => s === "a2" }).filas.length, 0);
+    assert.equal(deudaDeCaja({ porCobrar: caja.porCobrar }), null);
   });
 });
