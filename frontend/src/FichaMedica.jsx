@@ -974,6 +974,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const puedeRecetar = !conectado || (can ? can("recetas", "ver") : ["admin", "medico"].includes(rol));
   const puedePerio = !conectado || (can ? can("perio", "ver") : ["admin", "medico"].includes(rol));
   const puedeArchivos = !conectado || !can || can("radiografias", "ver");
+  // R4-05: la foto, las etiquetas y las notas del paciente se guardan con PUT /pacientes/{id}
+  // (pacientes:editar). Gerencia (pacientes ver/exportar) veía «Subir una foto» y la API lo rechaza.
+  const puedeEditarPac = !conectado || !can || can("pacientes", "editar");
   const puedeOdontograma = tabMod("odontograma");
   const puedeLab = tabMod("laboratorio");
   const puedeConsent = tabMod("consentimientos");
@@ -1885,7 +1888,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 vistazo evita trabajar sobre la ficha equivocada. */}
             <div className="fm-id__foto">
               <AvatarPaciente nombre={p.nombre} fotoUrl={p.fotoUrl} genero={p.genero} pediatrico={esPed} size={68} radio={22} />
-              {conectado && (
+              {conectado && puedeEditarPac && (
                 <button onClick={() => fotoRef.current && fotoRef.current.click()} disabled={subiendoFoto} className="fm-id__cam"
                   title={p.fotoUrl ? "Cambiar la foto" : "Subir una foto"} aria-label={p.fotoUrl ? "Cambiar la foto" : "Subir una foto"}>
                   <Camera size={13} strokeWidth={2} />
@@ -1979,12 +1982,14 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   {tab === "resumen" && <>
                   <div className="fm-mini is-tags" style={mini}>
                     {head(Tag, "var(--dc-info-700)", "Etiquetas")}
-                    {arr(p.tags).length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{arr(p.tags).map((t) => <span key={t} style={pill("var(--dc-info-700)")}>{t}<X size={12} strokeWidth={2} style={{ cursor: "pointer" }} onClick={() => delTag(t)} /></span>)}</div>}
-                    <input value={tagIn} onChange={(e) => setTagIn(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTag(); }} placeholder="Agregar etiqueta…" style={addInp} />
+                    {arr(p.tags).length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{arr(p.tags).map((t) => <span key={t} style={pill("var(--dc-info-700)")}>{t}{puedeEditarPac && <X size={12} strokeWidth={2} style={{ cursor: "pointer" }} onClick={() => delTag(t)} />}</span>)}</div>}
+                    {puedeEditarPac
+                      ? <input value={tagIn} onChange={(e) => setTagIn(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTag(); }} placeholder="Agregar etiqueta…" style={addInp} />
+                      : (!arr(p.tags).length && <div style={{ fontSize: 12, color: MUTED }}>Sin etiquetas – solo lectura</div>)}
                   </div>
                   <div className="fm-mini is-notas" style={{ ...mini, background: "var(--dc-warn-soft)", border: "1px solid var(--dc-danger-soft)" }}>
                     {head(FileText, "var(--dc-warn-600)", "Notas")}
-                    <textarea defaultValue={p.comentario || ""} onBlur={(e) => { if ((e.target.value || "") !== (p.comentario || "")) savePac({ comentario: e.target.value }); }} rows={2} placeholder="Notas del paciente…" style={{ ...addInp, resize: "vertical", fontFamily: "inherit", color: TEXT }} />
+                    <textarea defaultValue={p.comentario || ""} readOnly={!puedeEditarPac} onBlur={(e) => { if (puedeEditarPac && (e.target.value || "") !== (p.comentario || "")) savePac({ comentario: e.target.value }); }} rows={2} placeholder="Notas del paciente…" style={{ ...addInp, resize: "vertical", fontFamily: "inherit", color: TEXT }} />
                   </div>
                   </>}
                   {tab === "historia" && <div className={`fm-mini is-alerg${hayAlergia ? " is-hay" : ""}`} style={{ ...mini, background: "var(--dc-bg)", border: `1px solid ${hayAlergia ? "var(--dc-danger-mid)" : "var(--dc-bg)"}` }}>
@@ -2121,6 +2126,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     {(p.creadoEn || p.fechaRegistro) && <div><small>Apertura de la historia</small><b>{fmtFecha(/T\d/.test(String(p.creadoEn || p.fechaRegistro)) ? ymdLima(p.creadoEn || p.fechaRegistro) : String(p.creadoEn || p.fechaRegistro).slice(0, 10))}</b></div>}
                     <div><small>Edad</small><b>{edad != null ? `${edad} años` : "Sin fecha de nacimiento"}</b></div>
                   </div>
+                  {/* R4-05: sin pacientes:editar la filiación se ve, pero no se edita ni se guarda. */}
+                  <fieldset disabled={!puedeEditarPac} style={{ display: "contents" }}>
                   <section style={card}>
                     <div className="fm-fil__t"><User size={15} strokeWidth={1.9} /> Identificación</div>
                     <div className="fm-fil__g">
@@ -2165,7 +2172,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                       </div>
                     </section>
                   )}
-                  <div className="fm-fil__bar"><span>Los cambios quedan en el registro de actividad con tu nombre y la hora.</span><button onClick={guardarFiliacion} style={btn()}><Check size={15} strokeWidth={1.75} /> Guardar filiación</button></div>
+                  </fieldset>
+                  {puedeEditarPac
+                    ? <div className="fm-fil__bar"><span>Los cambios quedan en el registro de actividad con tu nombre y la hora.</span><button onClick={guardarFiliacion} style={btn()}><Check size={15} strokeWidth={1.75} /> Guardar filiación</button></div>
+                    : <div className="fm-fil__bar"><span>Solo lectura: tu rol puede ver los datos del paciente, pero no cambiarlos.</span></div>}
                 </div>
               );
             })()}
@@ -2581,16 +2591,17 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
                   <Select width={180} value={upTipo} onChange={setUpTipo} options={TIPOS_ARCHIVO.map((t) => ({ value: t, label: t }))} />
                   <input value={upNota} onChange={(e) => setUpNota(e.target.value)} placeholder="Nota (opcional)" style={{ ...inp, flex: 1, minWidth: 160 }} />
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 15px", borderRadius: "var(--dc-r-md)", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {/* Subir es crear en radiografías: quien solo las ve no tiene el botón. */}
+                  {(!conectado || !can || can("radiografias", "crear")) && <label style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 15px", borderRadius: "var(--dc-r-md)", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
                     <Plus size={15} strokeWidth={1.75} /> Subir archivo
                     <input type="file" accept="image/*" onChange={subirArchivo} style={{ display: "none" }} />
-                  </label>
+                  </label>}
                 </div>
                 {rx.length === 0 && <div style={{ fontSize: 13, color: MUTED }}>Sin archivos aún. Elige el tipo, agrega una nota y sube una radiografía o foto.</div>}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12 }}>
                   {rx.map((x) => (
                     <div key={x.id} style={{ border: `1px solid ${LINE}`, borderRadius: "var(--dc-r-md)", overflow: "hidden", background: "var(--dc-ink-alt)", position: "relative" }}>
-                      <button onClick={() => borrarArchivo(x)} title="Eliminar del expediente" aria-label="Eliminar del expediente" style={{ position: "absolute", top: 6, right: 6, zIndex: 2, width: 24, height: 24, borderRadius: "var(--dc-r-full)", border: "none", background: "rgba(0,0,0,.55)", color: "var(--dc-white)", cursor: "pointer", display: "grid", placeItems: "center" }}><Trash2 size={13} strokeWidth={2} /></button>
+                      {(!conectado || !can || can("radiografias", "eliminar")) && <button onClick={() => borrarArchivo(x)} title="Eliminar del expediente" aria-label="Eliminar del expediente" style={{ position: "absolute", top: 6, right: 6, zIndex: 2, width: 24, height: 24, borderRadius: "var(--dc-r-full)", border: "none", background: "rgba(0,0,0,.55)", color: "var(--dc-white)", cursor: "pointer", display: "grid", placeItems: "center" }}><Trash2 size={13} strokeWidth={2} /></button>}
                       <a href={x.url || undefined} target="_blank" rel="noreferrer" style={{ display: "block", height: 104 }}>{x.url ? <img src={x.url} alt={x.tipo} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ height: "100%", display: "grid", placeItems: "center" }}><Image size={26} color="rgba(255,255,255,.5)" /></div>}</a>
                       <div style={{ padding: "7px 10px", background: "var(--dc-white)" }}>
                         <div style={{ fontSize: 12, fontWeight: 500, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.tipo || "Estudio"}</div>

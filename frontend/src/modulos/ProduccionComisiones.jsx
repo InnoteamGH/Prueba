@@ -3,7 +3,7 @@
  * Rutas: #/reportes – #/comisiones – #/metas
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
+import { BarChart3, X, Calculator, Info, List as ListIcon } from "lucide-react";
 import api, { auth } from "../api/client";
 import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden, mismaSede, useSede } from "../comun";
 import { sedeApiUuid } from "../routing";
@@ -59,6 +59,7 @@ import {
   moneyFmt,
   pctEnEscalaAusentismo,
   techoRinde,
+  comisionesPorSede,
 } from "./produccionComisionesUtil";
 import "./panelGerencial.css";
 import "./produccionComisiones.css";
@@ -674,7 +675,8 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
           })}>i</button>
         </div>
         <div className="dc-card__body">
-          <ListaFiltrable rows={rows} sub="odontólogos" cols={[
+          {/* R4-13: el Excel y el PDF se llamaban «Odontólogos», igual que los de Producción. */}
+          <ListaFiltrable rows={rows} sub="odontólogos" exportTitulo="Ausentismo por odontólogo" cols={[
             { key: "nombre", label: "Odontólogo", get: (r) => r.nombre || "" },
             { key: "agenda", label: "Agenda", get: (r) => String(r.agenda ?? ""), sortVal: (r) => Number(r.agenda) || 0 },
             { key: "perdidas", label: "Se pierden", get: (r) => String(r.perdidas ?? ""), sortVal: (r) => Number(r.perdidas) || 0 },
@@ -792,7 +794,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
     if (propias.length) return propias.reduce((a, x) => a + (Number(x.metaMensual) || 0), 0);
     return Number(md.metaMensual) || 0;
   };
-  const [data, setData] = useState(null);
+  const [dataSrv, setData] = useState(null);
   const [err, setErr] = useState(null);
   // H-G5: periodo explícito (antes /comisiones sin fechas = mayo–octubre sin rotular).
   const [periodo, setPeriodo] = useState("6m");
@@ -812,6 +814,28 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   }, [sedes && sedes.join(","), claveSedes, periodo]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
 
   useEffect(() => { cargar(); }, [cargar]);
+  // H-06: /comisiones ignora la sede elegida para quien ve toda la clínica (daba el total de
+  // la clínica con «Sede Surco»). Con una sede elegida, producción y cobrado se rehacen con
+  // GET /citas (sí filtra por sede) y GET /pagos/historial (cada pago trae su sede).
+  const [deSede, setDeSede] = useState(null);   // { citas, pagos } | { error: true }
+  useEffect(() => {
+    setDeSede(null);
+    if (!conectado || !sedesApi || tab === "ausencias") return undefined;
+    let vivo = true;
+    Promise.all([api.citas.listar(null, rango.desde, rango.hasta, sedesApi), api.pagos.historial({ sedeIds: sedesApi }).catch(() => null)])
+      .then(([cs, pg]) => { if (vivo) setDeSede({ citas: Array.isArray(cs) ? cs : [], pagos: Array.isArray(pg) ? pg : null }); })
+      .catch(() => { if (vivo) setDeSede({ error: true }); });
+    return () => { vivo = false; };
+  }, [conectado, claveSedes, periodo, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  const data = useMemo(() => (dataSrv && deSede && !deSede.error
+    ? comisionesPorSede(dataSrv, deSede.citas, deSede.pagos, { desde: rango.desde, hasta: rango.hasta, enSede: (sid) => sid != null && (sedes || []).some((v) => mismaSede(v, sid)) })
+    : dataSrv), [dataSrv, deSede]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Aviso de lo que, con una sede elegida, sigue siendo de toda la clínica.
+  const avisoSede = !conectado || !sedesApi || tab === "ausencias" ? null
+    : deSede == null ? "Calculando la producción de la sede elegida…"
+    : deSede.error ? "Cifras de toda la clínica: el servidor aún no filtra Producción y comisiones por sede, y no se pudieron leer las citas de la sede."
+    : !data?.cobrosSede ? "Producción y comisión calculadas con las citas atendidas de la sede elegida. Lo cobrado es de toda la clínica: el servidor aún no filtra los cobros por sede."
+    : "Producción, comisión y cobrado de la sede elegida, calculados con sus citas atendidas y sus pagos (el servidor aún no filtra este reporte por sede).";
   useEffect(() => {
     const t = requestAnimationFrame(() => setAnimReady(true));
     return () => cancelAnimationFrame(t);
@@ -901,6 +925,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <span className="dc-nota" style={{ margin: 0 }}>Periodo: <b>{rotuloPeriodo(perDesde, perHasta)}</b>{mesesPer > 1 ? ` (${mesesPer} meses: la meta se cuenta ${mesesPer} veces)` : ""}</span>
             </div>
           )}
+          {avisoSede && <div className={`fm-aviso-edad${deSede?.error ? " is-mal" : " is-info"}`} style={{ marginBottom: 12 }}><Info size={15} strokeWidth={2} /><span>{avisoSede}</span></div>}
           <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores del periodo">
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Producción del periodo",
@@ -1022,7 +1047,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               })}>i</button>
             </div>
             <div className="dc-card__body">
-              <ListaFiltrable rows={porMedico} sub="odontólogos" cols={[
+              <ListaFiltrable rows={porMedico} sub="odontólogos" exportTitulo="Producción por odontólogo" cols={[
                 { key: "nombre", label: "Odontólogo", get: (m) => m.nombre || "" },
                 { key: "esp", label: "Especialidad", get: (m) => m.especialidad || "" },
                 { key: "citas", label: "Citas", get: (m) => String(m.atendidas || 0), sortVal: (m) => Number(m.atendidas) || 0 },

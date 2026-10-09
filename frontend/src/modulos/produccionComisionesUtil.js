@@ -229,3 +229,70 @@ export function ritmoDelPeriodo(desde, hasta, hoy = new Date()) {
 export const rotuloPeriodo = (desde, hasta) => (desde && hasta
   ? `del ${String(desde).slice(0, 10).split("-").reverse().join("/")} al ${String(hasta).slice(0, 10).split("-").reverse().join("/")}`
   : "");
+
+/* H-06: /comisiones ignora sedeIds para quien ve toda la clínica (admin y gerencia veían
+   S/ 1 880 con «Sede Surco» elegida). Con una sede elegida, la respuesta se rehace con datos
+   que sí se filtran:
+   - producción de cada odontólogo = suma del «valor» de sus citas atendidas del periodo
+     (GET /citas?sedeIds, la misma regla del servidor: cuadra con /comisiones sin sede);
+   - lo cobrado = pagos no anulados de esa sede (GET /pagos/historial trae la sede de cada uno).
+   El % y la meta siguen siendo los de /comisiones. pagos = null: lo cobrado queda como vino
+   y `cobrosSede` va en false (la pantalla avisa que esa parte es de toda la clínica). */
+const MESES_CORTO = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"];
+const MESES_LARGO = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const r2c = (n) => Math.round((Number(n) || 0) * 100) / 100;
+export function comisionesPorSede(data, citas, pagos, { desde, hasta, enSede = () => true } = {}) {
+  const base = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  const enRango = (f) => { const x = String(f || "").slice(0, 10); return !!x && (!desde || x >= desde) && (!hasta || x <= hasta); };
+  const at = (citas || []).filter((c) => c && c.estado === "atendida" && enRango(c.fecha) && enSede(c.sedeId ?? c.sede));
+  const agg = new Map();
+  for (const c of at) {
+    const k = String(c.medicoId ?? c.medico ?? "—");
+    const a = agg.get(k) || { n: 0, prod: 0, nombre: c.medico || null, meses: new Map() };
+    const v = Number(c.valor ?? c.precio) || 0;
+    a.n++; a.prod += v;
+    const ym = String(c.fecha).slice(0, 7); a.meses.set(ym, (a.meses.get(ym) || 0) + v);
+    agg.set(k, a);
+  }
+  const vistos = new Set();
+  const fila = (m, a) => {
+    const pct = Number(m.porcentaje) || 0;
+    return { ...m, atendidas: a.n, citas: a.n, produccion: r2c(a.prod), comision: r2c((a.prod * pct) / 100), ticketCita: a.n ? r2c(a.prod / a.n) : null, ejemplo: false };
+  };
+  const porMedico = (base.porMedico || []).map((m) => {
+    const k = String(m.medicoId ?? m.id); vistos.add(k);
+    return fila(m, agg.get(k) || { n: 0, prod: 0 });
+  });
+  for (const [k, a] of agg) if (!vistos.has(k)) porMedico.push(fila({ medicoId: k, nombre: a.nombre || "Sin odontólogo", porcentaje: 0, meta: null }, a));
+  const totalProduccion = r2c(porMedico.reduce((s, m) => s + m.produccion, 0));
+  const totalComision = r2c(porMedico.reduce((s, m) => s + m.comision, 0));
+  // Meses del periodo: los que mandó el servidor; si no mandó, del desde al hasta.
+  const ymsBase = (base.cobrosPorMes || base.tendencia || []).map((x) => x.anioMes).filter(Boolean);
+  const yms = ymsBase.length ? ymsBase : (() => {
+    const out = []; if (!desde || !hasta) return out;
+    let [y, m] = desde.slice(0, 7).split("-").map(Number); const [yh, mh] = hasta.slice(0, 7).split("-").map(Number);
+    while (y < yh || (y === yh && m <= mh)) { out.push(`${y}-${String(m).padStart(2, "0")}`); m++; if (m > 12) { m = 1; y++; } }
+    return out;
+  })();
+  const mesDe = (ym) => { const i = Number(ym.slice(5, 7)) - 1; return { mes: MESES_CORTO[i] || ym, mesLargo: MESES_LARGO[i] || ym, anioMes: ym }; };
+  const out = {
+    ...base, porMedico, totalProduccion, totalComision, totalCitas: at.length,
+    odontologosConProduccion: porMedico.filter((m) => m.produccion > 0).length,
+    mediaTicketClinica: at.length ? r2c(totalProduccion / at.length) : 0,
+    tendencia: yms.map((ym) => ({ ...mesDe(ym), produccion: r2c([...agg.values()].reduce((s, a) => s + (a.meses.get(ym) || 0), 0)) })),
+    porSede: true, cobrosSede: false,
+  };
+  if (Array.isArray(pagos)) {
+    const porMes = new Map(yms.map((ym) => [ym, 0]));
+    for (const p of pagos) {
+      if (!p || p.anulado || p.estado === "anulado") continue;
+      const f = String(p.fecha || p.creadoEn || "").slice(0, 10);
+      if (!enRango(f) || !enSede(p.sedeId ?? p.sede)) continue;
+      porMes.set(f.slice(0, 7), (porMes.get(f.slice(0, 7)) || 0) + (Number(p.monto) || 0));
+    }
+    const cobrosPorMes = [...porMes.keys()].sort().map((ym) => ({ ...mesDe(ym), cobrado: r2c(porMes.get(ym)) }));
+    const totalCobrado = r2c(cobrosPorMes.reduce((s, x) => s + x.cobrado, 0));
+    Object.assign(out, { cobrosPorMes, totalCobrado, mesesConCobro: cobrosPorMes.filter((x) => x.cobrado > 0).length, descuadre: r2c(totalCobrado - totalProduccion), cobrosSede: true });
+  }
+  return out;
+}

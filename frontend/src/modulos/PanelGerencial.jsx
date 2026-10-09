@@ -810,6 +810,11 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const sedeCx = useSede();
   const sedesApi = (!verSedes || (sedeCx.sede === "all" && sedeCx.global)) ? null
     : verSedes.map((x) => sedeApiUuid(x)).filter(Boolean);
+  // R4-01: con una sede elegida, /gerencial/kpis, /gerencial/indicadores y
+  // /tratamientos/resumen aún devuelven lo de toda la clínica (ignoran sedeIds). Lo que se
+  // puede rehacer con datos que sí se filtran (citas de hoy, pacientes, caja, egresos) se
+  // rehace; el resto lleva el rótulo «toda la clínica» y el aviso de arriba lo explica.
+  const sedeSinFiltroSrv = conectado && !!(sedesApi && sedesApi.length);
   const [kd, setKd] = useState(null);
   const [ind, setInd] = useState(null);
   const [rep, setRep] = useState(null);
@@ -973,8 +978,12 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const meta = metaEstado(kd?.hayMeta, kd?.metaMensualClinica);
   // H-G3: con sesión, lo mismo que «Facturado del mes» y el Top de tratamientos.
   const prodMes = conectado ? totalResumen(tratResumen) : (Number(kd?.ingresosMes) || 0);
-  const prodDia = Number(kd?.produccionDia) || 0;
-  const atendidosApi = kd?.pacientesAtendidosHoy;
+  // Con sede: la producción del día es el «valor» de las citas atendidas hoy en esa sede
+  // (GET /citas sí filtra), no la de toda la clínica que trae /gerencial/kpis.
+  const prodDia = sedeSinFiltroSrv
+    ? citasHoy.filter((c) => c.estado === "atendida").reduce((s, c) => s + (Number(c.valor ?? c.precio) || 0), 0)
+    : Number(kd?.produccionDia) || 0;
+  const atendidosApi = sedeSinFiltroSrv ? null : kd?.pacientesAtendidosHoy;
   const atendidos = atendidosApi != null
     ? Number(atendidosApi) || 0
     : distinctPatients(citasHoy, "atendida");
@@ -1024,7 +1033,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const tratSorted = [...tratList].sort((a, b) => (Number(b.importeTotal) || 0) - (Number(a.importeTotal) || 0));
 
   const cartera = ind?.cartera || {};
-  const pacs = Array.isArray(pacResumen) ? pacResumen : [];
+  // /pacientes/resumen no trae la sede: con una sede elegida se queda con los pacientes del
+  // directorio de esa sede (la misma regla que la Cartera).
+  const pacs = useMemo(() => (Array.isArray(pacResumen) ? pacResumen : []).filter((p) => !sedeSinFiltroSrv || !dirPac || dirPac.ids.has(String(p.pacienteId ?? p.id))), [pacResumen, sedeSinFiltroSrv, dirPac]);
   const conSaldo = pacs.filter((p) => Number(p.saldo) > 0);
   // Ejes del cubo a la medida de los pacientes que se dibujan.
   const escCubo = useMemo(() => (conectado ? escalaCubo(pacs) : ESCALA_CUBO_DEF), [pacs, conectado]);
@@ -1064,6 +1075,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     if (!Number.isFinite(t)) return false;
     return (Date.now() - t) <= 30 * 86400000;
   }).length;
+  const todaClinica = sedeSinFiltroSrv ? <span className="dc-pg__toda" title="Cifra de toda la clínica: el servidor aún no la filtra por sede.">toda la clínica</span> : null;
   const subHead = [
     nSedes != null ? `${nSedes} sede${nSedes === 1 ? "" : "s"}` : null,
     "datos al día de hoy",
@@ -1101,6 +1113,12 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
 
   return (
     <div className="dc-pg">
+      {sedeSinFiltroSrv && (
+        <div className="fm-aviso-edad is-info dc-pg__aviso-sede" role="note">
+          <Info size={15} strokeWidth={2} />
+          <span><b>Cifras de toda la clínica: el servidor aún no filtra por sede.</b> Los bloques marcados «toda la clínica» (Facturado del mes, Meta, Top de tratamientos, Requiere acción, Antigüedad de la deuda, Producción por especialidad, Aceptación de planes y Producción por tratamiento) siguen mostrando toda la clínica. Caja del día, Hoy en la clínica, Salidas, Top del equipo, Ocupación y Cartera sí son de la sede elegida.</span>
+        </div>
+      )}
 
       {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
       <ResumenMes kd={kd} sedes={verSedes} sedesApi={sedesApi} acciones={<div className="dc-head-acc" title={subHead}>
@@ -1264,7 +1282,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--dc-danger-700)" }} />
-          <h2>Requiere acción</h2>
+          <h2>Requiere acción{todaClinica}</h2>
           <span className="dc-card__meta">{alertas.length} asuntos abiertos</span>
           <button type="button" className="dc-info" aria-label="Asuntos"
             onClick={() => abrir({
@@ -1310,7 +1328,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               })}
             </div>
             <div className="dc-split__rule">
-              <p className="dc-rotulo">Antigüedad de la deuda – 100% = {moneyFmt(agingTotal)}</p>
+              <p className="dc-rotulo">Antigüedad de la deuda – 100% = {moneyFmt(agingTotal)}{todaClinica}</p>
               <StackSegs items={agingItems} total={agingTotal} />
               <div className="dc-leyenda">
                 {agingItems.map((it, i) => {
@@ -1346,7 +1364,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <section className="dc-card">
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g2)" }} />
-            <h2>Producción por especialidad</h2>
+            <h2>Producción por especialidad{todaClinica}</h2>
             <span className="dc-card__meta">100% = {moneyFmt(espTotal)}</span>
             <button type="button" className="dc-info" aria-label="Especialidades"
               onClick={() => abrir({
@@ -1385,7 +1403,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <section className="dc-card">
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g3)" }} />
-            <h2>Aceptación de planes</h2>
+            <h2>Aceptación de planes{todaClinica}</h2>
             <span className="dc-card__meta">{moneyFmt(propuesto)} propuesto</span>
             <button type="button" className="dc-info" aria-label="Planes"
               onClick={() => abrir({
@@ -1444,7 +1462,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--g1)" }} />
-          <h2>{conectado ? "Producción por tratamiento" : "Odontología general – por tratamiento"}</h2>
+          <h2>{conectado ? "Producción por tratamiento" : "Odontología general – por tratamiento"}{todaClinica}</h2>
           <span className="dc-card__meta">{tratTotal > 0 ? `100% = ${moneyFmt(tratTotal)}` : "Sin datos aún"}</span>
           {tratTotal <= 0 && (
             <span className="marca-demo" title="Sin ventas enlazadas a servicio del catálogo">sin desglose aún</span>

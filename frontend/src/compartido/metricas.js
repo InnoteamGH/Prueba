@@ -137,6 +137,55 @@ export function cartera(fichas, pacientes, { hoy = hoyISO(), sede = null } = {})
   return { filas, porCobrar, vencido, saldoPlan,
     conPorCobrar: filas.filter((f) => f.porCobrar > 0), conVencido: filas.filter((f) => f.vencido > 0), conSaldo: filas.filter((f) => f.saldoPlan > 0) };
 }
+/* ── M-06 / M-07 con sesión · Deuda por paciente desde GET /caja ──
+   /caja trae el saldo del plan de cada paciente (porCobrar[]: total, pagado, saldo) y,
+   aparte, los procedimientos terminados sin pagar (terminados[]: costo, terminadaEn).
+   «Hecho sin pagar» es lo terminado sin pasar del saldo (lo mismo que «Listo para cobrar»
+   de Caja); «vencido», la parte de eso terminada hace más de N días, imputando los pagos a
+   lo más antiguo primero (igual que cuentaPaciente). El saldo del plan incluye además lo
+   que falta hacer: no es deuda vencida (R4-12, R4-14).
+   Sin `terminados` (servidor anterior) devuelve null: el dato no se inventa.
+   incluir(sedeId) decide qué filas cuentan (filtro de sede de la pantalla). */
+export function deudaDeCaja(caja, { hoy = hoyISO(), umbral = UMBRAL_VENCIDO_DIAS, incluir = () => true } = {}) {
+  if (!caja || !Array.isArray(caja.terminados)) return null;
+  const saldos = new Map();
+  for (const r of caja.porCobrar || []) {
+    if (!incluir(r.sedeId)) continue;
+    const k = String(r.pacienteId);
+    saldos.set(k, (saldos.get(k) || 0) + num(r.saldo));
+  }
+  const porPac = new Map();
+  for (const t of caja.terminados) {
+    if (!incluir(t.sedeId)) continue;
+    const k = String(t.pacienteId);
+    const x = porPac.get(k) || { pacienteId: t.pacienteId, paciente: t.paciente || "—", items: [] };
+    x.items.push(t); porPac.set(k, x);
+  }
+  const filas = [];
+  for (const [k, x] of porPac) {
+    const suma = x.items.reduce((a, t) => a + num(t.costo), 0);
+    const saldo = saldos.get(k);
+    const hecho = saldo > 0 ? Math.min(suma, saldo) : suma;
+    // Lo que el saldo ya no cubre de lo terminado se da por pagado, empezando por lo más antiguo.
+    let resto = Math.max(0, suma - hecho), vencido = 0, dias = null;
+    const fecha = (t) => String(t.terminadaEn || "").slice(0, 10);
+    for (const t of [...x.items].sort((a, b) => (fecha(a) || "0000").localeCompare(fecha(b) || "0000"))) {
+      const c = num(t.costo); const aplicado = Math.min(c, resto); resto -= aplicado;
+      const pend = c - aplicado;
+      if (pend <= 0) continue;
+      const d = fecha(t) ? diasEntre(fecha(t), hoy) : null;
+      if (d != null) dias = Math.max(dias ?? 0, d);
+      if (d != null && d > umbral) vencido += pend;
+    }
+    const r2 = (n) => Math.round(n * 100) / 100;
+    filas.push({ pacienteId: x.pacienteId, paciente: x.paciente, hecho: r2(hecho), vencido: r2(vencido), dias });
+  }
+  return {
+    filas, porPaciente: new Map(filas.map((f) => [String(f.pacienteId), f])),
+    hecho: filas.reduce((a, f) => a + f.hecho, 0), vencido: filas.reduce((a, f) => a + f.vencido, 0),
+    conVencido: filas.filter((f) => f.vencido > 0),
+  };
+}
 // Antigüedad de lo por cobrar en tramos (0–30, 31–60, 61–90, 90+).
 export function antiguedadDeuda(carteraRes) {
   const tramos = [["0–30 días", 0, 30], ["31–60 días", 31, 60], ["61–90 días", 61, 90], ["Más de 90 días", 91, Infinity]].map(([l, a, b]) => ({ l, a, b, v: 0 }));
