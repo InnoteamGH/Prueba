@@ -190,7 +190,11 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
       setRecurrentes(mios.filter((b) => !b.fecha && b.diaSemana != null).map((b) => ({ id: b.id, dia: DOW_SEMANA.indexOf(Number(b.diaSemana)), ini: hm(b.horaInicio), fin: hm(b.horaFin), motivo: b.motivo || "Bloqueo" })).filter((r) => r.dia >= 0));
     }).catch(() => {});
   }, [conectado, miMedId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [motivo, setMotivo] = useState("Bloqueo");
+  // El motivo de los bloqueos nuevos es un dato del formulario: se recuerda en este navegador
+  // (antes volvía a «Bloqueo» al recargar y el siguiente bloqueo salía con otro motivo).
+  const CLAVE_MOTIVO = "dc_disp_motivo";
+  const [motivo, setMotivo0] = useState(() => { try { return localStorage.getItem(CLAVE_MOTIVO) || "Bloqueo"; } catch { return "Bloqueo"; } });
+  const setMotivo = (v) => { setMotivo0(v); try { localStorage.setItem(CLAVE_MOTIVO, v); } catch { /* sin almacenamiento */ } };
   const [modo, setModo] = useState("semana"); // "semana" | "recurrente"
   const ANTICIP = 7;                                  // días de anticipación exigidos
   // La rejilla abría SIEMPRE en la semana en curso, que por la regla de anticipación no

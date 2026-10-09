@@ -97,6 +97,11 @@ export const normSillon = (r) => ({
   nota: r.nota || "",
 });
 
+/** Normaliza un bloqueo de agenda. R-02: el servidor manda la sede como `sedeId` y la agenda
+    la buscaba en `sede`: sin ella, un bloqueo de San Isidro valía para todas las sedes y
+    dejaba sin cupos la grilla y el modal de agendar de Surco. */
+export const normBloqueo = (b) => ({ ...b, sede: b?.sedeId ?? b?.sede ?? null });
+
 export const sillonesDeSede = (sillones, sede) => (sillones || []).filter((s) => sede == null || mismaSedeS(s.sede, sede)).sort((a, b) => a.numero - b.numero);
 
 /** Etiqueta corta del uso del sillón: «Flexible», «Solo Odontopediatría», «Fijo · Dra. Quispe». */
@@ -168,10 +173,12 @@ export function bloqueoQuePisa(bloqueos, { fecha, hora, duracionMin, medicoId, s
   return (bloqueos || []).find((b) => {
     const aplica = (b.fecha && String(b.fecha).slice(0, 10) === fecha) || (!b.fecha && Number(b.diaSemana) === dow);
     if (!aplica) return false;
+    // La sede del bloqueo llega como `sede` (demo, ya normalizado) o `sedeId` (servidor).
+    const sedeB = b.sede ?? b.sedeId ?? null;
     if (b.medicoId != null && !mismo(b.medicoId, medicoId)) return false;
-    if (b.sillon != null && (!mismo(b.sillon, sillon) || (b.sede != null && !mismaSedeS(b.sede, sede)))) return false;
+    if (b.sillon != null && (!mismo(b.sillon, sillon) || (sedeB != null && !mismaSedeS(sedeB, sede)))) return false;
     // Toda la agenda o un doctor: el bloqueo vale solo en su sede (sin sede = todas).
-    if (b.sillon == null && b.sede != null && sede != null && !mismaSedeS(b.sede, sede)) return false;
+    if (b.sillon == null && sedeB != null && sede != null && !mismaSedeS(sedeB, sede)) return false;
     return aMin(b.horaInicio) < fin && ini < aMin(b.horaFin);
   }) || null;
 }

@@ -705,6 +705,10 @@
 .dc-hero__cifras > div { display: grid; gap: 2px; padding: 14px 18px; border-radius: 16px; background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); backdrop-filter: blur(6px); }
 .dc-hero__cifras b { font-size: 26px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums lining-nums; }
 .dc-hero__cifras span { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.75); }
+/* R-17: las cifras del Inicio llevan a su módulo. */
+.dc-hero__cifras > div.is-link { cursor: pointer; transition: opacity .15s ease; }
+.dc-hero__cifras > div.is-link:hover span { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.dc-hero__cifras > div.is-link:focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 8px; }
 @media (max-width: 767px) { .dc-hero { padding: 22px 20px; } .dc-hero h2 { font-size: 24px; } .dc-hero__cifras { width: 100%; } }
 
 .dc-hoy__grid--solo { grid-template-columns: 1fr; }

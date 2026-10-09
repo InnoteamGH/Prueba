@@ -618,14 +618,14 @@ export function BotonExportar({ titulo, cols, filas, sub = "registros" }) {
   // noche el Excel salía con fecha de mañana).
   const fecha = ymdLima(new Date()) || new Date().toISOString().slice(0, 10);
   const excel = async () => { setAbierto(false); await exportarExcel({ nombreArchivo: `${nombre}_${fecha}.xlsx`, hoja: titulo || "Datos", titulo, subtitulo: "", columnas, filas: await datos() }); };
-  const pdf = async () => { setAbierto(false); const filasPdf = await datos(); exportarPDF({ titulo, subtitulo: `${(filas || []).length} ${sub}`, columnas, filas: filasPdf }); };
+  const pdf = async () => { setAbierto(false); const filasPdf = await datos(); exportarPDF({ titulo, subtitulo: `${(filas || []).length} ${etiquetaCant((filas || []).length, sub)}`, columnas, filas: filasPdf }); };
   return (
     <div className="dc-exp">
       <button type="button" className="dc-exp__btn" onClick={() => setAbierto((v) => !v)} aria-haspopup="menu" aria-expanded={abierto} title="Exportar lo que se ve, con el membrete de la clínica"><Download size={14} strokeWidth={2} /> <span>Exportar</span></button>
       {abierto && <>
         <div className="dc-exp__velo" onClick={() => setAbierto(false)} />
         <div className="dc-exp__menu" role="menu">
-          <small>{(filas || []).length} {sub} · con membrete</small>
+          <small>{(filas || []).length} {etiquetaCant((filas || []).length, sub)} · con membrete</small>
           <button type="button" role="menuitem" onClick={excel}><FileSpreadsheet size={16} strokeWidth={1.9} /><span><b>Excel</b><em>Logo, datos de la empresa y filtros</em></span></button>
           <button type="button" role="menuitem" onClick={pdf}><FileText size={16} strokeWidth={1.9} /><span><b>PDF</b><em>Listo para imprimir o enviar</em></span></button>
         </div>
@@ -1556,11 +1556,17 @@ export const Modal = ({ icon, titulo, sub, onClose, children, footer, maxW, size
 // Tabla de datos reutilizable: título de columna centrado, filtro inline al clic,
 // orden A–Z/Z–A al costado, alineación por columna y clic en fila.
 // cols: [{ key, label, w, a:"left"|"center", get:(r)=>texto, cell:(r)=>JSX, noFilter, noSort }]
-const CANT_SING = { doctores: "doctor", odontólogos: "odontólogo", tratamientos: "tratamiento", servicios: "servicio", insumos: "insumo", movimientos: "movimiento", pagos: "pago", pacientes: "paciente", registros: "registro", planes: "plan", citas: "cita", sedes: "sede" };
-function etiquetaCant(n, sub) {
+const CANT_SING = { doctores: "doctor", odontólogos: "odontólogo", tratamientos: "tratamiento", servicios: "servicio", insumos: "insumo", movimientos: "movimiento", pagos: "pago", pacientes: "paciente", registros: "registro", planes: "plan", citas: "cita", sedes: "sede", comprobantes: "comprobante", órdenes: "orden", sillones: "sillón", liquidaciones: "liquidación" };
+/** «1 cita», «1 sillón», «2 citas»: el rótulo de una cantidad en singular cuando es una.
+    M4-12: la barra de las listas decía «1 citas» (usaba el plural tal cual). */
+export function etiquetaCant(n, sub) {
   if (!sub) return n === 1 ? "registro" : "registros";
-  if (n === 1) return CANT_SING[sub] || sub.replace(/es$/, "").replace(/s$/, "");
-  return sub;
+  if (n !== 1) return sub;
+  if (CANT_SING[sub]) return CANT_SING[sub];
+  if (/iones$/.test(sub)) return sub.replace(/iones$/, "ión");          // atenciones → atención
+  if (/[aeiouáéíóú]s$/.test(sub)) return sub.replace(/s$/, "");          // recetas → receta
+  if (/(r|l|n|d|j)es$/.test(sub)) return sub.replace(/es$/, "");         // doctores → doctor
+  return sub.replace(/s$/, "");
 }
 
 /* Filtro por columna y orden, el mismo de la tabla de Pacientes, para cualquier lista.
@@ -1641,7 +1647,7 @@ export function FiltroCabecera({ st, total, filtradas, sub = "registros", classN
   if (!buscable && !extra && !exportar) return null;
   return (
     <div className={`dc-fcab ${className}`}>
-      <span className="dc-fcab__cant"><b>{filtradas}</b> {sub}{q.trim() ? ` de ${total}` : ""}</span>
+      <span className="dc-fcab__cant"><b>{filtradas}</b> {etiquetaCant(filtradas, sub)}{q.trim() ? ` de ${total}` : ""}</span>
       {buscable && (
         <label className="dc-fcab__buscar">
           <Search size={14} strokeWidth={2} />
