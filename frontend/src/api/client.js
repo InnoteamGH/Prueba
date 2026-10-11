@@ -380,7 +380,12 @@ export const api = {
   },
   disponibilidad: {
     listar: (medicoId) => request("GET", `/disponibilidad${medicoId ? `?medicoId=${medicoId}` : ""}`),
-    crear: (d) => request("POST", "/disponibilidad", d),
+    // El servidor pide ahora la lista «dias» (como PUT /disponibilidad/mi); sin ella responde
+    // 400 «Debes proporcionar al menos un día». Se mandan los dos formatos: el bloque suelto y
+    // «dias» con ese mismo bloque.
+    crear: (d) => request("POST", "/disponibilidad", d && !Array.isArray(d.dias) && d.diaSemana != null
+      ? { ...d, dias: [{ diaSemana: Number(d.diaSemana), horaInicio: d.horaInicio, horaFin: d.horaFin, sedeId: d.sedeId ?? null }] }
+      : d),
     guardarMi: (payload) => request("PUT", "/disponibilidad/mi", payload),
     borrar: (id) => request("DELETE", `/disponibilidad/${id}`),
   },
