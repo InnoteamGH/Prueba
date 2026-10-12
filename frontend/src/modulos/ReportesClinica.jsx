@@ -10,6 +10,8 @@ import { sedeApiUuid } from "../routing";
 import { DataTable, DatosDemoCtx, Pestanas, Vacio, mismaSede, useSede } from "../comun";
 import * as M from "../compartido/metricas";
 import { fichaDeSede, sedeDeEgreso, sedeEnLista } from "../compartido/cajaSede";
+import { egresoEnSoles, r2, TC_DEFECTO } from "../compartido/cajaMoneda";
+import NoDisponible from "../ui/NoDisponible";
 
 const PERIODOS = [["hoy", "Hoy"], ["semana", "Esta semana"], ["mes", "Este mes"], ["mes_ant", "Mes anterior"], ["3m", "Últimos 3 meses"], ["anio", "Este año"]];
 const iso = M.isoDe;
@@ -35,6 +37,23 @@ const solesExp = (n) => (n == null ? "" : `${Number(n) < 0 ? "-" : ""}S/ ${Math.
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const mesTxt = (ym) => { const [y, m] = ym.split("-"); return `${MESES[Number(m) - 1]} ${y.slice(2)}`; };
 const servicioBase = (nombre) => String(nombre || "Procedimiento").split(" · ")[0];
+const usd2 = (n) => `US$ ${(Number(n) || 0).toFixed(2)}`;
+/* R5-09: egresos por categoría en soles. Los de dólares se convierten con el tipo de cambio
+   guardado en el egreso o, si no lo tiene, con el de la clínica (antes se omitían: «Este mes»
+   daba −S/ 8 sin el egreso de US$ 3.75 que sí muestran el Panel y Caja). */
+function egresosPorCategoria(lista, tcRef) {
+  const porCat = new Map(); let soles = 0, usd = 0;
+  for (const e of lista) {
+    const k = e.categoria || "Otros"; const a = porCat.get(k) || { soles: 0, usd: 0 };
+    const enSoles = egresoEnSoles(e, tcRef);
+    a.soles = r2(a.soles + enSoles); soles = r2(soles + enSoles);
+    if (e.moneda === "USD") { a.usd = r2(a.usd + (Number(e.monto) || 0)); usd = r2(usd + (Number(e.monto) || 0)); }
+    porCat.set(k, a);
+  }
+  const filas = [...porCat.entries()].sort((a, b) => b[1].soles - a[1].soles)
+    .map(([k, a]) => ({ id: `e-${k}`, tipo: "Egreso", concepto: a.usd ? `${k} (incluye ${usd2(a.usd)})` : k, monto: -a.soles }));
+  return { filas, soles, usd };
+}
 
 const REPORTES = [
   { id: "procedimientos", label: "Procedimientos", icon: Stethoscope, sub: "Qué se hizo, cuántas veces y cuánto sumó" },
@@ -71,6 +90,9 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
   const deSedeApi = (sid) => !sedesApi || (sid != null && verSedes.some((v) => mismaSede(v, sid)));
   const [srv, setSrv] = useState({});   // { [clave]: datos | { error: true } }
   const clave = `${rep}|${usaPeriodo ? `${r.desde}|${r.hasta}` : ""}|${claveSedes}`;
+  // R5-02: «Reintentar» borra el fallo guardado de este reporte y lo vuelve a pedir.
+  const [nRecarga, setNRecarga] = useState(0);
+  const reintentar = () => { setSrv((x) => { const { [clave]: _fallo, ...resto } = x; return resto; }); setNRecarga((n) => n + 1); };
   useEffect(() => {
     if (!conectado || srv[clave]) return;
     const fallo = () => setSrv((x) => ({ ...x, [clave]: { error: true } }));
@@ -87,9 +109,11 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     } else if (rep === "pacientes") {
       Promise.all([api.citas.listar(null, r.desde, r.hasta, sedesApi), api.pacientes.resumenCitas().catch(() => [])]).then(([c, rc]) => ok({ citas: lista(c), res: lista(rc) })).catch(fallo);
     } else {
-      Promise.all([api.pagos.historial({ sedeIds: sedesApi }), api.egresos.listar({ sedeIds: sedesApi })]).then(([pg, eg]) => ok({ pagos: lista(pg), egresos: lista(eg) })).catch(fallo);
+      // El tipo de cambio de la clínica convierte los egresos en dólares que no guardaron el suyo.
+      Promise.all([api.pagos.historial({ sedeIds: sedesApi }), api.egresos.listar({ sedeIds: sedesApi }), api.tipoCambio.get().catch(() => null)])
+        .then(([pg, eg, tc]) => ok({ pagos: lista(pg), egresos: lista(eg), tc: Number(tc?.tipoCambio ?? tc?.valor) || null })).catch(fallo);
     }
-  }, [conectado, clave]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, clave, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps
   const dSrv = conectado ? srv[clave] : null;
 
   const datosSrv = useMemo(() => {
@@ -157,23 +181,25 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       if (p.anulado || p.estado === "anulado" || !enRango(p.fecha || p.creadoEn, r) || !deSedeApi(p.sedeId)) continue;
       const k = p.metodo || "Otro"; ing.set(k, (ing.get(k) || 0) + (Number(p.monto) || 0)); ingTot += Number(p.monto) || 0;
     }
-    const egr = new Map(); let egrTot = 0;
-    for (const e of dSrv.egresos) {
-      if ((e.moneda || "PEN") === "USD" || !enRango(e.fecha, r) || !deSedeApi(e.sedeId ?? e.sede)) continue;
-      const k = e.categoria || "Otros"; egr.set(k, (egr.get(k) || 0) + (Number(e.monto) || 0)); egrTot += Number(e.monto) || 0;
-    }
+    const tcRef = Number(dSrv.tc) > 0 ? Number(dSrv.tc) : TC_DEFECTO;
+    const eg = egresosPorCategoria(dSrv.egresos.filter((e) => enRango(e.fecha, r) && deSedeApi(e.sedeId ?? e.sede)), tcRef);
+    const egrTot = eg.soles;
     const filas = [
       ...[...ing.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ id: `i-${k}`, tipo: "Ingreso", concepto: `Cobros · ${k}`, monto: v })),
-      ...[...egr.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ id: `e-${k}`, tipo: "Egreso", concepto: k, monto: -v })),
+      ...eg.filas,
     ];
-    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)], ["Neto", `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)" };
+    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)], ["Neto", `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)",
+      notaUsd: eg.usd ? `Los egresos en dólares (${usd2(eg.usd)}) se suman en soles con el tipo de cambio guardado en cada egreso o, si no lo tiene, con el de la clínica (S/ ${tcRef.toFixed(2)} por dólar).` : null };
   }, [conectado, dSrv, rep, clave]); // eslint-disable-line react-hooks/exhaustive-deps
   // Aviso honesto de lo que el servidor todavía no informa.
+  // H-05 / R5-04: /tratamientos/resumen ignora la sede elegida, pero ya recorta a las sedes del
+  // usuario (el administrador de Surco recibe solo Surco). El aviso sale solo a quien ve más
+  // sedes de las que eligió: el usuario de toda la clínica con una sede elegida, o el de
+  // varias sedes que eligió una.
+  const procSinFiltroSede = rep === "procedimientos" && !!sedesApi && (sx.global || (sx.mias || []).length > sedesApi.length);
   const avisoSrv = !datosSrv ? null
-    : datosSrv.error ? "No se pudieron obtener los datos del servidor para este reporte."
-    // H-05: /tratamientos/resumen devuelve lo mismo con cualquier sede (el administrador de
-    // sede veía 14 filas de toda la clínica sin saberlo).
-    : rep === "procedimientos" && sedesApi ? "Cifras de toda la clínica: el servidor aún no filtra los procedimientos por sede."
+    : datosSrv.error ? null
+    : procSinFiltroSede ? (sx.global ? "Cifras de toda la clínica: el servidor aún no filtra los procedimientos por la sede elegida." : "Cifras de todas tus sedes: el servidor aún no filtra los procedimientos por la sede elegida.")
     : datosSrv.sinDetalle ? (datosSrv.sinPorCobrar ? "El servidor informa el saldo de cada plan; «hecho sin pagar», «vencido» y «días sin pagar» estarán cuando lo resuma por ítem." : "«Vencido» y «días sin pagar» estarán cuando el servidor resuma la deuda por ítem; por eso esas columnas no se muestran.")
     : datosSrv.sinPrimera ? "Para separar pacientes nuevos de recurrentes el servidor debe informar la primera visita de cada paciente."
     : datosSrv.conDetalle ? "«Hecho sin pagar» son los procedimientos terminados que aún no se cobran (en Caja, «Listo para cobrar»); «vencido», la parte terminada hace más de 30 días. El saldo del plan incluye además lo que falta hacer."
@@ -225,16 +251,14 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       if (!enRango(p.fecha, r)) continue;
       const k = p.metodo || "Otro"; ing.set(k, (ing.get(k) || 0) + (Number(p.monto) || 0)); ingTot += Number(p.monto) || 0;
     }
-    const egr = new Map(); let egrTot = 0;
-    for (const e of egresos) {
-      if ((e.moneda || "PEN") === "USD" || !enRango(e.fecha, r)) continue;
-      const k = e.categoria || "Otros"; egr.set(k, (egr.get(k) || 0) + (Number(e.monto) || 0)); egrTot += Number(e.monto) || 0;
-    }
+    const eg = egresosPorCategoria(egresos.filter((e) => enRango(e.fecha, r)), TC_DEFECTO);
+    const egrTot = eg.soles;
     const filas = [
       ...[...ing.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ id: `i-${k}`, tipo: "Ingreso", concepto: `Cobros · ${k}`, monto: v })),
-      ...[...egr.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ id: `e-${k}`, tipo: "Egreso", concepto: k, monto: -v })),
+      ...eg.filas,
     ];
-    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)], ["Neto", `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)" };
+    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)], ["Neto", `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)",
+      notaUsd: eg.usd ? `Los egresos en dólares (${usd2(eg.usd)}) se suman en soles con el tipo de cambio guardado en cada egreso.` : null };
   }, [rep, per, fichas, pacientes, citas, egresos]); // eslint-disable-line
   const datos = conectado ? datosSrv : datosDemo;
 
@@ -293,10 +317,12 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
           {PERIODOS.map(([k, l]) => <button key={k} type="button" className={per === k ? "is-on" : ""} onClick={() => setPer(k)}>{l}</button>)}
         </div>
       )}
+      {datos.error && <NoDisponible bloque onReintentar={reintentar} texto="Reporte no disponible" detalle="No se pudieron obtener los datos del servidor para este reporte. Las cifras de arriba no son ceros: faltan los datos." />}
       {avisoSrv && <div className="fm-aviso-edad is-info"><ClipboardList size={15} strokeWidth={2} /><span>{avisoSrv}</span></div>}
+      {datos.notaUsd && <div className="fm-aviso-edad is-info"><Wallet2 size={15} strokeWidth={2} /><span>{datos.notaUsd}</span></div>}
       <DataTable titulo={R.label} sub="filas" rows={datos.filas} cols={cols} minWidth={720} exportTitulo={`${R.label}${usaPeriodo ? ` · ${periodoTxt}` : ""}`}
         accion={rep === "recuperar" && datos.filas.length ? <button type="button" className="dc-rcx__ir" onClick={() => { window.location.hash = "#/recall"; }}><BellRing size={13} strokeWidth={2} /> Ir a Recordatorios</button> : null}
-        empty={datos.cargando ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Cargando…" sub="Pidiendo los datos al servidor." /> : datos.error ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin datos del servidor" sub="No se pudo obtener este reporte. Vuelve a intentarlo más tarde." /> : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo={rep === "recuperar" ? "Nadie por recuperar" : rep === "saldo" ? "Nadie debe" : "Sin datos en este periodo"} sub={rep === "recuperar" ? "Todos los pacientes vinieron en los últimos 6 meses o ya tienen cita." : rep === "saldo" ? "No hay trabajo hecho sin pagar ni saldos de planes." : "Prueba con un periodo más amplio."} />} />
+        empty={datos.cargando ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Cargando…" sub="Pidiendo los datos al servidor." /> : datos.error ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="No disponible" sub="No se pudo obtener este reporte. Pulsa «Reintentar» arriba." /> : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo={rep === "recuperar" ? "Nadie por recuperar" : rep === "saldo" ? "Nadie debe" : "Sin datos en este periodo"} sub={rep === "recuperar" ? "Todos los pacientes vinieron en los últimos 6 meses o ya tienen cita." : rep === "saldo" ? "No hay trabajo hecho sin pagar ni saldos de planes." : "Prueba con un periodo más amplio."} />} />
     </div>
   );
 }

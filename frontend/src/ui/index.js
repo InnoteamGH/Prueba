@@ -3,3 +3,4 @@ export { default as Campo } from "./Campo.jsx";
 export { default as TarjetaKPI } from "./TarjetaKPI.jsx";
 export { default as Aviso } from "./Aviso.jsx";
 export { default as ChipAlergia } from "./ChipAlergia.jsx";
+export { default as NoDisponible } from "./NoDisponible.jsx";

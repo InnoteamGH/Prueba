@@ -20,6 +20,7 @@ import {
   carteraComoDirectorio,
 } from "./panelGerencialUtil";
 import { tienePermiso } from "../compartido/permisos";
+import NoDisponible from "../ui/NoDisponible";
 
 /* H-G9: el chip de cada asunto de «Requiere acción» lleva a la pantalla donde se resuelve
    (antes era un <span> sin acción). Solo si el rol puede ver ese módulo. */
@@ -832,6 +833,12 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const [inventarioValorizado, setInventarioValorizado] = useState(null);
   const [nSillones, setNSillones] = useState(null);
   const [nSedes, setNSedes] = useState(null);
+  // R5-02: qué lecturas fallaron. Un bloque cuya carga falló dice «No disponible · Reintentar»,
+  // no S/ 0, «sin saldo» ni «Nada pendiente por ahora» (que se leen como datos reales).
+  const [fallo, setFallo] = useState({});
+  const marcar = useCallback((k, mal) => setFallo((f) => (!!f[k] === mal ? f : { ...f, [k]: mal })), []);
+  // Cada «Reintentar» vuelve a pedir todo el panel, también el Resumen del mes.
+  const [nRecarga, setNRecarga] = useState(0);
   const fecha = hoyYmd();
 
   const abrir = useCallback((d) => setFicha(d), []);
@@ -918,21 +925,22 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     const deSede = (x) => !verSedes || x?.sedeId == null || verSedes.some((v) => mismaSede(v, x.sedeId));
     // Un 403 no es «S/ 0 cobrado»: se marca y la tarjeta dice «sin permiso».
     api.pagos.listar().then((r) => { setPagosErr(null); setPagos((r || []).filter(deSede)); }).catch((e) => { setPagosErr(e?.status === 403 ? "sin permiso" : "no disponible"); setPagos([]); });
-    api.citas.listar(fecha, null, null, sedesApi).then((r) => setCitasHoy((r || []).filter(deSede))).catch(() => setCitasHoy([]));
+    api.citas.listar(fecha, null, null, sedesApi).then((r) => { marcar("citas", false); setCitasHoy((r || []).filter(deSede)); }).catch(() => { marcar("citas", true); setCitasHoy([]); });
     api.actividad(fecha).then((r) => setActividad(r || [])).catch(() => setActividad([]));
     const d = new Date();
     const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     // Todas las áreas y solo las sedes que se ven (antes: área «Odontología general» fija y sin sede).
     api.tratamientos.resumen(desde, fecha, { sedeIds: sedesApi })
-      .then((r) => setTratResumen(r || []))
-      .catch(() => setTratResumen([]));
-    api.pacientes.resumen().then((r) => setPacResumen(r || [])).catch(() => setPacResumen([]));
-    api.catalogo.servicios().then((r) => setServicios(Array.isArray(r) ? r : [])).catch(() => setServicios([]));
+      .then((r) => { marcar("trat", false); setTratResumen(r || []); })
+      .catch(() => { marcar("trat", true); setTratResumen([]); });
+    api.pacientes.resumen().then((r) => { marcar("pacRes", false); setPacResumen(r || []); }).catch(() => { marcar("pacRes", true); setPacResumen([]); });
+    api.catalogo.servicios().then((r) => { marcar("serv", false); setServicios(Array.isArray(r) ? r : []); }).catch(() => { marcar("serv", true); setServicios([]); });
     Promise.all([api.pacientes.listar(), api.pacientes.resumenCitas().catch(() => [])]).then(([ps, rc]) => {
       const ult = {}; (Array.isArray(rc) ? rc : []).forEach((x) => { if (x && x.pacienteId) ult[x.pacienteId] = x.ultimaVisita || null; });
       const visibles = (Array.isArray(ps) ? ps : []).filter((p) => deSede({ sedeId: p.sedeRegistroId ?? null }));
+      marcar("dir", false);
       setDirPac({ ...carteraComoDirectorio(visibles, ult, fecha), ids: new Set(visibles.map((p) => String(p.id))) });
-    }).catch(() => setDirPac(null));
+    }).catch(() => { marcar("dir", true); setDirPac(null); });
     api.inventario.listar(sedesApi).then((rows) => {
       // Solo el almacén de las sedes que se ven.
       const list = (Array.isArray(rows) ? rows : []).filter((it) => deSede({ sedeId: it.sedeId ?? it.sede }));
@@ -958,6 +966,15 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   }, [conectado, fecha, citasProp, cargarDemo, claveSedes, sedeCx.sede]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { recargar(); }, [recargar]);
+  const reintentar = useCallback(() => { setNRecarga((n) => n + 1); recargar(); }, [recargar]);
+  // Bloques sin dato del servidor (solo con sesión: la demostración no falla).
+  const indErr = conectado && !!ind?.errorDeCarga;
+  const citasErr = conectado && !!fallo.citas;
+  const tratErr = conectado && !!fallo.trat;
+  const espErr = conectado && (!!fallo.trat || !!fallo.serv);
+  const carteraErr = conectado && (!!fallo.pacRes || !!fallo.dir);
+  const kpisErr = conectado && !!kd?.error;
+  const nd = (props) => <NoDisponible onReintentar={reintentar} {...props} />;
 
   // Jornada de hoy: del horario de la clínica (o de la sede elegida). Con sesión y sin
   // horario cargado no se supone uno; en la demostración vale el horario por defecto.
@@ -1016,7 +1033,12 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const aceptado = Number(conv.aceptado) || 0;
   const rechazado = Number(conv.rechazado) || 0;
   const pendiente = Number(conv.pendiente) || 0;
-  const propuesto = aceptado + rechazado + pendiente;
+  // R5-14: el 100 % es lo presupuestado vigente, como lo cuenta el servidor (presupuestado =
+  // aceptado + sin respuesta; tasa = aceptado ÷ presupuestado). Lo rechazado va aparte: antes
+  // se sumaba y, con planes rechazados, la tarjeta daba S/ 4 861 y 38 % con el servidor en
+  // S/ 4 380 y 42,2 %.
+  const propuesto = Number(conv.presupuestado) > 0 ? Number(conv.presupuestado) : aceptado + pendiente;
+  const tasaAceptacion = conv.tasa != null && Number.isFinite(Number(conv.tasa)) ? Number(conv.tasa) : (propuesto ? (aceptado / propuesto) * 100 : 0);
   // H-G4: con sesión, el resumen de tratamientos del mes repartido por la especialidad de
   // cada servicio del catálogo: suma lo mismo que «Facturado» y que «Producción por
   // tratamiento». indicadores.porEspecialidad contaba citas (canceladas y futuras incluidas).
@@ -1121,8 +1143,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       )}
 
       {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
-      <ResumenMes kd={kd} sedes={verSedes} sedesApi={sedesApi} acciones={<div className="dc-head-acc" title={subHead}>
-          <button type="button" className="dc-rm__ib" aria-label="Actualizar" title="Actualizar datos" onClick={recargar}><RefreshCw size={15} strokeWidth={2} /></button>
+      <ResumenMes kd={kd} sedes={verSedes} sedesApi={sedesApi} recarga={nRecarga} onReintentar={reintentar} acciones={<div className="dc-head-acc" title={subHead}>
+          <button type="button" className="dc-rm__ib" aria-label="Actualizar" title="Actualizar datos" onClick={reintentar}><RefreshCw size={15} strokeWidth={2} /></button>
           <button type="button" className="dc-rm__ib" aria-label="Qué mide cada gráfico" title="Qué mide cada gráfico" onClick={() => abrir({
             t: "Qué mide cada gráfico",
             s: "Índice del panel",
@@ -1175,7 +1197,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__body dc-card__body--alto">
             <dl className="dc-datos">
               <div><dt>Cobrado hoy</dt><dd style={{ color: "var(--g1)" }} title={pagosErr && conectado ? `Cobros ${pagosErr}` : undefined}>{pagosErr && conectado ? "—" : moneyFmt(cobradoHoy)}</dd></div>
-              <div><dt>Cobros</dt><dd>{pagosErr && conectado ? (pagosErr === "sin permiso" ? "sin permiso" : "no disponible") : pagosHoy.length}</dd></div>
+              <div><dt>Cobros</dt><dd>{pagosErr && conectado ? (pagosErr === "sin permiso" ? "sin permiso" : nd()) : pagosHoy.length}</dd></div>
               <div><dt>Ticket medio</dt><dd>{pagosErr && conectado ? "—" : moneyFmt(ticketMedio)}</dd></div>
             </dl>
             <CanvasCaja puntos={curva} abre={rangoCaja?.abre ?? 8} cierra={rangoCaja?.cierra ?? 20} onOpen={() => abrir({
@@ -1194,7 +1216,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
             <h2>Hoy en la clínica</h2>
-            <span className="dc-card__meta">{pluralEs(citasHoy.length, "cita", "citas")} en agenda</span>
+            <span className="dc-card__meta">{citasErr ? nd({ texto: "Agenda no disponible" }) : <>{pluralEs(citasHoy.length, "cita", "citas")} en agenda</>}</span>
             <button type="button" className="dc-hoy__ver" onClick={() => { window.location.hash = "#/agenda"; }}>Ver agenda</button>
           </div>
           <div className="dc-card__body">
@@ -1216,8 +1238,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <span className="dc-hoy__ico" style={{ background: "var(--dc-ok-100)", color: "var(--dc-ok-700)" }} aria-hidden="true">$</span>
           <div className="dc-hoy__tb">
             <div className="dc-hoy__tl">Producción del día</div>
-            <div className="dc-hoy__tv">{moneyFmt(prodDia)}</div>
-            <div className="dc-hoy__ts">{citasHoy.filter((c) => c.estado === "atendida").length} de {pluralEs(citasHoy.length, "cita", "citas")} atendidas</div>
+            <div className="dc-hoy__tv">{(sedeSinFiltroSrv ? citasErr : kpisErr) ? "—" : moneyFmt(prodDia)}</div>
+            <div className="dc-hoy__ts">{citasErr ? "Agenda no disponible" : <>{citasHoy.filter((c) => c.estado === "atendida").length} de {pluralEs(citasHoy.length, "cita", "citas")} atendidas</>}</div>
           </div>
         </div>
 
@@ -1246,13 +1268,13 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <span className="dc-hoy__ico" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">✓</span>
           <div className="dc-hoy__tb">
             <div className="dc-hoy__tl">Pacientes atendidos hoy</div>
-            <div className="dc-hoy__tv">{atendidos}</div>
-            <div className="dc-hoy__ts">{enSillon} en sillón ahora</div>
+            <div className="dc-hoy__tv">{atendidosApi == null && citasErr ? "—" : atendidos}</div>
+            <div className="dc-hoy__ts">{citasErr ? "Agenda no disponible" : `${enSillon} en sillón ahora`}</div>
           </div>
         </div>
         <ResumenOcupacion variante="hoy" sedes={verSedes} onVer={() => { window.location.hash = "#/reportes_ocs"; }} />
             </div>
-            {(() => {
+            {citasErr ? <div className="dc-hoy__est"><p className="dc-rotulo">Cómo va la agenda de hoy</p>{nd({ bloque: true, detalle: "No se pudieron leer las citas de hoy." })}</div> : (() => {
               const est = [
                 ["Atendidas", citasHoy.filter((c) => c.estado === "atendida").length, "var(--dc-ok-700)"],
                 ["En sillón", enSillon, "var(--dc-accent-cyan)"],
@@ -1283,24 +1305,25 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--dc-danger-700)" }} />
           <h2>Requiere acción{todaClinica}</h2>
-          <span className="dc-card__meta">{alertas.length} asuntos abiertos</span>
+          <span className="dc-card__meta">{indErr ? nd() : `${alertas.length} asuntos abiertos`}</span>
           <button type="button" className="dc-info" aria-label="Asuntos"
             onClick={() => abrir({
               t: "Requiere acción",
               s: "Lo que no puede esperar",
-              cifra: String(alertas.length),
-              parte: "asuntos",
+              cifra: indErr ? "—" : String(alertas.length),
+              parte: indErr ? undefined : "asuntos",
               como: "Saldos vencidos, cajas abiertas, stock bajo y evoluciones pendientes.",
               cols: [["Asunto"], ["Detalle"]],
               filas: alertas.map((a) => [a.titulo || a.tipo || "—", a.detalle || a.mensaje || "—"]),
-              vacio: "Sin asuntos abiertos.",
+              vacio: indErr ? "No se pudieron leer los asuntos abiertos del servidor." : "Sin asuntos abiertos.",
               tono: "riesgo",
             })}>i</button>
         </div>
         <div className="dc-card__body">
           <div className="dc-split" style={{ gridTemplateColumns: "1fr 1fr" }}>
             <div>
-              {!alertas.length && <div className="dc-vacio-mod">Nada pendiente por ahora.</div>}
+              {indErr ? nd({ bloque: true, detalle: "No se pudieron leer los asuntos abiertos." })
+                : !alertas.length && <div className="dc-vacio-mod">Nada pendiente por ahora.</div>}
               {alertas.map((a, i) => {
                 const riesgo = /vencid|caja|cerrar|saldo/i.test(String(a.titulo || a.tipo || ""));
                 return (
@@ -1328,7 +1351,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               })}
             </div>
             <div className="dc-split__rule">
-              <p className="dc-rotulo">Antigüedad de la deuda – 100% = {moneyFmt(agingTotal)}{todaClinica}</p>
+              <p className="dc-rotulo">Antigüedad de la deuda{indErr ? "" : ` – 100% = ${moneyFmt(agingTotal)}`}{todaClinica}</p>
+              {indErr ? nd({ bloque: true, detalle: "Sin este dato no se sabe cuánto saldo hay en cada tramo." }) : <>
               <StackSegs items={agingItems} total={agingTotal} />
               <div className="dc-leyenda">
                 {agingItems.map((it, i) => {
@@ -1354,6 +1378,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                   );
                 })}
               </div>
+              </>}
             </div>
           </div>
         </div>
@@ -1365,7 +1390,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g2)" }} />
             <h2>Producción por especialidad{todaClinica}</h2>
-            <span className="dc-card__meta">100% = {moneyFmt(espTotal)}</span>
+            <span className="dc-card__meta">{espErr ? "—" : `100% = ${moneyFmt(espTotal)}`}</span>
             <button type="button" className="dc-info" aria-label="Especialidades"
               onClick={() => abrir({
                 t: "Producción por especialidad",
@@ -1385,8 +1410,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           </div>
           <div className="dc-card__body">
             <div className="dc-barras">
-              {!espRaw.length && <div className="dc-vacio-mod">Sin producción por especialidad en el tramo.</div>}
-              {espRaw.map((e, i) => (
+              {espErr ? nd({ bloque: true, detalle: "No se pudieron leer las ventas del mes o el catálogo de servicios." })
+                : !espRaw.length && <div className="dc-vacio-mod">Sin producción por especialidad en el tramo.</div>}
+              {!espErr && espRaw.map((e, i) => (
                 <BarraFila key={e.nombre + i} nombre={e.nombre} valor={e.valor} total={espTotal}
                   color={COLORES_ESP[i % COLORES_ESP.length]}
                   onOpen={() => abrir({
@@ -1404,29 +1430,32 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g3)" }} />
             <h2>Aceptación de planes{todaClinica}</h2>
-            <span className="dc-card__meta">{moneyFmt(propuesto)} propuesto</span>
+            <span className="dc-card__meta">{indErr ? "—" : `${moneyFmt(propuesto)} presupuestado`}</span>
             <button type="button" className="dc-info" aria-label="Planes"
               onClick={() => abrir({
                 t: "Aceptación de planes",
-                s: "Reparto de lo propuesto",
-                cifra: moneyFmt(propuesto),
-                como: "Planes de tratamiento según estado: aceptado, sin respuesta o rechazado.",
+                s: "Reparto de lo presupuestado",
+                cifra: indErr ? "—" : moneyFmt(propuesto),
+                parte: indErr ? undefined : `${Math.round(tasaAceptacion)}% aceptado`,
+                como: "El 100 % es lo presupuestado vigente: lo aceptado más lo que espera respuesta, como lo cuenta el servidor. El porcentaje es lo aceptado entre ese total. Los planes rechazados se muestran aparte y no entran en el total ni en el porcentaje.",
                 cols: [["Estado"], ["Importe", "n"]],
-                filas: [
+                filas: indErr ? [] : [
                   ["Aceptado", moneyFmt(aceptado)],
                   ["Sin respuesta", moneyFmt(pendiente)],
-                  ["Rechazado", moneyFmt(rechazado)],
                 ],
-                total: moneyFmt(propuesto),
+                vacio: "No se pudo leer la aceptación de planes del servidor.",
+                total: indErr ? null : moneyFmt(propuesto),
+                fuente: indErr ? undefined : `Rechazado, aparte: ${moneyFmt(rechazado)}.`,
                 tono: "morado",
               })}>i</button>
           </div>
           <div className="dc-card__body">
+            {indErr ? nd({ bloque: true, detalle: "No se pudo leer cuánto se presupuestó y cuánto se aceptó." }) : <>
             <div className="dc-acep">
-              <div><b>{propuesto ? Math.round((aceptado / propuesto) * 100) : 0}%</b><span>de lo propuesto ya fue aceptado</span></div>
+              <div><b>{Math.round(tasaAceptacion)}%</b><span>de lo presupuestado ya fue aceptado</span></div>
               <div><b>{moneyFmt(pendiente)}</b><span>esperan respuesta: llamar para cerrar</span></div>
             </div>
-            <p className="dc-rotulo">Reparto de lo propuesto – 100% = {moneyFmt(propuesto)}</p>
+            <p className="dc-rotulo">Reparto de lo presupuestado – 100% = {moneyFmt(propuesto)}</p>
             <StackSegs
               items={[
                 { valor: aceptado, color: "var(--g4)" },
@@ -1438,7 +1467,6 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               {[
                 { nom: "Aceptado", valor: aceptado, color: "var(--g4)" },
                 { nom: "Sin respuesta", valor: pendiente, color: "var(--dc-line-alt, var(--dc-ink-200))" },
-                { nom: "Rechazado", valor: rechazado, color: "var(--dc-line-alt, var(--dc-ink-200))", ceroTxt: "ninguno" },
               ].map((it) => {
                 const lay = layoutProgreso(it.valor, propuesto);
                 return (
@@ -1446,11 +1474,19 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                     <i className="sw" style={{ background: it.color }} />
                     <span className="nm">{it.nom}</span>
                     <span className="im">{moneyFmt(it.valor)}</span>
-                    <span className="pc">{lay.dibujar ? lay.etiquetaPct : (it.ceroTxt || "sin saldo")}</span>
+                    <span className="pc">{lay.dibujar ? lay.etiquetaPct : "sin saldo"}</span>
                   </div>
                 );
               })}
+              {/* Lo rechazado no es parte del 100 %: se informa aparte, sin porcentaje. */}
+              <div className={`fila${rechazado > 0 ? "" : " cero"}`} title="No entra en el total ni en el porcentaje">
+                <i className="sw" style={{ background: "transparent", border: "1px dashed var(--dc-line)" }} />
+                <span className="nm">Rechazado</span>
+                <span className="im">{moneyFmt(rechazado)}</span>
+                <span className="pc">{rechazado > 0 ? "aparte" : "ninguno"}</span>
+              </div>
             </div>
+            </>}
           </div>
           <p className="dc-card__foot">
             Lo <b>sin contestar</b> no está perdido: nadie lo ha rechazado todavía.
@@ -1463,8 +1499,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--g1)" }} />
           <h2>{conectado ? "Producción por tratamiento" : "Odontología general – por tratamiento"}{todaClinica}</h2>
-          <span className="dc-card__meta">{tratTotal > 0 ? `100% = ${moneyFmt(tratTotal)}` : "Sin datos aún"}</span>
-          {tratTotal <= 0 && (
+          <span className="dc-card__meta">{tratErr ? "—" : tratTotal > 0 ? `100% = ${moneyFmt(tratTotal)}` : "Sin datos aún"}</span>
+          {tratTotal <= 0 && !tratErr && (
             <span className="marca-demo" title="Sin ventas enlazadas a servicio del catálogo">sin desglose aún</span>
           )}
           <button type="button" className="dc-info" aria-label="Tratamientos"
@@ -1483,7 +1519,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
             })}>i</button>
         </div>
         <div className="dc-card__body">
-          {tratTotal <= 0 ? (
+          {tratErr ? nd({ bloque: true, detalle: "No se pudieron leer las ventas del mes por tratamiento." }) : tratTotal <= 0 ? (
             <div className="dc-vacio-mod">
               <b>Qué falta:</b> todavía no hay ventas enlazadas a un servicio del catálogo.
               Al agregar una fase eligiendo del catálogo, el panel podrá armar la campaña
@@ -1601,7 +1637,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <div className="dc-card__body">
           <div className="dc-split" style={{ gridTemplateColumns: "250px 1fr" }}>
             <div>
-              {franjas > 0 ? (<>
+              {citasErr ? <div style={{ marginBottom: 12 }}>{nd({ texto: "Agenda de hoy no disponible" })}</div> : franjas > 0 ? (<>
                 <p className="dc-rotulo">Franjas horarias con citas – {ocupadas} de {franjas}</p>
                 <div className="gate" aria-label={`Ocupación: ${ocupadas} de ${franjas}`}>
                   {horasJornada.map((h, g) => (
@@ -1614,13 +1650,13 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                 <p className="dc-rotulo">{sinHorario ? "Franjas horarias: configura el horario de la clínica en Configuración." : "Hoy la clínica no abre."}</p>
               )}
               <dl className="dc-cifras">
-                <div className="dc-cifra"><dt>Citas hoy</dt><dd>{citasHoy.length}</dd></div>
-                <div className="dc-cifra"><dt>En sillón</dt><dd>{enSillon}</dd></div>
-                <div className="dc-cifra"><dt>Cobradas</dt><dd>{cobradas}</dd></div>
+                <div className="dc-cifra"><dt>Citas hoy</dt><dd>{citasErr ? "—" : citasHoy.length}</dd></div>
+                <div className="dc-cifra"><dt>En sillón</dt><dd>{citasErr ? "—" : enSillon}</dd></div>
+                <div className="dc-cifra"><dt>Cobradas</dt><dd>{citasErr ? "—" : cobradas}</dd></div>
                 <div className="dc-cifra">
                   <dt>Sillones libres</dt>
                   <dd>
-                    {sillonesLibres != null && nSillones != null
+                    {sillonesLibres != null && nSillones != null && !citasErr
                       ? `${sillonesLibres} de ${nSillones}`
                       : "—"}
                   </dd>
@@ -1638,7 +1674,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g3)" }} />
             <h2>Cartera de pacientes</h2>
-            <span className="dc-card__meta">{totalCartera || cartera.activos || 0} pacientes</span>
+            <span className="dc-card__meta">{carteraErr ? "—" : `${totalCartera || cartera.activos || 0} pacientes`}</span>
             <button type="button" className="dc-info" aria-label="Cartera"
               onClick={() => abrir({
                 t: "Cartera de pacientes",
@@ -1657,6 +1693,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               })}>i</button>
           </div>
           <div className="dc-card__body">
+            {carteraErr ? nd({ bloque: true, detalle: "No se pudieron leer los pacientes ni sus saldos." }) :
             <div className="dc-split" style={{ gridTemplateColumns: "236px 1fr" }}>
               <dl className="dc-cifras">
                 <div className="dc-cifra"><dt>Total</dt><dd>{totalCartera || "—"}</dd></div>
@@ -1678,7 +1715,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                   tono: Number(p.saldo) > 0 ? "riesgo" : "ok",
                 })}
               />
-            </div>
+            </div>}
           </div>
           <p className="dc-card__foot">Color = estado, tamaño = saldo. Al pasar el ratón se detiene.</p>
         </section>
@@ -1704,6 +1741,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               })}>i</button>
           </div>
           <div className="dc-card__body">
+            {conectado && fallo.pacRes ? nd({ bloque: true, detalle: "No se pudieron leer los pacientes." }) :
             <div className="dc-split" style={{ gridTemplateColumns: "236px 1fr" }}>
               <div>
                 <p className="dc-rotulo">Cómo leerlo</p>
@@ -1734,7 +1772,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                   tono: "riesgo",
                 })}
               />
-            </div>
+            </div>}
           </div>
           <p className="dc-card__foot">
             Ancla las explicaciones al <b>color de la arista</b>: al girar, “izquierda” cambia.

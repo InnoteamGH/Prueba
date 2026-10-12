@@ -23,7 +23,7 @@ import { DISP_DEMO, SILLONES_DEMO, completarSillones, normBloqueo, normSillon, e
 import { useReglasAgenda, sillonesPorSede, conSedesDeHorario, horarioDefineSede } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
-import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat } from "./compartido/integraciones";
+import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat, notaUltimoEnvioOk } from "./compartido/integraciones";
 import { estadoCita, estadoInfo, estadoFaseUi, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
@@ -37,6 +37,8 @@ import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } fr
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
 import { layoutProgreso } from "./util/progreso";
+import NoDisponible from "./ui/NoDisponible";
+import { guardarSedeElegida, leerSedeElegida, resolverSedeGuardada } from "./compartido/sedeElegida";
 import { coberturaDias, estadoStock, pctCoberturaBarra, requierenCompra, sugeridoPedir } from "./util/inventarioCalc";
 import { margenCatalogo, precioMedioCatalogo } from "./util/serviciosCatalogo";
 import {
@@ -4631,6 +4633,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     { id: "dj4", sedeId: 2, fecha: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3)), sedeNombre: "Sede Surco", abiertaPorNombre: "Karina Soto", abiertaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3, 8, 15).toISOString(), cerradaPorNombre: "Karina Soto", cerradaEn: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 3, 18, 55).toISOString(), fondo: 100, efectivoEsperado: 410, efectivoContado: 410, diferencia: 0, abierta: false },
   ]);
   const [histCajaRango, setHistCajaRango] = useState({ desde: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 14)), hasta: fmt(hoy) });
+  // R5-08: con «Desde» posterior a «Hasta» no se consulta (el servidor responde 400): se avisa.
+  const histRangoInvertido = !!(histCajaRango.desde && histCajaRango.hasta && histCajaRango.desde > histCajaRango.hasta);
+  const [histCajaError, setHistCajaError] = useState(false);
   useEffect(() => {
     if (!conectado) { setDestinosCatalogo(DESTINOS_BASE); return; }
     api.clinica.get().then((r) => {
@@ -4674,15 +4679,16 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     api.cajaMovimientos.listar(apertura.id).then((rows) => setCajaMovs(rows || [])).catch(() => setCajaMovs([]));
   };
   const recargarHistCaja = () => {
-    if (!conectado) return;
+    if (!conectado || histRangoInvertido) return;
     // Sin caja elegida (usuario de toda la clínica con «Todas»), todas las jornadas; la
     // lista se recorta igual en el cliente a las sedes que se ven.
     const sid = sedeUuid();
     api.cajaApertura.historial({ sedeId: sid || undefined, desde: histCajaRango.desde, hasta: histCajaRango.hasta })
       // Una jornada sin cierre registrado sigue abierta aunque el servidor no mande «abierta»:
       // la de un día anterior sin cerrar salía «Cerrada».
-      .then((rows) => setHistCaja(Array.isArray(rows) ? rows.map((r) => ({ ...r, ...mapJornada(r), abierta: r.abierta === true || (r.abierta !== false && !r.cerradaEn) })) : []))
-      .catch(() => { setHistCaja([]); notify("No se pudo cargar el historial de caja."); });
+      .then((rows) => { setHistCajaError(false); setHistCaja(Array.isArray(rows) ? rows.map((r) => ({ ...r, ...mapJornada(r), abierta: r.abierta === true || (r.abierta !== false && !r.cerradaEn) })) : []); })
+      // R5-02: un fallo no es «Sin jornadas en el rango».
+      .catch(() => { setHistCaja([]); setHistCajaError(true); });
   };
   // Al cambiar de caja no se arrastra la apertura de la anterior mientras llega la nueva.
   useEffect(() => { setApertura(null); setJornadaAbiertaPrevia(null); recargarApertura(); }, [conectado, String(sedeCaja), sedes.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -5315,9 +5321,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         {sedeRequierePick && sedesCaja.length > 1 && (cajaAbierta || cerradaHoyReg) ? <span className="dc-cj4__cifra">{cajaAbierta ? `Desde ${horaDe(apertura?.abiertaEn)}` : difTxtCierre(cerradaHoyReg)}</span> : null}
         {/* C5: lo cobrado en dólares ya está dentro de los soles (al TC de cada cobro): se dice
             «incluye», no «+», para no sumarlo dos veces. */}
+        {/* R5-02: si /caja falló, la franja no dice S/ 0: dice que no hay dato. */}
+        {conectado && cajaError ? <span className="dc-cj4__cifra"><NoDisponible onReintentar={recargarCaja} texto="Saldos de caja no disponibles" /></span> : <>
         <span className="dc-cj4__cifra" title={cobradoUsdHoy ? `Total en soles. Incluye ${usd2(cobradoUsdHoy)} cobrados en dólares (S/ ${M.sol2(totCobHoy.usdEnSoles)} al TC de cada cobro).` : undefined}>Cobrado hoy <b>{sol(montoHoy)}</b>{cobradoUsdHoy ? <small> (incluye {usd2(cobradoUsdHoy)})</small> : null}</span>
         <span className="dc-cj4__cifra">Por cobrar <b className="is-aviso">{sol(montoPorCobrar)}</b></span>
         <span className="dc-cj4__cifra" title={`Cobrado hoy menos egresos de hoy (${sol(totEgresosHoy)}${totEgresosHoyUsd ? `, incluye ${usd2(totEgresosHoyUsd)} convertidos con su TC` : ""}).`}>Neto del día <b className={netoHoy < 0 ? "is-neg" : ""}>{netoHoy < 0 ? "− " : ""}{sol(Math.abs(netoHoy))}</b></span>
+        </>}
         <div className="dc-cj4__acc">
           {!cajaAbierta && !cerradaHoyReg && puedeAbrirCaja && tab !== "hoy" && <button type="button" className="dc-cj4__btn is-pri" onClick={() => setTab("hoy")}><KeyRound size={14} strokeWidth={2} /> Abrir caja</button>}
           {cajaAbierta && puedeAbrirCaja && tab !== "cierre" && <button type="button" className="dc-cj4__btn" onClick={() => setTab("cierre")}><Lock size={14} strokeWidth={2} /> Cerrar caja</button>}
@@ -5383,8 +5392,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           {jornadaAbiertaPrevia?.id && (
             <div className="fm-aviso-edad is-mal">
               <AlertTriangle size={15} strokeWidth={2} />
-              <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}. {supervisaCaja ? "La cierra la sede (su administrador o recepción)." : "Ciérrala antes de abrir otra caja en esta sede."}</span>
-              {!supervisaCaja && <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" }); }}>Cerrarla</button>}
+              <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}. {!puedeAbrirCaja ? "La cierra la sede (su administrador o recepción)." : "Ciérrala antes de abrir otra caja en esta sede."}</span>
+              {/* R5-03: «Cerrarla» solo a quien opera la caja (facturacion:crear, lo mismo que pide
+                  el servidor para cerrar). Gerencia y TI la veían y el envío se frenaba después. */}
+              {puedeAbrirCaja && <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" }); }}>Cerrarla</button>}
             </div>
           )}
           {puedeAbrirCaja ? (
@@ -5850,7 +5861,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             </Card>
           )}
           {(() => {
-            const js = (histCaja || []).filter((r) => deCaja(r.sedeId)).map((r) => (!r.abierta && jornadaAbiertaPrevia?.id && String(r.id) === String(jornadaAbiertaPrevia.id) ? { ...r, abierta: true } : r));
+            const js0 = (histCaja || []).filter((r) => deCaja(r.sedeId)).map((r) => (!r.abierta && jornadaAbiertaPrevia?.id && String(r.id) === String(jornadaAbiertaPrevia.id) ? { ...r, abierta: true } : r));
+            // R5-07: el servidor devuelve la jornada que sigue abierta con cualquier rango
+            // (septiembre decía «5 jornadas» y eran 4). La lista y los totales son del rango; la
+            // abierta de otra fecha se avisa aparte para no perderla de vista.
+            const enRangoHist = (r) => !r.fecha || ((!histCajaRango.desde || r.fecha >= histCajaRango.desde) && (!histCajaRango.hasta || r.fecha <= histCajaRango.hasta));
+            const js = conectado ? js0.filter(enRangoHist) : js0;
+            const abiertasFuera = conectado ? js0.filter((r) => r.abierta && !enRangoHist(r)) : [];
             // C8: faltantes y sobrantes por separado (−5 y +5 no son «S/ 0.00»); los dólares aparte.
             const rs = resumenDiferencias(js), ru = resumenDiferencias(js, "diferenciaUsd");
             // Resultado de un cierre en una moneda: abierta, cerrada sin arqueo, cuadra, falta o sobra.
@@ -5864,11 +5881,18 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               {js.length > 0 && <span className={`dc-flujo__neto${rs.faltantes ? " is-neg" : ""}`} title={`${rs.nFaltantes} ${rs.nFaltantes === 1 ? "cierre con faltante" : "cierres con faltante"} en el rango`}>Faltantes <b>{rs.faltantes ? "− " : ""}S/ {M.sol2(rs.faltantes)}</b></span>}
               {js.length > 0 && <span className={`dc-flujo__neto${rs.sobrantes ? " is-aviso" : ""}`} title={`${rs.nSobrantes} ${rs.nSobrantes === 1 ? "cierre con sobrante" : "cierres con sobrante"} en el rango`}>Sobrantes <b>{rs.sobrantes ? "+ " : ""}S/ {M.sol2(rs.sobrantes)}</b></span>}
               {(ru.faltantes > 0 || ru.sobrantes > 0) && <span className={`dc-flujo__neto${ru.faltantes ? " is-neg" : ""}`} title="Descuadres de la gaveta en dólares">Dólares <b>{ru.faltantes ? `− ${usd2(ru.faltantes)}` : ""}{ru.faltantes && ru.sobrantes ? " · " : ""}{ru.sobrantes ? `+ ${usd2(ru.sobrantes)}` : ""}</b></span>}
-              <label><span>Desde</span><input type="date" aria-label="Desde" value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
-              <label><span>Hasta</span><input type="date" aria-label="Hasta" value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
-              <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja}><Repeat size={14} strokeWidth={1.9} /></button>
+              <label><span>Desde</span><input type="date" aria-label="Desde" aria-invalid={histRangoInvertido || undefined} max={histCajaRango.hasta || undefined} value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
+              <label><span>Hasta</span><input type="date" aria-label="Hasta" aria-invalid={histRangoInvertido || undefined} min={histCajaRango.desde || undefined} value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
+              <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja} disabled={histRangoInvertido}><Repeat size={14} strokeWidth={1.9} /></button>
             </div>
-          ); return js.length === 0 ? <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (
+          );
+          const avisosHist = (<>
+            {histRangoInvertido && <div className="fm-aviso-edad is-mal" style={{ width: "100%" }}><AlertTriangle size={15} strokeWidth={2} /><span>La fecha «Desde» ({fechaLegible(histCajaRango.desde)}) es posterior a «Hasta» ({fechaLegible(histCajaRango.hasta)}). Corrige el rango para ver las jornadas.</span></div>}
+            {abiertasFuera.map((r) => <div key={`fuera-${r.id}`} className="fm-aviso-edad is-info" style={{ width: "100%" }}><Info size={15} strokeWidth={2} /><span>Fuera del rango sigue abierta la jornada del {fechaLegible(r.fecha)} ({sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "sede"}).</span></div>)}
+          </>);
+          if (conectado && histCajaError && !histRangoInvertido) return <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<NoDisponible bloque onReintentar={recargarHistCaja} texto="Historial no disponible" detalle="No se pudieron leer las jornadas del servidor." /></Card>;
+          return js.length === 0 ? <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}{avisosHist}<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo={histRangoInvertido ? "Rango de fechas inválido" : "Sin jornadas en el rango"} sub={histRangoInvertido ? "«Desde» debe ser anterior o igual a «Hasta»." : "Abre y cierra caja para ver el historial."} /></Card> : (<>
+          {avisosHist}
           <ListaFiltrable rows={js} sub="jornadas" extra={rango} defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 960, cols: [
             { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__strong">{fechaLegible(r.fecha)}</span> },
             { key: "sede", label: "Sede", w: "minmax(140px,1fr)", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—" },
@@ -5936,7 +5960,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             })}
           </div>
           )}</ListaFiltrable>
-          ); })()}
+          </>); })()}
         </div>
       )}
 
@@ -6612,7 +6636,7 @@ function Integraciones({ notify }) {
       { n: "Proveedor OSE / PSE (SUNAT)", d: provSunat ? "Firma y envía a SUNAT las boletas y facturas que emite Caja." : "Sin proveedor conectado: Caja emite los comprobantes y quedan «Sin enviar». Se configura en Caja › Comprobantes SUNAT.", estado: provSunat ? "conectado" : "pendiente" },
     ] },
     { cat: "Mensajería e IA", ic: MessageSquare, c: "#16A36A", items: [
-      { n: "WhatsApp Cloud API (Meta)", d: !conectado || estWa === "conectado" ? "Canal oficial para el agente IA. Más económico a escala que intermediarios." : estWa === "incidencia" ? `${wa.detalle}${salud?.ultimoEnvioOk ? ` Último envío correcto: ${new Date(salud.ultimoEnvioOk).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }).replace(/\.$/, "")}.` : ""} Revísalo en WhatsApp + IA › Conexión WhatsApp.` : wa.detalle, estado: estWa, etiqueta: wa.etiqueta, rec: true },
+      { n: "WhatsApp Cloud API (Meta)", d: !conectado || estWa === "conectado" ? "Canal oficial para el agente IA. Más económico a escala que intermediarios." : estWa === "incidencia" ? `${wa.detalle}${notaUltimoEnvioOk(salud)} Revísalo en WhatsApp + IA › Conexión WhatsApp.` : wa.detalle, estado: estWa, etiqueta: wa.etiqueta, rec: true },
       // Aquí figuraba otro proveedor del que la aplicación no depende. El motor real es
       // OpenAI (application.yml: openai.base-url), y solo con OPENAI_API_KEY cargada:
       // sin ella el asistente cae al motor de reglas.
@@ -6837,6 +6861,9 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     const verbo = u.activo ? "desactivar" : "activar";
     if (!editable(u)) { notify("Solo la administración general puede cambiar a este usuario."); return; }
     if (!(u.activo ? puedeBajaUs : puedeEditarUs)) { notify(`Tu rol no puede ${verbo} usuarios: pídeselo a la administración general.`); return; }
+    // R5-10: el servidor deja reactivar con «editar» pero dar de baja pide «eliminar». Quien
+    // solo puede reactivar (el administrador de sede) no podrá deshacerlo: se le avisa antes.
+    if (!u.activo && !puedeBajaUs && !confirm(`¿Activar a ${u.nombre}? Volverá a tener acceso a la clínica. Tu rol no puede darlo de baja después: si te equivocas, tendrá que hacerlo la administración general.`)) return;
     if (conectado) {
       // Reactivar manda el usuario completo (como «Editar»), no solo { activo }: un PUT que
       // reemplaza no debe dejarlo sin nombre, rol ni sedes.
@@ -6969,7 +6996,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? "Sin sede" : etiquetaSedes(u.sedes)), cell: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>Sin sede</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span>) },
           { key: "ultimo", label: "Acceso", w: "104px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
           { key: "estado", label: "Estado", w: "96px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
-          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !(puedeEditarUs || puedeBajaUs) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Tu rol puede ver los usuarios, pero no cambiarlos.">Solo lectura</span> : !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc">{puedeEditarUs && <button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button>}{/* Desactivar es DELETE (baja); reactivar es PUT (editar). */}{(u.activo ? puedeBajaUs : puedeEditarUs) && <button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : "Activar"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button>}{/* H-T6: con sesión «Eliminar» hacía el mismo DELETE que Desactivar (no borra): queda solo Desactivar. */}{!conectado && puedeBajaUs && <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button>}</div> },
+          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !(puedeEditarUs || puedeBajaUs) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Tu rol puede ver los usuarios, pero no cambiarlos.">Solo lectura</span> : !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc">{puedeEditarUs && <button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button>}{/* Desactivar es DELETE (baja); reactivar es PUT (editar). */}{(u.activo ? puedeBajaUs : puedeEditarUs) && <button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : puedeBajaUs ? "Activar" : "Activar (darlo de baja otra vez lo hace la administración general)"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button>}{/* H-T6: con sesión «Eliminar» hacía el mismo DELETE que Desactivar (no borra): queda solo Desactivar. */}{!conectado && puedeBajaUs && <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button>}</div> },
         ]} />
     </div>
   );
@@ -7349,8 +7376,12 @@ function Auditoria() {
   const [audDesde, setAudDesde] = useState("");
   const [audHasta, setAudHasta] = useState("");
   const [totalSrv, setTotalSrv] = useState(0);
+  // R5-08: con «Desde» posterior a «Hasta» no se consulta: se avisa en vez de mostrar 0 filas.
+  const audRangoInvertido = !!(audDesde && audHasta && audDesde > audHasta);
+  // R5-02: «Reintentar» vuelve a pedir el registro.
+  const [nRecarga, setNRecarga] = useState(0);
   useEffect(() => {
-    if (!conectado) return;
+    if (!conectado || audRangoInvertido) return;
     let cancelled = false;
     api.auditoria({ desde: audDesde || null, hasta: audHasta || null }).then((list) => {
       if (cancelled) return;
@@ -7382,7 +7413,7 @@ function Auditoria() {
       setErr("No se pudo cargar el registro de auditoría.");
     });
     return () => { cancelled = true; };
-  }, [conectado, audDesde, audHasta]);
+  }, [conectado, audDesde, audHasta, audRangoInvertido, nRecarga]);
   if (!conectado) {
     const alertas = AUDITORIA.filter((a) => a.nivel === "warn").length;
     const usuarios = new Set(AUDITORIA.filter((a) => a.usuario !== "—").map((a) => a.usuario)).size;
@@ -7413,13 +7444,13 @@ function Auditoria() {
     );
   }
   if (err && rows == null) {
-    return <Card style={{ padding: 22, color: "var(--dc-danger-700)" }}>{err}</Card>;
+    return <Card style={{ padding: 22 }}><NoDisponible bloque onReintentar={() => { setErr(null); setNRecarga((n) => n + 1); }} texto="Auditoría no disponible" detalle={err} /></Card>;
   }
   if (rows == null) {
     return <Card style={{ padding: 22, color: "var(--dc-ink-500)" }}>Cargando auditoría…</Card>;
   }
   const hoyN = contarEventosHoy(rows, hoyLima);
-  const enRango = rows.filter((a) => (!audDesde || (a.dia && a.dia >= audDesde)) && (!audHasta || (a.dia && a.dia <= audHasta)));
+  const enRango = audRangoInvertido ? [] : rows.filter((a) => (!audDesde || (a.dia && a.dia >= audDesde)) && (!audHasta || (a.dia && a.dia <= audHasta)));
   const diasCon = rows.map((a) => a.dia).filter(Boolean).sort();
   const masAntiguo = diasCon[0] || "";
   // El servidor corta en 500 eventos (sin paginación): se avisa desde qué fecha hay datos.
@@ -7444,6 +7475,7 @@ function Auditoria() {
         {(audDesde || audHasta) && <Btn small kind="ghost" onClick={() => { setAudDesde(""); setAudHasta(""); }}>Quitar fechas</Btn>}
         <span style={{ fontSize: 12, color: "var(--dc-ink-500)", alignSelf: "center" }}>{enRango.length} de {rows.length} eventos{masAntiguo ? ` · hay datos desde el ${fechaCorta(masAntiguo)}` : ""}</span>
       </div>
+      {audRangoInvertido && <div className="fm-aviso-edad is-mal" role="alert"><AlertTriangle size={15} strokeWidth={2} /><span>La fecha «Desde» ({fechaCorta(audDesde)}) es posterior a «Hasta» ({fechaCorta(audHasta)}). Corrige el rango para ver los eventos.</span></div>}
       {recortado && <div className="fm-aviso-edad is-info"><AlertTriangle size={15} strokeWidth={2} /><span>El servidor entrega solo los <b>{totalSrv} eventos más recientes</b>{masAntiguo ? ` (desde el ${fechaCorta(masAntiguo)})` : ""}. Lo anterior no se puede consultar desde aquí hasta que GET /auditoria acepte fechas o páginas.</span></div>}
       <AuditoriaVista key={`${audDesde}|${audHasta}`} rows={enRango} hoyN={hoyN} usuarios={usuarios} alertas={enRango.filter((r) => r.nivel === "warn").length} sub="Inicios de sesión y aperturas de historia clínica (Ley 29733)" onDet={setDet} niv={niv} />
       {det && (() => { const R = ROLES[det.rol]; const N = niv[det.nivel]; return (
@@ -10370,7 +10402,20 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   // Sedes a las que pertenece este usuario (N:M). "all" = toda la cuenta.
   const misSedes = sedesDe(usuario);
   const multisede = usuario.sedes === "all" || misSedes.length > 1;
-  const [sede, setSede] = useState(() => multisede ? "all" : (misSedes[0] ?? "all"));
+  // R5-12: la sede elegida se guarda por usuario (id del token; en la demostración, su acceso)
+  // y al recargar se restaura si sigue siendo una de sus sedes. Antes volvía a «Todas las sedes».
+  const idUsuarioSede = (auth.token && parseJwt(auth.token)?.sub) || (usuario.user ? `demo_${usuario.user}` : `${usuario.rol || ""}_${usuario.nombre || ""}`);
+  const [sede, setSede] = useState(() => {
+    const porDefecto = multisede ? "all" : (misSedes[0] ?? "all");
+    if (!multisede) return porDefecto;
+    const guardada = resolverSedeGuardada(leerSedeElegida(idUsuarioSede), misSedes, sedeApiUuid);
+    // Con sesión el selector trabaja con el UUID de la sede (GET /sedes): se restaura así.
+    if (guardada != null && guardada !== "all" && auth.token) return sedeApiUuid(guardada) || guardada;
+    return guardada ?? porDefecto;
+  });
+  useEffect(() => {
+    if (multisede) guardarSedeElegida(idUsuarioSede, sede === "all" ? "all" : (sedeApiUuid(sede) || String(sede)));
+  }, [sede, idUsuarioSede, multisede]);
   const [agendarDesdeFicha, setAgendarDesdeFicha] = useState(null);
   const [cobroDesdeFicha, setCobroDesdeFicha] = useState(null);
   const [vista, setVistaRaw] = useState(() => {
@@ -10741,7 +10786,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   }, [pf]); // eslint-disable-line react-hooks/exhaustive-deps
   // Si cambian las sedes del usuario (refresco de sesión) y la elegida ya no es suya, se vuelve a las suyas.
   useEffect(() => {
-    if (sede !== "all" && !misSedes.map(String).includes(String(sede))) setSede(multisede ? "all" : (misSedes[0] ?? "all"));
+    // Con sesión la sede elegida es el UUID y misSedes trae los números del registro: se
+    // comparan con mismaSede (antes, al restaurarla al recargar, se descartaba siempre).
+    if (sede !== "all" && !misSedes.some((m) => mismaSede(m, sede))) setSede(multisede ? "all" : (misSedes[0] ?? "all"));
   }, [misSedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   // Sedes que mira el usuario ahora (todas las suyas o la elegida arriba): filtra reportes y catálogos.
   const idsSede = useMemo(() => (sede === "all" ? misSedes : [sede]), [sede, misSedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps

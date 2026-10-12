@@ -11,6 +11,7 @@ const BASE = (import.meta.env.VITE_API_URL || "http://localhost:8080/api").repla
 const TOKEN_KEY = "dc_token";
 import { limpiarRegistroSedes } from "../compartido/sedesRegistro";
 import { estadoFaseUi } from "../compartido/estados";
+import { conReintentos, crearCola, MAX_GET_SIMULTANEAS } from "./reintentos";
 const CLINICAL_KEYS = ["dc_data_v1_pacientes", "dc_data_v1_fichas", "dc_data_v1_citas"];
 /** NEW-59 / ODO-01: forma UUID 8-4-4-4-12 (incluye seeds nil v0). Rechaza demo `"1"` / `1`. */
 const UUID_PACIENTE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,7 +29,8 @@ export function limpiarCacheClinicaLocal() {
 /** Con sesión real no debe quedar nada de la demostración ni de otra cuenta: se borran
     todas las claves dc_* del navegador (datos, emisor, tipo de cambio, correlativos, cajas,
     tomas del odontograma…) salvo la sesión y las preferencias de pantalla. */
-const CONSERVAR = /^dc_(token|sesion|sesion_msg|usuario|entro|vista_|fm_tab|wa_info_oculta)/;
+// dc_sede_elegida_<usuario>: la sede elegida en el menú (R5-12), una preferencia como dc_vista_.
+const CONSERVAR = /^dc_(token|sesion|sesion_msg|usuario|entro|vista_|sede_elegida_|fm_tab|wa_info_oculta)/;
 export function limpiarDatosLocales({ conservarSedes = false } = {}) {
   try {
     Object.keys(localStorage).forEach((k) => {
@@ -67,6 +69,9 @@ export function parseJwt(token) {
 
 // Peticiones GET en vuelo: evita duplicados (React StrictMode, varios módulos) — BUG-020.
 const inflightGet = new Map();
+// R5-01: el servidor da 500/503 con muchas lecturas juntas (el Panel lanza unas 25). Como
+// mucho 6 GET a la vez; el resto espera en esta cola (api/reintentos.js).
+const colaGet = crearCola(MAX_GET_SIMULTANEAS);
 
 export const auth = {
   get token() { return localStorage.getItem(TOKEN_KEY); },
@@ -218,25 +223,18 @@ async function request(method, path, body, extraHeaders) {
   return data;
   };
   const run = async () => {
-    // BE-01 / WA-16: GET hasta 3 intentos ante 502/503/0; backoff desde 800ms (espaciado).
-    const maxAttempts = method === "GET" ? 3 : 1;
-    let last;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        return await runOnce();
-      } catch (e) {
-        last = e;
-        const st = e && (e.status || e._httpStatus);
-        const retriable = st === 503 || st === 502 || st === 0;
-        if (attempt === maxAttempts || !retriable) {
-          if (st === 0 || st) avisarFallo(st, path, e.message, method);
-          throw e;
-        }
-        const delayMs = Math.min(5000, 800 * (2 ** (attempt - 1)));
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
+    // R5-01 / R-19 / M5-04 (antes BE-01 / WA-16): una GET se repite hasta 2 veces ante 500,
+    // 502, 503, 504 o un fallo de red (400–800 ms y luego 1–2 s, al azar). Cada intento espera
+    // su turno en la cola y la suelta mientras espera el siguiente. Las escrituras no se
+    // repiten nunca (conReintentos solo repite GET) ni hacen cola.
+    try {
+      return await conReintentos(() => (method === "GET" ? colaGet.ejecutar(runOnce) : runOnce()), { method });
+    } catch (e) {
+      // El aviso global sale solo cuando se agotaron los intentos (mismo criterio que antes).
+      const st = e && (e.status || e._httpStatus);
+      if (st === 0 || st) avisarFallo(st, path, e.message, method);
+      throw e;
     }
-    throw last;
   };
   const promise = run();
   if (method === "GET") {

@@ -8,6 +8,7 @@ import api, { auth } from "../api/client";
 import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden, mismaSede, useSede } from "../comun";
 import { sedeApiUuid } from "../routing";
 import { medicoEnSedes } from "../compartido/medicosSede";
+import NoDisponible from "../ui/NoDisponible";
 
 /* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
    mismas cifras que usan Metas y el Resumen del mes), para que el módulo no salga en cero. */
@@ -775,13 +776,16 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   const desdeMes = ymdL(new Date(hoyD.getFullYear(), hoyD.getMonth(), 1)), hastaHoy = ymdL(hoyD);
   const [citasSrv, setCitasSrv] = useState(null);
   const [citasErr, setCitasErr] = useState(false);
+  // R5-02: «Reintentar» vuelve a pedir todo lo de la pantalla (comisiones, citas y pagos).
+  const [nRecarga, setNRecarga] = useState(0);
+  const reintentar = () => setNRecarga((n) => n + 1);
   useEffect(() => {
     if (!conectado || tab !== "ausencias") return;
     setCitasErr(false);
     api.citas.listar(null, desdeMes, hastaHoy, sedesApi)
       .then((r) => setCitasSrv((Array.isArray(r) ? r : []).filter((c) => !sedesApi || sedes.some((v) => mismaSede(v, c.sedeId ?? c.sede)))))
       .catch(() => { setCitasSrv([]); setCitasErr(true); });
-  }, [conectado, tab, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, tab, claveSedes, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps
   const citas = conectado ? (citasSrv || []) : citasProp;
   // Metas con sesión: las del catálogo de médicos del servidor (no las de ejemplo de MEDICOS).
   const [medsSrv, setMedsSrv] = useState([]);
@@ -810,8 +814,8 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
     if (!auth.token) { setData(datosDemo(sedes)); return; }
     api.comisiones(rango.desde, rango.hasta, sedesApi)
       .then((r) => setData(r && !Array.isArray(r) ? r : {}))
-      .catch((e) => setErr(e?.message || "No se pudo cargar comisiones"));
-  }, [sedes && sedes.join(","), claveSedes, periodo]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
+      .catch((e) => { setData(null); setErr(e?.message || "No se pudo cargar comisiones"); });
+  }, [sedes && sedes.join(","), claveSedes, periodo, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
 
   useEffect(() => { cargar(); }, [cargar]);
   // H-06: /comisiones ignora la sede elegida para quien ve toda la clínica (daba el total de
@@ -826,12 +830,15 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
       .then(([cs, pg]) => { if (vivo) setDeSede({ citas: Array.isArray(cs) ? cs : [], pagos: Array.isArray(pg) ? pg : null }); })
       .catch(() => { if (vivo) setDeSede({ error: true }); });
     return () => { vivo = false; };
-  }, [conectado, claveSedes, periodo, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, claveSedes, periodo, tab, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps
   const data = useMemo(() => (dataSrv && deSede && !deSede.error
     ? comisionesPorSede(dataSrv, deSede.citas, deSede.pagos, { desde: rango.desde, hasta: rango.hasta, enSede: (sid) => sid != null && (sedes || []).some((v) => mismaSede(v, sid)) })
     : dataSrv), [dataSrv, deSede]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Aviso de lo que, con una sede elegida, sigue siendo de toda la clínica.
-  const avisoSede = !conectado || !sedesApi || tab === "ausencias" ? null
+  // Aviso de lo que, con una sede elegida, sigue siendo de toda la clínica. R5-04: solo a quien
+  // ve más sedes de las que eligió; al usuario de una sola sede el servidor ya le recorta
+  // /comisiones a la suya (el recálculo de abajo da las mismas cifras y no hace falta avisar).
+  const veMasSedes = sedeCx.global || (sedeCx.mias || []).length > (sedesApi || []).length;
+  const avisoSede = !conectado || !sedesApi || tab === "ausencias" || !veMasSedes ? null
     : deSede == null ? "Calculando la producción de la sede elegida…"
     : deSede.error ? "Cifras de toda la clínica: el servidor aún no filtra Producción y comisiones por sede, y no se pudieron leer las citas de la sede."
     : !data?.cobrosSede ? "Producción y comisión calculadas con las citas atendidas de la sede elegida. Lo cobrado es de toda la clínica: el servidor aún no filtra los cobros por sede."
@@ -897,16 +904,17 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
     <div className="dc-pc">
       {/* Resumen y Ausentismo son submódulos del menú lateral (sin fila de pestañas). */}
 
-      {err && (/conectar con el servidor/i.test(String(err))
-        ? <div className="fm-aviso-edad is-info" style={{ marginBottom: 16 }}><span><b>Sin datos del servidor.</b> Producción y comisiones se calculan con las citas atendidas reales; en la demostración no hay servidor conectado.</span></div>
-        : <div className="dc-banda dc-banda--peligro" style={{ marginBottom: 16 }}><p>{err}</p></div>)}
+      {/* R5-02: si /comisiones falla, la pantalla no cae a S/ 0: dice que no hay dato. */}
+      {err && tab !== "ausencias" && <div style={{ marginBottom: 16 }}><NoDisponible bloque onReintentar={reintentar} texto="Producción y comisiones no disponibles" detalle="No se pudieron leer las comisiones del servidor. No son ceros: faltan los datos." /></div>}
 
-      {tab === "ausencias" && conectado && (
+      {tab === "ausencias" && conectado && !citasErr && (
         <p className="dc-nota" style={{ marginBottom: 12 }}>
-          {citasErr ? "No se pudieron cargar las citas del servidor." : citasSrv == null ? "Cargando citas del servidor…" : `Agenda del mes en curso: del ${desdeMes.split("-").reverse().join("/")} al ${hastaHoy.split("-").reverse().join("/")}.`}
+          {citasSrv == null ? "Cargando citas del servidor…" : `Agenda del mes en curso: del ${desdeMes.split("-").reverse().join("/")} al ${hastaHoy.split("-").reverse().join("/")}.`}
         </p>
       )}
-      {tab === "ausencias" ? (
+      {tab === "ausencias" && conectado && citasErr ? (
+        <NoDisponible bloque onReintentar={reintentar} texto="Ausentismo no disponible" detalle="No se pudieron cargar las citas del mes. Sin ellas no se calcula el ausentismo." />
+      ) : tab === "ausencias" ? (
         <AusentismoTab
           citas={citas}
           medicos={porMedico}
@@ -925,7 +933,8 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <span className="dc-nota" style={{ margin: 0 }}>Periodo: <b>{rotuloPeriodo(perDesde, perHasta)}</b>{mesesPer > 1 ? ` (${mesesPer} meses: la meta se cuenta ${mesesPer} veces)` : ""}</span>
             </div>
           )}
-          {avisoSede && <div className={`fm-aviso-edad${deSede?.error ? " is-mal" : " is-info"}`} style={{ marginBottom: 12 }}><Info size={15} strokeWidth={2} /><span>{avisoSede}</span></div>}
+          {avisoSede && !err && <div className={`fm-aviso-edad${deSede?.error ? " is-mal" : " is-info"}`} style={{ marginBottom: 12 }}><Info size={15} strokeWidth={2} /><span>{avisoSede}</span>{deSede?.error && <button type="button" onClick={reintentar}>Reintentar</button>}</div>}
+          {!err && <>
           <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores del periodo">
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Producción del periodo",
@@ -1229,6 +1238,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <span>Puedes registrar pagos de comisión desde esta pantalla</span>
             )}
           </div>
+          </>}
         </>
       )}
 

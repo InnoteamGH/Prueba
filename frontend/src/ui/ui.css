@@ -175,6 +175,45 @@
   box-shadow: var(--dc-focus);
   border-radius: 2px;
 }
+/* R5-02: dato que no se pudo cargar («No disponible · Reintentar»): no es un cero. */
+.dc-nodisp {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dc-ink-500);
+}
+.dc-nodisp.is-bloque {
+  display: flex;
+  padding: 14px;
+  border-radius: var(--dc-r-md);
+  border: 1px dashed var(--dc-line);
+  background: var(--dc-bg-soft);
+}
+.dc-nodisp__det {
+  flex-basis: 100%;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dc-ink-500);
+}
+.dc-nodisp__btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: var(--dc-fw-semibold);
+  color: var(--dc-brand-600);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.dc-nodisp__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--dc-focus);
+  border-radius: 2px;
+}
 .dc-kpi__skel {
   height: 22px;
   width: 56%;
@@ -2931,6 +2970,8 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-go__paso { --c: #16A36A; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px #E6EEEF; }
 .dc-go__paso.is-falta { --c: #D2463A; background: #FFF8F7; }
 .dc-go__paso.is-opc { --c: #D97706; }
+/* R5-11: configurado, pero con incidencia (p. ej. WhatsApp con envíos fallidos). */
+.dc-go__paso.is-aviso { --c: #B45309; background: #FFFBF2; }
 .dc-go__paso > div { flex: 1; display: grid; min-width: 0; }
 .dc-go__paso b { font-size: 14px; font-weight: 750; color: var(--dc-ink-900); }
 .dc-go__paso small { font-size: 12px; color: var(--dc-ink-500); }
@@ -4881,6 +4922,10 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-rm__hero .dc-rm__kpi small { color: rgba(255,255,255,.78) !important; }
 .dc-rm__hero .dc-rm__kpi b { color: #fff !important; }
 .dc-rm__hero .dc-rm__kpi em { color: rgba(255,255,255,.75) !important; }
+/* «No disponible · Reintentar» sobre el fondo oscuro del resumen (R5-02). */
+.dc-rm__hero .dc-nodisp { color: rgba(255,255,255,.85); }
+.dc-rm__hero .dc-nodisp__btn { color: #fff; }
+.dc-rm__hero .dc-nodisp__btn:focus-visible { box-shadow: 0 0 0 2px #fff; }
 .dc-rm__hero .dc-rm__ico { color: #fff !important; background: rgba(255,255,255,.16) !important; }
 .dc-rm__hero i.is-up { color: #7EF0BC; }
 .dc-rm__hero i.is-down { color: #FFC0A8; }

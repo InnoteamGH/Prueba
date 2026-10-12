@@ -17,6 +17,7 @@ import { DatosDemoCtx, MEDICOS, mismaSede } from "../comun";
 import { salidasMes } from "../compartido/metricas";
 import { medicoEnSedes } from "../compartido/medicosSede";
 import { totalResumen } from "./panelGerencialUtil";
+import NoDisponible from "../ui/NoDisponible";
 
 const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -38,7 +39,8 @@ export const avanceDemo = (d = new Date()) => {
   return Math.min(1, Math.max(0.12, (d.getDate() / dias) * 1.08));
 };
 
-export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi = null }) {
+// recarga: contador que sube con cada «Reintentar» del panel (vuelve a pedir lo de aquí).
+export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi = null, recarga = 0, onReintentar = null }) {
   const conectado = !!auth.token;
   const hoy = new Date();
   const desde = ymd(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
@@ -70,7 +72,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
     api.tratamientos.resumen(ymd(new Date(finAnt.getFullYear(), finAnt.getMonth(), 1)), hastaAnt, { sedeIds: sedesApi }).then((r) => setTopAnt(Array.isArray(r) ? r : [])).catch(() => setTopAnt(null));
     setCitasMes(null);
     if (sedesApi && sedesApi.length) api.citas.listar(null, desde, hasta, sedesApi).then((r) => setCitasMes(Array.isArray(r) ? r : [])).catch(() => setCitasMes(null));
-  }, [conectado, desde, hasta, sedesApi && sedesApi.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conectado, desde, hasta, sedesApi && sedesApi.join(","), recarga]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const d = useMemo(() => {
     if (!conectado) {
@@ -126,6 +128,9 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const proyeccion = hoy.getDate() ? Math.round((d.facturado / hoy.getDate()) * diasMes) : 0;
   const sinSalidas = conectado && !!egErr;
   const sinFacturado = conectado && !!topErr;
+  // R5-02: sin /gerencial/kpis no hay meta ni ranking: «No disponible», no «Sin meta» ni 0 %.
+  const sinKpis = conectado && !!kd?.error;
+  const nd = (props) => <NoDisponible onReintentar={onReintentar} {...props} />;
   const neto = d.facturado - d.salidas;
   const delta = d.anterior ? ((d.facturado - d.anterior) / d.anterior) * 100 : null;
   const maxTop = Math.max(1, ...d.top.map((t) => t.importe));
@@ -146,13 +151,13 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
           <span className="dc-rm__ico"><ArrowDownRight size={18} strokeWidth={2.2} /></span>
           <small>Facturado del mes{toda}</small>
           <b>{sinFacturado ? "—" : soles(d.facturado)}</b>
-          <em>{sinFacturado ? "Ventas por tratamiento no disponibles" : delta == null ? (conectado ? "Suma del Top de tratamientos; sin mes anterior para comparar" : "Sin mes anterior para comparar") : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%</i> vs. mes anterior</>}</em>
+          <em>{sinFacturado ? nd({ texto: "Ventas por tratamiento no disponibles" }) : delta == null ? (conectado ? "Suma del Top de tratamientos; sin mes anterior para comparar" : "Sin mes anterior para comparar") : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%</i> vs. mes anterior</>}</em>
         </article>
         <article className="dc-rm__kpi" style={{ "--c": "#E0694F" }}>
           <span className="dc-rm__ico"><ArrowUpRight size={18} strokeWidth={2.2} /></span>
           <small>Salidas del mes</small>
           <b>{sinSalidas ? "—" : soles(d.salidas)}</b>
-          <em>{sinSalidas ? (egErr === "sin permiso" ? "Sin permiso para ver los egresos" : "Egresos no disponibles") : <>{d.salidasUsd ? `+ US$ ${d.salidasUsd.toFixed(2)} en dólares · ` : ""}{d.salidasCat[0] ? `Mayor gasto: ${d.salidasCat[0][0]}` : "Sin egresos registrados"}</>}</em>
+          <em>{sinSalidas ? (egErr === "sin permiso" ? "Sin permiso para ver los egresos" : nd({ texto: "Egresos no disponibles" })) : <>{d.salidasUsd ? `+ US$ ${d.salidasUsd.toFixed(2)} en dólares · ` : ""}{d.salidasCat[0] ? `Mayor gasto: ${d.salidasCat[0][0]}` : "Sin egresos registrados"}</>}</em>
         </article>
         <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#0B6C78" : "#D0563F" }}>
           <span className="dc-rm__ico"><Wallet size={18} strokeWidth={2.2} /></span>
@@ -163,9 +168,9 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#C98A12" }}>
           <span className="dc-rm__ico"><Target size={18} strokeWidth={2.2} /></span>
           <small>Meta mensual{toda}</small>
-          <b>{d.meta ? soles(d.meta) : "Sin meta"}</b>
-          {d.meta > 0 ? (
-            <>
+          <b>{sinKpis ? "—" : d.meta ? soles(d.meta) : "Sin meta"}</b>
+          {sinKpis ? <em>{nd({ texto: "Meta no disponible" })}</em> : d.meta > 0 ? (
+            sinFacturado ? <em>Avance no disponible: falta el facturado del mes</em> : <>
               <div className="dc-rm__meta" role="img" aria-label={`Avance ${avance.toFixed(0)}% de la meta`}><i style={{ width: `${Math.min(100, avance)}%` }} /><span style={{ left: `${Math.min(100, ritmo)}%` }} title="Ritmo esperado a hoy" /></div>
               <em><i className={avance >= ritmo ? "is-up" : "is-down"}>{avance.toFixed(0)}%</i> logrado · {hoy.getDate() >= 5 ? `cierre estimado ${soles(proyeccion)}` : "estimado de cierre desde el día 5"}</em>
             </>
@@ -178,7 +183,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
       <div className="dc-rm__dos">
         <article className="dc-rm__card">
           <div className="dc-rm__cab"><Users size={16} strokeWidth={2} /><h3>Top del equipo</h3><span>{sedeElegida && citasMes ? "en esta sede · avance a su meta" : <>{toda ? <>{toda} · </> : null}avance a su meta · la raya es el ritmo a hoy</>}</span></div>
-          {equipo.length === 0 ? <p className="dc-rm__vacio">{sedeElegida && citasMes ? "Nadie atendió en esta sede este mes." : "Sin producción del equipo este mes."}</p> : (
+          {sinKpis && !(sedeElegida && citasMes) ? <p className="dc-rm__vacio">{nd({ texto: "Producción del equipo no disponible" })}</p> : equipo.length === 0 ? <p className="dc-rm__vacio">{sedeElegida && citasMes ? "Nadie atendió en esta sede este mes." : "Sin producción del equipo este mes."}</p> : (
             <ol className="dc-rm__rank">
               {equipo.map((x, i) => { const pct = x.meta ? (x.prod / x.meta) * 100 : 0; const tono = !x.meta ? "sin" : pct >= ritmo ? "ok" : pct >= ritmo * 0.8 ? "cerca" : "bajo"; return (
                 <li key={x.nombre} className={`is-${tono}`}>
@@ -193,7 +198,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         </article>
         <article className="dc-rm__card">
           <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>{toda ? <>{toda} · </> : null}por importe facturado del mes</span></div>
-          {conectado && topErr ? <p className="dc-rm__vacio">{topErr === "sin permiso" ? "Sin permiso para ver las ventas por tratamiento." : "Ventas por tratamiento no disponibles."}</p> : d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
+          {conectado && topErr ? <p className="dc-rm__vacio">{topErr === "sin permiso" ? "Sin permiso para ver las ventas por tratamiento." : nd({ texto: "Ventas por tratamiento no disponibles" })}</p> : d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
             <ol className="dc-rm__rank is-trat">
               {d.top.map((t, i) => (
                 <li key={t.nombre}>

@@ -9,6 +9,7 @@ import { useReglasAgenda } from "../compartido/useReglasAgenda";
 import { horarioConfigurado } from "../compartido/horarioReal";
 import { etiquetaUso } from "../compartido/sillones";
 import { tienePermiso } from "../compartido/permisos";
+import NoDisponible from "../ui/NoDisponible";
 
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const INACTIVAS = ["cancelada", "no_show", "reprogramada", "cerrada_sistema"];
@@ -20,13 +21,16 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
   const [remotas, setRemotas] = useState([]);
   const [horario, setHorario] = useState({ horario: {}, feriados: [] });
   const [horarioListo, setHorarioListo] = useState(false);
+  // R5-02: sin las citas de la semana la ocupación no es 0 %: es «no disponible».
+  const [citasErr, setCitasErr] = useState(false);
+  const [nRecarga, setNRecarga] = useState(0);
   const lunes = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + off * 7); return d; }, [off]);
   const dias = useMemo(() => DIAS.map((_, i) => { const d = new Date(lunes); d.setDate(d.getDate() + i); return fmt(d); }), [lunes]);
   useEffect(() => {
     if (!conectado) return;
-    api.citas.listar(null, dias[0], dias[5]).then((r) => setRemotas((r || []).map((c) => ({ ...c, sede: c.sedeId ?? c.sede, hora: String(c.hora || "").slice(0, 5) })))).catch(() => setRemotas([]));
+    api.citas.listar(null, dias[0], dias[5]).then((r) => { setCitasErr(false); setRemotas((r || []).map((c) => ({ ...c, sede: c.sedeId ?? c.sede, hora: String(c.hora || "").slice(0, 5) }))); }).catch(() => { setCitasErr(true); setRemotas([]); });
     api.clinica.get().then((r) => setHorario({ horario: r?.horario || {}, feriados: r?.feriados || [] })).catch(() => {}).finally(() => setHorarioListo(true));
-  }, [conectado, dias]);
+  }, [conectado, dias, nRecarga]);
   const citas = conectado ? remotas : (demoDb?.citas || []);
   const hor = conectado ? horario : (demoDb?.horarioClinica || horario);
   // Con sesión y sin horario cargado no se supone 09–19: la pantalla lo dice.
@@ -55,7 +59,7 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
   }, [sillones, dias, citas, hor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Médicos y especialidades para la etiqueta de uso: los del servidor con sesión.
-  return { conectado, sillones, dias, datos, sinHorario, medicos: reglas.medicos || [], especialidades: reglas.especialidades || [] };
+  return { conectado, sillones, dias, datos, sinHorario, citasErr: conectado && citasErr, recargar: () => setNRecarga((n) => n + 1), medicos: reglas.medicos || [], especialidades: reglas.especialidades || [] };
 }
 
 const horas = (min) => { const h = Math.round((min / 60) * 10) / 10; return Number.isInteger(h) ? String(h) : h.toFixed(1).replace(".", ","); };
@@ -72,7 +76,7 @@ function Anillo({ pct, size = 44 }) {
 
 export default function OcupacionSillones({ sedes: sedesVer = null }) {
   const [off, setOff] = useState(0);
-  const { conectado, sillones, dias, datos, sinHorario, medicos, especialidades } = useOcupacionSillones(off, sedesVer);
+  const { conectado, sillones, dias, datos, sinHorario, citasErr, recargar, medicos, especialidades } = useOcupacionSillones(off, sedesVer);
   const conPct = datos.filas.filter((f) => f.pct != null);
   const sedes = [...new Set(sillones.map((s) => String(s.sede)))];
   const nomSede = (id) => { const n = nombreSede(/^\d+$/.test(String(id)) ? Number(id) : id); return n && n !== "—" ? n : "Sede"; };
@@ -88,6 +92,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
     .filter((h) => h.fecha >= hoyF && h.libres > 0).sort((a, b) => b.libres - a.libres).slice(0, 3);
   if (!sillones.length) return conectado ? <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>No hay sillones activos registrados en las sedes que se ven. Se dan de alta en Configuración › Sillones.</p></section> : null;
   if (sinHorario) return <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>La clínica todavía no tiene cargado su horario de atención: sin él no se puede calcular la ocupación. Se configura en Configuración › Horarios.</p></section>;
+  if (citasErr) return <section className="dc-ocs dc-ocs--rep"><NoDisponible bloque onReintentar={recargar} texto="Ocupación no disponible" detalle={`No se pudieron leer las citas de la semana (${rango}). Sin ellas la ocupación no es 0 %: falta el dato.`} /></section>;
   // H-29: la misma exportación Excel/PDF que el resto de reportes: un sillón por fila, el %
   // de cada día y el total de la semana (números, para poder sumarlos en el Excel).
   const pctExp = (p) => (p == null ? "Cerrado" : `${p}%`);
@@ -211,7 +216,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
 
 /* Tarjeta compacta para el Panel gerencial: solo el dato y el enlace al detalle en la Agenda. */
 export function ResumenOcupacion({ onVer, variante, sedes = null }) {
-  const { sillones, datos, sinHorario } = useOcupacionSillones(0, sedes);
+  const { sillones, datos, sinHorario, citasErr, recargar } = useOcupacionSillones(0, sedes);
   if (!sillones.length || sinHorario) return null;
   const libres = Math.round((datos.cap - datos.min) / 60);
   if (variante === "hoy") return (
@@ -219,8 +224,8 @@ export function ResumenOcupacion({ onVer, variante, sedes = null }) {
       <span className="dc-hoy__ico" style={{ background: "#EFEAFE", color: "#6D4FD1" }} aria-hidden="true"><Armchair size={16} strokeWidth={2} /></span>
       <div className="dc-hoy__tb">
         <div className="dc-hoy__tl">Ocupación de sillones · semana</div>
-        <div className="dc-hoy__tv">{datos.pct ?? 0}%</div>
-        <div className="dc-hoy__ts">{libres} h libres en {sillones.length} sillones</div>
+        <div className="dc-hoy__tv">{citasErr ? "—" : `${datos.pct ?? 0}%`}</div>
+        <div className="dc-hoy__ts">{citasErr ? <NoDisponible onReintentar={recargar} /> : `${libres} h libres en ${sillones.length} sillones`}</div>
       </div>
     </div>
   );
@@ -229,8 +234,8 @@ export function ResumenOcupacion({ onVer, variante, sedes = null }) {
       <span className="dc-kpi__icon" style={{ background: "#EFEAFE", color: "#6D4FD1" }} aria-hidden="true"><Armchair size={16} strokeWidth={2} /></span>
       <div className="dc-kpi__body">
         <div className="dc-kpi__label">Ocupación de sillones · semana</div>
-        <div className="dc-kpi__value">{datos.pct ?? 0}%</div>
-        <div className="dc-kpi__sub">{sillones.length} sillones · {libres} h libres{onVer && <> · <button type="button" className="dc-kpi__link" onClick={onVer}>Ver detalle</button></>}</div>
+        <div className="dc-kpi__value">{citasErr ? "—" : `${datos.pct ?? 0}%`}</div>
+        <div className="dc-kpi__sub">{citasErr ? <NoDisponible onReintentar={recargar} /> : <>{sillones.length} sillones · {libres} h libres{onVer && <> · <button type="button" className="dc-kpi__link" onClick={onVer}>Ver detalle</button></>}</>}</div>
       </div>
     </div>
   );

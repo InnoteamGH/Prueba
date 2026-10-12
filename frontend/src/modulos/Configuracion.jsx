@@ -1,6 +1,6 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect, useContext, useRef } from "react";
-import {Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
+import {AlertTriangle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
 import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
 import { comisionSede, guardarMetaSedeDemo, medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
@@ -8,6 +8,7 @@ import { sedeApiUuid } from "../routing";
 import { conCop } from "../util/cop";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
 import { sillonesPorSede } from "../compartido/useReglasAgenda";
+import { estadoWhatsApp, notaUltimoEnvioOk } from "../compartido/integraciones";
 import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda, useSede, mismaSede, sedeNum, nombreSede} from "../comun";
 
 /* H-08 (admin): un 405/404 de POST /disponibilidad es que el servidor no tiene la ruta, no
@@ -286,9 +287,23 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   // horario de sus sedes cambiado (no puede tocar nada más de la clínica).
   const clinicaGuardada = useRef(null);
   const inp = { width: "100%", padding: "10px 13px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, outline: "none", color: NAVY, boxSizing: "border-box", background: "var(--dc-white)" };
+  // R5-11: el paso «WhatsApp conectado» de GET /go-live decía «Conexión con WhatsApp correcta»
+  // con un envío fallido y el último correcto del 2/10. Se cruza con GET /whatsapp/salud y se
+  // usa el mismo estado que Integraciones, el inicio de TI y WhatsApp + IA (estadoWhatsApp).
+  const [waSalud, setWaSalud] = useState(null);
   const cargarGoLive = () => {
     // NEW-48: solo si el rol puede ver config (go-live ahora exige config:ver).
-    if (conectado && (!can || can("config", "ver"))) api.goLive().then(setGoLive).catch(() => setGoLive(null));
+    if (conectado && (!can || can("config", "ver"))) {
+      api.goLive().then(setGoLive).catch(() => setGoLive(null));
+      // Sin permiso o sin respuesta queda el texto del servidor.
+      api.agente.salud().then((r) => setWaSalud(r && typeof r === "object" ? r : null)).catch(() => setWaSalud(null));
+    }
+  };
+  const pasoGoLive = (it) => {
+    if (it?.clave !== "whatsapp" || !conectado || !waSalud) return it;
+    const w = estadoWhatsApp(waSalud);
+    if (w.estado === "operativo") return { ...it, detalle: `${w.detalle}${notaUltimoEnvioOk(waSalud)}` };
+    return { ...it, aviso: w.estado === "incidencia", detalle: `${w.etiqueta}: ${w.detalle}${notaUltimoEnvioOk(waSalud)}` };
   };
   // El horario y los feriados se guardan también en el navegador con la clave que lee
   // el resto de la app (dashboard y disponibilidad), para que la demostración sea
@@ -426,8 +441,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   useEffect(() => { cargarDisp(medHor); }, [medHor]); // eslint-disable-line
   const dispDemo = demoDb?.dispMedicos || DISP_DEMO;
   // Bloques del doctor en las sedes que se ven; los de "cualquier sede" (sin sede) también.
-  const dispVista = (conectado ? disp : dispDemo.filter((d) => String(d.medicoId) === String(medHor)).map((d) => ({ ...d, sedeId: d.sede })))
-    .filter((d) => d.sedeId == null || d.sedeId === "" || sedeVisible(d.sedeId));
+  const dispDelMed = conectado ? disp : dispDemo.filter((d) => String(d.medicoId) === String(medHor)).map((d) => ({ ...d, sedeId: d.sede }));
+  const dispVista = dispDelMed.filter((d) => d.sedeId == null || d.sedeId === "" || sedeVisible(d.sedeId));
   // Un bloque sin sede vale en todas: solo lo quita la administración general.
   const bloqueEditable = (d) => (d.sedeId == null || d.sedeId === "" ? !limitarSede : sedeEditable(d.sedeId));
   const espNombre = (id) => (esps.find((e) => e.id === id) || {}).nombre || "—";
@@ -517,6 +532,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     if (edit.tipo === "sede" && (it.id ? !sedeEditable(it.id) : limitarSede)) { notify("Solo puedes editar los datos de tu sede."); return; }
     if (edit.tipo === "promo" && !String(it.titulo || "").trim()) { notify("Ponle un título a la promoción."); return; }
     if (edit.tipo === "promo" && (it.sedeId == null || it.sedeId === "" ? limitarSede : !sedeEditable(it.sedeId))) { notify("Elige una de tus sedes para la promoción."); return; }
+    // Mismo criterio que los rangos de Caja y Auditoría (R5-08): un rango invertido no se guarda.
+    if (edit.tipo === "promo" && it.desde && it.hasta && it.desde > it.hasta) { notify("La fecha «Desde» de la promoción es posterior a «Hasta»: corrige el rango."); return; }
     if (edit.tipo === "promo" && !auth.token) {
       // Demo: la promoción queda en esta pantalla con su sede (sin sede = toda la clínica).
       const reg = { ...it, titulo: it.titulo.trim(), sedeId: it.sedeId === "" || it.sedeId == null ? null : Number(it.sedeId) };
@@ -625,13 +642,14 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
               </div>
             </div>
             <div className="dc-go__pasos">
-              {(goLive?.items || []).map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["servicios", "especialidades"].includes(it.clave) ? () => { window.location.hash = "#/servicios"; } : ["sedes", "doctores", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave) : null; return (
-                <div key={it.clave} className={`dc-go__paso ${it.ok ? "is-ok" : it.obligatorio ? "is-falta" : "is-opc"}`}>
-                  <span className="dc-go__n">{it.ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
+              {(goLive?.items || []).map(pasoGoLive).map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["servicios", "especialidades"].includes(it.clave) ? () => { window.location.hash = "#/servicios"; } : ["sedes", "doctores", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave) : null; return (
+                <div key={it.clave} className={`dc-go__paso ${it.aviso ? "is-aviso" : it.ok ? "is-ok" : it.obligatorio ? "is-falta" : "is-opc"}`}>
+                  <span className="dc-go__n">{it.aviso ? <AlertTriangle size={13} strokeWidth={2.4} /> : it.ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
                   <span className="dc-go__ico"><I size={16} strokeWidth={2} /></span>
                   <div><b>{it.titulo}</b><small>{it.detalle || it.descripcion}</small></div>
                   <span className="dc-go__tag">{it.obligatorio ? "Obligatorio" : "Opcional"}</span>
                   {!it.ok && ir && <button type="button" onClick={ir}>Configurar</button>}
+                  {it.aviso && (!can || can("whatsapp", "ver")) && <button type="button" onClick={() => { window.location.hash = "#/whatsapp"; }}>Revisar</button>}
                 </div>
               ); })}
               {conectado && !goLive && <p className="dc-cfg__nada">Cargando estado…</p>}
@@ -967,7 +985,19 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
             </div>
             {medHor ? (<>
               <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-                {dispVista.length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Este doctor no tiene horarios configurados: la agenda no le pone límite de horas.</div>}
+                {/* R5-13: «no tiene horarios configurados: la agenda no le pone límite» salía también
+                    a quien solo ve su sede (el servidor le manda solo los bloques de sus sedes) o
+                    con una sede elegida, aunque el doctor sí tuviera horario en otra sede. */}
+                {dispVista.length === 0 && (() => {
+                  const txtSedes = (ids) => [...new Set((ids || []).map((x) => nomSedeCfg(x)))].join(" y ");
+                  const enOtras = dispDelMed.length - dispVista.length;
+                  const msg = limitarSede
+                    ? `Este doctor no tiene horario en ${txtSedes(mias) || "tu sede"}. Si también atiende aquí, agrégale un bloque abajo. Si solo atiende en otra sede, su horario de allá lo carga quien administra esa sede y no se ve desde aquí.`
+                    : enOtras > 0
+                      ? `Este doctor no tiene horario en ${txtSedes(ver) || "la sede elegida"}: sus ${enOtras} ${enOtras === 1 ? "bloque es" : "bloques son"} de otras sedes. Elige «Todas las sedes» en el menú para verlos.`
+                      : "Este doctor no tiene horarios configurados en ninguna sede: la agenda no le pone límite de horas.";
+                  return <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{msg}</div>;
+                })()}
                 {[...dispVista].sort((a, b) => (a.diaSemana === 0 ? 7 : a.diaSemana) - (b.diaSemana === 0 ? 7 : b.diaSemana) || String(a.horaInicio).localeCompare(String(b.horaInicio))).map((d) => (
                   <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 13px", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)" }}>
                     <span style={{ fontWeight: 500, color: NAVY, width: 44 }}>{(DIAS_SEM.find((x) => x.v === d.diaSemana) || {}).l || d.diaSemana}</span>
