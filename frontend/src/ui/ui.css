@@ -1414,6 +1414,7 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-sb__crearmenu { position: fixed; z-index: 141; min-width: 220px; padding: 6px; background: #fff; border-radius: 14px; box-shadow: 0 20px 44px -12px rgba(11,52,64,.45), 0 0 0 1px var(--dc-line); display: grid; }
 .dc-sb__crearmenu button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--dc-ink-900); }
 .dc-sb__crearmenu button svg { color: var(--dc-primary-alt); }
+.dc-sb__crearmenu button:focus-visible { box-shadow: inset 0 0 0 2px var(--dc-primary-alt); }
 .dc-sb__crearmenu button:hover, .dc-sb__crearmenu button:focus-visible { background: var(--dc-bg); }
 .dc-sb__sedefila { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .dc-sb__sede { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 0 0 10px; border-radius: 999px; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
@@ -2778,12 +2779,12 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-aud__dtit b { font-size: 14px; font-weight: 800; color: var(--dc-ink-900); text-transform: capitalize; }
 .dc-aud__dtit span { font-size: 12px; color: var(--dc-ink-500); }
 .dc-aud__lista { display: grid; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 1px #E3EFEF, 0 12px 26px -24px rgba(14,42,51,.55); overflow: hidden; }
-.dc-aud__ev { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 52px 32px minmax(0, 1.6fr) minmax(140px, 1fr) 120px 84px; align-items: center; gap: 12px; padding: 9px 14px; border-top: 1px solid #F0F5F5; transition: background .12s; }
+.dc-aud__ev { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 74px 32px minmax(0, 1.6fr) minmax(140px, 1fr) 120px 84px; align-items: center; gap: 12px; padding: 9px 14px; border-top: 1px solid #F0F5F5; transition: background .12s; }
 .dc-aud__ev:first-child { border-top: 0; }
 .dc-aud__ev:hover { background: #F7FBFB; }
 .dc-aud__ev:focus-visible { box-shadow: inset var(--dc-focus); }
 .dc-aud__ev.is-warn { background: linear-gradient(90deg, #FFF4EF, #fff 60%); box-shadow: inset 3px 0 0 #E0694F; }
-.dc-aud__hora { font-size: 12px; font-weight: 700; color: var(--dc-ink-700); font-variant-numeric: tabular-nums; }
+.dc-aud__hora { font-size: 12px; font-weight: 700; color: var(--dc-ink-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dc-aud__ico { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 12%, #fff); }
 .dc-aud__txt, .dc-aud__quien { display: grid; min-width: 0; }
 .dc-aud__txt b { font-size: 13px; font-weight: 700; color: var(--dc-ink-900); }
@@ -2792,7 +2793,7 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-aud__quien span { font-size: 12px; font-weight: 650; }
 .dc-aud__ev code { font-size: 12px; color: var(--dc-ink-500); background: #F4F7F8; padding: 3px 8px; border-radius: 8px; justify-self: start; }
 .dc-aud__ev .dc-int__est { justify-self: end; }
-@media (max-width: 900px) { .dc-aud__ev { grid-template-columns: 44px 32px minmax(0, 1fr) auto; } .dc-aud__quien, .dc-aud__ev code { display: none; } }
+@media (max-width: 900px) { .dc-aud__ev { grid-template-columns: 66px 32px minmax(0, 1fr) auto; } .dc-aud__quien, .dc-aud__ev code { display: none; } }
 
 /* ---- Pacientes: marketing ---- */
 
@@ -2852,7 +2853,7 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
   .dc-cob__avance { grid-column: 2; grid-row: 2; }
   .dc-cob__saldo { grid-column: 3; grid-row: 1; }
   .dc-cob__btn { grid-column: 3; grid-row: 2; justify-self: end; }
-  .dc-aud__ev { grid-template-columns: 44px 32px minmax(0, 1fr) auto !important; }
+  .dc-aud__ev { grid-template-columns: 66px 32px minmax(0, 1fr) auto !important; }
   .dc-aud__quien, .dc-aud__ev code { display: none !important; }
   
   .dc-pg2__acts { grid-column: 1 / -1; flex-wrap: wrap !important; }
@@ -4558,6 +4559,15 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-cal__cel.is-drop-no{cursor:no-drop}
 .dc-cal__now{position:absolute;left:0;right:0;height:0;border-top:2px solid #E0694F;z-index:3;pointer-events:none}
 .dc-cal__now::before{content:"";position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#E0694F}
+/* R-30: bloqueo de un doctor o de un sillón en Semana y Mes (no bloquea la franja entera). */
+.dc-cal__bloqp{display:flex;align-items:center;gap:4px;min-width:0;font-size:11px;font-weight:600;line-height:16px;color:var(--dc-danger-700);background:repeating-linear-gradient(135deg,#fff 0 5px,var(--dc-fee) 5px 10px);border:1px dashed color-mix(in srgb,#D92D20 35%,#fff);border-radius:6px;padding:1px 6px}
+.dc-cal__bloqp svg{flex-shrink:0}
+.dc-cal__bloqp>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-cal__bloqp.is-mes{font-weight:500}
+/* R-32: el número del día del Mes abre la vista Día. */
+.dc-cal__mesdia{align-self:flex-end;font:inherit;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;background:none;border:0;border-radius:6px;padding:0 5px;cursor:pointer;line-height:20px}
+.dc-cal__mesdia:hover{background:color-mix(in srgb,#0E9199 10%,#fff)}
+.dc-cal__mesdia:focus-visible{outline:2px solid var(--dc-primary-alt,#0E9199);outline-offset:1px}
 .dc-cal__stag{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.02em;color:#0B6C78;background:color-mix(in srgb,#0E9199 13%,#fff);border-radius:5px;padding:0 4px;line-height:15px}
 .dc-cal__uso{display:inline-block;max-width:100%;margin-top:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0;color:#0B6C78;background:color-mix(in srgb,#0E9199 12%,#fff)}
 .dc-cal__uso.is-doc{color:#5B3FC0;background:color-mix(in srgb,#6D4FD1 12%,#fff)}
@@ -4572,7 +4582,6 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-exp{position:relative;display:inline-flex}
 .dc-exp__btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:var(--dc-r-md);border:1px solid var(--dc-line);background:#fff;color:#0B6C78;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:border-color .15s,background .15s}
 .dc-exp__btn:hover{border-color:color-mix(in srgb,#0E9199 45%,#fff);background:color-mix(in srgb,#0E9199 5%,#fff)}
-.dc-exp__velo{position:fixed;inset:0;z-index:40}
 .dc-exp__menu{position:absolute;top:calc(100% + 6px);right:0;z-index:41;min-width:250px;background:#fff;border:1px solid var(--dc-line);border-radius:var(--dc-r-md);box-shadow:0 18px 40px -18px rgba(16,24,40,.4);overflow:hidden;padding:4px}
 .dc-exp__menu small{display:block;padding:7px 10px 6px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dc-ink-400)}
 .dc-exp__menu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:none;background:#fff;border-radius:8px;cursor:pointer}

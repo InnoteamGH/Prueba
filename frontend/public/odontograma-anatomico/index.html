@@ -534,6 +534,8 @@ text.marca--a,tspan.marca--a{fill:var(--azul);stroke:none;paint-order:normal}
 .ppto tfoot td{border-top:1.5px solid var(--linea-2);font-weight:700;font-size:13.5px;
   padding:12px 14px;color:var(--t900)}
 .ppto-vacio{padding:26px 18px;text-align:center;color:var(--t400);font-size:12.5px;line-height:1.6}
+/* M7-02: lo ya realizado de Plan y cuenta, aparte del total propuesto */
+.ppto-hechas{padding:10px 14px;border-top:1px dashed var(--linea-2);background:var(--panel-2);font-size:11.5px;line-height:1.45;color:var(--t500)}
 .ppto-falta{display:flex;gap:9px;align-items:flex-start;padding:11px 14px;background:var(--ambar-luz);
   border-top:1px solid var(--linea);font-size:11.5px;color:var(--ambar);line-height:1.45}
 .ppto-falta i{width:6px;height:6px;border-radius:var(--rf);background:var(--ambar);flex:none;margin-top:5px}
@@ -2188,11 +2190,16 @@ function recorrer(fn){
 let PLAN_SRV=[];
 /* el plan del sistema no se pudo leer: el documento lo avisa en vez de pasar por completo */
 let PLAN_SRV_ERROR=false;
+/* M7-02: lo pagado por el paciente (null = no se sabe; no se inventa «Pagado S/ 0»). */
+let PLAN_PAGADO=null;
 function aplicarPlanSrv(d){
   try{
     PLAN_SRV_ERROR=!!(d&&d.error);
+    PLAN_PAGADO=(d&&d.pagado!=null&&d.pagado!==''&&isFinite(+d.pagado))?Math.round(+d.pagado*100)/100:null;
+    /* M7-02: «hecho» = ya terminada o atendida en Plan y cuenta: no es una propuesta. */
     PLAN_SRV=(Array.isArray(d&&d.fases)?d.fases:[]).filter(function(f){return f&&f.t;}).map(function(f){
-      return {id:f.id, t:String(f.t), v:(+f.v||0), pz:(f.pz==null||f.pz===''?null:+f.pz), cara:f.cara?String(f.cara):''};});
+      return {id:f.id, t:String(f.t), v:(+f.v||0), pz:(f.pz==null||f.pz===''?null:+f.pz), cara:f.cara?String(f.cara):'',
+              hecho:!!f.hecho, estado:f.estado?String(f.estado):''};});
     if(typeof presupuesto==='function') presupuesto();
     if(typeof DOCU!=='undefined'&&DOCU&&!DOCU.hidden&&typeof pintarDocu==='function') pintarDocu();
   }catch(e){}
@@ -2229,12 +2236,17 @@ function planLineas(){
     lineas.push({pz:x.pz||null,max:max,cod:d.cod,t:d.t,v:d.v,cant:uds,
       ubic:ubic,q:'Añadido en recepción',det:d.t,suelto:1,src:x});
   });
+  /* M7-02: lo ya hecho de Plan y cuenta no es una propuesta: va aparte («Ya realizado»). Antes
+     «4.6 QA Endodoncia molar», terminada y por cobrar, salía entre los tratamientos propuestos. */
+  const hechas=[];
   PLAN_SRV.forEach(function(f){
     /* M5-07: la partida que vino del odontograma ya trae la cara en el nombre
        («Resina / obturación · pieza 15 (O)»): no se repite («… (O) (O)»). */
     var conCara=f.cara && f.t.replace(/\s+$/,'').slice(-(f.cara.length+2)).toUpperCase()!==('('+f.cara+')').toUpperCase();
-    lineas.push({pz:f.pz, cod:'plan:'+f.id, t:f.t+(conCara?' ('+f.cara+')':''), v:f.v, cant:1,
-      ubic:(f.pz?'pieza '+fdi(f.pz):'—'), q:'En Plan y cuenta', det:'En Plan y cuenta', plan:1});
+    var L={pz:f.pz, cod:'plan:'+f.id, t:f.t+(conCara?' ('+f.cara+')':''), v:f.v, cant:1,
+      ubic:(f.pz?'pieza '+fdi(f.pz):'—'), q:'En Plan y cuenta', det:'En Plan y cuenta', plan:1};
+    if(f.hecho){ L.estado=f.estado||'Realizado'; L.det='Ya realizado · '+L.estado; hechas.push(L); }
+    else lineas.push(L);
   });
   /* Se agrupa por pieza y tratamiento: dos caries en la misma pieza son una línea con
      cantidad 2. Lo pidió la clínica al quitar la columna de cara —dos filas idénticas
@@ -2248,7 +2260,36 @@ function planLineas(){
   });
   const juntas=orden.map(function(k){return agr[k];}).sort(function(a,b){
     return (a.pz===null?9999:a.pz)-(b.pz===null?9999:b.pz);});
-  return {lineas:juntas,faltan:faltan};
+  hechas.sort(function(a,b){return (a.pz===null?9999:a.pz)-(b.pz===null?9999:b.pz);});
+  return {lineas:juntas,faltan:faltan,hechas:hechas};
+}
+/* M7-02: filas de totales con lo ya realizado y lo pagado, la misma regla que
+   src/util/planInversionCuenta.js (filasTotalesPlan). Sin nada hecho ni pagado queda el cierre
+   de siempre: Subtotal y «Total a pagar». Con algo hecho o pagado: Total propuesto, Ya
+   realizado, Total del plan, Pagado y Saldo a pagar, como el Presupuesto PDF. */
+function cuentaPlan(T,hechas){
+  const r2=function(n){return Math.round((+n||0)*100)/100;};
+  const desc=DESCUENTO.activo&&T.desc>0?r2(T.desc):0;
+  const etqDesc=DESCUENTO.etiqueta+(DESCUENTO.tipo==='porcentaje'?' '+DESCUENTO.valor+' %':'');
+  const prop=r2(T.sub-desc);
+  const pag=PLAN_PAGADO;
+  const hay=hechas.length>0;
+  const enCuenta=hay||(pag!=null&&pag>0);
+  const P=[], C=[];
+  if(!enCuenta){
+    P.push(['Subtotal',r2(T.sub)]);
+    if(desc) P.push([etqDesc,-desc]);
+    P.push(['Total a pagar',prop,1]);
+    return {propuesto:P,cuenta:C};
+  }
+  if(desc){ P.push(['Subtotal propuesto',r2(T.sub)]); P.push([etqDesc,-desc]); }
+  P.push(['Total propuesto',prop]);
+  const real=r2(hechas.reduce(function(a,L){return a+L.v*(L.cant||1);},0));
+  const totPlan=r2(prop+(hay?real:0));
+  if(hay) C.push(['Ya realizado',real]);
+  C.push(['Total del plan',totPlan,pag==null?1:0]);
+  if(pag!=null){ C.push(['Pagado',pag]); C.push(['Saldo a pagar',r2(Math.max(0,totPlan-pag)),1]); }
+  return {propuesto:P,cuenta:C};
 }
 /* Subtotal, descuento y total. El descuento se muestra sólo si está activo. */
 function totalesPlan(lineas){
@@ -2325,14 +2366,24 @@ function indices(){
 
 function presupuesto(){
   const c=document.getElementById('ppto'); if(!c) return; c.innerHTML='';
-  const R=planLineas(), lineas=R.lineas, faltan=R.faltan;
+  const R=planLineas(), lineas=R.lineas, faltan=R.faltan, hechas=R.hechas||[];
   document.getElementById('ppto-sub').textContent =
     lineas.length ? lineas.length+(lineas.length===1?' línea':' líneas')+' – fase '+NOM_FASE[est.fase]
                   : 'sale del odontograma';
+  /* M7-02: lo ya realizado de Plan y cuenta no entra en este total: se dice aparte. */
+  const notaHechas=function(){
+    if(!hechas.length) return;
+    const n=document.createElement('div'); n.className='ppto-hechas';
+    const tot=hechas.reduce(function(a,L){return a+L.v*(L.cant||1);},0);
+    n.textContent='Ya realizado en Plan y cuenta: S/ '+tot.toFixed(2)+' ('+
+      hechas.map(function(L){return (L.pz?fdi(L.pz)+' ':'')+L.t;}).join(', ')+
+      '). No es una propuesta: en el documento va aparte, con lo pagado y el saldo.';
+    c.appendChild(n);
+  };
   if(!lineas.length&&!faltan.length){
     const v=document.createElement('div'); v.className='ppto-vacio';
-    v.textContent='Marca un hallazgo en mal estado y el presupuesto se arma solo.';
-    c.appendChild(v); return;
+    v.textContent=hechas.length?'No hay tratamientos por proponer.':'Marca un hallazgo en mal estado y el presupuesto se arma solo.';
+    c.appendChild(v); notaHechas(); return;
   }
   if(lineas.length){
     const tb=document.createElement('table');
@@ -2387,11 +2438,12 @@ function presupuesto(){
            (DESCUENTO.tipo==='porcentaje'?' '+DESCUENTO.valor+' %':'')+
            '</td><td class="imp">− S/ '+T.desc.toFixed(2)+'</td></tr>';
     }
-    ftx+='<tr><td colspan="4">Total</td><td class="imp">S/ '+T.tot.toFixed(2)+'</td></tr>';
+    ftx+='<tr><td colspan="4">'+(hechas.length?'Total propuesto':'Total')+'</td><td class="imp">S/ '+T.tot.toFixed(2)+'</td></tr>';
     tf.innerHTML=ftx;
     tb.appendChild(tf);
     c.appendChild(tb);
   }
+  notaHechas();
   if(faltan.length){
     const a=document.createElement('div'); a.className='ppto-falta';
     const i=document.createElement('i');
@@ -2704,13 +2756,15 @@ function hojaOdontograma(titulo,extra){
    aviso interno— y que la línea no mencione la cara ni la raíz. El detalle por
    cara y raíz vive en el resumen clínico. */
 function hojaPlan(){
-  const R=planLineas(), L=R.lineas, T=totalesPlan(L);
+  const R=planLineas(), L=R.lineas, T=totalesPlan(L), H=R.hechas||[];
   const filas = L.length
     ? L.map(function(x){
         return '<tr><td class="pz">'+esc(ambitoRot(x))+'</td><td>'+esc(x.t)+'</td>'+
           '<td class="c">'+(x.cant||1)+'</td><td class="n">'+imp(x.v)+'</td>'+
           '<td class="n">'+imp(x.v*(x.cant||1))+'</td></tr>';}).join('')
-    : '<tr><td colspan="5" class="vacio">'+(EN_SESION&&R.faltan.length
+    : '<tr><td colspan="5" class="vacio">'+(H.length
+        ? 'No hay tratamientos por proponer: lo de su plan ya está realizado (sección 2).'
+        : EN_SESION&&R.faltan.length
         ? 'Los hallazgos de esta fase no tienen tratamiento con precio en el catálogo de la clínica.'
         : 'No hay hallazgos en mal estado en esta fase.')+'</td></tr>';
   /* las dos primeras columnas quedan vacías y sin borde: el bloque de totales se
@@ -2718,13 +2772,25 @@ function hojaPlan(){
   const ft=function(et,val,cls){
     return '<tr'+(cls||'')+'><td class="vac" colspan="2"></td>'+
            '<td class="rot" colspan="2">'+et+'</td><td class="n">'+val+'</td></tr>';};
-  let tots=ft('Subtotal','S/ '+imp(T.sub));
-  if(DESCUENTO.activo && T.desc>0){
-    tots+=ft(esc(DESCUENTO.etiqueta)+
-      (DESCUENTO.tipo==='porcentaje'?' '+DESCUENTO.valor+' %':''),
-      '− S/ '+imp(T.desc));
-  }
-  tots+=ft('Total a pagar','S/ '+imp(T.tot),' class="tot"');
+  /* M7-02: lo ya realizado va aparte y el cierre descuenta lo pagado (como el Presupuesto PDF). */
+  const CU=cuentaPlan(T,H);
+  const filaTot=function(f){
+    return ft(esc(f[0]),(f[1]<0?'− S/ '+imp(-f[1]):'S/ '+imp(f[1])),f[2]?' class="tot"':'');};
+  const tots=CU.propuesto.map(filaTot).join('');
+  const realizadas = H.length
+    ? '<h2 class="doc-h2">2 &nbsp;–&nbsp; Ya realizado (en su plan de tratamiento)</h2>'+
+      '<table class="doc"><thead><tr><th style="width:88px">Pieza</th><th>Tratamiento</th>'+
+      '<th style="width:46px">Cant</th><th style="width:132px">Estado</th>'+
+      '<th style="width:98px">Importe S/</th></tr></thead><tbody>'+
+      H.map(function(x){
+        return '<tr><td class="pz">'+esc(ambitoRot(x))+'</td><td>'+esc(x.t)+'</td>'+
+          '<td class="c">'+(x.cant||1)+'</td><td>'+esc(x.estado||'Realizado')+'</td>'+
+          '<td class="n">'+imp(x.v*(x.cant||1))+'</td></tr>';}).join('')+
+      '</tbody><tfoot>'+CU.cuenta.map(filaTot).join('')+'</tfoot></table>'
+    : '';
+  /* sin nada realizado, lo pagado y el saldo siguen al total propuesto */
+  const totsProp = H.length ? tots : tots+CU.cuenta.map(filaTot).join('');
+  const nCond = H.length ? 3 : 2;
   const vence=new Date(); vence.setDate(vence.getDate()+30);
   const h=document.createElement('div'); h.className='hoja';
   h.innerHTML =
@@ -2741,11 +2807,14 @@ function hojaPlan(){
     '<table class="doc"><thead><tr><th style="width:88px">Pieza</th><th>Tratamiento</th>'+
     '<th style="width:46px">Cant</th><th style="width:92px">P. unit. S/</th>'+
     '<th style="width:98px">Importe S/</th></tr></thead><tbody>'+filas+'</tbody>'+
-    '<tfoot>'+tots+'</tfoot></table>'+
-    '<h2 class="doc-h2">2 &nbsp;–&nbsp; Condiciones</h2><div class="cond">'+
+    '<tfoot>'+totsProp+'</tfoot></table>'+
+    realizadas+
+    '<h2 class="doc-h2">'+nCond+' &nbsp;–&nbsp; Condiciones</h2><div class="cond">'+
     CONDICIONES.map(function(c,i){
+      /* M7-02: con lo ya realizado listado aparte, el alcance lo dice. */
+      const txt = (i===0 && H.length) ? c[1]+' Lo ya realizado de su plan se lista aparte y cuenta en el saldo.' : c[1];
       return '<div class="cl"><span class="cn">'+(i+1)+'</span><span><b>'+esc(c[0])+'.</b> '+
-             esc(c[1])+'</span></div>';}).join('')+'</div>'+
+             esc(txt)+'</span></div>';}).join('')+'</div>'+
     firmas()+pieDoc('Plan de inversión',1);
   return h;
 }

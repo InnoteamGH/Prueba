@@ -56,7 +56,10 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
   // metas. Gerencia tiene metas pero no config: la meta se guardaba y la comisión daba 403
   // (guardado a medias). Sin ese permiso el % se ve, pero en solo lectura.
   const puedeComGlobal = puedeEditar && (can ? can("config", "editar") : true);
-  const puedeCom = (s) => (s === "todas" ? puedeComGlobal : puedeEditar);
+  // R7-03: la misma regla con una sede elegida. Antes, con «Sede San Isidro», gerencia podía
+  // editar el % (el servidor lo acepta por /metas/{sede} y lo guarda en la ficha global del
+  // doctor). Sin el permiso que guarda la comisión, el % queda en solo lectura en todas las vistas.
+  const puedeCom = () => puedeComGlobal;
   const verSedes = useMemo(() => (sedes && sedes.length ? sedes.map(String) : null), [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [meds, setMeds] = useState([]);
   const [nombres, setNombres] = useState({});   // sedeId → nombre (conectado)
@@ -171,7 +174,9 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
     // guardado y se dice qué faltó: nunca un guardado a medias en silencio (R4-02).
     const tareas = cambiados.flatMap(({ m, s, key }) => {
       const meta = val(key, "meta"), com = val(key, "com");
-      if (s !== "todas") return [{ key, campos: ["meta", "com"], que: "meta y comisión", nombre: m.nombre, p: api.catalogo.fijarMetaSede(m.id, sedeApiUuid(s) || s, { metaMensual: meta, porcentajeComision: com }) }];
+      // R7-03: sin permiso de comisión se reenvía el % guardado, nunca uno editado.
+      const comBase = base[key]?.com === "" || base[key]?.com == null ? null : Number(base[key].com);
+      if (s !== "todas") return [{ key, campos: puedeComGlobal ? ["meta", "com"] : ["meta"], que: puedeComGlobal ? "meta y comisión" : "meta", nombre: m.nombre, p: api.catalogo.fijarMetaSede(m.id, sedeApiUuid(s) || s, { metaMensual: meta, porcentajeComision: puedeComGlobal ? com : comBase }) }];
       const cambioMeta = (draft[key]?.meta ?? "") !== (base[key]?.meta ?? "");
       const cambioCom = (draft[key]?.com ?? "") !== (base[key]?.com ?? "");
       return [
@@ -235,7 +240,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
       {conectado && !error && sinSede.length > 0 && !esGlobal && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>{disp
         ? <>El servidor no indica en qué sede atiende cada doctor: se muestran los que tienen horario en la sede elegida (Configuración › Horarios por doctor).{ocultosSinHorario.length ? ` ${ocultosSinHorario.length === 1 ? "1 doctor sin horario aquí no se lista" : `${ocultosSinHorario.length} doctores sin horario aquí no se listan`}${usuarioGlobal ? ": están en «Todas las sedes»." : ": su meta la fija quien administra su sede."}` : ""}</>
         : <>El servidor no indica en qué sede atiende cada doctor: {sinSede.length === 1 ? "este doctor se muestra" : `estos ${sinSede.length} doctores se muestran`} en la sede elegida. Indícalo en Configuración › Doctores.</>}</span></div>}
-      {puedeEditar && !puedeComGlobal && grupos.some((g) => g.sede === "todas") && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>Puedes fijar la meta de cada odontólogo. El <b>% de comisión</b> se ve en solo lectura: lo cambia quien administra Configuración › Doctores.</span></div>}
+      {puedeEditar && !puedeComGlobal && grupos.length > 0 && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>Puedes fijar la meta de cada odontólogo. El <b>% de comisión</b> se ve en solo lectura: lo cambia quien administra Configuración › Doctores.</span></div>}
       {conectado && !error && meds.length === 0 && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>}
       {sinDocsAqui && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo={vistaUnica ? `Ningún doctor tiene horario en ${nomSede(vistaUnica)}` : "Ningún doctor tiene horario en estas sedes"} sub="La meta se fija para los doctores que atienden en la sede. Carga su horario en Configuración › Horarios por doctor." /></Card>}
 

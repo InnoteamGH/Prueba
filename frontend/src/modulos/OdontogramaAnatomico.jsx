@@ -8,6 +8,8 @@ import { MEDICOS, useSede } from "../comun";
 import { useCatalogoApi, useMedicosApi, medicoEn, tarifaDibujoDesdeCatalogo } from "../compartido/catalogoApi";
 import { precioEnSede } from "../compartido/cajaSede";
 import { estadoFaseUi } from "../compartido/estados";
+import { etiquetaRealizada, faseRealizada } from "../util/planInversionCuenta";
+import { leerPagadoPaciente } from "../compartido/pagadoPaciente";
 import { copNumero } from "../util/cop";
 
 /* Profesional que firma los documentos del odontograma: el odontólogo que tiene la
@@ -267,18 +269,23 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   // Procedimientos de «Plan y cuenta» (GET /tratamientos): el plan de inversión del dibujo
   // los incluye con su importe, así no sale «Total S/ 0» cuando el plan ya está armado.
   const [planSrv, setPlanSrv] = useState(null);
+  // M7-02: lo pagado por el paciente, para que el plan descuente lo pagado como el Presupuesto PDF.
+  const [pagadoPlan, setPagadoPlan] = useState(null);
   useEffect(() => {
     setPlanSrv(null);
+    setPagadoPlan(null);
     if (!auth.token || !pacienteId || soloLectura) return undefined;
     let vivo = true;
     api.tratamientos.porPaciente(pacienteId).then((ps) => {
       if (!vivo) return;
       const fs = [];
-      (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && estadoFaseUi(f.estado) !== "anulado") fs.push({ id: f.id, t: f.nombre || "Procedimiento", v: Number(f.costo) || 0, pz: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || "" }); }));
+      // M7-02: cada partida dice si ya se hizo (terminada o atendida): no es «propuesta».
+      (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && estadoFaseUi(f.estado) !== "anulado") fs.push({ id: f.id, t: f.nombre || "Procedimiento", v: Number(f.costo) || 0, pz: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || "", hecho: faseRealizada(f.estado), estado: faseRealizada(f.estado) ? etiquetaRealizada(f.estado) : "" }); }));
       setPlanSrv(fs);
     // H-10: si el plan no se puede leer, el documento lo dice; antes salía una «Propuesta»
     // armada solo con los hallazgos, como si el paciente no tuviera nada en su plan.
     }).catch(() => { if (vivo) setPlanSrv({ error: true }); });
+    leerPagadoPaciente(pacienteId).then((p) => { if (vivo) setPagadoPlan(p); });
     return () => { vivo = false; };
   }, [pacienteId, soloLectura]);
   const syncChrome = useCallback(() => {
@@ -297,7 +304,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     postToIframe({ type: "dento-odontograma-profesional", profesional: profesionalDoc(medicoTratante, medsApi) });
     // Tarifa del plan de inversión del dibujo: la del catálogo de la clínica en la sede.
     if (tarifaDibujo) postToIframe({ type: "dento-odontograma-tarifa", tarifa: tarifaDibujo, sueltos: [] });
-    if (planSrv) postToIframe(Array.isArray(planSrv) ? { type: "dento-odontograma-plan", fases: planSrv } : { type: "dento-odontograma-plan", fases: [], error: true });
+    if (planSrv) postToIframe(Array.isArray(planSrv) ? { type: "dento-odontograma-plan", fases: planSrv, pagado: pagadoPlan } : { type: "dento-odontograma-plan", fases: [], error: true, pagado: pagadoPlan });
     // Membrete de los documentos del odontograma (resumen y plan de inversión): los
     // mismos datos de empresa y de la sede activa que el resto del sistema.
     postToIframe({
@@ -309,7 +316,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
         horario: datosDoc.sede.horario, correo: datosDoc.sede.correo, serie: datosDoc.sede.serieDocumento,
       },
     });
-  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante, medsApi, tarifaDibujo, denticion, planSrv]);
+  }, [postToIframe, zoom, pacienteNombre, pacienteDni, pacienteEdad, pacienteHc, pacienteSede, pacienteId, datosDoc, medicoTratante, medsApi, tarifaDibujo, denticion, planSrv, pagadoPlan]);
 
   const persistir = useCallback(async (payload) => {
     if (!editable || !pacienteId || !payload?.datos || !auth.token) return;

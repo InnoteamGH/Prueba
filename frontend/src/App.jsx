@@ -38,8 +38,10 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima } from "./util/fechaLima";
+import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
-import { bloqueosDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
+import { bloqueoTocaHora, bloqueosDelDia, bloqueosParcialesDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
+import { moverFocoMenu, useMenuDesplegable } from "./compartido/menuDesplegable";
 import { compararMesAnterior, tramoMesAnterior } from "./util/miProduccionComp";
 import { cierresAnteriores, fechaDMA, motivoCajaCerrada, resultadoCierre, tituloCajaCerrada } from "./compartido/cajaJornada";
 import { layoutBarras } from "./util/barras";
@@ -871,7 +873,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
           )}
         </div>
       </div>
-      {det && <Modal icon={<BarChart3 size={20} strokeWidth={1.75} />} titulo={det.titulo} sub={`${det.rows.length} registro(s)`} onClose={() => setDet(null)} maxW={520}>
+      {det && <Modal icon={<BarChart3 size={20} strokeWidth={1.75} />} titulo={det.titulo} sub={det.rows.length === 1 ? "1 registro" : `${det.rows.length} registros`} onClose={() => setDet(null)} maxW={520}>
         {det.rows.length === 0 ? <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Sin registros para mostrar.</div> : det.rows.map((r, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: i ? "1px solid var(--dc-line)" : "none", fontSize: 13 }}><span style={{ color: "var(--dc-ink-700)" }}>{r.izq}</span><span style={{ fontWeight: 500, color: NAVY }}>{r.der}</span></div>
         ))}
@@ -929,11 +931,13 @@ function offsetsFoco() {
     mesOff: (f.getFullYear() - h.getFullYear()) * 12 + f.getMonth() - h.getMonth(),
   };
 }
-function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null, onAsignar = null, onQuitarAsignacion = null, modoFijo = null, sedeFiltro = "all", medicoFijo = null, medicoPropio = null, soloConCitas = false }) {
+function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados = [], bloqueos = [], onNuevo, onRango, reglas = null, validar = null, sedeInicial = null, onAsignar = null, onQuitarAsignacion = null, modoFijo = null, sedeFiltro = "all", medicoFijo = null, medicoPropio = null, soloConCitas = false, notify = () => {}, onIrDia = null }) {
   const [modoLoc, setModo] = useState("semana");
   // NAV-04: el selector de vista vive arriba de la Agenda; aquí solo se dibuja.
   const modo = modoFijo || modoLoc;   // mes | semana | dia | sillon
   const [dlOpen, setDlOpen] = useState(false);   // menú de descarga del rango visible
+  const dlCajaRef = useRef(null), dlBtnRef = useRef(null), dlMenuRef = useRef(null);
+  useMenuDesplegable(dlOpen, () => setDlOpen(false), { dentro: [dlCajaRef], boton: dlBtnRef });
   // Cada vista (Semana, Por doctor, Por sillón…) monta su propio calendario: se arranca en la
   // fecha que se miraba en la vista anterior si fue hace poco (ver FOCO_CAL).
   const [off, setOff] = useState(() => offsetsFoco().off);             // semana
@@ -1050,10 +1054,21 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
       const sedeB = b.sede ?? b.sedeId ?? null;
       if (b.sillon == null && sedeB != null && sedeCal != null && !mismaSede(sedeB, sedeCal)) return false;
       if (b.sillon != null && !(modo === "sillon" && col.silObj && String(col.silObj.numero) === String(b.sillon) && (sedeB == null || mismaSede(col.silObj.sede, sedeB)))) return false;
-      const ini = (b.horaInicio || "").slice(0, 2), fin = (b.horaFin || "").slice(0, 2);
-      return hh >= ini && hh < fin;
+      // R-30: por minutos (17:00–17:30 toca la franja de las 17; comparando «17» < «17» no tocaba ninguna).
+      return bloqueoTocaHora(b, Number(hh));
     }) || null;
   };
+  // R-30: Semana y Mes no tienen columna por doctor ni por sillón, así que no pintaban esos
+  // bloqueos (Día y Por sillón sí). Se muestran como aviso en la franja o en el día, sin
+  // bloquear la celda: los demás doctores y sillones siguen libres.
+  const propioCal = medicoFijo ?? medicoPropio;
+  const medNomCal = (id) => (docs.find((d) => String(d.key) === String(id)) || ((reglas && reglas.medicos) || []).find((m) => String(m.id) === String(id)) || {}).nombre || "Doctor";
+  const enSedeCal = (s) => sedeCal == null || mismaSede(s, sedeCal);
+  const ocultoCal = (id) => [...oculto].some((k) => String(k) === String(id));
+  const bloqueosParciales = (dISO) => bloqueosParcialesDelDia(bloqueos, dISO, { medicoPropio: propioCal, soloPropios: soloConCitas, enSede: enSedeCal, oculto: ocultoCal })
+    // El bloqueo propio del médico ya se pinta en su Semana como bloqueo de toda la franja (M5-11).
+    .filter((b) => !(propioCal != null && b.medicoId != null && String(b.medicoId) === String(propioCal)));
+  const textoBloq = (b) => { const t = textoBloqueo(b, medNomCal); return { ...t, linea: `${t.horas} · ${t.motivo}${soloConCitas && t.quien !== "Toda la agenda" ? "" : ` · ${t.quien}`}` }; };
   // Fin de la cita según su duración (para mostrar el rango horario en el bloque).
   const finCita = (c) => { if (!c.hora) return ""; const [h, m] = c.hora.split(":").map(Number); const dur = Number(c.duracionMin) || 30; const t = h * 60 + m + dur; return `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
 
@@ -1093,6 +1108,14 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const next = () => modo === "mes" ? setMesOff(mesOff + 1) : modo === "semana" ? setOff(off + 1) : setDiaOff(diaOff + 1);
   // «Hoy» también vuelve a hoy la fecha que heredan las otras vistas.
   const irHoy = () => { FOCO_CAL = { fecha: hoyISO, ts: Date.now() }; setMesOff(0); setOff(0); setDiaOff(0); };
+  // R-32: pulsar un día del Mes abre la vista Día de esa fecha. Con el selector de vistas arriba
+  // (modoFijo) el setModo("dia") de antes no hacía nada: lo cambia la Agenda (onIrDia).
+  const irAlDia = (d) => {
+    const dISO = iso(d);
+    FOCO_CAL = { fecha: dISO, ts: Date.now() };
+    if (onIrDia) { onIrDia(dISO); return; }
+    setModo("dia"); setDiaOff(Math.round((d - hoyD) / 86400000));
+  };
   const enHoy = modo === "mes" ? mesOff === 0 : modo === "semana" ? off === 0 : diaOff === 0;
   const titulo = modo === "mes" ? `${MES[mesRef.getMonth()]} ${mesRef.getFullYear()}`
     : (modo === "semana") ? `${semana[0].getDate()} ${MESc[semana[0].getMonth()]} – ${semana[6].getDate()} ${MESc[semana[6].getMonth()]} ${semana[6].getFullYear()}`
@@ -1165,15 +1188,16 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const descargarRango = (tipo) => {
     setDlOpen(false);
     const filas = rangoCitas.map((c) => ({ fecha: c.fecha, hora: c.hora, paciente: c.paciente, medico: c.medico || "—", estado: EST_LABEL[estadoCita(c)] || c.estado }));
-    if (!filas.length) return;
+    // R-31: una semana sin citas no descargaba nada y no decía por qué.
+    if (!filas.length) { notify(modo === "mes" ? "No hay citas en ese mes." : (modo === "semana" || modo === "tabla") ? "No hay citas en esa semana." : "No hay citas ese día."); return; }
     // R-17: el archivo se llama por el rango que se descarga, no por el día de hoy
     // (la semana del 12 al 18/10 salía «agenda_semana_2026-10-09»).
     const rangoArchivo = modo === "mes" ? iso(mesRef).slice(0, 7)
       : (modo === "semana" || modo === "tabla") ? `${iso(semana[0])}_a_${iso(semana[6])}`
       : iso(diaSel);
-    if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${modo}_${rangoArchivo}.xlsx`, hoja: "Agenda", titulo: `Agenda — ${titulo}`, columnas: COLS_CAL, filas });
+    if (tipo === "excel") Promise.resolve(exportarExcel({ nombreArchivo: `agenda_${modo}_${rangoArchivo}.xlsx`, hoja: "Agenda", titulo: `Agenda — ${titulo}`, columnas: COLS_CAL, filas })).catch(() => notify("No se pudo generar el Excel."));
     // M6-05: en el PDF la fecha va dd/mm/aaaa (salía «2026-10-15»); el Excel la deja ordenable.
-    else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: conteoRango, columnas: COLS_CAL, filas: filas.map((x) => ({ ...x, fecha: fechaCortaLima(x.fecha) })) });
+    else if (!exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: conteoRango, columnas: COLS_CAL, filas: filas.map((x) => ({ ...x, fecha: fechaCortaLima(x.fecha) })) })) notify("Permite las ventanas emergentes para generar el PDF.");
   };
 
   const Bloque = ({ c }) => { const col = colorDe(c); const cancel = c.estado === "cancelada"; const arrastrable = !!onReagendar && !cancel && c.estado !== "cerrada_sistema"; const horaLbl = (modo === "dia" || modo === "sillon") ? `${c.hora}–${finCita(c)}` : c.hora;
@@ -1219,16 +1243,16 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
               <button key={k} className={modo === k ? "is-on" : ""} onClick={() => setModo(k)} style={{ padding: "6px 13px", borderRadius: "var(--dc-r-sm)", border: "none", cursor: "pointer", fontWeight: 500, fontSize: 13, background: modo === k ? "#fff" : "transparent", color: modo === k ? DS.c.primary : "var(--dc-ink-400)", boxShadow: modo === k ? "0 1px 2px rgba(16,24,40,.12)" : "none" }}>{lbl}</button>
             ))}
           </div>}
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setDlOpen((v) => !v)} title="Descargar lo visible" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", cursor: "pointer" }}><Download size={15} strokeWidth={1.75} /> Descargar</button>
-            {dlOpen && (<>
-              <div onClick={() => setDlOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 41, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", boxShadow: "0 18px 40px -18px rgba(16,24,40,.4)", overflow: "hidden", minWidth: 220 }}>
+          {/* M7-01: Escape y el clic fuera cierran «Descargar», sin capa que se coma el primer clic. */}
+          <div ref={dlCajaRef} style={{ position: "relative" }}>
+            <button ref={dlBtnRef} type="button" aria-haspopup="menu" aria-expanded={dlOpen} onClick={() => setDlOpen((v) => !v)} onKeyDown={(e) => { if (dlOpen) moverFocoMenu(e, dlMenuRef.current); }} title="Descargar lo visible" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", cursor: "pointer" }}><Download size={15} strokeWidth={1.75} /> Descargar</button>
+            {dlOpen && (
+              <div ref={dlMenuRef} role="menu" onKeyDown={(e) => moverFocoMenu(e, dlMenuRef.current)} style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 41, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", boxShadow: "0 18px 40px -18px rgba(16,24,40,.4)", overflow: "hidden", minWidth: 220 }}>
                 <div style={{ padding: "8px 12px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".05em", borderBottom: "1px solid var(--dc-bg)" }}>{modo === "mes" ? "Mes visible" : (modo === "semana" || modo === "tabla") ? "Semana visible" : "Día visible"} – {conteoRango}</div>
-                <button onClick={() => descargarRango("excel")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 13px", border: "none", background: "#fff", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><FileSpreadsheet size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /> Excel (.xlsx)</button>
-                <button onClick={() => descargarRango("pdf")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 13px", border: "none", borderTop: "1px solid var(--dc-bg)", background: "#fff", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><FileText size={16} strokeWidth={1.75} color="var(--dc-red)" /> PDF</button>
+                <button type="button" role="menuitem" onClick={() => descargarRango("excel")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 13px", border: "none", background: "#fff", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><FileSpreadsheet size={16} strokeWidth={1.75} color="var(--dc-ok-700)" /> Excel (.xlsx)</button>
+                <button type="button" role="menuitem" onClick={() => descargarRango("pdf")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 13px", border: "none", borderTop: "1px solid var(--dc-bg)", background: "#fff", cursor: "pointer", fontSize: 13, color: NAVY, fontWeight: 500 }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--dc-bg)")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}><FileText size={16} strokeWidth={1.75} color="var(--dc-red)" /> PDF</button>
               </div>
-            </>)}
+            )}
           </div>
         </div>
       </div>
@@ -1276,13 +1300,21 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
       })()}
       {modo === "mes" ? (
         <div style={{ padding: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6, marginBottom: 6 }}>
+          {/* Columnas iguales: con «1fr» un nombre largo ensanchaba su columna y el domingo se salía. */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 6, marginBottom: 6 }}>
             {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((n) => <div key={n} style={{ textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase" }}>{n}</div>)}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 }}>
-            {mesGrid.map((d, i) => { const dISO = iso(d); const cs = citasDe(dISO).sort((a, b) => (a.hora || "").localeCompare(b.hora || "")); const otroMes = d.getMonth() !== mesRef.getMonth(); const esHoy = dISO === hoyISO; return (
-              <div key={i} onClick={() => { setModo("dia"); setDiaOff(Math.round((d - hoyD) / 86400000)); }} className="dc-rise" style={{ minHeight: 110, borderRadius: "var(--dc-r-lg)", border: `1px solid ${esHoy ? tint(DS.c.primary, 0.502) : "rgba(228,231,236,0.6)"}`, background: esHoy ? "rgba(255,255,255,0.9)" : otroMes ? "rgba(245,247,250,0.5)" : "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)", padding: "10px 12px", cursor: "pointer", opacity: otroMes ? 0.7 : 1, display: "flex", flexDirection: "column", gap: 5, transition: "all .2s", boxShadow: esHoy ? `0 8px 24px -10px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)` : "none" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = tint(DS.c.primary, 0.376); e.currentTarget.style.boxShadow = `0 10px 24px -12px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)`; e.currentTarget.style.transform = "translateY(-2px)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = esHoy ? tint(DS.c.primary, 0.502) : "rgba(228,231,236,0.6)"; e.currentTarget.style.boxShadow = esHoy ? `0 8px 24px -10px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)` : "none"; e.currentTarget.style.transform = "none"; }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: esHoy ? DS.c.primary : NAVY, textAlign: "right", fontVariantNumeric: "tabular-nums", opacity: otroMes ? 0.5 : 1 }}>{d.getDate()}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 6 }}>
+            {mesGrid.map((d, i) => { const dISO = iso(d); const cs = citasDe(dISO).sort((a, b) => (a.hora || "").localeCompare(b.hora || "")); const otroMes = d.getMonth() !== mesRef.getMonth(); const esHoy = dISO === hoyISO;
+              // R-30: los bloqueos del día (de toda la agenda, de un doctor o de un sillón).
+              const blqs = bloqueosDelDia(bloqueos, dISO, { medicoPropio: propioCal, soloPropios: soloConCitas, enSede: enSedeCal }).filter((b) => !(b.medicoId != null && b.medicoId !== "" && ocultoCal(b.medicoId)));
+              return (
+              <div key={i} onClick={() => irAlDia(d)} className="dc-rise" title={`Ver el ${fechaLegible(dISO)} en la vista Día`} style={{ minHeight: 110, minWidth: 0, borderRadius: "var(--dc-r-lg)", border: `1px solid ${esHoy ? tint(DS.c.primary, 0.502) : "rgba(228,231,236,0.6)"}`, background: esHoy ? "rgba(255,255,255,0.9)" : otroMes ? "rgba(245,247,250,0.5)" : "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)", padding: "10px 12px", cursor: "pointer", opacity: otroMes ? 0.7 : 1, display: "flex", flexDirection: "column", gap: 5, transition: "all .2s", boxShadow: esHoy ? `0 8px 24px -10px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)` : "none" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = tint(DS.c.primary, 0.376); e.currentTarget.style.boxShadow = `0 10px 24px -12px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)`; e.currentTarget.style.transform = "translateY(-2px)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = esHoy ? tint(DS.c.primary, 0.502) : "rgba(228,231,236,0.6)"; e.currentTarget.style.boxShadow = esHoy ? `0 8px 24px -10px ${tint(DS.c.primary, 0.251)}, inset 0 2px 4px rgba(255,255,255,1)` : "none"; e.currentTarget.style.transform = "none"; }}>
+                {/* R-32: el número del día abre la vista Día de esa fecha (también con el teclado). */}
+                <button type="button" className="dc-cal__mesdia" aria-label={`Ver el ${fechaLegible(dISO)} en la vista Día`} onClick={(e) => { e.stopPropagation(); irAlDia(d); }} style={{ color: esHoy ? DS.c.primary : NAVY, opacity: otroMes ? 0.5 : 1 }}>{d.getDate()}</button>
+                {/* En la celda va la hora de inicio y a quién toca (el detalle completo, en el título). */}
+                {blqs.slice(0, 2).map((b, j) => { const t = textoBloq(b); return <div key={b.id ?? `b${j}`} className="dc-cal__bloqp is-mes" title={`Horario bloqueado: ${t.linea}`}><Lock size={11} strokeWidth={2.2} aria-hidden="true" /><span>{t.horas.split("–")[0]} {t.quien === "Toda la agenda" || soloConCitas ? t.motivo : t.quien.replace(/^Dra?\.\s*/, "")}</span></div>; })}
+                {blqs.length > 2 && <div className="dc-cal__bloqp is-mes" title={blqs.slice(2).map((b) => textoBloq(b).linea).join(" | ")}><Lock size={11} strokeWidth={2.2} aria-hidden="true" /><span>+{blqs.length - 2} {blqs.length - 2 === 1 ? "bloqueo" : "bloqueos"}</span></div>}
                 {cs.slice(0, 4).map((c) => { const col = colorDe(c); return <div key={c.id} role="button" tabIndex={0} title={`${c.hora} – ${c.paciente} – ${EST_LABEL[estadoCita(c)] || c.estado}`} onClick={(e) => { e.stopPropagation(); onCita && onCita(c); }} onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onCita && onCita(c); } }} style={{ cursor: "pointer", textDecoration: c.estado === "cancelada" ? "line-through" : "none", fontSize: 12, fontWeight: 500, color: NAVY, background: `linear-gradient(135deg, ${tint(col, 0.125)}, ${tint(col, 0.02)})`, border: `1px solid ${tint(col, 0.251)}`, borderLeft: `3px solid ${col}`, borderRadius: "var(--dc-r-sm)", padding: "3px 7px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 5, backdropFilter: "blur(4px)" }}><span style={{ fontWeight: 500, color: col }}>{c.hora}</span> <span>{c.paciente}</span></div>; })}
                 {cs.length > 4 && <div style={{ fontSize: 12, fontWeight: 500, color: DS.c.primary, background: tint(DS.c.primary, 0.071), padding: "2px 7px", borderRadius: "var(--dc-r-full)", alignSelf: "flex-start", marginTop: 2 }}>+{cs.length - 4} más</div>}
               </div>
@@ -1372,6 +1404,12 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                     style={{ borderLeft: "1px solid rgba(15,23,42,0.04)", padding: 3, display: "flex", flexDirection: "column", gap: 3, position: "relative", cursor: libre ? "pointer" : "default", background: isOver ? (malo ? "#FEF3F2" : tint(DS.c.primary, 0.071)) : blk ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-fee) 6px,var(--dc-fee) 12px)" : (cerr ? "repeating-linear-gradient(45deg,var(--dc-bg),var(--dc-bg) 6px,var(--dc-bg) 6px,var(--dc-bg) 12px)" : undefined), outline: isOver ? `2px dashed ${malo ? "#D92D20" : DS.c.primary}` : "none", outlineOffset: -2 }}>
                     {esAhora && <span className="dc-cal__now" style={{ top: `${nowPct}%` }} aria-hidden="true" />}
                     {blk && cs.length === 0 && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-danger-700)", opacity: .8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{blk.motivo || "Bloqueado"}</span>}
+                    {(modo === "semana" || modo === "dia") && (() => {
+                      const parc = bloqueosParciales(col.dISO).filter((b) => b !== blk && bloqueoTocaHora(b, h));
+                      if (!parc.length) return null;
+                      const ts = parc.map(textoBloq);
+                      return <span className="dc-cal__bloqp" title={`${parc.length === 1 ? "Horario bloqueado" : "Horarios bloqueados"}: ${ts.map((t) => t.linea).join(" | ")}. Los demás doctores y sillones siguen libres.`}><Lock size={11} strokeWidth={2.2} aria-hidden="true" /><span>{parc.length === 1 ? `${ts[0].quien === "Toda la agenda" ? "" : `${ts[0].quien.replace(/^Dra?\.\s*/, "")} · `}${ts[0].motivo}` : `${parc.length} bloqueos`}</span></span>;
+                    })()}
                     {cs.map((c) => <Bloque key={c.id} c={c} />)}
                   </div>
                 ); })}
@@ -1505,7 +1543,7 @@ function CancelarCitaModal({ cita, onClose, onConfirm }) {
 const ETQ_FILTRO_DIA = { pendiente: "Por confirmar", atendida: "Atendidas" };
 // La misma etiqueta en singular, para «Ninguna cita atendida» (R-24).
 const ETQ_FILTRO_DIA_UNA = { pendiente: "Por confirmar", atendida: "Atendida" };
-function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onAtender, ofrecerCupo, fichas, esperaState = [], setEspera = () => {}, pacientes = [], setPacientes = () => {}, vistaInicial = "dia", calModo = null, onIrEspera, can, agendarDesdeFicha = null, onAgendarDesdeFichaDone = () => {}, crearIntent = false, onIntentDone = () => {}, sedeActiva = 1 }) {
+function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onAtender, ofrecerCupo, fichas, esperaState = [], setEspera = () => {}, pacientes = [], setPacientes = () => {}, vistaInicial = "dia", calModo = null, onIrDia = null, onIrEspera, can, agendarDesdeFicha = null, onAgendarDesdeFichaDone = () => {}, crearIntent = false, onIntentDone = () => {}, sedeActiva = 1 }) {
   // Reprogramar y cancelar es operar la agenda. Antes se decidía con `rol !== "medico"`
   // y gerencia -que solo lee- pasaba el filtro y podía cancelar cualquier cita.
   const puedeOperarAgenda = can ? can("agenda", "editar") : rol !== "medico";
@@ -2084,7 +2122,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           ? <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo={`Ninguna cita ${(ETQ_FILTRO_DIA_UNA[estadoDia] || estadoInfo("cita", estadoDia).label).toLowerCase()}`} sub="Pulsa «Ver todas las citas» para ver el resto del día." />
           : <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub={bloqDia.length ? `No hay citas para ese día; ${bloqDia.length === 1 ? "hay un horario bloqueado (arriba)" : `hay ${bloqDia.length} horarios bloqueados (arriba)`}.` : esHoyVer ? "Tu agenda para hoy está libre." : "No hay citas para ese día."} />}
         cols={COLS_AGENDA} />
-      </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} medicoFijo={miId} medicoPropio={miIdPropio} soloConCitas={rol === "medico"} onCita={(c) => setCitaVer(c.id)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
+      </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} notify={notify} onIrDia={onIrDia} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} medicoFijo={miId} medicoPropio={miIdPropio} soloConCitas={rol === "medico"} onCita={(c) => setCitaVer(c.id)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
         onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
         onQuitarAsignacion={puedeAgendar ? (id) => { if (conectado) { api.sillones.quitarAsignacion(id).then(() => notify("Turno quitado.")).catch(() => notify("No se pudo quitar.")); return; } demoDb?.setAsignaciones((xs) => (xs || []).filter((x) => x.id !== id)); notify("Turno quitado."); } : null} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
 
@@ -5551,7 +5589,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {/* CAJA-17: los comprobantes de ejemplo se numeran con los cobros de TODA la clínica (así
           un cobro no cambia de número al cambiar de sede) y después se muestran los de las
           sedes que se ven. Las series son por sede de la clínica (Integraciones). */}
-      {tab === "sunat" && <FacturacionSunat puedeEmitir={puedeAbrirCaja} onIntegraciones={() => { window.location.hash = "#/integraciones"; }} notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
+      {tab === "sunat" && <FacturacionSunat puedeEmitir={puedeAbrirCaja} onIntegraciones={(can ? can("integraciones", "ver") : tienePermiso("integraciones", "ver")) ? () => { window.location.hash = "#/integraciones"; } : null} notify={notify} puedeConfig={puedeConfig} onDatosFact={() => setDatosFact(true)} abrirBoleta={abrirBoleta}
         sedes={(conectado && sedes.length ? sedes : SEDES).map((x) => ({ id: x.id, nombre: x.nombre || nombreSede(x.id) }))}
         verSedes={limiteSedes} consulta={{ sedeIds: sedesApi }}
         cobrosServidor={conectado ? [...boletasHoy, ...hist.filter(pagoEnSedeActiva)] : []}
@@ -5843,7 +5881,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <section className="dc-esp-hero dc-caja-sub dc-caja-sub--titulo">
               <div className="dc-esp-hero__txt">
                 <div className="dc-esp-hero__num"><b>Arqueo del día</b></div>
-                <p>{cajaAbierta ? `Cuenta la gaveta y compárala con el efectivo esperado${apertura?.reabierta ? ` · caja reabierta a las ${horaDe(apertura.abiertaEn)}: cuenta solo lo posterior` : ""}` : "Se habilita con la caja abierta"}</p>
+                {/* QA 7 (recepción): al reabrir una jornada pasada, «Ingresos y egresos» lista también
+                    los movimientos de antes de la reapertura y el arqueo no los cuenta: se dice cuántos. */}
+                <p>{cajaAbierta ? (() => {
+                  const fuera = Math.max(0, egresosHoy.length - egresosSesion.length) + Math.max(0, boletasHoyActivas.length - boletasSesion.length);
+                  const cuantos = fuera ? `${fuera} ${fuera === 1 ? "movimiento anterior queda" : "movimientos anteriores quedan"} en el cierre previo` : "";
+                  const hora = apertura?.abiertaEn ? horaDe(apertura.abiertaEn) : "";
+                  return `Cuenta la gaveta y compárala con el efectivo esperado${apertura?.reabierta ? ` · caja reabierta${hora ? ` a las ${hora}` : ""}: cuenta solo lo posterior${cuantos ? ` (${cuantos})` : ""}` : fuera ? ` · solo cuenta lo registrado desde la apertura${hora ? ` de las ${hora}` : ""} (${fuera === 1 ? "1 movimiento anterior no entra" : `${fuera} movimientos anteriores no entran`})` : ""}`;
+                })() : "Se habilita con la caja abierta"}</p>
               </div>
               <div className="dc-esp-hero__cifras" hidden></div>
               <span />
@@ -6074,12 +6119,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja} disabled={histRangoInvertido}><Repeat size={14} strokeWidth={1.9} /></button>
             </div>
           );
-          const avisosHist = (<>
-            {histRangoInvertido && <div className="fm-aviso-edad is-mal" style={{ width: "100%" }}><AlertTriangle size={15} strokeWidth={2} /><span>La fecha «Desde» ({fechaLegible(histCajaRango.desde)}) es posterior a «Hasta» ({fechaLegible(histCajaRango.hasta)}). Corrige el rango para ver las jornadas.</span></div>}
-            {abiertasFuera.map((r) => <div key={`fuera-${r.id}`} className="fm-aviso-edad is-info" style={{ width: "100%" }}><Info size={15} strokeWidth={2} /><span>Fuera del rango sigue abierta la jornada del {fechaLegible(r.fecha)} ({sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "sede"}).</span></div>)}
-          </>);
-          if (conectado && histCajaError && !histRangoInvertido) return <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<NoDisponible bloque onReintentar={recargarHistCaja} texto="Historial no disponible" detalle="No se pudieron leer las jornadas del servidor." /></Card>;
-          return js.length === 0 ? <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}{avisosHist}<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo={histRangoInvertido ? "Rango de fechas inválido" : "Sin jornadas en el rango"} sub={histRangoInvertido ? "«Desde» debe ser anterior o igual a «Hasta»." : "Abre y cierra caja para ver el historial."} /></Card> : (<>
+          // R7-10: con el rango invertido, un solo mensaje (antes salían dos del mismo error, más
+          // «Fuera del rango sigue abierta…», que no aplica a un rango inválido).
+          const avisosHist = histRangoInvertido ? null : abiertasFuera.map((r) => <div key={`fuera-${r.id}`} className="fm-aviso-edad is-info" style={{ width: "100%" }}><Info size={15} strokeWidth={2} /><span>Fuera del rango sigue abierta la jornada del {fechaLegible(r.fecha)} ({sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "sede"}).</span></div>);
+          if (histRangoInvertido) return <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<Vacio icon={<AlertTriangle size={22} strokeWidth={1.75} />} titulo="Rango de fechas inválido" sub={`La fecha «Desde» (${fechaLegible(histCajaRango.desde)}) es posterior a «Hasta» (${fechaLegible(histCajaRango.hasta)}). Corrige el rango para ver las jornadas.`} /></Card>;
+          if (conectado && histCajaError) return <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}<NoDisponible bloque onReintentar={recargarHistCaja} texto="Historial no disponible" detalle="No se pudieron leer las jornadas del servidor." /></Card>;
+          return js.length === 0 ? <Card style={{ display: "grid", gap: 12, justifyItems: "center", padding: 18 }}>{rango}{avisosHist}<Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Sin jornadas en el rango" sub="Abre y cierra caja para ver el historial." /></Card> : (<>
           {avisosHist}
           <ListaFiltrable rows={js} sub="jornadas" extra={rango} defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="caja_hist" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 960, cols: [
             { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__strong">{fechaLegible(r.fecha)}</span> },
@@ -7535,8 +7580,16 @@ function AuditoriaVista({ rows, hoyN, usuarios, alertas, sub, onDet, niv }) {
   const tipoDe = (a) => { const t = String(a.accion || "").toLowerCase(); return a.nivel === "warn" ? "alerta" : t.includes("sesión") || t.includes("sesion") ? "sesion" : t.includes("historia") || t.includes("odontograma") || t.includes("paciente") ? "clinico" : "cambio"; };
   const TIPOS = { sesion: [LogOut, "#2F6FDE", "Sesiones"], clinico: [Stethoscope, "#0E9199", "Clínico"], cambio: [Settings, "#6D4FD1", "Cambios"], alerta: [AlertTriangle, "#E0694F", "Alertas"] };
   const base = rows.filter((a) => filtro === "todos" || tipoDe(a) === filtro);
+  // Con sesión se agrupa por día (a.dia, AAAA-MM-DD de Lima) y la hora va aparte (a.hora). Antes
+  // se partía «12/10/26, 5:55 p. m.» por el último espacio: un grupo por minuto («12/10/26, 5:55»)
+  // y en la columna de la hora solo «p. m.».
   const agrupar = (lista) => { const grupos = [];
-  lista.forEach((a) => { const f = String(a.fecha || "—"); const k = f.lastIndexOf(" "); const dia = k > 0 ? f.slice(0, k).replace(/,$/, "") : f; const hora = k > 0 ? f.slice(k + 1) : ""; const g = grupos.find((x) => x.dia === dia); const it = { ...a, _hora: hora }; if (g) g.items.push(it); else grupos.push({ dia, items: [it] }); });
+  lista.forEach((a) => {
+    let dia, hora;
+    if (a.dia && a.hora != null) { dia = a.diaTxt || a.dia; hora = a.hora; }
+    else { const f = String(a.fecha || "—"); const k = f.lastIndexOf(" "); dia = k > 0 ? f.slice(0, k).replace(/,$/, "") : f; hora = k > 0 ? f.slice(k + 1) : ""; }
+    const g = grupos.find((x) => x.dia === dia); const it = { ...a, _hora: hora }; if (g) g.items.push(it); else grupos.push({ dia, items: [it] });
+  });
   return grupos; };
   const FCOLS = [
     { key: "fecha", label: "Fecha", get: (a) => a.fecha || "", sortVal: (a) => (a.orden != null ? a.orden : -(Number(a.id) || 0)) },
@@ -7587,6 +7640,8 @@ function AuditoriaVista({ rows, hoyN, usuarios, alertas, sub, onDet, niv }) {
   );
 }
 
+/* Eventos que GET /auditoria entrega como mucho por consulta (antes 500; hoy 2000). */
+const TOPE_AUDITORIA = 2000;
 function Auditoria() {
   // NEW-50/57/58: datos reales de GET /auditoria. KPI Hoy por fecha Lima YYYY-MM-DD. Sin filas inventadas.
   const conectado = !!auth.token;
@@ -7620,10 +7675,12 @@ function Auditoria() {
           ...base,
           fecha,
           dia: creado && !isNaN(creado) ? ymdLima(creado) : "",
+          diaTxt: creado && !isNaN(creado) ? creado.toLocaleDateString("es-PE", { timeZone: "America/Lima", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }) : "",
+          hora: creado && !isNaN(creado) ? creado.toLocaleTimeString("es-PE", { timeZone: "America/Lima", hour: "2-digit", minute: "2-digit" }) : null,
           usuario: a.usuario || "—",
           rol: a.rol || "—",
           // H-12 (admin): los códigos del servidor se muestran con su nombre, no en crudo.
-          accion: ({ HC_ACCESO: "Acceso a historia clínica", LOGIN: "Inicio de sesión", LOGOUT: "Cierre de sesión", PAGO: "Cobro registrado", PAGO_ANULADO: "Cobro anulado", CAJA_APERTURA: "Apertura de caja", CAJA_CIERRE: "Cierre de caja", EGRESO: "Egreso de caja" })[accion] || accion,
+          accion: ({ HC_ACCESO: "Acceso a historia clínica", LOGIN: "Inicio de sesión", LOGOUT: "Cierre de sesión", PAGO: "Cobro registrado", PAGO_ANULADO: "Cobro anulado", CAJA_APERTURA: "Apertura de caja", CAJA_CIERRE: "Cierre de caja", EGRESO: "Egreso de caja", USUARIO_ALTA: "Alta de usuario", USUARIO_BAJA: "Baja de usuario", USUARIO_CAMBIO: "Cambio de usuario" })[accion] || accion,
           nivel: "ok",
           dispositivo: base.dispositivo || resumenDispositivo(base.userAgent),
         };
@@ -7638,6 +7695,20 @@ function Auditoria() {
     });
     return () => { cancelled = true; };
   }, [conectado, audDesde, audHasta, audRangoInvertido, nRecarga]);
+  // R7-06: el evento trae el correo del usuario afectado, no su nombre: buscar «QA Usuario R7»
+  // no encontraba nada. Con permiso de ver usuarios, el correo (y el id del registro) se cruza
+  // con el directorio y el detalle lleva también el nombre.
+  const [dirUsuarios, setDirUsuarios] = useState(null);
+  useEffect(() => {
+    if (!conectado || !tienePermiso("usuarios", "ver")) return;
+    api.usuarios.listar().then((us) => setDirUsuarios(directorioUsuarios(us))).catch(() => setDirUsuarios(null));
+  }, [conectado]);
+  const rowsN = useMemo(() => (rows && dirUsuarios ? rows.map((r) => {
+    let detalle = detalleConNombres(r.detalle, dirUsuarios);
+    const afectado = usuarioAfectado(r.raw, dirUsuarios);
+    if (afectado && !detalle.toLowerCase().includes(afectado.toLowerCase())) detalle = `${detalle} (${afectado})`;
+    return { ...r, detalle, usuario: nombrePorCorreo(r.usuario, dirUsuarios) || r.usuario };
+  }) : rows), [rows, dirUsuarios]);
   if (!conectado) {
     const alertas = AUDITORIA.filter((a) => a.nivel === "warn").length;
     const usuarios = new Set(AUDITORIA.filter((a) => a.usuario !== "—").map((a) => a.usuario)).size;
@@ -7673,12 +7744,14 @@ function Auditoria() {
   if (rows == null) {
     return <Card style={{ padding: 22, color: "var(--dc-ink-500)" }}>Cargando auditoría…</Card>;
   }
-  const hoyN = contarEventosHoy(rows, hoyLima);
-  const enRango = audRangoInvertido ? [] : rows.filter((a) => (!audDesde || (a.dia && a.dia >= audDesde)) && (!audHasta || (a.dia && a.dia <= audHasta)));
-  const diasCon = rows.map((a) => a.dia).filter(Boolean).sort();
+  const hoyN = contarEventosHoy(rowsN, hoyLima);
+  const enRango = audRangoInvertido ? [] : rowsN.filter((a) => (!audDesde || (a.dia && a.dia >= audDesde)) && (!audHasta || (a.dia && a.dia <= audHasta)));
+  const diasCon = rowsN.map((a) => a.dia).filter(Boolean).sort();
   const masAntiguo = diasCon[0] || "";
-  // El servidor corta en 500 eventos (sin paginación): se avisa desde qué fecha hay datos.
-  const recortado = totalSrv >= 500;
+  // El servidor entrega como mucho los TOPE_AUDITORIA eventos más recientes del rango (sin
+  // páginas): se avisa desde qué fecha hay datos. R7-06: GET /auditoria ya acepta desde/hasta,
+  // así que lo anterior se consulta eligiendo las fechas (antes el aviso decía que no se podía).
+  const recortado = totalSrv >= TOPE_AUDITORIA;
   const usuarios = new Set(enRango.map((a) => a.usuario).filter((u) => u && u !== "—")).size;
   const fechaCorta = (d) => (d ? d.split("-").reverse().join("/") : "");
   const cols = [
@@ -7697,11 +7770,12 @@ function Auditoria() {
         <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Desde<input type="date" className="dc-premium-inp" value={audDesde} max={audHasta || hoyLima} onChange={(e) => setAudDesde(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
         <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Hasta<input type="date" className="dc-premium-inp" value={audHasta} min={audDesde || undefined} max={hoyLima} onChange={(e) => setAudHasta(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
         {(audDesde || audHasta) && <Btn small kind="ghost" onClick={() => { setAudDesde(""); setAudHasta(""); }}>Quitar fechas</Btn>}
-        <span style={{ fontSize: 12, color: "var(--dc-ink-500)", alignSelf: "center" }}>{enRango.length} de {rows.length} eventos{masAntiguo ? ` · hay datos desde el ${fechaCorta(masAntiguo)}` : ""}</span>
+        {/* R7-06: con el rango invertido no queda a la vista la cifra del rango anterior. */}
+        {!audRangoInvertido && <span style={{ fontSize: 12, color: "var(--dc-ink-500)", alignSelf: "center" }}>{enRango.length} de {rowsN.length} eventos{masAntiguo ? ` · hay datos desde el ${fechaCorta(masAntiguo)}` : ""}</span>}
       </div>
       {audRangoInvertido && <div className="fm-aviso-edad is-mal" role="alert"><AlertTriangle size={15} strokeWidth={2} /><span>La fecha «Desde» ({fechaCorta(audDesde)}) es posterior a «Hasta» ({fechaCorta(audHasta)}). Corrige el rango para ver los eventos.</span></div>}
-      {recortado && <div className="fm-aviso-edad is-info"><AlertTriangle size={15} strokeWidth={2} /><span>El servidor entrega solo los <b>{totalSrv} eventos más recientes</b>{masAntiguo ? ` (desde el ${fechaCorta(masAntiguo)})` : ""}. Lo anterior no se puede consultar desde aquí hasta que GET /auditoria acepte fechas o páginas.</span></div>}
-      <AuditoriaVista key={`${audDesde}|${audHasta}`} rows={enRango} hoyN={hoyN} usuarios={usuarios} alertas={enRango.filter((r) => r.nivel === "warn").length} sub="Inicios de sesión y aperturas de historia clínica (Ley 29733)" onDet={setDet} niv={niv} />
+      {recortado && !audRangoInvertido && <div className="fm-aviso-edad is-info"><AlertTriangle size={15} strokeWidth={2} /><span>El servidor entrega como mucho los <b>{totalSrv} eventos más recientes</b>{audDesde || audHasta ? " del rango" : ""}{masAntiguo ? ` (desde el ${fechaCorta(masAntiguo)})` : ""}. {audDesde || audHasta ? "Acorta el rango de fechas para ver los anteriores." : "Para ver lo anterior, elige un rango de fechas."}</span></div>}
+      <AuditoriaVista key={`${audDesde}|${audHasta}`} rows={enRango} hoyN={hoyN} usuarios={usuarios} alertas={enRango.filter((r) => r.nivel === "warn").length} sub="Sesiones, historias clínicas, caja y usuarios (Ley 29733)" onDet={setDet} niv={niv} />
       {det && (() => { const R = ROLES[det.rol]; const N = niv[det.nivel]; return (
         <Modal icon={<ShieldCheck size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={det.accion} sub={`${det.fecha} – ${det.usuario}`} onClose={() => setDet(null)} maxW={480} footer={<Btn small kind="ghost" onClick={() => setDet(null)}>Cerrar</Btn>}>
           <div style={{ display: "grid", gap: 10 }}>
@@ -9461,8 +9535,8 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
             <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{PLAN_NOMBRE[actual.id]} <span style={{ color: "var(--dc-ink-400)" }}>→</span> <strong style={{ color: NAVY }}>{confirmP.nombre}</strong></span>
             <span style={{ fontSize: 14, fontWeight: 600, color: sube ? "var(--dc-ok-700)" : NAVY, fontFamily: DISPLAY_FONT }}>S/ {confirmP.precio}/mes</span>
           </div>
-          {gana.length > 0 && <div style={{ marginBottom: 10 }}><div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", marginBottom: 6 }}>Se desbloquean {gana.length} módulo(s)</div><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{gana.map((m) => <span key={m} style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", border: "1px solid var(--dc-green-soft)", borderRadius: "var(--dc-r-full)", padding: "3px 9px" }}>{MODULOS.find((x) => x.id === m)?.label || m}</span>)}</div></div>}
-          {pierde.length > 0 && <div><div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", marginBottom: 6 }}>Se bloquean {pierde.length} módulo(s)</div><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{pierde.map((m) => <span key={m} style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-full)", padding: "3px 9px" }}>{MODULOS.find((x) => x.id === m)?.label || m}</span>)}</div></div>}
+          {gana.length > 0 && <div style={{ marginBottom: 10 }}><div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ok-700)", marginBottom: 6 }}>{gana.length === 1 ? "Se desbloquea 1 módulo" : `Se desbloquean ${gana.length} módulos`}</div><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{gana.map((m) => <span key={m} style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", border: "1px solid var(--dc-green-soft)", borderRadius: "var(--dc-r-full)", padding: "3px 9px" }}>{MODULOS.find((x) => x.id === m)?.label || m}</span>)}</div></div>}
+          {pierde.length > 0 && <div><div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)", marginBottom: 6 }}>{pierde.length === 1 ? "Se bloquea 1 módulo" : `Se bloquean ${pierde.length} módulos`}</div><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{pierde.map((m) => <span key={m} style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", border: "1px solid var(--dc-amber-soft)", borderRadius: "var(--dc-r-full)", padding: "3px 9px" }}>{MODULOS.find((x) => x.id === m)?.label || m}</span>)}</div></div>}
           {gana.length === 0 && pierde.length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Mismos módulos, distinto costo mensual.</div>}
         </Modal>
       ); })()}
@@ -10360,7 +10434,8 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
         {conectado && rxSinPermiso ? (
           <Vacio icon={<Lock size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin permiso para ver las fotos" : "Sin permiso para ver las radiografías"} sub="Tu rol no tiene acceso a las imágenes de este paciente." />
         ) : base.length === 0 ? (
-          <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin fotos" : "Sin radiografías"} sub={esFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía de este paciente."} />
+          // M7-03: sin paciente elegido no se habla de «este paciente» (el botón Subir está deshabilitado).
+          <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin fotos" : "Sin radiografías"} sub={pid == null || pid === "" ? (esFotos ? "Elige un paciente para ver y subir sus fotos clínicas." : "Elige un paciente para ver y subir sus radiografías.") : esFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía de este paciente."} />
         ) : (
           <ListaFiltrable rows={base} sub={esFotos ? "fotos" : "estudios"} className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave={esFotos ? "fotos" : "radiografias"}
             vistas={[{ id: "galeria", label: "Galería", icon: LayoutGrid }]}
@@ -10989,13 +11064,10 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     setVista(t); if (k === "paciente" || k === "cita") setCrearIntent(k);
   };
   const crearBtnRef = useRef(null);
-  // GLO-11: Esc cierra el menú «Crear» y devuelve el foco al botón +.
-  useEffect(() => {
-    if (!crearMenu) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") { setCrearMenu(false); try { crearBtnRef.current?.focus(); } catch (er) { /* */ } } };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [crearMenu]); // eslint-disable-line react-hooks/exhaustive-deps
+  const crearMenuRef = useRef(null);
+  // GLO-11: Esc cierra el menú «Crear» y devuelve el foco al botón +. M7-01: el clic fuera lo
+  // cierra y llega a su destino (antes una capa transparente se comía ese primer clic).
+  useMenuDesplegable(!!crearMenu, () => setCrearMenu(false), { dentro: [crearBtnRef, crearMenuRef], boton: crearBtnRef });
   const hayQueCrear = ACCIONES_CREAR.some(([, , , t]) => mods.includes(t) && can(t, "crear"));
   // Si el rol no tiene el módulo, redirige al primero disponible. Si solo lo bloquea el
   // plan, se queda y muestra el aviso «disponible en el plan X» (antes saltaba a otra
@@ -11285,9 +11357,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "agenda": case "agenda_cal": case "agenda_consolidado": {
         const vAg = vista === "agenda" ? "dia" : vista === "agenda_consolidado" ? "lista" : agModo;
         const irAg = (x) => { if (x === "dia") setVista("agenda"); else if (x === "lista") setVista("agenda_consolidado"); else { setAgModo(x); setVista("agenda_cal"); } };
+        // R-32: un día del Mes abre la vista Día en esa fecha (la Día la lee de FOCO_CAL).
+        const irDiaAgenda = (fecha) => { FOCO_CAL = { fecha, ts: Date.now() }; setVista("agenda"); };
         return (<div style={{ display: "grid", gap: 14 }}>
           <Pestanas etiqueta="Vista de la agenda" valor={vAg} onChange={irAg} opciones={[{ id: "dia", label: "Día", icon: List }, { id: "semana", label: "Semana", icon: Columns3 }, { id: "mes", label: "Mes", icon: Calendar }, { id: "doctores", label: "Por doctor", icon: Stethoscope }, { id: "sillon", label: "Por sillón", icon: Armchair }, { id: "lista", label: "Lista", icon: Table2 }]} />
-          {vista === "agenda" ? <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={medicosSede} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} /> : vista === "agenda_consolidado" ? <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={medicosSede} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense> : <Agenda key={`agenda-cal-${agModo}`} vistaInicial="calendario" calModo={agModo} citas={cf} setCitas={setCitas} medicos={medicosSede} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />}
+          {vista === "agenda" ? <Agenda key="agenda-dia" vistaInicial="dia" citas={cf} setCitas={setCitas} medicos={medicosSede} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} /> : vista === "agenda_consolidado" ? <React.Suspense fallback={null}><ConsolidadoCitas citas={cf} medicos={medicosSede} rol={rol} usuario={usuario} conectado={!!auth.token} notify={notify} /></React.Suspense> : <Agenda key={`agenda-cal-${agModo}`} vistaInicial="calendario" calModo={agModo} onIrDia={irDiaAgenda} citas={cf} setCitas={setCitas} medicos={medicosSede} rol={rol} can={can} usuario={usuario} notify={notify} onAtender={atenderCita} ofrecerCupo={ofrecerCupo} fichas={fichas} esperaState={espera} setEspera={setEspera} pacientes={pf} setPacientes={setPacientes} onIrEspera={() => setVista("espera")} agendarDesdeFicha={agendarDesdeFicha} onAgendarDesdeFichaDone={() => setAgendarDesdeFicha(null)} crearIntent={crearIntent === "cita"} onIntentDone={() => setCrearIntent(null)} sedeActiva={sedeActiva} />}
         </div>);
       }
       case "disponibilidad": return <Disponibilidad notify={notify} usuario={usuario} citas={citas} setCitas={setCitas} horarioClinica={horarioClinica} />;
@@ -11374,13 +11448,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
             {!colap && <span className="dc-sb__name"><span>Dento <b>Check</b></span><small>{marcaClinica}{!auth.token && <em className="dc-sb__demo" title="Datos de ejemplo. Los cambios se guardan solo en este navegador.">Demo</em>}</small></span>}
           </button>
           {rol !== "superadmin" && hayQueCrear && (
-            <button ref={crearBtnRef} type="button" className="dc-sb__mas" aria-label="Crear" title={rol === "medico" ? "Crear: cita, evolución, receta" : "Crear: cita, paciente, cobro, egreso"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 8, left: Math.max(8, r.left - (colap ? 0 : 180)) })); }}><Plus size={16} strokeWidth={2.25} /></button>
+            <button ref={crearBtnRef} type="button" className="dc-sb__mas" aria-label="Crear" title={rol === "medico" ? "Crear: cita, evolución, receta" : "Crear: cita, paciente, cobro, egreso"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCrearMenu((v) => (v ? false : { top: r.bottom + 8, left: Math.max(8, r.left - (colap ? 0 : 180)) })); }} onKeyDown={(e) => { if (crearMenu) moverFocoMenu(e, crearMenuRef.current); }} aria-haspopup="menu" aria-expanded={!!crearMenu}><Plus size={16} strokeWidth={2.25} /></button>
           )}
         </div>
         <div className={`dc-sb__acc${colap ? " is-colap" : ""}`}>
             {crearMenu && (<>
-              <div onClick={() => setCrearMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 140 }} />
-              <div className="dc-sb__crearmenu" role="menu" style={{ top: crearMenu.top, left: crearMenu.left }}>
+              <div ref={crearMenuRef} className="dc-sb__crearmenu" role="menu" style={{ top: crearMenu.top, left: crearMenu.left }} onKeyDown={(e) => moverFocoMenu(e, crearMenuRef.current)}>
                 <div className="dc-sb__crearmenu-tit">Crear nuevo</div>
                 {ACCIONES_CREAR.filter(([, , , t]) => mods.includes(t) && can(t, "crear")).map(([k, l, Ic, t, sub, col]) => (
                   <button key={k} type="button" role="menuitem" style={{ "--c": col }} onClick={() => { setCrearMenu(false); setSidebarOpen(false); crearAccion(k, t); }}><span className="dc-sb__crearico"><Ic size={16} strokeWidth={1.9} /></span><span className="dc-sb__creartxt"><b>{l}</b><small>{sub}</small></span></button>
@@ -12851,14 +12924,14 @@ function PortalPaciente({ usuario, onLogout }) {
                   <div>
                     <div style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Avance de tu tratamiento</div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, margin: "2px 0 4px" }}>{atendidasN} de {tratamiento.length} fases</div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{pendientes > 0 ? `${pendientes} pendiente(s) por completar` : "¡Tratamiento al día!"}</div>
+                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{pendientes > 0 ? (pendientes === 1 ? "1 pendiente por completar" : `${pendientes} pendientes por completar`) : "¡Tratamiento al día!"}</div>
                   </div>
                 </Card>
                 <Card style={{ padding: 22, background: piezasAtencion ? "var(--dc-white)" : "var(--dc-ok-soft)", border: `1px solid ${piezasAtencion ? "var(--dc-amber-soft)" : "var(--dc-green-soft)"}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{ fontSize: 44 }}>{piezasAtencion ? "🦷" : "😁"}</div>
                     <div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>{piezasAtencion === 0 ? "Tu boca está sana" : `${piezasAtencion} pieza(s) por atender`}</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>{piezasAtencion === 0 ? "Tu boca está sana" : (piezasAtencion === 1 ? "1 pieza por atender" : `${piezasAtencion} piezas por atender`)}</div>
                       <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 3 }}>{piezasAtencion === 0 ? "Sigue así: control cada 6 meses." : "Tu odontólogo recomienda tratarlas pronto."}</div>
                       <button onClick={() => setVista("salud")} style={{ marginTop: 10, background: "none", border: "none", color: TEAL, fontWeight: 500, fontSize: 13, cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>Ver mi salud <ChevronRight size={15} strokeWidth={1.75} /></button>
                     </div>
@@ -12888,7 +12961,7 @@ function PortalPaciente({ usuario, onLogout }) {
                 <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 200, background: piezasAtencion ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", borderRadius: "var(--dc-r-md)", padding: 18 }}>
                     <div style={{ fontSize: 27 }}>{piezasAtencion ? "🦷" : "✅"}</div>
-                    <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginTop: 6 }}>{piezasAtencion ? `${piezasAtencion} pieza(s) requieren atención` : "Sin pendientes"}</div>
+                    <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginTop: 6 }}>{piezasAtencion ? (piezasAtencion === 1 ? "1 pieza requiere atención" : `${piezasAtencion} piezas requieren atención`) : "Sin pendientes"}</div>
                     <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 4 }}>{piezasAtencion ? "Tu odontólogo te recomienda tratarlas pronto." : "¡Buen trabajo cuidando tu sonrisa!"}</div>
                   </div>
                   <div style={{ flex: 1, minWidth: 200, background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: 18 }}>

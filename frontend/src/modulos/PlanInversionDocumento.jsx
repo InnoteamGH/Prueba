@@ -28,6 +28,8 @@ import {
   paginasDesdeAlturaMm,
 } from "../util/planInversionPaginacion.js";
 import { altAnexoOdontograma } from "../util/odontogramaAnexo.js";
+import { etiquetaRealizada, faseRealizada, filasTotalesPlan } from "../util/planInversionCuenta.js";
+import { leerPagadoPaciente } from "../compartido/pagadoPaciente";
 import { filasADatos, listaHallazgos } from "../util/odontogramaHallazgos.js";
 
 const CONDICIONES_FALLBACK = [
@@ -185,9 +187,12 @@ export default function PlanInversionDocumento({
   // salía S/ 0 aunque Plan y cuenta tenía importes.
   const [planSrv, setPlanSrv] = useState(null);
   const [hallSrv, setHallSrv] = useState(null);
+  // M7-02: lo pagado por el paciente (null = no se sabe): el cierre descuenta lo pagado.
+  const [pagado, setPagado] = useState(null);
   useEffect(() => {
     if (!sesion || !pacienteId) return undefined;
     let vivo = true;
+    leerPagadoPaciente(pacienteId).then((p) => { if (vivo) setPagado(p); });
     api.tratamientos.porPaciente(pacienteId)
       // El servidor guarda la anulación como «cancelada» (antes solo se miraba «anulad…»).
       .then((ps) => { if (!vivo) return; const fs = []; (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && estadoFaseUi(f.estado) !== "anulado") fs.push(f); })); setPlanSrv(fs); })
@@ -199,22 +204,31 @@ export default function PlanInversionDocumento({
   }, [sesion, pacienteId, capa]);
 
   const cargandoTarifa = sesion && !conf.tarifa && catApi == null;
-  const { lineas, descartes, totales } = useMemo(() => {
+  const { lineas, descartes, totales, realizadas } = useMemo(() => {
     const sueltos = sueltosUI.map((s) => [s.pz, s.cod, s.max]);
     const fases = sesion ? (planSrv || []) : [];
     const piezasPlan = new Set(fases.map((f) => f.piezaNumero ?? f.pieza).filter((x) => x != null && x !== "").map(Number));
     const hall = (sesion && hallSrv ? hallSrv : hallazgos).filter(([pz]) => !piezasPlan.has(Number(pz)));
     const { lineas: L0, descartes: D } = resolverLineas(hall, sueltos, tarifaSede);
-    const delPlan = fases.map((f) => {
+    const linea = (f) => {
       const pz = f.piezaNumero ?? f.pieza;
       const cara = String(f.cara || "").trim();
       // M5-07: sin repetir la cara si el nombre ya la trae («… pieza 15 (O) (O)»).
-      return { pz: pz != null && pz !== "" ? Number(pz) : null, cod: f.codigo || f.servicioId || f.id, nom: nombreConCara(f.nombre || "Procedimiento", cara), v: Number(f.costo) || 0, cant: 1, ubic: ["Plan y cuenta"], max: null };
-    });
-    const L = delPlan.length ? [...delPlan, ...L0].sort((a, b) => (a.pz == null ? 99 : a.pz) - (b.pz == null ? 99 : b.pz)) : L0;
+      return { pz: pz != null && pz !== "" ? Number(pz) : null, cod: f.codigo || f.servicioId || f.id, nom: nombreConCara(f.nombre || "Procedimiento", cara), v: Number(f.costo) || 0, cant: 1, ubic: ["Plan y cuenta"], max: null, estado: faseRealizada(f.estado) ? etiquetaRealizada(f.estado) : "" };
+    };
+    // M7-02: lo ya terminado o atendido no es una propuesta: va aparte («Ya realizado»).
+    const porPieza = (a, b) => (a.pz == null ? 99 : a.pz) - (b.pz == null ? 99 : b.pz);
+    const delPlan = fases.filter((f) => !faseRealizada(f.estado)).map(linea);
+    const realizadas = fases.filter((f) => faseRealizada(f.estado)).map(linea).sort(porPieza);
+    const L = delPlan.length ? [...delPlan, ...L0].sort(porPieza) : L0;
     const totales = calcularTotales(L, doc.descuento || { activo: false });
-    return { lineas: L, descartes: D, totales };
+    return { lineas: L, descartes: D, totales, realizadas };
   }, [hallazgos, sueltosUI, doc.descuento, tarifaSede, sesion, planSrv, hallSrv]);
+  const cuenta = useMemo(() => filasTotalesPlan({
+    subtotal: totales.subtotal, descuento: doc.descuento?.activo ? totales.descuento : 0, etiquetaDescuento: "Descuento",
+    totalRealizado: realizadas.reduce((a, l) => a + Number(l.v) * Number(l.cant || 1), 0), hayRealizadas: realizadas.length > 0, pagado,
+  }), [totales, realizadas, pagado, doc.descuento?.activo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const soles2 = (n) => (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const hojasPlan = useMemo(() => partirLineasEnHojas(lineas), [lineas]);
   const mostrarOdo = doc.mostrarOdontograma !== false;
@@ -406,24 +420,38 @@ export default function PlanInversionDocumento({
                     </tr>
                   ))}
                   {chunk.length === 0 && (
-                    <tr><td colSpan={5} style={{ color: "#6b6560" }}>Sin líneas de tratamiento.</td></tr>
+                    <tr><td colSpan={5} style={{ color: "#6b6560" }}>{realizadas.length ? "No hay tratamientos por proponer: lo de su plan ya está realizado." : "Sin líneas de tratamiento."}</td></tr>
                   )}
                 </tbody>
               </table>
 
               {esUltimaPlan && (
                 <>
+                  {/* M7-02: lo ya realizado de Plan y cuenta, aparte de lo propuesto. */}
+                  {realizadas.length > 0 && (
+                    <>
+                      <h3 style={{ fontSize: 14, fontFamily: "system-ui,sans-serif", margin: "18px 0 8px" }}>Ya realizado (en su plan de tratamiento)</h3>
+                      <table>
+                        <thead><tr><th style={{ width: 72 }}>Pieza</th><th>Tratamiento</th><th style={{ width: 150 }}>Estado</th><th className="imp" style={{ width: 96 }}>Importe</th></tr></thead>
+                        <tbody>
+                          {realizadas.map((l, i) => (
+                            <tr key={`r-${l.cod}-${l.pz}-${i}`}><td className="pieza">{rotuloPieza(l)}</td><td>{l.nom}</td><td>{l.estado}</td><td className="imp">S/ {soles2(Number(l.v) * Number(l.cant || 1))}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
                   <div style={{ marginTop: 14, textAlign: "right", fontFamily: "system-ui,sans-serif", fontSize: 14 }}>
-                    <div>Subtotal: <b>S/ {(totales.subtotal).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div>
-                    {doc.descuento?.activo ? <div>Descuento: <b>− S/ {(totales.descuento).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div> : null}
-                    <div style={{ fontSize: 18, marginTop: 4 }}>Total: <b>S/ {(totales.total).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div>
+                    {[...cuenta.propuesto, ...cuenta.cuenta].map((f) => (
+                      <div key={f.rotulo} style={f.total ? { fontSize: 18, marginTop: 4 } : undefined}>{f.rotulo}: <b>{f.monto < 0 ? `− S/ ${soles2(-f.monto)}` : `S/ ${soles2(f.monto)}`}</b></div>
+                    ))}
                     {igvNota ? <div className="plan-inv-muted">{igvNota}</div> : null}
                   </div>
                   <section style={{ marginTop: 22 }}>
                     <h3 style={{ fontSize: 14, fontFamily: "system-ui,sans-serif" }}>Condiciones</h3>
                     <ol style={{ fontFamily: "system-ui,sans-serif", fontSize: 12, lineHeight: 1.45, paddingLeft: 18 }}>
                       {condiciones.map(([tit, txt], i) => (
-                        <li key={i} style={{ marginBottom: 8 }}><b>{tit}.</b> {textoCond(txt, dias)}</li>
+                        <li key={i} style={{ marginBottom: 8 }}><b>{tit}.</b> {textoCond(txt, dias)}{i === 0 && realizadas.length ? " Lo ya realizado de su plan se lista aparte y cuenta en el saldo." : ""}</li>
                       ))}
                     </ol>
                   </section>

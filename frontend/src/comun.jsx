@@ -13,6 +13,7 @@ import { abrirDocumento, datosImpresion, telefonosConWhatsapp } from "./util/mem
 import { estadoInfo, ESTADOS } from "./compartido/estados.js";
 import { registrarSedes, sedesRegistradas, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { ymdLima } from "./util/fechaLima";
+import { enfocarPrimera, moverFocoMenu, useMenuDesplegable } from "./compartido/menuDesplegable";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {Printer, AlertTriangle, ArrowUpDown, ArrowUpRight, Briefcase, Check, ChevronDown, ChevronUp, Clock, Globe, Info, MapPin, Menu, Plus, Repeat, Search, Server, Settings, ShieldCheck, Smile, Stethoscope, UserCheck, UserCog, X, MoreHorizontal, LayoutGrid, Table2, Download, FileSpreadsheet, FileText} from "lucide-react";
@@ -582,6 +583,11 @@ async function exportarExcelMembrete({ archivo, hoja, titulo, subtitulo, columna
    clínica. Exporta lo que se está viendo (con los filtros y el orden aplicados). */
 export function BotonExportar({ titulo, cols, filas, sub = "registros" }) {
   const [abierto, setAbierto] = useState(false);
+  // M7-01: Escape y el clic fuera lo cierran, sin capa que se coma el primer clic.
+  const cajaRef = useRef(null), btnRef = useRef(null), menuRef = useRef(null);
+  const conTeclado = useRef(false);
+  useMenuDesplegable(abierto, () => setAbierto(false), { dentro: [cajaRef], boton: btnRef });
+  useEffect(() => { if (abierto && conTeclado.current) enfocarPrimera(menuRef.current); }, [abierto]);
   const usables = (cols || []).filter((c) => (c.get || c.cell || c.exportar) && c.label && typeof c.label === "string" && c.key !== "acc" && !c.noExport);
   if (!usables.length) return null;
   const columnas = usables.map((c) => ({ key: c.key, label: c.label, w: Math.max(10, Math.min(40, String(c.label).length + 8)) }));
@@ -620,16 +626,17 @@ export function BotonExportar({ titulo, cols, filas, sub = "registros" }) {
   const excel = async () => { setAbierto(false); await exportarExcel({ nombreArchivo: `${nombre}_${fecha}.xlsx`, hoja: titulo || "Datos", titulo, subtitulo: "", columnas, filas: await datos() }); };
   const pdf = async () => { setAbierto(false); const filasPdf = await datos(); exportarPDF({ titulo, subtitulo: `${(filas || []).length} ${etiquetaCant((filas || []).length, sub)}`, columnas, filas: filasPdf }); };
   return (
-    <div className="dc-exp">
-      <button type="button" className="dc-exp__btn" onClick={() => setAbierto((v) => !v)} aria-haspopup="menu" aria-expanded={abierto} title="Exportar lo que se ve, con el membrete de la clínica"><Download size={14} strokeWidth={2} /> <span>Exportar</span></button>
-      {abierto && <>
-        <div className="dc-exp__velo" onClick={() => setAbierto(false)} />
-        <div className="dc-exp__menu" role="menu">
+    <div className="dc-exp" ref={cajaRef}>
+      <button ref={btnRef} type="button" className="dc-exp__btn" onClick={(e) => { conTeclado.current = e.detail === 0; setAbierto((v) => !v); }}
+        onKeyDown={(e) => { if (abierto) moverFocoMenu(e, menuRef.current); }}
+        aria-haspopup="menu" aria-expanded={abierto} title="Exportar lo que se ve, con el membrete de la clínica"><Download size={14} strokeWidth={2} /> <span>Exportar</span></button>
+      {abierto && (
+        <div ref={menuRef} className="dc-exp__menu" role="menu" onKeyDown={(e) => moverFocoMenu(e, menuRef.current)}>
           <small>{(filas || []).length} {etiquetaCant((filas || []).length, sub)} · con membrete</small>
           <button type="button" role="menuitem" onClick={excel}><FileSpreadsheet size={16} strokeWidth={1.9} /><span><b>Excel</b><em>Logo, datos de la empresa y filtros</em></span></button>
           <button type="button" role="menuitem" onClick={pdf}><FileText size={16} strokeWidth={1.9} /><span><b>PDF</b><em>Listo para imprimir o enviar</em></span></button>
         </div>
-      </>}
+      )}
     </div>
   );
 }
@@ -1907,28 +1914,22 @@ export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
   const listaRef = useRef(null);
   const conTeclado = useRef(false);
   const lista = opciones.filter(Boolean);
+  // M5-09: Escape cierra el menú aunque el foco siga en el botón ⋯, sin cerrar también el modal
+  // que lo contiene. M7-01: sin el fondo invisible que se comía el primer clic: el clic fuera
+  // cierra el menú y llega a su destino.
+  useMenuDesplegable(!!pos, () => setPos(null), { dentro: [btnRef, listaRef], boton: btnRef });
   useEffect(() => {
     if (!pos) return undefined;
     const cerrar = () => setPos(null);
-    // M5-09: Escape cierra el menú aunque el foco siga en el botón ⋯ (antes solo funcionaba con
-    // el foco dentro de la lista y quedaba el fondo invisible que bloqueaba los clics). Se
-    // escucha en captura para que no cierre también el modal que lo contiene.
-    const alTeclear = (e) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault(); e.stopPropagation();
-      setPos(null);
-      btnRef.current?.focus({ preventScroll: true });
-    };
-    window.addEventListener("keydown", alTeclear, true);
     // Abierto con el teclado (Enter o espacio sobre ⋯): el foco pasa a la primera opción.
-    if (conTeclado.current) listaRef.current?.querySelector("button")?.focus({ preventScroll: true });
+    if (conTeclado.current) enfocarPrimera(listaRef.current);
     // Se cierra si el botón se movió (la lista quedaría lejos de su fila), no por el
     // resto de un desplazamiento suave que todavía llega justo después de abrir.
     const y0 = btnRef.current?.getBoundingClientRect().top ?? 0;
     const alDesplazar = () => { const y = btnRef.current?.getBoundingClientRect().top ?? 0; if (Math.abs(y - y0) > 4) cerrar(); };
     window.addEventListener("resize", cerrar);
     document.addEventListener("scroll", alDesplazar, true);
-    return () => { window.removeEventListener("resize", cerrar); document.removeEventListener("scroll", alDesplazar, true); window.removeEventListener("keydown", alTeclear, true); };
+    return () => { window.removeEventListener("resize", cerrar); document.removeEventListener("scroll", alDesplazar, true); };
   }, [pos]);
   if (!lista.length) return null;
   const abrir = (e) => {
@@ -1940,25 +1941,19 @@ export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
   };
   return (
     <div className="dc-menu" onClick={(e) => e.stopPropagation()}>
-      <button ref={btnRef} type="button" className="dc-row-action" aria-label={etiqueta} title={etiqueta} aria-haspopup="menu" aria-expanded={!!pos} onClick={(e) => (pos ? setPos(null) : abrir(e))}><MoreHorizontal size={16} strokeWidth={1.75} /></button>
+      {/* M7-03: abierto con el ratón, ↓ lleva el foco a la primera opción (antes se quedaba en ⋯). */}
+      <button ref={btnRef} type="button" className="dc-row-action" aria-label={etiqueta} title={etiqueta} aria-haspopup="menu" aria-expanded={!!pos} onClick={(e) => (pos ? setPos(null) : abrir(e))}
+        onKeyDown={(e) => { if (pos) moverFocoMenu(e, listaRef.current); }}><MoreHorizontal size={16} strokeWidth={1.75} /></button>
       {/* En el body: un ancestro con transform u overflow (animación de entrada, tabla)
-          desplazaba la lista fija y el clic caía sobre la fila de otro paciente. */}
-      {pos && createPortal(<>
-        <div onClick={(e) => { e.stopPropagation(); setPos(null); }} style={{ position: "fixed", inset: 0, zIndex: 190 }} />
-        <div ref={listaRef} className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => {
-          // Flechas para moverse entre las opciones (Escape lo atiende el efecto de arriba).
-          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-          e.preventDefault();
-          const ops = [...(listaRef.current?.querySelectorAll("button") || [])];
-          const i = ops.indexOf(document.activeElement);
-          const sig = ops[(i + (e.key === "ArrowDown" ? 1 : -1) + ops.length) % ops.length];
-          sig?.focus();
-        }}>
+          desplazaba la lista fija y el clic caía sobre la fila de otro paciente. Las flechas
+          recorren las opciones; Escape lo atiende useMenuDesplegable. */}
+      {pos && createPortal(
+        <div ref={listaRef} className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => moverFocoMenu(e, listaRef.current)}>
           {lista.map((o) => (
             <button key={o.label} type="button" role="menuitem" className={`dc-menu__op${o.peligro ? " dc-menu__op--peligro" : ""}`} onClick={() => { setPos(null); o.onClick(); }}>{o.label}</button>
           ))}
-        </div>
-      </>, document.body)}
+        </div>, document.body)}
     </div>
   );
 }

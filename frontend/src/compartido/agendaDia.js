@@ -48,6 +48,30 @@ export function bloqueosDelDia(bloqueos, fechaISO, { medicoPropio = null, soloPr
     .sort((a, b) => hhmm(a.horaInicio).localeCompare(hhmm(b.horaInicio)) || hhmm(a.horaFin).localeCompare(hhmm(b.horaFin)));
 }
 
+const aMin = (h) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(h || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+
+/** R-30: ¿el bloqueo toca la franja de la hora `h` (de h:00 a h+1:00)? Antes se comparaba la
+    hora como texto («17» < «17»): un bloqueo de 17:00 a 17:30 no tocaba ninguna franja y no se
+    pintaba en la grilla. */
+export function bloqueoTocaHora(b, h) {
+  const ini = aMin(b?.horaInicio), fin = aMin(b?.horaFin);
+  if (ini == null || fin == null || fin <= ini || !Number.isFinite(Number(h))) return false;
+  return ini < (Number(h) + 1) * 60 && fin > Number(h) * 60;
+}
+
+/** ¿Es de un doctor o de un sillón (no de toda la agenda)? */
+export const esBloqueoParcial = (b) => !!b && ((b.sillon != null && b.sillon !== "") || (b.medicoId != null && b.medicoId !== ""));
+
+/** R-30: bloqueos de un doctor o de un sillón que la Semana y el Mes deben mostrar. Esas
+    vistas no tienen columna por doctor ni por sillón: antes no los pintaban y quien agendaba
+    desde la Semana no veía el hueco bloqueado (Día y Por sillón sí). No bloquean la celda
+    entera (los demás doctores y sillones siguen libres), así que se muestran como aviso.
+    - `oculto(medicoId)`: el doctor cuyo chip se ocultó tampoco muestra su bloqueo. */
+export function bloqueosParcialesDelDia(bloqueos, fechaISO, { medicoPropio = null, soloPropios = false, enSede = () => true, oculto = () => false } = {}) {
+  return bloqueosDelDia(bloqueos, fechaISO, { medicoPropio, soloPropios, enSede })
+    .filter((b) => esBloqueoParcial(b) && !(b.medicoId != null && b.medicoId !== "" && oculto(b.medicoId)));
+}
+
 /** «10:00–11:00 · Almuerzo» y a quién aplica (`medNom(id)` da el nombre del doctor). */
 export function textoBloqueo(b, medNom = () => "Doctor") {
   const quien = b.sillon != null && b.sillon !== "" ? `Sillón ${b.sillon}` : b.medicoId != null && b.medicoId !== "" ? medNom(b.medicoId) : "Toda la agenda";

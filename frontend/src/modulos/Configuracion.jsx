@@ -5,6 +5,8 @@ import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
 import { comisionSede, guardarMetaSedeDemo, medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
 import { sedeApiUuid } from "../routing";
+import { tienePermiso } from "../compartido/permisos";
+import { pluralizarParentesis } from "../util/plurales";
 import { conCop } from "../util/cop";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
 import { sillonesPorSede } from "../compartido/useReglasAgenda";
@@ -300,10 +302,13 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     if (conectado && (!can || can("config", "ver"))) {
       api.goLive().then(setGoLive).catch(() => setGoLive(null));
       // Sin permiso o sin respuesta queda el texto del servidor.
-      api.agente.salud().then((r) => setWaSalud(r && typeof r === "object" ? r : null)).catch(() => setWaSalud(null));
+      // R7-05: solo con permiso de WhatsApp (sin él, 403 en la consola); queda el texto del servidor.
+      if (tienePermiso("whatsapp", "ver")) api.agente.salud().then((r) => setWaSalud(r && typeof r === "object" ? r : null)).catch(() => setWaSalud(null));
     }
   };
-  const pasoGoLive = (it) => {
+  const pasoGoLive = (it0) => {
+    // R7-09: «2 sede(s)», «6 doctor(es)»… del servidor se escriben con el plural que toca.
+    const it = it0 && typeof it0.detalle === "string" ? { ...it0, detalle: pluralizarParentesis(it0.detalle) } : it0;
     if (it?.clave !== "whatsapp" || !conectado || !waSalud) return it;
     const w = estadoWhatsApp(waSalud);
     if (w.estado === "operativo") return { ...it, detalle: `${w.detalle}${notaUltimoEnvioOk(waSalud)}` };
@@ -660,7 +665,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
               <span className="dc-go__anillo" style={{ "--p": pct }}><b>{pct}%</b></span>
               <div className="dc-go__txt">
                 <h3>{listo ? "Todo listo para operar" : "Puesta en marcha de la clínica"}</h3>
-                <p>{listo ? "Sedes, servicios, doctores y horarios están configurados." : `${goLive?.obligatoriosPendientes || 0} punto(s) obligatorio(s) pendiente(s) para que el asistente pueda agendar y atender.`}</p>
+                <p>{listo ? "Sedes, servicios, doctores y horarios están configurados." : `${(() => { const n = Number(goLive?.obligatoriosPendientes) || 0; return n === 1 ? "1 punto obligatorio pendiente" : `${n} puntos obligatorios pendientes`; })()} para que el asistente pueda agendar y atender.`}</p>
                 <small>{total ? `${hechos} de ${total} pasos completos` : "Cargando checklist…"}</small>
               </div>
               <div className="dc-go__acc">

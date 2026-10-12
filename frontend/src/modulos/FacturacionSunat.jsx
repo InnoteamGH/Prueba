@@ -268,7 +268,7 @@ export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sede
         <div className="dc-fe__aviso-sin"><Receipt size={18} strokeWidth={2} /><div><b>{deCajaN} {deCajaN === 1 ? "comprobante emitido" : "comprobantes emitidos"} en Caja aún sin registro electrónico</b><span>Son las boletas de los cobros: se muestran aquí con su serie y número hasta que el servidor las registre para el envío a SUNAT.</span></div></div>
       )}
       {!cfg.proveedor && (
-        <div className="dc-fe__aviso-sin"><PlugZap size={18} strokeWidth={2} /><div><b>Sin proveedor de facturación electrónica</b><span>Los comprobantes se emiten en el sistema y quedan «Sin enviar» hasta conectar un proveedor (OSE/PSE).</span></div>{onIntegraciones && <button type="button" className="dc-fe__btn" onClick={onIntegraciones}>Ir a Integraciones</button>}</div>
+        <div className="dc-fe__aviso-sin"><PlugZap size={18} strokeWidth={2} /><div><b>Sin proveedor de facturación electrónica</b><span>Los comprobantes se emiten en el sistema y quedan «Sin enviar» hasta conectar un proveedor (OSE/PSE).{onIntegraciones ? "" : " Lo conecta quien administra Integraciones."}</span></div>{/* R-33: el botón solo para quien puede abrir Integraciones (recepción volvía a Inicio sin aviso). */}{onIntegraciones &&<button type="button" className="dc-fe__btn" onClick={onIntegraciones}>Ir a Integraciones</button>}</div>
       )}
       <DataTable sub="comprobantes" minWidth={0} rows={visibles} defaultSort={{ key: "fecha", dir: "desc" }}
         empty={<div className="dc-fe__vacio"><Receipt size={22} strokeWidth={1.75} /><b>Sin comprobantes</b><span>Los cobros de caja generan aquí su boleta o factura.</span></div>}

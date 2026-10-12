@@ -6,6 +6,7 @@ import { sedeApiUuid } from "../routing";
 import {DatosDemoCtx, usePersist, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, Modal, NAVY, Vacio, addDays, colorDe, fechaLegible, fmt, hoy, iniciales, nombreSede, tint, useSede, PersonaCelda} from "../comun";
 import { porReactivar, esPorReactivar } from "../compartido/metricas";
 import { useSedesWhatsapp } from "../compartido/useSedesWhatsapp";
+import { tienePermiso } from "../compartido/permisos";
 import { formatearWhatsappPe, sedesSinNumero, whatsappDeSede } from "../compartido/whatsappSede";
 
 function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
@@ -85,7 +86,9 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   const sedesWaVer = (sedesWa || []).filter((s) => s.activa !== false && enSede(s.id));
   const sinNumeroWa = sedesSinNumero(sedesWaVer);
   const [numCompartido, setNumCompartido] = useState("");
-  useEffect(() => { if (conectado && sinNumeroWa.length) api.agente.salud().then((s) => setNumCompartido(s?.numero || "")).catch(() => setNumCompartido("")); }, [conectado, sinNumeroWa.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  // R7-05: GET /whatsapp/salud solo con permiso de WhatsApp (gerencia recibía 403 y un error en
+  // la consola). Sin él, el aviso sale sin el número compartido.
+  useEffect(() => { if (conectado && sinNumeroWa.length && tienePermiso("whatsapp", "ver")) api.agente.salud().then((s) => setNumCompartido(s?.numero || "")).catch(() => setNumCompartido("")); }, [conectado, sinNumeroWa.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   // Cada interruptor es independiente. Se manda la regla completa (no solo `activo`) y,
   // al recargar, si el servidor devolvió apagadas otras reglas que nadie tocó, se
   // restauran: un PUT que reemplazaba toda la configuración apagaba las demás.

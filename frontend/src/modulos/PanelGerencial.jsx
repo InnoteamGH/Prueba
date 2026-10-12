@@ -840,6 +840,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const [sedesRows, setSedesRows] = useState([]);         // GET /sedes (número de WhatsApp de cada una)
   // R6-03: GET /caja de las sedes que se ven (deuda por antigüedad y cobros vencidos por sede).
   const [cajaRes, setCajaRes] = useState(null);
+  // R7-07: GET /caja falló. La antigüedad no vuelve en silencio al criterio del servidor.
+  const [cajaErr, setCajaErr] = useState(false);
   // R6-02: horario de los doctores (GET /disponibilidad): quién atiende en la sede elegida.
   // undefined = cargando; null = sin horario a la vista o no se pudo leer.
   const [dispMed, setDispMed] = useState(undefined);
@@ -959,7 +961,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       setPacSede(new Map(todos.map((p) => [String(p.id), sedeDePacienteObj(p)])));
     }).catch(() => { marcar("dir", true); setDirPac(null); setPacSede(null); });
     // R6-03: deuda por sede con GET /caja (porCobrar y terminados traen la sede de cada fila).
-    api.caja({ sedeIds: sedesApi }).then((r) => setCajaRes(r && typeof r === "object" && !Array.isArray(r) ? r : null)).catch(() => setCajaRes(null));
+    api.caja({ sedeIds: sedesApi }).then((r) => { const ok = r && typeof r === "object" && !Array.isArray(r); setCajaRes(ok ? r : null); setCajaErr(!ok); }).catch(() => { setCajaRes(null); setCajaErr(true); });
     // R6-02: horario de los doctores, para saber la meta y el equipo de la sede elegida.
     api.disponibilidad.listar().then((r) => setDispMed(Array.isArray(r) && r.length ? r : null)).catch(() => setDispMed(null));
     // R6-08: los chats de WhatsApp solo si el rol puede verlos (gerencia no: usa la cifra del servidor).
@@ -1068,8 +1070,11 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
 
   // R6-03: con /caja, la antigüedad es la del trabajo terminado sin cobrar de las sedes que se
   // ven (lo mismo que «Hecho sin pagar» de Más reportes y «Listo para cobrar» de Caja), tramo
-  // por tramo. Sin /caja, la de /gerencial/indicadores, que no filtra por sede.
-  const deuda = ind?.deudaPorAntiguedad || {};
+  // por tramo. R7-07: con sesión no se usa la de /gerencial/indicadores (otro criterio y sin
+  // sede): si /caja falla, «No disponible · Reintentar»; antes salía en silencio S/ 1 990 de
+  // toda la clínica, con su alerta «saldo vencido +60 días». La demostración sigue con la suya.
+  const deuda = conectado ? {} : (ind?.deudaPorAntiguedad || {});
+  const cajaCargando = conectado && !deudaCaja && !cajaErr;
   const tramosCaja = deudaCaja ? deudaCaja.tramos.map((t) => t.v) : null;
   const agingItems = [
     { nom: "Corriente – 0–30 d", valor: tramosCaja ? tramosCaja[0] : Number(deuda.hasta30) || 0, color: "var(--dc-ok-700)" },
@@ -1078,14 +1083,16 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     { nom: "+90 días – riesgo", valor: tramosCaja ? tramosCaja[3] : Number(deuda.masDe90) || 0, color: "var(--dc-danger-700)" },
   ].map((it, i) => ({ ...it, filas: deudaCaja ? deudaCaja.tramos[i].items : null }));
   const agingTotal = agingItems.reduce((s, x) => s + x.valor, 0);
-  const agingErr = !deudaCaja && indErr;
+  const agingErr = conectado ? (!deudaCaja && cajaErr) : indErr;
 
   // Requiere acción: con /caja, el aviso de saldos vencidos es el de la sede (trabajo terminado
   // hace más de 30 días sin cobrar); el del servidor («N pacientes con saldo vencido +60 días»,
   // de toda la clínica y con otra regla) se reemplaza. Lo demás (stock, evoluciones…) sigue
   // siendo de toda la clínica: con una sede elegida cada uno lleva su rótulo.
   const esAlertaSaldo = (a) => /saldo|vencid|deuda/i.test(`${a?.titulo || ""} ${a?.tipo || ""}`);
-  const alertasSrv = indErr ? [] : (ind?.alertas || []).filter((a) => !(deudaCaja && esAlertaSaldo(a))).map((a) => ({ ...a, _toda: sedeElegida }));
+  // R7-07: con sesión el aviso de saldos es siempre el de Caja; el del servidor usa otra regla
+  // y, si Caja no carga, contradecía al bloque de antigüedad.
+  const alertasSrv = indErr ? [] : (ind?.alertas || []).filter((a) => !((deudaCaja || conectado) && esAlertaSaldo(a))).map((a) => ({ ...a, _toda: sedeElegida }));
   const alertaCaja = deudaCaja && deudaCaja.conVencido.length ? [{
     tipo: "accion", severidad: "alta",
     titulo: `${pluralEs(deudaCaja.conVencido.length, "paciente", "pacientes")} con trabajo terminado sin cobrar hace más de 30 días`,
@@ -1417,8 +1424,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               })}
             </div>
             <div className="dc-split__rule">
-              <p className="dc-rotulo">Antigüedad de la deuda{agingErr ? "" : ` – 100% = ${moneyFmt(agingTotal)}`}{!deudaCaja && todaClinica}</p>
-              {agingErr ? nd({ bloque: true, detalle: "Sin este dato no se sabe cuánto saldo hay en cada tramo." }) : <>
+              <p className="dc-rotulo">Antigüedad de la deuda{agingErr || cajaCargando ? "" : ` – 100% = ${moneyFmt(agingTotal)}`}{!deudaCaja && !conectado && todaClinica}</p>
+              {agingErr ? nd({ bloque: true, detalle: conectado ? "No se pudo leer Caja: sin ese dato no se sabe cuánto trabajo terminado falta cobrar en cada tramo." : "Sin este dato no se sabe cuánto saldo hay en cada tramo." })
+                : cajaCargando ? <p className="dc-card__foot" style={{ margin: 0, padding: 0, border: 0 }}>Leyendo Caja…</p> : <>
               <StackSegs items={agingItems} total={agingTotal} />
               <div className="dc-leyenda">
                 {agingItems.map((it, i) => {
@@ -1874,11 +1882,15 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
             tienen sede se dicen aparte (sede A + sede B + sin sede = total). Sin permiso de
             WhatsApp vale la cifra del servidor, que con una sede elegida puede contar un chat en
             más de una sede: se avisa en el título. */}
-        <span title={waChats ? "Chats con actividad en los últimos 30 días. Cada chat es de la sede del número que lo recibió o, si no se sabe, de la sede del paciente." : sedeElegida ? "Cifra del servidor: los chats aún no guardan su sede y el servidor los reparte por paciente, así que la suma de las sedes puede no dar el total de la clínica." : undefined}>
+        {/* R7-08: el título decía «los chats aún no guardan su sede», y ya la guardan. Lo cierto
+            para quien no ve WhatsApp (gerencia) es que la cifra es la del resumen gerencial, que
+            reparte los chats por la sede del paciente: con una sede elegida se dice «de pacientes
+            de la sede», y que la suma de las sedes puede pasar del total (8 frente a 5 + 6). */}
+        <span title={waChats ? "Chats con actividad en los últimos 30 días. Cada chat es de la sede del número que lo recibió o, si no se sabe, de la sede del paciente." : sedeElegida ? "Cifra del resumen gerencial del servidor: cuenta los chats de los pacientes de esta sede, no la sede de cada chat. Un paciente de las dos sedes cuenta en ambas, así que la suma de las sedes puede pasar del total de la clínica. Con permiso de WhatsApp se cuenta por la sede de cada chat." : "Cifra del resumen gerencial del servidor."}>
           WhatsApp{" "}
           {waConversaciones || waAgendadas || waChats?.sinSede ? (
             <>
-              <b>{waConversaciones}</b> {waConversaciones === 1 ? "conversación" : "conversaciones"}{waChats ? (sedeElegida ? " de la sede" : " en 30 días") : ""}
+              <b>{waConversaciones}</b> {waConversaciones === 1 ? "conversación" : "conversaciones"}{waChats ? (sedeElegida ? " de la sede" : " en 30 días") : (sedeElegida ? " de pacientes de la sede" : "")}
               {waChats?.sinSede ? <>{sedeElegida ? " + " : " ("}<b>{waChats.sinSede}</b> sin sede{sedeElegida ? " (de toda la clínica)" : ")"}</> : null}
               {" – "}<b>{waAgendadas}</b> citas agendadas por ese canal
             </>

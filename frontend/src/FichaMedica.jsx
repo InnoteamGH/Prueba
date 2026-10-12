@@ -26,6 +26,7 @@ import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, textoIndicacione
 import { imprimirReceta } from "./util/recetaDoc";
 import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
 import { medicoEn } from "./compartido/catalogoApi";
+import { medicoDeSesionEnCitas } from "./util/medicoSesion";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 import PeriodontogramaClinico from "./modulos/Periodontograma";
@@ -1220,7 +1221,21 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       setMedicos(ms || []);
       const mine = (ms || []).find((m) => auth.sesion?.nombre && m.nombre && m.nombre.toLowerCase() === String(auth.sesion.nombre).toLowerCase());
       if (mine) setEvoMedico(String(mine.id));
-    }).catch(() => { });
+    }).catch(() => {
+      // M7-03: con GET /medicos en 500, «Atendido por» quedaba en «— Selecciona el doctor —» y el
+      // médico no tenía a quién elegir. Su id sale de sus propias citas (GET /citas solo le
+      // devuelve las suyas): se ofrece él mismo con el nombre de la sesión.
+      if (rol !== "medico" || !auth.sesion?.nombre) return;
+      const hoyD = new Date(), ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const desde = new Date(hoyD); desde.setDate(desde.getDate() - 120);
+      const hasta = new Date(hoyD); hasta.setDate(hasta.getDate() + 30);
+      api.citas.listar(null, ymd(desde), ymd(hasta)).then((rows) => {
+        const id = medicoDeSesionEnCitas(rows, auth.sesion.nombre);
+        if (!id) return;
+        setMedicos((cur) => (cur && cur.length ? cur : [{ id, nombre: auth.sesion.nombre }]));
+        setEvoMedico((v) => v || id);
+      }).catch(() => { });
+    });
     if (conectado && pacienteId) {
       api.laboratorio.listar(pacienteId).then((r) => { setLabOrdenes(r || []); setLabSinPermiso(false); }).catch((e) => { setLabOrdenes([]); setLabSinPermiso(!!e && (e.status === 403 || e._httpStatus === 403)); });
       if (puedeConsent) api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])).catch(() => setConsentimientos([]));
