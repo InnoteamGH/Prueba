@@ -181,13 +181,19 @@ export const porSedeDeSalud = (s) => (s && Array.isArray(s.porSede) ? s.porSede.
  */
 export function filasWhatsappSedes({ sedes = [], salud = null, porSede = null, igual = mismoId } = {}) {
   const lista = (Array.isArray(sedes) ? sedes : []).filter((s) => s && s.activa !== false);
-  const filasSrv = porSede && porSede.length ? porSede : porSedeDeSalud(salud);
+  const filasSrv0 = porSede && porSede.length ? porSede : porSedeDeSalud(salud);
   const general = estadoWhatsApp(salud);
   const numGeneral = normalizarWhatsappPe(salud?.numero) || String(salud?.numero || "").trim();
+  // R7-01/R7-02: el servidor marca con `compartido: true` / `estado: "compartido"` / `propio: false`
+  // la sede que aún usa el número único (y trae el número en `whatsappNumero`). Esa fila no tiene
+  // estado propio: vale el general. Si todas son así, se trata igual que sin `porSede`.
+  const esCompartida = (x) => !!x && (x.compartido === true || x.propio === false || /^compartido$/i.test(String(x.estado || "")));
+  const filasSrv = filasSrv0 && filasSrv0.length && !filasSrv0.every(esCompartida) ? filasSrv0 : null;
   if (filasSrv && filasSrv.length) {
     const filas = lista.map((s) => {
       const f = filasSrv.find((x) => igual(x.sedeId, s.id));
-      const numero = normalizarWhatsappPe(f?.numero) || whatsappDeSede(s);
+      if (f && esCompartida(f)) return { sedeId: s.id, nombre: s.nombre || "Sede", numero: normalizarWhatsappPe(f.whatsappNumero ?? f.numero) || numGeneral, propio: false, sinNumero: true, estado: { ...general, detalle: `Usa el número compartido. ${general.detalle}` } };
+      const numero = normalizarWhatsappPe(f?.numero ?? f?.whatsappNumero) || whatsappDeSede(s);
       if (!f) return { sedeId: s.id, nombre: s.nombre || "Sede", numero, propio: !!numero, sinNumero: !numero, estado: numero ? { estado: "pendiente", etiqueta: "Sin estado", detalle: "El servidor no informa el estado de este número." } : { estado: "pendiente", etiqueta: "Sin número propio", detalle: "Esta sede aún no tiene número de WhatsApp." } };
       const est = estadoWhatsApp(saludDeFila(f));
       // Sin número, el detalle lo dice (no «lo activa soporte»): se agrega en Configuración › Sedes.

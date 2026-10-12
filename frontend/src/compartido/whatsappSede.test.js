@@ -195,3 +195,27 @@ describe("filasWhatsappSedes", () => {
     assert.equal(r.filas[0].estado.etiqueta, "Comprobando…");
   });
 });
+
+describe("porSede del servidor con números compartidos (R7-01/R7-02)", () => {
+  it("todas compartidas: se trata como número compartido con el estado general", () => {
+    const salud = { ok: true, semaforo: "ambar", fallos24h: 3, numero: "+51 948 277 030", porSede: [
+      { sedeId: "a1", nombre: "Sede San Isidro", whatsappNumero: "+51 948 277 030", propio: false, estado: "compartido", compartido: true },
+      { sedeId: "a2", nombre: "Sede Surco", whatsappNumero: "+51 948 277 030", propio: false, estado: "compartido", compartido: true },
+    ] };
+    const r = filasWhatsappSedes({ sedes: [{ id: "a1", nombre: "Sede San Isidro" }, { id: "a2", nombre: "Sede Surco" }], salud });
+    assert.equal(r.modo, "compartido");
+    assert.equal(r.compartido.estado, "incidencia");
+    assert.ok(r.filas.every((f) => f.sinNumero && f.numero));
+  });
+  it("mixto: la compartida toma el estado general y el número de whatsappNumero", () => {
+    const salud = { ok: true, semaforo: "verde", numero: "+51 948 277 030", porSede: [
+      { sedeId: "a1", whatsappNumero: "+51 948 277 030", estado: "compartido", compartido: true },
+      { sedeId: "a2", whatsappNumero: "+51 911 222 333", estado: "conectado", ok: true, propio: true },
+    ] };
+    const r = filasWhatsappSedes({ sedes: [{ id: "a1", nombre: "SI" }, { id: "a2", nombre: "Surco", whatsappNumero: "+51911222333" }], salud });
+    assert.equal(r.modo, "porSede");
+    assert.equal(r.filas[0].sinNumero, true);
+    assert.equal(r.filas[1].numero, "+51911222333");
+    assert.equal(r.filas[1].estado.estado, "operativo");
+  });
+});
