@@ -191,15 +191,10 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)], ["Neto", `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)",
       notaUsd: eg.usd ? `Los egresos en dólares (${usd2(eg.usd)}) se suman en soles con el tipo de cambio guardado en cada egreso o, si no lo tiene, con el de la clínica (S/ ${tcRef.toFixed(2)} por dólar).` : null };
   }, [conectado, dSrv, rep, clave]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Aviso honesto de lo que el servidor todavía no informa.
-  // H-05 / R5-04: /tratamientos/resumen ignora la sede elegida, pero ya recorta a las sedes del
-  // usuario (el administrador de Surco recibe solo Surco). El aviso sale solo a quien ve más
-  // sedes de las que eligió: el usuario de toda la clínica con una sede elegida, o el de
-  // varias sedes que eligió una.
-  const procSinFiltroSede = rep === "procedimientos" && !!sedesApi && (sx.global || (sx.mias || []).length > sedesApi.length);
+  // Aviso honesto de lo que el servidor todavía no informa. R6-02: /tratamientos/resumen ya
+  // filtra por la sede elegida, así que Procedimientos no lleva aviso de «toda la clínica».
   const avisoSrv = !datosSrv ? null
     : datosSrv.error ? null
-    : procSinFiltroSede ? (sx.global ? "Cifras de toda la clínica: el servidor aún no filtra los procedimientos por la sede elegida." : "Cifras de todas tus sedes: el servidor aún no filtra los procedimientos por la sede elegida.")
     : datosSrv.sinDetalle ? (datosSrv.sinPorCobrar ? "El servidor informa el saldo de cada plan; «hecho sin pagar», «vencido» y «días sin pagar» estarán cuando lo resuma por ítem." : "«Vencido» y «días sin pagar» estarán cuando el servidor resuma la deuda por ítem; por eso esas columnas no se muestran.")
     : datosSrv.sinPrimera ? "Para separar pacientes nuevos de recurrentes el servidor debe informar la primera visita de cada paciente."
     : datosSrv.conDetalle ? "«Hecho sin pagar» son los procedimientos terminados que aún no se cobran (en Caja, «Listo para cobrar»); «vencido», la parte terminada hace más de 30 días. El saldo del plan incluye además lo que falta hacer."

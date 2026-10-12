@@ -11,7 +11,15 @@ import {
   totalResumen,
   especialidadDeItem,
   produccionPorEspecialidad,
+  medicosEnSedes,
+  equipoDeSede,
+  metaDeSede,
 } from "./panelGerencialUtil.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe("panelGerencialUtil — barras (total-scale, zero no bar)", () => {
   it("valor 0 no dibuja barra", () => {
@@ -109,5 +117,53 @@ describe("H-G3/H-G4: facturado y especialidad desde /tratamientos/resumen", () =
     assert.deepEqual(esp, [{ nombre: "Endodoncia", valor: 220 }, { nombre: "Periodoncia", valor: 120 }]);
     assert.equal(esp.reduce((a, e) => a + e.valor, 0), totalResumen(resumen));
     assert.equal(produccionPorEspecialidad([{ nombre: "Rara", importeTotal: 50 }], cat)[0].nombre, "Sin especialidad en el catálogo");
+  });
+});
+
+describe("R6-02: equipo y meta de la sede elegida", () => {
+  // Como en producción: Carla (d1) y Jorge (d5) solo tienen horario en San Isidro (a1); Luis
+  // (d2) en las dos. /gerencial/kpis?sedeIds=a2 trae a todos con producción 0.
+  const disp = [
+    { medicoId: "d1", sedeId: "a1", activo: true }, { medicoId: "d5", sedeId: "a1" },
+    { medicoId: "d2", sedeId: "a1" }, { medicoId: "d2", sedeId: "a2" },
+    { medicoId: "d9", sedeId: "a2", activo: false },
+  ];
+  const rankingSurco = [
+    { medicoId: "d1", medico: "Dra. Carla", atendidas: 0, produccion: 0, meta: null },
+    { medicoId: "d5", medico: "Dr. Jorge", atendidas: 0, produccion: 0, meta: 500 },
+    { medicoId: "d2", medico: "Dr. Luis", atendidas: 0, produccion: 0, meta: 300 },
+  ];
+  it("los doctores de la sede salen de su horario (los bloques inactivos no cuentan)", () => {
+    assert.deepEqual([...medicosEnSedes(disp, ["a2"])], ["d2"]);
+    assert.deepEqual([...medicosEnSedes(disp, ["a1"])].sort(), ["d1", "d2", "d5"]);
+    // Sin horario a la vista no se sabe: null (no «ninguno»).
+    assert.equal(medicosEnSedes([], ["a1"]), null);
+    assert.equal(medicosEnSedes(disp, null), null);
+  });
+  it("el equipo de la sede: sus doctores y quien atendió en ella", () => {
+    const enSurco = medicosEnSedes(disp, ["a2"]);
+    assert.deepEqual(equipoDeSede(rankingSurco, enSurco).map((r) => r.medicoId), ["d2"]);
+    const conCita = [...rankingSurco, { medicoId: "d7", atendidas: 1, produccion: 80, meta: null }];
+    assert.deepEqual(equipoDeSede(conCita, enSurco).map((r) => r.medicoId), ["d2", "d7"]);
+    // Sin horario: solo quien atendió.
+    assert.deepEqual(equipoDeSede(conCita, null).map((r) => r.medicoId), ["d7"]);
+  });
+  it("la meta de la sede es la de sus doctores, no la de toda la clínica", () => {
+    assert.equal(metaDeSede(rankingSurco, medicosEnSedes(disp, ["a2"])), 300);
+    assert.equal(metaDeSede(rankingSurco, medicosEnSedes(disp, ["a1"])), 800);
+    assert.equal(metaDeSede(rankingSurco, new Set()), 0);
+    assert.equal(metaDeSede(rankingSurco, null), null);
+  });
+});
+
+describe("R6-02: sin el aviso «el servidor aún no filtra» donde el servidor ya filtra", () => {
+  const leer = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
+  it("Panel, Resumen del mes, Producción y Más reportes", () => {
+    for (const f of ["PanelGerencial.jsx", "ResumenMes.jsx", "ProduccionComisiones.jsx", "ReportesClinica.jsx"]) {
+      const src = leer(f);
+      assert.doesNotMatch(src, /Cifras de toda la clínica: el servidor aún no filtra/, f);
+      assert.doesNotMatch(src, /aún no filtra este reporte por sede/, f);
+      assert.doesNotMatch(src, /No se calcula por sede/, f);
+    }
   });
 });

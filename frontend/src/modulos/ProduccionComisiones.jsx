@@ -3,7 +3,7 @@
  * Rutas: #/reportes – #/comisiones – #/metas
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, X, Calculator, Info, List as ListIcon } from "lucide-react";
+import { BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
 import api, { auth } from "../api/client";
 import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden, mismaSede, useSede } from "../comun";
 import { sedeApiUuid } from "../routing";
@@ -60,7 +60,6 @@ import {
   moneyFmt,
   pctEnEscalaAusentismo,
   techoRinde,
-  comisionesPorSede,
 } from "./produccionComisionesUtil";
 import "./panelGerencial.css";
 import "./produccionComisiones.css";
@@ -776,7 +775,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   const desdeMes = ymdL(new Date(hoyD.getFullYear(), hoyD.getMonth(), 1)), hastaHoy = ymdL(hoyD);
   const [citasSrv, setCitasSrv] = useState(null);
   const [citasErr, setCitasErr] = useState(false);
-  // R5-02: «Reintentar» vuelve a pedir todo lo de la pantalla (comisiones, citas y pagos).
+  // R5-02: «Reintentar» vuelve a pedir todo lo de la pantalla (comisiones y citas).
   const [nRecarga, setNRecarga] = useState(0);
   const reintentar = () => setNRecarga((n) => n + 1);
   useEffect(() => {
@@ -818,31 +817,10 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   }, [sedes && sedes.join(","), claveSedes, periodo, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
 
   useEffect(() => { cargar(); }, [cargar]);
-  // H-06: /comisiones ignora la sede elegida para quien ve toda la clínica (daba el total de
-  // la clínica con «Sede Surco»). Con una sede elegida, producción y cobrado se rehacen con
-  // GET /citas (sí filtra por sede) y GET /pagos/historial (cada pago trae su sede).
-  const [deSede, setDeSede] = useState(null);   // { citas, pagos } | { error: true }
-  useEffect(() => {
-    setDeSede(null);
-    if (!conectado || !sedesApi || tab === "ausencias") return undefined;
-    let vivo = true;
-    Promise.all([api.citas.listar(null, rango.desde, rango.hasta, sedesApi), api.pagos.historial({ sedeIds: sedesApi }).catch(() => null)])
-      .then(([cs, pg]) => { if (vivo) setDeSede({ citas: Array.isArray(cs) ? cs : [], pagos: Array.isArray(pg) ? pg : null }); })
-      .catch(() => { if (vivo) setDeSede({ error: true }); });
-    return () => { vivo = false; };
-  }, [conectado, claveSedes, periodo, tab, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps
-  const data = useMemo(() => (dataSrv && deSede && !deSede.error
-    ? comisionesPorSede(dataSrv, deSede.citas, deSede.pagos, { desde: rango.desde, hasta: rango.hasta, enSede: (sid) => sid != null && (sedes || []).some((v) => mismaSede(v, sid)) })
-    : dataSrv), [dataSrv, deSede]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Aviso de lo que, con una sede elegida, sigue siendo de toda la clínica. R5-04: solo a quien
-  // ve más sedes de las que eligió; al usuario de una sola sede el servidor ya le recorta
-  // /comisiones a la suya (el recálculo de abajo da las mismas cifras y no hace falta avisar).
-  const veMasSedes = sedeCx.global || (sedeCx.mias || []).length > (sedesApi || []).length;
-  const avisoSede = !conectado || !sedesApi || tab === "ausencias" || !veMasSedes ? null
-    : deSede == null ? "Calculando la producción de la sede elegida…"
-    : deSede.error ? "Cifras de toda la clínica: el servidor aún no filtra Producción y comisiones por sede, y no se pudieron leer las citas de la sede."
-    : !data?.cobrosSede ? "Producción y comisión calculadas con las citas atendidas de la sede elegida. Lo cobrado es de toda la clínica: el servidor aún no filtra los cobros por sede."
-    : "Producción, comisión y cobrado de la sede elegida, calculados con sus citas atendidas y sus pagos (el servidor aún no filtra este reporte por sede).";
+  // R6-02: /comisiones?sedeIds ya devuelve producción, comisión y cobrado de la sede elegida
+  // (médico por médico). Se usa tal cual: sin el recálculo con citas y pagos (H-06) ni el
+  // aviso de que el reporte era de toda la clínica.
+  const data = dataSrv;
   useEffect(() => {
     const t = requestAnimationFrame(() => setAnimReady(true));
     return () => cancelAnimationFrame(t);
@@ -933,7 +911,6 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <span className="dc-nota" style={{ margin: 0 }}>Periodo: <b>{rotuloPeriodo(perDesde, perHasta)}</b>{mesesPer > 1 ? ` (${mesesPer} meses: la meta se cuenta ${mesesPer} veces)` : ""}</span>
             </div>
           )}
-          {avisoSede && !err && <div className={`fm-aviso-edad${deSede?.error ? " is-mal" : " is-info"}`} style={{ marginBottom: 12 }}><Info size={15} strokeWidth={2} /><span>{avisoSede}</span>{deSede?.error && <button type="button" onClick={reintentar}>Reintentar</button>}</div>}
           {!err && <>
           <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores del periodo">
             <button type="button" className="dc-kpi" onClick={() => abrir({
@@ -952,7 +929,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <div className="dc-kpi__body">
                 <div className="dc-kpi__label">Producción del periodo</div>
                 <div className="dc-kpi__value">{moneyFmt(totalProd)}</div>
-                <div className="dc-kpi__sub">{totalCitas} citas facturadas</div>
+                <div className="dc-kpi__sub">{totalCitas} {totalCitas === 1 ? "cita facturada" : "citas facturadas"}</div>
               </div>
             </button>
             <button type="button" className="dc-kpi" onClick={() => abrir({

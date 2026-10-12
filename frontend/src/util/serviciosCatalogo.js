@@ -1,6 +1,7 @@
 /**
  * Catálogo de servicios: medias limpias (SPEC §15.6 / A37).
  */
+import { desgloseIgv } from "../compartido/catalogo.js";
 
 /** @param {Array<{ monto?: number, precio?: number, activo?: boolean }>} items */
 export function serviciosConPrecio(items) {
@@ -21,10 +22,13 @@ export function precioMedioCatalogo(items) {
 
 /**
  * Margen honesto (SRV-02): sin coste medido (> 0) no se inventa margen = precio.
+ * R6-09: el precio del catálogo lleva el IGV, que no es ingreso de la clínica: el margen es el
+ * precio SIN IGV menos el costo directo (Blanqueamiento S/ 400 con costo 120: 338.98 − 120 =
+ * S/ 218.98, no S/ 280). Redondeado a céntimos.
  * @returns {number|null} null ⇒ mostrar "—" / "sin coste"
  */
 export function margenCatalogo(s) {
   const coste = Number(s?.coste ?? s?.costeDirecto);
   if (!(coste > 0)) return null;
-  return (Number(s?.monto ?? s?.precio) || 0) - coste;
+  return Math.round((desgloseIgv(Number(s?.monto ?? s?.precio) || 0).base - coste) * 100) / 100;
 }

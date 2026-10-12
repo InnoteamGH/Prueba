@@ -188,6 +188,29 @@ export function carteraComoDirectorio(pacientes, ultimaPorId = {}, hoyIso) {
   return { total: lista.length, nuevos30: nuevos };
 }
 
+/* R6-02: con una sede elegida, /gerencial/kpis ya filtra la producción por sede, pero los
+   médicos no traen sede (H-14) y la meta de cada uno vale para todas: el ranking trae a todos
+   los doctores en cualquier sede y metaMensualClinica es la de toda la clínica.
+   - medicosEnSedes: ids de los doctores con horario (GET /disponibilidad) en las sedes que se
+     ven, la misma regla de la agenda y de Metas. null si no hay horario a la vista (no se sabe).
+   - equipoDeSede: el ranking del servidor con los doctores de la sede y los que atendieron en ella.
+   - metaDeSede: la suma de las metas de esos doctores (lo que Metas llama «Meta de la sede»);
+     null si no se sabe quién atiende en la sede. */
+const mismoIdTxt = (a, b) => a != null && b != null && String(a) === String(b);
+export function medicosEnSedes(disp, sedes, igual = mismoIdTxt) {
+  const bloques = (Array.isArray(disp) ? disp : []).filter((d) => d && d.activo !== false && d.medicoId != null);
+  if (!bloques.length || !Array.isArray(sedes) || !sedes.length) return null;
+  return new Set(bloques.filter((d) => sedes.some((s) => igual(s, d.sedeId ?? d.sede))).map((d) => String(d.medicoId)));
+}
+const idMed = (r) => String(r?.medicoId ?? r?.id ?? "");
+export function equipoDeSede(ranking, medicos) {
+  return (Array.isArray(ranking) ? ranking : []).filter((r) => (Number(r?.atendidas) || 0) > 0 || (Number(r?.produccion) || 0) > 0 || !!(medicos && medicos.has(idMed(r))));
+}
+export function metaDeSede(ranking, medicos) {
+  if (!medicos) return null;
+  return (Array.isArray(ranking) ? ranking : []).filter((r) => medicos.has(idMed(r))).reduce((a, r) => a + (Number(r?.meta) || 0), 0);
+}
+
 /** Producción por especialidad a partir del resumen de tratamientos y el catálogo:
  *  [{ nombre, valor }] de mayor a menor. Lo que no se reconoce va a «Sin especialidad». */
 export function produccionPorEspecialidad(lista, servicios, sinEsp = "Sin especialidad en el catálogo") {

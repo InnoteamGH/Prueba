@@ -18,8 +18,11 @@ import {
   totalResumen,
   produccionPorEspecialidad,
   carteraComoDirectorio,
+  medicosEnSedes,
+  equipoDeSede,
 } from "./panelGerencialUtil";
 import { tienePermiso } from "../compartido/permisos";
+import { contarChatsPorSede, sedeDeConversacion, sedeDePacienteObj } from "../compartido/whatsappSede";
 import NoDisponible from "../ui/NoDisponible";
 
 /* H-G9: el chip de cada asunto de «Requiere acción» lleva a la pantalla donde se resuelve
@@ -811,11 +814,12 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const sedeCx = useSede();
   const sedesApi = (!verSedes || (sedeCx.sede === "all" && sedeCx.global)) ? null
     : verSedes.map((x) => sedeApiUuid(x)).filter(Boolean);
-  // R4-01: con una sede elegida, /gerencial/kpis, /gerencial/indicadores y
-  // /tratamientos/resumen aún devuelven lo de toda la clínica (ignoran sedeIds). Lo que se
-  // puede rehacer con datos que sí se filtran (citas de hoy, pacientes, caja, egresos) se
-  // rehace; el resto lleva el rótulo «toda la clínica» y el aviso de arriba lo explica.
-  const sedeSinFiltroSrv = conectado && !!(sedesApi && sedesApi.length);
+  // R6-02: /gerencial/kpis, /tratamientos/resumen y /comisiones ya filtran por sedeIds, y de
+  // /gerencial/indicadores también la aceptación y las especialidades: esas cifras son de la
+  // sede elegida, sin aviso ni rótulo. /gerencial/indicadores sigue sin filtrar la deuda y las
+  // alertas (R6-03): la antigüedad de la deuda y el aviso de cobros vencidos se calculan con
+  // GET /caja (sí filtra); lo que queda del servidor sin filtrar lleva el rótulo «toda la clínica».
+  const sedeElegida = conectado && !!(sedesApi && sedesApi.length);
   const [kd, setKd] = useState(null);
   const [ind, setInd] = useState(null);
   const [rep, setRep] = useState(null);
@@ -833,6 +837,16 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const [inventarioValorizado, setInventarioValorizado] = useState(null);
   const [nSillones, setNSillones] = useState(null);
   const [nSedes, setNSedes] = useState(null);
+  const [sedesRows, setSedesRows] = useState([]);         // GET /sedes (número de WhatsApp de cada una)
+  // R6-03: GET /caja de las sedes que se ven (deuda por antigüedad y cobros vencidos por sede).
+  const [cajaRes, setCajaRes] = useState(null);
+  // R6-02: horario de los doctores (GET /disponibilidad): quién atiende en la sede elegida.
+  // undefined = cargando; null = sin horario a la vista o no se pudo leer.
+  const [dispMed, setDispMed] = useState(undefined);
+  // R6-08: chats de WhatsApp (GET /conversaciones, solo con permiso de WhatsApp) y la sede de
+  // cada paciente, para contar cada chat en una sola sede.
+  const [convs, setConvs] = useState(null);
+  const [pacSede, setPacSede] = useState(null);
   // R5-02: qué lecturas fallaron. Un bloque cuya carga falló dice «No disponible · Reintentar»,
   // no S/ 0, «sin saldo» ni «Nada pendiente por ahora» (que se leen como datos reales).
   const [fallo, setFallo] = useState({});
@@ -937,10 +951,20 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     api.catalogo.servicios().then((r) => { marcar("serv", false); setServicios(Array.isArray(r) ? r : []); }).catch(() => { marcar("serv", true); setServicios([]); });
     Promise.all([api.pacientes.listar(), api.pacientes.resumenCitas().catch(() => [])]).then(([ps, rc]) => {
       const ult = {}; (Array.isArray(rc) ? rc : []).forEach((x) => { if (x && x.pacienteId) ult[x.pacienteId] = x.ultimaVisita || null; });
-      const visibles = (Array.isArray(ps) ? ps : []).filter((p) => deSede({ sedeId: p.sedeRegistroId ?? null }));
+      const todos = Array.isArray(ps) ? ps : [];
+      const visibles = todos.filter((p) => deSede({ sedeId: p.sedeRegistroId ?? null }));
       marcar("dir", false);
-      setDirPac({ ...carteraComoDirectorio(visibles, ult, fecha), ids: new Set(visibles.map((p) => String(p.id))) });
-    }).catch(() => { marcar("dir", true); setDirPac(null); });
+      // R6-07: los pacientes sin sede se ven en cada sede (como en el directorio); se cuentan aparte.
+      setDirPac({ ...carteraComoDirectorio(visibles, ult, fecha), ids: new Set(visibles.map((p) => String(p.id))), sinSede: visibles.filter((p) => p.sedeRegistroId == null).length });
+      setPacSede(new Map(todos.map((p) => [String(p.id), sedeDePacienteObj(p)])));
+    }).catch(() => { marcar("dir", true); setDirPac(null); setPacSede(null); });
+    // R6-03: deuda por sede con GET /caja (porCobrar y terminados traen la sede de cada fila).
+    api.caja({ sedeIds: sedesApi }).then((r) => setCajaRes(r && typeof r === "object" && !Array.isArray(r) ? r : null)).catch(() => setCajaRes(null));
+    // R6-02: horario de los doctores, para saber la meta y el equipo de la sede elegida.
+    api.disponibilidad.listar().then((r) => setDispMed(Array.isArray(r) && r.length ? r : null)).catch(() => setDispMed(null));
+    // R6-08: los chats de WhatsApp solo si el rol puede verlos (gerencia no: usa la cifra del servidor).
+    if (tienePermiso("whatsapp", "ver")) api.conversaciones.listar().then((r) => setConvs(Array.isArray(r) ? r : null)).catch(() => setConvs(null));
+    else setConvs(null);
     api.inventario.listar(sedesApi).then((rows) => {
       // Solo el almacén de las sedes que se ven.
       const list = (Array.isArray(rows) ? rows : []).filter((it) => deSede({ sedeId: it.sedeId ?? it.sede }));
@@ -961,6 +985,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       setNSillones(Array.isArray(rows) ? rows.filter((x) => deSede({ sedeId: x.sedeId ?? x.sede })).length : null);
     }).catch(() => setNSillones(null));
     api.sedes.listar().then((rows) => {
+      setSedesRows(Array.isArray(rows) ? rows : []);
       setNSedes(verSedes ? verSedes.length : Array.isArray(rows) ? rows.length : null);
     }).catch(() => setNSedes(null));
   }, [conectado, fecha, citasProp, cargarDemo, claveSedes, sedeCx.sede]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -995,15 +1020,22 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const meta = metaEstado(kd?.hayMeta, kd?.metaMensualClinica);
   // H-G3: con sesión, lo mismo que «Facturado del mes» y el Top de tratamientos.
   const prodMes = conectado ? totalResumen(tratResumen) : (Number(kd?.ingresosMes) || 0);
-  // Con sede: la producción del día es el «valor» de las citas atendidas hoy en esa sede
-  // (GET /citas sí filtra), no la de toda la clínica que trae /gerencial/kpis.
-  const prodDia = sedeSinFiltroSrv
-    ? citasHoy.filter((c) => c.estado === "atendida").reduce((s, c) => s + (Number(c.valor ?? c.precio) || 0), 0)
-    : Number(kd?.produccionDia) || 0;
-  const atendidosApi = sedeSinFiltroSrv ? null : kd?.pacientesAtendidosHoy;
+  // R6-02: /gerencial/kpis ya trae la producción y los atendidos de hoy de la sede elegida.
+  const prodDia = Number(kd?.produccionDia) || 0;
+  const atendidosApi = kd?.pacientesAtendidosHoy;
   const atendidos = atendidosApi != null
     ? Number(atendidosApi) || 0
     : distinctPatients(citasHoy, "atendida");
+  // R6-12: una cita cancelada no está «en agenda» (la única de hoy, cancelada, salía como
+  // «1 cita en agenda · 0 de 1 atendidas» con Pendientes diciendo que no hay citas).
+  const citasAgenda = citasHoy.filter((c) => c.estado !== "cancelada");
+  // R6-02: doctores con horario en la sede elegida (meta y equipo de la sede).
+  const medicosSede = !sedeElegida ? null : dispMed === undefined ? undefined : medicosEnSedes(dispMed, verSedes, mismaSede);
+  // R6-03: deuda de las sedes que se ven, con GET /caja (null si no se pudo o el servidor no
+  // manda «terminados»: entonces vale la de /gerencial/indicadores, con su rótulo).
+  const deudaCaja = useMemo(() => (conectado && cajaRes
+    ? M.deudaDeCaja(cajaRes, { hoy: fecha, incluir: (sid) => sid == null || !verSedes || verSedes.some((v) => mismaSede(v, sid)) })
+    : null), [conectado, cajaRes, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
   const dMes = deltaPct(kd?.ingresosMes, kd?.ingresosMesAnterior);
   const ritmo = diaDelMesRitmo();
   const avanceMeta = !meta.vacia && meta.meta > 0 ? (prodMes / meta.meta) * 100 : 0;
@@ -1016,19 +1048,51 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const ticketMedio = pagosHoy.length ? cobradoHoy / pagosHoy.length : 0;
   const curva = useMemo(() => curvaCajaAcumulada(pagosHoy, fecha, rangoCaja || undefined), [pagosHoy, fecha, rangoCaja?.abre, rangoCaja?.cierra]); // eslint-disable-line react-hooks/exhaustive-deps
   const funnel = rep?.funnel || {};
-  const waConversaciones = Number(funnel.conversaciones) || 0;
   const waAgendadas = Number(funnel.agendadas) || 0;
+  // R6-08: el servidor reparte los chats por paciente y cuenta algunos en dos sedes (San Isidro
+  // 5 + Surco 6 con 8 en total). Con permiso de WhatsApp se cuentan aquí, cada chat en una sola
+  // sede (la regla de la bandeja de WhatsApp) y los que no tienen sede aparte; la ventana es la
+  // del servidor: actividad en los últimos 30 días.
+  const waChats = useMemo(() => {
+    if (!conectado || !convs) return null;
+    const sedeDePac = (c) => {
+      const conSede = (c.pacientes || []).find((p) => sedeDePacienteObj(p) != null);
+      if (conSede) return sedeDePacienteObj(conSede);
+      const pid = c.pacienteId || ((c.pacientes || []).length === 1 ? c.pacientes[0].id : null);
+      return pid && pacSede ? pacSede.get(String(pid)) ?? null : null;
+    };
+    const sedeDe = (c) => sedeDeConversacion(c, { sedes: sedesRows, sedeDePaciente: sedeDePac, igual: mismaSede }).sedeId;
+    return contarChatsPorSede(convs, { desde: M.sumarDias(fecha, -30), sedeDe, enSede: verSedes ? (s) => verSedes.some((v) => mismaSede(v, s)) : null });
+  }, [conectado, convs, pacSede, sedesRows, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const waConversaciones = waChats ? waChats.deSedes + (sedeElegida ? 0 : waChats.sinSede) : Number(funnel.conversaciones) || 0;
 
+  // R6-03: con /caja, la antigüedad es la del trabajo terminado sin cobrar de las sedes que se
+  // ven (lo mismo que «Hecho sin pagar» de Más reportes y «Listo para cobrar» de Caja), tramo
+  // por tramo. Sin /caja, la de /gerencial/indicadores, que no filtra por sede.
   const deuda = ind?.deudaPorAntiguedad || {};
+  const tramosCaja = deudaCaja ? deudaCaja.tramos.map((t) => t.v) : null;
   const agingItems = [
-    { nom: "Corriente – 0–30 d", valor: Number(deuda.hasta30) || 0, color: "var(--dc-ok-700)" },
-    { nom: "31–60 días", valor: Number(deuda.de31a60) || 0, color: "var(--dc-amber-ink)" },
-    { nom: "61–90 días", valor: Number(deuda.de61a90) || 0, color: "var(--dc-warn-700)" },
-    { nom: "+90 días – riesgo", valor: Number(deuda.masDe90) || 0, color: "var(--dc-danger-700)" },
-  ];
+    { nom: "Corriente – 0–30 d", valor: tramosCaja ? tramosCaja[0] : Number(deuda.hasta30) || 0, color: "var(--dc-ok-700)" },
+    { nom: "31–60 días", valor: tramosCaja ? tramosCaja[1] : Number(deuda.de31a60) || 0, color: "var(--dc-amber-ink)" },
+    { nom: "61–90 días", valor: tramosCaja ? tramosCaja[2] : Number(deuda.de61a90) || 0, color: "var(--dc-warn-700)" },
+    { nom: "+90 días – riesgo", valor: tramosCaja ? tramosCaja[3] : Number(deuda.masDe90) || 0, color: "var(--dc-danger-700)" },
+  ].map((it, i) => ({ ...it, filas: deudaCaja ? deudaCaja.tramos[i].items : null }));
   const agingTotal = agingItems.reduce((s, x) => s + x.valor, 0);
+  const agingErr = !deudaCaja && indErr;
 
-  const alertas = ind?.alertas || [];
+  // Requiere acción: con /caja, el aviso de saldos vencidos es el de la sede (trabajo terminado
+  // hace más de 30 días sin cobrar); el del servidor («N pacientes con saldo vencido +60 días»,
+  // de toda la clínica y con otra regla) se reemplaza. Lo demás (stock, evoluciones…) sigue
+  // siendo de toda la clínica: con una sede elegida cada uno lleva su rótulo.
+  const esAlertaSaldo = (a) => /saldo|vencid|deuda/i.test(`${a?.titulo || ""} ${a?.tipo || ""}`);
+  const alertasSrv = indErr ? [] : (ind?.alertas || []).filter((a) => !(deudaCaja && esAlertaSaldo(a))).map((a) => ({ ...a, _toda: sedeElegida }));
+  const alertaCaja = deudaCaja && deudaCaja.conVencido.length ? [{
+    tipo: "accion", severidad: "alta",
+    titulo: `${pluralEs(deudaCaja.conVencido.length, "paciente", "pacientes")} con trabajo terminado sin cobrar hace más de 30 días`,
+    detalle: deudaCaja.conVencido.map((f) => f.paciente).slice(0, 3).join(", "),
+    monto: deudaCaja.vencido,
+  }] : [];
+  const alertas = [...alertaCaja, ...alertasSrv];
   const conv = ind?.conversionPlanes || {};
   const aceptado = Number(conv.aceptado) || 0;
   const rechazado = Number(conv.rechazado) || 0;
@@ -1057,7 +1121,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const cartera = ind?.cartera || {};
   // /pacientes/resumen no trae la sede: con una sede elegida se queda con los pacientes del
   // directorio de esa sede (la misma regla que la Cartera).
-  const pacs = useMemo(() => (Array.isArray(pacResumen) ? pacResumen : []).filter((p) => !sedeSinFiltroSrv || !dirPac || dirPac.ids.has(String(p.pacienteId ?? p.id))), [pacResumen, sedeSinFiltroSrv, dirPac]);
+  const pacs = useMemo(() => (Array.isArray(pacResumen) ? pacResumen : []).filter((p) => !sedeElegida || !dirPac || dirPac.ids.has(String(p.pacienteId ?? p.id))), [pacResumen, sedeElegida, dirPac]);
   const conSaldo = pacs.filter((p) => Number(p.saldo) > 0);
   // Ejes del cubo a la medida de los pacientes que se dibujan.
   const escCubo = useMemo(() => (conectado ? escalaCubo(pacs) : ESCALA_CUBO_DEF), [pacs, conectado]);
@@ -1065,7 +1129,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const ejeCubo = (txt) => (pacs.length || !conectado ? txt : "sin pacientes aún");
   const saldoMayor = conSaldo.reduce((m, p) => Math.max(m, Number(p.saldo) || 0), 0);
 
-  const rankingBase = kd?.ranking || [];
+  // Con una sede elegida, los doctores de esa sede y quien atendió en ella (el servidor manda a todos).
+  const rankingBase = sedeElegida ? equipoDeSede(kd?.ranking, medicosSede || null) : (kd?.ranking || []);
   // Equipo: orden en el encabezado, igual que el resto de tablas del sistema.
   const colsEquipo = useMemo(() => [
     { key: "nombre", label: "Odontólogo", get: (r) => r.nombre || r.medico || "" },
@@ -1082,7 +1147,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const franjas = horasJornada.length;
   const horasConCita = new Set(citasHoy.filter((c) => c.estado !== "cancelada").map((c) => parseInt(String(c.hora || ""), 10)).filter((h) => horasJornada.includes(h)));
   // Demostración: como antes, una franja por cita (hasta 12).
-  const ocupadas = conectado ? horasConCita.size : Math.min(franjas, citasHoy.length);
+  const ocupadas = conectado ? horasConCita.size : Math.min(franjas, citasAgenda.length);
   const sillonesLibres = nSillones != null
     ? Math.max(0, nSillones - enSillon)
     : null;
@@ -1097,7 +1162,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     if (!Number.isFinite(t)) return false;
     return (Date.now() - t) <= 30 * 86400000;
   }).length;
-  const todaClinica = sedeSinFiltroSrv ? <span className="dc-pg__toda" title="Cifra de toda la clínica: el servidor aún no la filtra por sede.">toda la clínica</span> : null;
+  // Rótulo de lo que, con una sede elegida, sigue siendo de toda la clínica (sale de
+  // /gerencial/indicadores, que no lo filtra por sede: alertas y, sin /caja, la deuda).
+  const todaClinica = sedeElegida ? <span className="dc-pg__toda" title="Cifra de toda la clínica: el servidor aún no la filtra por sede.">toda la clínica</span> : null;
   const subHead = [
     nSedes != null ? `${nSedes} sede${nSedes === 1 ? "" : "s"}` : null,
     "datos al día de hoy",
@@ -1135,15 +1202,11 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
 
   return (
     <div className="dc-pg">
-      {sedeSinFiltroSrv && (
-        <div className="fm-aviso-edad is-info dc-pg__aviso-sede" role="note">
-          <Info size={15} strokeWidth={2} />
-          <span><b>Cifras de toda la clínica: el servidor aún no filtra por sede.</b> Los bloques marcados «toda la clínica» (Facturado del mes, Meta, Top de tratamientos, Requiere acción, Antigüedad de la deuda, Producción por especialidad, Aceptación de planes y Producción por tratamiento) siguen mostrando toda la clínica. Caja del día, Hoy en la clínica, Salidas, Top del equipo, Ocupación y Cartera sí son de la sede elegida.</span>
-        </div>
-      )}
-
+      {/* R6-02: ya no va el aviso general de cifras sin filtrar por sede: el servidor filtra
+          kpis, tratamientos y comisiones. Lo poco que sigue sin filtrar lleva su propio
+          rótulo «toda la clínica». */}
       {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
-      <ResumenMes kd={kd} sedes={verSedes} sedesApi={sedesApi} recarga={nRecarga} onReintentar={reintentar} acciones={<div className="dc-head-acc" title={subHead}>
+      <ResumenMes kd={kd} sedes={verSedes} sedesApi={sedesApi} recarga={nRecarga} onReintentar={reintentar} medicosSede={medicosSede} acciones={<div className="dc-head-acc" title={subHead}>
           <button type="button" className="dc-rm__ib" aria-label="Actualizar" title="Actualizar datos" onClick={reintentar}><RefreshCw size={15} strokeWidth={2} /></button>
           <button type="button" className="dc-rm__ib" aria-label="Qué mide cada gráfico" title="Qué mide cada gráfico" onClick={() => abrir({
             t: "Qué mide cada gráfico",
@@ -1216,7 +1279,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
             <h2>Hoy en la clínica</h2>
-            <span className="dc-card__meta">{citasErr ? nd({ texto: "Agenda no disponible" }) : <>{pluralEs(citasHoy.length, "cita", "citas")} en agenda</>}</span>
+            <span className="dc-card__meta" title={citasHoy.length > citasAgenda.length ? `Sin contar ${pluralEs(citasHoy.length - citasAgenda.length, "cita cancelada", "citas canceladas")}` : undefined}>{citasErr ? nd({ texto: "Agenda no disponible" }) : <>{pluralEs(citasAgenda.length, "cita", "citas")} en agenda</>}</span>
             <button type="button" className="dc-hoy__ver" onClick={() => { window.location.hash = "#/agenda"; }}>Ver agenda</button>
           </div>
           <div className="dc-card__body">
@@ -1238,8 +1301,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <span className="dc-hoy__ico" style={{ background: "var(--dc-ok-100)", color: "var(--dc-ok-700)" }} aria-hidden="true">$</span>
           <div className="dc-hoy__tb">
             <div className="dc-hoy__tl">Producción del día</div>
-            <div className="dc-hoy__tv">{(sedeSinFiltroSrv ? citasErr : kpisErr) ? "—" : moneyFmt(prodDia)}</div>
-            <div className="dc-hoy__ts">{citasErr ? "Agenda no disponible" : <>{citasHoy.filter((c) => c.estado === "atendida").length} de {pluralEs(citasHoy.length, "cita", "citas")} atendidas</>}</div>
+            <div className="dc-hoy__tv">{kpisErr ? "—" : moneyFmt(prodDia)}</div>
+            <div className="dc-hoy__ts">{citasErr ? "Agenda no disponible" : <>{citasHoy.filter((c) => c.estado === "atendida").length} de {pluralEs(citasAgenda.length, "cita", "citas")} atendidas</>}</div>
           </div>
         </div>
 
@@ -1304,17 +1367,19 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--dc-danger-700)" }} />
-          <h2>Requiere acción{todaClinica}</h2>
-          <span className="dc-card__meta">{indErr ? nd() : `${alertas.length} asuntos abiertos`}</span>
+          <h2>Requiere acción</h2>
+          <span className="dc-card__meta">{indErr ? nd() : `${pluralEs(alertas.length, "asunto abierto", "asuntos abiertos")}`}</span>
           <button type="button" className="dc-info" aria-label="Asuntos"
             onClick={() => abrir({
               t: "Requiere acción",
               s: "Lo que no puede esperar",
               cifra: indErr ? "—" : String(alertas.length),
               parte: indErr ? undefined : "asuntos",
-              como: "Saldos vencidos, cajas abiertas, stock bajo y evoluciones pendientes.",
+              como: deudaCaja
+                ? "Trabajo terminado hace más de 30 días sin cobrar (de Caja, por la sede que se ve), stock bajo y evoluciones pendientes. Los asuntos marcados «toda la clínica» el servidor aún no los separa por sede."
+                : "Saldos vencidos, cajas abiertas, stock bajo y evoluciones pendientes.",
               cols: [["Asunto"], ["Detalle"]],
-              filas: alertas.map((a) => [a.titulo || a.tipo || "—", a.detalle || a.mensaje || "—"]),
+              filas: alertas.map((a) => [`${a.titulo || a.tipo || "—"}${a._toda ? " (toda la clínica)" : ""}`, a.detalle || a.mensaje || "—"]),
               vacio: indErr ? "No se pudieron leer los asuntos abiertos del servidor." : "Sin asuntos abiertos.",
               tono: "riesgo",
             })}>i</button>
@@ -1325,7 +1390,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               {indErr ? nd({ bloque: true, detalle: "No se pudieron leer los asuntos abiertos." })
                 : !alertas.length && <div className="dc-vacio-mod">Nada pendiente por ahora.</div>}
               {alertas.map((a, i) => {
-                const riesgo = /vencid|caja|cerrar|saldo/i.test(String(a.titulo || a.tipo || ""));
+                const riesgo = a.severidad === "alta" || /vencid|caja|cerrar|saldo/i.test(String(a.titulo || a.tipo || ""));
                 return (
                   <div className="dc-pgacc" key={i} role="button" tabIndex={0}
                     onClick={() => abrir({
@@ -1334,13 +1399,14 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                       cifra: a.monto != null ? moneyFmt(a.monto) : (a.cantidad != null ? String(a.cantidad) : "—"),
                       como: "Alerta generada a partir del estado actual de la clínica.",
                       cols: [["Campo"], ["Valor"]],
-                      filas: Object.entries(a).filter(([k]) => !["titulo", "tipo"].includes(k)).slice(0, 6)
+                      filas: Object.entries(a).filter(([k]) => !["titulo", "tipo", "_toda"].includes(k)).slice(0, 6)
                         .map(([k, v]) => [k, String(v)]),
+                      nota: a._toda ? "Asunto de toda la clínica: el servidor aún no lo separa por sede" : undefined,
                       tono: riesgo ? "riesgo" : "aviso",
                     })}>
                     <span className="rail" style={{ background: riesgo ? "var(--dc-danger-700)" : "var(--dc-warn-600)" }} />
                     <div className="dc-pgacc__txt">
-                      <h3>{a.titulo || a.tipo || "Asunto"}</h3>
+                      <h3>{a.titulo || a.tipo || "Asunto"}{a._toda && todaClinica}</h3>
                       <p>{a.detalle || a.mensaje || ""}</p>
                     </div>
                     {(() => { const dest = destinoAlerta(a); const txt = a.monto != null ? moneyFmt(a.monto) : (a.cantidad ?? a.chip ?? "Ver"); return dest
@@ -1351,15 +1417,27 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               })}
             </div>
             <div className="dc-split__rule">
-              <p className="dc-rotulo">Antigüedad de la deuda{indErr ? "" : ` – 100% = ${moneyFmt(agingTotal)}`}{todaClinica}</p>
-              {indErr ? nd({ bloque: true, detalle: "Sin este dato no se sabe cuánto saldo hay en cada tramo." }) : <>
+              <p className="dc-rotulo">Antigüedad de la deuda{agingErr ? "" : ` – 100% = ${moneyFmt(agingTotal)}`}{!deudaCaja && todaClinica}</p>
+              {agingErr ? nd({ bloque: true, detalle: "Sin este dato no se sabe cuánto saldo hay en cada tramo." }) : <>
               <StackSegs items={agingItems} total={agingTotal} />
               <div className="dc-leyenda">
                 {agingItems.map((it, i) => {
                   const lay = layoutProgreso(it.valor, agingTotal);
                   return (
                     <div key={i} className={`fila${lay.dibujar ? "" : " cero"} clic`} role="button" tabIndex={0}
-                      onClick={() => abrir({
+                      onClick={() => abrir(deudaCaja ? {
+                        t: it.nom,
+                        s: "Trabajo terminado sin cobrar, por antigüedad",
+                        cifra: moneyFmt(it.valor),
+                        parte: lay.dibujar ? lay.etiquetaPct : "sin saldo",
+                        como: "Procedimientos terminados que aún no se cobran (en Caja, «Listo para cobrar»), por los días que pasaron desde que se terminaron. Lo pagado se descuenta de lo más antiguo.",
+                        cols: [["Paciente"], ["Procedimiento"], ["Días", "n"], ["Por cobrar", "n"]],
+                        filas: (it.filas || []).map((x) => [x.paciente || "—", x.nombre || "—", x.dias != null ? String(x.dias) : "—", moneyFmt(x.pendiente, { dec: 2 })]),
+                        vacio: "Nada por cobrar en este tramo.",
+                        total: moneyFmt(it.valor, { dec: 2 }),
+                        fuente: `Caja de ${sedeElegida ? "la sede elegida" : "las sedes que ves"}. Saldo de los planes: ${moneyFmt(deudaCaja.saldoPlanes, { dec: 2 })}, que incluye lo que falta hacer.`,
+                        tono: i >= 3 ? "riesgo" : i >= 1 ? "aviso" : "ok",
+                      } : {
                         t: it.nom,
                         s: "Tramo de antigüedad del saldo",
                         cifra: moneyFmt(it.valor),
@@ -1368,6 +1446,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                         cols: [["Tramo"], ["Saldo", "n"]],
                         filas: [[it.nom, moneyFmt(it.valor)]],
                         total: moneyFmt(it.valor),
+                        nota: sedeElegida ? "Cifra de toda la clínica: el servidor aún no la filtra por sede" : undefined,
                         tono: i >= 3 ? "riesgo" : i >= 1 ? "aviso" : "ok",
                       })}>
                       <i className="sw" style={{ background: lay.dibujar ? it.color : "var(--dc-line-alt, var(--dc-line))" }} />
@@ -1378,6 +1457,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                   );
                 })}
               </div>
+              {/* El 100 % es lo hecho sin cobrar; el saldo de los planes (Caja › Por cobrar) va aparte. */}
+              {deudaCaja && <p className="dc-card__foot" style={{ margin: "var(--dc-sp-3) 0 0", padding: 0, border: 0 }}>Trabajo terminado sin cobrar, por días desde que se terminó. {deudaCaja.saldoPlanes > 0 ? <>Saldo de los planes en Caja: <b>{moneyFmt(deudaCaja.saldoPlanes, { dec: 2 })}</b> ({pluralEs(deudaCaja.pacientesConSaldo, "paciente", "pacientes")}), que incluye lo que falta hacer.</> : "Caja no tiene saldos de planes por cobrar."}</p>}
               </>}
             </div>
           </div>
@@ -1389,7 +1470,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <section className="dc-card">
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g2)" }} />
-            <h2>Producción por especialidad{todaClinica}</h2>
+            <h2>Producción por especialidad</h2>
             <span className="dc-card__meta">{espErr ? "—" : `100% = ${moneyFmt(espTotal)}`}</span>
             <button type="button" className="dc-info" aria-label="Especialidades"
               onClick={() => abrir({
@@ -1429,7 +1510,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <section className="dc-card">
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g3)" }} />
-            <h2>Aceptación de planes{todaClinica}</h2>
+            <h2>Aceptación de planes</h2>
             <span className="dc-card__meta">{indErr ? "—" : `${moneyFmt(propuesto)} presupuestado`}</span>
             <button type="button" className="dc-info" aria-label="Planes"
               onClick={() => abrir({
@@ -1498,7 +1579,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--g1)" }} />
-          <h2>{conectado ? "Producción por tratamiento" : "Odontología general – por tratamiento"}{todaClinica}</h2>
+          <h2>{conectado ? "Producción por tratamiento" : "Odontología general – por tratamiento"}</h2>
           <span className="dc-card__meta">{tratErr ? "—" : tratTotal > 0 ? `100% = ${moneyFmt(tratTotal)}` : "Sin datos aún"}</span>
           {tratTotal <= 0 && !tratErr && (
             <span className="marca-demo" title="Sin ventas enlazadas a servicio del catálogo">sin desglose aún</span>
@@ -1618,13 +1699,13 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
             onClick={() => abrir({
               t: "Flujo del día",
               s: "Pulso de la jornada, no un gráfico con ejes",
-              cifra: String(citasHoy.length),
+              cifra: String(citasAgenda.length),
               parte: "citas",
               sub: "Las partículas son ambiente: no codifican ninguna cifra.",
               como: "A la izquierda van las cifras exactas; el lienzo solo muestra el pulso agenda → sillón → cobro.",
               cols: [["Métrica"], ["Valor", "n"]],
               filas: [
-                ["Citas hoy", String(citasHoy.length)],
+                ["Citas hoy", String(citasAgenda.length)],
                 ["En sillón", String(enSillon)],
                 ["Atendidas", String(cobradas)],
                 ["Sillones libres", sillonesLibres != null && nSillones != null
@@ -1650,7 +1731,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                 <p className="dc-rotulo">{sinHorario ? "Franjas horarias: configura el horario de la clínica en Configuración." : "Hoy la clínica no abre."}</p>
               )}
               <dl className="dc-cifras">
-                <div className="dc-cifra"><dt>Citas hoy</dt><dd>{citasErr ? "—" : citasHoy.length}</dd></div>
+                <div className="dc-cifra"><dt>Citas hoy</dt><dd>{citasErr ? "—" : citasAgenda.length}</dd></div>
                 <div className="dc-cifra"><dt>En sillón</dt><dd>{citasErr ? "—" : enSillon}</dd></div>
                 <div className="dc-cifra"><dt>Cobradas</dt><dd>{citasErr ? "—" : cobradas}</dd></div>
                 <div className="dc-cifra">
@@ -1674,7 +1755,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           <div className="dc-card__head">
             <span className="vin" style={{ background: "var(--g3)" }} />
             <h2>Cartera de pacientes</h2>
-            <span className="dc-card__meta">{carteraErr ? "—" : `${totalCartera || cartera.activos || 0} pacientes`}</span>
+            {/* R6-07: con una sede elegida, los pacientes sin sede se cuentan en cada sede (como en
+                el directorio): se dice cuántos son, para que la suma de las sedes se entienda. */}
+            <span className="dc-card__meta" title={sedeElegida && dirPac?.sinSede ? "Los pacientes sin sede se ven en todas las sedes, como en el directorio de Pacientes. Asígnales su sede en su ficha." : undefined}>{carteraErr ? "—" : `${totalCartera || cartera.activos || 0} pacientes${sedeElegida && dirPac?.sinSede ? ` · ${dirPac.sinSede} sin sede` : ""}`}</span>
             <button type="button" className="dc-info" aria-label="Cartera"
               onClick={() => abrir({
                 t: "Cartera de pacientes",
@@ -1685,7 +1768,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                   ["Nuevos 30 d", String(nuevos30)],
                   ["Con saldo", String(conSaldo.length)],
                 ],
-                como: "Cada punto es un paciente. Rojo = con saldo; cian = nuevo; verde = al día.",
+                como: `Cada punto es un paciente. Rojo = con saldo; cian = nuevo; verde = al día.${sedeElegida && dirPac?.sinSede ? ` Incluye ${pluralEs(dirPac.sinSede, "paciente", "pacientes")} sin sede, que se ven en todas las sedes como en el directorio.` : ""}`,
                 cols: [["Paciente"], ["Saldo", "n"]],
                 filas: conSaldo.slice(0, 20).map((p) => [p.nombre, moneyFmt(p.saldo)]),
                 vacio: "Sin pacientes en cartera.",
@@ -1787,11 +1870,17 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
           Inventario valorizado{" "}
           <b>{inventarioValorizado != null ? moneyFmt(inventarioValorizado) : "—"}</b>
         </span>
-        <span>
+        {/* R6-08: con los chats a la vista, cada uno cuenta en una sola sede y los que aún no
+            tienen sede se dicen aparte (sede A + sede B + sin sede = total). Sin permiso de
+            WhatsApp vale la cifra del servidor, que con una sede elegida puede contar un chat en
+            más de una sede: se avisa en el título. */}
+        <span title={waChats ? "Chats con actividad en los últimos 30 días. Cada chat es de la sede del número que lo recibió o, si no se sabe, de la sede del paciente." : sedeElegida ? "Cifra del servidor: los chats aún no guardan su sede y el servidor los reparte por paciente, así que la suma de las sedes puede no dar el total de la clínica." : undefined}>
           WhatsApp{" "}
-          {waConversaciones || waAgendadas ? (
+          {waConversaciones || waAgendadas || waChats?.sinSede ? (
             <>
-              <b>{waConversaciones}</b> conversaciones – <b>{waAgendadas}</b> citas agendadas por ese canal
+              <b>{waConversaciones}</b> {waConversaciones === 1 ? "conversación" : "conversaciones"}{waChats ? (sedeElegida ? " de la sede" : " en 30 días") : ""}
+              {waChats?.sinSede ? <>{sedeElegida ? " + " : " ("}<b>{waChats.sinSede}</b> sin sede{sedeElegida ? " (de toda la clínica)" : ")"}</> : null}
+              {" – "}<b>{waAgendadas}</b> citas agendadas por ese canal
             </>
           ) : (
             <b>—</b>
@@ -1800,9 +1889,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <span>
           <b>{nSedes != null ? nSedes : "—"}</b> sede{nSedes === 1 ? "" : "s"}
           {" – "}
-          <b>{nSillones != null ? nSillones : "—"}</b> sillones
+          <b>{nSillones != null ? nSillones : "—"}</b> {nSillones === 1 ? "sillón" : "sillones"}
           {" – "}
-          <b>{ranking.length || "—"}</b> odontólogos
+          <b>{ranking.length || "—"}</b> {ranking.length === 1 ? "odontólogo" : "odontólogos"}
         </span>
       </div>
 
