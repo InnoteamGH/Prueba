@@ -24,6 +24,9 @@ import { useReglasAgenda, sillonesPorSede, conSedesDeHorario, horarioDefineSede 
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
 import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat, notaUltimoEnvioOk } from "./compartido/integraciones";
+import WhatsappPorSede from "./compartido/WhatsappPorSede";
+import { sedesDemoWhatsapp } from "./compartido/useSedesWhatsapp";
+import { filasWhatsappSedes } from "./compartido/whatsappSede";
 import { estadoCita, estadoInfo, estadoFaseUi, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
@@ -624,9 +627,19 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   // Con sesión solo se listan las que el servidor informa: WhatsApp (GET /whatsapp/salud) y
   // SUNAT (GET /facturacion-electronica/config). Pasarela, respaldo y correo no tienen
   // endpoint de estado, así que no se muestran (antes eran textos fijos «hace 2 min», «03:00»).
+  // WhatsApp por sede: si el servidor informa el estado de cada número (porSede), una fila por
+  // sede; si solo informa uno, se dice que es compartido y una fila «por activar» nombra las
+  // sedes sin número propio (mismo cálculo que Integraciones › WhatsApp por sede).
+  const waSedesTI = esTI ? filasWhatsappSedes({ sedes: conectado ? sedesDash : sedesDemoWhatsapp(), salud: conectado ? saludWa : { ok: true, semaforo: "verde" }, igual: mismaSede }) : null;
+  const sinNumeroTI = waSedesTI ? waSedesTI.filas.filter((f) => f.sinNumero) : [];
+  const filaSinNumeroTI = sinNumeroTI.length > 0 && (conectado ? sedesDash.length > 0 : true)
+    ? ["Números de WhatsApp por sede", "pendiente", `${sinNumeroTI.map((f) => f.nombre).join(", ")} sin número propio${waSedesTI.modo === "compartido" ? ": usan el compartido" : ""}.`] : null;
   const INTEGRACIONES_TI = conectado ? [
     // H-T4: mismo estado que Integraciones y WhatsApp + IA (compartido/integraciones.js).
-    saludWa && (() => { const w = estadoWhatsApp(saludWa); return ["WhatsApp Business API (Meta)", w.estado, w.detalle]; })(),
+    ...(saludWa && waSedesTI?.modo === "porSede"
+      ? waSedesTI.filas.filter((f) => !f.sinNumero).map((f) => [`WhatsApp · ${f.nombre}`, f.estado.estado, f.estado.detalle])
+      : [saludWa && (() => { const w = estadoWhatsApp(saludWa); return ["WhatsApp Business API (Meta)", w.estado, sinNumeroTI.length ? `${w.detalle} Número compartido por las sedes sin número propio.` : w.detalle]; })()]),
+    filaSinNumeroTI,
     // El motor de IA también se lista: Integraciones lo cuenta entre las activas.
     saludWa && iaConectada(saludWa) !== undefined && ["API de OpenAI (asistente IA)", iaConectada(saludWa) ? "operativo" : "pendiente", iaConectada(saludWa) ? "Clave cargada" : "Sin clave: responde el motor de reglas"],
     cfgSunat && (cfgSunat.proveedor ? ["Facturación electrónica (SUNAT)", "operativo", "Proveedor conectado"] : ["Facturación electrónica (SUNAT)", "pendiente", "Sin proveedor: comprobantes «Sin enviar»"]),
@@ -637,7 +650,8 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
                             // esta misma demostración dice que todavía no se envían.
                             proveedorSunat() ? ["Facturación electrónica (SUNAT)", "operativo", "Proveedor conectado"] : ["Facturación electrónica (SUNAT)", "pendiente", "Sin proveedor: comprobantes «Sin enviar»"],
                             ["Respaldo automático", "operativo", "Último backup 03:00 h"],
-                            ["Servidor de correo", "operativo", "Cola vacía"]];
+                            ["Servidor de correo", "operativo", "Cola vacía"],
+                            filaSinNumeroTI].filter(Boolean);
   const incidenciasTI = INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").length;
   const dias = [...Array(7)].map((_, i) => { const f = addDays(i - 6); return { v: citasMed.filter((c) => c.fecha === f).length, lbl: new Date(f + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short" }).slice(0, 2) }; });
   const estados = [
@@ -6788,6 +6802,9 @@ function Integraciones({ notify }) {
       {/* La conexión con SUNAT es tarea de TI: proveedor, credenciales, IGV y series. */}
       <div className="dc-int__sec"><h3>Facturación electrónica</h3><span>Proveedor, credenciales y series de cada sede</span></div>
       <ConexionSunat notify={notify} />
+      {/* WhatsApp por sede (pedido del cliente): cada sede atiende y envía desde su número. */}
+      <div className="dc-int__sec"><h3>WhatsApp por sede</h3><span>Cada sede recibe sus chats y envía sus recordatorios, confirmaciones y encuestas desde su propio número. Se configura en Configuración › Sedes.</span></div>
+      <WhatsappPorSede salud={conectado ? salud : { ok: true, semaforo: "verde" }} />
       <div className="dc-int__sec"><h3>Catálogo de integraciones</h3><span>Pagos, mensajería e IA y captación de pacientes. Toca una para ver cómo se conecta.</span></div>
       <div className="dc-us__roles" role="tablist" aria-label="Categoría">
         <button type="button" role="tab" aria-selected={catSel === "todas"} className={catSel === "todas" ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setCatSel("todas")}><Plug size={13} strokeWidth={2} /> Todas <i>{its.length}</i></button>
@@ -10999,7 +11016,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     const uuid = sedeApiUuid(sedeActiva);
     const deSedes = () => {
       const sd = sedesOrg.find((x) => String(x.id) === String(uuid) || String(x.id) === String(sedeActiva)) || {};
-      return { sedes: [{ nombre: sd.nombre, direccion: sd.direccion, telefonos: sd.telefono, horario: sd.horario, correo: sd.email }] };
+      return { sedes: [{ nombre: sd.nombre, direccion: sd.direccion, telefonos: sd.telefono, horario: sd.horario, correo: sd.email, whatsappNumero: sd.whatsappNumero }] };
     };
     Promise.allSettled([api.clinica.impresion(uuid), api.clinica.get()]).then(([imp, cli]) => {
       if (!vivo) return;

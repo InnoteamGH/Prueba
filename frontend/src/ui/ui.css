@@ -5565,3 +5565,26 @@ button, input, select, textarea { font-family: inherit; }
 .dc-btn-pdf.is-chico .dc-btn-pdf__tag { font-size: 9px; padding: 2px 6px; }
 @media (max-width: 560px) { .dc-btn-pdf__tag { display: none; } }
 @media print { .dc-btn-pdf { display: none !important; } }
+
+/* ── WhatsApp por sede ──
+   Configuración › Sedes (número de cada sede), Integraciones › WhatsApp por sede y el aviso
+   de Recordatorios. */
+.dc-emp__sede small.is-falta, .dc-cfg__sede small.is-falta { color: var(--dc-warn-600); }
+.dc-wasd { padding: 4px 0; overflow: hidden; }
+.dc-wasd__comp { display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: #F3FBF7; border-bottom: 1px solid var(--dc-line); color: #15803D; }
+.dc-wasd__comp > div { flex: 1; display: grid; gap: 1px; min-width: 0; }
+.dc-wasd__comp b { font-size: 14px; font-weight: 700; color: var(--dc-ink-900); font-variant-numeric: tabular-nums; }
+.dc-wasd__comp small { font-size: 12px; color: var(--dc-ink-500); }
+.dc-wasd__fila { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid var(--dc-bg); }
+.dc-wasd__comp + .dc-wasd__fila, .dc-wasd > .dc-wasd__fila:first-child { border-top: 0; }
+.dc-wasd__ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #EAF6F6; color: #0A6C76; }
+.dc-wasd__txt { display: grid; gap: 2px; min-width: 0; }
+.dc-wasd__txt b { font-size: 14px; font-weight: 700; color: var(--dc-ink-900); }
+.dc-wasd__txt small { font-size: 12px; color: var(--dc-ink-500); }
+.dc-wasd__num { font-size: 13px; font-weight: 600; color: var(--dc-ink-900); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dc-wasd__num.is-comp { color: var(--dc-ink-400); font-weight: 500; }
+.dc-wasd .dc-cfg__nada { padding: 14px 18px; margin: 0; }
+@media (max-width: 640px) {
+  .dc-wasd__fila { grid-template-columns: 34px minmax(0, 1fr) auto; }
+  .dc-wasd__num { grid-column: 2 / 4; grid-row: 2; }
+}

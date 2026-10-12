@@ -9,7 +9,7 @@
    siguen siendo la fuente única de verdad; solo cambiaron de archivo. No
    renombres claves, solo valores (misma regla que antes).
    ============================================================================ */
-import { abrirDocumento, datosImpresion } from "./util/membrete";
+import { abrirDocumento, datosImpresion, telefonosConWhatsapp } from "./util/membrete";
 import { estadoInfo, ESTADOS } from "./compartido/estados.js";
 import { registrarSedes, sedesRegistradas, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { ymdLima } from "./util/fechaLima";
@@ -498,7 +498,7 @@ async function exportarExcelMembrete({ archivo, hoja, titulo, subtitulo, columna
   fila(1, e.nombre || "Clínica", { name: "Calibri", size: 16, bold: true, color: { argb: TINTA } }, 22);
   fila(2, [e.razonSocial, e.ruc ? `RUC ${e.ruc}` : ""].filter(Boolean).join("  ·  "), { size: 10, color: { argb: GRIS } });
   fila(3, [s.nombre, s.direccion].filter(Boolean).join("  ·  "), { size: 10, color: { argb: GRIS } });
-  fila(4, [s.telefonos, s.correo || e.web].filter(Boolean).join("  ·  "), { size: 10, color: { argb: GRIS } });
+  fila(4, [telefonosConWhatsapp(s), s.correo || e.web].filter(Boolean).join("  ·  "), { size: 10, color: { argb: GRIS } });
   // Línea de la marca bajo el membrete.
   for (let c = 1; c <= n; c++) ws.getCell(5, c).border = { bottom: { style: "medium", color: { argb: MARCA } } };
   ws.getRow(5).height = 6;

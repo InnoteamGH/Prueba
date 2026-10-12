@@ -340,7 +340,8 @@ export const api = {
     metricas: () => request("GET", "/whatsapp/metricas"),
     getInstrucciones: () => request("GET", "/whatsapp/instrucciones"),
     setInstrucciones: (payload) => request("PUT", "/whatsapp/instrucciones", typeof payload === "string" ? { instrucciones: payload } : payload),
-    salud: () => request("GET", "/whatsapp/salud"),
+    // sedeId (opcional): estado del número de esa sede, si el servidor lo acepta (WhatsApp por sede).
+    salud: (sedeId) => request("GET", `/whatsapp/salud${conQuery({ sedeId })}`),
     conexion: () => request("GET", "/whatsapp/conexion"),
   },
   goLive: () => request("GET", "/go-live"),

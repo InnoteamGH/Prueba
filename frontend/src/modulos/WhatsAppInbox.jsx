@@ -1,10 +1,10 @@
 /* Módulo WhatsApp + IA (inbox, agente, configuración del asistente).
    Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useContext, useState, useEffect, useRef } from "react";
-import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
+import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MapPin, MessageCircle, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
-import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, HORARIO_DEF, INK, Modal, NAVY, RED, hoy, nombreSede, tint, useSede} from "../comun";
+import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, HORARIO_DEF, INK, Modal, NAVY, RED, Select, hoy, mismaSede, nombreSede, tint, useSede} from "../comun";
 import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 import { AgendarRecepcionModal, CamposPacienteRapido, PAC_RAPIDO_VACIO, celular9, registrarPacienteRapido, validarPacienteRapido } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
@@ -12,6 +12,8 @@ import { proximaCita, cuentaPaciente } from "../compartido/metricas";
 import { fichaDeSede, sedeEnLista } from "../compartido/cajaSede";
 import { datosImpresion } from "../util/membrete";
 import { tienePermiso } from "../compartido/permisos";
+import { sedesDemoWhatsapp } from "../compartido/useSedesWhatsapp";
+import { formatearWhatsappPe, numeroDeSalida, numeroRecibido, sedeDeConversacion, sedeDePacienteObj, whatsappDeSede } from "../compartido/whatsappSede";
 import "./whatsappInbox.css";
 
 function respuestaAgente(texto, ctx) {
@@ -53,6 +55,8 @@ const haceDias = (n, hm) => { const d = new Date(); d.setDate(d.getDate() - n); 
 const haceMin = (n) => new Date(Date.now() - n * 60000).toISOString();
 // El asistente saluda con el nombre de la clínica de Configuración (el mismo de los documentos).
 const nombreClinica = () => datosImpresion()?.empresa?.nombre || "la clínica";
+// WhatsApp por sede: cada chat llega al número de una sede (numeroSede). El de Rosa Linares
+// no lo trae y se asigna por la sede de su ficha, como pasa con los chats antiguos.
 const CHATS_INIT = [
   { id: 1, nombre: "Rosa Linares", tel: "+51 987 654 321", modo: "ia", noLeidos: 0, actualizado: haceMin(18), msgs: [
     { de: "paciente", txt: "Hola buenas tardes", ts: haceMin(21) },
@@ -60,17 +64,17 @@ const CHATS_INIT = [
     { de: "paciente", txt: "Quiero una cita para limpieza", ts: haceMin(18) },
     { de: "ia", txt: "¡Con gusto! Una limpieza cuesta S/ 80. Tengo cupo mañana 09:00 con la Dra. Carla Mendoza en San Isidro. ¿Te lo reservo? 😊", ts: haceMin(18), tools: ["consultar_precio","ver_disponibilidad"] },
   ] },
-  { id: 2, nombre: "Jorge Núñez", tel: "+51 912 887 445", modo: "ia", noLeidos: 2, actualizado: haceDias(1, "13:50"), msgs: [
+  { id: 2, nombre: "Jorge Núñez", tel: "+51 912 887 445", numeroSede: "51986402117", modo: "ia", noLeidos: 2, actualizado: haceDias(1, "13:50"), msgs: [
     { de: "paciente", txt: "cuánto cuestan los brackets?", ts: haceDias(1, "13:45") },
     { de: "ia", txt: "Una consulta de Ortodoncia cuesta S/ 150. Ahí el especialista evalúa tu caso y te da el plan. ¿Te agendo? 😊", ts: haceDias(1, "13:45"), tools: ["consultar_precio"] },
     { de: "paciente", txt: "sí porfa para el sábado", ts: haceDias(1, "13:50") },
   ] },
-  { id: 3, nombre: "Ana Beltrán", tel: "+51 998 112 334", modo: "humano", noLeidos: 1, actualizado: haceDias(3, "12:30"), msgs: [
+  { id: 3, nombre: "Ana Beltrán", tel: "+51 998 112 334", numeroSede: "51997091083", modo: "humano", noLeidos: 1, actualizado: haceDias(3, "12:30"), msgs: [
     { de: "paciente", txt: "Estoy muy molesta, esperé 1 hora y no me atendieron", ts: haceDias(3, "12:30") },
     { de: "ia", txt: "Uy, lamento muchísimo la espera, de verdad no debió pasar 🙏 Ya estoy coordinando con el área de atención al paciente para resolverlo; te escriben enseguida por aquí.", ts: haceDias(3, "12:30"), tools: ["derivar_area"] },
     { de: "sistema", txt: "— Conversación derivada al área de atención al paciente —", ts: haceDias(3, "12:30") },
   ] },
-  { id: 4, nombre: "Luis Palacios", tel: "+51 945 330 218", modo: "ia", noLeidos: 0, actualizado: haceDias(12, "10:15"), msgs: [
+  { id: 4, nombre: "Luis Palacios", tel: "+51 945 330 218", numeroSede: "51986402117", modo: "ia", noLeidos: 0, actualizado: haceDias(12, "10:15"), msgs: [
     { de: "paciente", txt: "¿Atienden los domingos?", ts: haceDias(12, "10:14") },
     { de: "ia", txt: "Atendemos de lunes a sábado de 08:00 a 18:00 🕗 ¿Te busco un horario?", ts: haceDias(12, "10:15") },
   ] },
@@ -80,7 +84,7 @@ function WhatsAppInbox({ notify = () => {} }) {
   const conectado = !!auth.token;
   // Sede: la cita y el paciente nuevo se registran en la sede activa; la ficha, la próxima
   // cita y el saldo solo se muestran si el paciente es de las sedes que se ven.
-  const { activa, ids: sedesWa, pacientes: pacVisibles, citas: citasVisibles } = useSede();
+  const { activa, ids: sedesWa, pacientes: pacVisibles, citas: citasVisibles, enSede } = useSede();
   const [chats, setChats] = useState(conectado ? [] : CHATS_INIT);
   const [agendar, setAgendar] = useState(null);   // base del modal de agendado: { canal, motivo, sedeId, pacienteId | telefono }
   // «Agendar cita» abre siempre el modal de recepción (demo y con sesión): con el paciente
@@ -282,7 +286,9 @@ function WhatsAppInbox({ notify = () => {} }) {
     // La identidad de la conversación es el contacto (nombre de perfil de WhatsApp), NO un paciente.
     const pacs = Array.isArray(c.pacientes) ? c.pacientes : (c.pacienteId ? [{ id: c.pacienteId, nombre: c.pacienteNombre, proximaCita: c.proximaCita, ultimaCita: c.ultimaCita }] : []);
     const nombre = c.nombreContacto || c.pacienteNombre || c.telefono;
-    return { id: c.id, nombre, tel: c.telefono, modo: c.modo || "ia", ejemplo: !!c.ejemplo, creado: c.creadoEn, actualizado: c.actualizadoEn, esPaciente: !!c.esPaciente, pacienteId: c.pacienteId || null, pacienteNombre: c.pacienteNombre || null, pacientes: pacs, ultimoMensaje: c.ultimoMensaje || null, porResponder: c.porResponder || 0, proximaCita: c.proximaCita || null, ultimaCita: c.ultimaCita || null, msgs: [] };
+    // WhatsApp por sede: la sede del chat (sedeId) y el número de la clínica que lo recibió,
+    // si el servidor ya los manda (numeroSede, numeroClinica o telefonoClinica).
+    return { id: c.id, nombre, tel: c.telefono, modo: c.modo || "ia", ejemplo: !!c.ejemplo, creado: c.creadoEn, actualizado: c.actualizadoEn, esPaciente: !!c.esPaciente, pacienteId: c.pacienteId || null, pacienteNombre: c.pacienteNombre || null, pacientes: pacs, ultimoMensaje: c.ultimoMensaje || null, porResponder: c.porResponder || 0, proximaCita: c.proximaCita || null, ultimaCita: c.ultimaCita || null, sedeId: c.sedeId ?? null, numeroSede: numeroRecibido(c) || "", msgs: [] };
   };
   const cargarMensajes = (id) => {
     if (!conectado || !id) return;
@@ -511,11 +517,63 @@ function WhatsAppInbox({ notify = () => {} }) {
     return [...out, ...fijas];
   })();
 
+  // ── WhatsApp por sede ──
+  // Cada chat es de la sede del número que lo recibió: sedeId del chat; si no, su número
+  // cruzado con el whatsappNumero de las sedes; si no, la sede del paciente; si no, «Sin sede».
+  const [sedesDemoWa] = useState(() => (conectado ? [] : sedesDemoWhatsapp()));
+  const sedesWaLista = conectado ? sedesReales : sedesDemoWa;
+  // Con sesión, la sede de los pacientes de los chats que no traen ni sede ni número (hoy,
+  // todos): GET /pacientes una sola vez, solo si hace falta y el rol puede ver pacientes.
+  const [pacSedeApi, setPacSedeApi] = useState({});
+  const pidiendoPac = useRef(false);
+  const faltaSedePac = conectado && chats.some((c) => (c.sedeId == null || c.sedeId === "") && !c.numeroSede && (c.pacienteId || (c.pacientes || []).length));
+  useEffect(() => {
+    if (!faltaSedePac || pidiendoPac.current || !tienePermiso("pacientes", "ver")) return;
+    pidiendoPac.current = true;
+    api.pacientes.listar().then((ps) => setPacSedeApi(Object.fromEntries((Array.isArray(ps) ? ps : []).map((p) => [String(p.id), sedeDePacienteObj(p)]).filter(([, s]) => s != null)))).catch(() => {});
+  }, [faltaSedePac]);
+  const sedeDePacienteChat = (c) => {
+    if (!conectado) return sedeDePacienteObj(pacDeChat(c));
+    const conSede = (c.pacientes || []).find((p) => sedeDePacienteObj(p) != null);
+    if (conSede) return sedeDePacienteObj(conSede);
+    const pid = c.pacienteId || ((c.pacientes || []).length === 1 ? c.pacientes[0].id : null);
+    return pid ? (pacSedeApi[String(pid)] ?? sedeDePacienteObj(ctx360[pid]?.paciente)) : null;
+  };
+  const sedeDe = (c) => sedeDeConversacion(c, { sedes: sedesWaLista, sedeDePaciente: sedeDePacienteChat, igual: mismaSede });
+  const nomCorto = (n) => String(n || "").replace(/^Sede\s+/i, "");
+  const nomSedeChat = (x) => (x.sedeId == null ? "Sin sede" : x.sede?.nombre || nombreSede(x.sedeId));
+  // Sedes que se ven (filtro del menú) y filtro propio de la bandeja cuando son varias.
+  const sedesVisWa = (sedesWaLista || []).filter((s) => s.activa !== false && enSede(s.id));
+  const [filtroSede, setFiltroSede] = useState("todas");   // todas | sin | id de sede
+  useEffect(() => { if (filtroSede !== "todas" && filtroSede !== "sin" && !sedesVisWa.some((s) => String(s.id) === String(filtroSede))) setFiltroSede("todas"); }, [sedesVisWa.map((s) => s.id).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // El filtro del menú esconde los chats de otras sedes solo si su sede es segura (la del chat
+  // o la del número que lo recibió). La sede deducida de la ficha del paciente se muestra,
+  // pero no esconde el chat: hoy todos llegan al mismo número.
+  const chatEnMenu = (x) => x.sedeId == null || x.origen === "paciente" || enSede(x.sedeId);
+  const chatEnFiltroSede = (x) => filtroSede === "todas" || (filtroSede === "sin" ? x.sedeId == null : mismaSede(x.sedeId, filtroSede));
+  const numCompartido = conectado ? (salud?.numero || conexion?.numero || "") : "";
+  // Desde qué número sale lo que se escribe en este chat: el que lo recibió, el de su sede o el compartido.
+  const salidaDe = (c) => { const x = sedeDe(c); return { ...x, ...numeroDeSalida({ sedeId: x.sedeId, recibido: c?.numeroSede, sedes: sedesWaLista, compartido: numCompartido, igual: mismaSede }) }; };
+  const textoSalida = (c) => { const s = salidaDe(c); return s.numero ? `${formatearWhatsappPe(s.numero)}${s.compartido ? " (número compartido)" : s.sedeId != null ? ` · ${nomSedeChat(s)}` : ""}` : "el número de WhatsApp de la clínica"; };
+  // Cabecera: «Número de la sede: +51…» de la sede elegida (o la única que se ve); con varias,
+  // el de cada una.
+  const sedeFocoWa = filtroSede !== "todas" && filtroSede !== "sin" ? sedesVisWa.find((s) => String(s.id) === String(filtroSede)) : sedesVisWa.length === 1 ? sedesVisWa[0] : null;
+  const lineaNumeroWa = (() => {
+    if (sedeFocoWa) { const n = numeroDeSalida({ sedeId: sedeFocoWa.id, sedes: sedesVisWa, compartido: numCompartido, igual: mismaSede }); return n.numero ? `Número de la sede: ${formatearWhatsappPe(n.numero)}${n.compartido ? " (compartido por todas las sedes)" : ""}` : "Número de la sede: sin número propio"; }
+    if (sedesVisWa.some((s) => whatsappDeSede(s))) return `Números de las sedes: ${sedesVisWa.map((s) => `${nomCorto(s.nombre)} ${whatsappDeSede(s) ? formatearWhatsappPe(whatsappDeSede(s)) : numCompartido ? `${formatearWhatsappPe(numCompartido)} (compartido)` : "sin número propio"}`).join(" · ")}`;
+    return numCompartido ? `Número de la sede: ${formatearWhatsappPe(numCompartido)} (compartido por todas las sedes)` : "";
+  })();
+
   const FILTROS = [["todos", "Todos"], ["pendientes", "Pendientes"], ["ia", "IA"], ["humano", "Recepción"]];
   const normQ = (s) => String(s || "").replace(/\D/g, "");
   // Más reciente arriba, como en WhatsApp.
   const porFecha = (a, b) => String(b.actualizado || "").localeCompare(String(a.actualizado || ""));
-  const lista = [...chats].sort(porFecha).filter((c) => {
+  // Chats de las sedes que se ven (menú y filtro de sede): sobre ellos cuentan los filtros.
+  const chatsSede = chats.filter((c) => { const sx = sedeDe(c); return chatEnMenu(sx) && chatEnFiltroSede(sx); });
+  const idsSedeKey = chatsSede.map((c) => c.id).join(",");
+  // Si el chat abierto queda fuera de la sede elegida, se abre el primero que sí está.
+  useEffect(() => { if (activo != null && !chatsSede.some((c) => c.id === activo)) setActivo(chatsSede.length ? [...chatsSede].sort(porFecha)[0].id : null); }, [filtroSede, (sedesWa || []).join(","), idsSedeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lista = [...chatsSede].sort(porFecha).filter((c) => {
     if (!(filtro === "todos" || (filtro === "pendientes" ? (c.porResponder || 0) > 0 : c.modo === filtro))) return false;
     const raw = q.trim();
     if (!raw) return true;
@@ -528,7 +586,7 @@ function WhatsAppInbox({ notify = () => {} }) {
     }
     return false;
   });
-  const busquedaActiva = q.trim() !== "" || filtro !== "todos";
+  const busquedaActiva = q.trim() !== "" || filtro !== "todos" || filtroSede !== "todas";
 
   return (
     <div>
@@ -583,12 +641,19 @@ function WhatsAppInbox({ notify = () => {} }) {
                 </div>
               )}
             </div>
+            {lineaNumeroWa && <div className="wa-lista__num" title={`${lineaNumeroWa}. Los pacientes de cada sede escriben a su número; las respuestas y los recordatorios salen desde ahí.`}><MessageCircle size={13} strokeWidth={2} /> <span>{lineaNumeroWa}</span></div>}
             <div style={{ position: "relative" }}>
               <span style={{ position: "absolute", left: 10, top: 9, color: "var(--dc-ink-400)" }}><Search size={15} strokeWidth={1.75} /></span>
               <input className="dc-premium-inp" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar contacto o número" style={{ width: "100%", padding: "8px 10px 8px 32px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, outline: "none", boxSizing: "border-box", color: NAVY }} />
             </div>
+            {sedesVisWa.length > 1 && (
+              <div className="wa-lista__sede">
+                <Select small ariaLabel="Sede de los chats" value={filtroSede} onChange={setFiltroSede}
+                        options={[{ value: "todas", label: "Todas las sedes" }, ...sedesVisWa.map((s) => ({ value: String(s.id), label: s.nombre || "Sede" })), ...(chats.some((c) => sedeDe(c).sedeId == null) ? [{ value: "sin", label: "Sin sede" }] : [])]} />
+              </div>
+            )}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {FILTROS.map(([k, l]) => { const on = filtro === k; const n = k === "pendientes" ? chats.filter((c) => (c.porResponder || 0) > 0).length : k === "ia" ? chats.filter((c) => c.modo === "ia").length : k === "humano" ? chats.filter((c) => c.modo !== "ia").length : 0; return (
+              {FILTROS.map(([k, l]) => { const on = filtro === k; const n = k === "pendientes" ? chatsSede.filter((c) => (c.porResponder || 0) > 0).length : k === "ia" ? chatsSede.filter((c) => c.modo === "ia").length : k === "humano" ? chatsSede.filter((c) => c.modo !== "ia").length : 0; return (
                 <button key={k} onClick={() => setFiltro(k)} style={{ padding: "5px 10px", borderRadius: "var(--dc-r-full)", border: on ? "1.5px solid var(--dc-accent-cyan)" : "1.5px solid var(--dc-line)", background: on ? (tint(DS.c.primary, 0.071)) : "var(--dc-white)", color: on ? DS.c.primary : "var(--dc-ink-400)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>{l}{n > 0 && <span className="wa-filtro__n">{n}</span>}</button>
               ); })}
             </div>
@@ -601,8 +666,8 @@ function WhatsAppInbox({ notify = () => {} }) {
             {conectado && listLoaded && !listLoading && !listError && lista.length === 0 && chats.length === 0 && (
               <div style={{ padding: "28px 18px", textAlign: "center", color: "var(--dc-ink-500)", fontSize: 13 }}>Aún no hay conversaciones de WhatsApp. Cuando un paciente escriba, aparecerá aquí.</div>
             )}
-            {conectado && listLoaded && !listLoading && !listError && lista.length === 0 && chats.length > 0 && busquedaActiva && (
-              <div style={{ padding: "28px 18px", textAlign: "center", color: "var(--dc-ink-500)", fontSize: 13 }}>Ningún chat coincide con la búsqueda o filtro.</div>
+            {conectado && listLoaded && !listLoading && !listError && lista.length === 0 && chats.length > 0 && (busquedaActiva || chatsSede.length === 0) && (
+              <div style={{ padding: "28px 18px", textAlign: "center", color: "var(--dc-ink-500)", fontSize: 13 }}>{busquedaActiva ? "Ningún chat coincide con la búsqueda o filtro." : "No hay chats de la sede que estás viendo."}</div>
             )}
             {!conectado && lista.length === 0 && (
               <div style={{ padding: "28px 18px", textAlign: "center", color: "var(--dc-ink-500)", fontSize: 13 }}>Sin conversaciones.</div>
@@ -610,7 +675,8 @@ function WhatsAppInbox({ notify = () => {} }) {
             {lista.map((c) => (
               <button key={c.id} onClick={() => seleccionar(c.id)} className={`wa-item${activo === c.id ? " is-on" : ""}`}>
                 <div className="wa-av" style={{ "--av": colorDe(c.nombre) }}>{inicial(c.nombre)}</div>
-                {/* Dos líneas como en WhatsApp: nombre + hora arriba; último mensaje + estado abajo. */}
+                {/* Dos líneas como en WhatsApp: nombre + hora arriba; último mensaje + estado abajo.
+                    Con varias sedes, una tercera con la sede del chat (WhatsApp por sede). */}
                 <div className="wa-item__cuerpo">
                   <div className="wa-item__fila">
                     <span className="wa-item__nom">{c.nombre}</span>
@@ -623,6 +689,10 @@ function WhatsAppInbox({ notify = () => {} }) {
                     <span className={`wa-item__modo${c.modo === "ia" ? "" : " is-rec"}`}>{c.modo === "ia" ? "IA" : "Recepción"}</span>
                     {(conectado ? c.porResponder : c.noLeidos) > 0 && <span className="wa-item__nuevos" title="Mensajes sin leer">{conectado ? c.porResponder : c.noLeidos}</span>}
                   </div>
+                  {(sedesWaLista || []).length !== 1 && (() => { const sx = sedeDe(c); return (
+                    <div className="wa-item__fila">
+                      <span className={`wa-item__sede${sx.sedeId == null ? " is-sin" : ""}`} title={sx.sedeId == null ? "No se sabe a qué número de la clínica llegó este chat" : sx.origen === "paciente" ? `${nomSedeChat(sx)}: sede de la ficha del paciente` : `${nomSedeChat(sx)}${sx.numero ? `: llegó al ${formatearWhatsappPe(sx.numero)}` : ""}`}><MapPin size={10} strokeWidth={2.4} />{sx.sedeId == null ? "Sin sede" : nomCorto(nomSedeChat(sx))}</span>
+                    </div>); })()}
                 </div>
               </button>
             ))}
@@ -637,7 +707,7 @@ function WhatsAppInbox({ notify = () => {} }) {
         <div className="dc-inbox-thread">
           <div className="dc-inbox-chat-head">
             <button type="button" className="wa-volver" aria-label="Volver a los chats" onClick={() => setEnHilo(false)}><ArrowLeft size={18} strokeWidth={2} /></button>
-            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` – ${chat.pacientes.length} pacientes` : ""}</div></div></div>
+            <div className="dc-inbox-chat-head-name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="wa-av wa-av--sm" style={{ "--av": colorDe(chat.nombre) }}>{inicial(chat.nombre)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.nombre}{chat.ejemplo ? <span className="dc-inbox-ejemplo" style={{ marginLeft: 6 }}>Ejemplo</span> : null}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.tel}{chat.pacientes && chat.pacientes.length > 1 ? ` – ${chat.pacientes.length} pacientes` : ""} – {nomSedeChat(sedeDe(chat))}</div></div></div>
             <div className="dc-inbox-chat-head-actions">
               {puedeAgendarWa && <Btn small onClick={() => abrirAgendar()}><Calendar size={15} strokeWidth={1.75} /> Agendar</Btn>}
               {/* Un solo botón: oculta el panel del contacto y, al pulsarlo otra vez, lo muestra. */}
@@ -676,11 +746,11 @@ function WhatsAppInbox({ notify = () => {} }) {
           {!atBottom && <button type="button" aria-label="Ir al último mensaje" onClick={() => scrollBottom(true)} title="Ir al último mensaje" className="wa-bajar"><ChevronDown size={20} strokeWidth={1.75} /></button>}
           {conectado && !modoDemo && !(puedeOperarWa && puedeResponderWa) ? (
             <div className="wa-pie wa-pie--nota">
-              <Bot size={14} strokeWidth={1.75} /> {chat.modo === "ia" ? "El asistente IA responde automáticamente por WhatsApp." : "Esta conversación la atiende recepción."} Tu rol puede leer las conversaciones, pero no responder.
+              <Bot size={14} strokeWidth={1.75} /> {chat.modo === "ia" ? `El asistente IA responde automáticamente por WhatsApp desde ${textoSalida(chat)}.` : "Esta conversación la atiende recepción."} Tu rol puede leer las conversaciones, pero no responder.
             </div>
           ) : chat.modo === "ia" && conectado && !modoDemo ? (
             <div className="wa-pie wa-pie--nota">
-              <Bot size={14} strokeWidth={1.75} /> El asistente IA responde automáticamente por WhatsApp. Usa <b>&nbsp;Tomar control&nbsp;</b> para responder tú.
+              <Bot size={14} strokeWidth={1.75} /> El asistente IA responde automáticamente por WhatsApp desde {textoSalida(chat)}. Usa <b>&nbsp;Tomar control&nbsp;</b> para responder tú.
             </div>
           ) : chat.modo === "ia" ? (
             <div className="wa-pie">
@@ -689,6 +759,7 @@ function WhatsAppInbox({ notify = () => {} }) {
             </div>
           ) : (
             <div className="wa-pie">
+              <div className="wa-pie__desde"><MessageCircle size={12} strokeWidth={2} /> Tu respuesta sale desde {textoSalida(chat)}</div>
               <div className="wa-chips">
                 <span className="wa-chips__et"><Zap size={13} strokeWidth={2} style={{marginRight: 2}}/> Respuestas:</span>
                 {PLANTILLAS.map(([et, txt]) => <button key={et} type="button" className="wa-chip" title={txt} onClick={() => setInput(txt)}>{et}</button>)}
@@ -716,6 +787,10 @@ function WhatsAppInbox({ notify = () => {} }) {
               <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: .6, textTransform: "uppercase", color: "var(--dc-ink-400)", marginBottom: 12 }}>Detalles del contacto</div>
               <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 500 }}><Phone size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> {chat.tel}</div>
+                {(() => { const sx = sedeDe(chat); return (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, color: INK, fontWeight: 500 }}><Building2 size={15} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ marginTop: 1, flexShrink: 0 }} />
+                    <span>{nomSedeChat(sx)}<small style={{ display: "block", fontWeight: 400, color: "var(--dc-ink-500)" }}>{sx.sedeId == null ? "No se sabe a qué número de la clínica escribió." : sx.origen === "paciente" ? "Por la sede de su ficha de paciente." : sx.numero ? `Escribió al ${formatearWhatsappPe(sx.numero)}` : "Sede del chat"}</small></span>
+                  </div>); })()}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, color: INK, fontWeight: 500 }}><Calendar size={15} strokeWidth={1.75} color="var(--dc-ink-400)" /> Creado {conectado ? fmtCreado(chat.creado) : "hoy"}</div>
               </div>
             </div>

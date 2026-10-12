@@ -3,8 +3,8 @@
  * Dos fuentes, siempre del sistema:
  *   – empresa: nombre comercial, razón social, RUC, web y logo. Son los mismos en
  *     todas las sedes y se editan en Configuración → Datos de la clínica.
- *   – sede: dirección, teléfonos, horario, correo y serie de documentos. Son los de la
- *     sede desde donde se emite el documento (la sede activa de la sesión).
+ *   – sede: dirección, teléfonos, horario, correo, serie de documentos y WhatsApp. Son los
+ *     de la sede desde donde se emite el documento (la sede activa de la sesión).
  *
  * Con sesión se leen de GET /clinica/impresion?sedeId= (el mismo contrato que ya usa
  * el plan de inversión). Sin sesión (demostración) se arman con los datos de ejemplo
@@ -14,6 +14,7 @@
  * sistema: por eso las variables CSS (var(--dc-…)) se resuelven a su valor antes de
  * escribir el HTML. Sin eso, cabeceras de tabla y bordes salían en blanco. */
 import { useSyncExternalStore } from "react";
+import { digitosWhatsapp, formatearWhatsappPe, normalizarWhatsappPe } from "../compartido/whatsappSede";
 
 const BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.BASE_URL) || "/";
 export const LOGO_DEMO = `${BASE}marca/logo-clinica.png`;
@@ -27,9 +28,11 @@ const EMPRESA_DEMO = {
   bajada: "Centro odontológico",
   logo: LOGO_DEMO,
 };
+// WhatsApp por sede: cada sede de la demostración tiene su número (el celular de sus
+// teléfonos) y el ID de ese número en Meta. Se editan en Configuración › Sedes.
 const SEDES_DEMO = {
-  1: { id: 1, codigo: "SAN-ISIDRO", nombre: "Sede San Isidro", direccion: "Av. Conquistadores 145 — San Isidro", telefonos: "(01) 233 4998 – 997 091 083", horario: "Lun a vie 9:00–19:00 – sáb 9:00–14:00", correo: "sanisidro@odontosonrisa.pe", serieDocumento: "SI" },
-  2: { id: 2, codigo: "SURCO", nombre: "Sede Surco", direccion: "Av. Caminos del Inca 890 — Santiago de Surco", telefonos: "(01) 271 5530 – 986 402 117", horario: "Lun a sáb 9:00–19:00", correo: "surco@odontosonrisa.pe", serieDocumento: "SU" },
+  1: { id: 1, codigo: "SAN-ISIDRO", nombre: "Sede San Isidro", direccion: "Av. Conquistadores 145 — San Isidro", telefonos: "(01) 233 4998 – 997 091 083", horario: "Lun a vie 9:00–19:00 – sáb 9:00–14:00", correo: "sanisidro@odontosonrisa.pe", serieDocumento: "SI", whatsappNumero: "+51997091083", whatsappPhoneNumberId: "104512378900101" },
+  2: { id: 2, codigo: "SURCO", nombre: "Sede Surco", direccion: "Av. Caminos del Inca 890 — Santiago de Surco", telefonos: "(01) 271 5530 – 986 402 117", horario: "Lun a sáb 9:00–19:00", correo: "surco@odontosonrisa.pe", serieDocumento: "SU", whatsappNumero: "+51986402117", whatsappPhoneNumberId: "104512378900102" },
 };
 
 /** Lo editado en Configuración sin sesión: { empresa: {...}, sedes: { [id]: {...} } }. */
@@ -88,13 +91,25 @@ export function normalizarImpresion(c, sedeId, extra = {}) {
       horario: s.horario || "",
       correo: s.correo || s.email || x.email || "",
       serieDocumento: s.serieDocumento || "",
+      // Opcional: el WhatsApp de la sede (GET /clinica/impresion o GET /sedes). Sin él, el
+      // membrete queda como siempre.
+      whatsapp: normalizarWhatsappPe(s.whatsappNumero || s.whatsapp || "") || "",
     },
   };
 }
 
+/** Teléfonos de la sede para el membrete, con su WhatsApp al final si lo tiene y no figura
+    ya entre ellos. Va en la misma línea: los PDF no ganan una línea ni cambian de alto. */
+export function telefonosConWhatsapp(s) {
+  const tel = String(s?.telefonos || "").trim();
+  const wa = normalizarWhatsappPe(s?.whatsapp || s?.whatsappNumero || "");
+  if (!wa || tel.replace(/\D/g, "").includes(digitosWhatsapp(wa).slice(-9))) return tel;
+  return [tel, `WhatsApp ${formatearWhatsappPe(wa)}`].filter(Boolean).join(" – ");
+}
+
 /* ── almacén: lo fija MainApp al cambiar de sede; lo leen todas las descargas ── */
 // Con sesión arranca vacío hasta que llega /clinica/impresion: nunca la clínica de ejemplo.
-const VACIO = { empresa: { nombre: "", razonSocial: "", ruc: "", web: "", bajada: "", logo: "" }, sede: { id: null, nombre: "", direccion: "", telefonos: "", horario: "", correo: "", serieDocumento: "" }, demo: false };
+const VACIO = { empresa: { nombre: "", razonSocial: "", ruc: "", web: "", bajada: "", logo: "" }, sede: { id: null, nombre: "", direccion: "", telefonos: "", horario: "", correo: "", serieDocumento: "", whatsapp: "" }, demo: false };
 let actual = (() => { try { return localStorage.getItem("dc_token") ? VACIO : datosDemo(1); } catch { return datosDemo(1); } })();
 const subs = new Set();
 export function fijarDatosImpresion(d) { actual = d; subs.forEach((f) => f()); }
@@ -137,7 +152,7 @@ export function membreteHTML(titulo, sub, d = actual) {
   const marca = e.logo
     ? `<img class="mbr-logo" src="${escDoc(e.logo)}" alt="${escDoc(e.nombre)}">`
     : `<div class="mbr-marca"><span class="mbr-nom">${escDoc(e.nombre || "Clínica")}</span>${e.bajada ? `<span class="mbr-baj">${escDoc(e.bajada)}</span>` : ""}</div>`;
-  const datos = [e.ruc ? `RUC ${e.ruc}` : "", s.nombre, s.direccion, s.telefonos, s.correo || e.web, s.horario].filter(Boolean);
+  const datos = [e.ruc ? `RUC ${e.ruc}` : "", s.nombre, s.direccion, telefonosConWhatsapp(s), s.correo || e.web, s.horario].filter(Boolean);
   return `<header class="mbr">${marca}<div class="mbr-datos"><b>${escDoc(e.nombre || "Clínica")}</b>${datos.map(escDoc).join("<br>")}</div></header>`
     + (titulo ? `<h1 class="doc-h1">${escDoc(titulo)}</h1>` : "")
     + (sub ? `<p class="doc-sub">${escDoc(sub)}</p>` : "");

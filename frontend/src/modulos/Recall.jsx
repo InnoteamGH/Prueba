@@ -1,10 +1,12 @@
 /* Módulo Recall. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useContext, useState, useEffect } from "react";
-import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
+import {AlertTriangle, BellRing, CalendarCheck, Check, CheckCheck, CheckCircle2, Clock, MessageCircle, MessageSquare, Power, Repeat, Send, Shield, Smile, Sparkles, Star, Zap} from "lucide-react";
 import api, { auth, msgServidor } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import {DatosDemoCtx, usePersist, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY_FONT, DS, INK, KpiCard, Modal, NAVY, Vacio, addDays, colorDe, fechaLegible, fmt, hoy, iniciales, nombreSede, tint, useSede, PersonaCelda} from "../comun";
 import { porReactivar, esPorReactivar } from "../compartido/metricas";
+import { useSedesWhatsapp } from "../compartido/useSedesWhatsapp";
+import { formatearWhatsappPe, sedesSinNumero, whatsappDeSede } from "../compartido/whatsappSede";
 
 function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
@@ -76,6 +78,14 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   };
   // Al cambiar la sede del menú se vuelve a pedir todo (cola, historial y reseñas).
   useEffect(() => { cargar(); }, [sedesKey]); // eslint-disable-line
+  // WhatsApp por sede: cada recordatorio, confirmación o encuesta sale desde el número de la
+  // sede de la cita (o del paciente, si no hay cita). Se avisa qué sedes aún no tienen número
+  // propio: sus mensajes salen desde el número compartido de GET /whatsapp/salud.
+  const sedesWa = useSedesWhatsapp();
+  const sedesWaVer = (sedesWa || []).filter((s) => s.activa !== false && enSede(s.id));
+  const sinNumeroWa = sedesSinNumero(sedesWaVer);
+  const [numCompartido, setNumCompartido] = useState("");
+  useEffect(() => { if (conectado && sinNumeroWa.length) api.agente.salud().then((s) => setNumCompartido(s?.numero || "")).catch(() => setNumCompartido("")); }, [conectado, sinNumeroWa.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   // Cada interruptor es independiente. Se manda la regla completa (no solo `activo`) y,
   // al recargar, si el servidor devolvió apagadas otras reglas que nadie tocó, se
   // restauran: un PUT que reemplazaba toda la configuración apagaba las demás.
@@ -339,6 +349,17 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
           </>
           ); })()
       ) : (<>
+      <div className="fm-aviso-edad is-info dc-rec__wa">
+        <MessageCircle size={15} strokeWidth={2} />
+        <span>Cada mensaje sale desde el número de WhatsApp de la sede de la cita o, si no hay cita, de la sede del paciente.
+          {sedesWaVer.some((s) => whatsappDeSede(s)) && <> {sedesWaVer.filter((s) => whatsappDeSede(s)).map((s) => `${String(s.nombre || "Sede").replace(/^Sede\s+/i, "")}: ${formatearWhatsappPe(whatsappDeSede(s))}`).join(" · ")}.</>}</span>
+      </div>
+      {sinNumeroWa.length > 0 && (
+        <div className="fm-aviso-edad dc-rec__wa">
+          <AlertTriangle size={15} strokeWidth={2} />
+          <span>{sinNumeroWa.map((s) => s.nombre || "Sede").join(", ")} aún no {sinNumeroWa.length === 1 ? "tiene" : "tienen"} número de WhatsApp propio{conectado ? `: sus mensajes salen desde el número compartido${numCompartido ? ` (${formatearWhatsappPe(numCompartido)})` : ""}` : ""}. Se agrega en Configuración › Sedes.</span>
+        </div>
+      )}
       <Card className="dc-rec">
         <div className="dc-rec__cab">
           <div className="dc-rec__tit">

@@ -1,6 +1,6 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect, useContext, useRef } from "react";
-import {AlertTriangle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
+import {AlertTriangle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, MessageCircle, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
 import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
 import { comisionSede, guardarMetaSedeDemo, medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
@@ -9,6 +9,7 @@ import { conCop } from "../util/cop";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
 import { sillonesPorSede } from "../compartido/useReglasAgenda";
 import { estadoWhatsApp, notaUltimoEnvioOk } from "../compartido/integraciones";
+import { formatearWhatsappPe, mismoNumero, normalizarPhoneNumberId, normalizarWhatsappPe, validarPhoneNumberId, validarWhatsappPe, whatsappDeSede } from "../compartido/whatsappSede";
 import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda, useSede, mismaSede, sedeNum, nombreSede} from "../comun";
 
 /* H-08 (admin): un 405/404 de POST /disponibilidad es que el servidor no tiene la ruta, no
@@ -238,6 +239,9 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   const sedesApiCfg = ctxSede.sede === "all" && ctxSede.global ? null : (ver || []).map((x) => sedeApiUuid(x));
   const conectado = !!auth.token;
   const fiscalReadOnly = rol === "admin_sede" || limitarSede || (can ? !can("config", "editar") : false);
+  // WhatsApp por sede: el ID del número en Meta (phone_number_id) es un dato técnico de la
+  // integración; solo lo ve y lo edita quien gestiona integraciones o la configuración.
+  const veMetaId = can ? (can("integraciones", "editar") || can("integraciones", "configurar") || can("config", "configurar")) : true;
   const [tab, setTab] = useState(seccionInicial);
   // Listas completas; en pantalla se muestran solo las de las sedes que se ven.
   const [sedesTodas, setSedes] = useState([]);
@@ -408,7 +412,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   const delBilletera = (i) => setClinica((c) => ({ ...c, billeteras: c.billeteras.filter((_, j) => j !== i) }));
   const cargar = () => {
     if (!conectado) {
-      setSedes(SEDES.map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "" }; }));
+      setSedes(SEDES.map((s) => { const d = sedeDemo(s.id); return { id: s.id, nombre: d.nombre || s.nombre, direccion: d.direccion || s.dir, telefono: d.telefonos || "", horarioDocumento: d.horario || "", correo: d.correo || "", serieDocumento: d.serieDocumento || "", whatsappNumero: d.whatsappNumero || "", whatsappPhoneNumberId: d.whatsappPhoneNumberId || "" }; }));
       setEsps(ESPECIALIDADES.map((e) => ({ id: e.id, nombre: e.nombre, precioBase: e.precio })));
       // ref: el doctor de la demo, para calcular su meta y su % en las sedes que se ven.
       setMeds(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidadId: m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: m.activo !== false, porcentajeComision: m.comision ?? null, sedes: sedesMed(m), ref: m })));
@@ -464,6 +468,20 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     if (!m) { const def = sedeDefecto(sedesEdit); setEdit({ tipo: "doctor", item: { activo: true, sedesForm: def != null ? [def] : [], comSede: {} } }); return; }
     const comSede = Object.fromEntries(porSedeDe(m).filter((x) => sedeEditable(x.sede)).map((x) => [x.sede, x.com ?? ""]));
     setEdit({ tipo: "doctor", item: { ...m, sedesForm: sedesMedico(m), comSede } });
+  };
+
+  // El WhatsApp de la sede se edita con espacios («+51 987 654 321»); se guarda en E.164.
+  const abrirSede = (sd) => setEdit({ tipo: "sede", item: sd ? { ...sd, whatsappNumero: sd.whatsappNumero ? formatearWhatsappPe(sd.whatsappNumero) : "", whatsappPhoneNumberId: sd.whatsappPhoneNumberId || "" } : {} });
+  // Con sesión el servidor puede aceptar la sede sin guardar el WhatsApp (aún no tiene los
+  // campos): se mira lo que devolvió y, si no lo trae, se relee GET /sedes antes de avisar.
+  // Si no se puede comprobar, no se avisa.
+  const guardoWhatsapp = (r, id, payload) => {
+    const tiene = (x) => !!x && (!payload.whatsappNumero || mismoNumero(x.whatsappNumero, payload.whatsappNumero)) && (!payload.whatsappPhoneNumberId || String(x.whatsappPhoneNumberId || "") === payload.whatsappPhoneNumberId);
+    if (tiene(r)) return Promise.resolve(true);
+    return api.sedes.listar().then((l) => {
+      const x = (l || []).find((y) => (id != null ? String(y.id) === String(id) : (r?.id != null ? String(y.id) === String(r.id) : y.nombre === payload.nombre)));
+      return x ? tiene(x) : true;
+    }).catch(() => true);
   };
 
   const guardar = () => {
@@ -530,6 +548,9 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
       notify(ajeno ? "Comisión de tu sede guardada." : "Doctor guardado."); setEdit(null); return;
     }
     if (edit.tipo === "sede" && (it.id ? !sedeEditable(it.id) : limitarSede)) { notify("Solo puedes editar los datos de tu sede."); return; }
+    // WhatsApp de la sede: opcional, pero si se escribe debe ser un celular peruano.
+    if (edit.tipo === "sede" && validarWhatsappPe(it.whatsappNumero)) { notify(`WhatsApp de la sede: ${validarWhatsappPe(it.whatsappNumero)}`); return; }
+    if (edit.tipo === "sede" && veMetaId && validarPhoneNumberId(it.whatsappPhoneNumberId)) { notify(validarPhoneNumberId(it.whatsappPhoneNumberId)); return; }
     if (edit.tipo === "promo" && !String(it.titulo || "").trim()) { notify("Ponle un título a la promoción."); return; }
     if (edit.tipo === "promo" && (it.sedeId == null || it.sedeId === "" ? limitarSede : !sedeEditable(it.sedeId))) { notify("Elige una de tus sedes para la promoción."); return; }
     // Mismo criterio que los rangos de Caja y Auditoría (R5-08): un rango invertido no se guarda.
@@ -542,16 +563,22 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     }
     if (edit.tipo === "sede" && !auth.token) {
       const id = it.id || Date.now();
-      setSedes((ss) => (it.id ? ss.map((x) => (x.id === it.id ? { ...x, ...it } : x)) : [...ss, { ...it, id }]));
-      guardarDemo({ sedes: { [id]: { nombre: it.nombre, direccion: it.direccion || "", telefonos: it.telefono || "", horario: it.horarioDocumento || "", correo: it.correo || "", serieDocumento: it.serieDocumento || "" } } });
+      const wa = { whatsappNumero: normalizarWhatsappPe(it.whatsappNumero) || "", whatsappPhoneNumberId: normalizarPhoneNumberId(it.whatsappPhoneNumberId) || "" };
+      setSedes((ss) => (it.id ? ss.map((x) => (x.id === it.id ? { ...x, ...it, ...wa } : x)) : [...ss, { ...it, ...wa, id }]));
+      guardarDemo({ sedes: { [id]: { nombre: it.nombre, direccion: it.direccion || "", telefonos: it.telefono || "", horario: it.horarioDocumento || "", correo: it.correo || "", serieDocumento: it.serieDocumento || "", ...wa } } });
       refrescarDatosDemo();
       notify("Sede guardada."); setEdit(null); return;
     }
     if (edit.tipo === "sede") {
       // Dirección, teléfonos, horario, correo y serie salen en el membrete de los
       // documentos emitidos desde esta sede.
-      const payload = { nombre: it.nombre, direccion: it.direccion, telefono: it.telefono, horarioDocumento: it.horarioDocumento || null, correo: it.correo || null, serieDocumento: it.serieDocumento || null, activa: it.activa !== false };
-      (it.id ? api.sedes.actualizar(it.id, payload) : api.sedes.crear(payload)).then(() => done("Sede guardada.")).catch(err);
+      // WhatsApp por sede: el número (E.164) y su ID en Meta van siempre, también el ID que
+      // no se ve en el formulario (es el que ya tenía): así un PUT que reemplaza la sede no lo borra.
+      const payload = { nombre: it.nombre, direccion: it.direccion, telefono: it.telefono, horarioDocumento: it.horarioDocumento || null, correo: it.correo || null, serieDocumento: it.serieDocumento || null, activa: it.activa !== false, whatsappNumero: normalizarWhatsappPe(it.whatsappNumero), whatsappPhoneNumberId: normalizarPhoneNumberId(it.whatsappPhoneNumberId) };
+      (it.id ? api.sedes.actualizar(it.id, payload) : api.sedes.crear(payload))
+        .then((r) => (payload.whatsappNumero || payload.whatsappPhoneNumberId ? guardoWhatsapp(r, it.id, payload) : true))
+        .then((ok) => done(ok ? "Sede guardada." : "Sede guardada. El servidor aún no guarda el número de WhatsApp por sede."))
+        .catch(err);
     } else if (edit.tipo === "servicio") {
       const precio = Number(it.precioBase);
       if (!Number.isFinite(precio) || precio <= 0) { notify("El precio debe ser mayor a S/ 0."); return; }
@@ -723,16 +750,16 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
           </section>
 
           <section className="dc-cfg__panel">
-            {cab(limitarSede ? (sedes.length === 1 ? "Tu sede" : "Tus sedes") : "Sedes", limitarSede ? "Su dirección, teléfono, correo y serie salen en los documentos que emite tu sede." : "Cada sede tiene su propia dirección, teléfono, caja y agenda.", !limitarSede && <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
+            {cab(limitarSede ? (sedes.length === 1 ? "Tu sede" : "Tus sedes") : "Sedes", limitarSede ? "Su dirección, teléfono, correo y serie salen en los documentos que emite tu sede; su WhatsApp atiende a sus pacientes." : "Cada sede tiene su propia dirección, teléfono, WhatsApp, caja y agenda.", !limitarSede && <button type="button" className="dc-cfg__nuevo" onClick={() => abrirSede(null)}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
             <div className="dc-emp__sedes">
               {sedes.map((sd, k) => (
-                <button key={sd.id} type="button" className="dc-emp__sede" style={{ "--c": SEDE_COL[k % SEDE_COL.length] }} onClick={() => (sedeEditable(sd.id) ? setEdit({ tipo: "sede", item: { ...sd } }) : notify("Solo puedes editar los datos de tu sede."))}>
+                <button key={sd.id} type="button" className="dc-emp__sede" style={{ "--c": SEDE_COL[k % SEDE_COL.length] }} onClick={() => (sedeEditable(sd.id) ? abrirSede(sd) : notify("Solo puedes editar los datos de tu sede."))}>
                   <span className="dc-cfg__sico is-grande"><Building2 size={17} strokeWidth={2} /></span>
-                  <div><b>{sd.nombre}</b><small><MapPin size={11} strokeWidth={2.2} /> {sd.direccion || "Agrega la dirección"}</small><small><Phone size={11} strokeWidth={2.2} /> {sd.telefono || "Agrega el teléfono"}</small></div>
+                  <div><b>{sd.nombre}</b><small><MapPin size={11} strokeWidth={2.2} /> {sd.direccion || "Agrega la dirección"}</small><small><Phone size={11} strokeWidth={2.2} /> {sd.telefono || "Agrega el teléfono"}</small><small className={whatsappDeSede(sd) ? "" : "is-falta"} title="WhatsApp de la sede"><MessageCircle size={11} strokeWidth={2.2} /> {whatsappDeSede(sd) ? formatearWhatsappPe(whatsappDeSede(sd)) : "Agrega el WhatsApp de la sede"}</small></div>
                   <i className="dc-cfg__edit"><Pencil size={13} strokeWidth={2} /></i>
                 </button>
               ))}
-              {!limitarSede && <button type="button" className="dc-emp__sede is-nueva" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={18} strokeWidth={2.2} /><b>Agregar otra sede</b></button>}
+              {!limitarSede && <button type="button" className="dc-emp__sede is-nueva" onClick={() => abrirSede(null)}><Plus size={18} strokeWidth={2.2} /><b>Agregar otra sede</b></button>}
             </div>
           </section>
 
@@ -916,14 +943,16 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
 
       {tab === "sedes" && (
         <section className="dc-cfg__panel">
-          {cab(limitarSede ? (sedes.length === 1 ? "Tu sede" : "Tus sedes") : "Sedes", ver && !limitarSede ? "Sedes que se ven con el filtro del menú." : "Locales de atención de la clínica.", !limitarSede && <button type="button" className="dc-cfg__nuevo" onClick={() => setEdit({ tipo: "sede", item: {} })}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
+          {cab(limitarSede ? (sedes.length === 1 ? "Tu sede" : "Tus sedes") : "Sedes", ver && !limitarSede ? "Sedes que se ven con el filtro del menú." : "Locales de atención de la clínica, cada uno con su número de WhatsApp.", !limitarSede && <button type="button" className="dc-cfg__nuevo" onClick={() => abrirSede(null)}><Plus size={14} strokeWidth={2.2} /> Nueva sede</button>)}
           {sedes.length === 0 ? <p className="dc-cfg__nada">Sin sedes aún.</p> : (
             <div className="dc-cfg__docs">
               {sedes.map((sd, k) => { const col = ["#0E9199", "#D97706", "#6D4FD1", "#2F6FDE"][k % 4]; return (
                 <article key={sd.id} className="dc-cfg__sede" style={{ "--c": col }}>
                   <span className="dc-cfg__sico is-grande"><Building2 size={18} strokeWidth={2} /></span>
-                  <div><b>{sd.nombre}</b><small><MapPin size={11} strokeWidth={2.2} /> {sd.direccion || "Sin dirección"}</small><small><Phone size={11} strokeWidth={2.2} /> {sd.telefono || "Sin teléfono"}</small></div>
-                  {sedeEditable(sd.id) && <button type="button" className="dc-row-action" aria-label={`Editar ${sd.nombre}`} title="Editar" onClick={() => setEdit({ tipo: "sede", item: { ...sd } })}><Pencil size={14} strokeWidth={2} /></button>}
+                  <div><b>{sd.nombre}</b><small><MapPin size={11} strokeWidth={2.2} /> {sd.direccion || "Sin dirección"}</small><small><Phone size={11} strokeWidth={2.2} /> {sd.telefono || "Sin teléfono"}</small>
+                    <small className={whatsappDeSede(sd) ? "" : "is-falta"} title="WhatsApp de la sede"><MessageCircle size={11} strokeWidth={2.2} /> {whatsappDeSede(sd) ? `WhatsApp ${formatearWhatsappPe(whatsappDeSede(sd))}` : "Sin WhatsApp propio"}</small>
+                    {veMetaId && sd.whatsappPhoneNumberId && <small title="ID del número en Meta (phone_number_id)">ID en Meta: {sd.whatsappPhoneNumberId}</small>}</div>
+                  {sedeEditable(sd.id) && <button type="button" className="dc-row-action" aria-label={`Editar ${sd.nombre}`} title="Editar" onClick={() => abrirSede(sd)}><Pencil size={14} strokeWidth={2} /></button>}
                 </article>
               ); })}
             </div>
@@ -1129,6 +1158,17 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
               {edit.tipo === "sede" && <>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Dirección<input className="dc-premium-inp" value={it.direccion || ""} onChange={(e) => set("direccion", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Av. Conquistadores 145, San Isidro" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Teléfono<input className="dc-premium-inp" value={it.telefono || ""} onChange={(e) => set("telefono", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="01 234 5678" /></label>
+                {/* WhatsApp por sede: los pacientes de esta sede escriben a este número, y sus
+                    recordatorios, confirmaciones y reseñas salen desde él. */}
+                {(() => { const errWa = validarWhatsappPe(it.whatsappNumero); return (
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>WhatsApp de la sede
+                    <input className="dc-premium-inp" type="tel" inputMode="tel" autoComplete="off" value={it.whatsappNumero || ""} onChange={(e) => set("whatsappNumero", e.target.value)} onBlur={() => { const n = normalizarWhatsappPe(it.whatsappNumero); if (n) set("whatsappNumero", formatearWhatsappPe(n)); }} aria-invalid={!!errWa} style={{ ...inp, marginTop: 5, ...(errWa ? { border: "1.5px solid var(--dc-warn-600)" } : {}) }} placeholder="+51 9XX XXX XXX" />
+                    <small style={{ display: "block", marginTop: 4, fontSize: 12, fontWeight: 400, color: errWa ? "var(--dc-warn-600)" : "var(--dc-ink-500)" }}>{errWa || "Los pacientes de esta sede le escriben a este número; sus recordatorios y confirmaciones salen desde aquí."}</small>
+                  </label>); })()}
+                {veMetaId && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>ID del número en Meta (opcional)
+                  <input className="dc-premium-inp" inputMode="numeric" autoComplete="off" value={it.whatsappPhoneNumberId || ""} onChange={(e) => set("whatsappPhoneNumberId", e.target.value.replace(/\D/g, "").slice(0, 20))} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 104512378900101" />
+                  <small style={{ display: "block", marginTop: 4, fontSize: 12, fontWeight: 400, color: "var(--dc-ink-500)" }}>El «phone number ID» de WhatsApp Manager: con él el servidor sabe a qué sede llega cada mensaje.</small>
+                </label>}
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Horario para documentos<input className="dc-premium-inp" value={it.horarioDocumento || ""} onChange={(e) => set("horarioDocumento", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Lun a vie 9:00–19:00 – sáb 9:00–14:00" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Correo de la sede<input className="dc-premium-inp" type="email" value={it.correo || ""} onChange={(e) => set("correo", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="sede@clinica.pe" /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Serie de documentos<input className="dc-premium-inp" value={it.serieDocumento || ""} onChange={(e) => set("serieDocumento", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))} style={{ ...inp, marginTop: 5 }} placeholder="SI" /></label>
