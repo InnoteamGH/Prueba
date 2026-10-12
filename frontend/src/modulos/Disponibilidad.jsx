@@ -314,7 +314,7 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
     const nuevas = citasDia(sustDia).filter((c) => !yaPedida(c.id) && diaDest[c.id]).map((c) => ({ id: rid(), tipo: "enviada", citaId: c.id, otroId: Number(diaDest[c.id]), fecha: c.fecha, hora: c.hora, sede: c.sede, paciente: c.paciente, esp: c.esp, motivo: "Ausencia (día completo)", estado: "pendiente" }));
     if (!nuevas.length) { notify("Elige un colega para cada cita del día."); return; }
     setSolicitudes((s) => [...s, ...nuevas]);
-    notify(`Enviaste ${nuevas.length} solicitud(es) de sustitución para el ${fechaLegible(sustDia)}.`);
+    notify(`Enviaste ${nuevas.length} solicitud(es) de sustitución para el ${fechaLegible(sustDia).replace(/\.$/, "")}.`);
     setSustDia(null);
   };
   const doAceptar = (s) => { setCitas && setCitas((cs) => cs.map((c) => c.id === s.citaId ? { ...c, medicoId: miId } : c)); setSolicitudes((x) => x.map((y) => y.id === s.id ? { ...y, estado: "aceptada" } : y)); setAlertaViaje(null); notify("Aceptaste la sustitución. La cita ahora es tuya y aparece en tu agenda."); };
@@ -357,12 +357,20 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
       }
     }
   };
+  // M5-11: el bloqueo propio va con la sede donde el médico atiende ese día y a esa hora (la
+  // de su turno). Sin sedeId el servidor lo guardaba sin sede y lo recibían las otras sedes.
+  const sedeBloqueo = (dia, hora) => {
+    const delDia = filasMias.filter((d) => Number(d.diaSemana) === Number(dia.dow));
+    const t = delDia.find((d) => String(d.horaInicio || "").slice(0, 5) <= hora && hora < String(d.horaFin || "").slice(0, 5)) || delDia[0];
+    const s = t ? (t.sedeId ?? t.sede) : null;
+    return (s != null ? sedeApiUuid(s) : null) || sedeApiUuid(activa) || sedeApiUuid(sedeNueva) || null;
+  };
   const bloquear = async (dia, hora) => {
     if (modo === "recurrente") {
       if (conectado) {
         // Bloqueo semanal del propio médico (POST /bloqueos con diaSemana y medicoId, como en la Agenda).
         try {
-          const creado = await api.bloqueos.crear({ diaSemana: dia.dow, fecha: null, horaInicio: hora, horaFin: nextH(hora), motivo: mot(), medicoId: miId });
+          const creado = await api.bloqueos.crear({ diaSemana: dia.dow, fecha: null, horaInicio: hora, horaFin: nextH(hora), motivo: mot(), medicoId: miId, sedeId: sedeBloqueo(dia, hora) });
           setRecurrentes((r) => [...r, { id: creado?.id ?? rid(), dia: dia.idx, ini: hora, fin: nextH(hora), motivo: mot() }]);
         } catch { notify("No se pudo crear el bloqueo recurrente."); }
         return;
@@ -370,7 +378,7 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
       setRecurrentes((r) => [...r, { id: rid(), dia: dia.idx, ini: hora, fin: nextH(hora), motivo: mot() }]);
     } else {
       // Con sesión el bloqueo es del médico (medicoId): sin él bloquearía la agenda de toda la clínica.
-      const nuevoBloqueo = { fecha: dia.date, horaInicio: hora, horaFin: nextH(hora), motivo: mot(), ...(conectado ? { medicoId: miId } : {}) };
+      const nuevoBloqueo = { fecha: dia.date, horaInicio: hora, horaFin: nextH(hora), motivo: mot(), ...(conectado ? { medicoId: miId, sedeId: sedeBloqueo(dia, hora) } : {}) };
       if (conectado) {
         try {
           const creado = await api.bloqueos.crear(nuevoBloqueo);

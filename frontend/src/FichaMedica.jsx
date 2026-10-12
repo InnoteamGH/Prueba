@@ -1,6 +1,6 @@
 import { abrirDocumento } from "./util/membrete";
 import * as M from "./compartido/metricas";
-import { estadoLabel } from "./compartido/estados";
+import { estadoLabel, estadoFaseUi } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth, msgServidor } from "./api/client";
 import { buscarCie10 } from "./cie10";
@@ -21,7 +21,7 @@ import { puedeEscribirClinico as puedeEscribirClinicoDe } from "./util/clinicoWr
 import { tienePermiso } from "./compartido/permisos";
 import { formatearFDI } from "./util/formatearFDI";
 import { conCop } from "./util/cop";
-import { ymdLima, resumenDispositivo } from "./util/fechaLima";
+import { ymdLima, resumenDispositivo, fechaHoraLima } from "./util/fechaLima";
 import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, textoIndicaciones } from "./compartido/recetaItems";
 import { imprimirReceta } from "./util/recetaDoc";
 import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
@@ -63,6 +63,10 @@ const edadDe = (iso) => { if (!iso) return null; const b = new Date(iso + "T00:0
 const iniciales = (n) => (n || "?").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 const fmtFecha = (iso) => { if (!iso) return ""; const d = new Date(iso + "T00:00:00"); if (isNaN(d)) return iso; return d.toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" }); };
 const arr = (x) => (Array.isArray(x) ? x : []);
+// Estados de laboratorio del servidor → los del catálogo (compartido/estados.js), como en el Inicio.
+const ESTADO_LAB_API = { solicitado: "enviado", en_proceso: "en_proceso", listo: "recibido", entregado: "entregado" };
+// Indicaciones de receta guardadas con escapes JSON («\u2194»): se muestran decodificadas.
+const conRxFicha = (x) => (x && Array.isArray(x.recetas) ? { ...x, recetas: x.recetas.map((rx) => (rx && rx.indicaciones ? { ...rx, indicaciones: textoIndicaciones(rx.indicaciones) } : rx)) } : x);
 const parseJson = (s, fb) => { if (s == null) return fb; if (typeof s !== "string") return s; try { return JSON.parse(s) ?? fb; } catch { return fb; } };
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -790,7 +794,12 @@ function Receta({ pacienteId, clinica, paciente, recetas, onChange, notify, medi
                 )}
               </div>
               <BotonPDF chico onClick={() => printReceta(r)}>Imprimir</BotonPDF>
-              {r.id && conectado && <button type="button" className="dc-icon-btn" aria-label="Eliminar" onClick={() => api.recetas.borrar(r.id).then(() => { notify("Receta eliminada."); onChange && onChange(); }).catch(() => notify("No se pudo eliminar."))} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", color: RED, display: "grid", placeItems: "center" }}><Trash2 size={16} strokeWidth={1.75} /></button>}
+              {/* M5-10: borrar una receta pide confirmación (era una papelera directa) y solo se ofrece con recetas:eliminar. */}
+              {r.id && conectado && tienePermiso("recetas", "eliminar") && <button type="button" className="dc-icon-btn" aria-label="Eliminar receta" onClick={() => {
+                const nom = its.length ? its.map(nombreItemReceta).filter(Boolean).join(", ") : "la receta";
+                if (!window.confirm(`¿Eliminar la receta del ${M.fechaCorta(r.fecha)} (${nom})? Sale de la historia del paciente y no se puede deshacer.`)) return;
+                api.recetas.borrar(r.id).then(() => { notify("Receta eliminada."); onChange && onChange(); }).catch((e) => notify(msgServidor(e, "No se pudo eliminar la receta.")));
+              }} title="Eliminar receta" style={{ background: "none", border: "none", cursor: "pointer", color: RED, display: "grid", placeItems: "center" }}><Trash2 size={16} strokeWidth={1.75} /></button>}
             </div>
           );
         })}
@@ -1046,6 +1055,12 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const medicosCon = (actual) => (!actual || medicos.some((m) => String(m.id) === String(actual)) ? medicos : [...medicos, ...medicosTodos.filter((m) => String(m.id) === String(actual))]);
   const [evoMedico, setEvoMedico] = useState("");      // doctor de la nueva evolución
   const [evoCitaId, setEvoCitaId] = useState("");      // cita a la que pertenece la evolución ("" = sin cita)
+  // M5-01: la cita con la que se abrió la ficha («Completar» de la alerta de evoluciones
+  // pendientes o «Iniciar» de la agenda). Puede ser de un día anterior.
+  const [citaPedida, setCitaPedida] = useState(null);
+  // ficha360 trae las citas sin id: las de hoy (y la del día de la cita pedida) se leen de
+  // GET /citas?fecha=, que sí lo trae, para poder ligar la evolución con citaId.
+  const [citasConId, setCitasConId] = useState([]);
   const [evoFile, setEvoFile] = useState(null);       // archivo a anexar a la evolución
   const [draftEdit, setDraftEdit] = useState({});     // edición de borradores de evolución (por id)
   const [secOpen, setSecOpen] = useState({});         // secciones colapsables de la historia
@@ -1132,8 +1147,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
         apoderadoNombre: rp.apoderadoNombre || "", apoderadoParentesco: rp.apoderadoParentesco || "", apoderadoDni: rp.apoderadoDni || "", apoderadoTelefono: rp.apoderadoTelefono || "" });
       setFc(parseJson(rp.fichaClinica, {}) || {});
     };
-    // Indicaciones de receta guardadas con escapes JSON («\u2194»): se muestran decodificadas.
-    const conRx = (x) => (x && Array.isArray(x.recetas) ? { ...x, recetas: x.recetas.map((rx) => (rx && rx.indicaciones ? { ...rx, indicaciones: textoIndicaciones(rx.indicaciones) } : rx)) } : x);
+    const conRx = conRxFicha;
     api.pacientes.ficha360(pid).then((r) => {
       if (!vigente()) return;
       setD(conRx(r));
@@ -1213,6 +1227,26 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     }
   }, [pacienteId]); // eslint-disable-line
 
+  // M5-03: relee ficha360 sin vaciar la pantalla, para que el Resumen y la cabecera reflejen lo
+  // que cambió en «Plan y cuenta», el odontograma o el periodontograma (antes seguían con el
+  // total y las fases viejas hasta recargar la página). Si falla, se queda lo que había.
+  const refrescarFicha = () => {
+    if (!conectado || !pacienteId || errorFicha || !d || d.parcial) return;
+    const pid = pacienteId;
+    api.pacientes.ficha360(pid).then((r2) => { if (r2 && String(pidCargado.current) === String(pid)) setD(conRxFicha(r2)); }).catch(() => { });
+  };
+  const tabAnterior = useRef(tab);
+  useEffect(() => {
+    const antes = tabAnterior.current;
+    tabAnterior.current = tab;
+    if (antes !== tab && tab === "resumen") refrescarFicha();
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // «Plan y cuenta» avisa cuando agrega, termina, anula o cobra un procedimiento.
+    const onPlan = (ev) => { if (!ev?.detail?.pacienteId || String(ev.detail.pacienteId) === String(pacienteId)) refrescarFicha(); };
+    window.addEventListener("dc-plan-cambio", onPlan);
+    return () => window.removeEventListener("dc-plan-cambio", onPlan);
+  });
   const cargarRegistro = () => {
     if (!conectado || !pacienteId) return;
     api.auditoria({ pacienteId }).then((list) => setRegSrv(list || [])).catch(() => setRegSrv([]));
@@ -1222,7 +1256,21 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   const anotar = (tipo, accion, detalle = "") => setRegLocal((cur) => [{ id: `loc-${Date.now()}-${cur.length}`, ts: new Date().toISOString(), usuario: auth.sesion?.nombre || "Tú", rol: auth.sesion?.rol || "", tipo, accion, detalle, origen: "Esta sesión" }, ...cur]);
 
   const p = d?.paciente || {};
-  const r = d?.resumen || {};
+  // M5-03: las fases de ficha360 llegan con el estado del servidor («cancelada», «terminada»…).
+  // Se normalizan con estadoFaseUi y las anuladas no se listan ni se cuentan en el Resumen.
+  const tratTodos = arr(d?.tratamientos).map((t) => ({ ...t, estado: estadoFaseUi(t.estado) }));
+  const tratVivos = tratTodos.filter((t) => t.estado !== "anulado");
+  const faseHecha = (t) => ["completada", "atendida", "terminada"].includes(String(t.estado));
+  // M5-02 (servidor): ficha360.resumen todavía suma las fases anuladas. Si su total coincide con
+  // la suma de TODAS las fases (anuladas incluidas), se descuenta lo anulado; cuando el servidor
+  // ya no las sume, los números no coinciden y no se toca nada.
+  const rSrv = d?.resumen || {};
+  const costoAnulado = tratTodos.filter((t) => t.estado === "anulado").reduce((a, t) => a + (Number(t.costo) || 0), 0);
+  const sumaTodas = tratTodos.reduce((a, t) => a + (Number(t.costo) || 0), 0);
+  const resumenConAnuladas = costoAnulado > 0.005 && rSrv.planTotal != null && Math.abs((Number(rSrv.planTotal) || 0) - sumaTodas) < 0.01;
+  const r = resumenConAnuladas
+    ? { ...rSrv, planTotal: (Number(rSrv.planTotal) || 0) - costoAnulado, saldo: (Number(rSrv.saldo) || 0) - costoAnulado, tratamientos: tratVivos.length }
+    : rSrv;
   // Ficha parcial (ficha360 falló): qué se pudo leer por su propia ruta.
   const parcial = d?.parcial || null;
   const sinFichaClinica = !!parcial && !parcial.fichaClinica;   // no se guarda la anamnesis a ciegas
@@ -1291,14 +1339,45 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // Citas de hoy a las que se puede ligar la evolución (las que aún no tienen una firmada).
   const hoyLima = ymdLima(new Date()) || hoy;
   const conEvo = new Set(arr(d?.historia).filter((h) => h.citaId && (String(h.diagnostico || "").trim() || String(h.detalle || "").trim())).map((h) => String(h.citaId)));
-  const citasEvo = arr(d?.citas).filter((c) => c.id != null && c.fecha === hoyLima && !conEvo.has(String(c.id)) && !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(String(c.estado)));
+  const esCitaPedida = (c) => !!citaPedida && c && c.id != null && String(c.id) === String(citaPedida.citaId);
+  const citaLigable = (c) => c.id != null && (c.fecha === hoyLima || esCitaPedida(c)) && !conEvo.has(String(c.id)) && !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(String(c.estado));
+  // Las de ficha360 con id (demostración) y las leídas de GET /citas, sin repetir.
+  const citasEvo = [...arr(d?.citas), ...citasConId.filter((c) => !arr(d?.citas).some((x) => x.id != null && String(x.id) === String(c.id)))].filter(citaLigable);
+  // Si GET /citas no trajo la cita pedida (falló o no se pudo leer), se arma con lo que
+  // trajo la alerta; la hora y el motivo salen de la cita de ese día en la ficha (sin id).
+  if (citaPedida && citaPedida.fecha && !conEvo.has(String(citaPedida.citaId)) && !citasEvo.some(esCitaPedida)) {
+    const delDia = arr(d?.citas).filter((c) => c.fecha === citaPedida.fecha && !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(String(c.estado)));
+    const ref = delDia.length === 1 ? delDia[0] : {};
+    citasEvo.push({ ...ref, id: citaPedida.citaId, fecha: citaPedida.fecha, medico: ref.medico || citaPedida.doctor || "", estado: ref.estado || "atendida" });
+  }
+  citasEvo.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || String(a.hora || "").localeCompare(String(b.hora || "")));
   const citasEvoKey = citasEvo.map((c) => `${c.id}:${c.estado}`).join("|");
+  const evoConCitaPasada = citasEvo.some((c) => c.fecha && c.fecha !== hoyLima);
+  const etiquetaCitaEvo = (c) => {
+    const dia = c.fecha && c.fecha !== hoyLima ? `${M.fechaCorta(c.fecha)} · ` : "";
+    return `${dia}${String(c.hora || "").slice(0, 5) || "—"} · ${c.motivo || c.especialidad || "Cita"}${c.medico ? ` · ${c.medico}` : ""}`;
+  };
   useEffect(() => {
-    // La cita que se inició desde la agenda («Iniciar» guarda cuál) o, si no, la que está en
+    let pedida = null;
+    try { const x = JSON.parse(sessionStorage.getItem("dc_cita_atencion") || "null"); pedida = x && x.citaId && String(x.pacienteId) === String(pacienteId) ? x : null; } catch { pedida = null; }
+    setCitaPedida(pedida);
+    setCitasConId([]);
+    if (!conectado || !pacienteId || !puedeEscribirClinico) return undefined;
+    let vivo = true;
+    const fechas = [...new Set([hoyLima, pedida && pedida.fecha].filter(Boolean))];
+    Promise.all(fechas.map((f) => api.citas.listar(f).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])))
+      .then((ls) => {
+        if (!vivo) return;
+        setCitasConId(ls.flat().filter((c) => c && c.id != null && String(c.pacienteId) === String(pacienteId))
+          .map((c) => ({ ...c, hora: String(c.hora || "").slice(0, 5), medico: typeof c.medico === "string" ? c.medico : (c.medicoNombre || "") })));
+      });
+    return () => { vivo = false; };
+  }, [pacienteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // La cita con la que se abrió la ficha («Completar» o «Iniciar») o, si no, la que está en
     // atención o ya atendida hoy; con una sola cita del día, esa.
     if (evoCitaId && citasEvo.some((c) => String(c.id) === String(evoCitaId))) return;
-    let pedida = null;
-    try { const x = JSON.parse(sessionStorage.getItem("dc_cita_atencion") || "null"); pedida = x && String(x.pacienteId) === String(pacienteId) ? x.citaId : null; } catch { pedida = null; }
+    const pedida = citaPedida ? citaPedida.citaId : null;
     const elegida = (pedida && citasEvo.find((c) => String(c.id) === String(pedida)))
       || citasEvo.find((c) => c.estado === "en_atencion")
       || citasEvo.find((c) => /atend|complet/i.test(String(c.estado)))
@@ -1432,7 +1511,12 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       // H-06: con su fecha de Lima; sin ella el servidor ponía el día UTC (de noche, mañana).
       else await api.historia.crear({ pacienteId, sedeId: sedeId || null, fecha: hoy, titulo: "Evolución", ...cuerpo, ...(evoCitaId ? { citaId: evoCitaId } : {}) });
       if (evoFile) { try { const url = await leerArchivo(evoFile); await crearArchivo(url, "Foto intraoral", "Anexo de evolución" + (evo.diagnostico ? " – " + evo.diagnostico : "")); } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); } }
-      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); setEvoCitaId(""); notify("Evolución registrada y firmada."); cargar(); recargarRx();
+      // La cita ya tiene su evolución: no se vuelve a proponer al reabrir la ficha.
+      if (evoCitaId && citaPedida && String(citaPedida.citaId) === String(evoCitaId)) {
+        try { sessionStorage.removeItem("dc_cita_atencion"); } catch { /* sin almacenamiento */ }
+        setCitaPedida(null);
+      }
+      setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); setEvoCitaId(""); notify(evoCitaId ? "Evolución registrada y firmada, ligada a su cita." : "Evolución registrada y firmada."); cargar(); recargarRx();
     } catch { notify("No se pudo guardar la evolución."); }
   };
   const completarDraft = (id) => {
@@ -2040,7 +2124,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 <div className="fm-kpis4" style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
                   {[
                     ["Última visita", ultimaVisita ? fmtFecha(ultimaVisita.fecha) : "—", ultimaVisita && ultimaVisita.especialidad !== "—" ? ultimaVisita.especialidad : "", CalendarDays, NAVY],
-                    ["Tratamientos", String(arr(d?.tratamientos).length || r.tratamientos || 0), "en el plan", ClipboardList, TEAL],
+                    ["Tratamientos", String(Array.isArray(d?.tratamientos) ? tratVivos.length : (r.tratamientos || 0)), "en el plan", ClipboardList, TEAL],
                   ].map(([l, v, s, Ic, c]) => { const clickable = l === "Tratamientos" || ((l === "Por pagar" || l === "Saldo a favor") && debe); const titlePorPagar = (l === "Por pagar" || l === "Saldo a favor") && clickable ? "Ver estado de cuenta" : (clickable ? "Ver plan / cuenta" : undefined); return (
                     <div key={l} onClick={clickable ? () => setTab("cuenta") : undefined} style={{ ...card, cursor: clickable ? "pointer" : "default" }} title={titlePorPagar}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em" }}>{React.createElement(Ic, { size: 13, strokeWidth: 1.75 })} {l}</div>
@@ -2083,8 +2167,9 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                               <div style={{ fontSize: 12, color: MUTED }}>{o.laboratorio || "—"}</div>
                             </div>
                             <div style={{ textAlign: "right", flexShrink: 0 }}>
-                              <div style={{ fontWeight: 500, color: TEAL, textTransform: "capitalize" }}>{o.estado || "—"}</div>
-                              <div style={{ fontSize: 12, color: MUTED }}>Retorno: {String(o.fechaEstimada || o.entrega || o.fechaRetorno || "—").slice(0, 10)}</div>
+                              {/* R-24: el estado con su etiqueta («En proceso», no «En_proceso») y la fecha legible. */}
+                              <div style={{ fontWeight: 500, color: TEAL }}>{o.estado ? estadoLabel("laboratorio", ESTADO_LAB_API[o.estado] || o.estado) : "—"}</div>
+                              {(() => { const f = String(o.fechaEstimada || o.entrega || o.fechaRetorno || "").slice(0, 10); return <div style={{ fontSize: 12, color: MUTED }}>Retorno: {/^\d{4}-\d{2}-\d{2}$/.test(f) ? fmtFecha(f) : (f || "—")}</div>; })()}
                             </div>
                           </div>
                         ))}
@@ -2103,7 +2188,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                         <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid var(--dc-line)", flexWrap: "wrap" }}>
                           <div>
                             <div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.tipo || c.titulo || "Consentimiento"}</div>
-                            <div style={{ fontSize: 12, color: MUTED }}>{(c.fechaFirma || c.creadoEn || "").slice(0, 10) || "—"} – {c.firmado ? "Firmado" : "Pendiente"}</div>
+                            <div style={{ fontSize: 12, color: MUTED }}>{fechaHoraLima(c.fechaFirma || c.creadoEn) || "—"} – {c.firmado ? "Firmado" : "Pendiente"}</div>
                           </div>
                           {!c.firmado && !conectado && (
                             <button onClick={() => { setConsentimientos((cur) => cur.map((y) => y.id === c.id ? { ...y, firmado: true, fechaFirma: hoy, firmanteNombre: p.apoderadoNombre || p.nombre, local: true } : y)); anotar("firma", "Firmó un consentimiento", c.tipo || ""); notify("Consentimiento firmado."); }}
@@ -2344,9 +2429,12 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     </div>
                     {citasEvo.length > 0 && (
                       <div>
-                        <label style={lbl}>Cita de hoy</label>
+                        <label style={lbl}>{evoConCitaPasada ? "Cita" : "Cita de hoy"}</label>
                         <Select value={evoCitaId} onChange={setEvoCitaId} ariaLabel="Cita a la que pertenece la evolución"
-                          options={[{ value: "", label: "Sin cita (nota suelta)" }, ...citasEvo.map((c) => ({ value: String(c.id), label: `${String(c.hora || "").slice(0, 5) || "—"} · ${c.motivo || c.especialidad || "Cita"}${c.medico ? ` · ${c.medico}` : ""}` }))]} />
+                          options={[{ value: "", label: "Sin cita (nota suelta)" }, ...citasEvo.map((c) => ({ value: String(c.id), label: etiquetaCitaEvo(c) }))]} />
+                        {evoCitaId && citasEvo.some((c) => String(c.id) === String(evoCitaId) && c.fecha && c.fecha !== hoyLima) && (
+                          <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>Atención del {fmtFecha(citasEvo.find((c) => String(c.id) === String(evoCitaId)).fecha)} pendiente de evolución: al registrarla se cierra el pendiente y la atención cuenta en la producción.</div>
+                        )}
                       </div>
                     )}
                     <CieDiagInput style={inp} placeholder="Diagnóstico (CIE-10 o texto libre)" value={evo.diagnostico} onChange={(v) => setEvo({ ...evo, diagnostico: v })} />
@@ -2570,10 +2658,10 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 </div>
                 <div style={{ ...card, padding: 0, overflow: "hidden" }}>
                   <div style={{ padding: "12px 16px", fontWeight: 500, color: NAVY, borderBottom: `1px solid ${LINE}` }}>Plan de tratamiento</div>
-                  {arr(d?.tratamientos).length === 0 ? <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin plan de tratamiento.</div> : (
-                    <DataTable bare minWidth={0} sub="tratamientos" rows={arr(d?.tratamientos).map((t, i) => ({ ...t, id: t.id ?? i }))} cols={[
+                  {tratVivos.length === 0 ? <div style={{ padding: 16, fontSize: 13, color: MUTED }}>Sin plan de tratamiento.</div> : (
+                    <DataTable bare minWidth={0} sub="tratamientos" rows={tratVivos.map((t, i) => ({ ...t, id: t.id ?? i }))} cols={[
                       { key: "nombre", label: "Tratamiento", w: "minmax(0,2fr)", a: "left", get: (t) => `${t.nombre}${t.pieza ? ` – pieza ${t.pieza}` : ""}`, cell: (t) => <span style={{ color: NAVY, fontWeight: 600, fontSize: 13 }}>{t.nombre}{t.pieza ? ` – pieza ${t.pieza}` : ""}</span> },
-                      { key: "estado", label: "Estado", w: "130px", get: (t) => (t.estado === "completada" ? "Completada" : "Pendiente"), cell: (t) => <span className={`dc-pill${t.estado === "completada" ? " is-ok" : " is-aviso"}`}><i /> {t.estado === "completada" ? "Completada" : "Pendiente"}</span> },
+                      { key: "estado", label: "Estado", w: "130px", get: (t) => (faseHecha(t) ? "Completada" : "Pendiente"), cell: (t) => <span className={`dc-pill${faseHecha(t) ? " is-ok" : " is-aviso"}`}><i /> {faseHecha(t) ? "Completada" : "Pendiente"}</span> },
                       { key: "costo", label: "Costo", w: "110px", a: "right", get: (t) => money(t.costo), sortVal: (t) => Number(t.costo) || 0, cell: (t) => <span style={{ fontWeight: 700, fontFamily: "var(--dc-font-title)", fontSize: 13 }}>{money(t.costo)}</span> },
                     ]} />
                   )}
@@ -2629,20 +2717,20 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
           <aside hidden={tab !== "resumen"} className={`fm-lateral${tab !== "resumen" ? " is-oculta" : ""}`} style={{ borderLeft: `1px solid ${SOFT}`, background: "var(--dc-white)", padding: 16, overflowY: "auto", boxSizing: "border-box", minWidth: 0, display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 14, alignContent: "start" }}>
             <div>
               <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 10 }}>Presupuesto</div>
-              {arr(d?.tratamientos).length === 0
+              {tratVivos.length === 0
                 ? <div style={{ fontSize: 13, color: MUTED }}>Sin plan de tratamiento todavía.</div>
                 : <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 7 }}>
-                    {arr(d?.tratamientos).slice(0, 6).map((t, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                        <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", flexShrink: 0, border: `2px solid ${t.estado === "completada" ? GREEN : ACCENT}`, background: t.estado === "completada" ? GREEN : "transparent" }} />
+                    {tratVivos.slice(0, 6).map((t, i) => (
+                      <div key={i} title={estadoLabel("procedimiento", t.estado === "completada" ? "atendida" : t.estado)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: "var(--dc-r-full)", flexShrink: 0, border: `2px solid ${faseHecha(t) ? GREEN : ACCENT}`, background: faseHecha(t) ? GREEN : "transparent" }} />
                         <span style={{ flex: 1, minWidth: 0, color: NAVY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {t.nombre}{t.pieza && !/pieza/i.test(String(t.nombre)) ? ` (${t.pieza})` : ""}
                         </span>
                         <span style={{ color: TEXT, fontWeight: 500, flexShrink: 0 }}>{money(t.costo)}</span>
                       </div>
                     ))}
-                    {arr(d?.tratamientos).length > 6 && (
-                      <div style={{ fontSize: 12, color: MUTED }}>y {arr(d.tratamientos).length - 6} más…</div>
+                    {tratVivos.length > 6 && (
+                      <div style={{ fontSize: 12, color: MUTED }}>y {tratVivos.length - 6} más…</div>
                     )}
                   </div>}
             </div>

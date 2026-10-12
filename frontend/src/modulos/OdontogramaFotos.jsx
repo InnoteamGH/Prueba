@@ -7,9 +7,10 @@
    odontograma anatómico, recibe los datos de la fase (__dentoBridge.hydrate) y se copia
    su SVG con los estilos ya calculados, así la foto es idéntica a lo que vio el doctor. */
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { ArrowRight, ClipboardList, Smile, X } from "lucide-react";
-import api, { auth } from "../api/client";
+import { ArrowRight, ClipboardList, Lock, Smile, X } from "lucide-react";
+import api, { auth, esSinPermiso } from "../api/client";
 import { DatosDemoCtx } from "../comun";
+import { tienePermiso } from "../compartido/permisos";
 import { estadosAppAHtml } from "./OdontogramaAnatomico";
 import { filasADatos, listaHallazgos } from "../util/odontogramaHallazgos";
 
@@ -107,21 +108,31 @@ export function hallazgosDe(datos) { return listaHallazgos(datos); }
 const piezaFdi = (n) => { const s = String(n); return s.length === 2 ? `${s[0]}.${s[1]}` : s; };
 
 /* Datos de cada fase: con sesión, del servidor; en la demo, de la ficha del paciente. */
-function useFases(pacienteId, ficha) {
+/* sinAcceso: el rol no ve el odontograma (R-13). No se piden las tomas: eran tres 403 y la
+   pantalla decía «Sin registro en esta fase», como si el paciente no tuviera odontograma. */
+function useFases(pacienteId, ficha, sinAcceso = false) {
   const conectado = !!auth.token;
   const [remoto, setRemoto] = useState(null);
+  const [rechazado, setRechazado] = useState(false);
   useEffect(() => {
-    if (!conectado || !pacienteId) return undefined;
+    setRechazado(false);
+    if (!conectado || !pacienteId || sinAcceso) return undefined;
     let vivo = true;
-    Promise.all(FASES_FOTO.map(([f]) => api.odontograma.porPaciente(pacienteId, f).then((rows) => {
-      // Mismo formato que hidrata el módulo Odontograma: caras, raíces y todas las marcas
-      // de pieza con su color (antes solo contaba estadoPieza y la toma salía vacía).
-      return filasADatos(rows || []);
-    }).catch(() => ({})))).then((xs) => vivo && setRemoto(Object.fromEntries(FASES_FOTO.map(([f], i) => [f, xs[i]]))));
+    // Mismo formato que hidrata el módulo Odontograma: caras, raíces y todas las marcas
+    // de pieza con su color (antes solo contaba estadoPieza y la toma salía vacía).
+    const leer = (f) => api.odontograma.porPaciente(pacienteId, f).then((rows) => filasADatos(rows || []));
+    // Una toma que no se pudo leer (500) no es «Sin registro»: queda marcada como fallida.
+    const leerOFallo = (f) => leer(f).catch(() => ({ __fallo: true }));
+    // La primera toma va sola: si el servidor la rechaza (403) no se piden las otras dos.
+    leer(FASES_FOTO[0][0])
+      .catch((e) => { if (esSinPermiso(e)) throw e; return { __fallo: true }; })
+      .then((primera) => Promise.all(FASES_FOTO.slice(1).map(([f]) => leerOFallo(f))).then((resto) => [primera, ...resto]))
+      .then((xs) => vivo && setRemoto(Object.fromEntries(FASES_FOTO.map(([f], i) => [f, xs[i]]))))
+      .catch(() => { if (vivo) setRechazado(true); });
     return () => { vivo = false; };
-  }, [conectado, pacienteId]);
-  return useMemo(() => {
-    if (conectado) return remoto ? FASES_FOTO.map(([f, l, c, d]) => ({ fase: f, label: l, color: c, desc: d, datos: remoto[f] || {} })) : null;
+  }, [conectado, pacienteId, sinAcceso]);
+  const fases = useMemo(() => {
+    if (conectado) return remoto ? FASES_FOTO.map(([f, l, c, d]) => ({ fase: f, label: l, color: c, desc: d, datos: remoto[f] && !remoto[f].__fallo ? remoto[f] : {}, fallo: !!(remoto[f] && remoto[f].__fallo) })) : null;
     const html = ficha?.odoHtml || {};
     return FASES_FOTO.map(([f, l, c, d]) => {
       let datos = html[f];
@@ -129,11 +140,15 @@ function useFases(pacienteId, ficha) {
       return { fase: f, label: l, color: c, desc: d, datos: datos || {} };
     });
   }, [conectado, remoto, ficha]);
+  return { fases, sinPermiso: sinAcceso || rechazado };
 }
 
-function Foto({ datos, fase, label, color, onZoom }) {
+function Foto({ datos, fase, label, color, onZoom, fallo = false }) {
   const url = useFoto(datos, fase);
   const sin = vacio(datos);
+  if (fallo) return (
+    <div className="dc-ofo__img"><span>No se pudo leer esta toma (error del servidor). Vuelve a abrir la pestaña en un momento.</span><em><i style={{ background: color }} />{label}</em></div>
+  );
   return (
     <div className={`dc-ofo__img${url && url !== "error" ? " is-lista" : ""}`} role={url && url !== "error" ? "button" : undefined} tabIndex={url && url !== "error" ? 0 : undefined}
          title={url && url !== "error" ? "Ampliar" : undefined} onClick={url && url !== "error" ? () => onZoom(url, label) : undefined}
@@ -147,7 +162,8 @@ function Foto({ datos, fase, label, color, onZoom }) {
 export default function OdontogramaFotos({ pacienteId, ficha = null, onAbrir }) {
   const db = useContext(DatosDemoCtx);
   const f = ficha || db?.fichas?.[pacienteId] || null;
-  const fases = useFases(pacienteId, f);
+  const conectado = !!auth.token;
+  const { fases, sinPermiso } = useFases(pacienteId, f, conectado && !tienePermiso("odontograma", "ver"));
   const [zoom, setZoom] = useState(null);
   const nombres = useNombres();
   useEffect(() => { if (!zoom) return undefined; const k = (e) => e.key === "Escape" && setZoom(null); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [zoom]);
@@ -159,16 +175,16 @@ export default function OdontogramaFotos({ pacienteId, ficha = null, onAbrir }) 
       <section className="dc-ofo__cab">
         <span className="dc-ofo__ico"><Smile size={18} strokeWidth={2} /></span>
         <div><b>Odontograma · historia clínica</b><small>Las tomas de cada fase en solo lectura. Para marcar hallazgos o armar el presupuesto, ábrelo en su módulo.</small></div>
-        {onAbrir && <button type="button" onClick={onAbrir}>Abrir en Odontograma <ArrowRight size={14} strokeWidth={2.2} /></button>}
+        {onAbrir && !sinPermiso && <button type="button" onClick={onAbrir}>Abrir en Odontograma <ArrowRight size={14} strokeWidth={2.2} /></button>}
       </section>
       <section className="dc-ofo__card">
         <header><h3>Evolución visual</h3><small>Inicial → Evolución → Alta · toca una toma para ampliarla</small></header>
-        {fases == null ? <p className="dc-ofo__vacio">Cargando…</p> : (
+        {sinPermiso ? <p className="dc-ofo__vacio" style={{ display: "flex", alignItems: "center", gap: 8 }}><Lock size={15} strokeWidth={2} /> Sin permiso para ver el odontograma: tu rol no tiene acceso a esta sección.</p> : fases == null ? <p className="dc-ofo__vacio">Cargando…</p> : (
           <div className="dc-ofo__fases">
             {fases.map((x) => { const hx = hallazgosDe(x.datos); return (
               <div key={x.fase} className={`dc-ofo__fase${vacio(x.datos) ? " is-vacia" : ""}${ultima && ultima.fase === x.fase ? " is-ultima" : ""}`}>
-                <div className="dc-ofo__fcab"><i style={{ background: x.color }} /><b>{x.label}</b><small>{vacio(x.datos) ? "sin registro" : `${hx.total} ${hx.total === 1 ? "hallazgo" : "hallazgos"}`}</small>{ultima && ultima.fase === x.fase && <span className="dc-ofo__ult">Última</span>}</div>
-                <Foto datos={x.datos} fase={x.fase} label={x.label} color={x.color} onZoom={(url, l) => setZoom({ url, titulo: `Odontograma · fase ${l}` })} />
+                <div className="dc-ofo__fcab"><i style={{ background: x.color }} /><b>{x.label}</b><small>{x.fallo ? "no se pudo leer" : vacio(x.datos) ? "sin registro" : `${hx.total} ${hx.total === 1 ? "hallazgo" : "hallazgos"}`}</small>{ultima && ultima.fase === x.fase && <span className="dc-ofo__ult">Última</span>}</div>
+                <Foto datos={x.datos} fase={x.fase} label={x.label} color={x.color} fallo={x.fallo} onZoom={(url, l) => setZoom({ url, titulo: `Odontograma · fase ${l}` })} />
                 <small className="dc-ofo__desc">{x.desc}</small>
               </div>
             ); })}

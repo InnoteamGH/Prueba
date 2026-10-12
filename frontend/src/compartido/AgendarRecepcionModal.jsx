@@ -626,12 +626,12 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             <Clock size={13} strokeWidth={2} />
             {!tieneHorario ? <span>Este doctor no tiene horario configurado: se puede agendar a cualquier hora de la clínica.</span>
               : turnosHoy.length ? <span>{fechaLegible(f.fecha)} atiende {turnosHoy.map((t, i) => <b key={i}>{String(t.horaInicio).slice(0, 5)}–{String(t.horaFin).slice(0, 5)}{t.sede != null || t.sedeId != null ? ` (${nomSede(t.sede ?? t.sedeId).replace(/^Sede\s+/, "") || "sede"})` : ""}</b>).reduce((a, b) => [a, " y ", b])}</span>
-              : <span>No atiende el {fechaLegible(f.fecha)}. Elige otra fecha u otro doctor.</span>}
+              : <span>No atiende el {fechaLegible(f.fecha).replace(/\.$/, "")}. Elige otra fecha u otro doctor.</span>}
           </div>}
           <div className="dc-agm__paso"><i>3</i>Cuándo</div>
           <div>
             <div className="dc-agm__fh"><span style={{ ...lbl, marginBottom: 0 }}>Fecha y hora</span>
-              <button type="button" onClick={buscarHuecos} disabled={huecos === "buscando"}><Search size={13} strokeWidth={2.2} /> {huecos === "buscando" ? "Buscando…" : `Primer hueco libre${f.medicoId ? "" : espObj ? ` de ${espObj.nombre.toLowerCase()}` : ""}`}</button>
+              <button type="button" onClick={buscarHuecos} disabled={huecos === "buscando"} title="Busca los primeros horarios libres de los próximos 14 días"><Search size={13} strokeWidth={2.2} /> {huecos === "buscando" ? "Buscando…" : `Buscar huecos libres${f.medicoId ? "" : espObj ? ` de ${espObj.nombre.toLowerCase()}` : ""}`}</button>
             </div>
             {Array.isArray(huecos) && <div className="dc-agm__huecos">
               {huecos.length === 0 ? <p>Sin huecos en los próximos 14 días con estas condiciones.</p> : huecos.map((h, i) => (
@@ -639,8 +639,11 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
               ))}
               <button type="button" className="is-cerrar" onClick={() => setHuecos(null)} aria-label="Cerrar sugerencias">×</button>
             </div>}
+            {/* R-24: la hora escrita salía justo bajo «Primer hueco libre», como si fuera su
+                resultado. Se dice de dónde sale: la que eligió la persona o la primera libre. */}
             <div style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, marginBottom: 6 }}>
-              {fechaLegible(f.fecha)} – {f.hora}
+              Cita: {fechaLegible(f.fecha)} – {f.hora}
+              <span style={{ fontWeight: 400, color: "var(--dc-ink-500)", marginLeft: 6 }}>{horaElegida ? "(hora elegida)" : "(primera hora libre del día)"}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, border: `1.5px solid ${pasada ? "var(--dc-red)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
               <Clock size={16} strokeWidth={1.75} color={pasada ? "var(--dc-red)" : "var(--dc-ink-400)"} style={{ flexShrink: 0 }} />

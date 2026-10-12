@@ -27,4 +27,9 @@ describe("recetaItems H-08: un solo esquema, se leen los dos formatos", () => {
     assert.deepEqual(itemRecetaDesdeFormulario({ med: " Amoxicilina ", dosis: "500 mg", frec: "c/8 h", dur: "7 días" }),
       { medicamento: "Amoxicilina", presentacion: "500 mg", dosis: "", frecuencia: "c/8 h", duracion: "7 días" });
   });
+
+  it("M5-10: el formulario del módulo guarda presentación y dosis por separado", () => {
+    assert.deepEqual(itemRecetaDesdeFormulario({ med: "Paracetamol", pres: "500 mg", dosis: " 1 tableta ", frec: "c/8 h", dur: "3 días" }),
+      { medicamento: "Paracetamol", presentacion: "500 mg", dosis: "1 tableta", frecuencia: "c/8 h", duracion: "3 días" });
+  });
 });
