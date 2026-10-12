@@ -726,7 +726,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
           ? "El servidor aún no informa el estado de las integraciones."
           : incidenciasTI === 0
           ? "Todo operativo. Sin incidencias en las integraciones."
-          : `${incidenciasTI} integración(es) con incidencia. Revísalas antes que nada.`)
+          : `${incidenciasTI} ${incidenciasTI === 1 ? "integración" : "integraciones"} con incidencia. Revísalas antes que nada.`)
       : esGer
         ? (nHoy === 0 ? "Hoy no hay citas agendadas en la clínica." : cuposLibres == null ? `La clínica tiene ${pluralEs(nHoy, "cita", "citas")} hoy.` : `La clínica tiene ${pluralEs(nHoy, "cita", "citas")} hoy y ${pluralEs(cuposLibres, "cupo sin vender", "cupos sin vender")}.`)
         : (nHoy === 0 ? "Hoy no hay citas agendadas." : `${pluralEs(nHoy, "cita", "citas")} hoy${sinConfirmar ? `, ${pluralEs(sinConfirmar, "sin confirmar", "sin confirmar")}` : ""}.${cuposLibres == null ? "" : ` Quedan ${pluralEs(cuposLibres, "cupo libre", "cupos libres")}.`}`);
