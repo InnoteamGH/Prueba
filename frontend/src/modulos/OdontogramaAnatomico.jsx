@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef } from "react";
-import api, { auth } from "../api/client";
+import api, { auth, msgServidor } from "../api/client";
 import { snapshotAGuardados } from "../util/odontogramaBridge.js";
 import { apiRowsAHtmlDatos } from "../util/odontogramaHydrate.js";
 import { pedirAnexoAlIframe } from "../util/odontogramaAnexo.js";
@@ -7,6 +7,7 @@ import { useDatosImpresion } from "../util/membrete";
 import { MEDICOS, useSede } from "../comun";
 import { useCatalogoApi, useMedicosApi, medicoEn, tarifaDibujoDesdeCatalogo } from "../compartido/catalogoApi";
 import { precioEnSede } from "../compartido/cajaSede";
+import { estadoFaseUi } from "../compartido/estados";
 import { copNumero } from "../util/cop";
 
 /* Profesional que firma los documentos del odontograma: el odontólogo que tiene la
@@ -163,6 +164,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
 }, ref) {
   const iframeRef = useRef(null);
   const [syncState, setSyncState] = useState("idle");
+  const [errorCarga, setErrorCarga] = useState(null);   // no se pudo leer lo guardado de la fase
   const [frameReady, setFrameReady] = useState(false);
   const [autoH, setAutoH] = useState(860);
   const lastJson = useRef("");
@@ -242,11 +244,16 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       lastFirmas.current = firmasDe(datos);
       hydrated.current = true;
       lastJson.current = JSON.stringify(datos);
+      setErrorCarga(null);
       setSyncState("ok");
       setTimeout(measureIframe, 80);
-    } catch {
-      hydrated.current = true;
+    } catch (e) {
+      // M5-04: con un 500 el dibujo quedaba en «0 piezas · Todavía no hay hallazgos» (había 2)
+      // y se podía seguir marcando: cada pieza tocada se guardaba sobre lo que había. Ahora se
+      // avisa que no se pudo leer y no se guarda nada hasta leerlo («Reintentar»).
+      hydrated.current = false;
       setSyncState("idle");
+      setErrorCarga(msgServidor(e, "error del servidor"));
     }
   }, [pacienteId, capa, postToIframe, measureIframe, demoEstados, demoDatos]);
 
@@ -267,7 +274,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     api.tratamientos.porPaciente(pacienteId).then((ps) => {
       if (!vivo) return;
       const fs = [];
-      (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && !/anulad/i.test(String(f.estado || ""))) fs.push({ id: f.id, t: f.nombre || "Procedimiento", v: Number(f.costo) || 0, pz: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || "" }); }));
+      (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && estadoFaseUi(f.estado) !== "anulado") fs.push({ id: f.id, t: f.nombre || "Procedimiento", v: Number(f.costo) || 0, pz: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || "" }); }));
       setPlanSrv(fs);
     // H-10: si el plan no se puede leer, el documento lo dice; antes salía una «Propuesta»
     // armada solo con los hallazgos, como si el paciente no tuviera nada en su plan.
@@ -373,6 +380,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     lastJson.current = "";
     lastFirmas.current = {};
     setSyncState("idle");
+    setErrorCarga(null);
   }, [pacienteId, src]);
 
   // Cambio de fase sin remount: rehidratar solo si el padre lo pidió (no el iframe).
@@ -459,6 +467,12 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
 
   return (
     <div style={{ display: "grid", gap: 0 }}>
+      {auth.token && errorCarga && (
+        <div role="alert" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "0 0 10px", padding: "10px 14px", borderRadius: "var(--dc-r-md)", background: "var(--dc-danger-soft)", border: "1px solid var(--dc-danger-mid)", color: "var(--dc-danger-700)", fontSize: 13, lineHeight: 1.5 }}>
+          <span style={{ flex: "1 1 280px" }}><b>No se pudo leer el odontograma guardado</b> ({errorCarga}). Lo que se ve puede estar vacío o incompleto: no es el estado del paciente y no se guardan cambios hasta leerlo.</span>
+          <button type="button" className="dc-link" onClick={() => hidratarDesdeApi()}>Reintentar</button>
+        </div>
+      )}
       <div style={{ position: "relative", minHeight: frameReady ? 0 : (height != null ? height : 480) }}>
         {!frameReady && (
           <div

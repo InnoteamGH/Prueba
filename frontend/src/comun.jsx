@@ -1569,6 +1569,22 @@ export function etiquetaCant(n, sub) {
   return sub.replace(/s$/, "");
 }
 
+/* R-23: búsqueda sin tildes ni mayúsculas y, si lo escrito es un número (teléfono, DNI) con
+   espacios, guiones o puntos, comparando solo los dígitos: «933 445 566», tal como se ve en
+   la tabla, encuentra el 933445566 guardado (antes daba 0 resultados). */
+const sinTildes = (x) => String(x ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+export function coincideBusqueda(texto, consulta) {
+  const q = sinTildes(consulta).trim();
+  if (!q) return true;
+  const t = sinTildes(texto);
+  if (t.includes(q)) return true;
+  if (/^[\d\s().+-]+$/.test(q)) {
+    const dq = q.replace(/\D/g, "");
+    if (dq.length >= 3 && t.replace(/\D/g, "").includes(dq)) return true;
+  }
+  return false;
+}
+
 /* Filtro por columna y orden, el mismo de la tabla de Pacientes, para cualquier lista.
    cols: [{ key, label, get:(r)=>texto, sortVal?:(r)=>valor, noFilter, noSort }]
    Devuelve la lista filtrada y ordenada y el estado que usa <FiltroCabecera>. */
@@ -1582,9 +1598,9 @@ export function useFiltroTabla(rows, cols, defaultSort) {
   const toggleSort = (key) => { setActiveCol(null); if (sortCol !== key) { setSortCol(key); setSortDir("asc"); } else if (sortDir === "asc") setSortDir("desc"); else setSortCol(null); };
   const anyF = Object.values(colFilters).some((v) => v && v.trim()) || !!q.trim();
   const lista = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-    const base = (rows || []).filter((r) => cols.every((c) => { if (c.noFilter || !c.get) return true; const f = (colFilters[c.key] || "").trim().toLowerCase(); return !f || String(c.get(r) ?? "").toLowerCase().includes(f); })
-      && (!qq || cols.some((c) => !c.noFilter && c.get && String(c.get(r) ?? "").toLowerCase().includes(qq))));
+    const qq = q.trim();
+    const base = (rows || []).filter((r) => cols.every((c) => { if (c.noFilter || !c.get) return true; const f = (colFilters[c.key] || "").trim(); return !f || coincideBusqueda(c.get(r), f); })
+      && (!qq || cols.some((c) => !c.noFilter && c.get && coincideBusqueda(c.get(r), qq))));
     const sc = cols.find((c) => c.key === sortCol && (c.sortVal || c.get));
     if (!sc) return base;
     const val = sc.sortVal || sc.get;
@@ -1884,20 +1900,35 @@ export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
   // lista absoluta quedaba recortada por el contenedor.
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
+  const listaRef = useRef(null);
+  const conTeclado = useRef(false);
   const lista = opciones.filter(Boolean);
   useEffect(() => {
     if (!pos) return undefined;
     const cerrar = () => setPos(null);
+    // M5-09: Escape cierra el menú aunque el foco siga en el botón ⋯ (antes solo funcionaba con
+    // el foco dentro de la lista y quedaba el fondo invisible que bloqueaba los clics). Se
+    // escucha en captura para que no cierre también el modal que lo contiene.
+    const alTeclear = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); e.stopPropagation();
+      setPos(null);
+      btnRef.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener("keydown", alTeclear, true);
+    // Abierto con el teclado (Enter o espacio sobre ⋯): el foco pasa a la primera opción.
+    if (conTeclado.current) listaRef.current?.querySelector("button")?.focus({ preventScroll: true });
     // Se cierra si el botón se movió (la lista quedaría lejos de su fila), no por el
     // resto de un desplazamiento suave que todavía llega justo después de abrir.
     const y0 = btnRef.current?.getBoundingClientRect().top ?? 0;
     const alDesplazar = () => { const y = btnRef.current?.getBoundingClientRect().top ?? 0; if (Math.abs(y - y0) > 4) cerrar(); };
     window.addEventListener("resize", cerrar);
     document.addEventListener("scroll", alDesplazar, true);
-    return () => { window.removeEventListener("resize", cerrar); document.removeEventListener("scroll", alDesplazar, true); };
+    return () => { window.removeEventListener("resize", cerrar); document.removeEventListener("scroll", alDesplazar, true); window.removeEventListener("keydown", alTeclear, true); };
   }, [pos]);
   if (!lista.length) return null;
-  const abrir = () => {
+  const abrir = (e) => {
+    conTeclado.current = !!e && e.detail === 0;
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
     const abajo = window.innerHeight - r.bottom > 44 * lista.length + 24;
@@ -1905,12 +1936,20 @@ export function MenuAcciones({ opciones = [], etiqueta = "Más acciones" }) {
   };
   return (
     <div className="dc-menu" onClick={(e) => e.stopPropagation()}>
-      <button ref={btnRef} type="button" className="dc-row-action" aria-label={etiqueta} title={etiqueta} aria-haspopup="menu" aria-expanded={!!pos} onClick={() => (pos ? setPos(null) : abrir())}><MoreHorizontal size={16} strokeWidth={1.75} /></button>
+      <button ref={btnRef} type="button" className="dc-row-action" aria-label={etiqueta} title={etiqueta} aria-haspopup="menu" aria-expanded={!!pos} onClick={(e) => (pos ? setPos(null) : abrir(e))}><MoreHorizontal size={16} strokeWidth={1.75} /></button>
       {/* En el body: un ancestro con transform u overflow (animación de entrada, tabla)
           desplazaba la lista fija y el clic caía sobre la fila de otro paciente. */}
       {pos && createPortal(<>
         <div onClick={(e) => { e.stopPropagation(); setPos(null); }} style={{ position: "fixed", inset: 0, zIndex: 190 }} />
-        <div className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setPos(null); } }}>
+        <div ref={listaRef} className="dc-menu__lista" role="menu" style={{ position: "fixed", zIndex: 191, top: pos.top, bottom: pos.bottom, right: pos.right }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => {
+          // Flechas para moverse entre las opciones (Escape lo atiende el efecto de arriba).
+          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+          e.preventDefault();
+          const ops = [...(listaRef.current?.querySelectorAll("button") || [])];
+          const i = ops.indexOf(document.activeElement);
+          const sig = ops[(i + (e.key === "ArrowDown" ? 1 : -1) + ops.length) % ops.length];
+          sig?.focus();
+        }}>
           {lista.map((o) => (
             <button key={o.label} type="button" role="menuitem" className={`dc-menu__op${o.peligro ? " dc-menu__op--peligro" : ""}`} onClick={() => { setPos(null); o.onClick(); }}>{o.label}</button>
           ))}

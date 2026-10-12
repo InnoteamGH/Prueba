@@ -1,6 +1,18 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo } from "./fechaLima.js";
+import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima } from "./fechaLima.js";
+
+describe("fechaHoraLima M5-14", () => {
+  it("formatea la hora de firma en dd/mm/aaaa hh:mm de Lima", () => {
+    assert.equal(fechaHoraLima("2026-10-11T19:27:45.440786-05:00"), "11/10/2026 19:27");
+    assert.equal(fechaHoraLima("2026-10-12T00:27:45Z"), "11/10/2026 19:27");
+  });
+  it("una fecha sola sale sin hora y lo ilegible tal cual", () => {
+    assert.equal(fechaHoraLima("2026-10-11"), "11/10/2026");
+    assert.equal(fechaHoraLima(""), "");
+    assert.equal(fechaHoraLima("ayer"), "ayer");
+  });
+});
 
 describe("fechaLima NEW-57", () => {
   it("ymdLima formatea en America/Lima", () => {

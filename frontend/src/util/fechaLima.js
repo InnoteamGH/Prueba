@@ -11,6 +11,21 @@ export function ymdLima(d) {
   }).format(date);
 }
 
+/** «11/10/2026 19:27» (dd/mm/aaaa hh:mm) en hora de Lima, para documentos firmados (M5-14).
+    Una fecha sola («2026-10-11») sale sin hora; lo que no se puede leer, tal cual. */
+export function fechaHoraLima(v) {
+  if (v == null || v === "") return "";
+  const s = String(v);
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (soloFecha) return `${soloFecha[3]}/${soloFecha[2]}/${soloFecha[1]}`;
+  const date = v instanceof Date ? v : new Date(s);
+  if (Number.isNaN(date.getTime())) return s;
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date).map((x) => [x.type, x.value]));
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
+}
+
 /** Resume user-agent a etiqueta corta para Auditoría (NEW-58b). */
 export function resumenDispositivo(ua) {
   const s = String(ua || "").trim();

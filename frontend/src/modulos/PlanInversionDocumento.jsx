@@ -6,6 +6,8 @@ import { normalizarImpresion, urlLogo, useDatosImpresion } from "../util/membret
 import { DatosDemoCtx, Select, useSede } from "../comun";
 import { leerCatalogo } from "../compartido/catalogo";
 import { precioEnSede } from "../compartido/cajaSede";
+import { estadoFaseUi } from "../compartido/estados";
+import { nombreConCara } from "../compartido/presupuestoDoc";
 import { useCatalogoApi, HALLAZGO_IFRAME } from "../compartido/catalogoApi";
 import {
   SUELTOS_PARTIDA,
@@ -187,7 +189,8 @@ export default function PlanInversionDocumento({
     if (!sesion || !pacienteId) return undefined;
     let vivo = true;
     api.tratamientos.porPaciente(pacienteId)
-      .then((ps) => { if (!vivo) return; const fs = []; (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && !/anulad/i.test(String(f.estado || ""))) fs.push(f); })); setPlanSrv(fs); })
+      // El servidor guarda la anulación como «cancelada» (antes solo se miraba «anulad…»).
+      .then((ps) => { if (!vivo) return; const fs = []; (ps || []).forEach((pf) => (pf.fases || []).forEach((f) => { if (f && estadoFaseUi(f.estado) !== "anulado") fs.push(f); })); setPlanSrv(fs); })
       .catch(() => { if (vivo) setPlanSrv([]); });
     api.odontograma.porPaciente(pacienteId, capa)
       .then((rows) => { if (vivo) setHallSrv(listaHallazgos(filasADatos(rows || [])).lista.filter((m) => !m.hecho).map((m) => [Number(m.pieza), m.codigo, m.zona.replace(/^Cara /, "")])); })
@@ -205,7 +208,8 @@ export default function PlanInversionDocumento({
     const delPlan = fases.map((f) => {
       const pz = f.piezaNumero ?? f.pieza;
       const cara = String(f.cara || "").trim();
-      return { pz: pz != null && pz !== "" ? Number(pz) : null, cod: f.codigo || f.servicioId || f.id, nom: `${f.nombre || "Procedimiento"}${cara ? ` (${cara})` : ""}`, v: Number(f.costo) || 0, cant: 1, ubic: ["Plan y cuenta"], max: null };
+      // M5-07: sin repetir la cara si el nombre ya la trae («… pieza 15 (O) (O)»).
+      return { pz: pz != null && pz !== "" ? Number(pz) : null, cod: f.codigo || f.servicioId || f.id, nom: nombreConCara(f.nombre || "Procedimiento", cara), v: Number(f.costo) || 0, cant: 1, ubic: ["Plan y cuenta"], max: null };
     });
     const L = delPlan.length ? [...delPlan, ...L0].sort((a, b) => (a.pz == null ? 99 : a.pz) - (b.pz == null ? 99 : b.pz)) : L0;
     const totales = calcularTotales(L, doc.descuento || { activo: false });

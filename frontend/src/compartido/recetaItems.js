@@ -49,11 +49,9 @@ export const indicacionItemReceta = (it) => [it?.dosis, it?.frecuencia, it?.dura
     como JSON escapado («Ibuprofeno ↔ alergia…» con la barra literal): se decodifica. */
 export const textoIndicaciones = (t) => txt(t).replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 
-/** Formulario del módulo Recetas ({ med, dosis, frec, dur }) → esquema único para guardar. */
-export const itemRecetaDesdeFormulario = (x) => ({
-  medicamento: txt(x?.med),
-  presentacion: txt(x?.dosis),
-  dosis: "",
-  frecuencia: txt(x?.frec),
-  duracion: txt(x?.dur),
-});
+/** Formulario del módulo Recetas ({ med, pres, dosis, frec, dur }) → esquema único para guardar.
+    M5-10: el formulario no tenía dosis (su campo «dosis» era la presentación, «500 mg») y la
+    receta salía sin «1 tableta». Ahora trae los dos; uno sin «pres» es el formulario anterior. */
+export const itemRecetaDesdeFormulario = (x) => (x && x.pres !== undefined
+  ? { medicamento: txt(x.med), presentacion: txt(x.pres), dosis: txt(x.dosis), frecuencia: txt(x.frec), duracion: txt(x.dur) }
+  : { medicamento: txt(x?.med), presentacion: txt(x?.dosis), dosis: "", frecuencia: txt(x?.frec), duracion: txt(x?.dur) });

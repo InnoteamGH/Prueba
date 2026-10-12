@@ -2230,7 +2230,10 @@ function planLineas(){
       ubic:ubic,q:'Añadido en recepción',det:d.t,suelto:1,src:x});
   });
   PLAN_SRV.forEach(function(f){
-    lineas.push({pz:f.pz, cod:'plan:'+f.id, t:f.t+(f.cara?' ('+f.cara+')':''), v:f.v, cant:1,
+    /* M5-07: la partida que vino del odontograma ya trae la cara en el nombre
+       («Resina / obturación · pieza 15 (O)»): no se repite («… (O) (O)»). */
+    var conCara=f.cara && f.t.replace(/\s+$/,'').slice(-(f.cara.length+2)).toUpperCase()!==('('+f.cara+')').toUpperCase();
+    lineas.push({pz:f.pz, cod:'plan:'+f.id, t:f.t+(conCara?' ('+f.cara+')':''), v:f.v, cant:1,
       ubic:(f.pz?'pieza '+fdi(f.pz):'—'), q:'En Plan y cuenta', det:'En Plan y cuenta', plan:1});
   });
   /* Se agrupa por pieza y tratamiento: dos caries en la misma pieza son una línea con
