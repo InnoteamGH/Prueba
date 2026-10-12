@@ -237,6 +237,8 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     return [1, 2, 3, 4].map((n) => ({ id: `x${n}`, sede: f.sedeId, numero: n, nombre: `Sillón ${n}`, uso: "flexible", activo: true }));
   })();
   const ctxSede = { ...ctxReglas, sillones: sillonesSede };
+  // R-20: GET /sillones falló (500): no es que la sede no tenga sillones.
+  const fallaSillones = !demo && (reglas.fallos || []).includes("los sillones");
   const medSel = (ctxReglas.medicos || []).find((m) => String(m.id) === String(f.medicoId));
   // Sedes donde atiende un doctor: las de su ficha o, si no las trae, las de su horario.
   const sedesMed = (m) => {
@@ -265,6 +267,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const horaElegidaRef = useRef(!!base?.hora);
   const elegirHora = (si) => { horaElegidaRef.current = si; setHoraElegida(si); setHoraAuto(!si); };
   const horaAutoSiNoEligio = () => setHoraAuto(!horaElegidaRef.current);
+  // R-24: ¿la hora propuesta es de verdad una hora libre? Con un doctor que no atiende ese día
+  // no hay ninguna, y el resumen decía igual «08:00 (primera hora libre del día)».
+  const [sinHoraLibre, setSinHoraLibre] = useState(false);
   // DC-51: primera hora libre al abrir / cambiar fecha.
   useEffect(() => {
     if (!horaAuto || !f.fecha) return;
@@ -282,7 +287,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       // Además: el doctor atiende a esa hora, no tiene otra cita encima y queda algún sillón libre.
       const reglasOk = (h) => !f.medicoId || (evaluarCita(ctxSede, citaBorrador({ hora: h, sillon: null })).errores.length === 0 && sugerirSillon(ctxSede, citaBorrador({ hora: h })) != null);
       const valida = (h) => !ocupadas.has(h) && !citaFueraDeHorario(f.fecha, h, f.duracionMin, horarioClinica.horario, horarioClinica.feriados, sedeN).fuera && (!esHoy || toMin(h) > ahoraMin) && reglasOk(h);
-      const libre = HORAS_SEL.find(valida) || HORAS_SEL.find((h) => !ocupadas.has(h) && !citaFueraDeHorario(f.fecha, h, f.duracionMin, horarioClinica.horario, horarioClinica.feriados, sedeN).fuera) || HORAS_SEL[8] || "10:00";
+      const hallada = HORAS_SEL.find(valida);
+      if (!horaElegidaRef.current) setSinHoraLibre(!hallada);
+      const libre = hallada || HORAS_SEL.find((h) => !ocupadas.has(h) && !citaFueraDeHorario(f.fecha, h, f.duracionMin, horarioClinica.horario, horarioClinica.feriados, sedeN).fuera) || HORAS_SEL[8] || "10:00";
       // Nunca sobre una hora que la persona eligió mientras se esperaba la respuesta.
       setF((x) => (horaElegidaRef.current || x.hora === libre ? x : { ...x, hora: libre }));
     };
@@ -475,7 +482,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       // Un paciente que se atiende por primera vez en esta sede pasa a ser también de ella
       // (N:M): así aparece en Pacientes y en la agenda de esa sede.
       if (p.id != null && demoDb.setPacientes) demoDb.setPacientes((ps) => ps.map((x) => (String(x.id) !== String(p.id) || sedesDe(x).some((v) => mismaSede(v, sedeN)) ? x : { ...x, sedes: [...sedesDe(x), sedeN] })));
-      notify(fechas.length > 1 ? `${libres.length} cita(s) agendada(s)${fechas.length - libres.length ? `, ${fechas.length - libres.length} ocupadas` : ""}.` : `Cita agendada para ${p.nombre} el ${fechaLegible(f.fecha)} a las ${f.hora}.`);
+      notify(fechas.length > 1 ? `${libres.length} ${libres.length === 1 ? "cita agendada" : "citas agendadas"}${fechas.length - libres.length ? `, ${fechas.length - libres.length} ${fechas.length - libres.length === 1 ? "ocupada" : "ocupadas"}` : ""}.` : `Cita agendada para ${p.nombre} el ${fechaLegible(f.fecha)} a las ${f.hora}.`);
       onCreada();
       return;
     }
@@ -497,9 +504,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     setAvisoHorario(null);
     if (ok === 0) { notify(ultimoError || "No se pudo agendar (¿horario ocupado o bloqueado?)."); return; }
     const avisoTxt = f.avisar
-      ? (avisados > 0 && avisarFail === 0 ? ` – comprobante enviado a ${avisados} paciente(s)` : avisados > 0 ? ` – comprobante enviado a ${avisados}, ${avisarFail} no se pudo enviar` : " – no se pudo enviar el comprobante por WhatsApp")
+      ? (avisados > 0 && avisarFail === 0 ? ` – comprobante enviado a ${avisados} ${avisados === 1 ? "paciente" : "pacientes"}` : avisados > 0 ? ` – comprobante enviado a ${avisados}, ${avisarFail} no se pudo enviar` : " – no se pudo enviar el comprobante por WhatsApp")
       : "";
-    notify(fechas.length > 1 ? `${ok} cita(s) agendada(s)${fail ? `, ${fail} no (ocupadas/bloqueadas)` : ""}${avisoTxt}.` : `Cita agendada${avisoTxt}.`);
+    notify(fechas.length > 1 ? `${ok} ${ok === 1 ? "cita agendada" : "citas agendadas"}${fail ? `, ${fail} no (ocupadas/bloqueadas)` : ""}${avisoTxt}.` : `Cita agendada${avisoTxt}.`);
     onCreada();
   };
 
@@ -540,7 +547,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   // Por qué no se puede agendar todavía: se muestra junto al botón (antes el botón quedaba
   // gris y el motivo estaba más abajo, en la sección del sillón).
   const motivoBloqueo = avisoHorario ? "Fuera del horario: confirma arriba o cambia la hora."
-    : msgPasada || evaluacion.errores[0] || "";
+    : msgPasada || evaluacion.errores[0] || (fallaSillones && !sillonesSede.length ? "No se pudieron cargar los sillones: reintenta." : "");
 
   const canalBtns = (
     <div style={{ display: "flex", gap: 8 }}>
@@ -643,7 +650,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
                 resultado. Se dice de dónde sale: la que eligió la persona o la primera libre. */}
             <div style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, marginBottom: 6 }}>
               Cita: {fechaLegible(f.fecha)} – {f.hora}
-              <span style={{ fontWeight: 400, color: "var(--dc-ink-500)", marginLeft: 6 }}>{horaElegida ? "(hora elegida)" : "(primera hora libre del día)"}</span>
+              <span style={{ fontWeight: 400, color: "var(--dc-ink-500)", marginLeft: 6 }}>{horaElegida ? "(hora elegida)" : sinHoraLibre ? (f.medicoId ? "(sin horas libres ese día con este doctor)" : "(sin horas libres ese día)") : "(primera hora libre del día)"}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, border: `1.5px solid ${pasada ? "var(--dc-red)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
               <Clock size={16} strokeWidth={1.75} color={pasada ? "var(--dc-red)" : "var(--dc-ink-400)"} style={{ flexShrink: 0 }} />
@@ -668,7 +675,10 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           </div>
           <div>
             <span style={lbl}>Sillón{req}{f.sillon && sillonAuto && <em className="dc-agm__auto">propuesto</em>}</span>
-            {!demo && reglas.listo && !sillonesSede.length && <p className="dc-agm__val is-avi" style={{ margin: "4px 0 8px", fontSize: 12.5, color: "var(--dc-warn-700)" }}><Info size={13} strokeWidth={2.2} /> Esta sede no tiene sillones configurados. Configúralos en Configuración › Sillones para poder agendar.</p>}
+            {/* R-20: si GET /sillones falló es un error del servidor, no falta de configuración:
+                se dice y se ofrece reintentar (antes: «Esta sede no tiene sillones configurados»). */}
+            {!demo && reglas.listo && fallaSillones && <p role="alert" className="dc-agm__val is-err" style={{ margin: "4px 0 8px", fontSize: 12.5, color: "var(--dc-danger-700)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><AlertTriangle size={13} strokeWidth={2.2} /> <span style={{ flex: "1 1 220px" }}>No se pudieron cargar los sillones: el servidor respondió con un error. Reintenta antes de agendar.</span>{reglas.recargar && <Btn small kind="ghost" onClick={() => reglas.recargar()}>Reintentar</Btn>}</p>}
+            {!demo && reglas.listo && !fallaSillones && !sillonesSede.length && <p className="dc-agm__val is-avi" style={{ margin: "4px 0 8px", fontSize: 12.5, color: "var(--dc-warn-700)" }}><Info size={13} strokeWidth={2.2} /> Esta sede no tiene sillones configurados. Configúralos en Configuración › Sillones para poder agendar.</p>}
             <div className="dc-agm__sils" role="radiogroup" aria-label="Sillón">
               {estSil.map(({ s: x, estado, regla, ocupante }) => { const on = String(f.sillon) === String(x.numero); const bloq = estado === "no" || estado === "ocupado"; const et = etiquetaUso(x, ctxReglas); return (
                 <button key={x.id} type="button" role="radio" aria-checked={on} disabled={bloq} className={`is-${estado}${on ? " is-on" : ""}`}

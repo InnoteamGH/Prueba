@@ -26,6 +26,21 @@ export function fechaHoraLima(v) {
   return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
 }
 
+/** «12/10/2026» (dd/mm/aaaa) sin hora, para las columnas de fecha de los documentos (M6-05:
+    la Historia clínica PDF y el PDF de la agenda salían con «2026-10-12»). Acepta una fecha
+    sola («2026-10-12») o un instante («2026-10-12T09:34:48-05:00», que se lee en hora de
+    Lima). Lo que no se puede leer sale tal cual; vacío, "". */
+export function fechaCortaLima(v) {
+  if (v == null || v === "") return "";
+  const s = String(v);
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (soloFecha) return `${soloFecha[3]}/${soloFecha[2]}/${soloFecha[1]}`;
+  const ymd = ymdLima(v instanceof Date ? v : s);
+  if (!ymd) return s;
+  const [a, m, d] = ymd.split("-");
+  return `${d}/${m}/${a}`;
+}
+
 /** Resume user-agent a etiqueta corta para Auditoría (NEW-58b). */
 export function resumenDispositivo(ua) {
   const s = String(ua || "").trim();

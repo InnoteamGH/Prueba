@@ -177,7 +177,12 @@ export function horarioAlServidor(h) {
   return out;
 }
 
-async function request(method, path, body, extraHeaders) {
+// opciones (solo el login las usa): { idempotente, sinAviso, alReintentar }.
+//   idempotente: la escritura se puede repetir ante 5xx o red (no crea ni cambia nada).
+//   sinAviso: el fallo no levanta el aviso global (la pantalla de acceso dice el suyo y, si
+//     no, el banner rojo del 500 del login salía después en el Inicio).
+//   alReintentar(intento): para decir en pantalla que se está reintentando.
+async function request(method, path, body, extraHeaders, opciones = null) {
   const dedupeKey = method + " " + path;
   if (method === "GET" && inflightGet.has(dedupeKey)) {
     return inflightGet.get(dedupeKey);
@@ -226,13 +231,16 @@ async function request(method, path, body, extraHeaders) {
     // R5-01 / R-19 / M5-04 (antes BE-01 / WA-16): una GET se repite hasta 2 veces ante 500,
     // 502, 503, 504 o un fallo de red (400–800 ms y luego 1–2 s, al azar). Cada intento espera
     // su turno en la cola y la suelta mientras espera el siguiente. Las escrituras no se
-    // repiten nunca (conReintentos solo repite GET) ni hacen cola.
+    // repiten nunca (conReintentos solo repite GET) ni hacen cola. R6-10: salvo el login
+    // (`idempotente`), que tampoco hace cola pero sí se repite ante 500, 502, 503, 504 o red.
+    const idempotente = !!(opciones && opciones.idempotente);
+    const alReintentar = opciones && typeof opciones.alReintentar === "function" ? (_e, n) => opciones.alReintentar(n) : null;
     try {
-      return await conReintentos(() => (method === "GET" ? colaGet.ejecutar(runOnce) : runOnce()), { method });
+      return await conReintentos(() => (method === "GET" ? colaGet.ejecutar(runOnce) : runOnce()), { method, idempotente, alReintentar });
     } catch (e) {
       // El aviso global sale solo cuando se agotaron los intentos (mismo criterio que antes).
       const st = e && (e.status || e._httpStatus);
-      if (st === 0 || st) avisarFallo(st, path, e.message, method);
+      if ((st === 0 || st) && !(opciones && opciones.sinAviso)) avisarFallo(st, path, e.message, method);
       throw e;
     }
   };
@@ -274,8 +282,10 @@ export const api = {
   del: (p) => request("DELETE", p),
 
   // ── Endpoints tipados (se van agregando a medida que se conecta cada módulo) ──
-  async login(email, password) {
-    const r = await request("POST", "/auth/login", { email, password });
+  // R6-10: el login no crea ni cambia nada, así que ante 500, 502, 503, 504 o un fallo de red
+  // se repite hasta 2 veces (como las lecturas). `alReintentar(n)` avisa a la pantalla.
+  async login(email, password, { alReintentar } = {}) {
+    const r = await request("POST", "/auth/login", { email, password }, null, { idempotente: true, sinAviso: true, alReintentar });
     auth.token = r.token;
     // C23: extraer campo sedes del JWT (admin="all", otros=CSV de UUIDs)
     const payload = parseJwt(r.token);
@@ -294,8 +304,8 @@ export const api = {
     return r;
   },
   me: () => request("GET", "/auth/me"),
-  async portalLogin(dni, password) {
-    const r = await request("POST", "/auth/portal/login", { dni, password });
+  async portalLogin(dni, password, { alReintentar } = {}) {
+    const r = await request("POST", "/auth/portal/login", { dni, password }, null, { idempotente: true, sinAviso: true, alReintentar });
     auth.token = r.token;
     auth.sesion = { nombre: r.nombre, rol: "paciente", organizacionId: r.organizacionId, pacienteId: r.pacienteId };
     return r;

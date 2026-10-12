@@ -21,7 +21,7 @@ import { puedeEscribirClinico as puedeEscribirClinicoDe } from "./util/clinicoWr
 import { tienePermiso } from "./compartido/permisos";
 import { formatearFDI } from "./util/formatearFDI";
 import { conCop } from "./util/cop";
-import { ymdLima, resumenDispositivo, fechaHoraLima } from "./util/fechaLima";
+import { ymdLima, resumenDispositivo, fechaHoraLima, fechaCortaLima } from "./util/fechaLima";
 import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, textoIndicaciones } from "./compartido/recetaItems";
 import { imprimirReceta } from "./util/recetaDoc";
 import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
@@ -1630,7 +1630,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     const seccion = (t, v) => (v ? `<h2>${esc(t)}</h2><div class="box">${esc(v)}</div>` : "");
     const chips = (label, list) => (arr(list).length ? `<h2>${esc(label)}</h2><div>${arr(list).map((x) => `<span class="pill">${esc(x)}</span>`).join("")}</div>` : "");
     const ex = F.examen || {}, pn = F.perinatales || {};
-    const evos = arr(d?.historia).map((h) => `<tr><td>${esc(h.fecha || "")}</td><td><b>${esc(h.diagnostico || h.titulo || "Evolución")}</b>${h.detalle ? "<br>" + esc(h.detalle) : ""}${h.signosVitales ? `<br><span class="muted">Signos: ${esc(h.signosVitales)}</span>` : ""}</td><td>${esc(h.medico || "")}</td></tr>`).join("");
+    // M6-05: la fecha de cada evolución en dd/mm/aaaa, como el resto del documento (salía «2026-10-12»).
+    const evos = arr(d?.historia).map((h) => `<tr><td>${esc(fechaCortaLima(h.fecha) || "")}</td><td><b>${esc(h.diagnostico || h.titulo || "Evolución")}</b>${h.detalle ? "<br>" + esc(h.detalle) : ""}${h.signosVitales ? `<br><span class="muted">Signos: ${esc(h.signosVitales)}</span>` : ""}</td><td>${esc(h.medico || "")}</td></tr>`).join("");
     // Una tabla por fase: lo encontrado, lo planificado y lo ejecutado son tres cosas
     // distintas y salían mezcladas en una sola lista de "hallazgos".
     // Cada toma con todos sus hallazgos (caras, raíces y pieza completa) en lenguaje
@@ -1644,7 +1645,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       if (!h.total) return "";
       const filas = h.lista.map((m) => `<tr><td>${esc(m.pieza)}</td><td>${esc(m.zona)}</td><td>${esc(m.nombre)}</td><td>${m.hecho ? "Buen estado o realizado" : "Patológico o por hacer"}</td></tr>`).join("");
       const notas = Object.entries(datos).filter(([, x]) => x.nota).map(([n, x]) => `<div><b>${esc(n)}:</b> ${esc(x.nota)}</div>`).join("");
-      return `<h2>Odontograma – ${esc(titulo)}</h2><div class="muted">${h.total} ${h.total === 1 ? "hallazgo" : "hallazgos"} en ${h.piezas} ${h.piezas === 1 ? "pieza" : "piezas"} · ${h.rojo} por hacer · ${h.azul} realizados o en buen estado</div><table><thead><tr><th>Pieza</th><th>Zona</th><th>Hallazgo</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table>${notas ? `<div class="box">${notas}</div>` : ""}`;
+      return `<h2>Odontograma – ${esc(titulo)}</h2><div class="muted">${h.total} ${h.total === 1 ? "hallazgo" : "hallazgos"} en ${h.piezas} ${h.piezas === 1 ? "pieza" : "piezas"} · ${h.rojo} por hacer · ${h.azul} ${h.azul === 1 ? "realizado" : "realizados"} o en buen estado</div><table><thead><tr><th>Pieza</th><th>Zona</th><th>Hallazgo</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table>${notas ? `<div class="box">${notas}</div>` : ""}`;
     }).join("");
     imprimir("Historia clínica", `
       <h2>Filiación</h2>

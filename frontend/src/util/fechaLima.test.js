@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima } from "./fechaLima.js";
+import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima } from "./fechaLima.js";
 
 describe("fechaHoraLima M5-14", () => {
   it("formatea la hora de firma en dd/mm/aaaa hh:mm de Lima", () => {
@@ -11,6 +11,23 @@ describe("fechaHoraLima M5-14", () => {
     assert.equal(fechaHoraLima("2026-10-11"), "11/10/2026");
     assert.equal(fechaHoraLima(""), "");
     assert.equal(fechaHoraLima("ayer"), "ayer");
+  });
+});
+
+describe("fechaCortaLima M6-05", () => {
+  it("una fecha ISO sale dd/mm/aaaa", () => {
+    assert.equal(fechaCortaLima("2026-10-12"), "12/10/2026");
+    assert.equal(fechaCortaLima("2026-01-05"), "05/01/2026");
+  });
+  it("un instante se lee en hora de Lima y sale sin hora", () => {
+    assert.equal(fechaCortaLima("2026-10-12T09:34:48-05:00"), "12/10/2026");
+    // 00:27 UTC del 12 = 19:27 del 11 en Lima
+    assert.equal(fechaCortaLima("2026-10-12T00:27:45Z"), "11/10/2026");
+  });
+  it("vacío da \"\" y lo ilegible sale tal cual", () => {
+    assert.equal(fechaCortaLima(""), "");
+    assert.equal(fechaCortaLima(null), "");
+    assert.equal(fechaCortaLima("sin fecha"), "sin fecha");
   });
 });
 

@@ -194,7 +194,7 @@ export default function OdontogramaFotos({ pacienteId, ficha = null, onAbrir }) 
       {h && (
         <section className="dc-ofo__card">
           <header><h3><ClipboardList size={15} strokeWidth={2} /> Hallazgos de la última toma</h3><small>Fase {ultima.label.toLowerCase()} · {h.total} {h.total === 1 ? "hallazgo" : "hallazgos"} en {h.piezas} {h.piezas === 1 ? "pieza" : "piezas"}</small>
-            <span className="dc-ofo__pills"><span className="is-mal">{h.rojo} patológicos o por hacer</span><span className="is-ok">{h.azul} en buen estado o ejecutados</span></span></header>
+            <span className="dc-ofo__pills"><span className="is-mal">{h.rojo} {h.rojo === 1 ? "patológico" : "patológicos"} o por hacer</span><span className="is-ok">{h.azul} en buen estado o {h.azul === 1 ? "ejecutado" : "ejecutados"}</span></span></header>
           <div className="dc-ofo__tabw">
             <table className="dc-ofo__tab">
               <thead><tr><th>Pieza</th><th>Zona</th><th>Hallazgo</th><th>Estado</th></tr></thead>

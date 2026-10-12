@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { conReintentos, crearCola, esReintentable, esperaReintento, ESPERAS_MS, MAX_REINTENTOS } from "./reintentos.js";
+import { conReintentos, crearCola, esFalloDeServidor, esReintentable, esperaReintento, ESPERAS_MS, MAX_REINTENTOS, mensajeErrorLogin, MSG_SERVIDOR_NO_RESPONDE } from "./reintentos.js";
 
 const fallo = (status) => Object.assign(new Error(`Error ${status}`), { status });
 const sinDormir = { dormir: async () => {}, azar: () => 0.5 };
@@ -23,6 +23,41 @@ describe("esReintentable", () => {
   });
   it("las escrituras nunca se repiten", () => {
     for (const m of ["POST", "PUT", "PATCH", "DELETE"]) for (const st of [0, 500, 503]) assert.equal(esReintentable(m, st), false, `${m} ${st}`);
+  });
+  it("R6-10: un POST marcado idempotente (el login) sí se repite ante 5xx o red, no ante 4xx", () => {
+    for (const st of [0, 500, 502, 503, 504]) assert.equal(esReintentable("POST", st, true), true, String(st));
+    for (const st of [400, 401, 403, 409, 429]) assert.equal(esReintentable("POST", st, true), false, String(st));
+  });
+});
+
+describe("esFalloDeServidor", () => {
+  it("5xx reintentables y sin respuesta, sí; el resto, no", () => {
+    for (const st of [0, 500, 502, 503, 504]) assert.equal(esFalloDeServidor(st), true, String(st));
+    for (const st of [400, 401, 403, 404, 429, 501]) assert.equal(esFalloDeServidor(st), false, String(st));
+  });
+});
+
+describe("mensajeErrorLogin (R6-10)", () => {
+  it("500, 503 o la red caída: el servidor no responde (sin «backend» ni «acceso demo»)", () => {
+    for (const st of [0, 500, 502, 503, 504]) {
+      const m = mensajeErrorLogin(st);
+      assert.equal(m, MSG_SERVIDOR_NO_RESPONDE);
+      assert.doesNotMatch(m, /backend|demo/i);
+      assert.equal(mensajeErrorLogin(st, { portal: true }), MSG_SERVIDOR_NO_RESPONDE);
+    }
+    assert.equal(MSG_SERVIDOR_NO_RESPONDE, "El servidor no responde en este momento. Intenta de nuevo en unos segundos.");
+  });
+  it("credenciales: staff 401, portal 401 y 403", () => {
+    assert.equal(mensajeErrorLogin(401), "Credenciales inválidas.");
+    assert.equal(mensajeErrorLogin(401, { portal: true }), "DNI o contraseña del portal incorrectos.");
+    assert.equal(mensajeErrorLogin(403, { portal: true }), "DNI o contraseña del portal incorrectos.");
+  });
+  it("otro rechazo: el motivo del servidor (con punto final) o un texto genérico", () => {
+    assert.equal(mensajeErrorLogin(403, { servidor: "Usuario desactivado" }), "Usuario desactivado.");
+    assert.equal(mensajeErrorLogin(400, { servidor: "El correo no es válido." }), "El correo no es válido.");
+    assert.match(mensajeErrorLogin(400), /^No se pudo iniciar sesión/);
+    assert.match(mensajeErrorLogin(400, { servidor: "Error 400" }), /^No se pudo iniciar sesión/);
+    assert.match(mensajeErrorLogin(429), /Demasiados intentos/);
   });
 });
 
@@ -76,6 +111,17 @@ describe("conReintentos", () => {
       await assert.rejects(conReintentos(async () => { n++; throw fallo(st); }, { method: "GET", ...sinDormir }));
       assert.equal(n, 1, String(st));
     }
+  });
+  it("R6-10: un POST idempotente con 500, 503 se repite hasta 2 veces y entra", async () => {
+    const estados = [500, 503];
+    let n = 0;
+    const r = await conReintentos(async () => { n++; const st = estados.shift(); if (st) throw fallo(st); return { token: "t" }; }, { method: "POST", idempotente: true, ...sinDormir });
+    assert.deepEqual(r, { token: "t" }); assert.equal(n, 3);
+  });
+  it("R6-10: un POST idempotente con 401 no se repite", async () => {
+    let n = 0;
+    await assert.rejects(conReintentos(async () => { n++; throw fallo(401); }, { method: "POST", idempotente: true, ...sinDormir }), (e) => e.status === 401);
+    assert.equal(n, 1);
   });
   it("lee también el estado guardado en _httpStatus", async () => {
     let n = 0;
@@ -138,6 +184,12 @@ describe("client.js usa la cola y los reintentos", () => {
     assert.match(src, /crearCola\(MAX_GET_SIMULTANEAS\)/);
   });
   it("las GET pasan por la cola y conReintentos recibe el método", () => {
-    assert.match(src, /conReintentos\(\(\) => \(method === "GET" \? colaGet\.ejecutar\(runOnce\) : runOnce\(\)\), \{ method \}\)/);
+    assert.match(src, /conReintentos\(\(\) => \(method === "GET" \? colaGet\.ejecutar\(runOnce\) : runOnce\(\)\), \{ method, idempotente, alReintentar \}\)/);
+  });
+  it("R6-10: el login y el del portal se marcan idempotentes y sin aviso global", () => {
+    assert.match(src, /request\("POST", "\/auth\/login", \{ email, password \}, null, \{ idempotente: true, sinAviso: true, alReintentar \}\)/);
+    assert.match(src, /request\("POST", "\/auth\/portal\/login", \{ dni, password \}, null, \{ idempotente: true, sinAviso: true, alReintentar \}\)/);
+    // Ninguna otra escritura se marca idempotente.
+    assert.equal((src.match(/idempotente: true/g) || []).length, 2);
   });
 });

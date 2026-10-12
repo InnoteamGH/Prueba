@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
 import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales, esSinPermiso, msgServidor } from "./api/client";
+import { mensajeErrorLogin } from "./api/reintentos";
 import { limpiarRegistroSedes, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { fijarPermisosSesion, guardarPermisosServidor, permisosServidorGuardados, tienePermiso } from "./compartido/permisos";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
@@ -36,7 +37,11 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 // Soles y dólares en caja, montos escritos y la boleta de un cobro (compartido/cajaMoneda.js).
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
-import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima } from "./util/fechaLima";
+import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima } from "./util/fechaLima";
+import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
+import { bloqueosDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
+import { compararMesAnterior, tramoMesAnterior } from "./util/miProduccionComp";
+import { cierresAnteriores, fechaDMA, motivoCajaCerrada, resultadoCierre, tituloCajaCerrada } from "./compartido/cajaJornada";
 import { layoutBarras } from "./util/barras";
 import { normalizarProduccionEsp } from "./util/produccionEsp";
 import { layoutProgreso } from "./util/progreso";
@@ -102,6 +107,8 @@ function Login({ onLogin }) {
   const demoLoginOk = MODO_DEMO;
 
   const [cargando, setCargando] = useState(false);
+  // R6-10: el login se reintenta solo ante 500/503 o red; mientras tanto el botón lo dice.
+  const [reintentando, setReintentando] = useState(0);
   // UUID de sede → número corto del registro de sedes (GET /sedes), el que usa el frontend.
   const sedeInt = (uuid) => numSede(uuid);
   
@@ -109,9 +116,10 @@ function Login({ onLogin }) {
     const id = user.trim();
     // 1) Email → login staff conectado.
     if (id.includes("@")) {
-      setCargando(true); setError("");
+      setCargando(true); setError(""); setReintentando(0);
       try {
-        const r = await api.login(id.toLowerCase(), pass);
+        const r = await api.login(id.toLowerCase(), pass, { alReintentar: setReintentando });
+        setReintentando(0);
         // Las sedes reales de la clínica se registran antes de traducir las del usuario: sin
         // eso todas las sedes pasaban a ser la «1» y se mezclaban.
         limpiarRegistroSedes();
@@ -132,19 +140,19 @@ function Login({ onLogin }) {
                   permisos: r.permisos || null });
         return;
       } catch (e) {
-        setCargando(false);
-        setError(e instanceof ApiError && e.status === 401
-          ? "Credenciales inválidas."
-          : "No se pudo conectar con el servidor. Revisa el backend o usa un acceso demo.");
+        setCargando(false); setReintentando(0);
+        // R6-10: con 500/503 o sin red (ya reintentado 2 veces) «el servidor no responde»;
+        // 401, credenciales; otro rechazo, el motivo del servidor (api/reintentos.js).
+        setError(mensajeErrorLogin(e instanceof ApiError ? e.status : 0, { servidor: e instanceof ApiError ? msgServidor(e) : "" }));
         return;
       }
     }
     // 2) DNI (solo dígitos) → portal del paciente conectado.
     if (/^\d{6,12}$/.test(id)) {
-      setCargando(true); setError("");
+      setCargando(true); setError(""); setReintentando(0);
       try {
-        const r = await api.portalLogin(id, pass);
-        setCargando(false);
+        const r = await api.portalLogin(id, pass, { alReintentar: setReintentando });
+        setCargando(false); setReintentando(0);
         onLogin({
           rol: "paciente",
           nombre: r.nombre,
@@ -154,10 +162,8 @@ function Login({ onLogin }) {
         });
         return;
       } catch (e) {
-        setCargando(false);
-        setError(e instanceof ApiError && (e.status === 401 || e.status === 403)
-          ? "DNI o contraseña del portal incorrectos."
-          : "No se pudo abrir el portal. Revisa el backend o usa un acceso demo.");
+        setCargando(false); setReintentando(0);
+        setError(mensajeErrorLogin(e instanceof ApiError ? e.status : 0, { portal: true, servidor: e instanceof ApiError ? msgServidor(e) : "" }));
         return;
       }
     }
@@ -271,7 +277,7 @@ function Login({ onLogin }) {
                 </div>
                 {error && <div style={{ background: "var(--dc-danger-soft)", color: "var(--dc-danger-700)", border: "1px solid var(--dc-danger-mid)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>{error}</div>}
                 {aviso && !error && <div role="status" style={{ background: "var(--dc-ok-soft)", color: "var(--dc-ok-700)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>{aviso}</div>}
-                <button className="dc-login-btn" onClick={entrar} disabled={cargando} style={{ width: "100%", padding: "13px 16px", borderRadius: "var(--dc-r-lg)", border: "none", background: cargando ? "var(--dc-brand-soft)" : `linear-gradient(135deg,${DS.c.primary},${DS.c.primaryDark})`, color: "#fff", fontSize: 14, fontWeight: 500, cursor: cargando ? "default" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: `0 12px 24px -12px ${DS.c.primary}` }}>{cargando ? "Ingresando…" : <>Iniciar sesión <ArrowRight size={16} strokeWidth={1.75} /></>}</button>
+                <button className="dc-login-btn" onClick={entrar} disabled={cargando} style={{ width: "100%", padding: "13px 16px", borderRadius: "var(--dc-r-lg)", border: "none", background: cargando ? "var(--dc-brand-soft)" : `linear-gradient(135deg,${DS.c.primary},${DS.c.primaryDark})`, color: "#fff", fontSize: 14, fontWeight: 500, cursor: cargando ? "default" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: `0 12px 24px -12px ${DS.c.primary}` }}>{cargando ? (reintentando ? `El servidor tarda: reintentando (${reintentando} de 2)…` : "Ingresando…") : <>Iniciar sesión <ArrowRight size={16} strokeWidth={1.75} /></>}</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 4px" }}>
                 <div style={{ flex: 1, height: 1, background: "var(--dc-line)" }} /><span style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>¿Aún no tienes cuenta?</span><div style={{ flex: 1, height: 1, background: "var(--dc-line)" }} />
@@ -1166,7 +1172,8 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
       : (modo === "semana" || modo === "tabla") ? `${iso(semana[0])}_a_${iso(semana[6])}`
       : iso(diaSel);
     if (tipo === "excel") exportarExcel({ nombreArchivo: `agenda_${modo}_${rangoArchivo}.xlsx`, hoja: "Agenda", titulo: `Agenda — ${titulo}`, columnas: COLS_CAL, filas });
-    else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: conteoRango, columnas: COLS_CAL, filas });
+    // M6-05: en el PDF la fecha va dd/mm/aaaa (salía «2026-10-15»); el Excel la deja ordenable.
+    else exportarPDF({ titulo: `Agenda — ${titulo}`, subtitulo: conteoRango, columnas: COLS_CAL, filas: filas.map((x) => ({ ...x, fecha: fechaCortaLima(x.fecha) })) });
   };
 
   const Bloque = ({ c }) => { const col = colorDe(c); const cancel = c.estado === "cancelada"; const arrastrable = !!onReagendar && !cancel && c.estado !== "cerrada_sistema"; const horaLbl = (modo === "dia" || modo === "sillon") ? `${c.hora}–${finCita(c)}` : c.hora;
@@ -1496,6 +1503,8 @@ function CancelarCitaModal({ cita, onClose, onConfirm }) {
 
 // R-24: cómo se nombra en la agenda el filtro que llega desde las cifras del Inicio.
 const ETQ_FILTRO_DIA = { pendiente: "Por confirmar", atendida: "Atendidas" };
+// La misma etiqueta en singular, para «Ninguna cita atendida» (R-24).
+const ETQ_FILTRO_DIA_UNA = { pendiente: "Por confirmar", atendida: "Atendida" };
 function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onAtender, ofrecerCupo, fichas, esperaState = [], setEspera = () => {}, pacientes = [], setPacientes = () => {}, vistaInicial = "dia", calModo = null, onIrEspera, can, agendarDesdeFicha = null, onAgendarDesdeFichaDone = () => {}, crearIntent = false, onIntentDone = () => {}, sedeActiva = 1 }) {
   // Reprogramar y cancelar es operar la agenda. Antes se decidía con `rol !== "medico"`
   // y gerencia -que solo lee- pasaba el filtro y podía cancelar cualquier cita.
@@ -1530,7 +1539,11 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   const [filtroIni] = useState(() => { try { const x = JSON.parse(sessionStorage.getItem("dc_agenda_filtro") || "null"); return x && x.estado ? x : null; } catch { return null; } });
   const [estadoDia, setEstadoDia] = useState(() => (filtroIni ? filtroIni.estado : null));
   useEffect(() => { try { sessionStorage.removeItem("dc_agenda_filtro"); } catch { /* sin almacenamiento */ } }, []);
-  const [diaVer, setDiaVer] = useState(() => (filtroIni && /^\d{4}-\d{2}-\d{2}$/.test(String(filtroIni.fecha || "")) ? filtroIni.fecha : fmt(hoy)));
+  // M6-03: la vista Día arranca en la fecha que se miraba en Semana, Mes, Por doctor o Por
+  // sillón (si fue hace poco) y les deja la suya: antes Día 09/10 → Semana mostraba la de hoy.
+  const [diaVer, setDiaVer] = useState(() => (filtroIni && /^\d{4}-\d{2}-\d{2}$/.test(String(filtroIni.fecha || "")) ? filtroIni.fecha
+    : (vistaInicial !== "calendario" && fechaFocoVigente(FOCO_CAL)) || fmt(hoy)));
+  useEffect(() => { if (vista !== "calendario") FOCO_CAL = { fecha: diaVer, ts: Date.now() }; }, [diaVer]); // eslint-disable-line react-hooks/exhaustive-deps
   const diaVerRef = useRef(diaVer); diaVerRef.current = diaVer;   // al cambiar rápido de día, solo vale la respuesta del último
   const recargar = () => { if (!conectado) return; const dia = diaVer; api.citas.listar(dia).then((r) => { if (dia === diaVerRef.current) setRemoto((r || []).map(mapCita)); }).catch(() => notify("No se pudieron cargar las citas.")); };
   // El calendario pedia fecha=all: TODO el historico de la clinica al navegador, y
@@ -1865,6 +1878,10 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       } },
   ];
   const lista = [...todasHoy].sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
+  // M6-03: los horarios bloqueados del día que se ve. El médico ve los suyos y los de toda la
+  // agenda (como en su Semana); recepción y administración, todos los de la sede.
+  const bloqDia = vista === "calendario" ? [] : bloqueosDelDia(bloqueosEf, diaVer, { medicoPropio: miIdPropio, soloPropios: rol === "medico", enSede: (s) => sedeCx.enSede(s) });
+  const medNomBloq = (id) => [...(reglasAg.medicos || []), ...(medicos || [])].find((m) => m && String(m.id) === String(id))?.nombre || "Doctor";
   const fechaRaw = new Date(diaVer + "T00:00:00").toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", ...(diaVer.slice(0, 4) !== hoyISO.slice(0, 4) ? { year: "numeric" } : {}) });
   const fechaLarga = fechaRaw.charAt(0).toUpperCase() + fechaRaw.slice(1);
   const ahora = new Date(); const ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
@@ -2049,12 +2066,23 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           <button type="button" className="dc-link" onClick={() => setEstadoDia(null)}>Ver todas las citas</button>
         </div>
       )}
+      {/* M6-03: los bloqueos del día también en la tabla (antes solo en Semana y Por doctor). */}
+      {bloqDia.length > 0 && (
+        <div role="note" aria-label="Horarios bloqueados del día" className="dc-ag-bloq" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 10px", padding: "8px 12px", borderRadius: "var(--dc-r-md)", background: "repeating-linear-gradient(135deg, var(--dc-bg-alt) 0 6px, #fff 6px 12px)", border: "1px dashed var(--dc-line)", fontSize: 13, color: "var(--dc-ink-700)" }}>
+          <Lock size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
+          <b style={{ fontWeight: 600 }}>{bloqDia.length === 1 ? "Horario bloqueado:" : "Horarios bloqueados:"}</b>
+          {bloqDia.map((b) => { const t = textoBloqueo(b, medNomBloq); return (
+            <span key={b.id ?? `${t.horas}-${t.motivo}`} className="dc-pill" title={`${t.horas} · ${t.motivo} · ${t.quien}`} style={{ whiteSpace: "normal" }}><b style={{ fontVariantNumeric: "tabular-nums" }}>{t.horas}</b>&nbsp;· {t.motivo}{rol === "medico" && t.quien !== "Toda la agenda" ? "" : ` · ${t.quien}`}</span>
+          ); })}
+        </div>
+      )}
       <DataTable titulo={`${esHoyVer ? "Citas de hoy" : `Citas del ${fechaLegible(diaVer)}`}${estadoDia ? ` · ${(ETQ_FILTRO_DIA[estadoDia] || estadoInfo("cita", estadoDia).label).toLowerCase()}` : ""}`} sub="en la lista" minWidth={980} rows={estadoDia ? lista.filter((c) => c.estado === estadoDia) : lista} defaultSort={{ key: "hora", dir: "asc" }}
         rowClassName={(c) => `dc-ag-fila${proxima && c.id === proxima.id && c.estado !== "atendida" ? " is-prox" : ""}${c.estado === "cancelada" || c.estado === "cerrada_sistema" || c.estado === "atendida" ? " is-pasada" : ""}`}
         onRowClick={(c) => abrirFichaCita(c)}
         empty={estadoDia
-          ? <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo={`Ninguna cita ${(ETQ_FILTRO_DIA[estadoDia] || estadoInfo("cita", estadoDia).label).toLowerCase()}`} sub="Pulsa «Ver todas las citas» para ver el resto del día." />
-          : <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub={esHoyVer ? "Tu agenda para hoy está libre." : "No hay citas para ese día."} />}
+          // R-24: «Ninguna cita atendida» (decía «Ninguna cita atendidas»).
+          ? <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo={`Ninguna cita ${(ETQ_FILTRO_DIA_UNA[estadoDia] || estadoInfo("cita", estadoDia).label).toLowerCase()}`} sub="Pulsa «Ver todas las citas» para ver el resto del día." />
+          : <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub={bloqDia.length ? `No hay citas para ese día; ${bloqDia.length === 1 ? "hay un horario bloqueado (arriba)" : `hay ${bloqDia.length} horarios bloqueados (arriba)`}.` : esHoyVer ? "Tu agenda para hoy está libre." : "No hay citas para ese día."} />}
         cols={COLS_AGENDA} />
       </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} medicoFijo={miId} medicoPropio={miIdPropio} soloConCitas={rol === "medico"} onCita={(c) => setCitaVer(c.id)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
         onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
@@ -2378,8 +2406,6 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     }
   }, [fmId]); // eslint-disable-line
   const cerrarFm = () => { setFmId(null); setFmTab(null); irHash("pacientes"); };
-  // Radiografías y Fotos abren con el último paciente cuya ficha se miró.
-  useEffect(() => { if (fmId != null) try { sessionStorage.setItem("dc_ultimo_paciente", String(fmId)); } catch { /* sin almacenamiento */ } }, [fmId]);
   // La ficha solo se abre si el paciente está entre los visibles (sus sedes y el filtro de
   // arriba). El id llega también por enlace, marcador, «Ver ficha» de WhatsApp o dc-ir:
   // sin esto se abría la historia de un paciente de otra sede. Con sesión se espera al padrón.
@@ -2399,9 +2425,14 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   }, [pidiendoSuelto, fmId]); // eslint-disable-line react-hooks/exhaustive-deps
   const esperandoPadron = conectado && fmId != null && ((remoto == null && !listaError) || pidiendoSuelto);
   const fmPermitido = fmId == null || (!esperandoPadron && lista.some((p) => String(p.id) === String(fmId)));
+  // Radiografías y Fotos abren con el último paciente cuya ficha se miró. M6-01: solo cuando
+  // la ficha se abrió de verdad; antes se guardaba también el de otra sede que la API
+  // rechazaba (403) y esas pantallas quedaban en «Sin permiso», incluso al recargar.
+  useEffect(() => { if (fmId != null && fmPermitido && !esperandoPadron) guardarUltimoPaciente(fmId); }, [fmId, fmPermitido, esperandoPadron]);
   useEffect(() => {
     if (fmPermitido || esperandoPadron) return;
     notify(conectado && pacSueltos[String(fmId)] === false && !enPadron ? "No se encontró ese paciente o no tienes acceso a su ficha." : "Ese paciente no se atiende en la sede elegida. Cambia la sede arriba si también es tuya.");
+    olvidarUltimoPaciente(fmId);   // M6-01: si ya estaba guardado (de antes), se olvida
     cerrarFm();
   }, [fmPermitido, esperandoPadron]); // eslint-disable-line react-hooks/exhaustive-deps
   // Una sola historia clínica: la Ficha médica, que es la que guarda en el servidor
@@ -2625,14 +2656,14 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     if (conectado && camp.canal !== "email") {
       const objetivo = segmentoPac(camp.k);
       if (!objetivo.length) { notify("No hay destinatarios con teléfono en este segmento."); return; }
-      if (!confirm(`Se enviará la campaña por WhatsApp a ${objetivo.length} paciente(s). ¿Continuar?`)) return;
+      if (!confirm(`Se enviará la campaña por WhatsApp a ${pluralEs(objetivo.length, "paciente", "pacientes")}. ¿Continuar?`)) return;
       try {
         const r = await api.pacientes.campana(objetivo.map((p) => p.id), camp.msg);
-        notify(`Campaña enviada por WhatsApp a ${r?.enviados ?? 0}/${r?.total ?? objetivo.length} paciente(s).`);
+        notify(`Campaña enviada por WhatsApp a ${r?.enviados ?? 0} de ${pluralEs(r?.total ?? objetivo.length, "paciente", "pacientes")}.`);
       } catch (e) { notify("No se pudo enviar la campaña."); }
       setCamp(null); return;
     }
-    notify(`Campaña "${camp.label}" enviada por ${canalTxt} a ${camp.n} paciente(s).`);
+    notify(`Campaña "${camp.label}" enviada por ${canalTxt} a ${pluralEs(camp.n, "paciente", "pacientes")}.`);
     setCamp(null);
   };
   const cols = [
@@ -2743,7 +2774,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         const canales = [["whatsapp", "WhatsApp", <MessageSquare size={15} strokeWidth={1.75} />], ["email", "Email", <Mail size={15} strokeWidth={1.75} />], ["ambos", "Ambos", <Send size={15} strokeWidth={1.75} />]];
         const preview = (camp.msg || "").replace(/\{nombre\}/g, lista.find((p) => p.marketing)?.nombre?.split(" ")[0] || (conectado ? "(nombre)" : "Ana"));
         return (
-          <Modal icon={<Megaphone size={20} strokeWidth={1.75} />} titulo="Nueva campaña de marketing" sub={`Segmento: ${camp.label} – ${camp.n} destinatario(s)`} onClose={() => setCamp(null)} maxW={600}
+          <Modal icon={<Megaphone size={20} strokeWidth={1.75} />} titulo="Nueva campaña de marketing" sub={`Segmento: ${camp.label} – ${pluralEs(camp.n, "destinatario", "destinatarios")}`} onClose={() => setCamp(null)} maxW={600}
             footer={<><Btn small kind="ghost" onClick={() => setCamp(null)}>Cancelar</Btn><Btn small onClick={enviarCamp}><Send size={15} strokeWidth={1.75} /> Enviar a {camp.n}</Btn></>}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, background: tint(camp.color, 0.071), border: `1px solid ${tint(camp.color, 0.2)}`, borderRadius: "var(--dc-r-lg)", padding: "12px 14px", marginBottom: 18 }}>
               <div style={{ width: 40, height: 40, borderRadius: "var(--dc-r-md)", background: tint(camp.color, 0.133), color: camp.color, display: "grid", placeItems: "center", flexShrink: 0 }}>{camp.icon}</div>
@@ -3785,7 +3816,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
         {vistaOdo !== "anatomico" && <Card style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT, display: "flex", alignItems: "center", gap: 7 }}><ClipboardList size={15} strokeWidth={1.75} color={NAVY} /> Hallazgos del paciente</h3>
-            {piezasAfectadas.length > 0 && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", background: "var(--dc-line)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{piezasAfectadas.length} pieza(s)</span>}
+            {piezasAfectadas.length > 0 && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", background: "var(--dc-line)", padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{pluralEs(piezasAfectadas.length, "pieza", "piezas")}</span>}
           </div>
           {piezasAfectadas.length === 0 && <Vacio icon={<Smile size={24} strokeWidth={1.75} />} titulo="Boca sana" sub="Marca un estado y haz clic en una cara del diente." />}
           {piezasAfectadas.sort((a, b) => Number(a) - Number(b)).map((n) => {
@@ -4085,10 +4116,12 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   // (igual que en Caja). Con sesión, si no se puede leer la apertura, decide el servidor.
   const conCajasAbiertas = (sedesCobro, seguir) => {
     const lista = [...new Map(sedesCobro.filter((sd) => sd != null).map((sd) => [String(sd), sd])).values()];
-    const cerrada = (sd) => notify(`Abre la caja de ${nombreSedeEn(sedes, sd)} antes de cobrar.`);
+    // R-27: el mismo motivo que en Caja, según el estado real de la caja de esa sede (con una
+    // jornada anterior sin cerrar, abrirla no es posible: hay que cerrar esa primero).
+    const cerrada = (sd, previa = null) => notify(motivoCajaCerrada({ sede: nombreSedeEn(sedes, sd), jornadaPrevia: previa }));
     if (conectado) {
-      Promise.all(lista.map((sd) => api.cajaApertura.get(uuidSede(sedes, sd), fmt(hoy)).then((r) => [sd, !!r?.abierta]).catch(() => [sd, true])))
-        .then((rs) => { const c = rs.find(([, abierta]) => !abierta); if (c) cerrada(c[0]); else seguir(); });
+      Promise.all(lista.map((sd) => api.cajaApertura.get(uuidSede(sedes, sd), fmt(hoy)).then((r) => [sd, !!r?.abierta, r?.jornadaAbiertaPrevia || null]).catch(() => [sd, true, null])))
+        .then((rs) => { const c = rs.find(([, abierta]) => !abierta); if (c) cerrada(c[0], c[2]); else seguir(); });
       return;
     }
     const c = lista.find((sd) => !aperturaDemo(sd)?.abierta);
@@ -4454,7 +4487,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
       ); })()}
       {embedded ? (
       <DataTable titulo="Pacientes esperando cupo" sub="en espera" minWidth={940} rows={ordenada} rowClassName={(p) => (ordenada[0] && p.id === ordenada[0].id ? "dc-esp-fila is-sug" : "dc-esp-fila")} accion={<Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>} empty={<Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." />} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(158px,1.4fr)", a: "left", get: (p) => p.n, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(colorDe(p.n), 0.14), color: colorDe(p.n), display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.n)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</div>{p.ofrecido.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", display: "flex", alignItems: "center", gap: 4 }}><Bell size={10} strokeWidth={1.75} /> {p.ofrecido.length} oferta(s)</div>}</div></div> },
+        { key: "paciente", label: "Paciente", w: "minmax(158px,1.4fr)", a: "left", get: (p) => p.n, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(colorDe(p.n), 0.14), color: colorDe(p.n), display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.n)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</div>{p.ofrecido.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", display: "flex", alignItems: "center", gap: 4 }}><Bell size={10} strokeWidth={1.75} /> {pluralEs(p.ofrecido.length, "oferta", "ofertas")}</div>}</div></div> },
         { key: "urg", label: "Urgencia", w: "minmax(88px,0.7fr)", a: "center", get: (p) => URGENCIA[p.urg].l, cell: (p) => { const u = URGENCIA[p.urg]; return <span style={{ fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: u.bg, color: u.fg }}>{u.l}</span>; } },
         { key: "tel", label: "Contacto", w: "minmax(112px,1fr)", a: "left", get: (p) => p.tel, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Phone size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.tel}</span> },
         { key: "esp", label: "Especialidad", w: "minmax(120px,1fr)", a: "left", get: (p) => p.e, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><Stethoscope size={13} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.e}</span></span> },
@@ -4623,7 +4656,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // Texto del botón Cobrar: si está deshabilitado se dice por qué (supervisión o rol).
   const tituloCobrar = (x) => (supervisaCaja ? "Supervisión: cobra cada sede con su caja (su administrador o recepción)"
     : !puedeAbrirCaja ? "Tu rol solo consulta la caja"
-    : !cajaAbierta ? "Abre la caja para cobrar" : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono");
+    : !cajaAbierta ? tituloCajaCerrada(jornadaAbiertaPrevia) : x.porCobrar > 0 ? "Cobrar lo terminado" : "Registrar un abono");
   // C4: el egreso sale de la gaveta, así que lo registra quien opera la caja (recepción y
   // administrador de sede), igual aquí que en «Crear › Registrar egreso». Anularlo o
   // reclasificarlo es de quien aprueba. Autorización granular: con `can` manda la matriz.
@@ -4830,8 +4863,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const irCerrarPrevia = () => {
     const j = jornadaAbiertaPrevia;
     if (!j?.id) return;
-    if (supervisaCaja || !puedeAbrirCaja) { notify(`La caja de esta sede tiene abierta la jornada del ${j.fecha || "día anterior"}; la cierra la sede.`); return; }
-    if (!confirm(`La jornada del ${j.fecha || "día anterior"} sigue abierta en esta sede. Antes de abrir otra caja hay que cerrarla. ¿Ir a cerrarla ahora?`)) { notify(`Primero cierra la jornada del ${j.fecha || "día anterior"} (Historial).`); return; }
+    if (supervisaCaja || !puedeAbrirCaja) { notify(`La caja de esta sede tiene abierta la jornada del ${j.fecha ? fechaDMA(j.fecha) : "día anterior"}; la cierra la sede.`); return; }
+    if (!confirm(`La jornada del ${j.fecha ? fechaDMA(j.fecha) : "día anterior"} sigue abierta en esta sede. Antes de abrir otra caja hay que cerrarla. ¿Ir a cerrarla ahora?`)) { notify(`Primero cierra la jornada del ${j.fecha ? fechaDMA(j.fecha) : "día anterior"} (Historial).`); return; }
     setTab("historial"); setCierreAdmin({ id: j.id, fecha: j.fecha, sedeId: j.sedeId, fondo: Number(j.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" });
   };
   const abrirCaja = () => {
@@ -4864,7 +4897,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       return;
     }
     if (jornadaAbiertaPrevia?.id) {
-      notify(`Hay una jornada abierta del ${jornadaAbiertaPrevia.fecha || "día anterior"}. Ciérrala en Historial antes de abrir otra (una caja abierta por sede).`);
+      notify(`Hay una jornada abierta del ${jornadaAbiertaPrevia.fecha ? fechaDMA(jornadaAbiertaPrevia.fecha) : "día anterior"}. Ciérrala en Historial antes de abrir otra (una caja abierta por sede).`);
       setTab("historial");
       recargarHistCaja();
       return;
@@ -4887,7 +4920,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const contado = cierreAdminForm.contado === "" ? Number(cierreAdmin.fondo) || 0 : Number(cierreAdminForm.contado);
     if (Number.isNaN(contado)) { notify("Efectivo contado inválido."); return; }
     const just = (cierreAdminForm.justificacion || "").trim();
-    if (!confirm(`¿Cerrar la jornada del ${cierreAdmin.fecha} fuera de fecha?\n\nJustificación: ${just}`)) return;
+    if (!confirm(`¿Cerrar la jornada del ${fechaDMA(cierreAdmin.fecha)} fuera de fecha?\n\nJustificación: ${just}`)) return;
     setCierreAdminBusy(true);
     // Omitir efectivoEsperado: el API calcula fondo ± movimientos (CAJA-08).
     api.cajaApertura.cerrar(cierreAdmin.id, {
@@ -4895,7 +4928,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       justificacion: just,
     })
       .then(() => {
-        notify(`Jornada del ${cierreAdmin.fecha} cerrada (fuera de fecha).`);
+        notify(`Jornada del ${fechaDMA(cierreAdmin.fecha)} cerrada (fuera de fecha).`);
         setCierreAdmin(null);
         setCierreAdminForm({ contado: "", justificacion: "" });
         recargarHistCaja();
@@ -5036,10 +5069,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       setTab("hoy");
       return;
     }
+    // R-27: el motivo sale del estado real de la caja de la sede, ya leído: antes, según qué
+    // respuesta llegaba primero, un paciente veía «Abre la caja» y otro «Cierra la jornada».
+    if (conectado && !aperturaLista) { notify(`Todavía se está leyendo la caja de ${sedeNombre()}. Intenta de nuevo en un momento.`); return; }
     if (!cajaAbierta) {
-      notify(jornadaAbiertaPrevia?.id
-        ? "Cierra la jornada anterior en Historial antes de cobrar."
-        : `Abre la caja de ${sedeNombre()} antes de cobrar.`);
+      notify(motivoCajaCerrada({ sede: sedeNombre(), jornadaPrevia: jornadaAbiertaPrevia, puedeCerrar: puedeAbrirCaja }));
       setTab(jornadaAbiertaPrevia?.id ? "historial" : "hoy");
       try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { /* sin scroll */ }
       return;
@@ -5099,7 +5133,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     }
     // C4: el egreso sale de la gaveta: con la caja de la sede cerrada no se registra.
     if (sedeCaja != null && !cajaAbierta) {
-      notify(jornadaAbiertaPrevia?.id ? "Cierra la jornada anterior en Historial y abre la caja antes de registrar un egreso." : `Abre la caja de ${sedeNombre()} antes de registrar un egreso.`);
+      notify(motivoCajaCerrada({ sede: sedeNombre(), jornadaPrevia: jornadaAbiertaPrevia, accion: "registrar un egreso", puedeCerrar: puedeAbrirCaja }));
       setTab(jornadaAbiertaPrevia?.id ? "historial" : "hoy");
       return;
     }
@@ -5156,7 +5190,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   useEffect(() => { if (conectado) { recargarCaja(); recargarHist(); recargarCierre(); recargarEgresos(); } }, [claveVer]); // eslint-disable-line
   const pacsHoy = new Set(citasHoyApi.filter((c) => deCaja(c.sedeId ?? c.sede)).map((c) => c.pacienteId).filter(Boolean));
   useEffect(() => {
-    if (!conectado || !cobroDesdeFicha?.pid || !cajaCargada) return;
+    // R-27: espera también a saber si la caja de la sede está abierta (o con una jornada
+    // anterior sin cerrar), para que el aviso sea el mismo para todos los pacientes.
+    if (!conectado || !cobroDesdeFicha?.pid || !cajaCargada || !aperturaLista) return;
     const { pid, nombre } = cobroDesdeFicha;
     onCobroDesdeFichaDone();
     const hit = (caja.porCobrar || []).filter((r) => r.sedeId == null || deCaja(r.sedeId)).find((r) => String(r.pacienteId) === String(pid));
@@ -5170,7 +5206,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       if (s2 > 0.5) intentarCobrar({ pid, nombre, monto: s2 });
       else notify(`${nombre} no tiene saldo pendiente en esta caja.`);
     }).catch(() => notify(cajaError ? "No se pudieron cargar los saldos de caja. Reintenta." : `${nombre} no tiene saldo pendiente en esta caja.`));
-  }, [cobroDesdeFicha, conectado, cajaCargada]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cobroDesdeFicha, conectado, cajaCargada, aperturaLista]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (conectado && tab === "cierre") recargarCierre(); }, [tab, apertura?.id, apertura?.abierta]); // eslint-disable-line
   // Cuenta única del paciente (M-06/M-07): la misma que leen Pendientes, Panel y la ficha,
   // recortada a la sede de la caja (CAJA-03): un paciente de dos sedes no arrastra aquí lo
@@ -5411,7 +5447,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const sol = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const difTxt = (d) => (d == null ? "" : Math.abs(d) < 0.01 ? "Cuadró exacto" : d > 0 ? `Sobraron ${sol(d)}` : `Faltaron ${sol(-d)}`);
   // Resultado del cierre con la gaveta en dólares si no cuadró (C3).
-  const difTxtCierre = (r) => { const du = r?.diferenciaUsd == null ? null : Number(r.diferenciaUsd); return `${difTxt(r?.diferencia)}${du != null && Math.abs(du) > 0.009 ? ` · ${du > 0 ? "sobraron" : "faltaron"} ${usd2(Math.abs(du))}` : ""}`; };
+  // R-18: con descuadre en dólares se dice de qué moneda es cada resultado («Cuadró exacto ·
+  // sobraron US$ 3.75» parecía contradictorio).
+  const difTxtCierre = (r) => {
+    const du = r?.diferenciaUsd == null ? null : Number(r.diferenciaUsd);
+    const ds = difTxt(r?.diferencia);
+    if (du == null || Math.abs(du) <= 0.009) return ds;
+    const usdTxt = `${du > 0 ? "sobraron" : "faltaron"} ${usd2(Math.abs(du))}`;
+    return ds ? `Soles: ${ds.charAt(0).toLowerCase()}${ds.slice(1)} · dólares: ${usdTxt}` : `Dólares: ${usdTxt}`;
+  };
   const linksPend = linksVis.filter((l) => l.estado === "pendiente").length;
   const pasos = [
     { id: "apertura", n: 1, l: "Apertura", ic: KeyRound, ok: cajaAbierta || !!cerradaHoyReg, sub: cajaAbierta ? `Abierta ${horaDe(apertura?.abiertaEn)}` : cerradaHoyReg ? `Abrió ${horaDe(cerradaHoyReg.abiertaEn)}` : "Fondo y medios" },
@@ -5522,7 +5566,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           {jornadaAbiertaPrevia?.id && (
             <div className="fm-aviso-edad is-mal">
               <AlertTriangle size={15} strokeWidth={2} />
-              <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha || "—"}. {!puedeAbrirCaja ? "La cierra la sede (su administrador o recepción)." : "Ciérrala antes de abrir otra caja en esta sede."}</span>
+              <span><b>Hay una jornada sin cerrar</b> del {jornadaAbiertaPrevia.fecha ? fechaDMA(jornadaAbiertaPrevia.fecha) : "—"}. {!puedeAbrirCaja ? "La cierra la sede (su administrador o recepción)." : "Ciérrala antes de abrir otra caja en esta sede."}</span>
               {/* R5-03: «Cerrarla» solo a quien opera la caja (facturacion:crear, lo mismo que pide
                   el servidor para cerrar). Gerencia y TI la veían y el envío se frenaba después. */}
               {puedeAbrirCaja && <button type="button" onClick={() => { setTab("historial"); setCierreAdmin({ id: jornadaAbiertaPrevia.id, fecha: jornadaAbiertaPrevia.fecha, sedeId: jornadaAbiertaPrevia.sedeId, fondo: Number(jornadaAbiertaPrevia.fondo) || 0 }); setCierreAdminForm({ contado: "", justificacion: "" }); }}>Cerrarla</button>}
@@ -5543,7 +5587,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <label className="dc-ap3__campo"><span>Fondo inicial</span><span className="dc-ap3__monto"><i>S/</i><input inputMode="decimal" aria-label="Fondo inicial (S/)" value={aperturaForm.fondo} onChange={(e) => setAperturaForm({ ...aperturaForm, fondo: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo"><span>Fondo en dólares</span><span className="dc-ap3__monto"><i>US$</i><input inputMode="decimal" aria-label="Fondo inicial en dólares (US$)" value={aperturaForm.fondoUsd} onChange={(e) => setAperturaForm({ ...aperturaForm, fondoUsd: e.target.value.replace(/[^\d.]/g, "") })} placeholder="0.00" /></span></label>
                 <label className="dc-ap3__campo is-nota"><span>Nota (opcional)</span><input aria-label="Nota o turno" value={aperturaForm.nota} onChange={(e) => setAperturaForm({ ...aperturaForm, nota: e.target.value })} placeholder="Ej. turno mañana" /></label>
-                <button type="button" className="dc-ap2__cta" onClick={() => { if (jornadaAbiertaPrevia?.id) { irCerrarPrevia(); return; } abrirCaja(); }} disabled={sedeCaja == null} title={sedeCaja == null ? "Elige la sede" : jornadaAbiertaPrevia?.id ? `Primero cierra la jornada del ${jornadaAbiertaPrevia.fecha || "día anterior"}` : undefined}><KeyRound size={16} strokeWidth={2} /> Confirmar apertura</button>
+                <button type="button" className="dc-ap2__cta" onClick={() => { if (jornadaAbiertaPrevia?.id) { irCerrarPrevia(); return; } abrirCaja(); }} disabled={sedeCaja == null} title={sedeCaja == null ? "Elige la sede" : jornadaAbiertaPrevia?.id ? `Primero cierra la jornada del ${jornadaAbiertaPrevia.fecha ? fechaDMA(jornadaAbiertaPrevia.fecha) : "día anterior"}` : undefined}><KeyRound size={16} strokeWidth={2} /> Confirmar apertura</button>
               </div>}
             </section>
           ) : (
@@ -5596,15 +5640,15 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {conectado && porCobrarHoy.length > 0 && (
         <Card style={{ overflow: "hidden", border: "1px solid var(--dc-amber-soft)" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-warn-soft)", background: "var(--dc-white)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "var(--dc-r-sm)", background: "var(--dc-warn-600)", display: "grid", placeItems: "center" }}><Clock size={17} strokeWidth={1.75} color="#fff" /></div><div><div style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Por cobrar de hoy</div><div style={{ fontSize: 13, color: "var(--dc-warn-700)" }}>{porCobrarHoy.length} paciente(s) del día con saldo – cobra aquí al salir de atención</div></div></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "var(--dc-r-sm)", background: "var(--dc-warn-600)", display: "grid", placeItems: "center" }}><Clock size={17} strokeWidth={1.75} color="#fff" /></div><div><div style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Por cobrar de hoy</div><div style={{ fontSize: 13, color: "var(--dc-warn-700)" }}>{pluralEs(porCobrarHoy.length, "paciente", "pacientes")} del día con saldo – cobra aquí al salir de atención</div></div></div>
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-warn-600)", fontFamily: DISPLAY_FONT }}>S/ {porCobrarHoy.reduce((s, x) => s + x.saldo, 0).toLocaleString()}</span>
           </div>
           {porCobrarHoy.map((x, i) => (
             <div key={x.p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
               <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(NAVY, 0.071), color: NAVY, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(x.p.nombre)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{x.pend} fase(s) pendiente(s) – plan S/ {x.total.toFixed(0)}</div></div>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{x.pend} {x.pend === 1 ? "fase pendiente" : "fases pendientes"} – plan S/ {x.total.toFixed(0)}</div></div>
               <span style={{ fontWeight: 600, color: RED, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(x.saldo)}</span>
-              <Btn small disabled={!cajaAbierta} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><CreditCard size={14} strokeWidth={1.75} /> Cobrar</Btn>
+              <Btn small disabled={!cajaAbierta} title={cajaAbierta ? undefined : tituloCajaCerrada(jornadaAbiertaPrevia)} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><CreditCard size={14} strokeWidth={1.75} /> Cobrar</Btn>
             </div>
           ))}
         </Card>
@@ -5623,7 +5667,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <ListaFiltrable rows={filtroCob === "listos" && porCobrar.some((x) => x.porCobrar > 0) ? porCobrar.filter((x) => x.porCobrar > 0) : porCobrar} sub="pacientes" className="dc-cob__lf" defaultSort={{ key: "saldo", dir: "desc" }} vistaClave="cobros" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, cols: [
               { key: "p", label: "Paciente", w: "minmax(150px,1.2fr)", cell: (x) => <PersonaCelda nombre={x.p.nombre} /> },
               { key: "sede", label: "Sede", w: "minmax(130px,1fr)", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") || "—" },
-              { key: "listo", label: "Listo para cobrar", w: "minmax(140px,1fr)", cell: (x) => x.porCobrar > 0 ? <span className="dc-tp__num is-mal" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>S/ {M.sol2(x.porCobrar)}{x.vencido > 0 ? <small className="dc-cob__venc"> · vencido</small> : null}</span> : <span className="dc-tp__sub">—</span> },
+              { key: "listo", label: "Listo para cobrar", w: "minmax(160px,1.2fr)", cell: (x) => x.porCobrar > 0 ? <span style={{ display: "grid", minWidth: 0 }}><span className="dc-tp__num is-mal" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>S/ {M.sol2(x.porCobrar)}{x.vencido > 0 ? <small className="dc-cob__venc"> · vencido</small> : null}</span>{(x.terminadosItems || []).length > 0 && <small className="dc-tp__sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(x.terminadosItems || []).map((f) => f.nombre).filter(Boolean).join(" · ")}</small>}</span> : <span className="dc-tp__sub">—</span> },
               { key: "cob", label: "Pagado del plan", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
               { key: "saldo", label: "Saldo del plan", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {M.sol2(x.saldo)}</span> },
               { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
@@ -5638,7 +5682,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 {lista.map((x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; const col = colorDe(x.p.nombre); const pc = pct >= 75 ? "#16A36A" : pct >= 40 ? "#0E9199" : "#D97706"; return (
                   <div key={x.p.id} className="dc-cob__fila dc-cob__fila--v2">
                     <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(x.p.nombre)}</span>
-                    <div className="dc-cob__quien"><b>{x.p.nombre}</b><span>{x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} · {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span></div>
+                    <div className="dc-cob__quien"><b>{x.p.nombre}</b><span>{x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} · {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span>
+                      {/* R-24: qué se cobra, a la vista (el nombre solo salía en el tooltip). */}
+                      {x.porCobrar > 0 && (x.terminadosItems || []).length > 0 && <em className="dc-cob__proc" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}><CheckCircle2 size={12} strokeWidth={2} /><span>{(x.terminadosItems || []).map((f) => f.nombre).filter(Boolean).join(" · ")}</span></em>}</div>
                     <div className="dc-cob__ahora" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}><small>Por cobrar ahora</small><b className={x.porCobrar > 0 ? "is-si" : ""}>{x.porCobrar > 0 ? `S/ ${M.sol2(x.porCobrar)}` : "—"}</b></div>
                     <div className="dc-cob__plan"><small>Saldo del plan</small><b>S/ {M.sol2(x.saldo)}</b><i title={`Cobrado S/ ${x.pagado} de S/ ${x.total}`}><u style={{ width: `${pct}%`, background: pc }} /></i><em>{pct}% cobrado</em></div>
                     <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button>
@@ -5651,7 +5697,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         <aside className="dc-cob__lado">
           <div className={`dc-cob__estado${cajaAbierta ? " is-abierta" : ""}`} hidden={!jornadaAbiertaPrevia?.id}>
             <span className="dc-cob__estado-ico"><KeyRound size={18} strokeWidth={1.9} /></span>
-            <div><small>{!cajaAbierta && jornadaAbiertaPrevia?.id ? `Jornada del ${jornadaAbiertaPrevia.fecha} sin cerrar` : "Caja del día"}</small><b>{cajaAbierta ? "Abierta" : jornadaAbiertaPrevia?.id ? "Abierta, sin cerrar" : "Cerrada"}</b></div>
+            <div><small>{!cajaAbierta && jornadaAbiertaPrevia?.id ? `Jornada del ${fechaDMA(jornadaAbiertaPrevia.fecha)} sin cerrar` : "Caja del día"}</small><b>{cajaAbierta ? "Abierta" : jornadaAbiertaPrevia?.id ? "Abierta, sin cerrar" : "Cerrada"}</b></div>
             {!cajaAbierta && (jornadaAbiertaPrevia?.id || puedeAbrirCaja) && <button type="button" onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>{jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}</button>}
           </div>
           <div className="dc-cob__hoy" hidden={!boletasHoyActivas.some((b) => b.moneda === "USD")}>
@@ -5981,7 +6027,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           {cierreAdmin && (
             <Card style={{ padding: 16, display: "grid", gap: 12, maxWidth: 520, border: "1px solid var(--dc-warn-600)" }}>
               <h4 style={{ margin: 0, color: NAVY }}>Cerrar jornada fuera de fecha</h4>
-              <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>Fecha <strong>{cierreAdmin.fecha}</strong> – sede {sedes.find((s) => s.id === cierreAdmin.sedeId)?.nombre || "—"} – fondo S/ {M.sol2(Number(cierreAdmin.fondo || 0))}</div>
+              <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>Fecha <strong>{fechaDMA(cierreAdmin.fecha)}</strong> – sede {sedes.find((s) => s.id === cierreAdmin.sedeId)?.nombre || "—"} – fondo S/ {M.sol2(Number(cierreAdmin.fondo || 0))}</div>
               <Field label="Efectivo contado (S/)" value={cierreAdminForm.contado} onChange={(v) => setCierreAdminForm({ ...cierreAdminForm, contado: v })} placeholder={String(Number(cierreAdmin.fondo || 0).toFixed(2))} />
               <Field label="Justificación (obligatoria)" value={cierreAdminForm.justificacion} onChange={(v) => setCierreAdminForm({ ...cierreAdminForm, justificacion: v })} placeholder="Ej. Jornada histórica sin arqueo – cierre admin QA" />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -6006,6 +6052,18 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             // Colores de cada resultado (los mismos de la tarjeta en ui.css).
             const COL_EST = { cuadra: { "--c": "#16A36A", "--s": "#E3F7EC" }, falta: { "--c": "#DC4A3D", "--s": "#FDE8E6" }, sobra: { "--c": "#D97706", "--s": "#FFF1DC" }, cerrada: { "--c": "#5B6B70", "--s": "#EEF2F3" }, abierta: { "--c": "#6D5BD0", "--s": "#EEEAFD" } };
             const pillUsd = (r) => { const d = difUsdDe(r); if (d == null) return <span className="dc-tp__sub">—</span>; const est = estDe(r, d); return <span className={`dc-pill ${est === "cuadra" ? "is-ok" : est === "falta" ? "is-mal" : "is-aviso"}`}>{est === "cuadra" ? "Cuadra" : `${est === "falta" ? "Faltan" : "Sobran"} ${usd2(Math.abs(d))}`}</span>; };
+            // R-07: al reabrir una jornada el servidor guarda los cierres anteriores
+            // (sesionesPrevias); antes la pantalla solo mostraba el último y los demás
+            // desaparecían. Hora de Lima con el día si no es el de la jornada (reaperturas).
+            const horaHist = (x) => { if (!x) return "—"; const t = new Date(x); return Number.isNaN(t.getTime()) ? "—" : t.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }); };
+            const diaHist = (x, fecha) => { const y = x ? ymdLima(x) : null; return y && y !== fecha ? ` (${fechaDMA(y).slice(0, 5)})` : ""; };
+            const resTxt = (dif, fmtM) => { const e = resultadoCierre(dif); return e == null ? "sin arqueo" : e === "cuadra" ? "cuadra" : `${e === "falta" ? "faltan" : "sobran"} ${fmtM(Math.abs(dif))}`; };
+            const textoCierrePrevio = (c, fecha) => [
+              `${horaHist(c.abiertaEn)}${diaHist(c.abiertaEn, fecha)} a ${horaHist(c.cerradaEn)}${diaHist(c.cerradaEn, (c.abiertaEn && ymdLima(c.abiertaEn)) || fecha)}`,
+              `fondo S/ ${M.sol2(c.fondo)}${c.fondoUsd ? ` y ${usd2(c.fondoUsd)}` : ""}`,
+              `esperado ${c.efectivoEsperado != null ? `S/ ${M.sol2(c.efectivoEsperado)}` : "—"}, contado ${c.efectivoContado != null ? `S/ ${M.sol2(c.efectivoContado)}` : "—"} (${resTxt(c.diferencia, (n) => `S/ ${M.sol2(n)}`)})`,
+              ...(c.efectivoContadoUsd != null || c.efectivoEsperadoUsd != null || c.fondoUsd ? [`dólares: esperado ${c.efectivoEsperadoUsd != null ? usd2(c.efectivoEsperadoUsd) : "—"}, contado ${c.efectivoContadoUsd != null ? usd2(c.efectivoContadoUsd) : "—"} (${resTxt(c.diferenciaUsd, usd2)})`] : []),
+            ].join(" · ");
             const rango = (
             <div className="dc-hero-acc dc-rango">
               {js.length > 0 && <span className={`dc-flujo__neto${rs.faltantes ? " is-neg" : ""}`} title={`${rs.nFaltantes} ${rs.nFaltantes === 1 ? "cierre con faltante" : "cierres con faltante"} en el rango`}>Faltantes <b>{rs.faltantes ? "− " : ""}S/ {M.sol2(rs.faltantes)}</b></span>}
@@ -6032,6 +6090,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             { key: "con", label: "Contado", w: "110px", a: "right", cell: (r) => <span className="dc-tp__num">{r.efectivoContado != null ? `S/ ${M.sol2(Number(r.efectivoContado))}` : "—"}</span> },
             { key: "est", label: "Resultado", w: "140px", a: "right", cell: (r) => { const d = r.diferencia != null ? Number(r.diferencia) : null; const est = estDe(r, d); return <span className={`dc-pill ${est === "cuadra" || est === "cerrada" ? "is-ok" : est === "abierta" ? "is-info" : est === "falta" ? "is-mal" : "is-aviso"}`}>{est === "abierta" ? "Abierta" : est === "cuadra" ? "Cuadra" : est === "cerrada" ? "Cerrada" : `${est === "falta" ? "Faltan" : "Sobran"} S/ ${M.sol2(Math.abs(d))}`}</span>; } },
             { key: "usd", label: "Dólares", w: "140px", a: "right", cell: (r) => (r.efectivoContadoUsd != null || r.fondoUsd ? <span title={`Fondo ${usd2(r.fondoUsd)} · esperado ${r.efectivoEsperadoUsd != null ? usd2(r.efectivoEsperadoUsd) : "—"} · contado ${r.efectivoContadoUsd != null ? usd2(r.efectivoContadoUsd) : "—"}`}>{pillUsd(r)}</span> : <span className="dc-tp__sub">—</span>) },
+            { key: "prev", label: "Cierres anteriores", w: "120px", a: "center", cell: (r) => { const p = cierresAnteriores(r); return p.length ? <span className="dc-pill is-info" title={p.map((c) => textoCierrePrevio(c, r.fecha)).join("\n")}>{p.length === 1 ? "1 cierre" : `${p.length} cierres`}</span> : <span className="dc-tp__sub">—</span>; } },
           ] }} cols={[
             { key: "fecha", label: "Fecha", get: (r) => r.fecha || "" },
             { key: "sede", label: "Sede", get: (r) => sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "" },
@@ -6040,6 +6099,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             { key: "dif", label: "Diferencia", get: (r) => (r.diferencia != null ? Number(r.diferencia).toFixed(2) : ""), sortVal: (r) => Math.abs(Number(r.diferencia) || 0) },
             { key: "difUsd", label: "Diferencia US$", get: (r) => (r.diferenciaUsd != null ? Number(r.diferenciaUsd).toFixed(2) : ""), sortVal: (r) => Math.abs(Number(r.diferenciaUsd) || 0) },
             { key: "notas", label: "Justificación y observaciones", get: (r) => [r.justificacion, r.observaciones].filter(Boolean).join(" · ") },
+            { key: "prev", label: "Cierres anteriores (reaperturas)", get: (r) => cierresAnteriores(r).map((c) => `${textoCierrePrevio(c, r.fecha)}${c.justificacion ? ` · ${c.justificacion}` : ""}`).join(" | "), sortVal: (r) => cierresAnteriores(r).length },
           ]}>{(lista) => (
           <div className="dc-jor">
             {lista.map((r) => {
@@ -6059,7 +6119,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-jor__fecha"><b>{isNaN(f) ? "—" : f.getDate()}</b><span>{isNaN(f) ? r.fecha : f.toLocaleDateString("es-PE", { month: "short" }).replace(".", "")}</span><small>{isNaN(f) ? "" : f.toLocaleDateString("es-PE", { weekday: "short" }).replace(".", "")}</small></div>
                 <div className="dc-jor__info">
                   <b><MapPin size={13} strokeWidth={2} /> {sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—"}</b>
-                  <span><Clock size={12} strokeWidth={2} /> {hora(r.abiertaEn)} a {r.abierta ? "en curso" : hora(r.cerradaEn)}</span>
+                  <span><Clock size={12} strokeWidth={2} /> {hora(r.abiertaEn)}{diaHist(r.abiertaEn, r.fecha)} a {r.abierta ? "en curso" : `${hora(r.cerradaEn)}${diaHist(r.cerradaEn, (r.abiertaEn && ymdLima(r.abiertaEn)) || r.fecha)}`}</span>
                   <span className="dc-jor__quien">Abrió {r.abiertaPorNombre || "—"}{!r.abierta && r.cerradaPorNombre ? `, cerró ${r.cerradaPorNombre}` : ""}</span>
                 </div>
                 <div className="dc-jor__arq">
@@ -6085,6 +6145,19 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     {r.observaciones && <span><b>Observaciones:</b> {r.observaciones}</span>}
                   </div>
                 )}
+                {(() => { const prev = cierresAnteriores(r); return prev.length > 0 && (
+                  <details open className="dc-jor__prev" style={{ gridColumn: "1 / -1", borderTop: "1px dashed var(--dc-line)", paddingTop: 8, fontSize: 12, color: "var(--dc-ink-700)" }}>
+                    <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--dc-navy)" }}>{prev.length === 1 ? "1 cierre anterior" : `${prev.length} cierres anteriores`}: la jornada se reabrió {prev.length === 1 ? "una vez" : `${prev.length} veces`}</summary>
+                    <ol style={{ margin: "6px 0 0", paddingLeft: 18, display: "grid", gap: 4 }}>
+                      {prev.map((c) => (
+                        <li key={c.id}>
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>{textoCierrePrevio(c, r.fecha)}</span>
+                          {c.justificacion && <span style={{ color: "var(--dc-ink-500)" }}> · {c.justificacion}</span>}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ); })()}
               </article>
               );
             })}
@@ -6385,11 +6458,11 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
     if (supervisaT) { notify("Cobra la sede de la cita (su administrador o recepción)."); return; }
     const dp = datosPago(c);
     const abrir = () => setPago({ monto, nombre: c.paciente, pid: dp.pid, cita: c });
-    const cerrada = () => notify(`Abre la caja de ${nombreSedeEn(sedesApi, c.sede)} antes de cobrar.`);
+    const cerrada = (previa = null) => notify(motivoCajaCerrada({ sede: nombreSedeEn(sedesApi, c.sede), jornadaPrevia: previa }));
     if (auth.token) {
       const uuid = uuidSede(sedesApi, c.sede);
       if (!uuid) { notify("La cita no tiene sede: no se sabe en qué caja cobrar."); return; }
-      api.cajaApertura.get(uuid, fmt(hoy)).then((r) => (r?.abierta ? abrir() : cerrada())).catch(() => notify("No se pudo verificar la caja de la sede."));
+      api.cajaApertura.get(uuid, fmt(hoy)).then((r) => (r?.abierta ? abrir() : cerrada(r?.jornadaAbiertaPrevia || null))).catch(() => notify("No se pudo verificar la caja de la sede."));
       return;
     }
     if (!aperturaDemo(c.sede)?.abierta) { cerrada(); return; }
@@ -6500,6 +6573,21 @@ function MiProduccion({ usuario, citas, sedes = null }) {
       api.citas.listar(null, mesIni, fmt(hoy)).then((cs) => setCitasPendMp((cs || []).filter((c) => ids.has(String(c.id)) && c.estado === "atendida"))).catch(() => setCitasPendMp([]));
     }).catch(() => setEvoPendMp(null));
   }, [sedes && sedes.join(",")]); // eslint-disable-line
+  // M6-04: para comparar con el mes anterior hasta el mismo día (no un prorrateo) hacen falta
+  // sus atenciones del mes anterior, si el servidor no manda ese tramo. null = sin dato.
+  const [citasMesAnt, setCitasMesAnt] = useState(null);
+  const antAlDiaSrv = real && real.esMedico ? (real.produccionMesAnteriorAlDia ?? real.produccionMesAnteriorMismoPeriodo ?? null) : null;
+  useEffect(() => {
+    if (!conectado || !real || !real.esMedico || antAlDiaSrv != null || !(Number(real.produccionMesAnterior) > 0)) return;
+    const t = tramoMesAnterior(ymdLima(new Date()) || fmt(hoy));
+    if (!t) return;
+    const sedesQ = sedes && !(sedeMp.sede === "all" && sedeMp.global) ? sedes.map(sedeApiUuid).filter(Boolean) : null;
+    let vivo = true;
+    api.citas.listar(null, t.desde, t.hasta, sedesQ && sedesQ.length ? sedesQ : undefined)
+      .then((cs) => { if (vivo) setCitasMesAnt(Array.isArray(cs) ? cs : null); })
+      .catch(() => { if (vivo) setCitasMesAnt(null); });
+    return () => { vivo = false; };
+  }, [real, sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // El doctor de la sesión (antes estaba fijo en la Dra. Mendoza: id 1). Solo la demostración
   // usa MEDICOS; con sesión todo sale de GET /mi-produccion.
@@ -6536,16 +6624,15 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     : comisionSrv;
   const atenciones = R ? Math.max(0, (R.atenciones || 0) - pendEvoMes.length) : enSedes.citas;
   const ticket = R ? (restaMes > 0 ? (atenciones ? Math.round(mesProd / atenciones) : 0) : Math.round(Number(R.ticketPromedio) || 0)) : (atenciones ? Math.round(mesProd / atenciones) : 0);
-  // Comparar periodos equivalentes: el mes en curso contra el mismo tramo del anterior. Si el
-  // servidor no manda ese tramo, se prorratea el mes anterior al día de hoy, y en los
-  // primeros días (mes corto) no se muestra variación: el día 4 salía «−100 %».
-  const diaMes = Number(String(ymdLima(new Date()) || "").slice(8, 10)) || new Date().getDate();
-  const antEquiv = R ? Number(R.produccionMesAnteriorAlDia ?? R.produccionMesAnteriorMismoPeriodo ?? NaN) : NaN;
-  const diasMesAnt = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 0).getDate(); })();
-  const baseComp = Number.isFinite(antEquiv) && antEquiv > 0 ? antEquiv
-    : (mesAnterior > 0 && diaMes >= 10 ? mesAnterior * Math.min(1, diaMes / diasMesAnt) : null);
-  const compTxt = Number.isFinite(antEquiv) && antEquiv > 0 ? "vs mismo periodo del mes anterior" : "vs mes anterior al mismo día";
-  const deltaProd = baseComp ? Math.round(((mesProd - baseComp) / baseComp) * 100) : null;
+  // M6-04: el mes en curso contra lo que llevaba el mes anterior HASTA EL MISMO DÍA: el tramo
+  // que mande el servidor o, si no, la suma de sus atenciones del mes anterior hasta ese día
+  // (solo si cuadran con el total del mes que da el servidor). Antes se prorrateaba el mes
+  // anterior entero y se rotulaba como cifra real («+150 %» cuando era 0 %). Sin dato
+  // comparable no se muestra porcentaje.
+  const comp = R ? compararMesAnterior({ mesProd, mesAnterior, antAlDiaServidor: antAlDiaSrv, citasMesAnterior: citasMesAnt, hoyISO: ymdLima(new Date()) || fmt(hoy), medicoId: R.medicoId ?? null }) : null;
+  const baseComp = comp ? comp.base : null;
+  const compTxt = comp ? comp.txt : "vs mes anterior";
+  const deltaProd = comp ? comp.delta : null;
   // DEV-12: sin relleno de tasa inventada; sin dato → null y la UI muestra guion.
   const noShow = R && R.ausentismo != null ? Number(R.ausentismo) : null;
   const pct = meta > 0 ? Math.min(100, Math.round((mesProd / meta) * 100)) : null;
@@ -6604,8 +6691,12 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     );
   }
   const kpis = [
-    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: deltaProd, deltaTxt: compTxt, sub: mesAnterior > 0 && deltaProd == null ? "el mes recién empieza: aún sin comparar" : undefined,
-      desc: deltaProd != null ? `Suma de tus tratamientos facturados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% ${compTxt} (S/ ${Math.round(baseComp).toLocaleString()}).` : mesAnterior > 0 ? `Suma de tus tratamientos terminados este mes. Con pocos días del mes no se compara con el anterior (S/ ${mesAnterior.toLocaleString()} en todo el mes).` : "Suma de tus tratamientos terminados este mes. Aún no hay mes anterior para comparar." },
+    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: deltaProd, deltaTxt: compTxt,
+      sub: mesAnterior > 0 && deltaProd == null ? (comp ? `${comp.rango}: sin producción para comparar` : `mes anterior: S/ ${mesAnterior.toLocaleString()} en total`) : undefined,
+      desc: deltaProd != null ? `Suma de tus tratamientos facturados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% frente a lo que llevabas del ${comp.rango} (S/ ${Math.round(baseComp).toLocaleString()}).`
+        : mesAnterior > 0 ? (comp ? `Suma de tus tratamientos terminados este mes. Del ${comp.rango} no tuviste producción, así que no hay porcentaje que comparar (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`
+          : `Suma de tus tratamientos terminados este mes. No hay dato de lo que llevabas el mes anterior a estas alturas, así que no se calcula porcentaje (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`)
+        : "Suma de tus tratamientos terminados este mes. Aún no hay mes anterior para comparar." },
     // El porcentaje sale del que tiene pactado este médico (backend: porcentajeComision),
     // no de un 40% escrito a mano: el importe ya se calculaba con el suyo y la etiqueta
     // decía otra cosa.
@@ -6716,7 +6807,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
             {[
               // Sin producción por tratamiento no hay «mayor fuente» (salía «— es tu mayor fuente: 0 %»).
               top.v > 0 && top.n && top.n !== "—" && [`${top.n} es tu mayor fuente: ${topPct}% de tus ingresos. Reservar más cupos de esta especialidad sube tu producción.`, DS.c.primary],
-              deltaProd != null && [`Tu producción ${deltaProd >= 0 ? "creció" : "bajó"} ${Math.abs(deltaProd)}% ${compTxt}.`, deltaProd >= 0 ? "var(--dc-ok-700)" : "var(--dc-warn-600)"],
+              deltaProd != null && [`Tu producción ${deltaProd === 0 ? "está igual que" : deltaProd > 0 ? `va ${deltaProd}% por encima de` : `va ${Math.abs(deltaProd)}% por debajo de`} lo que llevabas del ${comp.rango}.`, deltaProd >= 0 ? "var(--dc-ok-700)" : "var(--dc-warn-600)"],
               ticket > 0 && [`Tus atenciones dejan de media S/ ${ticket}. Proponer tratamientos integrales (no solo limpiezas) lo sube.`, DS.c.primary],
               [noShow != null
                 ? `Ausentismo ${noShow}%. Confirmar por WhatsApp 24h antes reduce los espacios vacíos.`
@@ -9156,7 +9247,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
               <span className="dc-pac-hero__ico" style={{ background: "rgba(245,154,141,.28)", color: "#FFD1C9" }}><AlertTriangle size={15} strokeWidth={1.9} /></span>
               <div className="dc-esp-hero__prox-txt"><span>{atr.length === 1 ? "1 trabajo atrasado" : `${atr.length} trabajos atrasados`}</span><b>{atr.map((c) => c.paciente).join(", ")}</b></div>
               {/* Con sesión no hay envío de avisos al laboratorio: no se finge el contacto. */}
-              {!conectado && <button type="button" className="dc-esp-hero__btn" onClick={() => notify(`Se contactó al laboratorio por ${atr.length} trabajo(s) atrasado(s).`)}><Phone size={13} strokeWidth={1.9} /> Contactar</button>}
+              {!conectado && <button type="button" className="dc-esp-hero__btn" onClick={() => notify(`Se contactó al laboratorio por ${pluralEs(atr.length, "trabajo atrasado", "trabajos atrasados")}.`)}><Phone size={13} strokeWidth={1.9} /> Contactar</button>}
             </div>
           ) : <span />}
           {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={() => setNuevo({ paciente: "", sede: sedeEnvioDef, trabajo: "", lab: conectado ? "" : "Laboratorio Dental Lima", entrega: addDays(7) })}><Plus size={15} strokeWidth={2} /> Nuevo envío</button>}
@@ -10103,9 +10194,11 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   // radiografías del primer paciente de la lista, y con sesión se subían sin paciente.
   // Abre con el paciente cuya ficha se miró por última vez (el que se está atendiendo), no
   // con el primero de la lista.
+  const pidRecordado = useRef(null);   // el que vino de «último paciente», no elegido aquí (M6-01)
   const [pid, setPid] = useState(() => {
     if (pacienteFijo != null) return pacienteFijo;
-    let ult = null; try { ult = sessionStorage.getItem("dc_ultimo_paciente"); } catch { /* sin almacenamiento */ }
+    const ult = leerUltimoPaciente();
+    pidRecordado.current = ult;
     if (auth.token) return ult || null;
     return (ult && pacProp.find((p) => String(p.id) === ult)?.id) ?? (pacProp[0]?.id || null);
   });
@@ -10142,7 +10235,23 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
   };
   const [rxRem, setRxRem] = useState([]);
   // La sede del estudio es la que devuelve el servidor (sin una fija: todo salía «San Isidro»).
-  const recargarRx = () => { if (conectado && pid) api.radiografias.porPaciente(pid).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: r.sedeId ?? r.sede ?? null, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).then(() => setRxSinPermiso(false)).catch((e) => { if (esSinPermiso(e)) { setRxRem([]); setRxSinPermiso(true); } }); else setRxRem([]); };
+  // M6-01: el paciente recordado de otra ficha (no el fijo de la ficha abierta) que la API
+  // rechaza con 403 se olvida y se pide elegir uno, en vez de quedar en «Sin permiso».
+  const recargarRx = () => {
+    if (!(conectado && pid)) { setRxRem([]); setRxSinPermiso(false); return; }
+    const pedido = pid;
+    api.radiografias.porPaciente(pedido).then((rows) => setRxRem((rows || []).map((r) => ({ id: r.id, tipo: r.tipo || "periapical", fecha: r.fecha, sede: r.sedeId ?? r.sede ?? null, url: r.url, nota: r.nota, piezas: r.piezas, vista: r.vista, momento: r.momento })))).then(() => setRxSinPermiso(false))
+      .catch((e) => {
+        if (!esSinPermiso(e)) return;
+        setRxRem([]);
+        // Elegido aquí (o el de la ficha abierta) sí es «Sin permiso»: el rol no ve sus imágenes.
+        if (pacienteFijo == null && pidRecordado.current != null && String(pidRecordado.current) === String(pedido)) {
+          pidRecordado.current = null; olvidarUltimoPaciente(pedido);
+          setPid((v) => (String(v) === String(pedido) ? null : v)); setRxSinPermiso(false); return;
+        }
+        setRxSinPermiso(true);
+      });
+  };
   const [rxSinPermiso, setRxSinPermiso] = useState(false);
   useEffect(() => { recargarRx(); }, [pid, conectado]); // eslint-disable-line
   const paciente = pacientes.find((p) => String(p.id) === String(pid)) || { id: pid, nombre: "Selecciona un paciente" };

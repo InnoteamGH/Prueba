@@ -180,7 +180,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
     const pend = cola.filter((x) => x.estado === "por_contactar");
     if (!pend.length) { notify("No hay pacientes por contactar."); return; }
     // Un WhatsApp a decenas de pacientes no se lanza con un clic y sin preguntar.
-    if (!confirm(`Se enviará un WhatsApp a ${pend.length} paciente(s). ¿Continuar?`)) return;
+    if (!confirm(`Se enviará un WhatsApp a ${pend.length} ${pend.length === 1 ? "paciente" : "pacientes"}. ¿Continuar?`)) return;
     if (conectado) {
       // Antes se marcaba TODA la cola como "enviado" antes de saber si salía, y los
       // fallos se tragaban: la pantalla decía que se envió y esos pacientes no se
@@ -191,15 +191,15 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
           setCola((c) => c.map((x) => (ok.has(x.id) ? { ...x, estado: "enviado" } : x)));
           const fallidos = pend.length - ok.size;
           notify(fallidos === 0 && ok.size > 0
-            ? `Recall enviado a ${ok.size} paciente(s) por WhatsApp.`
+            ? `Recall enviado a ${ok.size} ${ok.size === 1 ? "paciente" : "pacientes"} por WhatsApp.`
             : ok.size === 0
-              ? `No se pudo enviar a ninguno de los ${pend.length} paciente(s). Siguen por contactar.`
+              ? `No se pudo enviar ${pend.length === 1 ? "al paciente. Sigue" : `a ninguno de los ${pend.length} pacientes. Siguen`} por contactar.`
               : `Enviado a ${ok.size} de ${pend.length}. No se pudo enviar a ${fallidos}; siguen por contactar.`);
         });
       return;
     }
     setCola((c) => c.map((x) => (x.estado === "por_contactar" ? { ...x, estado: "enviado" } : x)));
-    notify(`Recordatorio enviado a ${pend.length} paciente(s).`);
+    notify(`Recordatorio enviado a ${pend.length} ${pend.length === 1 ? "paciente" : "pacientes"}.`);
   };
   const activas = reglas.filter((r) => r.on).length;
   // Las tres vistas son submódulos del menú lateral (Recordatorios → …).

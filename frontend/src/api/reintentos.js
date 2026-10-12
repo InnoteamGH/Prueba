@@ -8,6 +8,9 @@
  *     juntas no vuelvan a llegar juntas.
  *   - POST, PUT, PATCH y DELETE nunca se repiten: la escritura pudo llegar al servidor aunque
  *     la respuesta se perdiera, y repetirla duplicaría el cobro, la cita o el paciente.
+ *     La excepción es la que se marca `idempotente`: hoy solo el inicio de sesión
+ *     (POST /auth/login y /auth/portal/login), que no crea ni cambia nada (R6-10: a las 09:10
+ *     el login dio 500 y la persona quedó en la pantalla de acceso).
  *   - Como mucho 6 GET a la vez: las demás esperan su turno en una cola.
  * Sin imports ni import.meta: lo usan client.js y node --test.
  */
@@ -24,10 +27,15 @@ export const ESPERAS_MS = [[400, 800], [1000, 2000]];
 
 const estadoDeError = (e) => (e ? (e.status ?? e._httpStatus) : undefined);
 
-/** ¿Se puede repetir esta petición? Solo las GET y solo ante un estado reintentable. */
-export function esReintentable(method, status) {
-  return String(method || "").toUpperCase() === "GET" && ESTADOS_REINTENTABLES.has(Number(status));
+/** ¿Se puede repetir esta petición? Las GET (o una escritura marcada `idempotente`, sin
+    efectos secundarios, como el login) y solo ante un estado reintentable. */
+export function esReintentable(method, status, idempotente = false) {
+  return (idempotente || String(method || "").toUpperCase() === "GET") && ESTADOS_REINTENTABLES.has(Number(status));
 }
+
+/** ¿El fallo es del servidor o de la red (500, 502, 503, 504 o sin respuesta)? Para decir
+    «el servidor no responde» en vez de culpar a la persona o a sus datos. */
+export const esFalloDeServidor = (status) => ESTADOS_REINTENTABLES.has(Number(status));
 
 /** Milisegundos a esperar antes del reintento n (1 = el primero). `azar` devuelve [0, 1). */
 export function esperaReintento(n, azar = Math.random) {
@@ -38,14 +46,15 @@ export function esperaReintento(n, azar = Math.random) {
 
 const dormirMs = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
-/** Ejecuta fn(intento) y, si falla con un estado reintentable y es una GET, la repite hasta
-    `max` veces esperando entre una y otra. Si no se puede repetir, el error sale tal cual. */
-export async function conReintentos(fn, { method = "GET", max = MAX_REINTENTOS, dormir = dormirMs, azar = Math.random, estadoDe = estadoDeError, alReintentar = null } = {}) {
+/** Ejecuta fn(intento) y, si falla con un estado reintentable y es una GET (o una escritura
+    `idempotente`), la repite hasta `max` veces esperando entre una y otra. Si no se puede
+    repetir, el error sale tal cual. */
+export async function conReintentos(fn, { method = "GET", idempotente = false, max = MAX_REINTENTOS, dormir = dormirMs, azar = Math.random, estadoDe = estadoDeError, alReintentar = null } = {}) {
   for (let intento = 0; ; intento += 1) {
     try {
       return await fn(intento);
     } catch (e) {
-      if (intento >= max || !esReintentable(method, estadoDe(e))) throw e;
+      if (intento >= max || !esReintentable(method, estadoDe(e), idempotente)) throw e;
       const ms = esperaReintento(intento + 1, azar);
       if (alReintentar) { try { alReintentar(e, intento + 1, ms); } catch { /* un aviso roto no corta el reintento */ } }
       await dormir(ms);
@@ -74,4 +83,21 @@ export function crearCola(max = MAX_GET_SIMULTANEAS) {
     get activas() { return activas; },
     get enEspera() { return pendientes.length; },
   };
+}
+
+/** R6-10: lo que dice la pantalla de acceso cuando el login falla después de los reintentos.
+    Antes decía «No se pudo conectar con el servidor. Revisa el backend o usa un acceso demo.»
+    ante cualquier error: texto de desarrollo y falso (el servidor sí respondió, con 500).
+    `servidor` es el motivo que mandó el servidor (si lo mandó); `portal`, el acceso por DNI. */
+export const MSG_SERVIDOR_NO_RESPONDE = "El servidor no responde en este momento. Intenta de nuevo en unos segundos.";
+export function mensajeErrorLogin(status, { portal = false, servidor = "" } = {}) {
+  const st = Number(status);
+  if (portal && (st === 401 || st === 403)) return "DNI o contraseña del portal incorrectos.";
+  if (!portal && st === 401) return "Credenciales inválidas.";
+  if (esFalloDeServidor(st)) return MSG_SERVIDOR_NO_RESPONDE;
+  if (st === 429) return "Demasiados intentos seguidos. Espera un minuto e intenta de nuevo.";
+  // «Error 400» es lo que pone el cliente cuando el servidor no dio motivo: no dice nada.
+  const m = String(servidor || "").trim().replace(/^Error \d{3}$/, "");
+  if (m) return /[.!?]$/.test(m) ? m : `${m}.`;
+  return portal ? "No se pudo abrir el portal. Intenta de nuevo en unos segundos." : "No se pudo iniciar sesión. Intenta de nuevo en unos segundos.";
 }

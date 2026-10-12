@@ -1580,7 +1580,11 @@ export function coincideBusqueda(texto, consulta) {
   if (t.includes(q)) return true;
   if (/^[\d\s().+-]+$/.test(q)) {
     const dq = q.replace(/\D/g, "");
-    if (dq.length >= 3 && t.replace(/\D/g, "").includes(dq)) return true;
+    const dt = t.replace(/\D/g, "");
+    if (dq.length >= 3 && dt.includes(dq)) return true;
+    // R-24: «+51 933 445 566» (con el código del Perú) también encuentra el celular 933445566.
+    const sin51 = dq.replace(/^(?:00)?51(?=9\d{8}$)/, "");
+    if (sin51 !== dq && dt.includes(sin51)) return true;
   }
   return false;
 }

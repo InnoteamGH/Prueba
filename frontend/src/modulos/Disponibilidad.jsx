@@ -314,7 +314,7 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
     const nuevas = citasDia(sustDia).filter((c) => !yaPedida(c.id) && diaDest[c.id]).map((c) => ({ id: rid(), tipo: "enviada", citaId: c.id, otroId: Number(diaDest[c.id]), fecha: c.fecha, hora: c.hora, sede: c.sede, paciente: c.paciente, esp: c.esp, motivo: "Ausencia (día completo)", estado: "pendiente" }));
     if (!nuevas.length) { notify("Elige un colega para cada cita del día."); return; }
     setSolicitudes((s) => [...s, ...nuevas]);
-    notify(`Enviaste ${nuevas.length} solicitud(es) de sustitución para el ${fechaLegible(sustDia).replace(/\.$/, "")}.`);
+    notify(`Enviaste ${nuevas.length} ${nuevas.length === 1 ? "solicitud" : "solicitudes"} de sustitución para el ${fechaLegible(sustDia).replace(/\.$/, "")}.`);
     setSustDia(null);
   };
   const doAceptar = (s) => { setCitas && setCitas((cs) => cs.map((c) => c.id === s.citaId ? { ...c, medicoId: miId } : c)); setSolicitudes((x) => x.map((y) => y.id === s.id ? { ...y, estado: "aceptada" } : y)); setAlertaViaje(null); notify("Aceptaste la sustitución. La cita ahora es tuya y aparece en tu agenda."); };
@@ -461,7 +461,7 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
       )}
       <Card style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, background: "var(--dc-info-soft)", border: "1px solid var(--dc-sky)" }}>
         <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: "var(--dc-info-soft)", color: "var(--dc-info-ink)", display: "grid", placeItems: "center", flexShrink: 0 }}><AlertCircle size={18} strokeWidth={1.75} /></div>
-        <div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>La clínica atiende {semana.length} día(s) a la semana; aquí solo salen esos. Tu disponibilidad solo se puede modificar con <strong>1 semana de anticipación</strong> (desde el <strong>{fechaLegible(limiteEdicion)}</strong>). Las franjas con <MapPin size={11} strokeWidth={1.75} style={{ verticalAlign: -1 }} /> son citas ya agendadas — incluidas las de <strong>otra sede</strong>. {conectado ? "Si no podrás atender una cita ya agendada, coordínalo con recepción." : <>Si no podrás atender, pide una <strong>sustitución</strong> (por cita o el día completo) a un colega de la especialidad de cada cita.</>}</div>
+        <div style={{ fontSize: 13, color: "var(--dc-info-ink)" }}>La clínica atiende {semana.length} {semana.length === 1 ? "día" : "días"} a la semana; aquí solo {semana.length === 1 ? "sale ese" : "salen esos"}. Tu disponibilidad solo se puede modificar con <strong>1 semana de anticipación</strong> (desde el <strong>{fechaLegible(limiteEdicion)}</strong>). Las franjas con <MapPin size={11} strokeWidth={1.75} style={{ verticalAlign: -1 }} /> son citas ya agendadas — incluidas las de <strong>otra sede</strong>. {conectado ? "Si no podrás atender una cita ya agendada, coordínalo con recepción." : <>Si no podrás atender, pide una <strong>sustitución</strong> (por cita o el día completo) a un colega de la especialidad de cada cita.</>}</div>
       </Card>
 
       {/* AGE-11: dos pestañas. Las citas del día a día se ven en la Agenda. */}
