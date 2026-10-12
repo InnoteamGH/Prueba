@@ -4934,9 +4934,9 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-rm__hero .dc-rm__kpi b { color: #fff !important; }
 .dc-rm__hero .dc-rm__kpi em { color: rgba(255,255,255,.75) !important; }
 /* «No disponible · Reintentar» sobre el fondo oscuro del resumen (R5-02). */
-.dc-rm__hero .dc-nodisp { color: rgba(255,255,255,.85); }
-.dc-rm__hero .dc-nodisp__btn { color: #fff; }
-.dc-rm__hero .dc-nodisp__btn:focus-visible { box-shadow: 0 0 0 2px #fff; }
+.dc-rm__hero .dc-nodisp, .dc-esp-hero .dc-nodisp { color: rgba(255,255,255,.85); }
+.dc-rm__hero .dc-nodisp__btn, .dc-esp-hero .dc-nodisp__btn { color: #fff; }
+.dc-rm__hero .dc-nodisp__btn:focus-visible, .dc-esp-hero .dc-nodisp__btn:focus-visible { box-shadow: 0 0 0 2px #fff; }
 .dc-rm__hero .dc-rm__ico { color: #fff !important; background: rgba(255,255,255,.16) !important; }
 .dc-rm__hero i.is-up { color: #7EF0BC; }
 .dc-rm__hero i.is-down { color: #FFC0A8; }

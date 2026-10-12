@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import {
   digitosWhatsapp, normalizarWhatsappPe, validarWhatsappPe, formatearWhatsappPe, mismoNumero,
   validarPhoneNumberId, whatsappDeSede, sedeDeConversacion, sedeDePacienteObj, numeroDeSalida,
-  sedesSinNumero, filasWhatsappSedes,
+  sedesSinNumero, filasWhatsappSedes, contarChatsPorSede,
 } from "./whatsappSede.js";
 
 const S1 = "5f1c2a8e-1111-4c1a-9d1e-00000000c001";
@@ -116,6 +116,31 @@ describe("sedeDeConversacion", () => {
     assert.equal(sedeDePacienteObj({ sede: 1 }), 1);
     assert.equal(sedeDePacienteObj({ sedes: [{ id: S3 }] }), S3);
     assert.equal(sedeDePacienteObj({}), null);
+  });
+});
+
+describe("R6-08: chats por sede que cuadran con el total", () => {
+  // Como en producción: 8 chats con actividad en 30 días, 3 de pacientes de San Isidro (S1) y
+  // 5 sin paciente; el servidor contaba San Isidro 5 + Surco 6 con 8 en total.
+  const convs = [
+    ...["a", "b", "c"].map((id) => ({ id, pacienteId: "p1", actualizadoEn: "2026-09-20T10:00:00-05:00" })),
+    ...["d", "e", "f", "g", "h"].map((id) => ({ id, pacienteId: null, actualizadoEn: "2026-10-02T10:00:00-05:00" })),
+    { id: "viejo", pacienteId: "p1", actualizadoEn: "2026-09-09T23:09:10-05:00" },
+  ];
+  const sedeDe = (c) => sedeDeConversacion(c, { sedes: SEDES, sedeDePaciente: (x) => (x.pacienteId === "p1" ? S1 : null) }).sedeId;
+  const desde = "2026-09-12";
+  it("cada chat cuenta en una sola sede y los sin sede van aparte", () => {
+    const todas = contarChatsPorSede(convs, { desde, sedeDe });
+    assert.equal(todas.total, 8); assert.equal(todas.deSedes, 3); assert.equal(todas.sinSede, 5);
+    const s1 = contarChatsPorSede(convs, { desde, sedeDe, enSede: (s) => s === S1 });
+    const s2 = contarChatsPorSede(convs, { desde, sedeDe, enSede: (s) => s === S2 });
+    assert.equal(s1.deSedes, 3); assert.equal(s2.deSedes, 0);
+    // San Isidro + Surco + sin sede = total.
+    assert.equal(s1.deSedes + s2.deSedes + s1.sinSede, todas.total);
+  });
+  it("sin fecha de corte cuenta todos; sin datos, ceros", () => {
+    assert.equal(contarChatsPorSede(convs, { sedeDe }).total, 9);
+    assert.deepEqual({ ...contarChatsPorSede(null), porSede: null }, { deSedes: 0, sinSede: 0, total: 0, porSede: null });
   });
 });
 

@@ -15,9 +15,8 @@ import {
   mesesDelPeriodo,
   ritmoDelPeriodo,
   rotuloPeriodo,
-  comisionesPorSede,
 } from "./produccionComisionesUtil.js";
-import { deudaDeCaja } from "../compartido/metricas.js";
+import { deudaDeCaja, tramosDeuda } from "../compartido/metricas.js";
 import { layoutProgreso } from "./panelGerencialUtil.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -180,41 +179,18 @@ describe("H-G5: periodo de Producción y comisiones", () => {
   });
 });
 
-describe("H-06: Producción y comisiones con una sede elegida", () => {
-  const srv = {
-    desde: "2026-09-01", hasta: "2026-10-09", totalProduccion: 310, totalCobrado: 999,
-    porMedico: [{ medicoId: "d1", nombre: "Dra. Carla", porcentaje: 40, meta: 500, atendidas: 2, produccion: 160 }, { medicoId: "d2", nombre: "Dr. Luis", porcentaje: 30, meta: null, atendidas: 1, produccion: 150 }],
-    cobrosPorMes: [{ mes: "Set", anioMes: "2026-09", cobrado: 0 }, { mes: "Oct", anioMes: "2026-10", cobrado: 999 }],
-  };
-  const citas = [
-    { medicoId: "d1", medico: "Dra. Carla", estado: "atendida", fecha: "2026-09-10", sedeId: "a2", valor: 80 },
-    { medicoId: "d1", medico: "Dra. Carla", estado: "atendida", fecha: "2026-10-02", sedeId: "a1", valor: 80 },
-    { medicoId: "d2", medico: "Dr. Luis", estado: "atendida", fecha: "2026-09-12", sedeId: "a1", valor: 150 },
-    { medicoId: "d1", medico: "Dra. Carla", estado: "cancelada", fecha: "2026-10-03", sedeId: "a2", valor: 80 },
-  ];
-  const pagos = [{ fecha: "2026-09-10T10:00:00-05:00", sedeId: "a2", monto: 50 }, { fecha: "2026-10-01T10:00:00-05:00", sedeId: "a1", monto: 30 }, { fecha: "2026-09-11", sedeId: "a2", monto: 20, anulado: true }];
-  const enSurco = (sid) => sid === "a2";
-  it("la producción sale de las citas atendidas de la sede, con el % de cada odontólogo", () => {
-    const d = comisionesPorSede(srv, citas, pagos, { desde: "2026-09-01", hasta: "2026-10-09", enSede: enSurco });
-    assert.equal(d.totalProduccion, 80);
-    assert.equal(d.totalCitas, 1);
-    assert.equal(d.totalComision, 32);
-    const carla = d.porMedico.find((m) => m.medicoId === "d1");
-    assert.equal(carla.produccion, 80); assert.equal(carla.atendidas, 1); assert.equal(carla.meta, 500);
-    assert.equal(d.porMedico.find((m) => m.medicoId === "d2").produccion, 0);
-    assert.equal(d.odontologosConProduccion, 1);
+describe("R6-02: Producción y comisiones con una sede elegida usa /comisiones?sedeIds", () => {
+  // El servidor ya filtra /comisiones por sede (producción, comisión y cobrado): la pantalla
+  // muestra su respuesta, sin rehacerla con las citas y los pagos ni avisar «toda la clínica».
+  const src = fs.readFileSync(path.join(__dirname, "ProduccionComisiones.jsx"), "utf8");
+  it("pide /comisiones con las sedes y no la recalcula", () => {
+    assert.match(src, /api\.comisiones\(rango\.desde, rango\.hasta, sedesApi\)/);
+    assert.doesNotMatch(src, /comisionesPorSede/);
+    assert.doesNotMatch(src, /api\.pagos\.historial/);
   });
-  it("lo cobrado son los pagos no anulados de la sede, mes a mes", () => {
-    const d = comisionesPorSede(srv, citas, pagos, { desde: "2026-09-01", hasta: "2026-10-09", enSede: enSurco });
-    assert.equal(d.cobrosSede, true);
-    assert.equal(d.totalCobrado, 50);
-    assert.deepEqual(d.cobrosPorMes.map((m) => [m.anioMes, m.cobrado]), [["2026-09", 50], ["2026-10", 0]]);
-    assert.equal(d.descuadre, -30);
-  });
-  it("sin pagos deja lo cobrado como vino y lo marca", () => {
-    const d = comisionesPorSede(srv, citas, null, { desde: "2026-09-01", hasta: "2026-10-09", enSede: enSurco });
-    assert.equal(d.cobrosSede, false);
-    assert.equal(d.totalCobrado, 999);
+  it("ya no existe el recálculo local", async () => {
+    const util = await import("./produccionComisionesUtil.js");
+    assert.equal(util.comisionesPorSede, undefined);
   });
 });
 
@@ -239,5 +215,19 @@ describe("R4-12 / R4-14: deuda desde GET /caja", () => {
   it("filtra por sede y no inventa el dato si el servidor no manda «terminados»", () => {
     assert.equal(deudaDeCaja(caja, { hoy: "2026-10-09", incluir: (s) => s === "a2" }).filas.length, 0);
     assert.equal(deudaDeCaja({ porCobrar: caja.porCobrar }), null);
+  });
+  it("R6-03: antigüedad por tramos y saldo de planes, por sede", () => {
+    const d = deudaDeCaja(caja, { hoy: "2026-10-09" });
+    // QA 220 (4 días) + Rosa 400 (8 días) corrientes; Rosa 400 de agosto (69 días) en 61–90.
+    assert.deepEqual(d.tramos.map((t) => t.v), [620, 0, 400, 0]);
+    assert.equal(d.tramos.reduce((a, t) => a + t.v, 0), d.hecho);
+    assert.equal(d.tramos[2].items[0].paciente, "Rosa");
+    assert.equal(d.saldoPlanes, 1709.25); assert.equal(d.pacientesConSaldo, 3);
+    const surco = deudaDeCaja(caja, { hoy: "2026-10-09", incluir: (s) => s === "a2" });
+    assert.deepEqual(surco.tramos.map((t) => t.v), [0, 0, 0, 0]);
+    assert.equal(surco.saldoPlanes, 600);
+  });
+  it("tramosDeuda: sin fecha o con fecha futura va al tramo corriente", () => {
+    assert.deepEqual(tramosDeuda([{ pendiente: 10, dias: null }, { pendiente: 5, dias: -2 }, { pendiente: 7, dias: 31 }, { pendiente: 1, dias: 400 }]).map((t) => t.v), [15, 7, 0, 1]);
   });
 });

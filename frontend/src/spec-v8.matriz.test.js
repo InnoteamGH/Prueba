@@ -106,7 +106,9 @@ describe("SPEC v8 SRV-01/02 servicios API", () => {
   });
   it("margenCatalogo no inventa margen sin coste", () => {
     assert.equal(margenCatalogo({ monto: 220, coste: 0 }), null);
-    assert.equal(margenCatalogo({ monto: 220, coste: 40 }), 180);
+    // R6-09: sobre el precio sin IGV (220 / 1.18 = 186.44), no sobre el total.
+    assert.equal(margenCatalogo({ monto: 220, coste: 40 }), 146.44);
+    assert.equal(margenCatalogo({ monto: 400, coste: 120 }), 218.98);
   });
   it("migración especialidad existe", () => {
     const mig = readFileSync(join(root, "../../supabase/migrations/0062_especialidad_catalogo_completo.sql"), "utf8");

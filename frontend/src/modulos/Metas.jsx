@@ -7,7 +7,9 @@ import { Check, Info, MapPin, Minus, Plus, RotateCcw, Target, TrendingUp } from 
 import api, { auth } from "../api/client";
 import { Card, ESPECIALIDADES, MEDICOS, SEDE_IDS, Vacio, colorDe, iniciales, mismaSede, nombreSede, tint, useSede } from "../comun";
 import { comisionSede, guardarMetaSedeDemo, metaSede, sedesMed } from "../compartido/medicosSede";
+import { sedesDeHorario } from "../compartido/useReglasAgenda";
 import { sedeApiUuid } from "../routing";
+import NoDisponible from "../ui/NoDisponible";
 
 const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
 const miles = (v) => (v === "" || v == null ? "" : Number(v).toLocaleString("es-PE"));
@@ -63,6 +65,10 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
   const [draft, setDraft] = useState({});       // k → { meta, com } en edición
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // R6-04: horario de los doctores (GET /disponibilidad). /medicos no trae la sede (H-14):
+  // con una sede elegida (o un usuario de sede) solo se listan los doctores con horario en
+  // ella, como en la agenda. null = sin horario a la vista (se listan todos, con el aviso).
+  const [disp, setDisp] = useState(null);
 
   const cargar = () => {
     setError(null);
@@ -79,6 +85,7 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
     api.sedes.listar().then((ss) => setNombres(Object.fromEntries((ss || []).map((s) => [String(s.id), s.nombre])))).catch(() => {});
     // El nombre de la especialidad sale del catálogo (/medicos solo trae especialidadId).
     api.catalogo.especialidades().then((es) => setEspNom(Object.fromEntries((es || []).map((e) => [String(e.id), e.nombre])))).catch(() => {});
+    api.disponibilidad.listar().then((d) => setDisp(Array.isArray(d) && d.some((x) => x && x.activo !== false) ? d.filter((x) => x && x.activo !== false) : null)).catch(() => setDisp(null));
     api.catalogo.medicos()
       .then((rows) => {
         armar((rows || []).filter((m) => m.activo !== false).map((m) => {
@@ -105,17 +112,22 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
     const gs = orden.filter((s) => (s === "todas" ? esGlobal : !verSedes || verSedes.some((v) => mismaSede(v, s))))
       .map((s) => ({ sede: s, meds: meds.filter((m) => m.sedesIds.includes(s)) }));
     // Con una sede elegida, los doctores sin sede no pueden desaparecer («0 de 0»): se listan
-    // en cada sede que se ve, con el aviso de que el servidor no indica dónde atienden.
+    // en cada sede que se ve. R6-04: si hay horario a la vista, solo los que tienen horario en
+    // esa sede (antes el admin de Surco veía y guardaba la meta de una doctora de San Isidro);
+    // sin horario, todos, con el aviso de que el servidor no indica dónde atienden.
     if (!esGlobal && sinSede.length) {
       const vistas = (verSedes || (mias || []).map(String)).map(String);
       vistas.forEach((v) => {
+        const deAqui = sinSede.filter((m) => !disp || sedesDeHorario(m, disp).some((s) => mismaSede(s, v)));
         const g = gs.find((x) => mismaSede(x.sede, v));
-        if (g) g.meds = [...g.meds, ...sinSede.filter((m) => !g.meds.includes(m))];
-        else gs.push({ sede: v, meds: [...sinSede] });
+        if (g) g.meds = [...g.meds, ...deAqui.filter((m) => !g.meds.includes(m))];
+        else gs.push({ sede: v, meds: [...deAqui] });
       });
     }
     return gs.filter((g) => g.meds.length);
-  }, [meds, verSedes, esGlobal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [meds, verSedes, esGlobal, disp]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Doctores sin sede que no se listan por no tener horario en la sede que se ve (R6-04).
+  const ocultosSinHorario = !esGlobal && disp ? sinSede.filter((m) => !grupos.some((g) => g.meds.includes(m))) : [];
   const nomSede = (s) => (s === "todas" ? "Todas las sedes" : nombres[s] || nombres[sedeApiUuid(s)] || nombreSede(Number(s)) || "Sede");
   const nomEsp = (m) => m.especialidad || (m.especialidadId != null ? espNom[String(m.especialidadId)] : null) || "Sin especialidad";
 
@@ -136,6 +148,10 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
   const pcts = filas.map((f) => val(f.key, "com")).filter((v) => v != null);
   const pctProm = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
   const unaSede = grupos.length === 1 && grupos[0].sede !== "todas";
+  // R6-04: con una sede a la vista y ningún doctor con horario en ella, la cifra es de esa sede
+  // (no «de la clínica») y se dice por qué la lista está vacía.
+  const vistaUnica = !esGlobal ? ((verSedes || (mias || []).map(String)).length === 1 ? (verSedes || (mias || []).map(String))[0] : null) : null;
+  const sinDocsAqui = conectado && !error && meds.length > 0 && !grupos.length && !esGlobal;
 
   const set = (key, campo, v) => setDraft((d) => ({ ...d, [key]: { ...(d[key] || {}), [campo]: v } }));
   const deshacer = () => setDraft(base);
@@ -203,21 +219,25 @@ export default function Metas({ notify = () => {}, can, sedes = null }) {
     <div className="dc-mtz" style={{ display: "grid", gap: 14 }}>
       <section className="dc-esp-hero">
         <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>{error ? "—" : soles(metaTotal)}</b><span>meta mensual {unaSede ? `de ${nomSede(grupos[0].sede)}` : "de la clínica"}</span></div>
+          {/* R6-11: si no se pudieron leer los médicos, ninguna cifra cae a S/ 0 (se leía como dato real). */}
+          <div className="dc-esp-hero__num"><b>{error ? "—" : soles(metaTotal)}</b><span>{error ? <NoDisponible onReintentar={cargar} texto="Metas no disponibles" /> : <>meta mensual {unaSede ? `de ${nomSede(grupos[0].sede)}` : sinDocsAqui && vistaUnica ? `de ${nomSede(vistaUnica)}` : "de la clínica"}</>}</span></div>
           <p>La meta y el % de comisión de cada odontólogo, sede por sede</p>
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{error ? "—" : `${conMeta} de ${docs}`}</b><span>Con meta</span></div>
-          <div><b>{pctProm != null ? `${Math.round(pctProm)}%` : "—"}</b><span>Comisión promedio</span></div>
-          <div><b>{soles(comTotal)}</b><span>Comisión si cumplen</span></div>
+          <div><b>{!error && pctProm != null ? `${Math.round(pctProm)}%` : "—"}</b><span>Comisión promedio</span></div>
+          <div><b>{error ? "—" : soles(comTotal)}</b><span>Comisión si cumplen</span></div>
         </div>
         <span />
         <button type="button" className="dc-esp-hero__btn" onClick={() => { window.location.hash = "#/reportes"; }}><TrendingUp size={14} strokeWidth={2} /> Ver avance del mes</button>
       </section>
-      {error && <div className="fm-aviso-edad is-mal"><Target size={15} strokeWidth={2} /><span>{error}</span><button type="button" onClick={cargar}>Reintentar</button></div>}
-      {conectado && !error && sinSede.length > 0 && !esGlobal && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>El servidor no indica en qué sede atiende cada doctor: {sinSede.length === 1 ? "este doctor se muestra" : `estos ${sinSede.length} doctores se muestran`} en la sede elegida. Indícalo en Configuración › Doctores.</span></div>}
+      {error && <NoDisponible bloque onReintentar={cargar} texto="No disponible" detalle={`${error} Las cifras de arriba no son ceros: faltan los datos.`} />}
+      {conectado && !error && sinSede.length > 0 && !esGlobal && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>{disp
+        ? <>El servidor no indica en qué sede atiende cada doctor: se muestran los que tienen horario en la sede elegida (Configuración › Horarios por doctor).{ocultosSinHorario.length ? ` ${ocultosSinHorario.length === 1 ? "1 doctor sin horario aquí no se lista" : `${ocultosSinHorario.length} doctores sin horario aquí no se listan`}${usuarioGlobal ? ": están en «Todas las sedes»." : ": su meta la fija quien administra su sede."}` : ""}</>
+        : <>El servidor no indica en qué sede atiende cada doctor: {sinSede.length === 1 ? "este doctor se muestra" : `estos ${sinSede.length} doctores se muestran`} en la sede elegida. Indícalo en Configuración › Doctores.</>}</span></div>}
       {puedeEditar && !puedeComGlobal && grupos.some((g) => g.sede === "todas") && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>Puedes fijar la meta de cada odontólogo. El <b>% de comisión</b> se ve en solo lectura: lo cambia quien administra Configuración › Doctores.</span></div>}
       {conectado && !error && meds.length === 0 && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>}
+      {sinDocsAqui && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo={vistaUnica ? `Ningún doctor tiene horario en ${nomSede(vistaUnica)}` : "Ningún doctor tiene horario en estas sedes"} sub="La meta se fija para los doctores que atienden en la sede. Carga su horario en Configuración › Horarios por doctor." /></Card>}
 
       {grupos.map((g) => {
         const metaS = g.meds.reduce((a, m) => a + (val(k(m.id, g.sede), "meta") || 0), 0);

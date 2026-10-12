@@ -104,6 +104,30 @@ export function sedeDeConversacion(conv, { sedes = [], sedeDePaciente = null, ig
   return { sedeId: null, sede: null, origen: null, numero: numRec };
 }
 
+/**
+ * R6-08: conversaciones con actividad desde `desde` (YYYY-MM-DD; por `actualizadoEn`, o
+ * `ultimoEntranteEn` / `creadoEn` si no viene), repartidas con UNA sede cada una (la de
+ * `sedeDe(conv)`, normalmente sedeDeConversacion). Antes el Panel mostraba la cuenta del
+ * servidor (/gerencial/reportes → funnel), que reparte los chats por paciente y cuenta algunos
+ * en dos sedes: San Isidro 5 + Surco 6 con 8 en total. Aquí cada chat cuenta una sola vez:
+ *   - deSedes: los de las sedes que se ven (`enSede(sedeId)`; sin filtro, todos los que tienen sede);
+ *   - sinSede: los que aún no tienen sede (no son de ninguna, se informan aparte);
+ *   - total = deSedes + sinSede con «Todas»; la suma de las sedes más los sin sede da el total.
+ */
+export function contarChatsPorSede(convs, { desde = null, sedeDe = () => null, enSede = null } = {}) {
+  const fechaDe = (c) => String(c?.actualizadoEn || c?.ultimoEntranteEn || c?.creadoEn || "").slice(0, 10);
+  const lista = (Array.isArray(convs) ? convs : []).filter((c) => c && (!desde || fechaDe(c) >= desde));
+  let deSedes = 0, sinSede = 0;
+  const porSede = new Map();
+  for (const c of lista) {
+    const s = sedeDe(c);
+    if (s == null || s === "") { sinSede++; continue; }
+    porSede.set(String(s), (porSede.get(String(s)) || 0) + 1);
+    if (!enSede || enSede(s)) deSedes++;
+  }
+  return { deSedes, sinSede, total: lista.length, porSede };
+}
+
 /** Sede de un paciente (API: sedeRegistroId o sedeIds; demo: sede o sedes). */
 export function sedeDePacienteObj(p) {
   if (!p) return null;
