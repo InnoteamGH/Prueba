@@ -14,6 +14,7 @@ import { datosImpresion } from "../util/membrete";
 import { tienePermiso } from "../compartido/permisos";
 import { sedesDemoWhatsapp } from "../compartido/useSedesWhatsapp";
 import { formatearWhatsappPe, numeroDeSalida, numeroRecibido, sedeDeConversacion, sedeDePacienteObj, whatsappDeSede } from "../compartido/whatsappSede";
+import { chatDePaciente, olvidarChatPedido, verChatPedido } from "../compartido/chatPaciente";
 import "./whatsappInbox.css";
 
 function respuestaAgente(texto, ctx) {
@@ -96,7 +97,14 @@ function WhatsAppInbox({ notify = () => {} }) {
     setAgendar({ canal: "whatsapp", motivo, sedeId: conectado ? sedeApiUuid(activa) : activa,
       ...(pacienteId != null ? { pacienteId } : { telefono: c?.tel || "", pacienteNombre: c && c.nombre && c.nombre !== c.tel ? c.nombre : "" }) });
   };
-  const [activo, setActivo] = useState(conectado ? null : 1);
+  // R-37: «WhatsApp» desde un paciente abre SU chat o avisa que no tiene; nunca deja abierto
+  // el primer chat de la lista (de otra persona). Mientras siga así (hasta que se elija un
+  // chat a mano), la bandeja no elige sola ningún otro chat.
+  const pedidoChat = useRef(verChatPedido());
+  const sinAutoSel = useRef(!!pedidoChat.current);
+  const [sinChatDe, setSinChatDe] = useState(null);   // nombre del paciente sin chat
+  useEffect(() => { olvidarChatPedido(); }, []);
+  const [activo, setActivo] = useState(conectado || pedidoChat.current ? null : 1);
   const [input, setInput] = useState("");
   const [ctx, setCtx] = useState({});
   const [q, setQ] = useState("");
@@ -300,6 +308,20 @@ function WhatsAppInbox({ notify = () => {} }) {
   // recreaba la lista con msgs vacío y se "borraba" la conversación abierta.
   // En entorno conectado (no demo) nunca mostrar chats de ejemplo.
   const soloReales = (cv) => (cv || []).filter((c) => !c.ejemplo || !!salud?.demo);
+  // R-37: con la lista ya cargada, abre el chat del paciente pedido o avisa que no tiene.
+  // Devuelve false si no había pedido.
+  const resolverPedido = (lista) => {
+    const ped = pedidoChat.current;
+    if (!ped) return false;
+    pedidoChat.current = null;
+    const c = chatDePaciente(lista, ped);
+    if (c) { setActivo(c.id); setEnHilo(true); setSinChatDe(null); return true; }
+    setActivo(null); setEnHilo(false); setSinChatDe(ped.nombre || "Este paciente");
+    notify("Este paciente aún no tiene conversación de WhatsApp.");
+    return true;
+  };
+  // Demostración: los chats de ejemplo ya están; el pedido se resuelve al montar.
+  useEffect(() => { if (!conectado) resolverPedido(CHATS_INIT); /* eslint-disable-next-line */ }, []);
   const cargarConversaciones = () => {
     if (!conectado) return;
     setListLoading(true);
@@ -311,8 +333,11 @@ function WhatsAppInbox({ notify = () => {} }) {
           const prevMsgs = Object.fromEntries(prev.map((c) => [c.id, c.msgs]));
           return rows.map((c) => ({ ...mapConv(c), msgs: prevMsgs[c.id] || [] }));
         });
+        if (resolverPedido(rows.map(mapConv))) return;
         setActivo((a) => {
           if (a && rows.some((c) => c.id === a)) return a;
+          // Abierta desde un paciente: no se elige solo el chat de otra persona.
+          if (sinAutoSel.current) return null;
           return rows[0] ? rows[0].id : null;
         });
       })
@@ -347,7 +372,7 @@ function WhatsAppInbox({ notify = () => {} }) {
     return () => { parar(); document.removeEventListener("visibilitychange", alCambiarVisibilidad); };
     /* eslint-disable-next-line */
   }, [conectado, activo]);
-  const seleccionar = (id) => { setActivo(id); setEnHilo(true); if (conectado) cargarMensajes(id); else setChats((cs) => cs.map((c) => c.id === id ? { ...c, noLeidos: 0 } : c)); };
+  const seleccionar = (id) => { sinAutoSel.current = false; setSinChatDe(null); setActivo(id); setEnHilo(true); if (conectado) cargarMensajes(id); else setChats((cs) => cs.map((c) => c.id === id ? { ...c, noLeidos: 0 } : c)); };
   const eliminarChat = (id) => {
     if (!id) return;
     if (!window.confirm("¿Eliminar esta conversación y sus mensajes? No se puede deshacer.")) return;
@@ -572,7 +597,8 @@ function WhatsAppInbox({ notify = () => {} }) {
   const chatsSede = chats.filter((c) => { const sx = sedeDe(c); return chatEnMenu(sx) && chatEnFiltroSede(sx); });
   const idsSedeKey = chatsSede.map((c) => c.id).join(",");
   // Si el chat abierto queda fuera de la sede elegida, se abre el primero que sí está.
-  useEffect(() => { if (activo != null && !chatsSede.some((c) => c.id === activo)) setActivo(chatsSede.length ? [...chatsSede].sort(porFecha)[0].id : null); }, [filtroSede, (sedesWa || []).join(","), idsSedeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // R-37: si se abrió desde un paciente, no se cambia al chat de otra persona.
+  useEffect(() => { if (activo != null && !chatsSede.some((c) => c.id === activo)) setActivo(chatsSede.length && !sinAutoSel.current ? [...chatsSede].sort(porFecha)[0].id : null); }, [filtroSede, (sedesWa || []).join(","), idsSedeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const lista = [...chatsSede].sort(porFecha).filter((c) => {
     if (!(filtro === "todos" || (filtro === "pendientes" ? (c.porResponder || 0) > 0 : c.modo === filtro))) return false;
     const raw = q.trim();
@@ -701,7 +727,9 @@ function WhatsAppInbox({ notify = () => {} }) {
         {/* Columna 2 – hilo de conversación */}
         {!chat ? (
           <div className="wa-vacio">
-            <div><MessageSquare size={34} strokeWidth={1.75} color="var(--dc-ink-400)" /><div style={{ marginTop: 10 }}>{conectado ? "Selecciona una conversación para verla." : "Sin conversación."}</div></div>
+            <div><MessageSquare size={34} strokeWidth={1.75} color="var(--dc-ink-400)" /><div style={{ marginTop: 10 }}>{sinChatDe
+              ? <>{sinChatDe} aún no tiene conversación de WhatsApp.<br />Cuando escriba al número de la clínica, su chat aparecerá en la lista.</>
+              : conectado ? "Selecciona una conversación para verla." : "Sin conversación."}</div></div>
           </div>
         ) : (<>
         <div className="dc-inbox-thread">

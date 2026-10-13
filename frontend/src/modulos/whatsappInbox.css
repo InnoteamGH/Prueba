@@ -113,7 +113,9 @@
   scrollbar-width: thin; scrollbar-color: rgba(14,42,51,.2) transparent;
 }
 .wa-fecha { display: flex; justify-content: center; margin: 12px 0 8px; position: sticky; top: 4px; z-index: 2; }
-.wa-fecha span { background: #fff; color: var(--dc-ink-500); font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.1); text-transform: capitalize; }
+/* R-39: sin text-transform: capitalize, que ponía mayúscula a cada palabra («08 De Setiembre
+   De 2026»). «Hoy» y «Ayer» ya vienen con mayúscula y la fecha empieza con el día. */
+.wa-fecha span { background: #fff; color: var(--dc-ink-500); font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.1); }
 .wa-sis { display: flex; justify-content: center; margin: 8px 0; }
 .wa-sis span { background: #FFF5C4; color: #6B5A12; font-size: 12px; padding: 6px 12px; border-radius: 8px; box-shadow: 0 1px 1px rgba(11,20,26,.08); text-align: center; max-width: 80%; }
 

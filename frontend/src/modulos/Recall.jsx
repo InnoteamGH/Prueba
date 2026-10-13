@@ -7,15 +7,21 @@ import {DatosDemoCtx, usePersist, EnCabecera, ListaFiltrable, Btn, Card, DISPLAY
 import { porReactivar, esPorReactivar } from "../compartido/metricas";
 import { useSedesWhatsapp } from "../compartido/useSedesWhatsapp";
 import { tienePermiso } from "../compartido/permisos";
+import { pedirChatPaciente } from "../compartido/chatPaciente";
 import { formatearWhatsappPe, sedesSinNumero, whatsappDeSede } from "../compartido/whatsappSede";
 
 function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
   // Es una acción que sale de la clínica: quien solo consulta no la lanza.
   const puedeEnviar = can ? can("recall", "crear") : true;
-  // H-G6: pausar/activar y guardar la plantilla son PUT /automatizaciones (permiso «editar»
-  // en recall). Gerencia solo tiene «ver»: la API se lo rechazaba con 403.
-  const puedeEditar = can ? can("recall", "editar") : true;
+  // H-G6: pausar/activar y guardar la plantilla son PUT /automatizaciones. Gerencia solo
+  // tiene «ver»: la API se lo rechazaba con 403.
+  // R-15: las automatizaciones son de TODA la clínica (todas las sedes), no del trabajo diario
+  // de una sede. Recepción tiene recall:editar para su cola de recall, y con eso veía Pausar,
+  // Activar, Guardar mensaje, Enviar prueba y Probar plantilla. Configurarlas pide
+  // recall:configurar (el administrador general lo tiene; a otro rol se le da en Permisos
+  // por rol y, si el servidor se lo da, los ve).
+  const puedeEditar = can ? can("recall", "configurar") : true;
   const conectado = !!auth.token;
   // Sede: cola, historial y NPS son de las sedes que se ven con el filtro del menú.
   const { sede: sedeFiltro, ids: sedesVer, enSede, global, activa, rol: rolSes, nombre: nombreSes } = useSede();
@@ -285,7 +291,8 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
               <AlertTriangle size={17} strokeWidth={1.75} />
               <div><b>{r.paciente} calificó {r.nps}/10</b><span>{r.comentario || "Sin comentario."} El asistente ya se disculpó; conviene que alguien del equipo lo contacte.</span></div>
               <div className="dc-sat-alerta__acc">
-                <button type="button" onClick={() => { window.location.hash = "#/whatsapp"; }}>Abrir chat</button>
+                {/* R-37: el chat de este paciente (o el aviso de que no tiene), no el primero de la lista. */}
+                <button type="button" onClick={() => { pedirChatPaciente({ id: r.pacienteId ?? pac?.id ?? null, telefono: pac?.telefono || r.telefono || "", nombre: r.paciente }); window.location.hash = "#/whatsapp"; }}>Abrir chat</button>
                 {pac && <button type="button" onClick={() => { window.location.hash = `#/pacientes/${pac.id}`; }}>Ver ficha</button>}
                 {/* Con sesión no hay endpoint para marcar la alerta: solo se oculta en esta pantalla y se dice así. */}
                 <button type="button" className="is-pri" onClick={() => { setAtendidosBajos((x) => [...x, r.paciente]); notify(conectado ? `${r.paciente}: alerta ocultada en esta pantalla. Guardarla como atendida estará disponible cuando el servidor lo soporte.` : `${r.paciente}: alerta marcada como atendida.`); }}>{conectado ? "Ocultar alerta" : "Marcar como atendido"}</button>
@@ -450,7 +457,8 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
               </div>
             </div>
           </div>
-          {/* Probar ahora: manda un WhatsApp real, solo quien puede enviar y editar */}
+          {!puedeEditar && <div style={{ marginTop: 14, fontSize: 12, color: "var(--dc-ink-500)", lineHeight: 1.45, display: "flex", alignItems: "flex-start", gap: 6 }}><Shield size={13} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Solo lectura: esta automatización es de toda la clínica. La pausa, la activa o cambia su mensaje quien administra la clínica.</div>}
+          {/* Probar ahora: manda un WhatsApp real, solo quien puede enviar y configurar */}
           {puedeEnviar && puedeEditar && <>
           <div style={{ marginTop: 14, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 13px" }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", marginBottom: 7 }}>Probar ahora <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– envíate este mensaje a un número real</span></div>
