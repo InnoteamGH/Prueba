@@ -29,7 +29,7 @@ import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWha
 import WhatsappPorSede from "./compartido/WhatsappPorSede";
 import { sedesDemoWhatsapp } from "./compartido/useSedesWhatsapp";
 import { filasWhatsappSedes, incidenciaEnSedes, sedeDePacienteObj } from "./compartido/whatsappSede";
-import { contactosReserva, planDelResumen } from "./util/portalPaciente";
+import { contactosReserva, planDelResumen, piezasPorAtender } from "./util/portalPaciente";
 import { estadoCita, estadoInfo, estadoFaseUi, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
@@ -12859,7 +12859,9 @@ function PortalPaciente({ usuario, onLogout }) {
   const [clinicaInfo, setClinicaInfo] = useState(null);
   const planDisp = !conectado || planSrv?.fases != null;
   const saldoDisp = !conectado || planSrv?.saldo != null;
-  const odoDisp = !conectado || planSrv?.odontograma != null;
+  // Revisión 10: con sesión, las piezas por atender salen del odontograma del resumen.
+  const piezasSrv = conectado ? piezasPorAtender(planSrv?.odontograma) : null;
+  const odoDisp = !conectado || piezasSrv != null;
   // Recetas e historia: tampoco llegan en el resumen; no se dice «0 recetas» ni «Sin visitas aún».
   const recetasDisp = !conectado || !!planSrv?.recetas;
   const historiaDisp = !conectado || !!planSrv?.historia;
@@ -12875,7 +12877,7 @@ function PortalPaciente({ usuario, onLogout }) {
   const ahorro = totalAhorradoApi != null ? Number(totalAhorradoApi) : Number(ficha.ahorro || 0);
 
   // Resumen amigable del odontograma (sin tecnicismos)
-  const piezasAtencion = Object.values(ficha.odontograma || {}).filter((d) => {
+  const piezasAtencion = conectado ? (piezasSrv ?? 0) : Object.values(ficha.odontograma || {}).filter((d) => {
     const tieneCaries = d.whole === "caries" || d.whole === "extraer" || d.whole === "fractura" || (d.caras && Object.values(d.caras).includes("caries"));
     return tieneCaries;
   }).length;
@@ -13094,8 +13096,8 @@ function PortalPaciente({ usuario, onLogout }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{ fontSize: 44 }}>{piezasAtencion ? "🦷" : "😁"}</div>
                     <div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>{piezasAtencion === 0 ? "Tu boca está sana" : (piezasAtencion === 1 ? "1 pieza por atender" : `${piezasAtencion} piezas por atender`)}</div>
-                      <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 3 }}>{piezasAtencion === 0 ? "Sigue así: control cada 6 meses." : "Tu odontólogo recomienda tratarlas pronto."}</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>{piezasAtencion === 0 ? (planDisp && pendientes > 0 ? "Sin piezas por atender" : "Tu boca está sana") : (piezasAtencion === 1 ? "1 pieza por atender" : `${piezasAtencion} piezas por atender`)}</div>
+                      <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 3 }}>{piezasAtencion === 0 ? (planDisp && pendientes > 0 ? `Te ${pendientes === 1 ? "queda 1 tratamiento" : `quedan ${pendientes} tratamientos`} de tu plan.` : "Sigue así: control cada 6 meses.") : "Tu odontólogo recomienda tratarlas pronto."}</div>
                       <button onClick={() => setVista("salud")} style={{ marginTop: 10, background: "none", border: "none", color: TEAL, fontWeight: 500, fontSize: 13, cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>Ver mi salud <ChevronRight size={15} strokeWidth={1.75} /></button>
                     </div>
                   </div>
@@ -13115,7 +13117,7 @@ function PortalPaciente({ usuario, onLogout }) {
           {vista === "salud" && (
             <div style={{ display: "grid", gap: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16 }}>
-                <Tile icon={<Smile size={19} strokeWidth={1.75} />} titulo="Piezas por atender" valor={odoDisp ? piezasAtencion : "No disponible"} sub={!odoDisp ? "Pregúntalo en tu próxima visita" : piezasAtencion ? "Tu dentista las revisó" : "Todo en orden"} color={!odoDisp ? "var(--dc-ink-400)" : piezasAtencion ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} />
+                <Tile icon={<Smile size={19} strokeWidth={1.75} />} titulo="Piezas por atender" valor={odoDisp ? piezasAtencion : "No disponible"} sub={!odoDisp ? "Pregúntalo en tu próxima visita" : piezasAtencion ? "Tu dentista las revisó" : (planDisp && pendientes > 0 ? "Sigue tu plan de tratamiento" : "Todo en orden")} color={!odoDisp ? "var(--dc-ink-400)" : piezasAtencion ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} />
                 <Tile icon={<FileText size={19} strokeWidth={1.75} />} titulo="Recetas activas" valor={recetasDisp ? (ficha.recetas || []).length : "No disponible"} sub={recetasDisp ? "En tu historia" : "Pídelas en la clínica"} color={TEAL} />
                 {/* Con sesión, la última cita atendida de las que manda el resumen (la historia no llega). */}
                 <Tile icon={<Activity size={19} strokeWidth={1.75} />} titulo="Última visita" valor={historiaDisp ? ((ficha.historia || [])[0]?.fecha || "—") : (ultimaAtendida ? fechaLegible(ultimaAtendida.fecha) : "—")} sub={historiaDisp ? "Registrada" : ultimaAtendida ? "Según tus citas atendidas" : "Sin citas atendidas"} color={NAVY} />
@@ -13132,8 +13134,8 @@ function PortalPaciente({ usuario, onLogout }) {
                   ) : (
                   <div style={{ flex: 1, minWidth: 200, background: piezasAtencion ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", borderRadius: "var(--dc-r-md)", padding: 18 }}>
                     <div style={{ fontSize: 27 }}>{piezasAtencion ? "🦷" : "✅"}</div>
-                    <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginTop: 6 }}>{piezasAtencion ? (piezasAtencion === 1 ? "1 pieza requiere atención" : `${piezasAtencion} piezas requieren atención`) : "Sin pendientes"}</div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 4 }}>{piezasAtencion ? "Tu odontólogo te recomienda tratarlas pronto." : "¡Buen trabajo cuidando tu sonrisa!"}</div>
+                    <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginTop: 6 }}>{piezasAtencion ? (piezasAtencion === 1 ? "1 pieza requiere atención" : `${piezasAtencion} piezas requieren atención`) : (planDisp && pendientes > 0 ? "Sin piezas por atender" : "Sin pendientes")}</div>
+                    <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 4 }}>{piezasAtencion ? "Tu odontólogo te recomienda tratarlas pronto." : (planDisp && pendientes > 0 ? `Te ${pendientes === 1 ? "queda 1 tratamiento" : `quedan ${pendientes} tratamientos`} de tu plan.` : "¡Buen trabajo cuidando tu sonrisa!")}</div>
                   </div>
                   )}
                   <div style={{ flex: 1, minWidth: 200, background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: 18 }}>

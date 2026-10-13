@@ -1,6 +1,7 @@
 /* Portal del paciente: lo que se lee del resumen del servidor (GET /portal/{id}/resumen).
    Sin React ni comun.jsx: lo usan App.jsx y node --test. */
 import { formatearWhatsappPe, normalizarWhatsappPe } from "../compartido/whatsappSede.js";
+import { leerAnidado } from "./odontogramaHydrate.js";
 
 /* R8-02: el resumen trae hoy solo `citas, paciente, totalInvertido, totalAhorrado, pagos`, y el
    portal afirmaba «Sin plan aún», «Tu boca está sana», «Piezas por atender 0» y «Saldo pendiente
@@ -30,6 +31,44 @@ export function planDelResumen(r) {
   const odontograma = esObj(r?.odontograma) ? r.odontograma : null;
   const nombrePlan = plan?.nombre || (planes && planes[0]?.nombre) || null;
   return { fases, saldo, odontograma, nombrePlan };
+}
+
+/* Revisión 10: el resumen ya trae el odontograma ({ piezas: [{ pieza, fase, estado, caras }] }),
+   pero «Piezas por atender» se contaba con el formato de la demostración y salía 0: el portal
+   decía «Tu boca está sana» a una paciente con caries en la 16. Cuenta las piezas cuyo último
+   registro (alta › evolución › inicial) tiene un hallazgo por tratar: en rojo en el dibujo
+   (`_colores` "r") o de los patológicos del catálogo. null si el odontograma no llega. */
+const POR_TRATAR = new Set(["caries", "fractura", "fractr", "extraer", "extraccion", "remanente", "resto", "restos",
+  "movilidad1", "movilidad2", "movilidad3", "giroversion", "supernumerario", "diastema", "transposicion", "absceso"]);
+const ORDEN_FASE = { inicial: 0, evolucion: 1, alta: 2 };
+const porTratar = (x) => POR_TRATAR.has(String(x ?? "").trim().toLowerCase());
+
+function piezaPorTratar(f) {
+  if (porTratar(f.estado ?? f.estadoPieza)) return true;
+  let c = f.caras ?? f.estadosCara;
+  if (typeof c === "string") c = leerAnidado(c);
+  if (!esObj(c)) return false;
+  if (esObj(c._colores) && Object.values(c._colores).some((v) => v === "r")) return true;
+  if (Array.isArray(c._piezas) && c._piezas.some((x) => x && (x.c === "r" || porTratar(x.h)))) return true;
+  if (porTratar(c._pieza)) return true;
+  const raices = esObj(c.raices) ? Object.values(c.raices) : [];
+  return Object.entries(c).some(([k, v]) => !k.startsWith("_") && k !== "raices" && porTratar(v)) || raices.some(porTratar);
+}
+
+export function piezasPorAtender(odontograma) {
+  const filas = Array.isArray(odontograma?.piezas) ? odontograma.piezas : (Array.isArray(odontograma) ? odontograma : null);
+  if (!filas) return null;
+  const ultimo = new Map();
+  filas.filter(esObj).forEach((f) => {
+    const n = f.pieza ?? f.numeroPieza;
+    if (n == null) return;
+    const orden = ORDEN_FASE[f.fase] ?? 0;
+    const prev = ultimo.get(String(n));
+    if (!prev || orden >= prev.orden) ultimo.set(String(n), { orden, f });
+  });
+  let total = 0;
+  ultimo.forEach(({ f }) => { if (piezaPorTratar(f)) total += 1; });
+  return total;
 }
 
 /* R8-03: «Reservar cita» proponía doctor, sede, horario y precio desde los datos de la

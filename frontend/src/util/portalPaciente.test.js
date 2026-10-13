@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { contactosReserva, planDelResumen } from "./portalPaciente.js";
+import { contactosReserva, planDelResumen, piezasPorAtender } from "./portalPaciente.js";
 
 describe("planDelResumen (R8-02)", () => {
   it("el resumen de hoy (citas, paciente, totales y pagos): plan, saldo y odontograma no disponibles", () => {
@@ -71,5 +71,34 @@ describe("contactosReserva (R8-03)", () => {
   it("sin números: lista vacía (el aviso sale sin número)", () => {
     assert.deepEqual(contactosReserva({ sedes: [{ id: 1, nombre: "Sede A" }] }), []);
     assert.deepEqual(contactosReserva(), []);
+  });
+});
+
+describe("piezasPorAtender (revisión 10)", () => {
+  it("cuenta las piezas con hallazgos por tratar del odontograma del servidor", () => {
+    const odo = { piezas: [
+      { pieza: 16, fase: "inicial", estado: null, caras: "{\"O\": \"caries\"}" },
+      { pieza: 21, fase: "inicial", estado: "sano", caras: "{}" },
+      { pieza: 36, fase: "inicial", estado: "corona", caras: "{}" },
+      { pieza: 46, fase: "inicial", estado: "ausente", caras: "{}" },
+    ], total: 4 };
+    assert.equal(piezasPorAtender(odo), 1);
+  });
+  it("usa el último registro de cada pieza (alta › evolución › inicial)", () => {
+    const odo = { piezas: [
+      { pieza: 16, fase: "inicial", caras: "{\"O\": \"caries\"}" },
+      { pieza: 16, fase: "alta", caras: "{\"O\": \"restaur\", \"_colores\": {\"O\": \"a\"}}" },
+      { pieza: 26, fase: "evolucion", estado: "extraer", caras: "{}" },
+    ] };
+    assert.equal(piezasPorAtender(odo), 1);
+  });
+  it("los hallazgos en rojo cuentan aunque el nombre sea un tratamiento", () => {
+    assert.equal(piezasPorAtender({ piezas: [{ pieza: 11, fase: "inicial", caras: { V: "restaur", _colores: { V: "r" } } }] }), 1);
+    assert.equal(piezasPorAtender({ piezas: [{ pieza: 11, fase: "inicial", caras: "{_pieza=corona, _piezas=[{h=corona, c=r}]}" }] }), 1);
+  });
+  it("sin odontograma devuelve null (no disponible), y vacío devuelve 0", () => {
+    assert.equal(piezasPorAtender(null), null);
+    assert.equal(piezasPorAtender({}), null);
+    assert.equal(piezasPorAtender({ piezas: [] }), 0);
   });
 });
