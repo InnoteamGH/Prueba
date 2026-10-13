@@ -8,6 +8,7 @@ import api, { auth } from "../api/client";
 import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden, mismaSede, useSede } from "../comun";
 import { sedeApiUuid } from "../routing";
 import { medicoEnSedes } from "../compartido/medicosSede";
+import { medicosDeSedes } from "../compartido/medicoEnSede";
 import NoDisponible from "../ui/NoDisponible";
 
 /* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
@@ -43,7 +44,7 @@ function datosDemo(sedes = null) {
     pendienteLiquidar: totalComision - totalPagado, mesesConCobro: cobrosPorMes.length, sinDato: false,
   };
 }
-import { filtraMicro, inicialesDe, layoutProgreso } from "./panelGerencialUtil";
+import { equipoDeSede, filtraMicro, inicialesDe, layoutProgreso } from "./panelGerencialUtil";
 import {
   UMBRAL_AUSENTISMO,
   PERIODOS_COMISIONES,
@@ -789,6 +790,16 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   // Metas con sesión: las del catálogo de médicos del servidor (no las de ejemplo de MEDICOS).
   const [medsSrv, setMedsSrv] = useState([]);
   useEffect(() => { if (conectado) api.catalogo.medicos().then((r) => setMedsSrv(Array.isArray(r) ? r : [])).catch(() => setMedsSrv([])); }, [conectado]);
+  // R8-07: horario de los doctores (GET /disponibilidad). Con una sede elegida se listan los
+  // doctores que atienden en ella con la regla de Metas y del Panel (compartido/medicoEnSede.js)
+  // y solo cuenta su meta: antes, con Surco, salían los 6 y «Al ritmo de su meta 0 de 1» contaba
+  // la meta de un doctor sin horario en Surco. undefined = cargando; null = no se pudo leer.
+  const [dispSrv, setDispSrv] = useState(undefined);
+  useEffect(() => {
+    if (!conectado) return;
+    api.disponibilidad.listar().then((r) => setDispSrv(Array.isArray(r) ? r : null)).catch(() => setDispSrv(null));
+  }, [conectado, nRecarga]);
+  const medsSede = conectado && sedesApi && dispSrv !== undefined ? medicosDeSedes(sedes, dispSrv, medsSrv, mismaSede) : null;
   const metaSrv = (m) => {
     const md = medsSrv.find((x) => String(x.id) === String(m.medicoId ?? m.id));
     if (!md) return 0;
@@ -826,7 +837,11 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
     return () => cancelAnimationFrame(t);
   }, [data]);
 
-  const porMedico = data?.porMedico || [];
+  // R8-07: con una sede elegida, los doctores que atienden en ella y quien produjo ahí (como el
+  // equipo del Panel). Sin horario ni sedes a la vista no se sabe y se listan todos.
+  const porMedicoSrv = data?.porMedico || [];
+  const porMedico = medsSede ? equipoDeSede(porMedicoSrv, medsSede) : porMedicoSrv;
+  const deLaSede = (m) => !medsSede || medsSede.has(String(m.medicoId ?? m.id ?? ""));
   const totalProd = Number(data?.totalProduccion) || 0;
   const totalCom = Number(data?.totalComision) || 0;
   const totalCitas = Number(data?.totalCitas) || 0;
@@ -954,7 +969,8 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               const hoyD = new Date();
               // Con sesión: meta mensual × meses del periodo y ritmo sobre el mismo periodo.
               const ritmoM = ritmoPer != null ? ritmoPer : (hoyD.getDate() / new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0).getDate()) * 100;
-              const conMeta = porMedico.map((m) => { const md = conectado ? null : MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const metaMes = Number(m.meta ?? (conectado ? metaSrv(m) : md ? medicoEnSedes(md, sedes).meta : 0)) || 0; const meta = metaMes * mesesPer; return { ...m, metaMes, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
+              // R8-07: solo la meta de los doctores de la sede (la que suman Metas y el Panel).
+              const conMeta = porMedico.filter(deLaSede).map((m) => { const md = conectado ? null : MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const metaMes = Number(m.meta ?? (conectado ? metaSrv(m) : md ? medicoEnSedes(md, sedes).meta : 0)) || 0; const meta = metaMes * mesesPer; return { ...m, metaMes, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
               const alRitmo = conMeta.filter((m) => m.pct >= ritmoM).length;
               const metaTot = conMeta.reduce((a, m) => a + m.meta, 0);
               return (

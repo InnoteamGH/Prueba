@@ -170,6 +170,15 @@ function saludDeFila(f) {
 /** Filas de `porSede` de GET /whatsapp/salud (si las trae), o null. */
 export const porSedeDeSalud = (s) => (s && Array.isArray(s.porSede) ? s.porSede.filter((x) => x && x.sedeId != null) : null);
 
+/** R8-09: ¿el número propio de alguna sede tiene fallos? (filas de `porSede` que no usan el
+    compartido). Integraciones y el inicio de TI lo pasan a estadosIntegraciones: así WhatsApp
+    cuenta como «con incidencia» en los dos, aunque la salud general esté bien. */
+export function incidenciaEnSedes(salud) {
+  const filas = porSedeDeSalud(salud) || [];
+  const propia = (x) => !(x.compartido === true || x.propio === false || /^compartido$/i.test(String(x.estado || "")));
+  return filas.filter(propia).some((f) => estadoWhatsApp(saludDeFila(f)).estado === "incidencia");
+}
+
 /**
  * Una fila por sede con su número y su estado, para Integraciones y el inicio de TI.
  *   - Con estado por sede (`salud.porSede` o `porSede`, las respuestas de ?sedeId=): el de cada número.

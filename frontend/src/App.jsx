@@ -24,10 +24,11 @@ import { DISP_DEMO, SILLONES_DEMO, completarSillones, normBloqueo, normSillon, e
 import { useReglasAgenda, sillonesPorSede, conSedesDeHorario, horarioDefineSede } from "./compartido/useReglasAgenda";
 import { CATALOGO_SEED, CARA_LETRA, leerCatalogo, nombreItem, servicioPorHallazgo, servicioPorId, precioServicio, precioCita, desgloseIgv, conIgv } from "./compartido/catalogo";
 import * as M from "./compartido/metricas";
-import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat, notaUltimoEnvioOk } from "./compartido/integraciones";
+import { PASARELAS, pasarelaActiva, proveedorSunat, setPasarelaActiva, estadoWhatsApp, iaConectada, fijarProveedorSunat, notaUltimoEnvioOk, estadosIntegraciones, contarIntegraciones } from "./compartido/integraciones";
 import WhatsappPorSede from "./compartido/WhatsappPorSede";
 import { sedesDemoWhatsapp } from "./compartido/useSedesWhatsapp";
-import { filasWhatsappSedes } from "./compartido/whatsappSede";
+import { filasWhatsappSedes, incidenciaEnSedes, sedeDePacienteObj } from "./compartido/whatsappSede";
+import { contactosReserva, planDelResumen } from "./util/portalPaciente";
 import { estadoCita, estadoInfo, estadoFaseUi, labAtrasado, textoConteo, CITA_INACTIVA } from "./compartido/estados";
 import FacturacionSunat, { ConexionSunat, serieSede } from "./modulos/FacturacionSunat";
 // Caja y Plan y cuenta: sede de cada pago, ítem, egreso y link (compartido/cajaSede.js).
@@ -660,7 +661,13 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
                             ["Respaldo automático", "operativo", "Último backup 03:00 h"],
                             ["Servidor de correo", "operativo", "Cola vacía"],
                             filaSinNumeroTI].filter(Boolean);
-  const incidenciasTI = INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").length;
+  // R8-09: las cifras (activas, con incidencia, por activar) son las de Integraciones, con la
+  // misma función y el mismo catálogo. La fila «Números de WhatsApp por sede» no es otra
+  // integración: se nombra en el aviso, pero no suma «por activar».
+  const estIntTI = esTI ? estadosIntegraciones({ conectado, salud: saludWa, provSunat: conectado ? (cfgSunat?.proveedor || "") : proveedorSunat(), pasarela: pasarelaActiva(), incidenciaSede: incidenciaEnSedes(saludWa) }) : [];
+  const cuentaTI = contarIntegraciones(estIntTI);
+  const pendTI = estIntTI.filter((i) => i.estado === "pendiente");
+  const incidenciasTI = cuentaTI.incidencia;
   const dias = [...Array(7)].map((_, i) => { const f = addDays(i - 6); return { v: citasMed.filter((c) => c.fecha === f).length, lbl: new Date(f + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short" }).slice(0, 2) }; });
   const estados = [
     { k: "pendiente", c: "var(--dc-warn)" }, { k: "confirmada", c: DS.c.primary }, { k: "en_atencion", c: "var(--dc-purple)" }, { k: "atendida", c: "var(--dc-ok-700)" }, { k: "cancelada", c: "var(--dc-red)" },
@@ -779,8 +786,8 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const verCaja = esAdmin || esGer || esAdmSede;
   const nombres = (arr, k = "paciente") => arr.slice(0, 3).map((x) => x[k]).join(", ") + (arr.length > 3 ? ` y ${arr.length - 3} más` : "");
   const tareas = [
-    esTI && INTEGRACIONES_TI.some(([, e]) => e === "pendiente") && { id: "tiPend", tono: "info", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length, "integración por activar", "integraciones por activar")}`, detalle: INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").map(([n]) => n).join(", ") + ".", accion: "Ver integraciones", ir: () => onIr("integraciones") },
-    esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: `${INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").map(([n, , d]) => `${n}: ${d}`).join(" ")} Revisa el estado antes de que afecte a la atención.`, accion: "Ver integraciones", ir: () => onIr("integraciones") },
+    esTI && (pendTI.length > 0 || filaSinNumeroTI) && { id: "tiPend", tono: "info", icon: <Plug size={18} strokeWidth={1.75} />, titulo: pendTI.length ? pluralEs(pendTI.length, "integración por activar", "integraciones por activar") : "Números de WhatsApp por sede", detalle: [pendTI.length ? `${pendTI.map((i) => i.n).join(", ")}.` : "", filaSinNumeroTI ? `Sin número de WhatsApp propio: ${sinNumeroTI.map((f) => f.nombre).join(", ")}${waSedesTI.modo === "compartido" ? " (usan el compartido)" : ""}.` : ""].filter(Boolean).join(" "), accion: "Ver integraciones", ir: () => onIr("integraciones") },
+    esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: `${(INTEGRACIONES_TI.some(([, e]) => e === "incidencia") ? INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").map(([n, , d]) => `${n}: ${d}`) : estIntTI.filter((i) => i.estado === "incidencia").map((i) => `${i.n}${i.wa ? `: ${i.wa.detalle}` : ""}`)).join(" ")} Revisa el estado antes de que afecte a la atención.`, accion: "Ver integraciones", ir: () => onIr("integraciones") },
     // Completar la evolución es trabajo del doctor: recepción y administración no pueden
     // hacerlo, así que no se les muestra una tarea con un botón que no les sirve.
     esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => {
@@ -820,7 +827,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     onIr("agenda");
   } : null);
   const cifras = esTI
-    ? [["Integraciones operativas", `${INTEGRACIONES_TI.filter(([, e]) => e === "operativo").length}/${INTEGRACIONES_TI.length}`, irSiVe("integraciones")], ["Con incidencia", incidenciasTI, irSiVe("integraciones")], ["Por activar", INTEGRACIONES_TI.filter(([, e]) => e === "pendiente").length, irSiVe("integraciones")], ["Usuarios", usrTiDash ? usrTiDash.length : conectado ? "…" : STAFF_INIT.length, irSiVe("usuarios")]]
+    ? [[cuentaTI.activas === 1 ? "Integración activa" : "Integraciones activas", cuentaTI.activas, irSiVe("integraciones")], ["Con incidencia", cuentaTI.incidencia, irSiVe("integraciones")], ["Por activar", cuentaTI.porActivar, irSiVe("integraciones")], ["Usuarios", usrTiDash ? usrTiDash.length : conectado ? "…" : STAFF_INIT.length, irSiVe("usuarios")]]
     : [["Citas hoy", citasHoyKpi.length, irAgenda(null)], ["Atendidas", atendidasHoy, irAgenda("atendida")], ["Por confirmar", sinConfirmar, irAgenda("pendiente")], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE")}`, esMed ? irSiVe("miproduccion") : irSiVe("facturacion")]];
   return (
     <div className="dc-hoy">
@@ -6890,33 +6897,37 @@ function Integraciones({ notify }) {
   }, []); // eslint-disable-line
   // H-T4: WhatsApp con fallos en 24 h ya no sale «Conectado» a secas: el estado es el mismo
   // que muestran el inicio de TI y WhatsApp + IA (estadoWhatsApp).
-  const wa = estadoWhatsApp(conectado ? salud : { ok: true, semaforo: "verde" });
-  const estWa = !conectado ? "conectado" : wa.estado === "operativo" ? "conectado" : wa.estado;
-  const iaInfo = iaConectada(salud);
-  const estIa = !conectado ? "conectado" : iaInfo === true ? "conectado" : "pendiente";
+  // R8-09: el estado de cada integración y la cuenta salen de compartido/integraciones.js, los
+  // mismos que usa el inicio de TI.
+  const estInt = estadosIntegraciones({ conectado, salud, provSunat, pasarela: pasarelaActiva(), incidenciaSede: incidenciaEnSedes(salud) });
+  const est = (id) => estInt.find((x) => x.id === id) || {};
+  const wa = est("whatsapp").wa;
+  const estWa = est("whatsapp").estado;
+  const iaInfo = est("ia").ia;
   const cats = [
     { cat: "Pagos en línea y POS", ic: CreditCard, c: "#2F6FDE", items: [
-      ...PASARELAS.map((pa) => ({ n: pa.n, d: pa.d, rec: pa.rec, estado: pasarelaActiva()?.id === pa.id ? "conectado" : "disponible" })),
+      ...PASARELAS.map((pa) => ({ n: pa.n, d: pa.d, rec: pa.rec, estado: est(`pasarela:${pa.id}`).estado })),
     ] },
     { cat: "Facturación electrónica", ic: Receipt, c: "#B45309", items: [
-      { n: "Proveedor OSE / PSE (SUNAT)", d: provSunat ? "Firma y envía a SUNAT las boletas y facturas que emite Caja." : "Sin proveedor conectado: Caja emite los comprobantes y quedan «Sin enviar». Se configura en Caja › Comprobantes SUNAT.", estado: provSunat ? "conectado" : "pendiente" },
+      { n: "Proveedor OSE / PSE (SUNAT)", d: provSunat ? "Firma y envía a SUNAT las boletas y facturas que emite Caja." : "Sin proveedor conectado: Caja emite los comprobantes y quedan «Sin enviar». Se configura en Caja › Comprobantes SUNAT.", estado: est("sunat").estado },
     ] },
     { cat: "Mensajería e IA", ic: MessageSquare, c: "#16A36A", items: [
       { n: "WhatsApp Cloud API (Meta)", d: !conectado || estWa === "conectado" ? "Canal oficial para el agente IA. Más económico a escala que intermediarios." : estWa === "incidencia" ? `${wa.detalle}${notaUltimoEnvioOk(salud)} Revísalo en WhatsApp + IA › Conexión WhatsApp.` : wa.detalle, estado: estWa, etiqueta: wa.etiqueta, rec: true },
       // Aquí figuraba otro proveedor del que la aplicación no depende. El motor real es
       // OpenAI (application.yml: openai.base-url), y solo con OPENAI_API_KEY cargada:
       // sin ella el asistente cae al motor de reglas.
-      { n: "API de OpenAI", d: `Motor del agente conversacional con function calling para consultar precios, ver disponibilidad y agendar. Sin clave, el asistente responde con el motor de reglas.${conectado && iaInfo === undefined ? " El servidor aún no informa si la clave está cargada." : ""}`, estado: estIa, rec: true },
+      { n: "API de OpenAI", d: `Motor del agente conversacional con function calling para consultar precios, ver disponibilidad y agendar. Sin clave, el asistente responde con el motor de reglas.${conectado && iaInfo === undefined ? " El servidor aún no informa si la clave está cargada." : ""}`, estado: est("ia").estado, rec: true },
     ] },
     { cat: "Captación de pacientes", ic: Users, c: "#6D4FD1", items: [
-      { n: "Doctoralia", d: "Directorio público con gran tráfico orgánico; sincroniza agenda para captar pacientes nuevos.", estado: "disponible" },
+      { n: "Doctoralia", d: "Directorio público con gran tráfico orgánico; sincroniza agenda para captar pacientes nuevos.", estado: est("doctoralia").estado },
     ] },
   ];
   const its = cats.flatMap((c) => c.items);
   // Activas = conectadas, con o sin fallos; las que fallan se cuentan aparte (como el inicio de TI).
-  const conectadas = its.filter((i) => i.estado === "conectado" || i.estado === "incidencia").length;
-  const incidenciasInt = its.filter((i) => i.estado === "incidencia").length;
-  const pendientesInt = its.filter((i) => i.estado === "pendiente").length;
+  const cuentaInt = contarIntegraciones(estInt);
+  const conectadas = cuentaInt.activas;
+  const incidenciasInt = cuentaInt.incidencia;
+  const pendientesInt = cuentaInt.porActivar;
   const [detInt, setDetInt] = useState(null);
   const [catSel, setCatSel] = useState("todas");
   const EST_INT = { conectado: ["Conectado", "is-ok"], incidencia: ["Con fallos", "is-warn"], pendiente: ["Pendiente", "is-warn"], disponible: ["Disponible", ""] };
@@ -6930,7 +6941,7 @@ function Integraciones({ notify }) {
         <div className="dc-esp-hero__cifras">
           {incidenciasInt > 0 && <div><b style={{ color: "var(--dc-warn-600)" }}>{incidenciasInt}</b><span>Con incidencia</span></div>}
           <div><b>{pendientesInt}</b><span>Por activar</span></div>
-          <div><b>{its.length - conectadas - pendientesInt}</b><span>Disponibles</span></div>
+          <div><b>{cuentaInt.disponibles}</b><span>Disponibles</span></div>
           <div><b>{its.filter((i) => i.rec).length}</b><span>Recomendadas</span></div>
         </div>
         <span />
@@ -8972,7 +8983,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           recibida: { l: "Recibida", c: "var(--dc-ok-700)", bg: "var(--dc-ok-soft)" },
           anulada:  { l: "Anulada",  c: "var(--dc-danger-700)", bg: "var(--dc-fee)" },
         };
-        const totalOC = filas.reduce((a, c) => a + (Number(c.total) || 0), 0);
+        // R8-04: las anuladas no son compras (igual que en Proveedores): antes «Total comprado»
+        // decía S/ 10 con S/ 8 de órdenes anuladas.
+        const totalOC = filas.filter((c) => c.estado !== "anulada").reduce((a, c) => a + (Number(c.total) || 0), 0);
         const pendOC = filas.filter((c) => c.estado === "borrador" || c.estado === "enviada" || c.estado === "en_camino").length;
         const recOC = filas.filter((c) => c.estado === "recibida").length;
         const OC_COL = { borrador: "#8A9CA1", enviada: "#D97706", en_camino: "#2563EB", recibida: "#16A36A", anulada: "#D0563F" };
@@ -9444,6 +9457,9 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
   const totalPacientes = conectado
     ? (consumoReal?.pacientes === undefined ? null : (consumoReal?.pacientes ?? null))
     : PACIENTES_INIT.length;
+  // Mi plan de TI decía «Pacientes —»: el rol no lee GET /pacientes (y antes de llegar el conteo
+  // se leía como «sin permiso»). Ahora lo dice: «No disponible para tu rol».
+  const pacSinPermiso = conectado && !!can && !can("pacientes", "ver");
   const SIN_CONTEO = "Aún no llega el conteo de tu clínica";
   const SIN_PERM = "Tu rol no consulta el padrón de pacientes";
   if (!actual) return <Card><p className="dc-seg__nada">Aún no llega el plan de tu clínica desde el servidor.</p></Card>;
@@ -9453,7 +9469,7 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
     { l: "Sedes", ic: <Building2 size={18} strokeWidth={1.75} />, c: NAVY, v: sedesUsadas == null ? "—" : `${sedesUsadas} / ${actual.sedesIncl} incl.`, sub: sedesUsadas == null ? SIN_CONTEO : sedesExtra > 0 ? (actual.sedeExtra ? `+${sedesExtra} adicional – S/${actual.sedeExtra}/mes` : `+${sedesExtra} — requiere plan Clínica o superior`) : actual.sedeExtra ? `Sede extra S/${actual.sedeExtra}/mes` : "Plan de 1 sede" },
     { l: "Odontólogos", ic: <Stethoscope size={18} strokeWidth={1.75} />, c: DS.c.primary, v: odontologos == null ? "—" : actual.odontologos === "ilim" ? `${odontologos} – Ilimitados` : `${odontologos} / ${actual.odontologos}`, sub: odontologos == null ? SIN_CONTEO : odExtra > 0 ? `+${odExtra} – S/${actual.odontologoExtra} c/u` : actual.odontologoExtra ? `Adicional S/${actual.odontologoExtra}/mes` : "Sin costo extra" },
     { l: "Usuarios de apoyo", ic: <Users size={18} strokeWidth={1.75} />, c: DS.c.primary, v: usuariosStaff == null ? "—" : `${usuariosStaff} – Ilimitados`, sub: usuariosStaff == null ? SIN_CONTEO : "Recepción, admin, TI…" },
-    { l: "Pacientes", ic: <Smile size={18} strokeWidth={1.75} />, c: "var(--dc-ok)", v: totalPacientes == null ? "—" : `${totalPacientes} – Ilimitados`, sub: totalPacientes == null ? (consumoReal?.pacientes === undefined ? SIN_PERM : SIN_CONTEO) : "Con auto-registro por link" },
+    { l: "Pacientes", ic: <Smile size={18} strokeWidth={1.75} />, c: "var(--dc-ok)", v: pacSinPermiso ? "No disponible para tu rol" : totalPacientes == null ? "—" : `${totalPacientes} – Ilimitados`, sub: pacSinPermiso ? `${SIN_PERM}. Ilimitados en tu plan.` : totalPacientes == null ? SIN_CONTEO : "Con auto-registro por link" },
   ];
   const TONO_PLAN = ["#0E9199", "#6D4FD1", "#D97706", "#E0694F"];
   // Con sesión el cambio de plan no tiene endpoint: no se finge, se pide a soporte.
@@ -9468,7 +9484,7 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
         <div className="dc-esp-hero__cifras">
           <div><b>{sedesUsadas == null ? "—" : `${sedesUsadas} ${sedesUsadas === 1 ? "sede" : "sedes"}`}</b><span>{sedesUsadas == null ? "Sedes" : sedesExtra > 0 ? `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"} + ${sedesExtra} adicional${sedesExtra === 1 ? "" : "es"}` : `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"}`}</span></div>
           <div><b>{odontologos == null ? "—" : actual.odontologos === "ilim" ? odontologos : `${odontologos}/${actual.odontologos}`}</b><span>Odontólogos</span></div>
-          <div><b>{totalPacientes == null ? "—" : totalPacientes}</b><span>Pacientes, ilimitados</span></div>
+          <div title={pacSinPermiso ? SIN_PERM : undefined}><b>{pacSinPermiso ? "No disponible" : totalPacientes == null ? "—" : totalPacientes}</b><span>{pacSinPermiso ? "Pacientes: no disponible para tu rol" : "Pacientes, ilimitados"}</span></div>
         </div>
         <span />
         <div className="dc-hero-acc"><span className="dc-plan__activo"><CheckCircle2 size={14} strokeWidth={2.2} /> Activo</span></div>
@@ -11342,7 +11358,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "gerencial": return <Gerencial citas={cf} sede={sede} sedes={idsSede} horarioClinica={horarioClinica} />;
       // Reportes (spec §3): una página con pestañas. Metas y comisiones se editan en
       // Configuración › Doctores; aquí solo se ve el avance (NAV-07).
-      case "metas": return <React.Suspense fallback={null}><Metas notify={notify} can={can} sedes={idsSede} /></React.Suspense>;
+      case "metas": return <React.Suspense fallback={null}><Metas notify={notify} can={can} sedes={idsSede} rol={rol} /></React.Suspense>;
       // Cada reporte es su propia entrada del menú (grupo Reportes, junto al Panel gerencial).
       case "reportes": case "comisiones": return <Reportes key="produccion" citas={cf} can={can} sedes={idsSede} />;
       case "reportes_aus": return <Reportes key="ausencias" citas={cf} can={can} tab="ausencias" sedes={idsSede} />;
@@ -12646,12 +12662,24 @@ function AgendarCitaModal({ paciente, onClose, onConfirm, base, citas = CITAS_IN
   const confirmar = () => { if (!medico) return; onConfirm({ id: base?.id || Date.now(), paciente: paciente.nombre, dni: paciente.dni, medicoId: medico.id, esp, sede: sedeSel, precio: precio ?? undefined, fecha, hora, motivo: motivo.trim() || espObj.nombre, estado: "confirmada", llegada: false }); };
   const lbl = { fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block", marginBottom: 6 };
   const inp = { width: "100%", padding: "11px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 14, color: NAVY, outline: "none", boxSizing: "border-box" };
+  // R8-03: la capa es un diálogo (role="dialog") y Escape la cierra; el foco vuelve a donde estaba.
+  const panelRef = useRef(null);
+  const cerrarRef = useRef(onClose);
+  cerrarRef.current = onClose;
+  useEffect(() => {
+    const prev = document.activeElement;
+    panelRef.current?.focus();
+    // Un desplegable abierto (Servicio, Hora) consume su Escape con preventDefault: solo se cierra él.
+    const onKey = (e) => { if (e.key === "Escape" && !e.defaultPrevented) { e.stopPropagation(); cerrarRef.current?.(); } };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); try { prev?.focus?.(); } catch { /* */ } };
+  }, []);
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,27,56,.45)", display: "grid", placeItems: "center", zIndex: 200, padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 600, maxHeight: "calc(92vh / var(--dc-z, 1))", overflowY: "auto", boxShadow: "0 30px 70px -20px rgba(15,27,56,.5)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)" }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dc-agendar-titulo" tabIndex={-1} onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "var(--dc-r-lg)", width: "100%", maxWidth: 600, maxHeight: "calc(92vh / var(--dc-z, 1))", overflowY: "auto", boxShadow: "0 30px 70px -20px rgba(15,27,56,.5)", animation: "dcModal .26s cubic-bezier(.2,.7,.2,1)", outline: "none" }}>
         <div style={{ padding: "22px 24px", background: `linear-gradient(125deg,${TEAL},var(--dc-brand-600))`, color: "#fff", position: "relative" }}>
-          <button aria-label="Cerrar" onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,.16)", border: "none", borderRadius: "var(--dc-r-sm)", width: 30, height: 30, cursor: "pointer", color: "#fff", display: "grid", placeItems: "center" }}><X size={16} strokeWidth={1.75} /></button>
-          <div style={{ fontSize: 18, fontWeight: 600, fontFamily: DISPLAY_FONT }}>{esReprog ? "Reprogramar cita" : "Reservar una cita"}</div>
+          <button type="button" aria-label="Cerrar" onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,.16)", border: "none", borderRadius: "var(--dc-r-sm)", width: 30, height: 30, cursor: "pointer", color: "#fff", display: "grid", placeItems: "center" }}><X size={16} strokeWidth={1.75} /></button>
+          <div id="dc-agendar-titulo" style={{ fontSize: 18, fontWeight: 600, fontFamily: DISPLAY_FONT }}>{esReprog ? "Reprogramar cita" : "Reservar una cita"}</div>
           <div style={{ fontSize: 13, color: "var(--dc-sky)", marginTop: 2 }}>{esReprog ? "Elige la nueva fecha y hora." : "Elige el servicio y el horario que más te convenga."}</div>
         </div>
         <div style={{ padding: 22, display: "grid", gap: 14 }}>
@@ -12724,11 +12752,25 @@ function PortalPaciente({ usuario, onLogout }) {
   // Nombre de la clínica: con sesión, el que manda el resumen del portal; nunca la marca de ejemplo.
   const [clinicaPortal, setClinicaPortal] = useState(conectado ? "" : "Clínica Dental Sonríe+");
 
+  // R8-02: con sesión, el plan, el saldo y el odontograma solo valen si el resumen del servidor
+  // los trae (util/portalPaciente.js). Si no llegan se dice «No disponible»: nunca «Sin plan aún»,
+  // «Tu boca está sana» ni «Estás al día» sin el dato.
+  const [planSrv, setPlanSrv] = useState(null);
+  // R8-03: sede del paciente y datos de la clínica del resumen (para decir dónde reservar).
+  const [sedePac, setSedePac] = useState(null);
+  const [clinicaInfo, setClinicaInfo] = useState(null);
+  const planDisp = !conectado || planSrv?.fases != null;
+  const saldoDisp = !conectado || planSrv?.saldo != null;
+  const odoDisp = !conectado || planSrv?.odontograma != null;
+  // Recetas e historia: tampoco llegan en el resumen; no se dice «0 recetas» ni «Sin visitas aún».
+  const recetasDisp = !conectado || !!planSrv?.recetas;
+  const historiaDisp = !conectado || !!planSrv?.historia;
+  const NO_DISP_PLAN = "Consulta tu plan y saldo en la clínica";
   const tratamiento = ficha.tratamiento || [];
   const total = tratamiento.reduce((s, f) => s + (Number(f.costo) || 0), 0);
   const pagado = tratamiento.filter((f) => f.estado === "atendida").reduce((s, f) => s + (Number(f.costo) || 0), 0);
-  const saldo = Math.max(0, total - pagado);
-  const pendientes = tratamiento.filter((f) => f.estado === "pendiente").length;
+  const saldo = conectado ? Math.max(0, Number(planSrv?.saldo) || 0) : Math.max(0, total - pagado);
+  const pendientes = tratamiento.filter((f) => (conectado ? f.estado !== "atendida" : f.estado === "pendiente")).length;
   const invertido = totalInvertidoApi != null
     ? Number(totalInvertidoApi)
     : (ficha.pagos || []).reduce((s, p) => s + (Number(p.monto) || 0), 0);
@@ -12764,15 +12806,20 @@ function PortalPaciente({ usuario, onLogout }) {
         metodo: pg.metodo || "—",
         fecha: pg.creadoEn ? String(pg.creadoEn).slice(0, 10) : "—",
       }));
+      // R8-02: plan, saldo y odontograma, solo si el resumen los trae.
+      const pl = planDelResumen(r);
+      setPlanSrv({ ...pl, recetas: Array.isArray(r.recetas), historia: Array.isArray(r.historia) });
+      setSedePac(sedeDePacienteObj(p));
+      setClinicaInfo(r.clinica && typeof r.clinica === "object" ? r.clinica : null);
       setFicha((prev) => ({
         ...prev,
         pagos,
         alergias: p.alergias || [],
         antecedentes: p.antecedentes || [],
-        tratamiento: prev.tratamiento || [],
-        odontograma: {},
-        historia: [],
-        recetas: [],
+        tratamiento: pl.fases || [],
+        odontograma: pl.odontograma || {},
+        historia: Array.isArray(r.historia) ? r.historia.filter((h) => h && typeof h === "object").map((h) => ({ fecha: h.fecha ? String(h.fecha).slice(0, 10) : "—", titulo: h.titulo || h.motivo || "Visita", detalle: h.detalle || h.nota || "" })) : [],
+        recetas: Array.isArray(r.recetas) ? r.recetas.filter((x) => x && typeof x === "object").map((x) => ({ fecha: x.fecha || x.creadoEn || "", texto: x.texto || x.indicaciones || x.medicamento || "Receta" })) : [],
         ahorro: Number(r.totalAhorrado) || 0,
       }));
       setTotalInvertidoApi(r.totalInvertido != null ? r.totalInvertido : null);
@@ -12798,13 +12845,19 @@ function PortalPaciente({ usuario, onLogout }) {
   };
   useEffect(() => { cargarPortal(); }, []); // eslint-disable-line
   const [agendar, setAgendar] = useState(null); // null | "nueva" | citaObj (reprogramar)
+  // R8-03: con sesión no se arma una cita con datos de la demostración (doctor, sede, hora y
+  // precio sin consultar la disponibilidad): se dice dónde reservar, con el número de la sede.
+  // Las sedes se piden al abrir el aviso (null = consultando; [] = sin datos).
+  const [sedesContacto, setSedesContacto] = useState(null);
+  useEffect(() => {
+    if (!conectado || !agendar || sedesContacto) return;
+    api.portal.sedes().then((r) => setSedesContacto(Array.isArray(r) ? r : [])).catch(() => setSedesContacto([]));
+  }, [agendar]); // eslint-disable-line react-hooks/exhaustive-deps
+  const contactos = conectado && sedesContacto ? contactosReserva({ clinica: clinicaInfo, sedes: sedesContacto, sedeId: sedePac, igual: mismaSede }) : [];
   const proximaCita = misCitas.filter((c) => c.estado !== "cancelada" && c.fecha >= fmt(hoy)).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))[0];
+  const ultimaAtendida = misCitas.filter((c) => c.estado === "atendida" && c.fecha <= fmt(hoy)).sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora))[0];
   const agendarCita = (c) => {
-    if (conectado) {
-      notify("La reserva de citas desde el portal aún no está conectada al API. Pide una cita en recepción o WhatsApp.");
-      setAgendar(null);
-      return;
-    }
+    if (conectado) { setAgendar(null); return; }
     const existe = misCitas.some((x) => x.id === c.id);
     setMisCitas((cs) => existe ? cs.map((x) => x.id === c.id ? { ...x, ...c } : x) : [...cs, c]);
     setAgendar(null);
@@ -12920,13 +12973,25 @@ function PortalPaciente({ usuario, onLogout }) {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 16 }} className="dc-gerencial-row">
                 <Card style={{ padding: 22, display: "flex", alignItems: "center", gap: 18 }}>
-                  <Ring pct={progreso} />
+                  {planDisp ? <Ring pct={progreso} /> : <div aria-hidden="true" style={{ width: 92, height: 92, borderRadius: "var(--dc-r-full)", border: "10px solid var(--dc-bg)", boxSizing: "border-box", display: "grid", placeItems: "center", color: "var(--dc-ink-400)", flexShrink: 0 }}><ClipboardList size={24} strokeWidth={1.75} /></div>}
                   <div>
                     <div style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Avance de tu tratamiento</div>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, margin: "2px 0 4px" }}>{atendidasN} de {tratamiento.length} fases</div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{pendientes > 0 ? (pendientes === 1 ? "1 pendiente por completar" : `${pendientes} pendientes por completar`) : "¡Tratamiento al día!"}</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, margin: "2px 0 4px" }}>{!planDisp ? "No disponible" : tratamiento.length ? `${atendidasN} de ${tratamiento.length} ${tratamiento.length === 1 ? "fase" : "fases"}` : "Sin plan por ahora"}</div>
+                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{!planDisp ? NO_DISP_PLAN : !tratamiento.length ? "Cuando tu odontólogo cree tu plan, lo verás aquí." : pendientes > 0 ? (pendientes === 1 ? "1 pendiente por completar" : `${pendientes} pendientes por completar`) : "¡Tratamiento al día!"}</div>
                   </div>
                 </Card>
+                {!odoDisp ? (
+                <Card style={{ padding: 22, background: "var(--dc-white)", border: "1px solid var(--dc-line)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div aria-hidden="true" style={{ width: 52, height: 52, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", color: "var(--dc-ink-400)", display: "grid", placeItems: "center", flexShrink: 0 }}><Smile size={24} strokeWidth={1.75} /></div>
+                    <div>
+                      <div style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Estado de tus piezas</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>No disponible</div>
+                      <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 3 }}>Aquí aún no se muestra tu odontograma. Tu odontólogo te lo explica en la consulta.</div>
+                    </div>
+                  </div>
+                </Card>
+                ) : (
                 <Card style={{ padding: 22, background: piezasAtencion ? "var(--dc-white)" : "var(--dc-ok-soft)", border: `1px solid ${piezasAtencion ? "var(--dc-amber-soft)" : "var(--dc-green-soft)"}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{ fontSize: 44 }}>{piezasAtencion ? "🦷" : "😁"}</div>
@@ -12937,11 +13002,12 @@ function PortalPaciente({ usuario, onLogout }) {
                     </div>
                   </div>
                 </Card>
+                )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 16 }}>
                 {/* Bug D25 re-test: Tarjeta "Saldo pendiente" clickeable navega a pagos */}
-                <Tile icon={<Wallet size={19} strokeWidth={1.75} />} titulo="Saldo pendiente" valor={`S/ ${saldo.toFixed(0)}`} sub={saldo > 0 ? "Puedes pagar en cuotas" : "Estás al día"} color={RED} onClick={saldo > 0 ? () => setVista("pagos") : undefined} />
+                <Tile icon={<Wallet size={19} strokeWidth={1.75} />} titulo="Saldo pendiente" valor={saldoDisp ? `S/ ${saldo.toFixed(0)}` : "No disponible"} sub={!saldoDisp ? NO_DISP_PLAN : saldo > 0 ? (conectado ? "Puedes pagar en la clínica" : "Puedes pagar en cuotas") : "Estás al día"} color={RED} onClick={saldoDisp && saldo > 0 ? () => setVista("pagos") : undefined} />
                 <Tile icon={<Percent size={19} strokeWidth={1.75} />} titulo="Has ahorrado" valor={`S/ ${ahorro.toFixed(0)}`} sub="En descuentos y promos" color="var(--dc-ok-700)" />
                 <Tile icon={<CreditCard size={19} strokeWidth={1.75} />} titulo="Total invertido" valor={`S/ ${invertido.toFixed(0)}`} sub="En tu salud dental" color={NAVY} />
               </div>
@@ -12951,19 +13017,27 @@ function PortalPaciente({ usuario, onLogout }) {
           {vista === "salud" && (
             <div style={{ display: "grid", gap: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16 }}>
-                <Tile icon={<Smile size={19} strokeWidth={1.75} />} titulo="Piezas por atender" valor={piezasAtencion} sub={piezasAtencion ? "Tu dentista las revisó" : "Todo en orden"} color={piezasAtencion ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} />
-                <Tile icon={<FileText size={19} strokeWidth={1.75} />} titulo="Recetas activas" valor={(ficha.recetas || []).length} sub="En tu historia" color={TEAL} />
-                <Tile icon={<Activity size={19} strokeWidth={1.75} />} titulo="Última visita" valor={(ficha.historia || [])[0]?.fecha || "—"} sub="Registrada" color={NAVY} />
+                <Tile icon={<Smile size={19} strokeWidth={1.75} />} titulo="Piezas por atender" valor={odoDisp ? piezasAtencion : "No disponible"} sub={!odoDisp ? "Pregúntalo en tu próxima visita" : piezasAtencion ? "Tu dentista las revisó" : "Todo en orden"} color={!odoDisp ? "var(--dc-ink-400)" : piezasAtencion ? "var(--dc-warn-600)" : "var(--dc-ok-700)"} />
+                <Tile icon={<FileText size={19} strokeWidth={1.75} />} titulo="Recetas activas" valor={recetasDisp ? (ficha.recetas || []).length : "No disponible"} sub={recetasDisp ? "En tu historia" : "Pídelas en la clínica"} color={TEAL} />
+                {/* Con sesión, la última cita atendida de las que manda el resumen (la historia no llega). */}
+                <Tile icon={<Activity size={19} strokeWidth={1.75} />} titulo="Última visita" valor={historiaDisp ? ((ficha.historia || [])[0]?.fecha || "—") : (ultimaAtendida ? fechaLegible(ultimaAtendida.fecha) : "—")} sub={historiaDisp ? "Registrada" : ultimaAtendida ? "Según tus citas atendidas" : "Sin citas atendidas"} color={NAVY} />
               </div>
               <Card style={{ padding: 22 }}>
                 <h3 style={{ margin: "0 0 4px", color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Resumen de tu salud dental</h3>
                 <p style={{ color: "var(--dc-ink-400)", fontSize: 14, margin: "0 0 16px" }}>Una mirada sencilla a cómo está tu boca.</p>
                 <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  {!odoDisp ? (
+                  <div style={{ flex: 1, minWidth: 200, background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: 18 }}>
+                    <div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>Estado de tus piezas: no disponible</div>
+                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 4 }}>Aquí aún no se muestra tu odontograma. Tu odontólogo te explica en la consulta qué piezas hay que tratar.</div>
+                  </div>
+                  ) : (
                   <div style={{ flex: 1, minWidth: 200, background: piezasAtencion ? "var(--dc-warn-soft)" : "var(--dc-ok-soft)", borderRadius: "var(--dc-r-md)", padding: 18 }}>
                     <div style={{ fontSize: 27 }}>{piezasAtencion ? "🦷" : "✅"}</div>
                     <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginTop: 6 }}>{piezasAtencion ? (piezasAtencion === 1 ? "1 pieza requiere atención" : `${piezasAtencion} piezas requieren atención`) : "Sin pendientes"}</div>
                     <div style={{ fontSize: 13, color: "var(--dc-ink-400)", marginTop: 4 }}>{piezasAtencion ? "Tu odontólogo te recomienda tratarlas pronto." : "¡Buen trabajo cuidando tu sonrisa!"}</div>
                   </div>
+                  )}
                   <div style={{ flex: 1, minWidth: 200, background: "var(--dc-bg)", borderRadius: "var(--dc-r-md)", padding: 18 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: NAVY, marginBottom: 8 }}>Alergias y antecedentes</div>
                     {((ficha.alergias || []).length || (ficha.antecedentes || []).length) ? (
@@ -12984,7 +13058,9 @@ function PortalPaciente({ usuario, onLogout }) {
                     <ChevronRight size={16} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ marginTop: 3, flexShrink: 0 }} />
                   </div>
                 ))}
-                {(!ficha.historia || ficha.historia.length === 0) && <Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo="Sin visitas aún" sub="Tu historia clínica aparecerá aquí tras tu primera atención." />}
+                {(!ficha.historia || ficha.historia.length === 0) && (historiaDisp
+                  ? <Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo="Sin visitas aún" sub="Tu historia clínica aparecerá aquí tras tu primera atención." />
+                  : <Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo="Historia no disponible" sub="Aquí aún no se muestra tu historia clínica. Tus citas están en «Mis citas» y la historia completa la pides en la clínica." />)}
               </Card>
               {(ficha.recetas || []).length > 0 && (
                 <Card style={{ padding: 22 }}>
@@ -13032,9 +13108,9 @@ function PortalPaciente({ usuario, onLogout }) {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16 }}>
                 <Tile icon={<Wallet size={19} strokeWidth={1.75} />} titulo="Total invertido" valor={`S/ ${invertido.toFixed(0)}`} sub="En tu salud dental" color={NAVY} />
                 <Tile icon={<Percent size={19} strokeWidth={1.75} />} titulo="Has ahorrado" valor={`S/ ${ahorro.toFixed(0)}`} sub="Gracias a descuentos" color="var(--dc-ok-700)" />
-                <Tile icon={<CreditCard size={19} strokeWidth={1.75} />} titulo="Saldo pendiente" valor={`S/ ${saldo.toFixed(0)}`} sub={saldo > 0 ? "En cuotas disponibles" : "Estás al día"} color={RED} />
+                <Tile icon={<CreditCard size={19} strokeWidth={1.75} />} titulo="Saldo pendiente" valor={saldoDisp ? `S/ ${saldo.toFixed(0)}` : "No disponible"} sub={!saldoDisp ? NO_DISP_PLAN : saldo > 0 ? (conectado ? "Puedes pagar en la clínica" : "En cuotas disponibles") : "Estás al día"} color={RED} />
               </div>
-              {saldo > 0 && (
+              {saldoDisp && saldo > 0 && (
                 <Card style={{ padding: 20, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-sky)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                     {/* Con sesión el pago en línea desde el portal no tiene endpoint: no se simula. */}
@@ -13064,6 +13140,10 @@ function PortalPaciente({ usuario, onLogout }) {
             <Card style={{ padding: 22 }}>
               <h3 style={{ margin: "0 0 4px", color: NAVY, fontSize: 16, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Mi plan de tratamiento</h3>
               <p style={{ color: "var(--dc-ink-400)", fontSize: 14, margin: "0 0 18px" }}>Tu progreso paso a paso, fase por fase.</p>
+              {/* R8-02: sin el plan en el resumen no se dice «Sin plan aún» ni se dibuja un avance de 0 %. */}
+              {!planDisp ? (
+                <NoDisponible bloque texto="Plan no disponible" detalle={`${NO_DISP_PLAN}. Aquí aún no se muestran tus fases ni lo que falta pagar.`} />
+              ) : (<>
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "var(--dc-ink-400)" }}>Avance general</span><span style={{ fontWeight: 600, color: TEAL, fontFamily: DISPLAY_FONT }}>{progreso}%</span></div>
                 <div style={{ height: 10, background: "var(--dc-bg)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${progreso}%`, height: "100%", background: `linear-gradient(90deg,${TEAL},var(--dc-brand-600))` }} /></div>
@@ -13086,7 +13166,8 @@ function PortalPaciente({ usuario, onLogout }) {
                 ); })}
                 {tratamiento.length === 0 && <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin plan aún" sub="Cuando tu odontólogo cree tu plan de tratamiento, lo verás aquí paso a paso." />}
               </div>
-              {saldo > 0 && (
+              </>)}
+              {saldoDisp && saldo > 0 && (
                 <div style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                   <div style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>Saldo pendiente de tu plan: <strong style={{ color: RED }}>S/ {M.sol2(saldo)}</strong></div>
                   <Btn small kind="red" onClick={() => setVista("pagos")}><CreditCard size={15} strokeWidth={1.75} /> Ir a pagar</Btn>
@@ -13133,7 +13214,26 @@ function PortalPaciente({ usuario, onLogout }) {
           </div>
         </Modal>
       )}
-      {agendar && <AgendarCitaModal paciente={paciente} base={agendar !== "nueva" ? agendar : null} onClose={() => setAgendar(null)} onConfirm={agendarCita} />}
+      {/* R8-03: con sesión, en vez del formulario con doctor, sede, hora y precio de la
+          demostración (sin consultar la disponibilidad), un diálogo dice cómo reservar. */}
+      {agendar && conectado && (
+        <Modal icon={<Calendar size={20} strokeWidth={1.75} />} titulo={agendar !== "nueva" ? "Reprogramar tu cita" : "Reservar una cita"} sub="Se coordina con la clínica" onClose={() => setAgendar(null)} maxW={460}
+          footer={<Btn small kind="ghost" onClick={() => setAgendar(null)}>Cerrar</Btn>}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--dc-ink-700)", lineHeight: 1.6 }}>{agendar !== "nueva" ? "Para reprogramar tu cita" : "Para reservar"}, escríbenos por WhatsApp o llama a recepción. Desde el portal aún no se puede ver la disponibilidad de los doctores ni reservar.</p>
+            {sedesContacto == null
+              ? <div role="status" style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Buscando el número de tu sede…</div>
+              : contactos.map((c) => (
+                <div key={`${c.nombre}-${c.whatsapp}-${c.telefono}`} style={{ border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "12px 14px", display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: NAVY }}>{c.nombre}</div>
+                  {c.whatsapp && <a href={c.whatsappUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 500, color: "var(--dc-ok-700)", textDecoration: "none" }}><MessageSquare size={16} strokeWidth={1.75} /> WhatsApp {c.whatsappTexto}</a>}
+                  {c.telefono && <a href={`tel:${c.telefono.replace(/[^\d+]/g, "")}`} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 500, color: NAVY, textDecoration: "none" }}><Phone size={16} strokeWidth={1.75} /> Recepción {c.telefono}</a>}
+                </div>
+              ))}
+          </div>
+        </Modal>
+      )}
+      {agendar && !conectado && <AgendarCitaModal paciente={paciente} base={agendar !== "nueva" ? agendar : null} onClose={() => setAgendar(null)} onConfirm={agendarCita} />}
       {pagoModal != null && !conectado && <ModalCobro monto={pagoModal} onClose={() => setPagoModal(null)} onAprobado={() => { setPagoModal(null); notify(auth.token ? "¡Pago aprobado! Comprobante registrado (todavía no se envía a SUNAT ni por correo)." : "¡Pago aprobado! Boleta electrónica emitida y enviada a tu correo."); }} />}
       {toast && (() => { const tn = tonoAviso(toast); return (
         <div className="dc-toast" role="status" aria-live="polite" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 300, background: "#fff", borderRadius: "var(--dc-r-lg)", border: `1px solid ${tn.borde}`, boxShadow: "0 12px 32px rgba(16,24,40,.18)", padding: 16, display: "flex", gap: 12, alignItems: "center", maxWidth: 340 }}>

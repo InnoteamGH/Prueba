@@ -10,6 +10,7 @@ import { pluralizarParentesis } from "../util/plurales";
 import { conCop } from "../util/cop";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
 import { sillonesPorSede } from "../compartido/useReglasAgenda";
+import { medicosDeSedes } from "../compartido/medicoEnSede";
 import { estadoWhatsApp, notaUltimoEnvioOk } from "../compartido/integraciones";
 import { formatearWhatsappPe, mismoNumero, normalizarPhoneNumberId, normalizarWhatsappPe, validarPhoneNumberId, validarWhatsappPe, whatsappDeSede } from "../compartido/whatsappSede";
 import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda, useSede, mismaSede, sedeNum, nombreSede} from "../comun";
@@ -448,6 +449,15 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   useEffect(() => { if (medHor && !meds.some((m) => String(m.id) === String(medHor))) setMedHor(""); }, [ver ? ver.join(",") : "todas"]); // eslint-disable-line
   const cargarDisp = (mid) => { if (conectado && mid) api.disponibilidad.listar(mid).then((r) => setDisp(r || [])).catch(() => setDisp([])); else setDisp([]); };
   useEffect(() => { cargarDisp(medHor); }, [medHor]); // eslint-disable-line
+  // R8-07: «Los que atienden en Sede Surco» listaba a los 6 doctores (todos sin sede, H-14).
+  // Con sedes elegidas, la lista usa la regla de Metas, Producción y el Panel
+  // (compartido/medicoEnSede.js): las sedes de la ficha y, si no trae, el horario de cada
+  // doctor. Se pide al abrir la pestaña (un horario recién agregado ya cuenta).
+  const [dispTodos, setDispTodos] = useState(null);
+  useEffect(() => { if (conectado && tab === "doctores" && ver) api.disponibilidad.listar().then((r) => setDispTodos(Array.isArray(r) ? r : null)).catch(() => setDispTodos(null)); }, [tab, ver ? ver.join(",") : "todas"]); // eslint-disable-line
+  const medsSedeDoc = conectado && ver ? medicosDeSedes(ver, dispTodos, medsTodos, mismaSede) : null;
+  const medsDoctores = medsSedeDoc ? meds.filter((m) => medsSedeDoc.has(String(m.id))) : meds;
+  const medsSinHorarioAqui = medsSedeDoc ? meds.filter((m) => !medsSedeDoc.has(String(m.id))) : [];
   const dispDemo = demoDb?.dispMedicos || DISP_DEMO;
   // Bloques del doctor en las sedes que se ven; los de "cualquier sede" (sin sede) también.
   const dispDelMed = conectado ? disp : dispDemo.filter((d) => String(d.medicoId) === String(medHor)).map((d) => ({ ...d, sedeId: d.sede }));
@@ -909,8 +919,9 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
       {tab === "doctores" && (
         <section className="dc-cfg__panel">
           {cab("Doctores", sedeUnicaVer != null ? `Los que atienden en ${nomSedeCfg(sedeUnicaVer)}; comisión y meta de esa sede.` : "Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.", sedesEdit.length > 0 && <button type="button" className="dc-cfg__nuevo" onClick={() => abrirDoctor(null)}><Plus size={14} strokeWidth={2.2} /> Nuevo doctor</button>)}
-          {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : (
-            <ListaFiltrable rows={meds} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_doctores" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
+          {medsSinHorarioAqui.length > 0 && <div className="fm-aviso-edad" role="note"><Info size={15} strokeWidth={2} /><span>El servidor no indica en qué sede atiende cada doctor: se listan los que tienen horario {sedeUnicaVer != null ? `en ${nomSedeCfg(sedeUnicaVer)}` : "en estas sedes"}, como en Metas. {medsSinHorarioAqui.length === 1 ? "No se lista 1 doctor sin horario aquí" : `No se listan ${medsSinHorarioAqui.length} doctores sin horario aquí`}: {medsSinHorarioAqui.map((m) => m.nombre).join(", ")}. Su horario se carga en Horarios por doctor.</span></div>}
+          {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : medsDoctores.length === 0 ? <p className="dc-cfg__nada">Ningún doctor tiene horario {sedeUnicaVer != null ? `en ${nomSedeCfg(sedeUnicaVer)}` : "en estas sedes"}.</p> : (
+            <ListaFiltrable rows={medsDoctores} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_doctores" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
               { key: "n", label: "Doctor", w: "minmax(180px,1.3fr)", cell: (m) => <PersonaCelda nombre={m.nombre} /> },
               { key: "cop", label: "COP", w: "100px", get: (m) => conCop(m.cop) || "—" },
               { key: "e", label: "Especialidad", w: "minmax(150px,1fr)", get: (m) => espNombre(m.especialidadId) || "—" },

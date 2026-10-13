@@ -314,6 +314,9 @@ export const api = {
     resumen: () => request("GET", `/portal/${auth.sesion?.pacienteId}/resumen`),
     confirmar: (citaId) => request("PATCH", `/portal/citas/${citaId}/confirmar`),
     cancelar: (citaId) => request("PATCH", `/portal/citas/${citaId}/cancelar`),
+    // R8-03: el teléfono y el WhatsApp de las sedes, para decir al paciente dónde reservar.
+    // Es opcional: si falla, el aviso sale sin número y sin aviso global de error.
+    sedes: () => request("GET", "/sedes", null, null, { sinAviso: true }),
   },
   citas: {
     // El backend ya aceptaba desde+hasta; solo faltaba pedirselo. Sin rango, el

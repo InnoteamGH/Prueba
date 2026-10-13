@@ -2,6 +2,7 @@
  * Helpers del Panel Gerencial (SPEC §8): escala al TOTAL, cero sin barra,
  * pacientes distintos, meta vacía sin S/ 0 ni 0%.
  */
+import { medicosDeSedes } from "../compartido/medicoEnSede.js";
 
 const META_VACIA = "Sin meta configurada";
 
@@ -196,11 +197,12 @@ export function carteraComoDirectorio(pacientes, ultimaPorId = {}, hoyIso) {
    - equipoDeSede: el ranking del servidor con los doctores de la sede y los que atendieron en ella.
    - metaDeSede: la suma de las metas de esos doctores (lo que Metas llama «Meta de la sede»);
      null si no se sabe quién atiende en la sede. */
+/* R8-07: la regla es la de compartido/medicoEnSede.js (la misma de Metas, Producción y
+   Configuración › Doctores): las sedes de la ficha del doctor si GET /medicos las trae
+   (`medicos`, opcional) y, si no, las de su horario. */
 const mismoIdTxt = (a, b) => a != null && b != null && String(a) === String(b);
-export function medicosEnSedes(disp, sedes, igual = mismoIdTxt) {
-  const bloques = (Array.isArray(disp) ? disp : []).filter((d) => d && d.activo !== false && d.medicoId != null);
-  if (!bloques.length || !Array.isArray(sedes) || !sedes.length) return null;
-  return new Set(bloques.filter((d) => sedes.some((s) => igual(s, d.sedeId ?? d.sede))).map((d) => String(d.medicoId)));
+export function medicosEnSedes(disp, sedes, igual = mismoIdTxt, medicos = null) {
+  return medicosDeSedes(sedes, disp, medicos, igual);
 }
 const idMed = (r) => String(r?.medicoId ?? r?.id ?? "");
 export function equipoDeSede(ranking, medicos) {
@@ -209,6 +211,31 @@ export function equipoDeSede(ranking, medicos) {
 export function metaDeSede(ranking, medicos) {
   if (!medicos) return null;
   return (Array.isArray(ranking) ? ranking : []).filter((r) => medicos.has(idMed(r))).reduce((a, r) => a + (Number(r?.meta) || 0), 0);
+}
+
+/* R8-06: con una sede elegida, el pie del Panel decía «Inventario valorizado S/ 1 749», la cifra
+   de toda la clínica: los 5 insumos no tienen sede y entraban en todas. Ahora la cifra de la sede
+   suma solo los insumos de esa sede, y los que no tienen sede se informan aparte (no son de
+   ninguna). Con «Todas» (sin `enSede`) se suma todo, sin separar.
+   - items: insumos (GET /inventario o los de la demostración); los inactivos no cuentan.
+   - enSede(sedeId): ¿la sede del insumo es de las que se ven? null = «Todas».
+   - costoDe(it): costo unitario (por defecto costoUnitario de la API).
+   Devuelve { total, sinSede, nSinSede }: total es null si ningún insumo tiene stock y costo. */
+const costoApi = (it) => it.costoUnitario ?? it.costo_unitario;
+export function valorInventario(items, { enSede = null, costoDe = costoApi } = {}) {
+  let total = 0, sinSede = 0, nSinSede = 0, hay = false;
+  for (const it of Array.isArray(items) ? items : []) {
+    if (!it || it.activo === false) continue;
+    const stock = Number(it.stock);
+    const costo = Number(costoDe(it));
+    if (!Number.isFinite(stock) || !Number.isFinite(costo)) continue;
+    hay = true;
+    const sid = it.sedeId ?? it.sede;
+    if (enSede && (sid == null || sid === "")) { sinSede += stock * costo; nSinSede++; continue; }
+    if (enSede && !enSede(sid)) continue;
+    total += stock * costo;
+  }
+  return { total: hay ? total : null, sinSede, nSinSede };
 }
 
 /** Producción por especialidad a partir del resumen de tratamientos y el catálogo:

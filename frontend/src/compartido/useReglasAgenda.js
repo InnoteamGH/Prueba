@@ -6,6 +6,7 @@ import { DatosDemoCtx, ESPECIALIDADES, MEDICOS, mismaSede, useSede } from "../co
 import { sedeApiUuid } from "../routing";
 import { sedesRegistradas } from "./sedesRegistro";
 import { DISP_DEMO, SILLONES_DEMO, normBloqueo, normSillon } from "./sillones";
+import { sedesDeHorario, sedesFijasMedico } from "./medicoEnSede";
 
 /* GET /sillones sin sedeId devuelve los de una sola sede (la del token), no los de todas:
    se piden por cada sede del usuario y se unen. Cada lista se recorta a su sede por si el
@@ -26,13 +27,9 @@ export function sillonesPorSede(uuids0, estado = null) {
    el modal de agendar y la lista de espera de cada sede ofrecían también a los doctores de la
    otra. Mientras el servidor no mande las sedes, la de cada doctor se deduce de su horario
    (el sedeId de sus bloques en GET /disponibilidad). */
-const idSede = (v) => (v && typeof v === "object" ? v.id : v);
-/** Sedes que trae la ficha del doctor (lista de ids u objetos, o una sola sedeId). */
-export const sedesFijasMedico = (m) => [].concat(m?.sedes ?? m?.sedeIds ?? m?.sedeId ?? []).map(idSede).filter((x) => x != null && x !== "");
-/** Sedes de los bloques de horario del doctor. */
-export const sedesDeHorario = (m, disp) => [...new Set((disp || [])
-  .filter((d) => m && String(d.medicoId) === String(m.id))
-  .map((d) => d.sedeId ?? d.sede).filter((x) => x != null && x !== "").map(String))];
+/* Las sedes de la ficha y las del horario viven en compartido/medicoEnSede.js (R8-07), con la
+   regla que comparten Metas, Producción, el Panel y Configuración › Doctores. */
+export { sedesFijasMedico, sedesDeHorario };
 
 /** ¿Un doctor sin bloques a la vista NO atiende en las sedes del usuario? El servidor solo manda
     a cada usuario el horario de sus sedes: si es de algunas sedes (no de toda la clínica) y sí
