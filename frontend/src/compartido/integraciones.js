@@ -68,3 +68,37 @@ export function estadoWhatsApp(s) {
 export function iaConectada(s) {
   return s ? [s.iaReal, s.ia, s.openai, s.iaConectada].find((x) => typeof x === "boolean") : undefined;
 }
+
+/* R8-09: el catálogo de integraciones y su cuenta, los mismos en Integraciones y en el inicio de
+   TI. Antes el inicio contaba su propia lista (con «Números de WhatsApp por sede» como otra
+   integración por activar) y decía «1/4 operativas · 1 con incidencia · 2 por activar», mientras
+   Integraciones decía «2 activas · 1 con incidencia · 1 por activar».
+   estado: "conectado" | "incidencia" | "pendiente" | "disponible".
+   - conectado: con sesión, lo que se sabe del servidor (GET /whatsapp/salud y GET
+     /facturacion-electronica/config); sin sesión, la demostración.
+   - salud: respuesta de GET /whatsapp/salud (null mientras se consulta, { error } si falló).
+   - provSunat: proveedor OSE/PSE ("" si no hay). pasarela: { id } activa o null.
+   - incidenciaSede: el número propio de alguna sede tiene fallos (whatsappSede.incidenciaEnSedes). */
+export function estadosIntegraciones({ conectado = false, salud = null, provSunat = "", pasarela = null, incidenciaSede = false } = {}) {
+  const wa0 = estadoWhatsApp(conectado ? salud : { ok: true, semaforo: "verde" });
+  const wa = conectado && incidenciaSede && wa0.estado !== "incidencia"
+    ? { ...wa0, estado: "incidencia", etiqueta: "Con fallos", detalle: "El número de WhatsApp de una sede tiene fallos: revisa WhatsApp por sede." }
+    : wa0;
+  const ia = iaConectada(salud);
+  return [
+    ...PASARELAS.map((pa) => ({ id: `pasarela:${pa.id}`, n: pa.n, estado: pasarela && pasarela.id === pa.id ? "conectado" : "disponible" })),
+    { id: "sunat", n: "Proveedor OSE / PSE (SUNAT)", estado: provSunat ? "conectado" : "pendiente" },
+    { id: "whatsapp", n: "WhatsApp Cloud API (Meta)", estado: !conectado || wa.estado === "operativo" ? "conectado" : wa.estado, wa },
+    { id: "ia", n: "API de OpenAI", estado: !conectado || ia === true ? "conectado" : "pendiente", ia },
+    { id: "doctoralia", n: "Doctoralia", estado: "disponible" },
+  ];
+}
+
+/** Cuenta de una lista de integraciones ({ estado }). Activas = conectadas con o sin fallos;
+    las que fallan se cuentan además aparte. */
+export function contarIntegraciones(items) {
+  const l = (Array.isArray(items) ? items : []).filter(Boolean);
+  const de = (e) => l.filter((i) => i.estado === e).length;
+  const conectadas = de("conectado"), incidencia = de("incidencia"), porActivar = de("pendiente");
+  return { total: l.length, activas: conectadas + incidencia, sinFallos: conectadas, incidencia, porActivar, disponibles: l.length - conectadas - incidencia - porActivar };
+}

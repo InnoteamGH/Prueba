@@ -13,6 +13,7 @@ import { abrirDocumento, datosImpresion, telefonosConWhatsapp } from "./util/mem
 import { estadoInfo, ESTADOS } from "./compartido/estados.js";
 import { registrarSedes, sedesRegistradas, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { ymdLima } from "./util/fechaLima";
+import { etiquetaCantidad } from "./util/plurales";
 import { enfocarPrimera, moverFocoMenu, useMenuDesplegable } from "./compartido/menuDesplegable";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -1563,17 +1564,11 @@ export const Modal = ({ icon, titulo, sub, onClose, children, footer, maxW, size
 // Tabla de datos reutilizable: título de columna centrado, filtro inline al clic,
 // orden A–Z/Z–A al costado, alineación por columna y clic en fila.
 // cols: [{ key, label, w, a:"left"|"center", get:(r)=>texto, cell:(r)=>JSX, noFilter, noSort }]
-const CANT_SING = { doctores: "doctor", odontólogos: "odontólogo", tratamientos: "tratamiento", servicios: "servicio", insumos: "insumo", movimientos: "movimiento", pagos: "pago", pacientes: "paciente", registros: "registro", planes: "plan", citas: "cita", sedes: "sede", comprobantes: "comprobante", órdenes: "orden", sillones: "sillón", liquidaciones: "liquidación" };
-/** «1 cita», «1 sillón», «2 citas»: el rótulo de una cantidad en singular cuando es una.
-    M4-12: la barra de las listas decía «1 citas» (usaba el plural tal cual). */
+/** «1 cita», «1 sillón», «1 proveedor», «2 citas»: el rótulo de una cantidad en singular cuando
+    es una. M4-12: la barra de las listas decía «1 citas» (usaba el plural tal cual). R8-05: y
+    «1 proveedore» (quitaba la «s» final): las reglas del español están en util/plurales.js. */
 export function etiquetaCant(n, sub) {
-  if (!sub) return n === 1 ? "registro" : "registros";
-  if (n !== 1) return sub;
-  if (CANT_SING[sub]) return CANT_SING[sub];
-  if (/iones$/.test(sub)) return sub.replace(/iones$/, "ión");          // atenciones → atención
-  if (/[aeiouáéíóú]s$/.test(sub)) return sub.replace(/s$/, "");          // recetas → receta
-  if (/(r|l|n|d|j)es$/.test(sub)) return sub.replace(/es$/, "");         // doctores → doctor
-  return sub.replace(/s$/, "");
+  return etiquetaCantidad(n, sub);
 }
 
 /* R-23: búsqueda sin tildes ni mayúsculas y, si lo escrito es un número (teléfono, DNI) con

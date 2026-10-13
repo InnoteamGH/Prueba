@@ -20,6 +20,7 @@ import {
   carteraComoDirectorio,
   medicosEnSedes,
   equipoDeSede,
+  valorInventario,
 } from "./panelGerencialUtil";
 import { tienePermiso } from "../compartido/permisos";
 import { contarChatsPorSede, sedeDeConversacion, sedeDePacienteObj } from "../compartido/whatsappSede";
@@ -820,6 +821,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   // alertas (R6-03): la antigüedad de la deuda y el aviso de cobros vencidos se calculan con
   // GET /caja (sí filtra); lo que queda del servidor sin filtrar lleva el rótulo «toda la clínica».
   const sedeElegida = conectado && !!(sedesApi && sedesApi.length);
+  // R8-06: el inventario se separa por sede cuando se ve una parte de la clínica (también en la
+  // demostración y para el usuario de una sede); con «Todas» se suma todo.
+  const invPorSede = !!verSedes && !(sedeCx.sede === "all" && sedeCx.global);
   const [kd, setKd] = useState(null);
   const [ind, setInd] = useState(null);
   const [rep, setRep] = useState(null);
@@ -834,7 +838,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const [ficha, setFicha] = useState(null);
   const [metaEdit, setMetaEdit] = useState(null);
   const [metaVal, setMetaVal] = useState("");
+  // { total, sinSede, nSinSede } (panelGerencialUtil.valorInventario) o null si no se pudo leer.
   const [inventarioValorizado, setInventarioValorizado] = useState(null);
+  // R8-07: GET /medicos, para usar las sedes de la ficha de cada doctor si el servidor las manda.
+  const [medsPanel, setMedsPanel] = useState(null);
   const [nSillones, setNSillones] = useState(null);
   const [nSedes, setNSedes] = useState(null);
   const [sedesRows, setSedesRows] = useState([]);         // GET /sedes (número de WhatsApp de cada una)
@@ -928,7 +935,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),
       ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${(Number(pg.monto)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })),
     ].sort((a, b) => String(a.hora).localeCompare(String(b.hora))));
-    setInventarioValorizado(M.inventarioValorizado((demoDb?.inventario || []).filter((it) => it.sede == null || enSede([it.sede]))));
+    setInventarioValorizado(valorInventario(demoDb?.inventario || [], { enSede: invPorSede ? (s) => enSede([s]) : null, costoDe: (it) => it.precio ?? it.costo ?? it.precioUnitario }));
     setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false && enSede([x.sede])).length);
     setNSedes(verSedes ? verSedes.length : 2);
   }, [demoDb, citasProp, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -967,22 +974,13 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
     // R6-08: los chats de WhatsApp solo si el rol puede verlos (gerencia no: usa la cifra del servidor).
     if (tienePermiso("whatsapp", "ver")) api.conversaciones.listar().then((r) => setConvs(Array.isArray(r) ? r : null)).catch(() => setConvs(null));
     else setConvs(null);
+    // R8-06: solo el almacén de las sedes que se ven; los insumos sin sede van aparte.
     api.inventario.listar(sedesApi).then((rows) => {
-      // Solo el almacén de las sedes que se ven.
-      const list = (Array.isArray(rows) ? rows : []).filter((it) => deSede({ sedeId: it.sedeId ?? it.sede }));
-      let total = 0;
-      let ok = false;
-      for (const it of list) {
-        if (it && it.activo === false) continue;
-        const stock = Number(it.stock);
-        const costo = Number(it.costoUnitario ?? it.costo_unitario);
-        if (Number.isFinite(stock) && Number.isFinite(costo)) {
-          total += stock * costo;
-          ok = true;
-        }
-      }
-      setInventarioValorizado(ok ? total : null);
+      const v = valorInventario(rows, { enSede: invPorSede ? (s) => verSedes.some((x) => mismaSede(x, s)) : null });
+      setInventarioValorizado(v.total == null ? null : v);
     }).catch(() => setInventarioValorizado(null));
+    // R8-07: la ficha de los doctores (sus sedes, si el servidor las manda) para el equipo y la meta de la sede.
+    api.catalogo.medicos().then((r) => setMedsPanel(Array.isArray(r) ? r : null)).catch(() => setMedsPanel(null));
     sillonesPorSede(null).then((rows) => {
       setNSillones(Array.isArray(rows) ? rows.filter((x) => deSede({ sedeId: x.sedeId ?? x.sede })).length : null);
     }).catch(() => setNSillones(null));
@@ -1031,8 +1029,9 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   // R6-12: una cita cancelada no está «en agenda» (la única de hoy, cancelada, salía como
   // «1 cita en agenda · 0 de 1 atendidas» con Pendientes diciendo que no hay citas).
   const citasAgenda = citasHoy.filter((c) => c.estado !== "cancelada");
-  // R6-02: doctores con horario en la sede elegida (meta y equipo de la sede).
-  const medicosSede = !sedeElegida ? null : dispMed === undefined ? undefined : medicosEnSedes(dispMed, verSedes, mismaSede);
+  // R6-02 / R8-07: doctores que atienden en la sede elegida (meta y equipo de la sede), con la
+  // regla de Metas: las sedes de su ficha si el servidor las manda; si no, su horario.
+  const medicosSede = !sedeElegida ? null : dispMed === undefined ? undefined : medicosEnSedes(dispMed, verSedes, mismaSede, medsPanel);
   // R6-03: deuda de las sedes que se ven, con GET /caja (null si no se pudo o el servidor no
   // manda «terminados»: entonces vale la de /gerencial/indicadores, con su rótulo).
   const deudaCaja = useMemo(() => (conectado && cajaRes
@@ -1874,9 +1873,14 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
       {/* GER-04: la producción por odontólogo vive en un solo bloque («Producción del equipo vs. meta», arriba); el detalle está en Reportes. */}
 
       <div className="dc-pie">
-        <span>
-          Inventario valorizado{" "}
-          <b>{inventarioValorizado != null ? moneyFmt(inventarioValorizado) : "—"}</b>
+        {/* R8-06: con una sede, la cifra es la de sus insumos; los que no tienen sede se dicen
+            aparte (antes salía la cifra de toda la clínica como si fuera de la sede). */}
+        <span title={inventarioValorizado?.nSinSede ? (inventarioValorizado.nSinSede === 1
+          ? "1 insumo no tiene sede: no es de ninguna sede, así que no se suma a la cifra de la sede. Asígnale su sede en Inventario."
+          : `${inventarioValorizado.nSinSede} insumos no tienen sede: no son de ninguna sede, así que no se suman a la cifra de la sede. Asígnales su sede en Inventario.`) : undefined}>
+          Inventario valorizado{invPorSede ? (verSedes.length === 1 ? " de la sede" : " de las sedes") : ""}{" "}
+          <b>{inventarioValorizado != null ? moneyFmt(inventarioValorizado.total) : "—"}</b>
+          {inventarioValorizado?.nSinSede > 0 && <>{" + "}<b>{moneyFmt(inventarioValorizado.sinSede)}</b> de insumos sin sede (toda la clínica)</>}
         </span>
         {/* R6-08: con los chats a la vista, cada uno cuenta en una sola sede y los que aún no
             tienen sede se dicen aparte (sede A + sede B + sin sede = total). Sin permiso de

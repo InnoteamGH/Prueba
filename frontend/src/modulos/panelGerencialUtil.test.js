@@ -14,6 +14,7 @@ import {
   medicosEnSedes,
   equipoDeSede,
   metaDeSede,
+  valorInventario,
 } from "./panelGerencialUtil.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -153,6 +154,47 @@ describe("R6-02: equipo y meta de la sede elegida", () => {
     assert.equal(metaDeSede(rankingSurco, medicosEnSedes(disp, ["a1"])), 800);
     assert.equal(metaDeSede(rankingSurco, new Set()), 0);
     assert.equal(metaDeSede(rankingSurco, null), null);
+  });
+  it("R8-07: con las fichas de GET /medicos, sus sedes mandan sobre el horario", () => {
+    const meds = [{ id: "d1", sedes: [] }, { id: "d2", sedes: [] }, { id: "d5", sedes: [{ id: "a2" }] }];
+    assert.deepEqual([...medicosEnSedes(disp, ["a2"], undefined, meds)].sort(), ["d2", "d5"]);
+    // Sin fichas con sede, el mismo resultado que con el horario solo.
+    assert.deepEqual([...medicosEnSedes(disp, ["a2"], undefined, [{ id: "d1", sedes: [] }])], ["d2"]);
+  });
+});
+
+describe("R8-06: inventario valorizado de la sede elegida", () => {
+  // Como en producción: los 5 insumos sin sede, y la cifra de toda la clínica en cada sede.
+  const sinSede = [
+    { id: 1, stock: 10, costoUnitario: 100 }, { id: 2, stock: 3, costoUnitario: 183 },
+    { id: 3, stock: 1, costoUnitario: 50 }, { id: 4, stock: 0, costoUnitario: 999 }, { id: 5, stock: 2, costoUnitario: 75.5 },
+  ];
+  const enSurco = (s) => s === "a2";
+  it("con «Todas» se suma todo, sin separar", () => {
+    const v = valorInventario(sinSede);
+    assert.equal(v.total, 1000 + 549 + 50 + 0 + 151);
+    assert.equal(v.nSinSede, 0);
+  });
+  it("con una sede, los insumos sin sede no se suman a la sede: se informan aparte", () => {
+    const v = valorInventario(sinSede, { enSede: enSurco });
+    assert.equal(v.total, 0);
+    assert.equal(v.sinSede, 1750);
+    assert.equal(v.nSinSede, 5);
+  });
+  it("solo los insumos de la sede elegida; los inactivos y los de otra sede no cuentan", () => {
+    const items = [
+      { stock: 2, costoUnitario: 10, sedeId: "a2" }, { stock: 1, costoUnitario: 7, sedeId: "a1" },
+      { stock: 5, costoUnitario: 10, sedeId: "a2", activo: false }, { stock: 1, costoUnitario: 3 },
+    ];
+    assert.deepEqual(valorInventario(items, { enSede: enSurco }), { total: 20, sinSede: 3, nSinSede: 1 });
+  });
+  it("sin stock ni costo legibles: null (no S/ 0)", () => {
+    assert.equal(valorInventario([]).total, null);
+    assert.equal(valorInventario([{ stock: "x", costoUnitario: 3 }]).total, null);
+    assert.equal(valorInventario(null).total, null);
+  });
+  it("el costo puede venir con otro nombre (demostración)", () => {
+    assert.equal(valorInventario([{ stock: 2, precio: 15, sede: 1 }], { costoDe: (it) => it.precio }).total, 30);
   });
 });
 
