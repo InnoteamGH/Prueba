@@ -4,6 +4,7 @@ import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, 
 import { mensajeErrorLogin } from "./api/reintentos";
 import { limpiarRegistroSedes, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { fijarPermisosSesion, guardarPermisosServidor, permisosServidorGuardados, tienePermiso } from "./compartido/permisos";
+import { pedirChatPaciente } from "./compartido/chatPaciente";
 import { hashDeVista, irHash, parseHash, sedeApiUuid, canonVista } from "./routing";
 // Carga diferida: módulos pesados solo se descargan al abrirlos (chunk aparte).
 const FichaMedica = React.lazy(() => import("./FichaMedica"));
@@ -2745,7 +2746,9 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
           // R-13: sin permiso de odontograma (recepción) no se ofrece: eran tres 403 y «Sin registro».
           tienePermiso("odontograma", "ver") && { label: "Abrir odontograma", onClick: () => abrirOdontograma(p) },
           { label: "Historia clínica", onClick: () => abrirHistoria(p) },
-          p.telefono && { label: "WhatsApp", onClick: () => { window.location.hash = "#/whatsapp"; } },
+          // R-37: abre el chat de ESTE paciente (por su id o su número) o avisa que no tiene;
+          // antes quedaba abierto el primer chat de la lista, de otra persona.
+          p.telefono && tienePermiso("whatsapp", "ver") && { label: "WhatsApp", onClick: () => { pedirChatPaciente(p); window.location.hash = "#/whatsapp"; } },
           puedeEditarPac && { label: "Editar datos", onClick: () => editar(p) },
           puedeEliminar && { label: "Eliminar paciente", peligro: true, onClick: () => eliminarPaciente(p) },
         ]} />
@@ -4267,7 +4270,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
           </div>
         )}
         {conectado && !tratCargado && !tratError && !tratSinPermiso && pacienteId && <div style={{ padding: 20, fontSize: 13, color: "var(--dc-ink-500)" }}>Leyendo el plan del paciente…</div>}
-        {fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && planListo && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub="Agrega el primer procedimiento o pásalos desde el odontograma." />}
+        {fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && planListo && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub={puedeAgregarProc ? "Agrega el primer procedimiento o pásalos desde el odontograma." : "Aún no hay procedimientos en el plan de este paciente."} />}
         {fases.length > 0 && (
           <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="procedimientos" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
             vistas={[{ id: "recorrido", label: "Recorrido", icon: Route }]}
@@ -8138,6 +8141,9 @@ function FirmaModal({ doc, onClose, onConfirm, esMenor = false, firmante, setFir
 }
 function Consentimientos({ pacientes: pacProp, notify }) {
   const conectado = !!auth.token;
+  // R-38: registrar es POST /consentimientos (consentimientos:crear). Recepción solo tiene
+  // «ver»: llenaba todo el formulario y el servidor respondía 403.
+  const puedeCrear = tienePermiso("consentimientos", "crear");
   const sedeCx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
   // Se traen tambien nacimiento y apoderado: hacen falta para saber si el paciente es
@@ -8182,6 +8188,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
   // sin mirar creaba el documento a otra persona). Se identifica por id, no por nombre.
   const pacForm = form ? pacientes.find((p) => String(p.id) === String(form.pacienteId)) || null : null;
   const enviar = () => {
+    if (!puedeCrear) { notify("Tu rol puede ver los consentimientos, pero no registrar nuevos."); setForm(null); return; }
     if (!pacForm) { notify("Elige el paciente."); return; }
     if (conectado) {
       const pid = pacForm.id;
@@ -8228,10 +8235,12 @@ function Consentimientos({ pacientes: pacProp, notify }) {
             <div><b>{docs.length}</b><span>Documentos</span></div>
           </div>
           <div className="dc-form-hero__barra" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
-          <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ pacienteId: "", tipo: CONSENT_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo consentimiento" : "Enviar consentimiento"}</button>
+          {puedeCrear
+            ? <button type="button" className="dc-esp-hero__btn" onClick={() => setForm({ pacienteId: "", tipo: CONSENT_TIPOS[0] })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo consentimiento" : "Enviar consentimiento"}</button>
+            : <span className="dc-esp-hero__solo" title="Tu rol puede ver y descargar los consentimientos, pero no registrar nuevos."><Lock size={13} strokeWidth={1.9} /> Solo lectura</span>}
         </section>
       ); })()}
-      {form && (
+      {form && puedeCrear && (
         <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo={conectado ? "Nuevo consentimiento" : "Enviar consentimiento"} sub={conectado ? "Queda por firmar en consultorio, con fecha registrada" : "El paciente lo firma en línea con fecha registrada"} onClose={() => setForm(null)} maxW={540} footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={15} strokeWidth={1.75} /> {conectado ? "Registrar" : "Enviar al paciente"}</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={form.pacienteId || ""} placeholder="— Elige el paciente —" onChange={(v) => setForm({ ...form, pacienteId: v })} options={pacientes.map((p) => ({ value: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : undefined }))} /></label>
@@ -8292,7 +8301,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
             <footer><small>{firmado(d) ? "Archivado con fecha y hora" : "Esperando la firma del paciente"}</small>{accion(d)}</footer>
           </article>
         );
-        if (!docs.length) return <Card><Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo="Sin consentimientos" sub="Envía el primer consentimiento para que el paciente lo firme en línea." /></Card>;
+        if (!docs.length) return <Card><Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo="Sin consentimientos" sub={!puedeCrear ? "Aún no hay consentimientos registrados." : conectado ? "Registra el primero con «Nuevo consentimiento»: queda por firmar en consultorio." : "Envía el primer consentimiento para que el paciente lo firme en línea."} /></Card>;
         return (
           <Card className="dc-env">
             <div className="dc-env__cab"><h3>Consentimientos</h3></div>
@@ -10012,6 +10021,12 @@ function useDocumentosApi(pacienteId) {
 }
 function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () => {}, soloPendientes = false, onAbrirPaciente = null }) {
   const conectado = !!auth.token;
+  // R-38: cada clase se ofrece solo con su permiso de crear (POST /consentimientos o
+  // /formularios/envios). Recepción envía formularios, pero los consentimientos solo los ve.
+  const puedeConsent = tienePermiso("consentimientos", "crear");
+  const puedeFormulario = tienePermiso("formularios", "crear");
+  const clasesDoc = [puedeConsent && { value: "consentimiento", label: "Consentimiento" }, puedeFormulario && { value: "formulario", label: "Formulario" }].filter(Boolean);
+  const puedeClase = (c) => (c === "consentimiento" ? puedeConsent : puedeFormulario);
   const db = useContext(DatosDemoCtx);
   const { docs: docsApi, recargar: recargarApi, sinPermiso: docsSinPermiso } = useDocumentosApi(pacienteFijo);
   const docsAll = conectado ? (docsApi || []) : (db?.documentos || []);
@@ -10055,6 +10070,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
   };
   const enviar = () => {
     const pid = pacienteFijo ?? form.pacienteId;
+    if (!puedeClase(form.clase)) { notify(form.clase === "consentimiento" ? "Tu rol puede ver los consentimientos, pero no registrar nuevos." : "Tu rol no puede enviar formularios."); return; }
     if (!pid) { notify("Elige el paciente."); return; }
     if (conectado) {
       // Consentimiento: el servidor lo registra (sin enlace de firma todavía). Formulario: se envía por WhatsApp.
@@ -10073,9 +10089,13 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
     <Card className="dc-docs">
       <div className="dc-docs__cab">
         <div><h3>{soloPendientes ? "Documentos por firmar o completar" : "Documentos"}</h3><span>Consentimientos y formularios{nPend ? ` · ${nPend} pendiente${nPend > 1 ? "s" : ""}` : ""}</span></div>
-        {!soloPendientes && <Btn small onClick={() => setForm({ clase: "consentimiento", tipo: CONSENT_TIPOS[0], pacienteId: pacienteFijo || null })}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo documento" : "Enviar documento"}</Btn>}
+        {!soloPendientes && clasesDoc.length > 0 && <Btn small onClick={() => { const c = clasesDoc[0].value; setForm({ clase: c, tipo: c === "consentimiento" ? CONSENT_TIPOS[0] : FORM_TIPOS[0], pacienteId: pacienteFijo || null }); }}><Send size={14} strokeWidth={1.75} /> {conectado ? "Nuevo documento" : "Enviar documento"}</Btn>}
       </div>
-      {conectado && docsSinPermiso ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin permiso para ver los documentos" sub="Tu rol no tiene acceso a los consentimientos ni a los formularios." /> : docs.length === 0 ? <Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo={soloPendientes ? "Nada pendiente" : "Sin documentos"} sub={soloPendientes ? "Todos los consentimientos y formularios están firmados o completados." : "Envía un consentimiento o un formulario para que el paciente lo firme o complete."} /> : (
+      {conectado && docsSinPermiso ? <Vacio icon={<Lock size={22} strokeWidth={1.75} />} titulo="Sin permiso para ver los documentos" sub="Tu rol no tiene acceso a los consentimientos ni a los formularios." /> : docs.length === 0 ? <Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo={soloPendientes ? "Nada pendiente" : "Sin documentos"} sub={soloPendientes ? "Todos los consentimientos y formularios están firmados o completados."
+        : puedeConsent && puedeFormulario ? "Envía un consentimiento o un formulario para que el paciente lo firme o complete."
+        : puedeFormulario ? "Envía un formulario para que el paciente lo complete."
+        : puedeConsent ? "Registra un consentimiento para que el paciente lo firme."
+        : "Aún no hay consentimientos ni formularios de este paciente."} /> : (
         <DataTable bare minWidth={0} sub="documentos" exportar={false} rows={docs} defaultSort={{ key: "fecha", dir: "desc" }} cols={[
           ...(pacienteFijo == null ? [{ key: "pac", label: "Paciente", w: "minmax(150px,1.1fr)", a: "left", get: (d) => pacDe(d.pacienteId)?.nombre || d.paciente || "—", cell: (d) => onAbrirPaciente ? <button type="button" className="dc-link" onClick={() => onAbrirPaciente(d.pacienteId)}>{pacDe(d.pacienteId)?.nombre || d.paciente || "—"}</button> : <span>{pacDe(d.pacienteId)?.nombre || d.paciente || "—"}</span> }] : []),
           { key: "tipo", label: "Documento", w: "minmax(180px,1.4fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span className="dc-doc-tipo"><span>{d.clase === "consentimiento" ? <Shield size={14} strokeWidth={1.9} /> : <FileText size={14} strokeWidth={1.9} />}</span>{d.tipo}</span> },
@@ -10095,7 +10115,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
           footer={<><Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={enviar}><Send size={14} strokeWidth={1.75} /> Enviar</Btn></>}>
           <div style={{ display: "grid", gridTemplateColumns: pacienteFijo == null ? "1fr 1fr" : "1fr", gap: 14 }}>
             {pacienteFijo == null && <label className="dc-campo-lbl">Paciente<Select value={form.pacienteId || ""} placeholder="— Elige el paciente —" onChange={(v) => setForm({ ...form, pacienteId: v })} options={(conectado ? visibles : pacientes).map((p) => ({ value: p.id, label: p.nombre, sub: p.dni ? `DNI ${p.dni}` : undefined }))} /></label>}
-            <label className="dc-campo-lbl">Clase<Select value={form.clase} onChange={(v) => setForm({ ...form, clase: v, tipo: v === "consentimiento" ? CONSENT_TIPOS[0] : FORM_TIPOS[0] })} options={[{ value: "consentimiento", label: "Consentimiento" }, { value: "formulario", label: "Formulario" }]} /></label>
+            <label className="dc-campo-lbl">Clase<Select value={form.clase} onChange={(v) => setForm({ ...form, clase: v, tipo: v === "consentimiento" ? CONSENT_TIPOS[0] : FORM_TIPOS[0] })} options={clasesDoc} /></label>
             <label className="dc-campo-lbl">Documento<Select value={form.tipo} onChange={(v) => setForm({ ...form, tipo: v })} options={(form.clase === "consentimiento" ? CONSENT_TIPOS : FORM_TIPOS).map((t) => ({ value: t, label: t }))} /></label>
           </div>
           {form.clase === "consentimiento" && <CamposConsentimiento form={form} setForm={setForm} paciente={pacDe(pacienteFijo ?? form.pacienteId)?.nombre || ""} />}
@@ -10451,7 +10471,10 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
           <Vacio icon={<Lock size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin permiso para ver las fotos" : "Sin permiso para ver las radiografías"} sub="Tu rol no tiene acceso a las imágenes de este paciente." />
         ) : base.length === 0 ? (
           // M7-03: sin paciente elegido no se habla de «este paciente» (el botón Subir está deshabilitado).
-          <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin fotos" : "Sin radiografías"} sub={pid == null || pid === "" ? (esFotos ? "Elige un paciente para ver y subir sus fotos clínicas." : "Elige un paciente para ver y subir sus radiografías.") : esFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía de este paciente."} />
+          <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin fotos" : "Sin radiografías"} sub={/* R-39: sin permiso de subir (recepción) no se invita a «Subir». */ pid == null || pid === ""
+            ? (esFotos ? `Elige un paciente para ver${puedeSubirRx ? " y subir" : ""} sus fotos clínicas.` : `Elige un paciente para ver${puedeSubirRx ? " y subir" : ""} sus radiografías.`)
+            : !puedeSubirRx ? (esFotos ? "Aún no hay fotos clínicas de este paciente." : "Aún no hay radiografías de este paciente.")
+            : esFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía de este paciente."} />
         ) : (
           <ListaFiltrable rows={base} sub={esFotos ? "fotos" : "estudios"} className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave={esFotos ? "fotos" : "radiografias"}
             vistas={[{ id: "galeria", label: "Galería", icon: LayoutGrid }]}

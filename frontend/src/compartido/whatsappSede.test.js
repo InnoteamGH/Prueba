@@ -9,6 +9,7 @@ import {
   validarPhoneNumberId, whatsappDeSede, sedeDeConversacion, sedeDePacienteObj, numeroDeSalida,
   sedesSinNumero, filasWhatsappSedes, contarChatsPorSede,
 } from "./whatsappSede.js";
+import { chatDePaciente, pedirChatPaciente, verChatPedido, olvidarChatPedido } from "./chatPaciente.js";
 
 const S1 = "5f1c2a8e-1111-4c1a-9d1e-00000000c001";
 const S2 = "5f1c2a8e-2222-4c1a-9d1e-00000000c002";
@@ -217,5 +218,41 @@ describe("porSede del servidor con números compartidos (R7-01/R7-02)", () => {
     assert.equal(r.filas[0].sinNumero, true);
     assert.equal(r.filas[1].numero, "+51911222333");
     assert.equal(r.filas[1].estado.estado, "operativo");
+  });
+});
+
+/* R-37: «WhatsApp» desde un paciente abre su chat o ninguno (nunca el de otra persona). */
+describe("chatDePaciente (R-37)", () => {
+  const CHATS = [
+    { id: "c1", tel: "51900000998", pacienteId: "p-otro", actualizado: "2026-10-12T10:00:00Z" },
+    { id: "c2", tel: "51922556677", pacienteId: "p-hugo", actualizado: "2026-10-01T10:00:00Z" },
+    { id: "c3", tel: "51911222333", pacientes: [{ id: "p-mama" }, { id: "p-hijo" }], actualizado: "2026-10-05T10:00:00Z" },
+    { id: "c4", tel: "+51 987 654 321", actualizado: "2026-09-01T10:00:00Z" },
+  ];
+  it("por el paciente ligado al chat, aunque no sea el primero de la lista", () => {
+    assert.equal(chatDePaciente(CHATS, { pacienteId: "p-hugo", telefono: "999999999" }).id, "c2");
+  });
+  it("por uno de los pacientes que gestiona el número (familia)", () => {
+    assert.equal(chatDePaciente(CHATS, { pacienteId: "p-hijo" }).id, "c3");
+  });
+  it("por el número normalizado si no hay chat ligado a su ficha", () => {
+    assert.equal(chatDePaciente(CHATS, { pacienteId: "p-sin-chat", telefono: "987654321" }).id, "c4");
+    assert.equal(chatDePaciente(CHATS, { telefono: "+51 922 556 677" }).id, "c2");
+  });
+  it("sin chat: null (no el primero de la lista)", () => {
+    assert.equal(chatDePaciente(CHATS, { pacienteId: "p-nuevo", telefono: "955000111" }), null);
+    assert.equal(chatDePaciente(CHATS, { pacienteId: null, telefono: "" }), null);
+    assert.equal(chatDePaciente([], { pacienteId: "p-hugo" }), null);
+  });
+  it("con varios chats del mismo número, el más reciente", () => {
+    const dos = [{ id: "a", tel: "51922556677", actualizado: "2026-10-01" }, { id: "b", tel: "922556677", actualizado: "2026-10-09" }];
+    assert.equal(chatDePaciente(dos, { telefono: "922 556 677" }).id, "b");
+  });
+  it("el pedido se lee sin borrarse y se olvida al montar la bandeja", () => {
+    pedirChatPaciente({ id: 7, telefono: "987654321", nombre: "Rosa" });
+    assert.deepEqual(verChatPedido(), { pacienteId: 7, telefono: "987654321", nombre: "Rosa" });
+    assert.ok(verChatPedido());
+    olvidarChatPedido();
+    assert.equal(verChatPedido(), null);
   });
 });

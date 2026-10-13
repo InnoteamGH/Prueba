@@ -218,11 +218,15 @@ async function request(method, path, body, extraHeaders, opciones = null) {
   const text = await res.text();
   const data = text ? safeJson(text) : null;
   if (!res.ok) {
-    // DC-40: mensaje honesto con status + path (no fingir caída de red).
+    // DC-40: mensaje honesto del servidor (no fingir caída de red). R-39: sin la coletilla
+    // técnica «(409 POST /pacientes)», que llegaba tal cual a los avisos de la pantalla; el
+    // estado, el método y la ruta van a la consola (para soporte) y quedan en el error.
     const base = (data && (data.error || data.message)) || `Error ${res.status}`;
-    const msg = `${base} (${res.status} ${method} ${path})`;
-    const err = new ApiError(res.status, msg, data);
+    console.warn(`[API] ${res.status} ${method} ${path}: ${base}`);
+    const err = new ApiError(res.status, base, data);
     err._httpStatus = res.status;
+    err.metodo = method;
+    err.ruta = path;
     throw err;
   }
   return data;
@@ -265,7 +269,8 @@ export class ApiError extends Error {
     vez de una lista vacía que parece real. */
 export const esSinPermiso = (e) => !!e && (e.status === 403 || e._httpStatus === 403);
 
-/** Motivo que dio el servidor, sin la coletilla técnica «(409 PATCH /citas/…)». */
+/** Motivo que dio el servidor, sin la coletilla técnica «(409 PATCH /citas/…)» (el cliente
+    ya no la agrega; se sigue quitando por si llega de otra fuente). */
 export function msgServidor(e, porDefecto = "") {
   const d = e && e.data;
   const m = (d && typeof d === "object" && (d.message || d.error || d.mensaje)) || (e && e.message) || "";

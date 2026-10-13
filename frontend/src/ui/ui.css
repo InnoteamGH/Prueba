@@ -1319,6 +1319,8 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-esp-hero__btn { all: unset; box-sizing: border-box; cursor: pointer; justify-self: start; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; background: #fff; color: var(--dc-brand-600); font-size: 12px; font-weight: 700; box-shadow: 0 8px 18px -10px rgba(0,0,0,.45); }
 .dc-esp-hero__btn:hover { background: #F2FBFB; }
 .dc-esp-hero__btn:focus-visible { box-shadow: 0 0 0 3px rgba(255,255,255,.55); }
+/* En lugar del botón cuando el rol solo puede ver (R-38): dice por qué no hay botón. */
+.dc-esp-hero__solo { justify-self: start; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.24); color: rgba(255,255,255,.88); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: help; }
 
 .dc-esp-tablero { padding: 0; overflow: hidden; }
 
