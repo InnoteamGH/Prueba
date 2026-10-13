@@ -11,6 +11,7 @@ import { estadoFaseUi } from "../compartido/estados";
 import { etiquetaRealizada, faseRealizada } from "../util/planInversionCuenta";
 import { leerPagadoPaciente } from "../compartido/pagadoPaciente";
 import { copNumero } from "../util/cop";
+import { clasificarEstado, hayAccionDelUsuario } from "../util/odontogramaSync.js";
 
 /* Profesional que firma los documentos del odontograma: el odontólogo que tiene la
    sesión abierta; si imprime otra persona (recepción), el médico tratante del
@@ -174,6 +175,16 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   const hydrated = useRef(false);
   const lastFirmas = useRef({});   // firma por pieza de lo hidratado / último guardado
   const faseDesdeIframe = useRef(null);
+  // M8-01: cada carga va numerada y el dibujo devuelve ese número en sus avisos. Hasta que
+  // confirma la carga no se guarda nada, y los avisos de cargas anteriores se ignoran.
+  const capaRef = useRef(capa);
+  capaRef.current = capa;
+  const faseDeseada = useRef(capa);
+  const seqCarga = useRef(0);          // última lectura pedida (las respuestas viejas se descartan)
+  const seqEnviado = useRef(null);     // última carga enviada al dibujo
+  const pendiente = useRef(null);      // carga enviada sin confirmar
+  const confirmadoEn = useRef(null);
+  const ultimaInteraccion = useRef(null);
 
   const src = useMemo(() => {
     const q = new URLSearchParams();
@@ -226,30 +237,40 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
   const abrirDocumento = useCallback((que) => { postToIframe({ type: "dento-odontograma-documento", que }); }, [postToIframe]);
   useImperativeHandle(ref, () => ({ capturarAnexo, abrirDocumento }), [capturarAnexo, abrirDocumento]);
 
-  const hidratarDesdeApi = useCallback(async (faseH = capa) => {
+  // Envía una carga numerada al dibujo; los cambios se aceptan cuando el dibujo la confirma.
+  const enviarCarga = useCallback((faseH, datos, seq) => {
+    hydrated.current = false;
+    seqEnviado.current = seq;
+    pendiente.current = { seq, fase: faseH, datos, enviadoEn: Date.now() };
+    postToIframe({ type: "dento-odontograma-hydrate", fase: faseH, datos, seq });
+  }, [postToIframe]);
+
+  const hidratarDesdeApi = useCallback(async (faseH) => {
     if (!pacienteId) return;
+    // La fase sale del valor vigente (no de un cierre viejo, p. ej. el temporizador de carga).
+    const fase = faseH || capaRef.current;
+    faseDeseada.current = fase;
+    const mio = ++seqCarga.current;
+    hydrated.current = false;
     if (!auth.token) {
       // Sin servidor: lo guardado de esa fase. Solo la inicial cae en los hallazgos de la
       // ficha; evolución y alta sin guardar empiezan vacías (no copian la inicial).
-      const datos = (faseH === capa ? demoDatos : null) || (faseH === "inicial" ? estadosAppAHtml(demoEstados || {}) : {});
-      postToIframe({ type: "dento-odontograma-hydrate", fase: faseH, datos });
-      hydrated.current = true;
-      lastJson.current = JSON.stringify(datos);
-      lastDemo.current = JSON.stringify(datos);
+      const datos = (fase === capaRef.current ? demoDatos : null) || (fase === "inicial" ? estadosAppAHtml(demoEstados || {}) : {});
+      enviarCarga(fase, datos, mio);
       setTimeout(measureIframe, 80);
       return;
     }
     try {
-      const rows = await api.odontograma.porPaciente(pacienteId, faseH);
+      const rows = await api.odontograma.porPaciente(pacienteId, fase);
+      // Respuesta de una lectura anterior (otra fase u otro paciente): no se pinta.
+      if (mio !== seqCarga.current || fase !== faseDeseada.current) return;
       const datos = apiRowsAHtmlDatos(rows || []);
-      postToIframe({ type: "dento-odontograma-hydrate", fase: faseH, datos });
-      lastFirmas.current = firmasDe(datos);
-      hydrated.current = true;
-      lastJson.current = JSON.stringify(datos);
+      enviarCarga(fase, datos, mio);
       setErrorCarga(null);
       setSyncState("ok");
       setTimeout(measureIframe, 80);
     } catch (e) {
+      if (mio !== seqCarga.current) return;
       // M5-04: con un 500 el dibujo quedaba en «0 piezas · Todavía no hay hallazgos» (había 2)
       // y se podía seguir marcando: cada pieza tocada se guardaba sobre lo que había. Ahora se
       // avisa que no se pudo leer y no se guarda nada hasta leerlo («Reintentar»).
@@ -257,7 +278,7 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       setSyncState("idle");
       setErrorCarga(msgServidor(e, "error del servidor"));
     }
-  }, [pacienteId, capa, postToIframe, measureIframe, demoEstados, demoDatos]);
+  }, [pacienteId, enviarCarga, measureIframe, demoEstados, demoDatos]);
 
   const datosDoc = useDatosImpresion();
   // Con sesión: catálogo y médicos del servidor para la tarifa y el profesional del dibujo.
@@ -323,6 +344,8 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     if (!hydrated.current) return;
     const json = JSON.stringify(payload.datos);
     if (json === lastJson.current) return;
+    // M8-01: nunca se escribe sin que el usuario haya tocado el dibujo tras la carga.
+    if (!hayAccionDelUsuario(ultimaInteraccion.current, confirmadoEn.current)) return;
     lastJson.current = json;
     // Solo las piezas que cambiaron frente a lo hidratado (o lo último guardado).
     const rows = filasCambiadas(lastFirmas.current, payload.datos);
@@ -354,10 +377,31 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
       const d = ev?.data;
       if (!d) return;
       if (d.type === "dento-odontograma-state") {
+        if (ev.source && iframeRef.current && ev.source !== iframeRef.current.contentWindow) return;
+        const accion = clasificarEstado(d, {
+          // La fase que se pidió cargar (la del módulo, o la que eligió el dibujo).
+          capa: faseDeseada.current,
+          pendiente: pendiente.current,
+          seqActual: seqEnviado.current,
+          mismasMarcas: (a, b) => JSON.stringify(firmasDe(a)) === JSON.stringify(firmasDe(b)),
+        });
+        if (accion === "ignorar") return;
+        if (accion === "confirmar") {
+          // La base para comparar es lo que el dibujo muestra tras la carga: así solo se
+          // guardan las piezas que el usuario cambie, no diferencias de formato.
+          pendiente.current = null;
+          lastFirmas.current = firmasDe(d.datos || {});
+          lastJson.current = JSON.stringify(d.datos || {});
+          lastDemo.current = lastJson.current;
+          confirmadoEn.current = Date.now();
+          hydrated.current = true;
+          setTimeout(measureIframe, 60);
+          return;
+        }
         // Cambio de fase desde el dibujo: el iframe solo tiene en memoria la fase con que se
         // cargó, así que lo que manda ahora es una fase vacía. No se guarda: primero se carga
         // lo guardado de esa fase (efecto de capa) y recién ahí se aceptan cambios.
-        if (d.fase && d.fase !== capa) {
+        if (accion === "cambio-fase") {
           hydrated.current = false;
           lastJson.current = "";
           lastDemo.current = "";
@@ -386,6 +430,12 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     hydrated.current = false;
     lastJson.current = "";
     lastFirmas.current = {};
+    // Otro paciente o dibujo recargado: las lecturas en curso y la carga sin confirmar ya no valen.
+    seqCarga.current += 1;
+    seqEnviado.current = null;
+    pendiente.current = null;
+    confirmadoEn.current = null;
+    ultimaInteraccion.current = null;
     setSyncState("idle");
     setErrorCarga(null);
   }, [pacienteId, src]);
@@ -419,6 +469,15 @@ const OdontogramaAnatomico = forwardRef(function OdontogramaAnatomico({
     if (cargado.current) return;
     cargado.current = true;
     injectarEstiloSistema(iframeRef.current?.contentDocument);
+    // M8-01: marca de la última acción del usuario dentro del dibujo (puntero o teclado).
+    try {
+      const w = iframeRef.current?.contentWindow;
+      if (w && !w.__dcInteraccion) {
+        w.__dcInteraccion = true;
+        const marca = () => { ultimaInteraccion.current = Date.now(); };
+        ["pointerdown", "keydown", "touchstart"].forEach((t) => w.addEventListener(t, marca, true));
+      }
+    } catch { /* */ }
     setFrameReady(true);
     capaPrev.current = capa;
     syncChrome();

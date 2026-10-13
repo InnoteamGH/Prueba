@@ -3252,6 +3252,9 @@ construir(); panel();
       wrap.style.transform='scale('+(n/100)+')';
     }catch(e){}
   }
+  // M8-01: número de la última carga recibida del sistema; va en cada aviso de estado para
+  // que el sistema descarte los avisos generados antes de esa carga.
+  var hidSeq=null;
   function snapshot(){
     try{
       if(typeof est==='undefined') return null;
@@ -3265,7 +3268,7 @@ construir(); panel();
           || (r.pieza||[]).length>0 || (r.nota||'').trim()!=='';
         if(tiene) out[pz]=r;
       });
-      return { type:'dento-odontograma-state', fase: est.fase, datos: out, ts: Date.now() };
+      return { type:'dento-odontograma-state', fase: est.fase, datos: out, ts: Date.now(), seq: hidSeq };
     }catch(e){ return null; }
   }
   function notify(){
@@ -3276,6 +3279,7 @@ construir(); panel();
     try{
       if(typeof est==='undefined' || typeof pintar!=='function') return;
       var fase=msg.fase||est.fase||'inicial';
+      if(msg.seq!=null) hidSeq=msg.seq;
       if(!est.datos[fase]) est.datos[fase]={};
       var incoming=msg.datos||{};
       // Sustituir la capa (no mergear piezas huérfanas de una toma anterior).
