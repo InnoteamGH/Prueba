@@ -39,7 +39,7 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 // Soles y dólares en caja, montos escritos y la boleta de un cobro (compartido/cajaMoneda.js).
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
-import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima } from "./util/fechaLima";
+import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
 import { bloqueoTocaHora, bloqueosDelDia, bloqueosParcialesDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
@@ -79,6 +79,9 @@ import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 // Vive en ./comun para que los módulos se puedan cargar en chunks separados.
 import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto, nombreSinSufijoPieza } from "./compartido/presupuestoDoc";
+import { leerPagadoPaciente } from "./compartido/pagadoPaciente";
+import { guardarCitaAtencion, limpiarCitaAtencion } from "./compartido/citaAtencion";
+import { puedeSalir } from "./compartido/guardaSalida";
 import { cruceAlergias, listaAlergias } from "./compartido/alergias";
 import { horasSemana, horarioConfigurado } from "./comun";
 import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, textoIndicaciones } from "./compartido/recetaItems";
@@ -786,21 +789,37 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const nomPac = (id) => (pacientesAll.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
   const verCaja = esAdmin || esGer || esAdmSede;
   const nombres = (arr, k = "paciente") => arr.slice(0, 3).map((x) => x[k]).join(", ") + (arr.length > 3 ? ` y ${arr.length - 3} más` : "");
+  // M4-10 / M8-02: «Completar» abre la Historia clínica (donde se escribe la evolución) con la
+  // cita de ESA alerta ya elegida en «Cita» (antes, siempre la de la primera alerta). La cita
+  // suele ser de un día anterior: viajan su fecha, hora y doctor para que la ficha la ofrezca
+  // y la ligue (citaId). Sin citaId no se deja la de otra alerta.
+  const completarEvo = (item) => {
+    if (!item?.pacienteId) { onIr("pacientes"); return; }
+    if (item.citaId) guardarCitaAtencion(item, { pacienteId: item.pacienteId, origen: "alerta" });
+    else limpiarCitaAtencion();
+    onIr("pacientes", { pacienteId: item.pacienteId, tab: "historia" });
+  };
+  const evoItems = (pendEvo && pendEvo.items) || [];
+  const detalleEvo = (
+    <>
+      {evoItems.slice(0, 3).map((x, i) => (
+        <React.Fragment key={`${x.citaId || x.pacienteId || "p"}-${i}`}>
+          {i ? ", " : ""}
+          {x.pacienteId
+            ? <button type="button" className="dc-tarea__link" onClick={() => completarEvo(x)} title={`Completar la evolución de ${x.paciente || "este paciente"}${x.fecha ? ` (${M.fechaCorta(x.fecha)})` : ""}`}>{x.paciente || "Paciente"}</button>
+            : (x.paciente || "Paciente")}
+        </React.Fragment>
+      ))}
+      {nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.
+    </>
+  );
   const tareas = [
     esTI && (pendTI.length > 0 || filaSinNumeroTI) && { id: "tiPend", tono: "info", icon: <Plug size={18} strokeWidth={1.75} />, titulo: pendTI.length ? pluralEs(pendTI.length, "integración por activar", "integraciones por activar") : "Números de WhatsApp por sede", detalle: [pendTI.length ? `${pendTI.map((i) => i.n).join(", ")}.` : "", filaSinNumeroTI ? `Sin número de WhatsApp propio: ${sinNumeroTI.map((f) => f.nombre).join(", ")}${waSedesTI.modo === "compartido" ? " (usan el compartido)" : ""}.` : ""].filter(Boolean).join(" "), accion: "Ver integraciones", ir: () => onIr("integraciones") },
     esTI && incidenciasTI > 0 && { id: "ti", tono: "peligro", icon: <Plug size={18} strokeWidth={1.75} />, titulo: `${pluralEs(incidenciasTI, "integración con incidencia", "integraciones con incidencia")}`, detalle: `${(INTEGRACIONES_TI.some(([, e]) => e === "incidencia") ? INTEGRACIONES_TI.filter(([, e]) => e === "incidencia").map(([n, , d]) => `${n}: ${d}`) : estIntTI.filter((i) => i.estado === "incidencia").map((i) => `${i.n}${i.wa ? `: ${i.wa.detalle}` : ""}`)).join(" ")} Revisa el estado antes de que afecte a la atención.`, accion: "Ver integraciones", ir: () => onIr("integraciones") },
     // Completar la evolución es trabajo del doctor: recepción y administración no pueden
     // hacerlo, así que no se les muestra una tarea con un botón que no les sirve.
-    esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: `${(pendEvo.items || []).slice(0, 3).map((x) => x.paciente).join(", ")}${nPend > 3 ? ` y ${nPend - 3} más` : ""}. La producción cuenta cuando las completas.`, accion: "Completar", ir: () => {
-      // M4-10: abre la Historia clínica (donde se escribe la evolución), no el Resumen, con la
-      // cita pendiente ya elegida en «Cita» (la ficha la lee de dc_cita_atencion).
-      const primer = (pendEvo.items || [])[0];
-      if (!primer?.pacienteId) { onIr("pacientes"); return; }
-      // M5-01: la cita pendiente suele ser de un día anterior; la ficha solo ofrecía las de
-      // hoy. Se pasa también su fecha y su doctor para que la ofrezca y la ligue (citaId).
-      if (primer.citaId) { try { sessionStorage.setItem("dc_cita_atencion", JSON.stringify({ pacienteId: String(primer.pacienteId), citaId: String(primer.citaId), fecha: primer.fecha || null, doctor: primer.doctor || null, origen: "alerta" })); } catch { /* sin almacenamiento */ } }
-      onIr("pacientes", { pacienteId: primer.pacienteId, tab: "historia" });
-    } },
+    // Cada nombre del detalle completa su propia alerta; el botón, la primera.
+    esMed && nPend > 0 && { id: "evo", tono: "aviso", icon: <ClipboardList size={18} strokeWidth={1.75} />, titulo: `${pluralEs(nPend, "evolución sin completar", "evoluciones sin completar")}`, detalle: detalleEvo, accion: "Completar", ir: () => completarEvo(evoItems[0]) },
     // INI-04: una sola tarjeta de confirmaciones (hoy + mañana) con una sola acción.
     !esTI && (sinConfHoy.length + (esMed ? 0 : mananaSinConf.length)) > 0 && { id: "conf", tono: sinConfHoy.length ? "aviso" : "info", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `Confirmaciones pendientes · hoy ${sinConfHoy.length}${esMed ? "" : ` · mañana ${mananaSinConf.length}`}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))) || "Las de hoy ya están confirmadas.", accion: esMed ? "Ir a la agenda" : "Enviar confirmaciones", ir: esMed ? () => onIr("agenda") : () => { if (conectado) enviarConfMañana(); else notify(`Confirmaciones enviadas por WhatsApp a ${sinConfHoy.length + mananaSinConf.length} pacientes.`); } },
     verCaja && deudores.length > 0 && (conectado
@@ -1672,6 +1691,10 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     setFmTabCita(tab);
     // Solo pacientes visibles (sede): nunca la semilla completa, que incluye otras sedes.
     const pid = c?.pacienteId ?? (conectado ? null : (pacientes.find((x) => x.nombre === c?.paciente) || {}).id);
+    // M8-02: «Evolución» y «Finalizar» abren la historia para escribir la evolución de ESTA
+    // cita: se deja la cita (como «Completar» e «Iniciar») para que la ficha la ofrezca en
+    // «Cita» aunque no sea de hoy y la evolución salga con su citaId.
+    if (pid != null && tab === "historia") guardarCitaAtencion(c, { pacienteId: pid, origen: "agenda" });
     // La ficha es una página (#/pacientes/<id>/<pestaña>): se navega a ella.
     if (pid != null) { setFmId(pid); setFichaCita(c); irHash("pacientes", { pacienteId: pid, tab: tab || undefined }); return; }
     notify("Esta cita no tiene un paciente registrado todavía.");
@@ -2426,7 +2449,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     const fut = mias.filter((c) => c.fecha >= hoyISO && !CITA_INACTIVA.includes(c.estado) && c.estado !== "atendida").sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
     return fut[0] || null;
   };
-  const relFecha = (iso, futuro) => { const d = Math.round((new Date(iso + "T00:00:00") - new Date(hoyISO + "T00:00:00")) / 86400000); const n = Math.abs(d); const txt = n === 0 ? "Hoy" : n < 30 ? `${n} día${n > 1 ? "s" : ""}` : n < 365 ? `${Math.round(n / 30)} mes${Math.round(n / 30) > 1 ? "es" : ""}` : `${Math.round(n / 365)} año${Math.round(n / 365) > 1 ? "s" : ""}`; return futuro ? (n === 0 ? "Hoy" : `En ${txt}`) : (n === 0 ? "Hoy" : `Hace ${txt}`); };
+  // M8-08: con el signo de la fecha: una «última cita» que aún no llega no dice «Hace 9 días».
+  const relFecha = (iso, futuro) => fechaRelativa(iso, hoyISO, { futuro });
   const [fmId, setFmId] = useState(() => {
     const { pacienteId } = parseHash(typeof window !== "undefined" ? window.location.hash : "");
     return pacienteId || null;
@@ -2506,7 +2530,10 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
   const sedeAlta = misSedes.find((m) => mismaSede(m, sedeActiva)) ?? misSedes[0] ?? sedeActiva;
   const nuevo = () => { setFormErr({}); setForm({ nombre: "", dni: "", telefono: "", email: "", nacimiento: "", genero: "", distrito: "", canal: "Recomendación", aseguradora: "Ninguno", marketing: false, sedes: [sedeAlta], tags: [], comentario: "", tarea: "", apoderadoNombre: "", apoderadoParentesco: "", apoderadoDni: "", apoderadoTelefono: "" }); };
   const [formErr, setFormErr] = useState({});
-  const editar = (p) => setForm({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", nacimiento: p.nacimiento || "", genero: p.genero || "", distrito: p.distrito || "", canal: p.canal || "Recomendación", aseguradora: p.aseguradora || "Ninguno", marketing: p.marketing === true, sedes: normSedes(p.sedes ?? p.sede ?? [sedeAlta]), sedeRegistroId: p.sedeRegistroId ?? null, tags: p.tags || [], comentario: p.comentario || "", tarea: p.tarea || "", apoderadoNombre: p.apoderadoNombre || "", apoderadoParentesco: p.apoderadoParentesco || "", apoderadoDni: p.apoderadoDni || "", apoderadoTelefono: p.apoderadoTelefono || "" });
+  // M8-06: los errores de validación son de un formulario: al abrir otro (o cerrarlo) no
+  // pasan al siguiente (salían los de «Nuevo paciente» vacío en «Editar datos»).
+  useEffect(() => { if (!form) setFormErr({}); }, [form]);
+  const editar = (p) => { setFormErr({}); setForm({ id: p.id, nombre: p.nombre, dni: p.dni || "", telefono: p.telefono || "", email: p.email || "", nacimiento: p.nacimiento || "", genero: p.genero || "", distrito: p.distrito || "", canal: p.canal || "Recomendación", aseguradora: p.aseguradora || "Ninguno", marketing: p.marketing === true, sedes: normSedes(p.sedes ?? p.sede ?? [sedeAlta]), sedeRegistroId: p.sedeRegistroId ?? null, tags: p.tags || [], comentario: p.comentario || "", tarea: p.tarea || "", apoderadoNombre: p.apoderadoNombre || "", apoderadoParentesco: p.apoderadoParentesco || "", apoderadoDni: p.apoderadoDni || "", apoderadoTelefono: p.apoderadoTelefono || "" }); };
   const toggleTag = (t) => setForm((f) => { const a = f.tags || []; return { ...f, tags: a.includes(t) ? a.filter((x) => x !== t) : [...a, t] }; });
   useEffect(() => { if (crearIntent) { nuevo(); onIntentDone(); } }, [crearIntent]); // eslint-disable-line
   // BUG-105: Helper para actualizar campo y limpiar su error específico
@@ -3654,7 +3681,8 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
               </>
             )}
             <div className={vistaOdo === "anatomico" ? "dc-odo-bar" : undefined} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
-              {vistaOdo === "anatomico" && !pacienteFijo && paciente && paciente.nombre && (
+              {/* M8-08: sin paciente elegido no hay avatar (salía «SU», de «Selecciona un…»). */}
+              {vistaOdo === "anatomico" && !pacienteFijo && pacienteId && pacientes.some((x) => x.id === pacienteId) && paciente.nombre && (
                 <span className="dc-odo-bar__foto"><AvatarPaciente nombre={paciente.nombre} fotoUrl={paciente.fotoUrl} genero={paciente.genero} pediatrico={esPed} size={44} radio={14} /></span>
               )}
               {vistaOdo === "anatomico" && !pacienteFijo && (
@@ -4036,6 +4064,13 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const verPagos = !can || can("facturacion", "ver");
   const [pagosRem, setPagosRem] = useState(null);
   useEffect(() => { setPagosRem(null); }, [pacienteId, conectado]);
+  // M8-05: sin Caja (el doctor) y sin el resumen de la ficha (el módulo Tratamientos), lo pagado
+  // sale de la misma fuente que la ficha: el resumen financiero del paciente o su ficha360
+  // (leerPagadoPaciente). Antes el módulo decía «Pagado S/ 0.00» y la ficha S/ 30.75.
+  // undefined = leyendo; null = no se pudo saber.
+  const pagadoDeResumen = !!(resumenFicha && resumenFicha.invertido != null);
+  const leePagadoAparte = conectado && !verPagos && !pagadoDeResumen;
+  const [pagadoLeido, setPagadoLeido] = useState(undefined);
   // Sin permiso (403) no se muestra «Presupuesto vacío 0/0»: se dice que no se puede ver.
   const [tratSinPermiso, setTratSinPermiso] = useState(false);
   // H-02 / H-06: si la lectura del plan falla (500) NO es un plan vacío. Antes se pintaba
@@ -4050,6 +4085,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     const pid = pacienteId;
     pidTrat.current = pid;
     if (verPagos) api.pagos.listar(pid).then((r) => { if (pidTrat.current === pid) setPagosRem(Array.isArray(r) ? r : []); }).catch(() => {});
+    else if (leePagadoAparte) leerPagadoPaciente(pid).then((v) => { if (pidTrat.current === pid) setPagadoLeido(v); }).catch(() => { if (pidTrat.current === pid) setPagadoLeido(null); });
     setTratLeyendo(true);
     api.tratamientos.porPaciente(pid).then((planes) => {
       if (pidTrat.current !== pid) return;
@@ -4067,7 +4103,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   };
   useEffect(() => {
     // Otro paciente: nada del plan anterior (ni su id) sirve para este.
-    setPlanId(null); setFasesRem([]); setTratError(null); setTratCargado(false); setTratSinPermiso(false); setNueva(null);
+    setPlanId(null); setFasesRem([]); setTratError(null); setTratCargado(false); setTratSinPermiso(false); setNueva(null); setPagadoLeido(undefined);
     if (pacienteId) recargarTrat();
   }, [pacienteId, conectado]); // eslint-disable-line
   // Con sesión, agregar exige el plan leído: sin eso no se sabe si ya existe uno.
@@ -4100,7 +4136,10 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const pagosVistos = conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []);
   const pagadoPagos = pagosVistos
     ? pagosVistos.filter((p) => !p.anulado && sx.enSede(sedeDePagoPac(p))).reduce((s, p) => s + (Number(p.monto) || 0), 0)
-    : (conectado && resumenFicha && resumenFicha.invertido != null ? Number(resumenFicha.invertido) || 0 : null);
+    : (conectado && pagadoDeResumen ? Number(resumenFicha.invertido) || 0
+      : leePagadoAparte && pagadoLeido != null ? Number(pagadoLeido) || 0 : null);
+  // Mientras se lee lo pagado no se pinta «S/ 0.00» (luego cambiaría a lo real).
+  const pagadoLeyendo = leePagadoAparte && !!pacienteId && pagadoLeido === undefined;
   const total = fases.reduce((s, f) => s + f.costo, 0);
   const pagado = Math.round((pagadoPagos != null ? pagadoPagos : fases.filter((f) => f.estado === "atendida").reduce((s, f) => s + f.costo, 0)) * 100) / 100;
   const saldo = Math.max(0, Math.round((total - pagado) * 100) / 100);
@@ -4236,15 +4275,15 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
         <div className="dc-trat-met dc-trat-met--franja">
           <div className="dc-trat-met__cifras">
             <div><b>S/ {total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Total del plan</span></div>
-            <div><b>S/ {pagado.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Pagado {total ? Math.min(100, Math.round((pagado / total) * 100)) : 0}%</span></div>
-            <div className={saldo > 0 ? "is-saldo" : ""}><b>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>{saldo > 0 ? "Saldo del plan" : "Al día"}</span></div>
+            <div><b>{pagadoLeyendo ? "…" : `S/ ${pagado.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}</b><span>{pagadoLeyendo ? "Pagado" : `Pagado ${total ? Math.min(100, Math.round((pagado / total) * 100)) : 0}%`}</span></div>
+            <div className={!pagadoLeyendo && saldo > 0 ? "is-saldo" : ""}><b>{pagadoLeyendo ? "…" : `S/ ${saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`}</b><span>{pagadoLeyendo || saldo > 0 ? "Saldo del plan" : "Al día"}</span></div>
             <div><b>{atendidas + fases.filter((f) => f.estado === "terminada").length}/{fases.length}</b><span>Avance clínico</span></div>
           </div>
         </div>
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan {planListo && <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span>}</h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && planListo && <BotonPDF chico onClick={() => { if (conectado && verPagos && pagosRem == null) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []), pagado: conectado && !verPagos ? pagadoPagos : null, sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}{puedeAgregarProc && <Btn small disabled={!planListo || !pacienteId} title={planListo ? undefined : (tratLeyendo ? "Leyendo el plan del paciente…" : "Se habilita cuando se pueda leer el plan del paciente")} onClick={() => { if (!planListo) return; setNueva({ nombre: "", costo: "", pieza: "", cara: "" }); }}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn>}</div></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan {planListo && <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span>}</h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && planListo && <BotonPDF chico onClick={() => { if ((conectado && verPagos && pagosRem == null) || pagadoLeyendo) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []), pagado: conectado && !verPagos ? pagadoPagos : null, sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}{puedeAgregarProc && <Btn small disabled={!planListo || !pacienteId} title={planListo ? undefined : (tratLeyendo ? "Leyendo el plan del paciente…" : "Se habilita cuando se pueda leer el plan del paciente")} onClick={() => { if (!planListo) return; setNueva({ nombre: "", costo: "", pieza: "", cara: "" }); }}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn>}</div></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -10621,12 +10660,13 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
 // pacientes, ni caja- se quedaba mirando cinco tareas imposibles en "0/5" para siempre.
 /* Guía del sistema: el recorrido real de un paciente por Dento Check, paso a paso.
    Cada paso dice dónde está en el menú, qué se hace ahí y lleva al módulo. Se filtra
-   por lo que el rol puede ver, así nadie recibe pasos de módulos que no tiene. */
+   por lo que el rol puede ver, así nadie recibe pasos de módulos que no tiene. M8-07: un
+   consejo que nombra otro módulo va como { t, mod } y solo lo ve quien tiene ese módulo. */
 const GUIA_PASOS = [
   { id: "agenda", titulo: "Agenda la cita", donde: "Atención › Agenda", icon: CalendarCheck, color: "#0E9199", target: "agenda_cal",
     tips: ["Toca un hueco libre del calendario o usa + › Nueva cita.", "Cada doctor tiene su color; arrastra una cita para reprogramarla.", "La confirmación sale sola por WhatsApp."] },
   { id: "recepcion", titulo: "Recibe al paciente", donde: "Atención › Pendientes de hoy", icon: UserCheck, color: "#2563EB", target: "dashboard",
-    tips: ["Aquí ves quién llegó, quién falta confirmar y quién debe.", "Marca la llegada en la Agenda de hoy; si no hay sillón, pásalo a Lista de espera."] },
+    tips: ["Aquí ves quién llegó, quién falta confirmar y lo que tienes pendiente.", "Marca la llegada en la Agenda de hoy.", { t: "Si no hay sillón, pásalo a Lista de espera.", mod: "espera" }] },
   { id: "historia", titulo: "Abre su historia clínica", donde: "Clínico › Pacientes", icon: FileText, color: "#7C3AED", target: "pacientes",
     tips: ["Toca al paciente: la ficha reúne anamnesis, alergias, evoluciones, recetas y archivos.", "Cada evolución queda firmada; para corregirla se agrega una adenda.", "La pestaña Registro muestra quién abrió o cambió la historia."] },
   { id: "odontograma", titulo: "Marca el odontograma", donde: "Clínico › Odontograma", icon: Smile, color: "#DC2626", target: "odontograma",
@@ -10636,11 +10676,11 @@ const GUIA_PASOS = [
   { id: "caja", titulo: "Cobra y cuadra la caja", donde: "Finanzas › Caja", icon: Wallet, color: "#16A36A", target: "facturacion",
     tips: ["Abre la caja con el fondo del día.", "Cobra en efectivo, Yape, Plin o tarjeta; sale el comprobante.", "Al cerrar, cuenta billetes y monedas: el sistema te dice si cuadra."] },
   { id: "whatsapp", titulo: "Deja que WhatsApp trabaje", donde: "Atención › WhatsApp + IA", icon: MessageSquare, color: "#0B8F5A", target: "whatsapp",
-    tips: ["El asistente responde y agenda las 24 horas.", "En Recordatorios eliges qué avisos salen solos: confirmaciones, controles y cumpleaños."] },
+    tips: ["El asistente responde y agenda las 24 horas.", { t: "En Recordatorios eliges qué avisos salen solos: confirmaciones, controles y cumpleaños.", mod: "recall" }] },
   { id: "numeros", titulo: "Revisa tus números", donde: "General › Dashboard gerencial", icon: BarChart3, color: "#1E3A5F", target: "gerencial",
-    tips: ["Producción, cobros, ocupación y deuda del día y del mes.", "Metas de producción muestra cómo va cada doctor."] },
+    tips: ["Producción, cobros, ocupación y deuda del día y del mes.", { t: "Metas de producción muestra cómo va cada doctor.", mod: "metas" }] },
   { id: "equipo", titulo: "Da acceso a tu equipo", donde: "Administración › Usuarios", icon: Users, color: "#B7791F", target: "usuarios",
-    tips: ["Crea la cuenta de cada persona con su rol.", "En Permisos por rol decides qué ve y qué edita cada uno."] },
+    tips: ["Crea la cuenta de cada persona con su rol.", { t: "En Permisos por rol decides qué ve y qué edita cada uno.", mod: "permisos" }] },
   { id: "clinica", titulo: "Deja lista la clínica", donde: "Administración › Configuración", icon: Settings, color: "#475569", target: "config",
     tips: ["Datos de la empresa y de cada sede, horarios, servicios y doctores.", "Puesta en marcha lleva la lista completa de lo que falta."] },
 ];
@@ -10829,6 +10869,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   });
   const setVista = (v, extra) => {
     const dest = (v === "fotos") ? "fotos" : canonVista(v);
+    // M8-08: la pantalla con cambios sin guardar (p. ej. «Mi horario») pregunta antes de salir.
+    if (dest !== vista && !puedeSalir()) return;
     setVistaRaw(dest);
     irHash(dest, extra);
   };
@@ -10944,7 +10986,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const [toast, setToast] = useState(null);
-  const notify = (m) => { setToast(m); setTimeout(() => setToast(null), 4200); };
+  // M8-08: cada aviso dura sus 4,2 s. Sin cancelar el temporizador anterior, el de un aviso
+  // previo (p. ej. «Agrega al menos un medicamento.») borraba el siguiente («Receta emitida.»,
+  // «Radiografía guardada en el expediente.») antes de que se leyera.
+  const toastTimer = useRef(null);
+  const notify = (m) => { setToast(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 4200); };
 
   // Plan de membresía contratado por la clínica (demo: se puede cambiar en vivo desde "Mi plan").
   const esSuper = rol === "superadmin";
@@ -11078,7 +11124,33 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   }, []);
   // Solo los pasos de módulos que este rol ve: con la lista entera, quien no tenía el
   // módulo veía el paso en gris y nunca llegaba al 100 %.
-  const misPasos = GUIA_PASOS.filter((p) => { const m = modDeVista(p.target); return mods.includes(m) && modAllowed(m) && can(m, "ver"); });
+  const veModulo = (mod) => { const m = modDeVista(mod); return mods.includes(m) && modAllowed(m) && can(m, "ver"); };
+  const misPasos = GUIA_PASOS.filter((p) => veModulo(p.target));
+  // M8-07: la guía se cierra con Escape (como los menús y los modales), lleva el foco adentro
+  // y lo devuelve al botón «?» al cerrarse; Tab no se sale de ella mientras está abierta.
+  const guiaRef = useRef(null);
+  useEffect(() => {
+    if (!showPasos) return undefined;
+    const previo = document.activeElement;
+    const enfocables = () => (guiaRef.current ? [...guiaRef.current.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter((el) => !el.disabled) : []);
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setShowPasos(false); return; }
+      if (e.key !== "Tab") return;
+      const els = enfocables();
+      if (!els.length) return;
+      const primero = els[0], ultimo = els[els.length - 1];
+      if (!guiaRef.current.contains(document.activeElement)) { e.preventDefault(); primero.focus(); }
+      else if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+    };
+    document.addEventListener("keydown", onKey, true);
+    const t = setTimeout(() => { const x = guiaRef.current && guiaRef.current.querySelector(".dc-guia__x"); if (x) x.focus(); }, 0);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      clearTimeout(t);
+      try { if (previo && typeof previo.focus === "function" && document.contains(previo)) previo.focus(); } catch { /* sin foco */ }
+    };
+  }, [showPasos]);
   // Acciones del botón "Crear", cada una con el módulo que necesita. La de sistemas es
   // dar de alta un usuario; sin ella el desplegable le salía vacío.
   // Menú «Crear» por rol (NAV-10): solo acciones del día. Las altas de servicio y de
@@ -11256,7 +11328,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     const pid = cita.pacienteId ?? (auth.token ? null : (pacientes.find((p) => p.dni && p.dni === cita.dni) || pacientes.find((p) => p.nombre === cita.paciente) || {}).id);
     if (pid != null) setPacienteActivo(pid);
     // La evolución que se escriba después en la historia queda ligada a esta cita (citaId).
-    try { if (pid != null && cita.id != null) sessionStorage.setItem("dc_cita_atencion", JSON.stringify({ pacienteId: String(pid), citaId: String(cita.id), fecha: cita.fecha || null, origen: "agenda" })); } catch { /* sin almacenamiento */ }
+    if (pid != null) guardarCitaAtencion(cita, { pacienteId: pid, origen: "agenda" });
     setVista("odontograma");
     notify(`Atención iniciada con ${cita.paciente}.`);
   };
@@ -11625,7 +11697,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                 ? <button type="button" className="dc-sb__planchip" title="Ver mi plan" onClick={() => { setVista("plan"); setSidebarOpen(false); }}><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</button>
                 : <span className="dc-sb__planchip"><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</span>)}
             </div>}
-            {rol !== "superadmin" && misPasos.length > 0 && <button type="button" className="dc-mini-btn dc-sb__ayuda" aria-label="Ayuda: guía del sistema" title="Ayuda: guía del sistema" onClick={() => { setShowPasos(true); setSidebarOpen(false); }}>?</button>}
+            {rol !== "superadmin" && misPasos.length > 0 && <button type="button" className="dc-mini-btn dc-sb__ayuda" aria-label="Ayuda: guía del sistema" title="Ayuda: guía del sistema" aria-haspopup="dialog" aria-expanded={showPasos} onClick={() => { setShowPasos(true); setSidebarOpen(false); }}>?</button>}
             <button type="button" className="dc-mini-btn dc-sb__out" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={onLogout}><LogOut size={15} strokeWidth={2} /></button>
           </div>
         </div>
@@ -11657,11 +11729,11 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         const pct = misPasos.length ? Math.round((done / misPasos.length) * 100) : 0;
         return (
         <div className="dc-guia__velo" onClick={() => setShowPasos(false)}>
-          <aside className="dc-guia" onClick={(e) => e.stopPropagation()} aria-label="Guía del sistema">
+          <aside ref={guiaRef} className="dc-guia" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="dc-guia-titulo">
             <header className="dc-guia__head">
-              <div className="dc-guia__anillo" style={{ "--p": pct }}><span>{done}/{misPasos.length}</span></div>
+              <div className="dc-guia__anillo" style={{ "--p": pct }} aria-label={`${done} de ${misPasos.length} pasos vistos`}><span aria-hidden="true">{done}/{misPasos.length}</span></div>
               <div className="dc-guia__tit">
-                <h3>Guía del sistema</h3>
+                <h3 id="dc-guia-titulo">Guía del sistema</h3>
                 <p>El recorrido de un paciente por Dento Check, de la cita al cobro. Abre cada paso para ver dónde está y cómo se usa.</p>
               </div>
               <button type="button" className="dc-guia__x" aria-label="Cerrar la guía" onClick={() => setShowPasos(false)}><X size={18} strokeWidth={2} /></button>
@@ -11677,7 +11749,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                   </button>
                   {open && (
                     <div className="dc-guia__cuerpo">
-                      <ul>{p.tips.map((t) => <li key={t}>{t}</li>)}</ul>
+                      <ul>{p.tips.filter((t) => typeof t === "string" || veModulo(t.mod)).map((t) => (typeof t === "string" ? t : t.t)).map((t) => <li key={t}>{t}</li>)}</ul>
                       <div className="dc-guia__acc">
                         <button type="button" className="dc-guia__ir" onClick={() => ir(p)}>Ir a {p.donde.split("› ").pop()} <ArrowRight size={14} strokeWidth={2.2} /></button>
                         <button type="button" className="dc-guia__marca" onClick={() => marcar(p)}>{on ? "Marcar como pendiente" : "Ya lo vi"}</button>
@@ -11687,7 +11759,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
                 </li>
               ); })}
             </ol>
-            <footer className="dc-guia__pie">{done >= misPasos.length ? <><CheckCircle2 size={16} strokeWidth={2} /> Recorriste toda la guía. Puedes volver cuando quieras desde el menú.</> : <>La lista de lo que falta configurar en la clínica está en <b>Configuración › Puesta en marcha</b>.</>}</footer>
+            {/* M8-07: «Puesta en marcha» está en Configuración: solo se nombra a quien la tiene. */}
+            <footer className="dc-guia__pie">{done >= misPasos.length ? <><CheckCircle2 size={16} strokeWidth={2} /> Recorriste toda la guía. Puedes volver cuando quieras desde el menú.</> : veModulo("config") ? <>La lista de lo que falta configurar en la clínica está en <b>Configuración › Puesta en marcha</b>.</> : <>Marca «Ya lo vi» en cada paso para llevar la cuenta. La guía vuelve a abrirse con el botón <b>?</b> del menú.</>}</footer>
           </aside>
         </div>
         );
@@ -12767,7 +12840,9 @@ function PortalPaciente({ usuario, onLogout }) {
   const [verVisita, setVerVisita] = useState(null); // visita de la historia
   const [verFase, setVerFase] = useState(null); // fase del tratamiento
   const [pagoModal, setPagoModal] = useState(null); // monto a pagar o null
-  const notify = (m) => { setToast(m); setTimeout(() => setToast(null), 4200); };
+  // M8-08: cada aviso dura sus 4,2 s; el temporizador del anterior ya no lo borra antes.
+  const toastTimer = useRef(null);
+  const notify = (m) => { setToast(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 4200); };
 
   const [portalError, setPortalError] = useState(null);
   const [totalInvertidoApi, setTotalInvertidoApi] = useState(null);
@@ -13670,7 +13745,9 @@ function AwgConfig({ notify }) {
 function BackOfficeAWG({ usuario, onLogout }) {
   const [secc, setSecc] = useState("clinicas");
   const [toast, setToast] = useState(null);
-  const notify = (m) => { setToast(m); setTimeout(() => setToast(null), 4200); };
+  // M8-08: cada aviso dura sus 4,2 s; el temporizador del anterior ya no lo borra antes.
+  const toastTimer = useRef(null);
+  const notify = (m) => { setToast(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 4200); };
   const SECC = [
     { id: "clinicas", label: "Clínicas", icon: Building2 },
     { id: "suscripciones", label: "Suscripciones", icon: CreditCard },

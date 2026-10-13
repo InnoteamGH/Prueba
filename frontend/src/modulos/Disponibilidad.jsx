@@ -1,11 +1,13 @@
 /* Módulo Disponibilidad. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
-import React, { useState, useEffect, useMemo, useContext } from "react";
+import React, { useState, useEffect, useMemo, useContext, useRef } from "react";
 import { AlertCircle, AlertTriangle, BellRing, CalendarCheck, Check, ChevronRight, Clock, Lock, MapPin, Repeat, Send, Trash2, X } from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import { DISP_DEMO } from "../compartido/sillones";
 import {DatosDemoCtx, Pestanas, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, SEDES, Select, TEAL, TimeSelect, addDays, cortaSede, diasAbiertosDe, espsDe, etiquetaSedes, fechaLegible, fmt, horarioDeSede, horasEntre, hoy, jornadaClinica, minutosViaje, mismaSede, nombreSede, puede, sedeNum, sedesDe, toMin, tint, useSede} from "../comun";
 import { horarioConfigurado } from "../compartido/horarioReal";
+import { fijarGuardaSalida } from "../compartido/guardaSalida";
+import { mesCorto } from "../util/fechaLima";
 
 // Nombre comparable (sin «Dr./Dra.», sin tildes ni mayúsculas) para reconocer al médico de la sesión.
 const normNom = (s) => String(s || "").replace(/^(?:\s*(?:dr\(a\)\.?|dra\.?|dr\.?)\s*)+/i, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
@@ -60,6 +62,12 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
     ? { ini: `${String(RANGO[0]).padStart(2, "0")}:00`, fin: `${String(RANGO[1]).padStart(2, "0")}:00` }
     : { ini: "08:00", fin: "18:00" }));
   const [diasAtiende, setDiasAtiende] = useState(() => DOW_SEMANA.map(() => true));
+  // M8-08: abrir o cerrar un día y cambiar la jornada no se aplica hasta «Guardar». Se compara
+  // con lo último cargado o guardado para avisar de los cambios sin guardar.
+  const fotoHorario = (dias, j) => `${dias.map((x) => (x ? 1 : 0)).join("")}|${j.ini}|${j.fin}`;
+  const fotoInicial = useRef(null);
+  if (fotoInicial.current == null) fotoInicial.current = fotoHorario(diasAtiende, jornada);
+  const [fotoGuardada, setFotoGuardada] = useState(null);
   // Con sesión, el médico de la sesión sale de GET /medicos (por nombre); nunca MEDICOS[0].
   const [medSrv, setMedSrv] = useState(null);
   const [medSrvListo, setMedSrvListo] = useState(!conectado);
@@ -106,9 +114,11 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
   };
   useEffect(() => {
     if (conectado || miMedId == null || !misBloquesDemo.length) return;
-    setDiasAtiende(DOW_SEMANA.map((d) => misBloquesDemo.some((b) => Number(b.diaSemana) === d)));
+    const dias = DOW_SEMANA.map((d) => misBloquesDemo.some((b) => Number(b.diaSemana) === d));
+    setDiasAtiende(dias);
     const ini = misBloquesDemo.map((b) => b.horaInicio).sort()[0], fin = misBloquesDemo.map((b) => b.horaFin).sort().slice(-1)[0];
     setJornada({ ini, fin }); setJornadaCargada({ ini, fin });
+    setFotoGuardada(fotoHorario(dias, { ini, fin }));
   }, [conectado, miMedId]); // eslint-disable-line
   // Carga la disponibilidad guardada del médico (días + jornada) al abrir.
   useEffect(() => {
@@ -127,11 +137,12 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
       setDiasAtiende(dias);
       // La jornada va de la primera entrada a la última salida (antes se tomaba solo el primer turno).
       if (r0j && rfj) setJornada({ ini: r0j, fin: rfj });
+      setFotoGuardada(fotoHorario(dias, r0j && rfj ? { ini: r0j, fin: rfj } : jornada));
     }).catch(() => {});
   }, [medSrvListo, miMedId]); // eslint-disable-line
   const guardarDisp = async () => {
     if (!conectado) {
-      if (miMedId == null || !demoDb?.setDispMedicos) { notify("Disponibilidad guardada. Tu agenda ya la usa."); return; }
+      if (miMedId == null || !demoDb?.setDispMedicos) { setFotoGuardada(fotoHorario(diasAtiende, jornada)); notify("Disponibilidad guardada. Tu agenda ya la usa."); return; }
       // Días que ya no atiende: fuera. Días nuevos: la jornada. Si cambió la jornada, se
       // reemplazan los bloques del día (pueden ser mañana en una sede y tarde en otra).
       const cambioJornada = !jornadaCargada || jornadaCargada.ini !== jornada.ini || jornadaCargada.fin !== jornada.fin;
@@ -151,6 +162,7 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
         return [...otros, ...nuevos];
       });
       setJornadaCargada({ ...jornada });
+      setFotoGuardada(fotoHorario(diasAtiende, jornada));
       notify("Disponibilidad guardada. La agenda ya no te cita fuera de estos días y horas.");
       return;
     }
@@ -167,12 +179,34 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
     setGuardandoDisp(true);
     try {
       await api.disponibilidad.guardarMi({ dias });
+      setFotoGuardada(fotoHorario(diasAtiende, jornada));
       notify("Disponibilidad guardada. Tu agenda y el asistente ya la usan.");
     } catch (e) {
       notify(String(e?.message || "").toLowerCase().includes("médico") ? "Tu usuario no está vinculado a una ficha de médico." : "No se pudo guardar la disponibilidad.");
     }
     setGuardandoDisp(false);
   };
+  const sinGuardar = fotoHorario(diasAtiende, jornada) !== (fotoGuardada ?? fotoInicial.current);
+  // M8-08: al salir por el menú con cambios sin guardar se pregunta; al cerrar o recargar la
+  // pestaña, el navegador avisa. Si se sale por otro camino, se dice que no se aplicaron.
+  const sinGuardarRef = useRef(false);
+  sinGuardarRef.current = sinGuardar;
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+  useEffect(() => {
+    let salioAdrede = false;
+    const quitar = fijarGuardaSalida(
+      () => (sinGuardarRef.current ? "Tienes cambios sin guardar en tus días u horario de atención. ¿Salir sin guardarlos?" : null),
+      () => { salioAdrede = true; },
+    );
+    const antesDeCerrar = (e) => { if (!sinGuardarRef.current) return; e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", antesDeCerrar);
+    return () => {
+      quitar();
+      window.removeEventListener("beforeunload", antesDeCerrar);
+      if (sinGuardarRef.current && !salioAdrede && notifyRef.current) notifyRef.current("Saliste de «Mi horario» sin guardar: los cambios de días u horario no se aplicaron.");
+    };
+  }, []);
   const [bloqueos, setBloqueos] = useState([]);
   // Bloqueos recurrentes: una entrada por día de la semana (se repiten cada semana).
   // Con sesión arrancan vacíos y salen del servidor (bloqueos con diaSemana); el almuerzo
@@ -215,7 +249,8 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
     d.setDate(d.getDate() + ((dow + 6) % 7));
     const fecha = fmt(d);
     const j = jornadaDelDia(fecha);
-    return { idx: i, dow, date: fecha, num: d.getDate(), mes: d.toLocaleDateString("es-PE", { month: "short" }),
+    // M8-08: «oct», como el resto de la app (el navegador daba «Oct.» para el mes solo).
+    return { idx: i, dow, date: fecha, num: d.getDate(), mes: mesCorto(d),
              esHoy: fecha === fmt(hoy), jornada: j };
   });
 
@@ -419,7 +454,8 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
     if (todos) { editables.forEach((d) => liberar(estadoCelda(d, hora))); notify(`Liberaste las ${hora} (días editables).`); }
     else { editables.forEach((d) => { if (estadoCelda(d, hora).tipo === "libre") bloquear(d, hora); }); notify(modo === "recurrente" ? `${hora} bloqueada todas las semanas (${mot()}).` : `${hora} bloqueada en los días editables.`); }
   };
-  const toggleDiaAtiende = (idx) => { const d = semana[idx]; if (!editableFecha(d.date)) { avisoAnticip(); return; } setDiasAtiende((s) => s.map((x, j) => j === idx ? !x : x)); notify(`${DIAS[d.dow]} ${diasAtiende[idx] ? "cerrado" : "abierto"} para atención.`); };
+  // M8-08: abrir o cerrar el día no guarda nada todavía: el aviso lo dice.
+  const toggleDiaAtiende = (idx) => { const d = semana[idx]; if (!editableFecha(d.date)) { avisoAnticip(); return; } setDiasAtiende((s) => s.map((x, j) => j === idx ? !x : x)); notify(`${DIAS[d.dow]} marcado como ${diasAtiende[idx] ? "cerrado" : "abierto"}. Guarda para aplicar.`); };
   const inputT = { padding: "7px 9px", borderRadius: "var(--dc-r-sm)", border: "1.5px solid var(--dc-line)", fontSize: 13, color: NAVY, outline: "none" };
 
   const libresSemana = semana.reduce((s, d) => s + HORAS.filter((h) => estadoCelda(d, h).tipo === "libre").length, 0);
@@ -551,7 +587,9 @@ function Disponibilidad({ notify, usuario, citas: citasProp = [], setCitas, hora
         )}
 
         <div style={{ padding: "12px 20px", borderTop: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Los cambios se reflejan al instante en tu agenda.</span>
+          {sinGuardar
+            ? <span role="status" style={{ fontSize: 13, color: "var(--dc-warn-700)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6 }}><AlertTriangle size={14} strokeWidth={1.9} /> Tienes cambios sin guardar en tus días u horario de atención.</span>
+            : <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{conectado ? "Los bloqueos se aplican al instante; los días y el horario de atención, al pulsar «Guardar»." : "Los días y el horario de atención se aplican al pulsar «Guardar»."}</span>}
           <Btn small onClick={guardarDisp} disabled={guardandoDisp}><Check size={15} strokeWidth={1.75} /> {guardandoDisp ? "Guardando…" : "Guardar"}</Btn>
         </div>
       </Card>

@@ -41,6 +41,32 @@ export function fechaCortaLima(v) {
   return `${d}/${m}/${a}`;
 }
 
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+/** «oct»: el mes abreviado en minúscula y sin punto, como en el resto de la app (M8-08: el
+    navegador da «Oct.» para el mes solo y «Mi horario» decía «19 Oct. – 24 Oct.»). Acepta un
+    Date o «aaaa-mm-dd»; lo que no se puede leer, "". */
+export function mesCorto(v) {
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? "" : MESES_CORTOS[v.getMonth()];
+  const m = /^\d{4}-(\d{2})/.exec(String(v || ""));
+  return m ? MESES_CORTOS[Number(m[1]) - 1] || "" : "";
+}
+
+/** «Hace 9 días», «Hoy» o «En 3 días» respecto de hoy (ambas «aaaa-mm-dd»). M8-08: una fecha
+    futura nunca sale como «Hace …»: con `futuro` (p. ej. «Próxima cita») dice «En …»; sin él
+    (p. ej. «Última cita» con una fecha que aún no llega), «Próxima». */
+export function fechaRelativa(iso, hoyIso, { futuro = false } = {}) {
+  const a = Date.parse(`${String(iso || "").slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${String(hoyIso || "").slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return "";
+  const d = Math.round((a - b) / 86400000);
+  if (d === 0) return "Hoy";
+  const n = Math.abs(d);
+  const meses = Math.round(n / 30), anios = Math.round(n / 365);
+  const txt = n < 30 ? `${n} día${n > 1 ? "s" : ""}` : n < 365 ? `${meses} mes${meses > 1 ? "es" : ""}` : `${anios} año${anios > 1 ? "s" : ""}`;
+  if (d > 0) return futuro ? `En ${txt}` : "Próxima";
+  return `Hace ${txt}`;
+}
+
 /** Resume user-agent a etiqueta corta para Auditoría (NEW-58b). */
 export function resumenDispositivo(ua) {
   const s = String(ua || "").trim();

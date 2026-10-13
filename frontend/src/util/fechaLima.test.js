@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima } from "./fechaLima.js";
+import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, mesCorto, fechaRelativa } from "./fechaLima.js";
 
 describe("fechaHoraLima M5-14", () => {
   it("formatea la hora de firma en dd/mm/aaaa hh:mm de Lima", () => {
@@ -82,5 +82,27 @@ describe("fechaLima NEW-57", () => {
       },
     ]);
     assert.equal(rows[0].dispositivo, "Firefox – Windows – escritorio");
+  });
+});
+
+describe("mesCorto y fechaRelativa (M8-08)", () => {
+  it("el mes en minúscula y sin punto", () => {
+    assert.equal(mesCorto(new Date(2026, 9, 19)), "oct");
+    assert.equal(mesCorto("2026-09-05"), "set");
+    assert.equal(mesCorto("2026-01-31"), "ene");
+    assert.equal(mesCorto(""), "");
+    assert.equal(mesCorto(new Date("x")), "");
+  });
+  it("una fecha futura nunca dice «Hace»", () => {
+    assert.equal(fechaRelativa("2026-10-22", "2026-10-13"), "Próxima");
+    assert.equal(fechaRelativa("2026-10-22", "2026-10-13", { futuro: true }), "En 9 días");
+    assert.equal(fechaRelativa("2026-10-04", "2026-10-13"), "Hace 9 días");
+    assert.equal(fechaRelativa("2026-10-12", "2026-10-13"), "Hace 1 día");
+    assert.equal(fechaRelativa("2026-10-13", "2026-10-13"), "Hoy");
+  });
+  it("meses y años como antes; lo ilegible, vacío", () => {
+    assert.equal(fechaRelativa("2026-07-13", "2026-10-13"), "Hace 3 meses");
+    assert.equal(fechaRelativa("2024-10-13", "2026-10-13"), "Hace 2 años");
+    assert.equal(fechaRelativa("", "2026-10-13"), "");
   });
 });

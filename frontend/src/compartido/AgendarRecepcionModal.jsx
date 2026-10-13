@@ -8,6 +8,7 @@ import { useReglasAgenda, conSedesDeHorario, horarioDefineSede } from "./useRegl
 import { CATALOGO_SEED, precioCita, precioServicio } from "./catalogo";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
+import { medicoDeSesionEnLista } from "../util/medicoSesion";
 import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, calcEdad, espsDe, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, mismaSede, sedeNum, sedesDe, toMin, tint, useSede, validarFormPaciente} from "../comun";
 
 /* ---- RENIEC: autocompletar nombres desde el DNI (solo datos reales del backend) ---- */
@@ -135,7 +136,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   // Sede: la cita se registra en una de las sedes que el usuario ve ahora (filtro del menú).
   // Por defecto la de la cita de origen o la sede activa, nunca la primera de la lista:
   // así el admin de Surco no deja citas en San Isidro sin darse cuenta.
-  const { ids: sedesVer, activa: sedeActivaCtx, pacientes: pacSede, global: sedeGlobal } = useSede();
+  const { ids: sedesVer, activa: sedeActivaCtx, pacientes: pacSede, global: sedeGlobal, nombre: nombreSesionCtx } = useSede();
   const sedePermitida = (id) => !sedesVer || sedesVer.some((w) => mismaSede(id, w));
   const [pac, setPac] = useState([]); const [medsLista, setMeds] = useState([]); const [esps, setEsps] = useState([]); const [seds, setSeds] = useState([]);
   const [pacTodos, setPacTodos] = useState([]);   // todas las sedes: solo para hallar un DNI exacto y no duplicar fichas
@@ -415,6 +416,17 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   // Doctores que hacen el servicio y, de ellos, los que atienden en la sede elegida.
   const medsEsp = f.especialidadId ? meds.filter((m) => espsMed(m).includes(String(f.especialidadId))) : meds;
   const medsF = medsEsp.filter((m) => atiendeEn(m, f.sedeId));
+  // M8-08: el doctor que agenda viene elegido en «Doctor» si está en la lista (una sola vez:
+  // si lo cambia o lo quita, se respeta). Antes quedaba en «Seleccionar».
+  const medPropioListo = useRef(false);
+  useEffect(() => {
+    if (medPropioListo.current || rol !== "medico" || f.medicoId || base?.medicoId) return;
+    if (!medsF.length || (!demo && !reglas.listo)) return;
+    medPropioListo.current = true;
+    const id = medicoDeSesionEnLista(medsF, auth.sesion?.nombre || nombreSesionCtx);
+    const yo = id != null ? medsF.find((m) => String(m.id) === id) : null;
+    if (yo) setF((x) => (x.medicoId ? x : { ...x, medicoId: yo.id }));
+  }, [medsF.length, reglas.listo, rol]); // eslint-disable-line react-hooks/exhaustive-deps
   // Fecha y hora pasadas bloquean el agendado (antes solo se pintaba «Fecha pasada»).
   const msgPasada = f.fecha && f.hora && yaPaso(f.fecha, f.hora) ? motivoPasado(f.fecha, f.hora) : "";
   const pasada = !!msgPasada;

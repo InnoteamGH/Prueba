@@ -27,6 +27,7 @@ import { imprimirReceta } from "./util/recetaDoc";
 import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
 import { medicoEn } from "./compartido/catalogoApi";
 import { medicoDeSesionEnCitas } from "./util/medicoSesion";
+import { EVENTO_CITA_ATENCION, atencionPorCita, guardarCitaAtencion, leerCitaAtencion, limpiarCitaAtencion, ponerIdsCitas } from "./compartido/citaAtencion";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
 import PeriodontogramaClinico from "./modulos/Periodontograma";
@@ -1062,6 +1063,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // ficha360 trae las citas sin id: las de hoy (y la del día de la cita pedida) se leen de
   // GET /citas?fecha=, que sí lo trae, para poder ligar la evolución con citaId.
   const [citasConId, setCitasConId] = useState([]);
+  // M8-03: citas de GET /citas del día de cada «Ver atención» abierta (fecha → citas del
+  // paciente), para decidir por citaId si la atención tiene evolución.
+  const [citasAtencion, setCitasAtencion] = useState({});
+  const pedidaAplicada = useRef(null);                 // última cita pedida que se eligió en «Cita»
+  const evoFormRef = useRef(null);                     // «Nueva nota de evolución» (para llevar ahí)
   const [evoFile, setEvoFile] = useState(null);       // archivo a anexar a la evolución
   const [draftEdit, setDraftEdit] = useState({});     // edición de borradores de evolución (por id)
   const [secOpen, setSecOpen] = useState({});         // secciones colapsables de la historia
@@ -1359,11 +1365,12 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // Las de ficha360 con id (demostración) y las leídas de GET /citas, sin repetir.
   const citasEvo = [...arr(d?.citas), ...citasConId.filter((c) => !arr(d?.citas).some((x) => x.id != null && String(x.id) === String(c.id)))].filter(citaLigable);
   // Si GET /citas no trajo la cita pedida (falló o no se pudo leer), se arma con lo que
-  // trajo la alerta; la hora y el motivo salen de la cita de ese día en la ficha (sin id).
+  // trajo quien la pidió (alerta, agenda o «Ver atención»: día, hora, motivo y doctor) y, si
+  // falta algo, con la cita de ese día en la ficha (sin id).
   if (citaPedida && citaPedida.fecha && !conEvo.has(String(citaPedida.citaId)) && !citasEvo.some(esCitaPedida)) {
     const delDia = arr(d?.citas).filter((c) => c.fecha === citaPedida.fecha && !["cancelada", "no_show", "reprogramada", "cerrada_sistema"].includes(String(c.estado)));
     const ref = delDia.length === 1 ? delDia[0] : {};
-    citasEvo.push({ ...ref, id: citaPedida.citaId, fecha: citaPedida.fecha, medico: ref.medico || citaPedida.doctor || "", estado: ref.estado || "atendida" });
+    citasEvo.push({ ...ref, id: citaPedida.citaId, fecha: citaPedida.fecha, hora: citaPedida.hora || ref.hora || "", motivo: citaPedida.motivo || ref.motivo || "", medico: ref.medico || citaPedida.doctor || "", estado: ref.estado || "atendida" });
   }
   citasEvo.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || String(a.hora || "").localeCompare(String(b.hora || "")));
   const citasEvoKey = citasEvo.map((c) => `${c.id}:${c.estado}`).join("|");
@@ -1372,33 +1379,48 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
     const dia = c.fecha && c.fecha !== hoyLima ? `${M.fechaCorta(c.fecha)} · ` : "";
     return `${dia}${String(c.hora || "").slice(0, 5) || "—"} · ${c.motivo || c.especialidad || "Cita"}${c.medico ? ` · ${c.medico}` : ""}`;
   };
+  // Citas del paciente en esos días según GET /citas (traen el id que ficha360 no trae).
+  const leerCitasDe = (fechas, pid) => Promise.all(fechas.map((f) => api.citas.listar(f).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])))
+    .then((ls) => ls.flat().filter((c) => c && c.id != null && String(c.pacienteId) === String(pid))
+      .map((c) => ({ ...c, hora: String(c.hora || "").slice(0, 5), medico: typeof c.medico === "string" ? c.medico : (c.medicoNombre || "") })));
   useEffect(() => {
-    let pedida = null;
-    try { const x = JSON.parse(sessionStorage.getItem("dc_cita_atencion") || "null"); pedida = x && x.citaId && String(x.pacienteId) === String(pacienteId) ? x : null; } catch { pedida = null; }
+    // M8-02: la cita pedida se lee al abrir la ficha y también cuando otra acción la deja para
+    // este paciente con la ficha ya abierta («Ver atención › Registrar evolución», la agenda).
+    const pedida = leerCitaAtencion(pacienteId);
     setCitaPedida(pedida);
     setCitasConId([]);
-    if (!conectado || !pacienteId || !puedeEscribirClinico) return undefined;
+    setCitasAtencion({});
+    pedidaAplicada.current = null;
     let vivo = true;
-    const fechas = [...new Set([hoyLima, pedida && pedida.fecha].filter(Boolean))];
-    Promise.all(fechas.map((f) => api.citas.listar(f).then((x) => (Array.isArray(x) ? x : [])).catch(() => [])))
-      .then((ls) => {
-        if (!vivo) return;
-        setCitasConId(ls.flat().filter((c) => c && c.id != null && String(c.pacienteId) === String(pacienteId))
-          .map((c) => ({ ...c, hora: String(c.hora || "").slice(0, 5), medico: typeof c.medico === "string" ? c.medico : (c.medicoNombre || "") })));
-      });
-    return () => { vivo = false; };
+    const sumarCitas = (cs) => { if (vivo && cs.length) setCitasConId((cur) => [...cur, ...cs.filter((c) => !cur.some((x) => String(x.id) === String(c.id)))]); };
+    const onPedida = (ev) => {
+      const x = ev && ev.detail;
+      if (!x || String(x.pacienteId) !== String(pacienteId)) return;
+      setCitaPedida(x);
+      if (conectado && puedeEscribirClinico && x.fecha) leerCitasDe([x.fecha], pacienteId).then(sumarCitas);
+    };
+    window.addEventListener(EVENTO_CITA_ATENCION, onPedida);
+    if (conectado && pacienteId && puedeEscribirClinico) {
+      leerCitasDe([...new Set([hoyLima, pedida && pedida.fecha].filter(Boolean))], pacienteId).then(sumarCitas);
+    }
+    return () => { vivo = false; window.removeEventListener(EVENTO_CITA_ATENCION, onPedida); };
   }, [pacienteId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // La cita con la que se abrió la ficha («Completar» o «Iniciar») o, si no, la que está en
-    // atención o ya atendida hoy; con una sola cita del día, esa.
+    // La cita pedida («Completar», «Iniciar», «Finalizar», «Evolución» o «Ver atención») se
+    // elige una vez, aunque hubiera otra elegida; después manda lo que elija la persona.
+    const pedida = citaPedida ? String(citaPedida.citaId) : null;
+    if (pedida && pedidaAplicada.current !== pedida && citasEvo.some((c) => String(c.id) === pedida)) {
+      pedidaAplicada.current = pedida;
+      setEvoCitaId(pedida);
+      return;
+    }
     if (evoCitaId && citasEvo.some((c) => String(c.id) === String(evoCitaId))) return;
-    const pedida = citaPedida ? citaPedida.citaId : null;
-    const elegida = (pedida && citasEvo.find((c) => String(c.id) === String(pedida)))
-      || citasEvo.find((c) => c.estado === "en_atencion")
+    // Si no, la que está en atención o ya atendida hoy; con una sola cita del día, esa.
+    const elegida = citasEvo.find((c) => c.estado === "en_atencion")
       || citasEvo.find((c) => /atend|complet/i.test(String(c.estado)))
       || (citasEvo.length === 1 ? citasEvo[0] : null);
     setEvoCitaId(elegida ? String(elegida.id) : "");
-  }, [citasEvoKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [citasEvoKey, citaPedida && citaPedida.citaId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Resumen: última visita atendida y próxima cita programada.
   const citasArr = arr(d?.citas);
   // H-16: solo citas atendidas y ya pasadas, la más reciente primero (antes caía en
@@ -1504,7 +1526,8 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       const ahora = new Date();
       setD((cur) => ({ ...cur, historia: [{ id: `demo-h${Date.now()}`, fecha: hoy, hora: ahora.toTimeString().slice(0, 5), creadoEn: ahora.toISOString(), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medicoId: evoMedico || "", medico: med?.nombre || "", citaId: evoCitaId || null, local: true }, ...arr(cur.historia)] }));
       // Queda en la historia del sistema (no sólo en esta ventana): al reabrir la ficha sigue ahí.
-      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, historia: [{ fecha: hoy, hora: ahora.toTimeString().slice(0, 5), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medico: med ? med.nombre : "", sede: sedeCx.activa ?? undefined }, ...(cur.historia || [])] }));
+      if (demoDb && demoDb.updFicha) demoDb.updFicha(pacienteId, (cur) => ({ ...cur, historia: [{ fecha: hoy, hora: ahora.toTimeString().slice(0, 5), titulo: "Evolución", diagnostico: evo.diagnostico, detalle: evo.detalle, signosVitales: sv || null, medico: med ? med.nombre : "", sede: sedeCx.activa ?? undefined, ...(evoCitaId ? { citaId: evoCitaId } : {}) }, ...(cur.historia || [])] }));
+      if (evoCitaId && citaPedida && String(citaPedida.citaId) === String(evoCitaId)) { limpiarCitaAtencion(); setCitaPedida(null); }
       anotar("crear", "Registró una evolución", evo.diagnostico || evo.detalle);
       // El anexo (foto o radiografía) va a Archivos del paciente, igual que con servidor.
       if (evoFile && demoDb && demoDb.updFicha) {
@@ -1528,7 +1551,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
       if (evoFile) { try { const url = await leerArchivo(evoFile); await crearArchivo(url, "Foto intraoral", "Anexo de evolución" + (evo.diagnostico ? " – " + evo.diagnostico : "")); } catch { notify("La evolución se guardó, pero el archivo no se pudo anexar."); } }
       // La cita ya tiene su evolución: no se vuelve a proponer al reabrir la ficha.
       if (evoCitaId && citaPedida && String(citaPedida.citaId) === String(evoCitaId)) {
-        try { sessionStorage.removeItem("dc_cita_atencion"); } catch { /* sin almacenamiento */ }
+        limpiarCitaAtencion();
         setCitaPedida(null);
       }
       setEvo({ diagnostico: "", detalle: "" }); setVit({}); setEvoFile(null); setEvoCitaId(""); notify(evoCitaId ? "Evolución registrada y firmada, ligada a su cita." : "Evolución registrada y firmada."); cargar(); recargarRx();
@@ -1836,17 +1859,48 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
   // La línea de tiempo mostraba que «existió» una cita o una evolución, pero no qué se
   // hizo. Cada fecha se abre ahora como una atención con su detalle completo.
   const fechaDe = (x) => String(x || "").slice(0, 10);
+  // M8-03: si la atención tiene evolución se decide por citaId (la evolución de una cita puede
+  // escribirse otro día, p. ej. al «Completar» una alerta); la fecha queda de respaldo. Las
+  // citas de ficha360 no traen id: sale de GET /citas (hoy, la cita pedida y el día abierto).
+  const citasApiConocidas = [...citasConId, ...Object.values(citasAtencion).flat()];
+  const fechaDeCita = new Map();
+  [...arr(d?.citas), ...citasApiConocidas].forEach((c) => { if (c && c.id != null && c.id !== "" && c.fecha) fechaDeCita.set(String(c.id), fechaDe(c.fecha)); });
+  if (citaPedida && citaPedida.fecha && !fechaDeCita.has(String(citaPedida.citaId))) fechaDeCita.set(String(citaPedida.citaId), fechaDe(citaPedida.fecha));
   const atencionDe = (fecha) => {
     const del = linea.filter((e) => e.fecha === fecha);
+    const citasDia = ponerIdsCitas(del.filter((e) => e.k === "cita").map((e) => e.c), citasApiConocidas.filter((c) => fechaDe(c.fecha) === fechaDe(fecha)));
+    const porCita = atencionPorCita({ fecha, citas: citasDia, historia: arr(d?.historia), fechaDeCita });
     return {
       fecha,
-      citas: del.filter((e) => e.k === "cita").map((e) => e.c),
-      evos: del.filter((e) => e.k === "evolucion").map((e) => e.h),
+      citas: citasDia,
+      evos: porCita.evos,
+      sinEvolucion: porCita.sinEvolucion,
       recetas: del.filter((e) => e.k === "receta").map((e) => e.r),
       pagos: del.filter((e) => e.k === "pago").map((e) => e.g),
       archivos: del.filter((e) => e.k === "archivo").map((e) => e.x),
       procs: arr(d?.tratamientos).filter((t) => [t.fecha, t.completadaEn, t.terminadaEn, t.atendidaEn].some((f) => fechaDe(f) === fecha)),
     };
+  };
+  // Al abrir «Ver atención» de un día cuyas citas llegaron sin id (ficha360), se leen las de
+  // ese día de GET /citas una sola vez (hoy y el de la cita pedida ya se leyeron).
+  useEffect(() => {
+    if (!atVer || !conectado || !pacienteId || !tienePermiso("agenda", "ver")) return undefined;
+    if (Object.prototype.hasOwnProperty.call(citasAtencion, fechaDe(atVer)) || citasConId.some((c) => fechaDe(c.fecha) === fechaDe(atVer))) return undefined;
+    const delDia = arr(d?.citas).filter((c) => fechaDe(c.fecha) === fechaDe(atVer));
+    if (!delDia.length || delDia.every((c) => c.id != null && c.id !== "")) return undefined;
+    let vivo = true;
+    const f = fechaDe(atVer);
+    leerCitasDe([f], pacienteId).then((cs) => { if (vivo) setCitasAtencion((cur) => ({ ...cur, [f]: cs })); });
+    return () => { vivo = false; };
+  }, [atVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  // M8-02: «Registrar evolución» de una atención lleva al formulario con ESA cita elegida en
+  // «Cita» (aunque no sea de hoy), para que la evolución salga con su citaId. Sin el id de la
+  // cita, solo lleva al formulario.
+  const registrarEvolucionDe = (cita) => {
+    setAtVer(null);
+    if (cita && cita.id != null && cita.id !== "") guardarCitaAtencion(cita, { pacienteId, origen: "atencion" });
+    setTab("historia");
+    setTimeout(() => { try { evoFormRef.current && evoFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* sin scroll */ } }, 80);
   };
   const itemsReceta = itemsDeReceta;
   const lineaMed = (x) => [nombreItemReceta(x), indicacionItemReceta(x)].filter(Boolean).join(" · ");
@@ -1886,11 +1940,11 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
             <div><small>Pagado ese día</small><b>{totalPagos ? money(totalPagos) : "—"}</b></div>
           </div>
           {vacio && <p className="fm-at__nada">No hay registros para esta fecha.</p>}
-          {a.citas.some((c) => /atend|complet/i.test(String(c.estado))) && !a.evos.length && (
+          {a.sinEvolucion.length > 0 && (
             <div className="fm-at__aviso">
               <AlertTriangle size={16} strokeWidth={2} />
-              <span><b>Atención sin evolución.</b> La cita figura como atendida pero no se registró qué se hizo.</span>
-              {puedeEscribirClinico && <button type="button" onClick={() => { setAtVer(null); setTab("historia"); }}>Registrar evolución</button>}
+              <span><b>Atención sin evolución.</b> {a.sinEvolucion.length > 1 ? `${a.sinEvolucion.length} citas figuran como atendidas` : "La cita figura como atendida"} pero no se registró qué se hizo.</span>
+              {puedeEscribirClinico && <button type="button" onClick={() => registrarEvolucionDe(a.sinEvolucion[0])}>Registrar evolución</button>}
             </div>
           )}
           {a.citas.length > 0 && <Sec ic={CalendarDays} t="Cita" n={a.citas.length}>
@@ -1901,6 +1955,12 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               <div key={i} className="fm-at__evo">
                 <div className="fm-at__evocab"><b>{h.diagnostico || h.titulo || "Evolución"}</b>{h.titulo === "Adenda" ? <i className="fm-at__pill is-adenda">Adenda</i> : lleno ? <i className="fm-at__pill is-ok">Firmada</i> : <i className="fm-at__pill is-pend">Pendiente de llenar</i>}</div>
                 {h.titulo && h.diagnostico && h.titulo !== h.diagnostico && h.titulo !== "Adenda" && <small className="fm-at__sub">{h.titulo}</small>}
+                {(() => {
+                  // Ligada por citaId a la cita de otro día, o escrita otro día para la cita de este.
+                  const fc = h.citaId != null && h.citaId !== "" ? fechaDeCita.get(String(h.citaId)) : "";
+                  const nota = fc && fc !== fechaDe(a.fecha) ? `Evolución de la atención del ${fmtFecha(fc)}` : (fechaDe(h.fecha) && fechaDe(h.fecha) !== fechaDe(a.fecha) ? `Registrada el ${fmtFecha(fechaDe(h.fecha))}` : "");
+                  return nota ? <small className="fm-at__sub">{nota}</small> : null;
+                })()}
                 <p>{h.detalle || "Sin detalle del procedimiento."}</p>
                 {h.signosVitales && <div className="fm-at__vit"><Activity size={13} strokeWidth={2} /> {h.signosVitales}</div>}
                 <small className="fm-at__firma">{rotuloMedico(h.medico) || "Profesional no indicado"}{h.hora ? ` · ${h.hora}` : ""}</small>
@@ -2431,7 +2491,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                   );
                 })()}
 
-                {puedeEscribirClinico && <div style={card}>
+                {puedeEscribirClinico && <div style={{ ...card, scrollMarginTop: 16 }} ref={evoFormRef}>
                   <div style={secTitle}>Nueva nota de evolución</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>Plantillas:</span>

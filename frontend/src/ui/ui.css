@@ -627,6 +627,10 @@
 .dc-tarea__txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .dc-tarea__txt b { font-size: 14px; font-weight: 600; color: var(--dc-ink-900); }
 .dc-tarea__txt span { font-size: 13px; color: var(--dc-ink-500); line-height: 1.4; }
+/* M8-02: cada paciente de la alerta abre su propia evolución pendiente. */
+.dc-tarea__link { all: unset; cursor: pointer; color: var(--dc-primary-alt); font-weight: 600; border-radius: 4px; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 2px; }
+.dc-tarea__link:hover { text-decoration-color: currentColor; }
+.dc-tarea__link:focus-visible { box-shadow: var(--dc-focus); }
 
 .dc-hoy__vacio { display: grid; justify-items: center; gap: 4px; padding: 40px 20px; color: var(--dc-ok-700); text-align: center; }
 .dc-hoy__vacio b { font-size: 15px; color: var(--dc-ink-900); }
