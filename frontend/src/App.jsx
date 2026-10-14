@@ -82,6 +82,7 @@ import { imprimirPresupuesto, nombreSinSufijoPieza } from "./compartido/presupue
 import { leerPagadoPaciente } from "./compartido/pagadoPaciente";
 import { guardarCitaAtencion, limpiarCitaAtencion } from "./compartido/citaAtencion";
 import { estadoAlReprogramar } from "./compartido/citaEstadoInicial";
+import { validarClaveNueva, sinRutaCambioClave } from "./util/claveNueva.js";
 import { MSG_MODULO_NO_DISPONIBLE, moduloOcultoParaRol, sinModulosOcultos } from "./compartido/modulosRol";
 import { MOTIVO_ANULAR_MIN, accionesProcedimiento, cuerpoAnulacion, motivoAnulacionValido } from "./util/procedimientoAcciones";
 import { puedeSalir } from "./compartido/guardaSalida";
@@ -117,11 +118,30 @@ function Login({ onLogin }) {
   const demoLoginOk = MODO_DEMO;
 
   const [cargando, setCargando] = useState(false);
+  // Revisión 12: entrada con clave temporal → «Crea tu clave» antes de pasar al sistema.
+  const [cambio, setCambio] = useState(null);   // { datos (para onLogin), actual, nueva, repetir, sinRuta }
   // R6-10: el login se reintenta solo ante 500/503 o red; mientras tanto el botón lo dice.
   const [reintentando, setReintentando] = useState(0);
   // UUID de sede → número corto del registro de sedes (GET /sedes), el que usa el frontend.
   const sedeInt = (uuid) => numSede(uuid);
   
+  const guardarClaveNueva = async () => {
+    if (!cambio) return;
+    const err = validarClaveNueva(cambio.nueva, cambio.repetir, cambio.actual);
+    if (err) { setError(err); return; }
+    setCargando(true); setError("");
+    try {
+      await api.cambiarClave(cambio.actual, cambio.nueva);
+      setCargando(false);
+      onLogin(cambio.datos);
+    } catch (e) {
+      setCargando(false);
+      const st = e instanceof ApiError ? e.status : 0;
+      if (sinRutaCambioClave(st)) { setCambio((c) => ({ ...c, sinRuta: true })); setError(""); return; }
+      setError(e instanceof ApiError ? msgServidor(e, "No se pudo guardar la clave nueva.") : "Sin conexión con el servidor. Inténtalo de nuevo.");
+    }
+  };
+
   const entrar = async () => {
     const id = user.trim();
     // 1) Email → login staff conectado.
@@ -145,9 +165,11 @@ function Login({ onLogin }) {
         // Sin sede en la respuesta solo los roles de toda la clínica ven todas; el resto
         // queda sin sede (falla cerrado) en vez de ver todas.
         const listaSedes = Array.isArray(sedesUsr) && sedesUsr.length ? sedesUsr.map(sedeInt) : sedesUsr === "all" && ROLES_GLOBALES.includes(r.rol) ? "all" : sedeNum ? [sedeNum] : (ROLES_GLOBALES.includes(r.rol) ? "all" : []);
-        onLogin({ rol: r.rol, nombre: r.nombre, sedes: listaSedes,
+        const datosLogin = { rol: r.rol, nombre: r.nombre, sedes: listaSedes,
                   organizacionId: r.organizacionId, sedeId: sedeNum, conectado: true,
-                  permisos: r.permisos || null });
+                  permisos: r.permisos || null };
+        if (r.debeCambiarClave) { setCambio({ datos: datosLogin, actual: pass, nueva: "", repetir: "", sinRuta: false }); setModo("cambiarClave"); return; }
+        onLogin(datosLogin);
         return;
       } catch (e) {
         setCargando(false); setReintentando(0);
@@ -267,7 +289,25 @@ function Login({ onLogin }) {
             <div style={{ fontWeight: 500, fontSize: 18, color: DS.c.ink }}>Dento <span style={{ color: DS.c.primary }}>Check</span></div>
           </div>
 
-          {modo === "login" ? (
+          {modo === "cambiarClave" && cambio ? (
+            <div>
+              <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 21, fontWeight: 600, color: INK, margin: "0 0 5px", letterSpacing: "-.01em" }}>Crea tu clave</h2>
+              <p style={{ color: "var(--dc-ink-400)", fontSize: 14, margin: "0 0 22px" }}>Entraste con una clave temporal. Por seguridad, crea una clave nueva para continuar: al menos 8 caracteres, con letras y números.</p>
+              {cambio.sinRuta ? (
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div role="status" style={{ background: "var(--dc-warn-soft)", color: "var(--dc-warn-700)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>El servidor todavía no permite cambiar la clave desde aquí. Por ahora puedes entrar con la clave temporal; cámbiala cuando esté disponible.</div>
+                  <button className="dc-login-btn" onClick={() => onLogin(cambio.datos)} style={{ width: "100%", padding: "13px 16px", borderRadius: "var(--dc-r-lg)", border: "none", background: `linear-gradient(135deg,${DS.c.primary},${DS.c.primaryDark})`, color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Entrar con la clave temporal</button>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 16 }}>
+                  <Field label="Clave nueva" type="password" value={cambio.nueva} onChange={(v) => setCambio((c) => ({ ...c, nueva: v }))} placeholder="Al menos 8 caracteres" icon={<Lock size={16} strokeWidth={1.75} />} />
+                  <Field label="Repite la clave nueva" type="password" value={cambio.repetir} onChange={(v) => setCambio((c) => ({ ...c, repetir: v }))} placeholder="Escríbela otra vez" icon={<Lock size={16} strokeWidth={1.75} />} />
+                  {error && <div role="alert" style={{ background: "var(--dc-danger-soft)", color: "var(--dc-danger-700)", border: "1px solid var(--dc-danger-mid)", fontSize: 13, padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}>{error}</div>}
+                  <button className="dc-login-btn" onClick={guardarClaveNueva} disabled={cargando} style={{ width: "100%", padding: "13px 16px", borderRadius: "var(--dc-r-lg)", border: "none", background: cargando ? "var(--dc-brand-soft)" : `linear-gradient(135deg,${DS.c.primary},${DS.c.primaryDark})`, color: "#fff", fontSize: 14, fontWeight: 500, cursor: cargando ? "default" : "pointer" }}>{cargando ? "Guardando…" : "Guardar y entrar"}</button>
+                </div>
+              )}
+            </div>
+          ) : modo === "login" ? (
             <div>
               <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 21, fontWeight: 600, color: INK, margin: "0 0 5px", letterSpacing: "-.01em" }}>Bienvenido de vuelta</h2>
               <p style={{ color: "var(--dc-ink-400)", fontSize: 14, margin: "0 0 26px" }}>Staff con correo, o portal del paciente con DNI.</p>

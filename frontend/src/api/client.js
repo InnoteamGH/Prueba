@@ -308,6 +308,8 @@ export const api = {
     limpiarCacheClinicaLocal();
     return r;
   },
+  // Revisión 12: tras entrar con clave temporal (`debeCambiarClave`), el usuario crea la suya.
+  cambiarClave: (claveActual, claveNueva) => request("POST", "/auth/cambiar-clave", { claveActual, claveNueva }),
   me: () => request("GET", "/auth/me"),
   async portalLogin(dni, password, { alReintentar } = {}) {
     const r = await request("POST", "/auth/portal/login", { dni, password }, null, { idempotente: true, sinAviso: true, alReintentar });
