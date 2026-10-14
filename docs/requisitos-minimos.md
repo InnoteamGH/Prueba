@@ -319,3 +319,19 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Agente de IA:** responde con los datos de la sede del número que recibió el chat: dirección, horario (`horario.sedes[sedeId]`, o el general), doctores y horarios de esa sede (`/disponibilidad` con `sedeId`), precios de esa sede (`preciosSede`) y solo las promociones de esa sede o de toda la clínica. Al agendar desde el chat, la cita se crea en esa sede.
 92. Portal del paciente (`GET /portal/{pacienteId}/resumen`): además de citas, pagos, total invertido y ahorro, devolver el plan vigente con sus fases (`plan: { nombre, total, fases: [{ nombre, piezaNumero, estado, costo }] }`), el saldo pendiente (`saldo`) y las piezas por atender del último odontograma. Sin esos campos el portal muestra «No disponible»; no debe deducir que el paciente está al día.
 93. Metas por sede (`PUT /medicos/{id}/metas/{sedeId}`): validar que el médico atiende en la sede con su horario (`/disponibilidad` de esa sede) o con `medico.sedes`, y cargar las sedes de cada médico en `/medicos`. Hoy responde 403 «médico sin sede asignada» a todos, así que el administrador de sede no puede fijar ninguna meta. Guardar la meta y el % por sede (no en la ficha global del médico) si la clínica decide que son por sede.
+94. Decisiones del cliente (revisión 11) que necesitan backend:
+   - **Citas:** `POST /citas` sin `estado` crea «pendiente»; el frontend envía «pendiente» salvo el canal presencial. `PUT /citas/{id}` debe aceptar `estado` (hoy lo ignora; el frontend lo corrige con `PATCH /citas/{id}/estado`). La confirmación del paciente por WhatsApp pasa la cita a «confirmada».
+   - **Producción:** `/comisiones`, `/mi-produccion` y `/gerencial/*` calculan la producción sobre procedimientos terminados (fases `terminado`/`atendida`), no sobre citas atendidas. «Facturado» queda solo para comprobantes electrónicos.
+   - **TI:** sin acceso a Caja ni cobranza (`/caja`, `/pagos`, `/pagos/*` → 403 para el rol `ti`).
+   - **Metas:** meta mensual por médico y sede (no en la ficha global); el % de comisión es del médico y solo lo cambia el administrador general (`PUT /medicos/{id}`).
+   - **Procedimientos:** el médico anula (no borra) los no terminados con `PATCH /tratamientos/fases/{id}` `{ estado: "anulado", motivo }`, guardando el motivo (hoy se pierde); un terminado solo lo anula el administrador; `DELETE` solo el administrador.
+   - **Usuarios:** al entrar con clave temporal, el login devuelve `debeCambiarClave: true` y obliga a cambiarla; el administrador de sede puede desactivar con `DELETE` a los usuarios de su sede (no administradores).
+   - **Consentimiento firmado:** `POST /consentimientos/{id}/anular` con motivo (médico o administrador); queda en la historia como anulado.
+   - **Sede de registros existentes:** `PUT /inventario/{id}` debe aceptar `sedeId` y `PUT /pacientes/{id}` `sedeRegistroId` (solo administrador general); hoy los ignoran.
+   - **Recordatorios:** `PUT /automatizaciones` exige `recall: configurar`.
+95. Izipay + WhatsApp con IA (revisión 11):
+   - `GET /public/izipay/checkout/{pagoId}` hoy responde 400 «Izipay rechazó Token/Generate: Estructura del request inválida»: corregir el cuerpo del pedido de token según la documentación del sandbox.
+   - La página de pago va en el dominio de la clínica, con su nombre y logo, y envía a Izipay los datos reales del paciente (nombre, DNI, celular, correo).
+   - Al pagar: crear la cita de la reserva, registrar el pago en la Caja de la sede (método `izipay`) con comprobante y confirmar por WhatsApp.
+   - La IA debe usar `POST /reservas` + `POST /pagos/link` y enviar el link; la cita se confirma al pagar. Mientras Izipay no opere, la cita de la IA queda «pendiente».
+   - Mensaje del link: «viernes 23/10 a las 17:00» y «Sede Surco» (hoy «2026-10-23» y «Sede Sede Surco»).
