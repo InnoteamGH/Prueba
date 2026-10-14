@@ -1,8 +1,10 @@
-/* Resumen del mes para gerencia: facturado, salidas, meta, equipo vs meta y top de tratamientos.
+/* Resumen del mes para gerencia: producción, salidas, meta, equipo vs meta y top de tratamientos.
+ * Términos (decisión del cliente): Producción = valor de los procedimientos terminados;
+ * Cobrado = pagos registrados en Caja. (Las variables internas siguen llamándose «facturado».)
  *
  * Conectado (sin endpoints nuevos):
  *   - Meta y equipo: GET /gerencial/kpis → metaMensualClinica, ranking[{ nombre, produccion, meta }]
- *   - Facturado del mes (H-G3): la suma de GET /tratamientos/resumen del mes, la MISMA lista
+ *   - Producción del mes (H-G3): la suma de GET /tratamientos/resumen del mes, la MISMA lista
  *     del Top de tratamientos (y de Producción por especialidad del panel). Antes era
  *     kpis.ingresosMes (citas atendidas), que daba S/ 0 con S/ 340 en el Top de al lado.
  *     El mes anterior se compara con el mismo tramo de días.
@@ -55,7 +57,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const [topErr, setTopErr] = useState(null);
   const motivo = (e) => (e?.status === 403 ? "sin permiso" : "no disponible");
   // R6-02: con una sede elegida, /gerencial/kpis y /tratamientos/resumen ya devuelven lo de esa
-  // sede: Facturado, Top de tratamientos, Top del equipo y Resultado son de la sede, sin rótulo
+  // sede: Producción, Top de tratamientos, Top del equipo y Resultado son de la sede, sin rótulo
   // «toda la clínica» ni recálculo con las citas. Solo la meta no viene por sede (los médicos no
   // traen sede, H-14): la de la sede es la suma de las metas de sus doctores (los que tienen
   // horario en ella), como en Metas.
@@ -146,7 +148,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
       <div className="dc-rm__kpis">
         <article className="dc-rm__kpi" style={{ "--c": "#0E9199" }}>
           <span className="dc-rm__ico"><ArrowDownRight size={18} strokeWidth={2.2} /></span>
-          <small>Facturado del mes</small>
+          <small>Producción del mes</small>
           <b>{sinFacturado ? "—" : soles(d.facturado)}</b>
           <em>{sinFacturado ? nd({ texto: "Ventas por tratamiento no disponibles" }) : delta == null ? (conectado ? "Suma del Top de tratamientos; sin mes anterior para comparar" : "Sin mes anterior para comparar") : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%</i> vs. mes anterior</>}</em>
         </article>
@@ -159,16 +161,16 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
         <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#0B6C78" : "#D0563F" }}>
           <span className="dc-rm__ico"><Wallet size={18} strokeWidth={2.2} /></span>
           <small>Resultado del mes</small>
-          {/* R6-02: también por sede: facturado y salidas ya son de la sede elegida. */}
+          {/* R6-02: también por sede: producción y salidas ya son de la sede elegida. */}
           <b>{sinSalidas || sinFacturado ? "—" : <>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</>}</b>
-          <em>{sinSalidas ? "No se calcula sin los egresos" : sinFacturado ? "No se calcula sin el facturado" : <>Facturado menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
+          <em>{sinSalidas ? "No se calcula sin los egresos" : sinFacturado ? "No se calcula sin la producción" : <>Producción menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
         </article>
         <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#C98A12" }}>
           <span className="dc-rm__ico"><Target size={18} strokeWidth={2.2} /></span>
           <small>{sedeElegida && !d.metaClinica ? "Meta de la sede" : "Meta mensual"}{todaMeta}</small>
           <b>{sinKpis || d.metaCargando ? "—" : d.meta ? soles(d.meta) : "Sin meta"}</b>
           {sinKpis ? <em>{nd({ texto: "Meta no disponible" })}</em> : d.metaCargando ? <em>Calculando la meta de la sede…</em> : d.metaClinica ? <em>Sin el horario de los doctores no se sabe la meta de la sede</em> : d.meta > 0 ? (
-            sinFacturado ? <em>Avance no disponible: falta el facturado del mes</em> : <>
+            sinFacturado ? <em>Avance no disponible: falta la producción del mes</em> : <>
               <div className="dc-rm__meta" role="img" aria-label={`Avance ${avance.toFixed(0)}% de la meta`}><i style={{ width: `${Math.min(100, avance)}%` }} /><span style={{ left: `${Math.min(100, ritmo)}%` }} title="Ritmo esperado a hoy" /></div>
               <em><i className={avance >= ritmo ? "is-up" : "is-down"}>{avance.toFixed(0)}%</i> logrado · {hoy.getDate() >= 5 ? `cierre estimado ${soles(proyeccion)}` : "estimado de cierre desde el día 5"}</em>
             </>
@@ -195,7 +197,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
           )}
         </article>
         <article className="dc-rm__card">
-          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>{sedeElegida ? "en esta sede · " : ""}por importe facturado del mes</span></div>
+          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>{sedeElegida ? "en esta sede · " : ""}por importe producido del mes</span></div>
           {conectado && topErr ? <p className="dc-rm__vacio">{topErr === "sin permiso" ? "Sin permiso para ver las ventas por tratamiento." : nd({ texto: "Ventas por tratamiento no disponibles" })}</p> : d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
             <ol className="dc-rm__rank is-trat">
               {d.top.map((t, i) => (

@@ -416,6 +416,8 @@ export const api = {
     crear: (u) => request("POST", "/usuarios", u),
     actualizar: (id, u) => request("PUT", `/usuarios/${id}`, u),
     desactivar: (id) => request("DELETE", `/usuarios/${id}`),
+    // El servidor genera la clave temporal y la devuelve una sola vez: { claveTemporal, usuarioId }.
+    resetClave: (id) => request("POST", `/usuarios/${id}/reset-clave`),
   },
   sedes: {
     listar: () => request("GET", "/sedes"),

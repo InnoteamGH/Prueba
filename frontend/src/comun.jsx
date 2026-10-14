@@ -108,11 +108,10 @@ export const ROLES = {
     desc: "Responsable operativo de la(s) sede(s) asignada(s): agenda, personal, pacientes, cajas, inventario, laboratorio, reportes y producción de su sede. Solo ve la información de sus sedes habilitadas.",
     mods: ["dashboard","reportes","whatsapp","agenda","espera","pacientes","servicios","inventario","laboratorio","facturacion","comisiones","metas","resenas","recall","seguros","formularios","tratamientos","config","plan"] },
   ti:        { label: "Administrador TI", icon: Server, color: DS.c.primary,
-    // H-T9: el servidor le da facturacion:["ver"], agenda:["ver"] y whatsapp:["ver"], y el
-    // menú sigue al servidor. La descripción dice lo que de verdad ve (antes: «sin acceso a
-    // la cobranza» y «reseteo de clave», que no existe). Si debe quedar sin Caja ni
-    // WhatsApp, se quita en la matriz del servidor (Permisos por rol), no aquí.
-    desc: "Help Desk interno de la clínica: gestión de usuarios (alta, bloqueo, roles y sedes), permisos, integraciones, configuración básica y auditoría de accesos. Sin acceso a la historia clínica. No cobra ni responde WhatsApp: Caja, agenda y conversaciones, solo en lectura si la matriz de permisos se lo da.",
+    // H-T9: el servidor le da facturacion:["ver"], agenda:["ver"] y whatsapp:["ver"]. Por
+    // decisión del cliente TI no ve Caja ni la cobranza aunque el servidor le dé lectura:
+    // el frontend se lo quita (compartido/modulosRol.js). Agenda y WhatsApp siguen al servidor.
+    desc: "Help Desk interno de la clínica: gestión de usuarios (alta, bloqueo, roles, sedes y restablecer clave), permisos, integraciones, configuración básica y auditoría de accesos. Sin acceso a la historia clínica ni a Caja y cobranza. No responde WhatsApp: agenda y conversaciones, solo en lectura si la matriz de permisos se lo da.",
     mods: ["dashboard","usuarios","permisos","integraciones","config","auditoria","plan"] },
   medico:    { label: "Odontólogo", icon: Stethoscope, color: DS.c.primary,
     desc: "Su agenda y disponibilidad, odontograma, tratamientos, recetas y su producción, en la(s) sede(s) donde atiende.",

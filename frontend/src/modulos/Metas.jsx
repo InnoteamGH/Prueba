@@ -1,12 +1,15 @@
-/* Pantalla #/metas — meta mensual y % de comisión de cada odontólogo, POR SEDE.
+/* Pantalla #/metas — meta mensual de cada odontólogo POR SEDE y su % de comisión.
    Un doctor que atiende en dos sedes tiene una meta en cada una: la de la sede es la suma
-   de sus doctores. Con el filtro global de sede (o un usuario de una sola sede) solo se ve
-   y se edita esa sede. El avance del mes está en Reportes › Producción y comisiones. */
+   de sus doctores. El % de comisión es del médico (el mismo en todas sus sedes): solo lo
+   cambia el administrador general en «Todas las sedes» (util/metasComision.js). Con el
+   filtro global de sede (o un usuario de una sola sede) solo se ve y se edita la meta de esa
+   sede. El avance del mes está en Reportes › Producción y comisiones. */
 import React, { useEffect, useMemo, useState } from "react";
 import { Check, Info, MapPin, Minus, Plus, RotateCcw, Target, TrendingUp } from "lucide-react";
 import api, { auth, msgServidor } from "../api/client";
 import { Card, ESPECIALIDADES, MEDICOS, SEDE_IDS, Vacio, colorDe, iniciales, mismaSede, nombreSede, tint, useSede } from "../comun";
-import { comisionSede, guardarMetaSedeDemo, metaSede, sedesMed } from "../compartido/medicosSede";
+import { guardarMetaSedeDemo, metaSede, sedesMed } from "../compartido/medicosSede";
+import { NOTA_COMISION_GLOBAL, comisionMedico, cuerpoMetaSede, puedeEditarComision } from "../util/metasComision";
 import { atiendeEnSedes } from "../compartido/medicoEnSede";
 import { sedeApiUuid } from "../routing";
 import NoDisponible from "../ui/NoDisponible";
@@ -51,15 +54,11 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
   // Con sesión SEDE_IDS son las sedes reales (registro), así que también vale el recuento.
   const esGlobal = sedeSel === "all" && (usuarioGlobal || !mias || mias.length >= SEDE_IDS.length);
   const puedeEditar = can ? can("metas", "editar") : true;
-  // R4-02: el % de una meta de toda la clínica (doctor sin sede) se guarda con PUT
-  // /medicos/{id}, que el servidor autoriza con el permiso de Configuración, no con el de
-  // metas. Gerencia tiene metas pero no config: la meta se guardaba y la comisión daba 403
-  // (guardado a medias). Sin ese permiso el % se ve, pero en solo lectura.
-  const puedeComGlobal = puedeEditar && (can ? can("config", "editar") : true);
-  // R7-03: la misma regla con una sede elegida. Antes, con «Sede San Isidro», gerencia podía
-  // editar el % (el servidor lo acepta por /metas/{sede} y lo guarda en la ficha global del
-  // doctor). Sin el permiso que guarda la comisión, el % queda en solo lectura en todas las vistas.
-  const puedeCom = () => puedeComGlobal;
+  // El % de comisión es del médico (global): solo el administrador general lo cambia, y solo
+  // en «Todas las sedes», por PUT /medicos/{id} (que el servidor autoriza con Configuración).
+  // Con una sede elegida se edita solo la meta; gerencia y el administrador de sede ven el %
+  // en solo lectura (R4-02 / R7-03).
+  const puedeComGlobal = puedeEditarComision({ rol, vistaTodas: esGlobal, puedeEditarMetas: puedeEditar, puedeConfig: can ? can("config", "editar") : true });
   const verSedes = useMemo(() => (sedes && sedes.length ? sedes.map(String) : null), [sedes && sedes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [meds, setMeds] = useState([]);
   const [nombres, setNombres] = useState({});   // sedeId → nombre (conectado)
@@ -82,7 +81,7 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
       setBase(b); setDraft(b);
     };
     if (!conectado) {
-      armar(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: ESPECIALIDADES.find((e) => e.id === m.esp)?.nombre, sedesIds: sedesMed(m).map(String), metaDe: (s) => metaSede(m, s), comDe: (s) => comisionSede(m, s), ref: m })));
+      armar(MEDICOS.map((m) => ({ id: m.id, nombre: m.nombre, especialidad: ESPECIALIDADES.find((e) => e.id === m.esp)?.nombre, sedesIds: sedesMed(m).map(String), metaDe: (s) => metaSede(m, s), comDe: () => comisionMedico(m), ref: m })));
       return;
     }
     api.sedes.listar().then((ss) => setNombres(Object.fromEntries((ss || []).map((s) => [String(s.id), s.nombre])))).catch(() => {});
@@ -98,7 +97,8 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
           return { id: m.id, nombre: m.nombre, especialidad: m.especialidad, especialidadId: m.especialidadId, cop: m.cop, activo: m.activo,
             sedes: ids, sedesIds: ids.length ? ids : ["todas"], sinSede: !ids.length,
             metaDe: (s) => (ms[s]?.metaMensual !== undefined ? ms[s].metaMensual : m.metaMensual ?? null),
-            comDe: (s) => (ms[s]?.porcentajeComision !== undefined ? ms[s].porcentajeComision : m.porcentajeComision ?? null) };
+            // El % es del médico: el de su ficha, no el de cada sede.
+            comDe: () => comisionMedico(m) };
         }));
       })
       .catch((e) => { setMeds([]); setError(e?.status === 404 ? "No se pudo cargar el catálogo de médicos." : "No se pudieron cargar las metas."); });
@@ -165,34 +165,46 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
   const bloqueada = (m) => esAdminSede && !!m.sinSede;
   const medsBloqueados = [...new Set(filas.filter((f) => bloqueada(f.m)).map((f) => f.m))];
   const todasBloqueadas = filas.length > 0 && medsBloqueados.length === new Set(filas.map((f) => f.m)).size;
-  const set = (key, campo, v) => setDraft((d) => ({ ...d, [key]: { ...(d[key] || {}), [campo]: v } }));
+  // El % es del médico: al cambiarlo en una fila cambia en todas sus filas (una por sede).
+  const set = (key, campo, v) => setDraft((d) => {
+    if (campo !== "com") return { ...d, [key]: { ...(d[key] || {}), [campo]: v } };
+    const mid = (filas.find((f) => f.key === key) || {}).m?.id;
+    const nd = { ...d };
+    filas.filter((f) => f.key === key || (mid != null && f.m.id === mid)).forEach((f) => { nd[f.key] = { ...(nd[f.key] || {}), com: v }; });
+    return nd;
+  });
   const deshacer = () => setDraft(base);
   const guardarTodo = () => {
     if (!puedeEditar) { notify("Sin permiso para editar metas."); return; }
     const malo = cambiados.find(({ key }) => { const c = val(key, "com"); return c != null && (c < 0 || c > 100); });
     if (malo) { notify("La comisión va de 0 a 100 %."); return; }
+    const cambioMeta = (key) => (draft[key]?.meta ?? "") !== (base[key]?.meta ?? "");
+    const cambioCom = (key) => (draft[key]?.com ?? "") !== (base[key]?.com ?? "");
+    // El % se guarda una vez por médico (es global), con todas sus filas.
+    const comPorMedico = puedeComGlobal ? [...new Map(cambiados.filter(({ key }) => cambioCom(key)).map((f) => [String(f.m.id), f])).values()]
+      .map((f) => ({ m: f.m, com: val(f.key, "com"), keys: filas.filter((x) => String(x.m.id) === String(f.m.id)).map((x) => x.key) })) : [];
     if (!conectado) {
-      cambiados.forEach(({ m, s, key }) => guardarMetaSedeDemo(m.ref, Number(s), val(key, "meta"), val(key, "com")));
+      cambiados.filter(({ key }) => cambioMeta(key)).forEach(({ m, s, key }) => guardarMetaSedeDemo(m.ref, Number(s), val(key, "meta"), undefined));
+      comPorMedico.forEach(({ m, com }) => {
+        m.ref.comision = com;
+        try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); o[m.id] = { ...(o[m.id] || {}), comision: com }; localStorage.setItem("dc_data_v1_medicos_cfg", JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ }
+      });
       setBase(draft);
-      notify(cambiados.length === 1 ? `Meta y comisión de ${cambiados[0].m.nombre} guardadas.` : `${cambiados.length} metas guardadas.`);
+      notify(cambiados.length === 1 ? `Cambio de ${cambiados[0].m.nombre} guardado.` : `${cambiados.length} cambios guardados.`);
       return;
     }
     setSaving(true);
-    // Una petición por cada cosa que cambió (antes la meta global mandaba siempre también la
-    // comisión, aunque no se hubiera tocado). Si el servidor rechaza una parte, lo demás queda
+    // Una petición por cada cosa que cambió. Si el servidor rechaza una parte, lo demás queda
     // guardado y se dice qué faltó: nunca un guardado a medias en silencio (R4-02).
-    const tareas = cambiados.flatMap(({ m, s, key }) => {
-      const meta = val(key, "meta"), com = val(key, "com");
-      // R7-03: sin permiso de comisión se reenvía el % guardado, nunca uno editado.
-      const comBase = base[key]?.com === "" || base[key]?.com == null ? null : Number(base[key].com);
-      if (s !== "todas") return [{ key, campos: puedeComGlobal ? ["meta", "com"] : ["meta"], que: puedeComGlobal ? "meta y comisión" : "meta", nombre: m.nombre, p: api.catalogo.fijarMetaSede(m.id, sedeApiUuid(s) || s, { metaMensual: meta, porcentajeComision: puedeComGlobal ? com : comBase }) }];
-      const cambioMeta = (draft[key]?.meta ?? "") !== (base[key]?.meta ?? "");
-      const cambioCom = (draft[key]?.com ?? "") !== (base[key]?.com ?? "");
-      return [
-        cambioMeta && { key, campos: ["meta"], que: "meta", nombre: m.nombre, p: api.catalogo.fijarMeta(m.id, meta) },
-        cambioCom && puedeComGlobal && { key, campos: ["com"], que: "comisión", nombre: m.nombre, p: api.catalogo.actualizarMedico(m.id, { nombre: m.nombre, especialidadId: m.especialidadId || null, cop: m.cop || null, activo: m.activo !== false, porcentajeComision: com }) },
-      ].filter(Boolean);
-    });
+    // Meta por sede: PUT /medicos/{id}/metas/{sedeId} con { metaMensual } (sin el %). Meta de
+    // un doctor sin sede (vista «Todas las sedes»): la ruta global de la meta.
+    const tareas = [
+      ...cambiados.filter(({ key }) => cambioMeta(key)).map(({ m, s, key }) => ({ keys: [key], campos: ["meta"], que: "meta", nombre: m.nombre,
+        p: s !== "todas" ? api.catalogo.fijarMetaSede(m.id, sedeApiUuid(s) || s, cuerpoMetaSede(val(key, "meta"))) : api.catalogo.fijarMeta(m.id, val(key, "meta")) })),
+      ...comPorMedico.map(({ m, com, keys }) => ({ keys, campos: ["com"], que: "comisión", nombre: m.nombre,
+        p: api.catalogo.actualizarMedico(m.id, { nombre: m.nombre, especialidadId: m.especialidadId || null, cop: m.cop || null, activo: m.activo !== false, porcentajeComision: com }) })),
+    ];
+    if (!tareas.length) { setDraft(base); setSaving(false); notify("Sin cambios que guardar."); return; }
     Promise.allSettled(tareas.map((t) => t.p))
       .then((rs) => {
         const fallos = tareas.filter((_, i) => rs[i].status === "rejected");
@@ -201,7 +213,7 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
         // Lo guardado deja de contar como cambio; lo rechazado sigue marcado «sin guardar».
         setBase((b) => {
           const nb = { ...b };
-          ok.forEach((t) => { nb[t.key] = { ...(nb[t.key] || {}), ...Object.fromEntries(t.campos.map((c) => [c, draft[t.key]?.[c] ?? ""])) }; });
+          ok.forEach((t) => t.keys.forEach((kk) => { nb[kk] = { ...(nb[kk] || {}), ...Object.fromEntries(t.campos.map((c) => [c, draft[kk]?.[c] ?? ""])) }; }));
           return nb;
         });
         const e = rs.find((r) => r.status === "rejected").reason;
@@ -238,7 +250,7 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
         <div className="dc-esp-hero__txt">
           {/* R6-11: si no se pudieron leer los médicos, ninguna cifra cae a S/ 0 (se leía como dato real). */}
           <div className="dc-esp-hero__num"><b>{error ? "—" : soles(metaTotal)}</b><span>{error ? <NoDisponible onReintentar={cargar} texto="Metas no disponibles" /> : <>meta mensual {unaSede ? `de ${nomSede(grupos[0].sede)}` : sinDocsAqui && vistaUnica ? `de ${nomSede(vistaUnica)}` : "de la clínica"}</>}</span></div>
-          <p>La meta y el % de comisión de cada odontólogo, sede por sede</p>
+          <p>La meta de cada odontólogo, sede por sede, y su % de comisión</p>
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{error ? "—" : `${conMeta} de ${docs}`}</b><span>Con meta</span></div>
@@ -253,7 +265,8 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
         ? <>El servidor no indica en qué sede atiende cada doctor: se muestran los que tienen horario en la sede elegida (Configuración › Horarios por doctor).{ocultosSinHorario.length ? ` ${ocultosSinHorario.length === 1 ? "1 doctor sin horario aquí no se lista" : `${ocultosSinHorario.length} doctores sin horario aquí no se listan`}${usuarioGlobal ? ": están en «Todas las sedes»." : ": su meta la fija quien administra su sede."}` : ""}</>
         : <>El servidor no indica en qué sede atiende cada doctor: {sinSede.length === 1 ? "este doctor se muestra" : `estos ${sinSede.length} doctores se muestran`} en la sede elegida. Indícalo en Configuración › Doctores.</>}</span></div>}
       {puedeEditar && medsBloqueados.length > 0 && <div className="fm-aviso-edad" role="note"><Info size={15} strokeWidth={2} /><span>El servidor no deja guardar metas de médicos sin sede asignada, y no indica la sede de {medsBloqueados.length === 1 ? "este doctor" : `estos ${medsBloqueados.length} doctores`}: {medsBloqueados.length === 1 ? "su meta y su comisión se ven" : "sus metas y comisiones se ven"} en solo lectura. Las fija el administrador general.</span></div>}
-      {puedeEditar && !puedeComGlobal && grupos.length > 0 && !todasBloqueadas && <div className="fm-aviso-edad"><Info size={15} strokeWidth={2} /><span>Puedes fijar la meta de cada odontólogo. El <b>% de comisión</b> se ve en solo lectura: lo cambia quien administra Configuración › Doctores.</span></div>}
+      {!puedeComGlobal && grupos.length > 0 && !todasBloqueadas && <div className="fm-aviso-edad" role="note" data-nota-comision><Info size={15} strokeWidth={2} /><span>{puedeEditar ? "Puedes fijar la meta de cada odontólogo en esta sede. " : ""}{NOTA_COMISION_GLOBAL}</span></div>}
+      {puedeComGlobal && grupos.length > 0 && <div className="fm-aviso-edad is-info" role="note"><Info size={15} strokeWidth={2} /><span>El % de comisión es del médico en todas sus sedes: si lo cambias en una fila, cambia en todas las suyas.</span></div>}
       {conectado && !error && meds.length === 0 && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>}
       {sinDocsAqui && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo={vistaUnica ? `Ningún doctor tiene horario en ${nomSede(vistaUnica)}` : "Ningún doctor tiene horario en estas sedes"} sub="La meta se fija para los doctores que atienden en la sede. Carga su horario en Configuración › Horarios por doctor." /></Card>}
 
@@ -290,7 +303,7 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
                       <span className="dc-mtz__dn"><b>{m.nombre}{cambio && <em className="dc-mtz__tag">Editado</em>}</b><small>{nomEsp(m)}{m.sinSede && !esGlobal ? <> · <i>sede no indicada por el servidor{bloq ? ": solo lectura" : ""}</i></> : null}{otras.length ? <> · <i>también en {otras.map((s) => nomSede(s).replace(/^Sede\s+/i, "")).join(", ")}</i></> : null}</small></span>
                     </span>
                     <span role="cell" title={tituloBloq}><Monto value={draft[key]?.meta} disabled={!puedeEditar || bloq} label={`Meta mensual de ${m.nombre} en ${nomSede(g.sede)}`} onChange={(v) => set(key, "meta", v)} /></span>
-                    <span role="cell"><Porcentaje value={draft[key]?.com} disabled={!puedeCom(g.sede) || bloq} title={tituloBloq || (puedeEditar && !puedeCom(g.sede) ? "Solo lectura: el % de comisión lo cambia quien administra Configuración › Doctores." : undefined)} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>
+                    <span role="cell"><Porcentaje value={draft[key]?.com} disabled={!puedeComGlobal || bloq} title={tituloBloq || (!puedeComGlobal ? `Solo lectura. ${NOTA_COMISION_GLOBAL}` : undefined)} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>
                     <span role="cell" className="dc-mtz__gana">{/* H-G10: pide solo lo que falta (antes decía «Define meta y %» con el % ya en 40). */}{met && pc != null ? <><b>{soles((met * pc) / 100)}</b><small>{pc}% de {soles(met)}</small></> : <small>{!met && pc == null ? "Define meta y %" : !met ? `Define la meta (comisión ${pc}%)` : `Define el % (meta ${soles(met)})`}</small>}</span>
                     <span role="cell" className="dc-mtz__parte"><i><u style={{ width: `${parte}%`, background: col }} /></i><b>{parte ? `${parte}%` : "—"}</b></span>
                   </div>
@@ -301,7 +314,7 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
         );
       })}
 
-      <p className="dc-mtz__nota"><Info size={13} strokeWidth={2} /> La comisión se calcula sobre lo que el odontólogo produce en cada sede (citas atendidas al precio de esa sede). Quién va al ritmo y cuánto lleva ganado está en <b>Reportes › Producción y comisiones</b>.</p>
+      <p className="dc-mtz__nota"><Info size={13} strokeWidth={2} /> La comisión es el % del médico sobre su producción en cada sede: el valor de los procedimientos terminados, al precio de esa sede (el servidor todavía la calcula con las citas atendidas). Quién va al ritmo y cuánto lleva ganado está en <b>Reportes › Producción y comisiones</b>.</p>
 
       {puedeEditar && cambiados.length > 0 && (
         <div className="dc-mtz__barra" role="region" aria-label="Cambios sin guardar">

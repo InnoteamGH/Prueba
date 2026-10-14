@@ -137,7 +137,7 @@ export function diaDelMesRitmo(date = new Date()) {
   return { dia: d, diasMes: dias, ritmoPct: (d / dias) * 100 };
 }
 
-/* H-G3 / H-G4: «Facturado del mes», «Producción por especialidad» y «Top de tratamientos»
+/* H-G3 / H-G4: «Producción del mes» (antes «Facturado del mes»), «Producción por especialidad» y «Top de tratamientos»
    salen de la MISMA lista (GET /tratamientos/resumen del mes). Antes Facturado usaba
    kpis.ingresosMes (citas atendidas × precio) y Especialidad indicadores.porEspecialidad
    (citas, aunque estuvieran canceladas o fueran futuras): tres cifras distintas de

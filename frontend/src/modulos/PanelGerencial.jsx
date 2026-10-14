@@ -1018,7 +1018,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
 
 
   const meta = metaEstado(kd?.hayMeta, kd?.metaMensualClinica);
-  // H-G3: con sesión, lo mismo que «Facturado del mes» y el Top de tratamientos.
+  // H-G3: con sesión, lo mismo que «Producción del mes» y el Top de tratamientos.
   const prodMes = conectado ? totalResumen(tratResumen) : (Number(kd?.ingresosMes) || 0);
   // R6-02: /gerencial/kpis ya trae la producción y los atendidos de hoy de la sede elegida.
   const prodDia = Number(kd?.produccionDia) || 0;
@@ -1110,7 +1110,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
   const propuesto = Number(conv.presupuestado) > 0 ? Number(conv.presupuestado) : aceptado + pendiente;
   const tasaAceptacion = conv.tasa != null && Number.isFinite(Number(conv.tasa)) ? Number(conv.tasa) : (propuesto ? (aceptado / propuesto) * 100 : 0);
   // H-G4: con sesión, el resumen de tratamientos del mes repartido por la especialidad de
-  // cada servicio del catálogo: suma lo mismo que «Facturado» y que «Producción por
+  // cada servicio del catálogo: suma lo mismo que «Producción del mes» y que «Producción por
   // tratamiento». indicadores.porEspecialidad contaba citas (canceladas y futuras incluidas).
   const espRaw = conectado
     ? produccionPorEspecialidad(tratResumen, servicios || [])
@@ -1294,10 +1294,10 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
         <div className="dc-hoy__t" role="button" tabIndex={0}
           onClick={() => abrir({
             t: "Producción del día",
-            s: "Trabajo facturado hoy",
+            s: "Valor de lo producido hoy",
             cifra: moneyFmt(prodDia),
-            sub: "Producción no es cobro.",
-            como: "Misma lógica que la producción del mes, acotada a hoy.",
+            sub: "Producción no es cobro: lo cobrado son los pagos registrados en Caja.",
+            como: "Producción = valor de los procedimientos terminados (criterio acordado con la clínica). El servidor todavía calcula la del día con las citas atendidas de hoy.",
             cols: [["Paciente"], ["Estado"]],
             filas: citasHoy.filter((c) => c.estado === "atendida").map((c) => [c.paciente || c.pacienteNombre || "—", "Atendida"]),
             vacio: "Aún no hay citas atendidas hoy.",
@@ -1485,8 +1485,8 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                 s: "Cada barra es su parte del total",
                 cifra: moneyFmt(espTotal),
                 como: conectado
-                  ? "Los procedimientos del mes (la misma lista del Top de tratamientos) agrupados por la especialidad de su servicio en el catálogo. Suma lo mismo que «Facturado del mes»."
-                  : "Se cruza la cita (con su especialidad) con lo facturado.",
+                  ? "Los procedimientos del mes (la misma lista del Top de tratamientos) agrupados por la especialidad de su servicio en el catálogo. Suma lo mismo que «Producción del mes»."
+                  : "Se cruza la cita (con su especialidad) con lo producido.",
                 cols: [["Especialidad"], ["Importe", "n"], ["%", "n"]],
                 filas: espRaw.map((e) => {
                   const lay = layoutProgreso(e.valor, espTotal);

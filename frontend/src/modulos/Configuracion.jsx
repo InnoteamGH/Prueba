@@ -3,7 +3,8 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import {AlertTriangle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, MessageCircle, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
 import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
-import { comisionSede, guardarMetaSedeDemo, medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
+import { medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
+import { NOTA_COMISION_GLOBAL, comisionMedico } from "../util/metasComision";
 import { sedeApiUuid } from "../routing";
 import { tienePermiso } from "../compartido/permisos";
 import { pluralizarParentesis } from "../util/plurales";
@@ -232,7 +233,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   // Un doctor sin sede (datos viejos) se ve en todas; al editarlo se le asigna.
   const medVisible = (m) => { const l = sedesMedico(m); return !l.length || l.some(sedeVisible); };
   // Un usuario de sede no cambia los datos generales de un doctor que también atiende en otra
-  // sede (ni de uno sin sede): solo su comisión en su sede.
+  // sede (ni de uno sin sede): lo ve en solo lectura (su meta se fija en Metas y comisiones).
   const medAjeno = (m) => { if (!limitarSede) return false; const l = sedesMedico(m); return !l.length || l.some((x) => !sedeEditable(x)); };
   // Sede para lo nuevo: la activa del menú (nunca "todas"), o la primera de la lista.
   const sedePreferida = ctxSede.activa ?? (mias || [])[0] ?? null;
@@ -468,21 +469,22 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   // Meta y % de un doctor en las sedes que se ven (demo: calculado; API: metasSede si llega).
   const metasApi = (m) => (Array.isArray(m.metasSede) ? m.metasSede : Object.entries(m.metasSede || {}).map(([sedeId, x]) => ({ sedeId, ...x })));
   const porSedeDe = (m) => {
-    if (m.ref) return sedesMed(m.ref).filter(sedeVisible).map((sd) => ({ sede: sd, meta: metaSede(m.ref, sd), com: comisionSede(m.ref, sd) }));
-    return sedesMedico(m).filter(sedeVisible).map((sd) => { const x = metasApi(m).find((y) => mismaSede(y.sedeId, sd)) || {}; return { sede: sd, meta: x.metaMensual ?? null, com: x.porcentajeComision !== undefined ? x.porcentajeComision : (m.porcentajeComision ?? null) }; });
+    if (m.ref) return sedesMed(m.ref).filter(sedeVisible).map((sd) => ({ sede: sd, meta: metaSede(m.ref, sd) }));
+    return sedesMedico(m).filter(sedeVisible).map((sd) => { const x = metasApi(m).find((y) => mismaSede(y.sedeId, sd)) || {}; return { sede: sd, meta: x.metaMensual ?? null }; });
   };
   const metaVista = (m) => {
     if (m.ref) return medicoEnSedes(m.ref, ver ? ver.map(sedeNum) : null).meta;
     const ps = porSedeDe(m).filter((x) => x.meta != null);
     return ps.length ? ps.reduce((a, x) => a + (Number(x.meta) || 0), 0) : (m.metaMensual ?? null);
   };
-  // Con una sola sede a la vista, el % es el de esa sede; si no, el base del doctor.
-  const comisionVista = (m) => { if (sedeUnicaVer == null) return m.porcentajeComision ?? null; const x = porSedeDe(m).find((y) => mismaSede(y.sede, sedeUnicaVer)); return x ? x.com : (m.porcentajeComision ?? null); };
+  // El % de comisión es del médico, el mismo en todas sus sedes (util/metasComision.js).
+  const comisionVista = (m) => comisionMedico(m);
+  // Solo el administrador general lo cambia (en la demostración, también).
+  const editaComision = !limitarSede && (rol === "admin" || !auth.token);
   const nomSedeCfg = (id) => (sedesTodas.find((x) => mismaSede(x.id, id)) || {}).nombre || nombreSede(id);
   const abrirDoctor = (m) => {
-    if (!m) { const def = sedeDefecto(sedesEdit); setEdit({ tipo: "doctor", item: { activo: true, sedesForm: def != null ? [def] : [], comSede: {} } }); return; }
-    const comSede = Object.fromEntries(porSedeDe(m).filter((x) => sedeEditable(x.sede)).map((x) => [x.sede, x.com ?? ""]));
-    setEdit({ tipo: "doctor", item: { ...m, sedesForm: sedesMedico(m), comSede } });
+    if (!m) { const def = sedeDefecto(sedesEdit); setEdit({ tipo: "doctor", item: { activo: true, sedesForm: def != null ? [def] : [] } }); return; }
+    setEdit({ tipo: "doctor", item: { ...m, sedesForm: sedesMedico(m) } });
   };
 
   // El WhatsApp de la sede se edita con espacios («+51 987 654 321»); se guarda en E.164.
@@ -528,17 +530,19 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
       (it.id ? api.sillones.actualizar(it.id, payload) : api.sillones.crear(payload)).then(() => { notify("Sillón guardado."); setEdit(null); cargarSillones(); }).catch(err);
       return;
     }
-    // Doctor: la administración general edita sus datos, sus sedes y el % base; un usuario
-    // de sede solo el % de comisión en su sede (y los datos de un doctor solo de su sede).
+    // Doctor: la administración general edita sus datos y sus sedes; el % de comisión (del
+    // médico, el mismo en todas sus sedes) solo el administrador general. Un usuario de sede
+    // edita los datos de un doctor solo de su sede.
     const aPct = (v) => (v === "" || v == null ? null : Math.max(0, Math.min(100, Number(v))));
     const ajeno = edit.tipo === "doctor" && !!it.id && medAjeno(it);
     const editaSedesDoc = edit.tipo === "doctor" && (!it.id || !limitarSede);
     const sedesDoc = edit.tipo === "doctor" ? (it.sedesForm || []).filter((x) => sedeEditable(x)) : [];
     if (editaSedesDoc && !sedesDoc.length) { notify("Elige al menos una sede donde atiende el doctor."); return; }
-    // % propio en las sedes del usuario (no toca el % base ni las otras sedes).
-    const comPropias = Object.entries(it.comSede || {}).filter(([sd]) => limitarSede && sedeEditable(sd) && (it.id ? true : sedesDoc.some((x) => mismaSede(x, sd))));
-    // NAV-07 / MET-01: meta y % de comisión se editan aquí y solo aquí. En la
-    // demostración se aplican a la ficha del doctor que leen Reportes y Mi producción.
+    // Un doctor que también atiende fuera de las sedes del usuario no tiene nada que este
+    // pueda cambiar: el % es del médico y lo fija el administrador general.
+    if (ajeno) { setEdit(null); return; }
+    // NAV-07 / MET-01: el % de comisión se edita aquí y en Metas y comisiones (Todas las
+    // sedes). En la demostración se aplica a la ficha del doctor que leen Reportes y Mi producción.
     if (edit.tipo === "doctor" && !auth.token) {
       const pct = aPct(it.porcentajeComision);
       let m = MEDICOS.find((x) => x.id === it.id);
@@ -548,19 +552,17 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
         const ss = sedesDoc.map(Number);
         m = { id: Math.max(0, ...MEDICOS.map((x) => Number(x.id) || 0)) + 1, nombre: it.nombre.trim(), cop: String(it.cop || "").replace(/^COP\s*/i, ""), esp, esps: [esp], sede: ss[0], sedes: ss, foto: iniciales(String(it.nombre).replace(/^Dra?\.\s*/, "")), color: colorDe(it.nombre), meta: null, prodDemo: 0, citasDemo: 0, comision: limitarSede ? null : pct };
         MEDICOS.push(m);
-      } else if (!ajeno) {
+      } else {
         Object.assign(m, { nombre: it.nombre.trim() || m.nombre });
         if (!limitarSede) {
           const ss = sedesDoc.map(Number);
-          Object.assign(m, { comision: pct, sedes: ss, sede: ss.includes(Number(m.sede)) ? m.sede : ss[0] });
-          try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); o[m.id] = { ...(o[m.id] || {}), comision: pct, sedes: m.sedes, sede: m.sede }; localStorage.setItem("dc_data_v1_medicos_cfg", JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ }
+          Object.assign(m, { comision: editaComision ? pct : m.comision, sedes: ss, sede: ss.includes(Number(m.sede)) ? m.sede : ss[0] });
+          try { const o = JSON.parse(localStorage.getItem("dc_data_v1_medicos_cfg") || "{}"); o[m.id] = { ...(o[m.id] || {}), comision: m.comision, sedes: m.sedes, sede: m.sede }; localStorage.setItem("dc_data_v1_medicos_cfg", JSON.stringify(o)); } catch (e) { /* sin almacenamiento */ }
         }
       }
-      // % de la sede: misma ficha por sede que usan Metas, Reportes y Mi producción.
-      comPropias.forEach(([sd, v]) => guardarMetaSedeDemo(m, Number(sd), metaSede(m, Number(sd)), aPct(v)));
       const fila = { id: m.id, nombre: m.nombre, especialidadId: it.id ? it.especialidadId : m.esp, cop: m.cop ? `COP ${m.cop}` : null, activo: it.activo !== false, porcentajeComision: m.comision ?? null, sedes: sedesMed(m), ref: m };
       setMeds((ms) => (ms.some((x) => x.id === m.id) ? ms.map((x) => (x.id === m.id ? { ...x, ...fila, especialidadId: ajeno ? x.especialidadId : (it.especialidadId ?? x.especialidadId), cop: ajeno ? x.cop : (it.cop || x.cop), activo: ajeno ? x.activo : it.activo !== false } : x)) : [...ms, fila]));
-      notify(ajeno ? "Comisión de tu sede guardada." : "Doctor guardado."); setEdit(null); return;
+      notify("Doctor guardado."); setEdit(null); return;
     }
     if (edit.tipo === "sede" && (it.id ? !sedeEditable(it.id) : limitarSede)) { notify("Solo puedes editar los datos de tu sede."); return; }
     // WhatsApp de la sede: opcional, pero si se escribe debe ser un celular peruano.
@@ -600,14 +602,12 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
       const payload = { nombre: it.nombre, precioBase: precio };
       (it.id ? api.catalogo.actualizarEspecialidad(it.id, payload) : api.catalogo.crearEspecialidad(payload)).then(() => done("Servicio guardado.")).catch(err);
     } else if (edit.tipo === "doctor") {
-      const pctC = aPct(it.porcentajeComision);
-      // % de sus sedes: PUT /medicos/{id}/metas/{sedeId}, conservando la meta de esa sede.
-      const fijarPropias = (id) => Promise.all(comPropias.map(([sd, v]) => { const ps = porSedeDe(it).find((x) => mismaSede(x.sede, sd)); return api.catalogo.fijarMetaSede(id, sedeApiUuid(sd), { metaMensual: ps?.meta ?? null, porcentajeComision: aPct(v) }); }));
-      if (ajeno) { fijarPropias(it.id).then(() => done("Comisión de tu sede guardada.")).catch(err); return; }
+      // El % es del médico: solo el administrador general lo cambia; los demás reenvían el
+      // guardado (un PUT que reemplaza no debe dejarlo en blanco).
+      const pctC = editaComision ? aPct(it.porcentajeComision) : (it.id ? comisionMedico(it) : null);
       // Sin sedes el doctor aparecería en la agenda de todas: se crea (o reasigna) con las suyas.
-      const payload = { nombre: it.nombre, especialidadId: it.especialidadId || null, cop: it.cop || null, activo: it.activo !== false, porcentajeComision: limitarSede && !it.id ? null : pctC, ...(editaSedesDoc ? { sedeIds: sedesDoc.map((x) => sedeApiUuid(x)) } : {}) };
+      const payload = { nombre: it.nombre, especialidadId: it.especialidadId || null, cop: it.cop || null, activo: it.activo !== false, porcentajeComision: pctC, ...(editaSedesDoc ? { sedeIds: sedesDoc.map((x) => sedeApiUuid(x)) } : {}) };
       (it.id ? api.catalogo.actualizarMedico(it.id, payload).then(() => it.id) : api.catalogo.crearMedico(payload).then((r) => r?.id))
-        .then((id) => (id && comPropias.length ? fijarPropias(id) : null))
         .then(() => done("Doctor guardado."))
         .catch(err);
     } else if (edit.tipo === "promo") {
@@ -918,7 +918,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
 
       {tab === "doctores" && (
         <section className="dc-cfg__panel">
-          {cab("Doctores", sedeUnicaVer != null ? `Los que atienden en ${nomSedeCfg(sedeUnicaVer)}; comisión y meta de esa sede.` : "Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.", sedesEdit.length > 0 && <button type="button" className="dc-cfg__nuevo" onClick={() => abrirDoctor(null)}><Plus size={14} strokeWidth={2.2} /> Nuevo doctor</button>)}
+          {cab("Doctores", sedeUnicaVer != null ? `Los que atienden en ${nomSedeCfg(sedeUnicaVer)}; meta de esa sede y % de comisión del médico.` : "Los doctores activos aparecen en la agenda y en el agendamiento por WhatsApp.", sedesEdit.length > 0 && <button type="button" className="dc-cfg__nuevo" onClick={() => abrirDoctor(null)}><Plus size={14} strokeWidth={2.2} /> Nuevo doctor</button>)}
           {medsSinHorarioAqui.length > 0 && <div className="fm-aviso-edad" role="note"><Info size={15} strokeWidth={2} /><span>El servidor no indica en qué sede atiende cada doctor: se listan los que tienen horario {sedeUnicaVer != null ? `en ${nomSedeCfg(sedeUnicaVer)}` : "en estas sedes"}, como en Metas. {medsSinHorarioAqui.length === 1 ? "No se lista 1 doctor sin horario aquí" : `No se listan ${medsSinHorarioAqui.length} doctores sin horario aquí`}: {medsSinHorarioAqui.map((m) => m.nombre).join(", ")}. Su horario se carga en Horarios por doctor.</span></div>}
           {meds.length === 0 ? <p className="dc-cfg__nada">Sin doctores aún.</p> : medsDoctores.length === 0 ? <p className="dc-cfg__nada">Ningún doctor tiene horario {sedeUnicaVer != null ? `en ${nomSedeCfg(sedeUnicaVer)}` : "en estas sedes"}.</p> : (
             <ListaFiltrable rows={medsDoctores} sub="doctores" defaultSort={{ key: "nombre", dir: "asc" }} vistaClave="cfg_doctores" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
@@ -947,7 +947,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                   <div className="dc-cfg__dnums">
                     <div><Percent size={12} strokeWidth={2.2} /><span>Comisión</span><b>{comisionVista(m) != null ? `${comisionVista(m)}%` : "—"}</b></div>
                     <div><Target size={12} strokeWidth={2.2} /><span>Meta</span><b>{metaVista(m) != null ? `S/ ${Number(metaVista(m)).toLocaleString("es-PE")}` : "—"}</b></div>
-                    <button type="button" onClick={() => abrirDoctor(m)}><Pencil size={13} strokeWidth={2} /> {medAjeno(m) ? "Comisión" : "Editar"}</button>
+                    <button type="button" onClick={() => abrirDoctor(m)}><Pencil size={13} strokeWidth={2} /> {medAjeno(m) ? "Ver" : "Editar"}</button>
                   </div>
                 </article>
               ); })}
@@ -1092,14 +1092,14 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
 
       </div>
       {edit && (() => { const it = edit.item; const set = (k, v) => setEdit((e) => ({ ...e, item: { ...e.item, [k]: v } })); const T = { sede: "Sede", servicio: "Servicio", doctor: "Doctor", promo: "Promoción", sillon: "Sillón" }[edit.tipo];
-        // Doctor de varias sedes (o sin sede) abierto por un usuario de sede: solo su comisión ahí.
+        // Doctor de varias sedes (o sin sede) abierto por un usuario de sede: solo lectura.
         const docAjeno = edit.tipo === "doctor" && !!it.id && medAjeno(it);
         const roDoc = docAjeno ? { readOnly: true, style: { ...inp, marginTop: 5, background: "var(--dc-bg)", color: "var(--dc-ink-500)" } } : {};
         return (
           <Modal icon={<Settings size={20} strokeWidth={1.75} />} titulo={`${it.id ? "Editar" : ["sede", "promo"].includes(edit.tipo) ? "Nueva" : "Nuevo"} ${T.toLowerCase()}`} onClose={() => setEdit(null)} maxW={460}
-            footer={<><Btn small kind="ghost" onClick={() => setEdit(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> Guardar</Btn></>}>
+            footer={docAjeno ? <Btn small kind="ghost" onClick={() => setEdit(null)}>Cerrar</Btn> : <><Btn small kind="ghost" onClick={() => setEdit(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> Guardar</Btn></>}>
             <div style={{ display: "grid", gap: 12 }}>
-              {docAjeno && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>{it.nombre} también atiende en otra sede: su nombre, especialidad y estado los cambia la administración general. Aquí fijas su comisión en tu sede.</span></div>}
+              {docAjeno && <div className="fm-aviso-edad is-info"><Info size={15} strokeWidth={2} /><span>{it.nombre} también atiende en otra sede: su nombre, especialidad y estado los cambia la administración general. Su meta en tu sede se fija en Metas y comisiones.</span></div>}
               {edit.tipo !== "promo" && edit.tipo !== "sillon" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Nombre<input className="dc-premium-inp" value={it.nombre || ""} onChange={(e) => set("nombre", e.target.value)} style={{ ...inp, marginTop: 5 }} {...roDoc} placeholder={edit.tipo === "servicio" ? "Ej. Blanqueamiento dental" : edit.tipo === "doctor" ? "Ej. Dra. Carla Mendoza" : "Ej. Sede San Isidro"} /></label>}
               {edit.tipo === "servicio" && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Precio (S/)<input className="dc-premium-inp" type="number" value={it.precioBase ?? ""} onChange={(e) => set("precioBase", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="80" /></label>}
               {edit.tipo === "promo" && <>
@@ -1121,8 +1121,6 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                 const editaSedes = !it.id || !limitarSede;
                 const marcadas = it.sedesForm || [];
                 const toggleSede = (id) => set("sedesForm", marcadas.some((x) => mismaSede(x, id)) ? marcadas.filter((x) => !mismaSede(x, id)) : [...marcadas, id]);
-                // % por sede del usuario de sede (no toca el % base del doctor).
-                const sedesCom = limitarSede ? (it.id ? sedesMedico(it).filter((x) => sedeEditable(x) && sedeVisible(x)) : marcadas) : [];
                 const porSede = it.id ? porSedeDe(it) : [];
                 return <>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Especialidad<Select value={it.especialidadId || ""} onChange={(v) => set("especialidadId", v)} disabled={docAjeno} placeholder="— Selecciona —" options={esps.map((e) => ({ value: e.id, label: e.nombre }))} /></label>
@@ -1139,14 +1137,14 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                   ) : <div style={{ marginTop: 6, fontSize: 13, color: "var(--dc-ink-700)" }}>{marcadas.length ? marcadas.map((x) => nomSedeCfg(x)).join(" – ") : "Sin sede"}<small style={{ display: "block", color: "var(--dc-ink-500)", marginTop: 2 }}>Las sedes de un doctor las asigna la administración general.</small></div>}
                 </div>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Usuario vinculado<input className="dc-premium-inp" value={it.usuarioId || it.usuario || ""} readOnly style={{ ...inp, marginTop: 5, background: "var(--dc-bg)" }} placeholder="Sin usuario vinculado" /></label>
-                {!limitarSede && <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Comisión base %<input className="dc-premium-inp" type="number" min="0" max="100" value={it.porcentajeComision ?? ""} onChange={(e) => set("porcentajeComision", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 40" /></label>}
-                {sedesCom.map((sd) => (
-                  <label key={String(sd)} style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>% de comisión en {nomSedeCfg(sd)}<input className="dc-premium-inp" type="number" min="0" max="100" value={(it.comSede || {})[sd] ?? ""} onChange={(e) => set("comSede", { ...(it.comSede || {}), [sd]: e.target.value })} style={{ ...inp, marginTop: 5 }} placeholder={it.porcentajeComision != null ? `${it.porcentajeComision} (el de su ficha)` : "Ej. 40"} /></label>
-                ))}
-                {/* Meta y % por sede: un solo lugar para editarlos (Metas y comisiones). */}
+                {/* El % de comisión es del médico (el mismo en todas sus sedes): solo lo cambia el administrador general. */}
+                {editaComision
+                  ? <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>% de comisión (todas las sedes)<input className="dc-premium-inp" type="number" min="0" max="100" value={it.porcentajeComision ?? ""} onChange={(e) => set("porcentajeComision", e.target.value)} style={{ ...inp, marginTop: 5 }} placeholder="Ej. 40" /></label>
+                  : it.id ? <div data-nota-comision><span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>% de comisión</span><div style={{ marginTop: 6, fontSize: 13, color: "var(--dc-ink-700)" }}>{comisionMedico(it) != null ? `${comisionMedico(it)} %` : "Sin definir"}<small style={{ display: "block", color: "var(--dc-ink-500)", marginTop: 2 }}>{NOTA_COMISION_GLOBAL}</small></div></div> : null}
+                {/* La meta es por sede: un solo lugar para editarla (Metas y comisiones). */}
                 <div className="dc-cfg__metas">
-                  <div><b>Meta mensual por sede</b><span>Se fija sede por sede, con su propio % si hace falta.</span></div>
-                  {porSede.length > 0 && <ul>{porSede.map((x) => <li key={String(x.sede)}><span>{nomSedeCfg(x.sede)}{x.com != null ? ` · ${x.com}%` : ""}</span><b>{x.meta != null ? `S/ ${Number(x.meta).toLocaleString("es-PE")}` : "Sin meta"}</b></li>)}</ul>}
+                  <div><b>Meta mensual por sede</b><span>Se fija sede por sede. El % de comisión es el mismo en todas.</span></div>
+                  {porSede.length > 0 && <ul>{porSede.map((x) => <li key={String(x.sede)}><span>{nomSedeCfg(x.sede)}</span><b>{x.meta != null ? `S/ ${Number(x.meta).toLocaleString("es-PE")}` : "Sin meta"}</b></li>)}</ul>}
                   <button type="button" onClick={() => { setEdit(null); window.location.hash = "#/metas"; }}><Target size={13} strokeWidth={2.2} /> Editar en Metas y comisiones</button>
                 </div>
                 <p style={{ margin: 0, fontSize: 12, color: "var(--dc-ink-500)" }}>Su sillón fijo, si lo tiene, se define en Configuración › Sillones.</p>

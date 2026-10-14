@@ -10,6 +10,7 @@ import { sedeApiUuid } from "../routing";
 import { medicoEnSedes } from "../compartido/medicosSede";
 import { medicosDeSedes } from "../compartido/medicoEnSede";
 import NoDisponible from "../ui/NoDisponible";
+import { CRITERIO_PRODUCCION } from "../util/metasComision";
 
 /* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
    mismas cifras que usan Metas y el Resumen del mes), para que el módulo no salga en cero. */
@@ -455,7 +456,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
     s: "Canceladas y no asistidas sobre la agenda",
     cifra: clinica.sinDato ? "—" : fmtTasa(clinica.tasa),
     parte: clinica.sinDato ? "sin dato" : `${clinica.perdidas} de ${clinica.total}`,
-    sub: "Se mide sobre la agenda del periodo, no sobre lo facturado.",
+    sub: "Se mide sobre la agenda del periodo, no sobre la producción.",
     micro: [
       ["Canceladas", String(clinica.canceladas)],
       ["No asistió", String(clinica.noShows)],
@@ -754,7 +755,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
       </section>
 
       <div className="dc-pie">
-        <span>Se cuenta sobre las <b>citas de la agenda</b>, no sobre las facturadas</span>
+        <span>Se cuenta sobre las <b>citas de la agenda</b>, no sobre la producción</span>
         <span>Canceladas y no asistidas van <b>separadas</b> en la lectura; el % las suma</span>
       </div>
     </>
@@ -878,7 +879,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
     cifra: moneyFmt(m.produccion),
     parte: `${m.atendidas || 0} citas`,
     sub: `Comisión ${moneyFmt(m.comision)} (${m.porcentaje}%).`,
-    como: "Producción = citas atendidas × precio base de la especialidad de cada cita. Comisión = producción × % del odontólogo (se define en Configuración › Doctores).",
+    como: `${CRITERIO_PRODUCCION} Hoy: citas atendidas × precio base de la especialidad de cada cita. Comisión = producción × % del odontólogo (el mismo en todas sus sedes).`,
     cols: [["Concepto"], ["Valor", "n"]],
     filas: [
       ["Citas atendidas", String(m.atendidas || 0)],
@@ -930,10 +931,10 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
           <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores del periodo">
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Producción del periodo",
-              s: "Lo facturado por citas atendidas",
+              s: "Valor de los procedimientos terminados",
               cifra: moneyFmt(totalProd),
               parte: `${totalCitas} citas`,
-              como: "Suma de producción atribuida a cada odontólogo por sus citas atendidas (precio base de la especialidad de la cita).",
+              como: `${CRITERIO_PRODUCCION} Hoy es la suma atribuida a cada odontólogo por sus citas atendidas (precio base de la especialidad de la cita).`,
               cols: [["Odontólogo"], ["Citas", "n"], ["Producción", "n"]],
               filas: porMedico.map((m) => [m.nombre, String(m.atendidas || 0), moneyFmt(m.produccion)]),
               total: moneyFmt(totalProd),
@@ -944,14 +945,14 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <div className="dc-kpi__body">
                 <div className="dc-kpi__label">Producción del periodo</div>
                 <div className="dc-kpi__value">{moneyFmt(totalProd)}</div>
-                <div className="dc-kpi__sub">{totalCitas} {totalCitas === 1 ? "cita facturada" : "citas facturadas"}</div>
+                <div className="dc-kpi__sub">{totalCitas} {totalCitas === 1 ? "cita atendida" : "citas atendidas"}</div>
               </div>
             </button>
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Comisión devengada",
               s: "Producción × porcentaje",
               cifra: moneyFmt(totalCom),
-              como: "Cada odontólogo: producción × su % (Configuración › Doctores). No es lo cobrado ni lo pagado.",
+              como: `Cada odontólogo: producción × su % de comisión (el mismo en todas sus sedes). No es lo cobrado ni lo pagado. ${CRITERIO_PRODUCCION}`,
               cols: [["Odontólogo"], ["%", "n"], ["Comisión", "n"]],
               filas: porMedico.map((m) => [m.nombre, `${m.porcentaje}%`, moneyFmt(m.comision)]),
               total: moneyFmt(totalCom),
@@ -961,7 +962,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <div className="dc-kpi__body">
                 <div className="dc-kpi__label">Comisión devengada</div>
                 <div className="dc-kpi__value">{moneyFmt(totalCom)}</div>
-                <div className="dc-kpi__sub">Sobre producción facturada</div>
+                <div className="dc-kpi__sub">Sobre la producción</div>
               </div>
             </button>
             {/* Avance contra la meta de cada odontólogo (la meta se edita en Metas y comisiones). */}
@@ -1120,10 +1121,10 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                   s: "Acumulado del periodo",
                   cifra: moneyFmt(totalCobrado),
                   micro: [
-                    ["Facturado", moneyFmt(totalProd)],
-                    ["Descuadre", `${descuadre >= 0 ? "+" : ""}${moneyFmt(Math.abs(descuadre)).replace("S/ ", "S/ ")}`],
+                    ["Producción", moneyFmt(totalProd)],
+                    ["Diferencia", `${descuadre >= 0 ? "+" : ""}${moneyFmt(Math.abs(descuadre)).replace("S/ ", "S/ ")}`],
                   ],
-                  como: "Suma de cobros de caja por mes. El descuadre frente a lo facturado puede venir de saldos de meses anteriores.",
+                  como: "Cobrado = pagos registrados en Caja, sumados por mes. La diferencia con la producción (procedimientos terminados) puede venir de saldos de meses anteriores o de trabajo aún sin cobrar.",
                   cols: [["Mes"], ["Cobrado", "n"]],
                   filas: cobros.map((m) => [m.mesLargo || m.mes, moneyFmt(m.cobrado)]),
                   total: moneyFmt(totalCobrado),
@@ -1134,15 +1135,15 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                 <dl className="dc-datos">
                   <div><dt>Cobrado</dt><dd>{moneyFmt(totalCobrado)}</dd></div>
                   <div onClick={() => abrir({
-                    t: "Descuadre cobrado vs facturado",
+                    t: "Cobrado vs producción",
                     s: "Misma ventana de fechas",
                     cifra: `${descuadre >= 0 ? "+" : "−"}${moneyFmt(Math.abs(descuadre))}`,
-                    como: "Cobrado del periodo − producción facturada del mismo tramo. Puede ser positivo si se cobran tratamientos de antes.",
+                    como: `Cobrado del periodo (pagos en Caja) − producción del mismo tramo. Puede ser positivo si se cobran tratamientos de antes. ${CRITERIO_PRODUCCION}`,
                     cols: [["Concepto"], ["Monto", "n"]],
-                    filas: [["Cobrado", moneyFmt(totalCobrado)], ["Facturado", moneyFmt(totalProd)], ["Diferencia", moneyFmt(descuadre)]],
+                    filas: [["Cobrado", moneyFmt(totalCobrado)], ["Producción", moneyFmt(totalProd)], ["Diferencia", moneyFmt(descuadre)]],
                     tono: "aviso",
                   })}>
-                    <dt>Sobre lo facturado</dt>
+                    <dt>Cobrado vs producción</dt>
                     <dd style={{ color: "var(--dc-warn-700)" }}>
                       {descuadre >= 0 ? "+" : "−"}{moneyFmt(Math.abs(descuadre))}
                     </dd>
@@ -1225,8 +1226,8 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
           </div>
 
           <div className="dc-pie">
-            <span>Comisión sobre <b>producción facturada</b>, no sobre lo cobrado</span>
-            <span>El porcentaje se define en la ficha de cada odontólogo</span>
+            <span>Comisión sobre la <b>producción</b> (procedimientos terminados), no sobre lo cobrado</span>
+            <span>El porcentaje es del odontólogo, el mismo en todas sus sedes</span>
             {can?.("comisiones", "editar") && (
               <span>Puedes registrar pagos de comisión desde esta pantalla</span>
             )}

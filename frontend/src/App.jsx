@@ -81,6 +81,9 @@ import { medicoEnSedes } from "./compartido/medicosSede";
 import { imprimirPresupuesto, nombreSinSufijoPieza } from "./compartido/presupuestoDoc";
 import { leerPagadoPaciente } from "./compartido/pagadoPaciente";
 import { guardarCitaAtencion, limpiarCitaAtencion } from "./compartido/citaAtencion";
+import { estadoAlReprogramar } from "./compartido/citaEstadoInicial";
+import { MSG_MODULO_NO_DISPONIBLE, moduloOcultoParaRol, sinModulosOcultos } from "./compartido/modulosRol";
+import { MOTIVO_ANULAR_MIN, accionesProcedimiento, cuerpoAnulacion, motivoAnulacionValido } from "./util/procedimientoAcciones";
 import { puedeSalir } from "./compartido/guardaSalida";
 import { cruceAlergias, listaAlergias } from "./compartido/alergias";
 import { horasSemana, horarioConfigurado } from "./comun";
@@ -273,7 +276,7 @@ function Login({ onLogin }) {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Contraseña</span>
-                    <button onClick={() => setError("Contacta al administrador de tu clínica o a soporte para restablecer tu contraseña.")} style={{ background: "none", border: "none", color: DS.c.primary, fontSize: 13, fontWeight: 500, cursor: "pointer", padding: 0 }}>¿La olvidaste?</button>
+                    <button onClick={() => setError("Pide al administrador de tu clínica que restablezca tu clave: te entregará una clave temporal.")} style={{ background: "none", border: "none", color: DS.c.primary, fontSize: 13, fontWeight: 500, cursor: "pointer", padding: 0 }}>¿La olvidaste?</button>
                   </div>
                   <div className="dc-input-container" style={{ position: "relative" }}>
                     <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", display: "flex", color: "var(--dc-ink-500)", transition: "color .2s", pointerEvents: "none" }}><Lock size={16} strokeWidth={1.75} /></span>
@@ -1780,13 +1783,17 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       if (r.nuevoSillon != null) extra = ` Pasa al sillón ${r.nuevoSillon}.`;
       if (r.avisos.length) extra += ` ${r.avisos[0]}`;
     }
+    // Otra fecha u otra hora: el paciente tiene que confirmar el nuevo horario (pasa a
+    // «pendiente»). Si solo cambia el sillón, el doctor o la sede, conserva su estado.
+    const estadoNuevo = c0 ? estadoAlReprogramar(c0, patch) : null;
+    if (estadoNuevo) { patch = { ...patch, estado: estadoNuevo }; extra = ` Queda por confirmar.${extra}`; }
     if (conectado) {
       // Al servidor la sede va como sedeId (UUID) y solo si cambia: el número del registro
       // (1, 2…) que usa la agenda no le sirve.
       const { sede: sedeP, ...resto } = patch;
       const body = sedeP != null && !(c0 && c0.sede != null && mismaSede(c0.sede, sedeP)) && sedeApiUuid(sedeP) ? { ...resto, sedeId: sedeApiUuid(sedeP) } : resto;
-      api.put(`/citas/${id}`, body).then(() => { notify("Cita reprogramada."); recargar(); recargarAll(); onOk && onOk(); }).catch((e) => notify(`No se pudo reprogramar${e?.message ? `: ${e.message}` : "."}`)); return true; }
-    setCitas((cs) => cs.map((c) => c.id === id ? { ...c, ...patch, ...(patch.medicoId != null ? { medico: undefined } : {}) } : c));
+      api.put(`/citas/${id}`, body).then(() => { notify(`Cita reprogramada.${extra}`); recargar(); recargarAll(); onOk && onOk(); }).catch((e) => notify(`No se pudo reprogramar${e?.message ? `: ${e.message}` : "."}`)); return true; }
+    setCitas((cs) => cs.map((c) => c.id === id ? { ...c, ...patch, ...(estadoNuevo ? { llegada: false } : {}), ...(patch.medicoId != null ? { medico: undefined } : {}) } : c));
     notify(`Cita reprogramada a ${patch.hora}${patch.fecha ? " – " + fechaLegible(patch.fecha) : ""}`.replace(/\.?$/, ".") + extra);
     onOk && onOk();
     return true;
@@ -1795,8 +1802,10 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // Amarre espera → citas: "Asignar" abre un modal para elegir doctor, fecha y hora.
   const asignarDeEspera = (p) => {
     // Conectado: abre el modal real de agendado (crea la cita en el backend) y recuerda la fila de espera a retirar.
+    // El cupo se ofrece por teléfono: la cita nace por confirmar (canal «llamada»); si el
+    // paciente está en la clínica, recepción elige «Presencial» y nace confirmada.
     if (conectado) {
-      setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n && p.n !== "—" ? p.n : "", telefono: p.pacienteId ? undefined : (p.tel || undefined), especialidadId: p.especialidadId ?? undefined, especialidadNombre: p.e && p.e !== "—" ? p.e : undefined, ...(p.sede != null ? { sedeId: p.sede } : {}), motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", _esperaId: p.id });
+      setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n && p.n !== "—" ? p.n : "", telefono: p.pacienteId ? undefined : (p.tel || undefined), especialidadId: p.especialidadId ?? undefined, especialidadNombre: p.e && p.e !== "—" ? p.e : undefined, ...(p.sede != null ? { sedeId: p.sede } : {}), motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "llamada", _esperaId: p.id });
       return;
     }
     // Demo (sin backend): flujo ligero con datos de ejemplo.
@@ -1840,12 +1849,12 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     const { borrador, sillon, ev } = planAsignar(p);
     if (ev.errores.length) { notify(ev.errores[0]); return; }
     if (sillon == null) { notify("No hay sillón libre a esa hora en la sede del doctor."); return; }
-    setCitas((cs) => [...cs, { id: nid, pacienteId: p.pacienteId || null, paciente: p.n, dni: "", ...borrador, sillon, motivo: `${p.e} (desde lista de espera)`, estado: "confirmada", llegada: false }]);
+    setCitas((cs) => [...cs, { id: nid, pacienteId: p.pacienteId || null, paciente: p.n, dni: "", ...borrador, sillon, motivo: `${p.e} (desde lista de espera)`, estado: "pendiente", llegada: false }]);
     setEspera((e) => (e || []).filter((x) => x.id !== p.id));
     const esHoy = p.fecha === fmt(hoy);
     if (esHoy) { setNuevaCita(nid); setTimeout(() => setNuevaCita((v) => (v === nid ? null : v)), 6000); }
     const medNom = (MEDICOS.find((m) => m.id === p.medicoId) || {}).nombre || "";
-    notify(`Cita creada para ${p.n} con ${medNom} el ${esHoy ? "hoy" : fechaLegible(p.fecha)} a las ${p.hora}.${esHoy ? " Resaltada en verde." : ""}`);
+    notify(`Cita agendada para ${p.n} con ${medNom} ${esHoy ? "hoy" : `el ${fechaLegible(p.fecha)}`} a las ${p.hora} · por confirmar.${esHoy ? " Resaltada en verde." : ""}`);
     setAsignarPac(null);
   };
 
@@ -2306,7 +2315,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
             {!ev.errores.length && ev.nuevoSillon != null && <p className="is-avi"><Armchair size={13} strokeWidth={2.2} /> Pasa al sillón {ev.nuevoSillon}: el actual está ocupado a esa hora.</p>}
             {ev.avisos.map((m, i) => <p key={"a" + i} className="is-avi"><Info size={13} strokeWidth={2.2} /> {m}</p>)}
           </div>}
-          <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 12 }}>Se valida que no sea una hora pasada, que el doctor atienda y que el horario no choque con otra cita ni con el sillón.</div>
+          <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 12 }}>Se valida que no sea una hora pasada, que el doctor atienda y que el horario no choque con otra cita ni con el sillón.{c0 && !sinCambio && c0.estado !== "pendiente" ? " Con la nueva fecha u hora, la cita queda por confirmar." : ""}</div>
         </Modal>
         );
       })()}
@@ -2791,7 +2800,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // sedeActiva: el precio del procedimiento es el de la sede donde se atiende, no el de la
     // primera sede del paciente (CLINICO-06 / CAJA-07).
     // Plan y cuenta cotiza con la sede de precio del paciente (menú › su única sede › activa).
-    plan: (pid, extra) => <Tratamientos key={`plan-${pid}`} resumenFicha={extra?.resumen || null} sedeActiva={sedeDePrecio(sedeCx, pacientes.find((x) => String(x.id) === String(pid)), sedeActiva)} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
+    plan: (pid, extra) => <Tratamientos key={`plan-${pid}`} rol={rol} resumenFicha={extra?.resumen || null} sedeActiva={sedeDePrecio(sedeCx, pacientes.find((x) => String(x.id) === String(pid)), sedeActiva)} pacienteFijo={pid} pacientes={pacientes} fichas={fichas} updFicha={updFicha} notify={notify} can={can} consumirInsumos={consumirInsumos} onCobrar={(pac) => onCobrarPaciente?.(pac)} />,
     archivos: (pid, sub) => <ArchivosPaciente key={`arch-${pid}`} pid={pid} sub={sub} pacientes={pacientes} notify={notify} can={can} sedeActiva={sedeActiva} misSedes={misSedes} onIrLaboratorio={() => onIr("laboratorio")} />,
   };
   if (fmId && esperandoPadron) return <Card><div style={{ padding: 24, textAlign: "center", color: "var(--dc-ink-500)", fontSize: 14 }}>Cargando ficha…</div></Card>;
@@ -3538,7 +3547,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
       if (pacPlanRef.current !== pid) return;
       const ps = planes || [];
       const fs = [];
-      ps.forEach((pl) => (pl.fases || []).forEach((f) => fs.push({ id: f.id, nombre: f.nombre || f.descripcion || "", costo: Number(f.costo) || 0, estado: f.estado, servicioId: f.servicioId ?? null, pieza: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || null, origen: f.origen || null })));
+      ps.forEach((pl) => (pl.fases || []).forEach((f) => fs.push({ id: f.id, nombre: f.nombre || f.descripcion || "", costo: Number(f.costo) || 0, estado: estadoFaseUi(f.estado), servicioId: f.servicioId ?? null, pieza: f.piezaNumero ?? f.pieza ?? null, cara: f.cara || null, origen: f.origen || null })));
       setPlanOdo({ cargado: true, planId: ps[0]?.plan?.id ?? ps[0]?.id ?? null, fases: fs, error: false });
     }).catch(() => { if (pacPlanRef.current === pid) setPlanOdo({ cargado: true, planId: null, fases: [], error: true }); });
   };
@@ -4013,7 +4022,7 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
 }
 
 /* ---- Tratamientos (plan de tratamiento = fuente de los cargos) ---- */
-function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can, sedeActiva = "all", resumenFicha = null }) {
+function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFicha, notify, pacienteActivo, consumirInsumos, can, sedeActiva = "all", resumenFicha = null, rol = auth.sesion?.rol || "" }) {
   // Cobrar una fase es caja, no plan de tratamiento. Gerencia consulta el plan; el
   // cobro lo hace quien tiene caja (recepción, administración).
   const { puede: puedeCobrar } = useEmiteCobros(can);
@@ -4024,6 +4033,10 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   // R-21: anular es PATCH de la fase (tratamientos:editar). Recepción (tratamientos ver) veía
   // «Anular procedimiento» y «Anular» en el detalle porque se miraba solo si cobra.
   const puedeAnular = can ? can("tratamientos", "editar") : true;
+  // El médico no borra, anula: «Eliminar» (DELETE) solo con tratamientos:eliminar del servidor.
+  const puedeEliminarProc = auth.token ? tienePermiso("tratamientos", "eliminar") : (can ? can("tratamientos", "eliminar") : true);
+  const accProc = (f) => accionesProcedimiento(f, { rol, puedeEditar: puedeAnular, puedeEliminar: puedeEliminarProc });
+  const [anularF, setAnularF] = useState(null);   // { f, motivo }: anular con motivo (obligatorio)
   const conectado = !!auth.token;
   const sx = useSede();
   const [pacRemoto, setPacRemoto] = useState(null);
@@ -4164,24 +4177,44 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     }
     setTrat((t) => [...t, { id: Date.now(), sede: sedeTrab, nombre: nueva.nombre.trim(), costo: Number(nueva.costo) || 0, estado: "pendiente", servicioId: nueva.servicioId || null, piezaNumero: nueva.pieza ? Number(nueva.pieza) : null, cara: nueva.cara || null }]); notify("Procedimiento agregado al presupuesto."); setNueva(null);
   };
-  const quitarFase = (f) => {
-    // TRA-04: un procedimiento no se borra, se anula (queda en el historial del plan).
-    if (!confirm(`¿Anular «${f.nombre}»? Sale del presupuesto y del saldo; queda registrado como anulado.`)) return;
+  // TRA-04: un procedimiento no se borra, se anula (queda en el historial del plan) con su motivo.
+  const pedirAnular = (f) => { if (!accProc(f).anular) { notify(f.estado === "terminada" ? "Un procedimiento terminado solo lo anula el administrador general." : "Tu rol no puede anular procedimientos."); return; } setAnularF({ f, motivo: "" }); };
+  const quitarFase = (f, motivo0) => {
+    const motivo = motivoAnulacionValido(motivo0);
+    if (!motivo) { notify(`Escribe el motivo de la anulación (al menos ${MOTIVO_ANULAR_MIN} caracteres).`); return false; }
     if (conectado) {
-      // M5-04: el respaldo DELETE es solo para un servidor que no acepta el estado (400/404/405/422).
-      // Con un 500 o un 403 se probaba igual, respondía 403 y la fase seguía viva sin decir por qué.
-      const anulado = () => { notify("Procedimiento anulado."); recargarTrat(); avisarPlan(); };
-      api.tratamientos.actualizarFase(f.id, { estado: "anulado" }).then(anulado).catch((e) => {
+      // M5-04: el respaldo DELETE es solo para un servidor que no acepta el estado (400/404/405/422)
+      // y solo para quien puede eliminar (el médico recibe 403 en DELETE: anula, no borra).
+      const anulado = () => { notify("Procedimiento anulado."); setAnularF(null); recargarTrat(); avisarPlan(); };
+      api.tratamientos.actualizarFase(f.id, cuerpoAnulacion(motivo)).then(anulado).catch((e) => {
         const st = e?.status ?? e?._httpStatus;
-        if ([400, 404, 405, 422].includes(st)) { api.tratamientos.borrarFase(f.id).then(anulado).catch((e2) => notify(msgServidor(e2, "No se pudo anular el procedimiento."))); return; }
-        if (st === 403) { notify("Tu rol no puede anular procedimientos."); return; }
+        if ([400, 404, 405, 422].includes(st) && puedeEliminarProc) { api.tratamientos.borrarFase(f.id).then(anulado).catch((e2) => notify(msgServidor(e2, "No se pudo anular el procedimiento."))); return; }
+        if (st === 403) { notify(f.estado === "terminada" ? "El servidor no deja anular este procedimiento terminado: lo anula el administrador general." : "Tu rol no puede anular procedimientos."); return; }
         notify(st >= 500 || st == null ? "El servidor no respondió y el procedimiento sigue en el plan. Vuelve a intentarlo en un momento." : msgServidor(e, "No se pudo anular el procedimiento."));
         recargarTrat();
       });
+      return true;
+    }
+    setTrat((tt) => tt.map((x) => (x.id === f.id ? { ...x, estado: "anulado", anuladoEn: new Date().toISOString(), motivoAnulacion: motivo } : x))); notify("Procedimiento anulado. Ya no suma al saldo."); setAnularF(null);
+    return true;
+  };
+  // Eliminar de verdad (DELETE): solo con tratamientos:eliminar. No queda en el historial.
+  const eliminarFase = (f) => {
+    if (!accProc(f).eliminar) { notify("Tu rol no puede eliminar procedimientos: anúlalo con su motivo."); return; }
+    if (!window.confirm(`¿Eliminar «${f.nombre}» del plan? Se borra y no queda en el historial. Si solo no se va a hacer, usa «Anular».`)) return;
+    if (conectado) {
+      api.tratamientos.borrarFase(f.id)
+        .then(() => { notify("Procedimiento eliminado."); recargarTrat(); avisarPlan(); })
+        .catch((e) => notify(esSinPermiso(e) ? "Tu rol no puede eliminar procedimientos: anúlalo con su motivo." : msgServidor(e, "No se pudo eliminar el procedimiento.")));
       return;
     }
-    setTrat((tt) => tt.map((x) => (x.id === f.id ? { ...x, estado: "anulado", anuladoEn: new Date().toISOString() } : x))); notify("Procedimiento anulado. Ya no suma al saldo.");
+    setTrat((tt) => tt.filter((x) => x.id !== f.id)); notify("Procedimiento eliminado.");
   };
+  // Opciones del menú ⋯ de un procedimiento: anular (con motivo) y, con permiso, eliminar.
+  const opcionesBaja = (f) => { const a = accProc(f); return [
+    ...(a.anular ? [{ label: "Anular procedimiento", peligro: true, onClick: () => pedirAnular(f) }] : []),
+    ...(a.eliminar ? [{ label: "Eliminar procedimiento", peligro: true, onClick: () => eliminarFase(f) }] : []),
+  ]; };
   const esInvasivo = (nom) => /endodoncia|cirug|implante|extracci|bracket|ortodoncia/i.test(nom || "");
   // El doctor marca la fase como terminada: el cobro queda generado solo en Caja
   // (bloque «Tratamientos terminados por cobrar»), sin que recepción lo digite.
@@ -4327,10 +4360,10 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
                   {f.estado !== "terminada" && puedeTerminar
                     ? <button type="button" className="dc-tr__btn is-fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={14} strokeWidth={2} /> Terminar</button>
                     : puedeCobrar && <button type="button" className="dc-tr__btn is-cob" onClick={() => cobrarFase(f)}><DollarSign size={14} strokeWidth={2} /> Cobrar</button>}
-                  {(puedeCobrar || puedeTerminar) && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[
+                  {(puedeCobrar || puedeTerminar || opcionesBaja(f).length > 0) && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[
                     ...(f.estado !== "terminada" && puedeTerminar && puedeCobrar ? [{ label: "Cobrar por adelantado", onClick: () => cobrarFase(f) }] : []),
                     { label: "Ver detalle", onClick: () => setDetF(f) },
-                    ...(f.estado !== "terminada" && puedeAnular ? [{ label: "Anular procedimiento", peligro: true, onClick: () => quitarFase(f) }] : []),
+                    ...opcionesBaja(f),
                   ]} />}
                 </div>) },
             ] }} cols={[
@@ -4345,8 +4378,9 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
                   {f.estado !== "terminada" && puedeTerminar && <button type="button" className="dc-accion dc-accion--fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={13} strokeWidth={2} style={{ marginRight: 4 }} />Terminar</button>}
                   {f.estado === "terminada" && <EstadoPill entidad="procedimiento" estado="terminada" />}
-                  {puedeCobrar ? <><button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button>
-                  {f.estado !== "terminada" && puedeAnular && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[{ label: "Anular procedimiento", peligro: true, onClick: () => quitarFase(f) }]} />}</> : (f.estado !== "terminada" && !puedeTerminar) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : null}
+                  {puedeCobrar ? <button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button> : (f.estado !== "terminada" && !puedeTerminar) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : null}
+                  {/* El médico (sin Caja) también anula desde aquí: antes el menú salía solo con «Cobrar». */}
+                  {opcionesBaja(f).length > 0 && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={opcionesBaja(f)} />}
                 </div>
               );
               const origen = (f) => f.origen === "odontograma" && <span className="dc-tr__orig"><Smile size={11} strokeWidth={2} /> del odontograma</span>;
@@ -4384,13 +4418,13 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
         )}
       </Card>
       {detF && (() => { const f = fases.find((x) => x.id === detF.id) || detF;
-        // R-21: «Anular» solo con permiso de editar tratamientos; un terminado lo anula solo quien
-        // además cobra (su cobro ya está en Caja), como hasta ahora.
-        const accAnular = puedeAnular && f.estado !== "atendida" && (puedeCobrar || f.estado !== "terminada");
+        // R-21: «Anular» solo con permiso de editar tratamientos; un terminado lo anula solo el
+        // administrador general. «Eliminar», solo con tratamientos:eliminar (el médico no).
+        const { anular: accAnular, eliminar: accEliminar } = accProc(f);
         const accCobrar = puedeCobrar && f.estado !== "atendida";
         return (
         <Modal icon={<ClipboardList size={20} strokeWidth={1.75} />} tone={NAVY} titulo={f.nombre} sub={`Procedimiento del plan – ${paciente.nombre}`} onClose={() => setDetF(null)} maxW={460}
-          footer={!accAnular && !accCobrar ? <Btn small kind="ghost" onClick={() => setDetF(null)}>Cerrar</Btn> : <>{accAnular && <Btn small kind="ghost" onClick={() => { quitarFase(f); setDetF(null); }}><Trash2 size={15} strokeWidth={1.75} /> Anular</Btn>}{accCobrar ? <Btn small onClick={() => { cobrarFase(f); setDetF(null); }}><DollarSign size={15} strokeWidth={1.75} /> Cobrar S/ {f.costo.toFixed(0)}</Btn> : <Btn small kind="ghost" onClick={() => setDetF(null)}>Cerrar</Btn>}</>}>
+          footer={!accAnular && !accEliminar && !accCobrar ? <Btn small kind="ghost" onClick={() => setDetF(null)}>Cerrar</Btn> : <>{accEliminar && <Btn small kind="ghost" onClick={() => { setDetF(null); eliminarFase(f); }}><Trash2 size={15} strokeWidth={1.75} /> Eliminar</Btn>}{accAnular && <Btn small kind="ghost" onClick={() => { setDetF(null); pedirAnular(f); }}><X size={15} strokeWidth={1.75} /> Anular</Btn>}{accCobrar ? <Btn small onClick={() => { cobrarFase(f); setDetF(null); }}><DollarSign size={15} strokeWidth={1.75} /> Cobrar S/ {f.costo.toFixed(0)}</Btn> : <Btn small kind="ghost" onClick={() => setDetF(null)}>Cerrar</Btn>}</>}>
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Procedimiento</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500, textAlign: "right" }}>{nombreFaseLimpio(f)}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Pieza</span><span style={{ fontSize: 13, color: NAVY, fontWeight: 500 }}>{piezaDeFase(f)}</span></div>
@@ -4398,6 +4432,19 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Costo</span><span style={{ fontSize: 14, color: NAVY, fontWeight: 600, fontFamily: DISPLAY_FONT }}>S/ {M.sol2(f.costo)}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid var(--dc-bg)" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Estado</span><EstadoPill entidad="procedimiento" estado={f.estado} /></div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0" }}><span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontWeight: 500 }}>Origen</span><span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{f.origen === "odontograma" ? "Derivado del odontograma" : "Agregado manualmente"}</span></div>
+          </div>
+        </Modal>
+      ); })()}
+      {anularF && (() => { const f = anularF.f; const ok = !!motivoAnulacionValido(anularF.motivo); return (
+        <Modal icon={<X size={20} strokeWidth={1.75} />} tone="var(--dc-danger-700)" titulo="Anular procedimiento" sub={nombreFaseLimpio(f)} onClose={() => setAnularF(null)} maxW={460}
+          footer={<><Btn small kind="ghost" onClick={() => setAnularF(null)}>Cancelar</Btn><Btn small kind="red" disabled={!ok} onClick={() => quitarFase(f, anularF.motivo)}><X size={15} strokeWidth={1.75} /> Anular</Btn></>}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.5 }}>Sale del presupuesto y del saldo, pero queda en el historial del plan como <b>anulado</b>, con su motivo. No se borra.</p>
+            {f.estado === "terminada" && <div className="fm-aviso-edad is-mal" role="note"><AlertTriangle size={15} strokeWidth={2} /><span>Este procedimiento ya está terminado: deja de sumar a la producción y su cobro pendiente sale de Caja.</span></div>}
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Motivo de la anulación
+              <textarea className="dc-premium-inp" autoFocus rows={3} value={anularF.motivo} onChange={(e) => setAnularF((x) => ({ ...x, motivo: e.target.value }))} placeholder="Ej. El paciente no aceptó el tratamiento" style={{ ...inp, marginTop: 5, resize: "vertical" }} />
+            </label>
+            {!ok && <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Obligatorio: al menos {MOTIVO_ANULAR_MIN} caracteres.</small>}
           </div>
         </Modal>
       ); })()}
@@ -4495,7 +4542,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
     const espId = ESPECIALIDADES.find((x) => x.nombre === p.e)?.id;
     // El preferido solo si atiende en esa sede y hace ese servicio.
     const med = MEDICOS.find((m) => m.nombre === p.medico && (!espId || espsDe(m).includes(espId)) && sedesDe(m).some((x) => mismaSede(x, sedeP)));
-    setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "presencial", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), ...(conectado ? { especialidadId: p.especialidadId ?? undefined, especialidadNombre: p.e && p.e !== "—" ? p.e : undefined } : {}), _esperaId: p.id });
+    setAsignarBase({ pacienteId: p.pacienteId || "", pacienteNombre: p.n, motivo: `${p.e || "Consulta"} (desde lista de espera)`, canal: "llamada", sedeId: conectado ? sedeApiUuid(sedeP) : sedeP, ...(!conectado && med ? { medicoId: med.id } : {}), ...(!conectado && espId ? { especialidadId: espId } : {}), ...(conectado ? { especialidadId: p.especialidadId ?? undefined, especialidadNombre: p.e && p.e !== "—" ? p.e : undefined } : {}), _esperaId: p.id });
   };
   const quitarEspera = (p) => {
     if (!window.confirm(`¿Quitar a ${p.n} de la lista de espera?`)) return;
@@ -6787,16 +6834,16 @@ function MiProduccion({ usuario, citas, sedes = null }) {
   const kpis = [
     { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: deltaProd, deltaTxt: compTxt,
       sub: mesAnterior > 0 && deltaProd == null ? (comp ? `${comp.rango}: sin producción para comparar` : `mes anterior: S/ ${mesAnterior.toLocaleString()} en total`) : undefined,
-      desc: deltaProd != null ? `Suma de tus tratamientos facturados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% frente a lo que llevabas del ${comp.rango} (S/ ${Math.round(baseComp).toLocaleString()}).`
-        : mesAnterior > 0 ? (comp ? `Suma de tus tratamientos terminados este mes. Del ${comp.rango} no tuviste producción, así que no hay porcentaje que comparar (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`
-          : `Suma de tus tratamientos terminados este mes. No hay dato de lo que llevabas el mes anterior a estas alturas, así que no se calcula porcentaje (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`)
-        : "Suma de tus tratamientos terminados este mes. Aún no hay mes anterior para comparar." },
+      desc: deltaProd != null ? `Suma de tus procedimientos terminados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% frente a lo que llevabas del ${comp.rango} (S/ ${Math.round(baseComp).toLocaleString()}).`
+        : mesAnterior > 0 ? (comp ? `Suma de tus procedimientos terminados este mes. Del ${comp.rango} no tuviste producción, así que no hay porcentaje que comparar (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`
+          : `Suma de tus procedimientos terminados este mes. No hay dato de lo que llevabas el mes anterior a estas alturas, así que no se calcula porcentaje (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`)
+        : "Suma de tus procedimientos terminados este mes. Aún no hay mes anterior para comparar." },
     // El porcentaje sale del que tiene pactado este médico (backend: porcentajeComision),
     // no de un 40% escrito a mano: el importe ya se calculaba con el suyo y la etiqueta
     // decía otra cosa.
     { l: pctComision != null ? `Mi comisión (${pctComision}%)` : "Mi comisión", v: `S/ ${comision.toLocaleString()}`, icon: Percent, color: RED, sub: conectado ? undefined : "Se paga el 5 del mes", desc: pctComision != null ? `El ${pctComision}% de tu producción (S/ ${mesProd.toLocaleString()}).${conectado ? "" : " Se liquida el día 5 del mes siguiente."}` : `Sobre una producción de S/ ${mesProd.toLocaleString()}.${conectado ? "" : " Se liquida el día 5 del mes siguiente."} Tu porcentaje lo fija administración.` },
     // M4-12: «1 cita hoy», «1 atención del mes» (decía «1 citas», «1 atenciones»).
-    { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString()}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: restaHoy > 0 ? `S/ ${restaHoy.toLocaleString()} esperan su evolución` : `${pluralEs(citasHoyN, "cita", "citas")} hoy`, desc: `Lo facturado en tus atenciones de hoy (${pluralEs(citasHoyN, "cita programada", "citas programadas")}).${restaHoy > 0 ? ` No suma S/ ${restaHoy.toLocaleString()} de atenciones con la evolución pendiente: cuentan al completarla.` : ""}` },
+    { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString()}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: restaHoy > 0 ? `S/ ${restaHoy.toLocaleString()} esperan su evolución` : `${pluralEs(citasHoyN, "cita", "citas")} hoy`, desc: `Lo producido en tus atenciones de hoy (${pluralEs(citasHoyN, "cita programada", "citas programadas")}).${restaHoy > 0 ? ` No suma S/ ${restaHoy.toLocaleString()} de atenciones con la evolución pendiente: cuentan al completarla.` : ""}` },
     { l: "Promedio por atención", v: `S/ ${ticket}`, icon: CreditCard, color: DS.c.primary, sub: `${pluralEs(atenciones, "atención", "atenciones")} del mes`, desc: `Producción del mes dividida entre ${atenciones === 1 ? "tu única atención" : `tus ${atenciones} atenciones`}. Subirlo con tratamientos de mayor valor mejora tu comisión.` },
     { l: "Tasa de ausentismo", v: noShow != null ? `${noShow}%` : "—", icon: TrendingDown, color: DS.c.primary, sub: "de tus citas", desc: `Porcentaje de citas canceladas o no asistidas sobre tu agenda. Los recordatorios automáticos ayudan a bajarlo.` },
     // La calificación real de este médico (backend: calificacion / resenas). Era un
@@ -7032,22 +7079,13 @@ function Integraciones({ notify }) {
   );
 }
 
-/* Clave temporal de un usuario nuevo (con sesión): aleatoria y segura, generada con
-   crypto.getRandomValues. Nunca una clave fija: «demo» dejaba entrar a cualquiera. Se
-   muestra una sola vez a quien crea la cuenta; lo ideal es que el servidor invite por correo. */
-const ALFABETO_CLAVE = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-function claveTemporal(largo = 14) {
-  const c = globalThis.crypto;
-  if (!c || !c.getRandomValues) throw new Error("El navegador no puede generar una clave segura.");
-  const out = [];
-  const buf = new Uint8Array(1);
-  // Muestreo por rechazo: sin sesgo de módulo.
-  const tope = 256 - (256 % ALFABETO_CLAVE.length);
-  while (out.length < largo) { c.getRandomValues(buf); if (buf[0] < tope) out.push(ALFABETO_CLAVE[buf[0] % ALFABETO_CLAVE.length]); }
-  // Al menos una mayúscula, una minúscula y un dígito (políticas de clave habituales).
-  if (!/[A-Z]/.test(out.join("")) || !/[a-z]/.test(out.join("")) || !/\d/.test(out.join(""))) return claveTemporal(largo);
-  return out.join("");
-}
+/* La clave temporal la genera el SERVIDOR: al crear un usuario (POST /usuarios sin
+   «password») y al restablecerla (POST /usuarios/{id}/reset-clave) la devuelve una sola vez
+   en «claveTemporal». El navegador ya no inventa claves. */
+const claveDeRespuesta = (r) => {
+  const c = r && typeof r === "object" ? r.claveTemporal : null;
+  return typeof c === "string" && c.trim() ? c : null;
+};
 
 /* Roles que el perfil de TI puede asignar al personal (el paciente se gestiona aparte). */
 const ROLES_ASIGNABLES = ["admin", "gerencia", "admin_sede", "ti", "medico", "recepcion"];
@@ -7127,7 +7165,9 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
   const [q, setQ] = useState("");
   const [filtroRol, setFiltroRol] = useState("todos");
   const [form, setForm] = useState(null); // null = cerrado
-  const [claveNueva, setClaveNueva] = useState(null); // { nombre, email, clave }: se muestra una sola vez
+  const [claveNueva, setClaveNueva] = useState(null); // { nombre, email, clave, motivo: "alta" | "reset", aviso }: se muestra una sola vez
+  // «Restablecer clave»: solo con usuarios:editar del servidor (recepción recibe 403).
+  const puedeResetUs = conectado ? tienePermiso("usuarios", "editar") : puedeEditarUs;
 
   const lista = staff.filter((u) =>
     (filtroRol === "todos" || u.rol === filtroRol) &&
@@ -7158,11 +7198,14 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
       // sedeIds: todas sus sedes (UUID); sedeId: la principal, para el servidor que aún guarda una sola.
       const sedeIds = sedes === "all" ? [] : sedes.map((x) => sedeApiUuid(x));
       const payload = { nombre: form.nombre.trim(), email: String(form.email).trim(), rol: form.rol, activo: form.activo !== false, permisos: form.permisos || null, sedeIds, sedeId: sedeIds[0] ?? null };
-      let clave = null;
-      if (!form.id) { try { clave = claveTemporal(); } catch (e) { notify(e.message); return; } }
-      (form.id ? api.usuarios.actualizar(form.id, payload) : api.usuarios.crear({ ...payload, password: clave }))
-        .then(() => { if (form.id) notify(`Usuario ${form.nombre} actualizado.`); else setClaveNueva({ nombre: form.nombre, email: payload.email, clave }); setForm(null); recargar(); })
-        .catch((e) => notify("Error al guardar: " + (e.message || "")));
+      // Sin «password»: el servidor genera la clave temporal y la devuelve en la respuesta.
+      (form.id ? api.usuarios.actualizar(form.id, payload) : api.usuarios.crear(payload))
+        .then((r) => {
+          if (form.id) notify(`Usuario ${form.nombre} actualizado.`);
+          else setClaveNueva({ nombre: form.nombre, email: payload.email, clave: claveDeRespuesta(r), motivo: "alta", id: r?.id ?? null, aviso: typeof r?.aviso === "string" ? r.aviso : "" });
+          setForm(null); recargar();
+        })
+        .catch((e) => { const m = msgServidor(e); notify(`No se pudo guardar el usuario${m ? `: ${m}` : "."}`); });
       return;
     }
     if (form.id) {
@@ -7203,9 +7246,17 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     if (conectado) { api.usuarios.desactivar(u.id).then(() => { notify(`${u.nombre} desactivado.`); recargar(); }).catch(() => notify("No se pudo desactivar al usuario.")); return; }
     setStaff((s) => s.filter((x) => x.id !== u.id)); notify(`${u.nombre} dado de baja.`);
   };
-  const resetPass = (u) => notify(auth.token
-    ? `El restablecimiento de clave de ${u.nombre} todavía no está disponible desde aquí. Pídelo a soporte.`
-    : `Se envió un enlace para restablecer la contraseña de ${u.nombre} a ${u.email || u.user}. (Demostración)`);
+  // POST /usuarios/{id}/reset-clave: el servidor genera una clave temporal nueva y la devuelve
+  // una sola vez ({ claveTemporal, usuarioId }); la anterior deja de servir.
+  const resetPass = (u, { recienCreado = false } = {}) => {
+    if (!conectado) { notify(`Se envió un enlace para restablecer la clave de ${u.nombre} a ${u.email || u.user}. (Demostración)`); return; }
+    if (!puedeResetUs) { notify("Tu rol no puede restablecer claves: pídeselo a la administración."); return; }
+    if (!recienCreado && !editable(u)) { notify("Este usuario también trabaja fuera de tus sedes: su clave la restablece la administración general."); return; }
+    if (!confirm(`¿Restablecer la clave de ${u.nombre}? Su clave actual dejará de funcionar y se generará una clave temporal nueva.`)) return;
+    api.usuarios.resetClave(u.id)
+      .then((r) => { setForm(null); setClaveNueva({ nombre: u.nombre, email: u.email, clave: claveDeRespuesta(r), motivo: "reset", id: u.id, aviso: "" }); })
+      .catch((e) => { const m = msgServidor(e); notify(esSinPermiso(e) ? "Tu rol no puede restablecer claves: pídeselo a la administración." : `No se pudo restablecer la clave de ${u.nombre}${m ? `: ${m}` : "."}`); });
+  };
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -7236,7 +7287,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         {/* Formulario alta/edición */}
         {form && (
           <Modal icon={form.id ? <Pencil size={20} strokeWidth={1.75} /> : <UserPlus size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar usuario" : "Nuevo usuario"} sub={form.id ? "Actualiza sus datos, rol y sedes" : "Crea la cuenta y asigna su rol y sedes"} onClose={() => setForm(null)} maxW={620}
-            footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}>{!conectado && <Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn>}{puedeBajaUs && form.activo !== false && <Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> {conectado ? "Dar de baja" : "Eliminar"}</Btn>}</span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
+            footer={<>{form.id && <span style={{ marginRight: "auto", display: "inline-flex", gap: 6 }}>{puedeResetUs && <Btn small kind="ghost" onClick={() => resetPass(form)}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn>}{puedeBajaUs && form.activo !== false && <Btn small kind="ghost" onClick={() => { eliminar(form); setForm(null); }}><Trash2 size={15} strokeWidth={1.75} /> {conectado ? "Dar de baja" : "Eliminar"}</Btn>}</span>}<Btn small kind="ghost" onClick={() => setForm(null)}>Cancelar</Btn><Btn small onClick={guardar}><Check size={15} strokeWidth={1.75} /> {form.id ? "Guardar cambios" : "Crear usuario"}</Btn></>}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
               <Field label="Nombre completo" value={form.nombre} onChange={(v) => setForm({ ...form, nombre: v })} placeholder="Ej. Ana Torres" />
               {!conectado && <Field label="Usuario" value={form.user} onChange={(v) => setForm({ ...form, user: v })} placeholder="atorres" icon={<UserCheck size={15} strokeWidth={1.75} />} />}
@@ -7294,13 +7345,28 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
             <div style={{ marginTop: 14, fontSize: 13, color: "var(--dc-ink-400)", display: "flex", alignItems: "center", gap: 7, background: "var(--dc-bg)", padding: "10px 12px", borderRadius: "var(--dc-r-md)" }}><ShieldCheck size={15} strokeWidth={1.75} color={ROLES[form.rol].color} /> {ROLES[form.rol].desc}</div>
           </Modal>
         )}
-        {claveNueva && (
-          <Modal icon={<KeyRound size={20} strokeWidth={1.75} />} titulo="Usuario creado" sub={`Clave temporal de ${claveNueva.nombre}`} onClose={() => setClaveNueva(null)} maxW={480}
-            footer={<><Btn small kind="ghost" onClick={() => { const no = () => notify("No se pudo copiar: anótala."); try { const pr = navigator.clipboard?.writeText(claveNueva.clave); if (!pr) { no(); return; } pr.then(() => notify("Clave copiada."), no); } catch { no(); } }}><Copy size={15} strokeWidth={1.75} /> Copiar clave</Btn><Btn small onClick={() => setClaveNueva(null)}><Check size={15} strokeWidth={1.75} /> Ya la entregué</Btn></>}>
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.5 }}>Entrega esta clave a <b>{claveNueva.nombre}</b> ({claveNueva.email}) por un canal seguro. <b>Solo se muestra esta vez</b>: al cerrar ya no se puede volver a ver. Debe cambiarla en su primer ingreso.</p>
-            <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 20, letterSpacing: 1, textAlign: "center", padding: "14px 12px", border: "1.5px dashed var(--dc-line)", borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", color: NAVY, userSelect: "all" }}>{claveNueva.clave}</div>
+        {claveNueva && (() => {
+          const esReset = claveNueva.motivo === "reset";
+          const copiar = () => { const no = () => notify("No se pudo copiar: anótala."); try { const pr = navigator.clipboard?.writeText(claveNueva.clave); if (!pr) { no(); return; } pr.then(() => notify("Clave copiada."), no); } catch { no(); } };
+          // Si el servidor no la devuelve no hay clave que mostrar: se dice y se ofrece generarla.
+          const puedeOtra = !claveNueva.clave && esReset === false && claveNueva.id != null && puedeResetUs;
+          return (
+          <Modal icon={<KeyRound size={20} strokeWidth={1.75} />} titulo={esReset ? "Clave restablecida" : "Usuario creado"} sub={claveNueva.clave ? `Clave temporal de ${claveNueva.nombre}` : claveNueva.nombre} onClose={() => setClaveNueva(null)} maxW={480}
+            footer={claveNueva.clave
+              ? <><Btn small kind="ghost" onClick={copiar}><Copy size={15} strokeWidth={1.75} /> Copiar clave</Btn><Btn small onClick={() => setClaveNueva(null)}><Check size={15} strokeWidth={1.75} /> Ya la entregué</Btn></>
+              : <>{puedeOtra && <Btn small kind="ghost" onClick={() => resetPass({ id: claveNueva.id, nombre: claveNueva.nombre, email: claveNueva.email }, { recienCreado: true })}><KeyRound size={15} strokeWidth={1.75} /> Restablecer clave</Btn>}<Btn small onClick={() => setClaveNueva(null)}><Check size={15} strokeWidth={1.75} /> Entendido</Btn></>}>
+            {claveNueva.clave ? <>
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.5 }}>{esReset ? <>La clave anterior de <b>{claveNueva.nombre}</b> ya no sirve. </> : null}<b>Entrégala al usuario; no se volverá a mostrar.</b> Hazlo por un canal seguro{claveNueva.email ? <> ({claveNueva.email})</> : null}. Debe cambiarla en su primer ingreso.</p>
+              <div data-clave-temporal style={{ fontFamily: "ui-monospace, monospace", fontSize: 20, letterSpacing: 1, textAlign: "center", padding: "14px 12px", border: "1.5px dashed var(--dc-line)", borderRadius: "var(--dc-r-md)", background: "var(--dc-bg)", color: NAVY, userSelect: "all", wordBreak: "break-all" }}>{claveNueva.clave}</div>
+              {claveNueva.aviso && <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--dc-ink-500)", lineHeight: 1.45 }}>{claveNueva.aviso}</p>}
+            </> : (
+              <div role="alert" className="fm-aviso-edad is-mal" style={{ margin: 0 }}><AlertTriangle size={15} strokeWidth={2} /><span>{esReset
+                ? <>El servidor restableció la clave de <b>{claveNueva.nombre}</b>, pero no devolvió la clave temporal. Vuelve a intentarlo o pídela a soporte.</>
+                : <>Se creó la cuenta de <b>{claveNueva.nombre}</b>, pero el servidor no devolvió una clave temporal: la persona todavía no puede entrar.{puedeOtra ? " Usa «Restablecer clave» para generarle una." : " Pide a la administración que le restablezca la clave."}</>}</span></div>
+            )}
           </Modal>
-        )}
+          );
+        })()}
         {/* Matriz de permisos por usuario (override) */}
         {form && permOpen && (
           <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo={`Permisos de ${form.nombre || "usuario"}`} sub="Ajusta qué puede hacer esta persona en cada módulo. Sobrescribe los permisos de su rol." onClose={() => setPermOpen(false)} maxW={860}
@@ -7318,7 +7384,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? "Sin sede" : etiquetaSedes(u.sedes)), cell: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>Sin sede</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span>) },
           { key: "ultimo", label: "Acceso", w: "104px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
           { key: "estado", label: "Estado", w: "96px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
-          { key: "acc", label: "Acciones", w: "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !(puedeEditarUs || puedeBajaUs) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Tu rol puede ver los usuarios, pero no cambiarlos.">Solo lectura</span> : !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc">{puedeEditarUs && <button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button>}{/* Desactivar es DELETE (baja); reactivar es PUT (editar). */}{(u.activo ? puedeBajaUs : puedeEditarUs) && <button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : puedeBajaUs ? "Activar" : "Activar (darlo de baja otra vez lo hace la administración general)"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button>}{/* H-T6: con sesión «Eliminar» hacía el mismo DELETE que Desactivar (no borra): queda solo Desactivar. */}{!conectado && puedeBajaUs && <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button>}</div> },
+          { key: "acc", label: "Acciones", w: conectado && puedeResetUs ? "136px" : "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !(puedeEditarUs || puedeBajaUs) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Tu rol puede ver los usuarios, pero no cambiarlos.">Solo lectura</span> : !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc">{puedeEditarUs && <button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button>}{conectado && puedeResetUs && u.activo && <button type="button" className="dc-row-action" aria-label={`Restablecer clave de ${u.nombre}`} title="Restablecer clave" onClick={() => resetPass(u)}><KeyRound size={14} strokeWidth={2} /></button>}{/* Desactivar es DELETE (baja); reactivar es PUT (editar). */}{(u.activo ? puedeBajaUs : puedeEditarUs) && <button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : puedeBajaUs ? "Activar" : "Activar (darlo de baja otra vez lo hace la administración general)"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button>}{/* H-T6: con sesión «Eliminar» hacía el mismo DELETE que Desactivar (no borra): queda solo Desactivar. */}{!conectado && puedeBajaUs && <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button>}</div> },
         ]} />
     </div>
   );
@@ -10864,6 +10930,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     const base = modulosVisibles(ROL_PERMS[rol] || {});
     const fromHash = parseHash(typeof window !== "undefined" ? window.location.hash : "");
     if (fromHash.vista && base.includes(modDeVista(fromHash.vista))) return canonVista(fromHash.vista);
+    // Un módulo oculto para el rol (TI › Caja) abierto por URL muestra «no disponible para tu rol».
+    if (fromHash.vista && moduloOcultoParaRol(rol, modDeVista(canonVista(fromHash.vista)))) return canonVista(fromHash.vista);
     const v = localStorage.getItem("dc_vista_" + rol);
     return v && base.includes(modDeVista(v)) ? v : (base[0] || "dashboard");
   });
@@ -11049,9 +11117,12 @@ function MainApp({ usuario, setUsuario, onLogout }) {
     }).catch(() => {});
   }, [conectado, !!servPerms, usuario?.rol]); // eslint-disable-line
   const effPerms = useMemo(() => {
-    const p = conectado
+    const p0 = conectado
       ? (servPerms || permisosServidorGuardados() || permsRoles || ROL_PERMS[usuario?.rol] || {})
       : permisosEfectivos(usuario, rolePerms);
+    // TI no ve Caja ni la cobranza aunque el servidor le dé lectura (decisión del cliente):
+    // sin el módulo, el menú, el buscador, «Crear» y las tarjetas de saldos lo ocultan.
+    const p = sinModulosOcultos(p0, usuario?.rol);
     // Helper central (compartido/permisos.js): los módulos sin `can` preguntan ahí.
     fijarPermisosSesion(p);
     return p;
@@ -11071,6 +11142,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         return;
       }
       const mod = modDeVista(canon);
+      // Entró por URL a un módulo que su rol no ve (TI › Caja): se queda y ve el aviso.
+      if (moduloOcultoParaRol(rol, mod)) { setVistaRaw(canon); return; }
       if (!mods.includes(mod)) {
         const dest = mods.find((m) => modAllowed(m)) || mods[0] || "dashboard";
         setVistaRaw(dest);
@@ -11186,7 +11259,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   useEffect(() => {
     if (!mods.length) return;
     const mod = modDeVista(vista);
-    if (!mods.includes(mod)) {
+    if (!mods.includes(mod) && !moduloOcultoParaRol(rol, mod)) {
       const dest = mods.find((m) => modAllowed(m)) || mods[0];
       if (dest) setVista(dest);
     }
@@ -11447,6 +11520,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
   const render = () => {
     // Un usuario de sede sin ninguna sede asignada no ve datos de nadie (falla cerrado).
     if (!misSedes.length && !ROLES_GLOBALES.includes(rol)) return <Card><Vacio icon={<MapPin size={22} strokeWidth={1.75} />} titulo="Tu usuario no tiene sede asignada" sub="Pide al administrador que te asigne una sede en Usuarios y permisos." /></Card>;
+    if (moduloOcultoParaRol(rol, modDeVista(vista))) return <Card className="dc-bloq" role="alert"><span className="dc-bloq__ico"><Lock size={22} strokeWidth={1.9} /></span><div><h3>{MSG_MODULO_NO_DISPONIBLE}</h3><p>{rol === "ti" ? "Caja y la cobranza no forman parte del perfil de TI." : "Pide a la administración el acceso si lo necesitas."}</p></div>{mods[0] && <Btn kind="ghost" onClick={() => setVista(mods.find((m) => modAllowed(m)) || mods[0])}>Ir a mi inicio</Btn>}</Card>;
     if (vista !== "plan" && !["usuarios", "permisos", "auditoria"].includes(vista) && !modAllowed(modDeVista(vista))) return <PlanBloqueado modulo={vista} onVerPlanes={() => setVista("plan")} />;
     switch (vista) {
       case "plataforma": return <Plataforma notify={notify} />;
@@ -11482,7 +11556,7 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       // escriben el mismo estado que la pestaña de la ficha.
       case "odontograma": return <Odontograma pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} pacienteActivo={pacienteActivo} sedeActiva={sedeActiva} can={can} rol={rol} />;
       case "perio": return <Periodontograma pacientes={pf} notify={notify} can={can} pacienteActivo={pacienteActivo} />;
-      case "tratamientos": return <Tratamientos sedeActiva={sedeActiva} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} can={can} pacienteActivo={pacienteActivo} consumirInsumos={consumirInsumos} />;
+      case "tratamientos": return <Tratamientos rol={rol} sedeActiva={sedeActiva} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} can={can} pacienteActivo={pacienteActivo} consumirInsumos={consumirInsumos} />;
       case "recetas": return <Recetas pacientes={pf} notify={notify} updFicha={updFicha} fichas={fichas} />;
       case "radiografias": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} />;
       case "fotos": return <Radiografias pacientes={pf} notify={notify} sedeActiva={sedeActiva} misSedes={misSedes} can={can} soloFotos />;

@@ -9,6 +9,7 @@ import { CATALOGO_SEED, precioCita, precioServicio } from "./catalogo";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import { medicoDeSesionEnLista } from "../util/medicoSesion";
+import { estadoInicialCita, textoCitaAgendada } from "./citaEstadoInicial";
 import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, calcEdad, espsDe, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, mismaSede, sedeNum, sedesDe, toMin, tint, useSede, validarFormPaciente} from "../comun";
 
 /* ---- RENIEC: autocompletar nombres desde el DNI (solo datos reales del backend) ---- */
@@ -470,7 +471,9 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       if (pacId == null) { setGuardando(false); notify("No se pudo registrar al paciente."); return; }
       setPacNuevo(null); cargarPac(); setF((x) => ({ ...x, pacienteId: pacId }));
     }
-    const cuerpo = { pacienteId: pacId, especialidadId: f.especialidadId || null, medicoId: f.medicoId, sedeId: sedeApiUuid(sedeId), hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: Number(f.sillon), motivo: mot, canalOrigen: f.canal, estado: "confirmada", ...(forzarFueraDeHorario ? { forzarFueraDeHorario: true } : {}) };
+    // Nace «pendiente» (por confirmar), salvo la presencial: el paciente está en la clínica.
+    const estadoNace = estadoInicialCita(f.canal);
+    const cuerpo = { pacienteId: pacId, especialidadId: f.especialidadId || null, medicoId: f.medicoId, sedeId: sedeApiUuid(sedeId), hora: f.hora, duracionMin: Number(f.duracionMin) || 30, sillon: Number(f.sillon), motivo: mot, canalOrigen: f.canal, estado: estadoNace, ...(forzarFueraDeHorario ? { forzarFueraDeHorario: true } : {}) };
     const paso = f.repetir === "semanal" ? 7 : f.repetir === "quincenal" ? 14 : f.repetir === "mensual" ? 30 : 0;
     const n = f.repetir === "no" ? 1 : Math.max(1, Math.min(12, Number(f.veces) || 1));
     const fechas = []; for (let i = 0; i < n; i++) { const d = new Date(f.fecha + "T00:00:00"); d.setDate(d.getDate() + paso * i); fechas.push(fmt(d)); }
@@ -489,12 +492,12 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
       }
       const base0 = Date.now();
       const sedeN = sedeNum(sedeId);   // la cita guarda su sede y el precio de esa sede
-      demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: sedeN, precio: precioCita(demoDb.catalogo || CATALOGO_SEED, Number(f.especialidadId) || med.esp || 1, sedeN) ?? undefined, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: "pendiente", llegada: false }))]);
+      demoDb.setCitas((cs) => [...cs, ...libres.map((fch, i) => ({ id: base0 + i, paciente: p.nombre, pacienteId: p.id, dni: p.dni || "", medicoId: Number(f.medicoId), esp: Number(f.especialidadId) || med.esp || 1, sede: sedeN, precio: precioCita(demoDb.catalogo || CATALOGO_SEED, Number(f.especialidadId) || med.esp || 1, sedeN) ?? undefined, sillon: Number(f.sillon), duracionMin: Number(f.duracionMin) || 30, fecha: fch, hora: f.hora, motivo: mot, estado: estadoNace, llegada: false }))]);
       setGuardando(false); setAvisoHorario(null);
       // Un paciente que se atiende por primera vez en esta sede pasa a ser también de ella
       // (N:M): así aparece en Pacientes y en la agenda de esa sede.
       if (p.id != null && demoDb.setPacientes) demoDb.setPacientes((ps) => ps.map((x) => (String(x.id) !== String(p.id) || sedesDe(x).some((v) => mismaSede(v, sedeN)) ? x : { ...x, sedes: [...sedesDe(x), sedeN] })));
-      notify(fechas.length > 1 ? `${libres.length} ${libres.length === 1 ? "cita agendada" : "citas agendadas"}${fechas.length - libres.length ? `, ${fechas.length - libres.length} ${fechas.length - libres.length === 1 ? "ocupada" : "ocupadas"}` : ""}.` : `Cita agendada para ${p.nombre} el ${fechaLegible(f.fecha)} a las ${f.hora}.`);
+      notify(fechas.length > 1 ? `${textoCitaAgendada(estadoNace, libres.length)}${fechas.length - libres.length ? `, ${fechas.length - libres.length} ${fechas.length - libres.length === 1 ? "ocupada" : "ocupadas"}` : ""}.` : `Cita agendada para ${p.nombre} el ${fechaLegible(f.fecha)} a las ${f.hora}${estadoNace === "pendiente" ? " · por confirmar" : ""}.`);
       onCreada();
       return;
     }
@@ -518,7 +521,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
     const avisoTxt = f.avisar
       ? (avisados > 0 && avisarFail === 0 ? ` – comprobante enviado a ${avisados} ${avisados === 1 ? "paciente" : "pacientes"}` : avisados > 0 ? ` – comprobante enviado a ${avisados}, ${avisarFail} no se pudo enviar` : " – no se pudo enviar el comprobante por WhatsApp")
       : "";
-    notify(fechas.length > 1 ? `${ok} ${ok === 1 ? "cita agendada" : "citas agendadas"}${fail ? `, ${fail} no (ocupadas/bloqueadas)` : ""}${avisoTxt}.` : `Cita agendada${avisoTxt}.`);
+    notify(fechas.length > 1 ? `${textoCitaAgendada(estadoNace, ok)}${fail ? `, ${fail} no (ocupadas/bloqueadas)` : ""}${avisoTxt}.` : `${textoCitaAgendada(estadoNace)}${avisoTxt}.`);
     onCreada();
   };
 
@@ -564,7 +567,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
   const canalBtns = (
     <div style={{ display: "flex", gap: 8 }}>
       {[["llamada", "Llamada", <Phone size={14} strokeWidth={1.75} />], ["whatsapp", "WhatsApp", <MessageSquare size={14} strokeWidth={1.75} />], ["presencial", "Presencial", <User size={14} strokeWidth={1.75} />]].map(([k, l, ic]) => { const on = f.canal === k; return (
-        <button key={k} onClick={() => setF({ ...f, canal: k })} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${T}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-accent-soft)" : "var(--dc-white)", color: on ? "var(--dc-brand-600)" : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{ic} {l}</button>
+        <button key={k} type="button" aria-pressed={on} onClick={() => setF({ ...f, canal: k })} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: "var(--dc-r-md)", border: on ? `1.5px solid ${T}` : "1.5px solid var(--dc-line)", background: on ? "var(--dc-accent-soft)" : "var(--dc-white)", color: on ? "var(--dc-brand-600)" : "var(--dc-ink-400)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{ic} {l}</button>
       ); })}
     </div>
   );
@@ -678,6 +681,10 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             )}
           </div>
           <div className="dc-agm__paso"><i>4</i>Detalles</div>
+          {/* El canal decide el estado con que nace la cita: por eso está a la vista y no en «Más datos». */}
+          <div><span style={lbl}>¿Cómo llegó?</span>{canalBtns}
+            <small data-estado-nace style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12, color: "var(--dc-ink-500)" }}><Info size={13} strokeWidth={2.2} style={{ flexShrink: 0 }} />{estadoInicialCita(f.canal) === "confirmada" ? "Presencial: el paciente está en la clínica, la cita queda confirmada." : "La cita queda por confirmar: confírmala en la Agenda cuando el paciente responda."}</small>
+          </div>
           <label><span style={lbl}>Motivo</span><input className="dc-premium-inp" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} placeholder="Ej. Evaluación, dolor de muela…" style={inp} /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
             <label><span style={lbl}>Duración{durAuto && durServicio && Number(f.duracionMin) === durServicio && <em className="dc-agm__auto">según {espObj.nombre.toLowerCase()}</em>}</span>
@@ -729,7 +736,6 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
           {!masDatos && <label><span style={lbl}>Nota de la cita</span><textarea className="dc-premium-inp" value={f.nota} onChange={(e) => setF({ ...f, nota: e.target.value })} rows={2} placeholder="Ej. viene por promoción…" style={{ ...inp, resize: "vertical" }} /></label>}
         </div>
         {masDatos && <div style={{ display: "grid", gap: 14, alignContent: "start", borderLeft: "1px solid var(--dc-line)", paddingLeft: 20 }}>
-          <div><span style={lbl}>¿Cómo llegó?</span>{canalBtns}</div>
           <label><span style={lbl}>Nota de la cita</span><textarea className="dc-premium-inp" value={f.nota} onChange={(e) => setF({ ...f, nota: e.target.value })} rows={3} placeholder="Ej. viene por promoción…" style={{ ...inp, resize: "vertical" }} /></label>
         </div>}
       </div>
