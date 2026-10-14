@@ -1792,7 +1792,12 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       // (1, 2…) que usa la agenda no le sirve.
       const { sede: sedeP, ...resto } = patch;
       const body = sedeP != null && !(c0 && c0.sede != null && mismaSede(c0.sede, sedeP)) && sedeApiUuid(sedeP) ? { ...resto, sedeId: sedeApiUuid(sedeP) } : resto;
-      api.put(`/citas/${id}`, body).then(() => { notify(`Cita reprogramada.${extra}`); recargar(); recargarAll(); onOk && onOk(); }).catch((e) => notify(`No se pudo reprogramar${e?.message ? `: ${e.message}` : "."}`)); return true; }
+      // El PUT del servidor ignora `estado`: si la cita debe quedar por confirmar y no quedó, se
+      // pasa con el cambio de estado (si falla, la cita igual quedó reprogramada).
+      api.put(`/citas/${id}`, body)
+        .then((r) => (estadoNuevo && r?.estado !== estadoNuevo ? api.citas.cambiarEstado(id, estadoNuevo).catch(() => null) : null))
+        .then(() => { notify(`Cita reprogramada.${extra}`); recargar(); recargarAll(); onOk && onOk(); })
+        .catch((e) => notify(`No se pudo reprogramar${e?.message ? `: ${e.message}` : "."}`)); return true; }
     setCitas((cs) => cs.map((c) => c.id === id ? { ...c, ...patch, ...(estadoNuevo ? { llegada: false } : {}), ...(patch.medicoId != null ? { medico: undefined } : {}) } : c));
     notify(`Cita reprogramada a ${patch.hora}${patch.fecha ? " – " + fechaLegible(patch.fecha) : ""}`.replace(/\.?$/, ".") + extra);
     onOk && onOk();
