@@ -390,3 +390,14 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Estado de la IA:** al vencer la reserva, la conversación debe enterarse. Hoy, dos horas después de vencida, la IA sigue diciendo «Ya tiene un cupo reservado… a la espera de la confirmación del pago». Al vencer, la IA avisa al paciente que el cupo se liberó y ofrece un link nuevo.
    - **Hora del cupo:** la IA dijo «hasta las 14:50» para una reserva que vencía a las 13:39 (hora de Lima). Debe leer el `caducaEn` de la reserva del link enviado y convertirlo a hora de Lima.
    - **Procedimiento anulado:** el servidor agrega «[Motivo: …]» al nombre. El motivo ya viaja en `motivo`; el nombre no se modifica (el frontend lo quita al mostrar).
+102. Cobro por WhatsApp: lo que falta después de validar la firma (revisión 18):
+   - **Pago en Caja:** al confirmar el pago (`/public/izipay/resultado` o IPN «OK PAID»), registrar el cobro en la sede de la cita con método `izipay`, importe, `izipayRef` y la cita. Debe salir en `/pagos`, en el historial del paciente y en el cierre del día (`porMetodo.izipay`). Hoy se crea la cita, pero el cierre de Surco marca Izipay S/ 0.
+   - **Aviso al paciente:** al crear la cita, la IA envía por el mismo chat la confirmación: «✅ Pago recibido. Su cita quedó confirmada para el jueves 29/10 a las 17:00 en Sede Surco…». Hoy solo confirma si el paciente pregunta.
+   - **Conciliar los pagos aprobados que quedaron sin cita:**
+     - link de la IA de R17 (`18d74c9c…`, 29/10 15:00): sigue «pendiente», con la reserva «retenida» y el cupo bloqueado;
+     - los tres de R16: «caducado».
+
+     Consultar a Izipay por `izipayRef` y crear la cita o marcar el pago para devolución.
+   - **`/pagos/historial?pacienteId=`** ignora el filtro y devuelve pagos de otros pacientes.
+   - **Canal de la cita:** una cita creada desde un link de recepción queda con `canalOrigen: whatsapp_ia`; debe reflejar el origen real del link.
+   - **Hora del cupo en el chat:** sigue mal (dijo «16:47» para un cupo que vence a las 14:38 hora de Lima).
