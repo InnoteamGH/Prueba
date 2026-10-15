@@ -4150,7 +4150,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
     api.tratamientos.porPaciente(pid).then((planes) => {
       if (pidTrat.current !== pid) return;
       const ps = planes || []; setPlanId(ps[0]?.plan?.id || null);
-      const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: estadoFaseUi(f.estado), planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null })));
+      const fs = []; ps.forEach((pf) => (pf.fases || []).forEach((f) => fs.push({ id: f.id, sede: f.sedeId ?? pf.plan?.sedeId ?? null, nombre: f.nombre, costo: Number(f.costo) || 0, estado: estadoFaseUi(f.estado), planId: f.planId, piezaNumero: f.piezaNumero ?? null, cara: f.cara || null, servicioId: f.servicioId || null, motivo: f.motivo || f.motivoCancelacion || f.motivoAnulacion || null })));
       setFasesRem(fs); setTratSinPermiso(false); setTratError(null); setTratCargado(true); setTratLeyendo(false);
     }).catch((e) => {
       if (pidTrat.current !== pid) return;
@@ -4172,6 +4172,13 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   // Para mostrar, solo los ítems de las sedes que se ven: cada sede presupuesta y cobra lo
   // suyo. Se escribe siempre sobre la ficha completa (setTrat con la lista de la ficha).
   const fases = (conectado ? fasesRem : (fichas[pacienteId]?.tratamiento || [])).filter((f) => f.estado !== "anulado" && sx.enSede(sedeFase(f)));
+  // Revisión 17: los anulados no suman ni se atienden, pero quedan en el historial del plan con
+  // su motivo (el servidor lo devuelve como `motivo` o `motivoCancelacion`).
+  const fasesAnuladas = (conectado ? fasesRem : (fichas[pacienteId]?.tratamiento || [])).filter((f) => f.estado === "anulado" && sx.enSede(sedeFase(f)));
+  // El servidor además agrega «[Motivo: …]» al nombre del procedimiento anulado: se quita al mostrar.
+  const MARCA_MOTIVO = /\s*\[Motivo:\s*([^\]]*)\]\s*$/i;
+  const motivoDeAnulacion = (f) => String(f.motivoAnulacion || f.motivo || f.motivoCancelacion || (String(f.nombre || "").match(MARCA_MOTIVO) || [])[1] || "").trim();
+  const nombreAnulado = (f) => nombreFaseLimpio({ ...f, nombre: String(f.nombre || "").replace(MARCA_MOTIVO, "") });
   const piezaDeFase = (f) => {
     if (f.piezaNumero != null && f.piezaNumero !== "") return String(f.piezaNumero);
     if (f.pieza != null && f.pieza !== "") return String(f.pieza);
@@ -4462,6 +4469,24 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
               );
               return null;
             }}</ListaFiltrable>
+        )}
+        {fasesAnuladas.length > 0 && (
+          <details className="dc-tr__anulados" style={{ borderTop: "1px solid var(--dc-line)", padding: "10px 20px 14px" }}>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--dc-ink-700)" }}>
+              {fasesAnuladas.length === 1 ? "1 procedimiento anulado" : `${fasesAnuladas.length} procedimientos anulados`} <span style={{ fontWeight: 400, color: "var(--dc-ink-500)" }}>· no suman al presupuesto ni al saldo</span>
+            </summary>
+            <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "grid", gap: 8 }}>
+              {fasesAnuladas.map((f) => { const m = motivoDeAnulacion(f); const pz = piezaDeFase(f); return (
+                <li key={f.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, color: "var(--dc-ink-500)" }}>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ textDecoration: "line-through" }}>{nombreAnulado(f)}{pz !== "—" ? ` · pieza ${pz}` : ""}</span>
+                    <small style={{ display: "block", fontSize: 12 }}>{m ? `Anulado: ${m}` : "Anulado"}</small>
+                  </span>
+                  <span style={{ whiteSpace: "nowrap", textDecoration: "line-through" }}>S/ {M.sol2(f.costo)}</span>
+                </li>
+              ); })}
+            </ul>
+          </details>
         )}
       </Card>
       {detF && (() => { const f = fases.find((x) => x.id === detF.id) || detF;
