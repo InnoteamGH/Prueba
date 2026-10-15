@@ -341,3 +341,15 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Ambiente:** mientras se prueba, token, comercio y SDK deben ser todos del sandbox (`sandbox-checkout.izipay.pe`, credenciales del panel de pruebas). Hoy el comercio 4081888 es de producción: el sandbox lo rechaza con P54 y una tarjeta real se cobraría. `keyRSA` debe ser «RSA» o la clave pública (hoy trae «IZIPAY_API_URL=…»); `sdkUrl`, el del mismo ambiente que el token.
    - **Mensaje de la IA:** la URL del pago va sola (WhatsApp no interpreta `[texto](url)`) y con el `pagoId` con guiones; el servicio sin «30 años».
    - **`PATCH /citas/{id}/estado`:** hoy responde 500 para cancelada/confirmada/en_atencion/atendida (regresión). Las transiciones no permitidas (atendida o en_atencion en el futuro) deben dar 400 con el motivo. `POST /auth/cambiar-clave` y `POST /consentimientos/{id}/anular` también dan 500: revisar la migración de base de datos del último despliegue.
+98. Pago por WhatsApp, reservas y anulaciones (revisión 14):
+   - **Sesión de pago:** `GET /public/izipay/checkout/{pagoId}` vuelve a responder 400 «Izipay rechazó Token/Generate: Estructura del request inválida» (ya pasó en las revisiones 11 y 12). Registrar en el log el cuerpo exacto que se envía a `Token/Generate` (sin secretos) y compararlo con la referencia oficial del token de sesión. Revisar también que las variables de Izipay del sandbox estén cada una en su línea: en la revisión 13 `keyRSA` traía pegado «IZIPAY_API_URL=…».
+   - **«Ya pagué»:** cuando el paciente dice que pagó, la IA consulta el estado del pago de su reserva (herramienta propia). No vuelve a llamar a `agendar` ni a `disponibilidad`, y no le dice que su hora «no está disponible»: ese cupo lo retiene su propia reserva. Si el pago está pendiente, responde que aún no llega la confirmación y que el cupo sigue guardado hasta la hora de vencimiento.
+   - **Vencimiento:** a los 30 minutos sin pago, la reserva pasa a «vencida» y el link a «vencido»; hoy siguen «retenida» y «pendiente» con horas de atraso. Un link vencido no pide token a Izipay: `GET /public/izipay/checkout/{pagoId}` responde 410 «El link venció» y la página de pago lo muestra.
+   - **Mensaje del link:** las líneas no se pasan a mayúscula inicial. Hoy llega «Https://app…», «Tiempo, se libera…» y «Aplica a otro tratamiento…».
+   - **Anular consentimiento** (`POST /consentimientos/{id}/anular`):
+     - el motivo es obligatorio (400 sin motivo);
+     - el documento anulado conserva la firma, la fecha de firma y el texto que se firmó;
+     - el título y el contenido no se modifican;
+     - `anulado`, `motivoAnulacion`, `anuladoEn` y `anuladoPor` se guardan y se devuelven también en `GET /consentimientos`;
+     - un consentimiento ya anulado no se puede anular otra vez (409).
+   - **«No asistió» en el futuro:** `PATCH /citas/{id}/estado?estado=no_show` en una cita futura debe dar 400, igual que «atendida» y «en_atencion».
