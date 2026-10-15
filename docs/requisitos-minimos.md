@@ -374,3 +374,13 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Después de mandar el link, la IA no vuelve a llamar a `agendar`** para la misma reserva. Un «Sí» o «Confirmo» del paciente se responde recordando que falta el pago.
    - **Ambiente de pruebas:** mientras se prueba, comercio, claves y SDK del sandbox (hoy, comercio 4081888 de producción). Para salir a producción, cambiar las cuatro credenciales juntas.
    - **Correo de facturación:** el del paciente o uno real de la clínica (hoy `pagos@clnicadentalsonre.local`).
+100. Confirmación del pago (revisión 16):
+   - **Firma:** con un pago aprobado en el sandbox (código «00»), Izipay devuelve `payloadHttp` y `signature`. La página los reenvía tal cual a `/public/izipay/resultado`, pero el servidor responde «firma inválida». Además, el aviso directo (IPN) tampoco registró el pago. Revisar:
+     - que la clave Hash sea la del comercio de pruebas 4004353 (no la de producción);
+     - el cálculo de la firma: Base64 de HMAC-SHA256 sobre `payloadHttp` exactamente como llega, sin volver a serializar el JSON;
+     - que `urlIPN` llegue a Izipay y el endpoint responda 200.
+   - **Pago aprobado y cupo liberado:** si el pago se aprobó pero el aviso no se validó, el link no puede pasar a «caducado» ni liberar el cupo sin antes consultar a Izipay el estado de la transacción (`izipayRef`). Con dinero real, el paciente pagaría y se quedaría sin cita.
+   - **Hora del cupo en el chat:** la IA dice «su cupo sigue guardado hasta las 16:10». Esa hora está en UTC (en Lima es 11:10) y es de otra reserva del mismo paciente. Debe dar la hora de Lima de la reserva del link enviado.
+   - **Motivo de anulación del procedimiento:** la respuesta del `PATCH` ya lo trae; `GET /tratamientos` también debe devolverlo (`motivo` o `motivoCancelacion`).
+   - **Consentimiento anulado:** no modificar el título ni el texto firmado (hoy agrega «[ANULADO]» y «[Anulado: motivo]»); guardar `anuladoEn` y `anuladoPor`.
+   - **Link con reserva liberada:** el link debe quedar «anulado», no «pendiente». El cobro ya se bloquea con «pago caducado».
