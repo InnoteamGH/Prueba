@@ -40,6 +40,7 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
+import { estadoLink, horaLimaDe, idCorto, resumenLinks, vencioYa } from "./util/linksPago";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
 import { bloqueoTocaHora, bloqueosDelDia, bloqueosParcialesDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
@@ -4852,7 +4853,7 @@ const medioUi = (t) => MEDIO_UI[String(t || "").toLowerCase()] || [Wallet, "#0E9
 const DENOMS_USD = [100, 50, 20, 10, 5, 1];
 const DENOMS = [[200, "b"], [100, "b"], [50, "b"], [20, "b"], [10, "b"], [5, "m"], [2, "m"], [1, "m"], [0.5, "m"], [0.2, "m"], [0.1, "m"]];
 
-function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null, abrirEgreso = false, onEgresoAbierto = () => {} }) {
+function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirInsumos, rol = "", can, sedeActiva = 1, sedeFiltro = null, misSedes = [1, 2], cobroDesdeFicha = null, onCobroDesdeFichaDone = () => {}, tab: tabProp = null, onTab = null, abrirEgreso = false, onEgresoAbierto = () => {}, onIrDiaAgenda = null }) {
   const [verApertura, setVerApertura] = useState(false);   // apertura de caja plegada hasta que se pide
   // Bug #26 re-test: Gerencia debe VER la pestaña Ingresos/egresos (solo lectura), aunque no pueda crear egresos
   const puedeVerMovimientos = can ? can("facturacion", "ver") : rol !== "recepcion";
@@ -5395,6 +5396,72 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // caja elegida se vuelven a pedir (CAJA-05).
   useEffect(() => { if (conectado) { recargarCaja(); recargarHist(); recargarCierre(); recargarEgresos(); } }, [claveVer]); // eslint-disable-line
   const pacsHoy = new Set(citasHoyApi.filter((c) => deCaja(c.sedeId ?? c.sede)).map((c) => c.pacienteId).filter(Boolean));
+  // ── Links de pago con sesión ──
+  // Los de Izipay que creó la IA de WhatsApp al reservar un cupo (GET /pagos/links, el más
+  // reciente primero). Se piden al entrar a Caja (para el número de la pestaña), cada vez que
+  // se abre la pestaña y con «Actualizar». Llevan `sede` y `monto` como los de ejemplo: el
+  // mismo filtro de sede (CAJA-19) y el mismo conteo de pendientes sirven para los dos.
+  const [linksCarga, setLinksCarga] = useState(conectado ? "cargando" : "ok");   // cargando | ok | error
+  const [linksVer, setLinksVer] = useState(0);   // cada recarga reintenta las reservas que fallaron
+  const linksPedidos = useRef(false);
+  const recargarLinks = () => {
+    if (!conectado) return;
+    setLinksCarga("cargando");
+    api.pagos.links()
+      .then((r) => { setLinks((Array.isArray(r) ? r : []).map((l) => ({ ...l, id: l.pagoId, sede: l.sedeId ?? null, monto: Number(l.importe) || 0 }))); setLinksCarga("ok"); setLinksVer((n) => n + 1); })
+      .catch(() => setLinksCarga("error"));
+  };
+  useEffect(() => {
+    if (!conectado || (tab !== "links" && linksPedidos.current)) return;
+    linksPedidos.current = true;
+    recargarLinks();
+  }, [conectado, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  // El link no trae el paciente: se pide la reserva de los que se muestran (los 30 más
+  // recientes de la sede, en paralelo) y de ella salen el paciente y el concepto. El nombre se
+  // toma de lo ya cargado (pacientes, citas, saldos de caja) o, si no está, de GET
+  // /pacientes/{id}. Lo que falle queda «Paciente» y se reintenta al actualizar.
+  const MAX_LINKS = 30;
+  const [reservasLink, setReservasLink] = useState({});   // reservaId → { pacienteId, concepto }
+  const [nombresPac, setNombresPac] = useState({});       // pacienteId → nombre
+  const reservasPedidas = useRef(new Set());
+  const pacPedidos = useRef(new Set());
+  const nombreCargado = (pid) => {
+    if (pid == null || pid === "") return "";
+    const k = String(pid);
+    return pacientes.find((p) => String(p.id) === k)?.nombre
+      || citasHoyApi.find((c) => String(c.pacienteId) === k && c.paciente)?.paciente
+      || (caja.porCobrar || []).find((r) => String(r.pacienteId) === k && r.paciente)?.paciente
+      || nombresPac[k] || "";
+  };
+  const reservasVis = conectado ? linksVis.slice(0, MAX_LINKS).map((l) => l.reservaId).filter(Boolean) : [];
+  const claveReservas = reservasVis.join(",");
+  useEffect(() => {
+    const faltan = reservasVis.filter((id) => !reservasPedidas.current.has(id));
+    if (!faltan.length) return;
+    faltan.forEach((id) => reservasPedidas.current.add(id));
+    Promise.all(faltan.map((id) => api.pagos.reserva(id).then((r) => [id, r], () => [id, null]))).then((pares) => {
+      const nuevas = {};
+      pares.forEach(([id, r]) => { if (r) nuevas[id] = { pacienteId: r.pacienteId ?? null, concepto: r.concepto || "" }; else reservasPedidas.current.delete(id); });
+      if (Object.keys(nuevas).length) setReservasLink((m) => ({ ...m, ...nuevas }));
+    });
+  }, [claveReservas, linksVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const pids = [...new Set(reservasVis.map((id) => reservasLink[id]?.pacienteId).filter((p) => p != null && p !== "").map(String))]
+      .filter((p) => !nombreCargado(p) && !pacPedidos.current.has(p));
+    if (!pids.length) return;
+    pids.forEach((p) => pacPedidos.current.add(p));
+    Promise.all(pids.map((p) => api.pacientes.ver(p).then((r) => [p, r?.nombre || ""], () => [p, ""]))).then((pares) => {
+      const nombres = {};
+      pares.forEach(([p, n]) => { if (n) nombres[p] = n; else pacPedidos.current.delete(p); });
+      if (Object.keys(nombres).length) setNombresPac((m) => ({ ...m, ...nombres }));
+    });
+  }, [reservasLink, linksVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Fila de la lista: el link con su paciente y concepto (los de ejemplo ya los traen).
+  const filaLink = (l) => {
+    if (!conectado) return l;
+    const rv = reservasLink[l.reservaId];
+    return { ...l, paciente: nombreCargado(rv?.pacienteId) || "Paciente", concepto: rv?.concepto || "" };
+  };
   useEffect(() => {
     // R-27: espera también a saber si la caja de la sede está abierta (o con una jornada
     // anterior sin cerrar), para que el aviso sea el mismo para todos los pacientes.
@@ -5600,8 +5667,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     setEgresos((es) => es.filter((x) => x.id !== e.id));
     notify("Egreso anulado.");
   };
+  // Con sesión los links no se crean desde Caja: los crea la IA de WhatsApp al reservar un cupo.
+  const AVISO_CREAR_LINK = "Los links se crean desde el chat de WhatsApp al reservar un cupo.";
   const crearLink = () => {
-    if (conectado) { notify("Los links de pago aún no están disponibles en el servidor."); setLinkForm(null); return; }
+    if (conectado) { notify(AVISO_CREAR_LINK); setLinkForm(null); return; }
     if (!linkForm.paciente.trim() || !(Number(linkForm.monto) > 0)) { notify("Indica paciente y monto para el link."); return; }
     // El link es de la sede que lo genera: su cobro entra a esa caja (CAJA-19).
     const sedeLink = linkForm.sede ?? sedeCaja;
@@ -6506,10 +6575,117 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         );
       })()}
 
-      {tab === "links" && conectado && (
-        // Con sesión no hay servicio de links de pago en el servidor: no se crean links de ejemplo.
-        <Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Links de pago aún no disponibles" sub="Tu clínica todavía no tiene el servicio de links de pago en el servidor. Cobra desde Caja con los métodos habituales." /></Card>
-      )}
+      {tab === "links" && conectado && (() => {
+        // Links reales de Izipay, con el mismo diseño de tarjetas que los de ejemplo. Se ven los
+        // 30 más recientes de la sede; la cabecera cuenta todos los de la sede. Crear un link
+        // desde Caja no se ofrece: lo hace la IA de WhatsApp al reservar el cupo.
+        const r = resumenLinks(linksVis);
+        const filas = linksVis.slice(0, MAX_LINKS).map(filaLink);
+        const cargando = linksCarga === "cargando";
+        const actualizar = <Btn small kind="ghost" disabled={cargando} onClick={recargarLinks}><Repeat size={14} strokeWidth={1.9} /> {cargando ? "Actualizando…" : "Actualizar"}</Btn>;
+        const nuevoLink = <button type="button" className="dc-flujo__nuevo is-teal" title={AVISO_CREAR_LINK} onClick={() => notify(AVISO_CREAR_LINK)}><Plus size={14} strokeWidth={2} /> Nuevo link</button>;
+        const citaTxt = (l) => [/^\d{4}-\d{2}-\d{2}$/.test(String(l.fecha || "")) ? fechaLegible(l.fecha) : "", String(l.hora || "").slice(0, 5)].filter(Boolean).join(" · ");
+        const sedeTxt = (l) => l.sedeNombre || nombreSedeEn(sedes, l.sedeId) || "";
+        // Ámbar como los de ejemplo: «is-warn» en la tarjeta y «is-aviso» en la tabla.
+        const PILL = { ok: "is-ok", mute: "is-mute", neutro: "" };
+        const ICO_EST = { pendiente: Clock, pagado: CheckCircle2, caducado: Hourglass, anulado: X };
+        const pill = (l, enTarjeta = false) => { const e = estadoLink(l); const Ic = ICO_EST[e.clave] || Clock; return <span className={`dc-pill ${e.tono === "aviso" ? (enTarjeta ? "is-warn" : "is-aviso") : PILL[e.tono] || ""}`}><Ic size={12} strokeWidth={2} /> {e.etiqueta}</span>; };
+        // Solo se copia un link que todavía se puede pagar (pendiente y sin vencer).
+        const copiable = (l) => estadoLink(l).clave === "pendiente" && !vencioYa(l.caducaEn) && !!l.url;
+        // Lo que sigue según el estado: hasta cuándo se retiene el cupo o qué pasó con la cita.
+        // QA 17: hay links pagados sin cita (el pago no llegó a convertirse en cita).
+        const detalleTxt = (l) => {
+          const e = estadoLink(l).clave, hora = horaLimaDe(l.caducaEn);
+          if (e === "pendiente") return hora ? `${vencioYa(l.caducaEn) ? "Venció" : "Vence"} a las ${hora} (hora de Lima)` : "";
+          if (e === "pagado") return l.citaId ? "Cita creada" : "Pago confirmado, todavía sin cita";
+          return "";
+        };
+        const copiar = (l) => {
+          const url = String(l.url || "");
+          const falla = () => notify(`No se pudo copiar. Link: ${url}`);
+          try { if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => notify(`Link de pago de ${l.paciente} copiado.`), falla); else falla(); } catch { falla(); }
+        };
+        const aviso = (
+          <div className="fm-aviso-edad is-info">
+            <Zap size={15} strokeWidth={2} />
+            <span><b>Links de pago de Izipay.</b> Los crea la IA de WhatsApp al reservar un cupo: el cupo queda retenido hasta que vence el link y, cuando Izipay confirma el pago, se crea la cita.</span>
+          </div>
+        );
+        const vacio = (icon, titulo, sub) => <Card style={{ display: "grid", justifyItems: "center", gap: 10, padding: 18 }}><Vacio icon={icon} titulo={titulo} sub={sub} />{actualizar}</Card>;
+        if (!links.length && cargando) return <div style={{ display: "grid", gap: 16 }}>{aviso}<Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Cargando links de pago…" sub="Trayendo los links de la sede desde el servidor." /></Card></div>;
+        if (!links.length && linksCarga === "error") return <div style={{ display: "grid", gap: 16 }}>{aviso}{vacio(<AlertTriangle size={22} strokeWidth={1.75} />, "No se pudieron cargar los links de pago", "No llegó la respuesta del servidor. Vuelve a intentarlo.")}</div>;
+        return (
+        <div style={{ display: "grid", gap: 16 }}>
+          {aviso}
+          {linksCarga === "error" && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span>No se pudo actualizar la lista: se muestra la última que llegó.</span></div>}
+          {linksVis.length === 0 ? vacio(<Zap size={22} strokeWidth={1.75} />, "Todavía no hay links de pago", "Se crean cuando la IA de WhatsApp reserva un cupo.") : (
+          <ListaFiltrable rows={filas} sub="links" alfabetico={false} extra={<>
+            <span className="dc-flujo__neto is-aviso" title="Con el cupo retenido hasta que vence el link">Esperando pago <b>{r.pendientes}</b></span>
+            <span className="dc-flujo__neto" title="Pago confirmado por Izipay">Pagados <b>{r.pagados}</b> · <b>S/ {M.sol2(r.montoPagado)}</b></span>
+            <span className="dc-flujo__neto is-mute" title="Vencieron sin pago: el cupo se liberó">Vencidos <b>{r.caducados}</b></span>
+            {actualizar}
+            {nuevoLink}
+          </>} vistaClave="caja_links" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 980, cols: [
+            { key: "p", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (l) => <PersonaCelda nombre={l.paciente} sub={l.concepto || undefined} /> },
+            { key: "c", label: "Cita", w: "minmax(140px,1fr)", get: (l) => citaTxt(l) || "—" },
+            { key: "s", label: "Sede", w: "minmax(110px,.8fr)", get: (l) => sedeTxt(l) || "—" },
+            { key: "e", label: "Estado", w: "150px", a: "center", cell: (l) => pill(l) },
+            { key: "d", label: "Detalle", w: "minmax(170px,1.1fr)", get: (l) => detalleTxt(l) || "—" },
+            { key: "m", label: "Importe", w: "100px", a: "right", cell: (l) => <span className="dc-tp__num">S/ {M.sol2(l.monto)}</span> },
+            { key: "n", label: "Pedido", w: "90px", get: (l) => idCorto(l.pagoId) || "—" },
+            { key: "acc", label: "", w: "130px", a: "right", noSort: true, cell: (l) => (copiable(l) ? <Btn small kind="ghost" onClick={() => copiar(l)}><Copy size={14} strokeWidth={2} /> Copiar link</Btn> : null) },
+          ] }} cols={[
+            { key: "paciente", label: "Paciente", get: (l) => l.paciente || "" },
+            { key: "concepto", label: "Concepto", get: (l) => l.concepto || "" },
+            { key: "cita", label: "Cita", get: (l) => citaTxt(l), sortVal: (l) => `${l.fecha || ""} ${l.hora || ""}` },
+            { key: "sede", label: "Sede", get: (l) => sedeTxt(l) },
+            { key: "estado", label: "Estado", get: (l) => estadoLink(l).etiqueta },
+            { key: "detalle", label: "Detalle", get: (l) => detalleTxt(l) },
+            { key: "monto", label: "Importe", get: (l) => Number(l.monto || 0).toFixed(2), sortVal: (l) => Number(l.monto) || 0 },
+            { key: "pedido", label: "Pedido", get: (l) => idCorto(l.pagoId) },
+          ]}>{(listaL) => (
+          <div className="dc-tickets">
+            {listaL.map((l) => {
+              const e = estadoLink(l);
+              const pagado = e.clave === "pagado";
+              const vencido = e.clave === "pendiente" && vencioYa(l.caducaEn);
+              const detalle = detalleTxt(l);
+              const conCita = pagado && !!l.citaId;
+              const col = colorDe(l.paciente);
+              return (
+              <article key={l.id} className={`dc-ticket${pagado ? " is-pagado" : ""}${e.tono === "mute" || vencido ? " is-inactivo" : ""}`}>
+                <div className="dc-ticket__top">
+                  <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(l.paciente)}</span>
+                  <div className="dc-ticket__quien"><b>{l.paciente}</b><span>{l.concepto || "Reserva de cita"}</span></div>
+                  {pill(l, true)}
+                </div>
+                <div className="dc-ticket__monto"><small>Importe</small><b>S/ {M.sol2(l.monto)}</b></div>
+                <div className="dc-ticket__info">
+                  {citaTxt(l) && <span><Calendar size={13} strokeWidth={2} /> Cita: {citaTxt(l)}</span>}
+                  {sedeTxt(l) && <span><MapPin size={13} strokeWidth={2} /> {sedeTxt(l)}</span>}
+                  {detalle && <span className={conCita ? "is-ok" : "is-aviso"}>
+                    {conCita ? <CalendarCheck size={13} strokeWidth={2} /> : pagado ? <AlertTriangle size={13} strokeWidth={2} /> : <Clock size={13} strokeWidth={2} />} {detalle}
+                    {/* «Ver en la agenda» abre la vista Día en la fecha de la cita. */}
+                    {conCita && onIrDiaAgenda && /^\d{4}-\d{2}-\d{2}$/.test(String(l.fecha || "")) && <> · <button type="button" onClick={() => onIrDiaAgenda(l.fecha)}>Ver en la agenda</button></>}
+                  </span>}
+                </div>
+                <div className="dc-ticket__corte" aria-hidden="true" />
+                <div className="dc-ticket__pie">
+                  <span className="dc-ticket__url" title={`Pedido ${l.pagoId || ""}`}><Receipt size={13} strokeWidth={2} /> Pedido {idCorto(l.pagoId) || "—"}</span>
+                  {copiable(l) && <div className="dc-ticket__acc">
+                    <button type="button" onClick={() => copiar(l)} title="Copiar el link para el paciente"><Copy size={14} strokeWidth={2} /> Copiar link</button>
+                  </div>}
+                </div>
+              </article>
+              );
+            })}
+          </div>
+          )}</ListaFiltrable>
+          )}
+          {linksVis.length > MAX_LINKS && <p style={{ margin: 0, fontSize: 12, color: "var(--dc-ink-500)" }}>Se muestran los {MAX_LINKS} links más recientes de {linksVis.length}.</p>}
+        </div>
+        );
+      })()}
       {tab === "links" && !conectado && (() => {
         const activos = linksVis.filter((l) => l.estado === "pendiente");
         const cobrado = linksVis.filter((l) => l.estado === "pagado").reduce((s, l) => s + l.monto, 0);
@@ -11737,7 +11913,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       case "caja_cierre": return <Facturacion key="caja" tab="cierre" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_historial": return <Facturacion key="caja" tab="historial" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_movimientos": return <Facturacion key="caja" tab="movimientos" onTab={irCaja} abrirEgreso={crearIntent === "egreso"} onEgresoAbierto={() => setCrearIntent(null)} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
-      case "caja_links": return <Facturacion key="caja" tab="links" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
+      // «Ver en la agenda» de un link pagado abre la vista Día en la fecha de la cita (FOCO_CAL).
+      case "caja_links": return <Facturacion key="caja" tab="links" onTab={irCaja} onIrDiaAgenda={can("agenda", "ver") ? (fecha) => { FOCO_CAL = { fecha, ts: Date.now() }; setVista("agenda"); } : null} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja_sunat": return <Facturacion key="caja" tab="sunat" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "caja": return <Facturacion key="caja" tab="hoy" onTab={irCaja} pacientes={pf} fichas={fichas} updFicha={updFicha} notify={notify} consumirInsumos={consumirInsumos} rol={rol} can={can} sedeActiva={sedeActiva} sedeFiltro={sede} misSedes={misSedes} cobroDesdeFicha={cobroDesdeFicha} onCobroDesdeFichaDone={() => setCobroDesdeFicha(null)} />;
       case "miproduccion": return <MiProduccion usuario={usuario} citas={cf} sedes={idsSede} />;

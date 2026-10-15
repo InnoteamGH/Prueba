@@ -531,6 +531,11 @@ export const api = {
     cierre: (fecha, q) => request("GET", `/pagos/cierre${conQuery({ fecha: fecha || null, ...(q || {}) })}`),
     anular: (id, body) => request("POST", `/pagos/${id}/anular`, body || {}),
     enviarWa: (id) => request("POST", `/pagos/${id}/enviar-wa`),
+    // Links de pago de Izipay que creó la IA de WhatsApp, el más reciente primero (recepción
+    // solo recibe los de su sede). No traen el nombre del paciente: sale de su reserva.
+    links: () => request("GET", "/pagos/links"),
+    // Reserva retenida de un link: { pacienteId, medicoId, estado, fecha, hora, sedeId, importe, concepto, caducaEn, citaId }.
+    reserva: (id) => request("GET", `/reservas/${id}`),
     // Niubiz: crear sesión de pago (paso A) y confirmar tras el checkout (paso B)
     niubizSesion: (monto, email) => request("POST", "/pagos/niubiz/sesion", { monto, email }),
     niubizConfirmar: (d) => request("POST", "/pagos/niubiz/confirmar", d),

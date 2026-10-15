@@ -2370,6 +2370,18 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-ticket__monto b { font-size: 20px; }
 .dc-ticket__pie { padding: 10px 14px 12px; }
 .dc-ticket__acc button { height: 28px; font-size: 12px; }
+/* Links de pago reales: datos de la cita bajo el importe (alineados con él) y vencidos o
+   anulados en gris */
+.dc-ticket__info { display: grid; gap: 4px; padding: 0 14px 10px 56px; font-size: 12px; color: var(--dc-ink-700); }
+.dc-ticket__info > span { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.dc-ticket__info > span.is-aviso { color: #9A5B06; font-weight: 600; }
+.dc-ticket__info > span.is-ok { color: #15803D; font-weight: 600; }
+.dc-ticket__info button { all: unset; cursor: pointer; font-weight: 700; color: #0A6C76; }
+.dc-ticket__info button:focus-visible { box-shadow: var(--dc-focus); border-radius: 6px; }
+.dc-ticket.is-inactivo .dc-ticket__monto b { color: var(--dc-ink-500); }
+.dc-pill.is-mute { --c: #64748B; }
+.dc-ticket .dc-pill.is-mute { color: var(--dc-ink-500); background: #EEF2F4; }
+.dc-flujo__neto.is-mute { background: #EEF2F4; color: var(--dc-ink-700); }
 .dc-jor { gap: 8px; }
 .dc-jor__card { grid-template-columns: 54px minmax(0, 1.2fr) minmax(280px, 1.4fr) 150px; gap: 14px; padding: 10px 14px 10px 10px; border-radius: 16px; }
 .dc-jor__fecha { padding: 5px 0; border-radius: 12px; }
