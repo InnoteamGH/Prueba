@@ -358,3 +358,19 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
      - `anulado`, `motivoAnulacion`, `anuladoEn` y `anuladoPor` se guardan y se devuelven también en `GET /consentimientos`;
      - un consentimiento ya anulado no se puede anular otra vez (409).
    - **«No asistió» en el futuro:** `PATCH /citas/{id}/estado?estado=no_show` en una cita futura debe dar 400, igual que «atendida» y «en_atencion».
+99. Reservas, IA y ambiente de pago (revisión 15):
+   - **`POST /reservas` valida como una cita:**
+     - horario del doctor en esa sede y día;
+     - fecha y hora futuras;
+     - sin choque con citas ni con otras reservas activas del mismo doctor (o sillón);
+     - 409 o 400 con el motivo.
+
+     Hoy acepta dos reservas a la misma hora, una reserva sobre una cita, domingos, las 21:30 y fechas pasadas.
+   - **La IA nunca confirma una cita que no existe.** «Ya pagué» → consulta el estado del pago de la reserva:
+     - si está pendiente, lo dice y da la hora de vencimiento;
+     - solo cuando el backend recibió el IPN válido y creó la cita, la IA la confirma.
+
+     `confirmar_asistencia` solo aplica a citas existentes.
+   - **Después de mandar el link, la IA no vuelve a llamar a `agendar`** para la misma reserva. Un «Sí» o «Confirmo» del paciente se responde recordando que falta el pago.
+   - **Ambiente de pruebas:** mientras se prueba, comercio, claves y SDK del sandbox (hoy, comercio 4081888 de producción). Para salir a producción, cambiar las cuatro credenciales juntas.
+   - **Correo de facturación:** el del paciente o uno real de la clínica (hoy `pagos@clnicadentalsonre.local`).
