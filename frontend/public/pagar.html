@@ -35,7 +35,12 @@
   <script>
     (function () {
       const params = new URLSearchParams(location.search);
-      const pagoId = params.get("pagoId") || params.get("id");
+      // Revisión 13: la IA envía el id sin guiones (32 caracteres) y el servidor solo lo encuentra
+      // con guiones: se normaliza al formato UUID.
+      const pagoIdCrudo = String(params.get("pagoId") || params.get("id") || "").trim();
+      const pagoId = /^[0-9a-f]{32}$/i.test(pagoIdCrudo)
+        ? pagoIdCrudo.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5")
+        : pagoIdCrudo;
       const apiBase = (params.get("api") || localStorage.getItem("dc_api") || "https://o6xu3m6s78.execute-api.us-east-1.amazonaws.com").replace(/\/$/, "");
       const msg = document.getElementById("msg");
       const meta = document.getElementById("meta");
@@ -64,14 +69,17 @@
         });
       }
 
-      function typeFormPopup() {
+      // Revisión 13: el formulario va incrustado en la página. En el SDK el modo emergente se
+      // llama POP_UP (no POPUP) y, abierto desde el link de WhatsApp en el celular, una ventana
+      // emergente puede quedar bloqueada.
+      function typeFormEmbebido() {
         try {
           if (window.Izipay && Izipay.enums && Izipay.enums.typeForm) {
             const tf = Izipay.enums.typeForm;
-            return tf.POPUP || tf.MODAL || tf.EMBEDDED || "popup";
+            return tf.EMBEDDED || tf.POP_UP || "embedded";
           }
         } catch (e) { /* ignore */ }
-        return "popup";
+        return "embedded";
       }
 
       function processTypeAuth() {
@@ -120,7 +128,10 @@
           const transactionId = res.j.transactionId;
           const orderNumber = res.j.orderNumber;
           const amount = String(res.j.amount || Number(res.j.importe).toFixed(2));
-          const keyRSA = res.j.keyRSA || "RSA";
+          // keyRSA: "RSA" o la clave pública. Si el servidor manda otra cosa (p. ej. una variable
+          // de entorno mal cargada, «IZIPAY_API_URL=…»), se usa "RSA".
+          const kr = String(res.j.keyRSA || "").trim();
+          const keyRSA = kr && (kr === "RSA" || /BEGIN PUBLIC KEY/.test(kr) || /^[A-Za-z0-9+/=\s-]{64,}$/.test(kr)) ? kr : "RSA";
           const sdkUrl = res.j.sdkUrl || "https://sandbox-checkout.izipay.pe/payments/v1/js/index.js";
           const email = res.j.email || "";
           const clinica = res.j.clinicaNombre || "Clínica";
@@ -171,7 +182,7 @@
                     document: docNumber
                   },
                   render: {
-                    typeForm: typeFormPopup(),
+                    typeForm: typeFormEmbebido(),
                     container: "#formHost"
                   },
                   urlIPN: apiBase + "/api/public/izipay/ipn"
@@ -204,12 +215,14 @@
                     btnPay.hidden = false;
                   }
                 };
+                // El SDK dibuja el formulario dentro de #formHost: no se vacía después (antes se
+                // borraba el formulario recién creado y la página quedaba en «Abriendo pasarela…»).
+                formHost.textContent = "";
                 checkout.LoadForm({
                   authorization: authorization,
                   keyRSA: keyRSA,
                   callbackResponse: onResponse
                 });
-                formHost.textContent = "";
                 btnPay.hidden = true;
               } catch (err) {
                 showErr((err && (err.message || err.Errors)) || String(err));
