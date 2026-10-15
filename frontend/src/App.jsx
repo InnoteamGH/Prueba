@@ -91,6 +91,7 @@ import { horasSemana, horarioConfigurado } from "./comun";
 import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, textoIndicaciones } from "./compartido/recetaItems";
 import { imprimirReceta as imprimirRecetaDoc } from "./util/recetaDoc";
 import { textoConsentimiento } from "./compartido/consentimientoTexto";
+import { MOTIVO_ANULAR_CONSENT_MIN, contenidoSinMarcas, estadoConsentimiento, motivoAnulacion, tituloLimpio, validarMotivoAnulacion } from "./util/consentimientoEstado";
 import {BotonPDF, SedeCtx, useSede, useEmiteCobros, coincideBusqueda, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
@@ -826,8 +827,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     ? labRem.map((o) => ({ id: o.id, pacienteId: o.pacienteId ?? null, paciente: o.paciente || null, sede: o.sedeId != null ? numSede(o.sedeId) : null, trabajo: o.tipoTrabajo || "Trabajo", entrega: o.fechaEstimada, estado: ESTADO_LAB[o.estado] || "enviado" }))
         .filter((c) => labAtrasado(c, hoyIso) && (c.sede != null ? sedeCxD.enSede(c.sede) : deVisible(c.pacienteId, c.paciente)))
     : (dbDash?.labCasos || []).filter((c) => labAtrasado(c, hoyIso) && deVisible(c.pacienteId, c.paciente) && sedeCxD.enSede(sedeReg(c, c.pacienteId)));
+  // Un anulado tiene firmado: false, pero no está por firmar.
   const docsPend = conectado
-    ? docsRem.filter((d) => !d.firmado && deVisible(d.pacienteId))
+    ? docsRem.filter((d) => estadoConsentimiento(d) === "pendiente" && deVisible(d.pacienteId))
     : (dbDash?.documentos || []).filter((d) => (d.estado === "pendiente" || d.estado === "enviado") && deVisible(d.pacienteId));
   const nomPac = (id) => (pacientesAll.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
   const verCaja = esAdmin || esGer || esAdmSede;
@@ -8313,7 +8315,9 @@ function Consentimientos({ pacientes: pacProp, notify }) {
     { id: 4, pacienteId: 25, paciente: "Mateo Ríos", tipo: "Odontopediatría (sellantes)", fecha: fmt(hoy), estado: "pendiente" },
   ]);
   const [docsRem, setDocsRem] = useState([]);
-  const recargarDocs = () => { if (conectado) api.consentimientos.listar().then((rows) => setDocsRem((rows || []).map((c) => ({ id: c.id, pacienteId: c.pacienteId, paciente: nombrePac(c.pacienteId), tipo: c.tipo || c.titulo || "Consentimiento", fecha: (c.fechaFirma || c.creadoEn || "").slice(0, 10), fechaFirma: c.fechaFirma || null, creadoEn: c.creadoEn || null, estado: c.firmado ? "firmado" : "pendiente", contenido: c.contenido, firmaUrl: c.firmaUrl,
+  // Anulado: en la lista solo lo dice el título «[ANULADO] …» y la línea «[Anulado: motivo]» del
+  // contenido (util/consentimientoEstado.js). Se muestra el nombre y el texto originales.
+  const recargarDocs = () => { if (conectado) api.consentimientos.listar().then((rows) => setDocsRem((rows || []).map((c) => ({ id: c.id, pacienteId: c.pacienteId, paciente: nombrePac(c.pacienteId), tipo: tituloLimpio(c) || "Consentimiento", fecha: (c.fechaFirma || c.creadoEn || "").slice(0, 10), fechaFirma: c.fechaFirma || null, creadoEn: c.creadoEn || null, estado: estadoConsentimiento(c), motivoAnulacion: motivoAnulacion(c), contenido: contenidoSinMarcas(c.contenido), firmaUrl: c.firmaUrl,
     firmanteNombre: c.firmanteNombre, firmanteDni: c.firmanteDni, firmanteRelacion: c.firmanteRelacion })))).catch(() => {}); };
   useEffect(() => { recargarDocs(); }, [conectado, pacRemoto]); // eslint-disable-line
   // Solo documentos de pacientes visibles (lista, KPIs y % firmados). Se filtra al mostrar;
@@ -8324,6 +8328,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
   const [form, setForm] = useState(null);
   const [firmaDoc, setFirmaDoc] = useState(null);
   const [firmante, setFirmante] = useState({ nombre: "", dni: "", relacion: "" });
+  const [anularDoc, setAnularDoc] = useState(null);   // { d, motivo, error, enviando }: anular un firmado
   // El paciente del documento que se esta firmando, con sus datos completos.
   const pacDeDoc = firmaDoc ? (pacientes.find((p) => p.nombre === firmaDoc.paciente) || null) : null;
   const firmaEsDeMenor = !!pacDeDoc && esPediatrico(pacDeDoc.nacimiento);
@@ -8370,10 +8375,30 @@ function Consentimientos({ pacientes: pacProp, notify }) {
     }
     setDocs((d) => d.map((x) => x.id === firmaDoc.id ? { ...x, estado: "firmado", fecha: fmt(hoy) } : x)); notify("Consentimiento firmado digitalmente y archivado con fecha y hora."); setFirmaDoc(null);
   };
+  // Un consentimiento firmado no se borra: se anula con motivo obligatorio y queda en la lista
+  // como «Anulado». Lo anula quien puede registrarlos (consentimientos:crear).
+  const pedirAnular = (d) => { if (!puedeCrear) { notify("Tu rol puede ver los consentimientos, pero no anularlos."); return; } setAnularDoc({ d, motivo: "", error: "", enviando: false }); };
+  const confirmarAnular = () => {
+    const { d, motivo } = anularDoc;
+    const error = validarMotivoAnulacion(motivo);
+    if (error) { setAnularDoc((x) => ({ ...x, error })); return; }
+    const m = String(motivo).trim();
+    if (conectado) {
+      setAnularDoc((x) => ({ ...x, error: "", enviando: true }));
+      api.consentimientos.anular(d.id, m)
+        .then(() => { notify("Consentimiento anulado."); setAnularDoc(null); recargarDocs(); })
+        .catch((e) => setAnularDoc((x) => x && { ...x, enviando: false, error: msgServidor(e, "No se pudo anular el consentimiento.") }));
+      return;
+    }
+    setDocs((xs) => xs.map((x) => (x.id === d.id ? { ...x, estado: "anulado", motivoAnulacion: m } : x))); notify("Consentimiento anulado."); setAnularDoc(null);
+  };
   const kpis = [["Firmados", docs.filter((d) => d.estado === "firmado").length, "var(--dc-ok-700)", <ShieldCheck size={18} strokeWidth={1.75} />], ["Pendientes", docs.filter((d) => d.estado === "pendiente").length, "var(--dc-warn-600)", <Clock size={18} strokeWidth={1.75} />], ["Total", docs.length, NAVY, <Shield size={18} strokeWidth={1.75} />]];
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {(() => { const nF = docs.filter((d) => d.estado === "firmado").length; const pct = docs.length ? Math.round((nF / docs.length) * 100) : 0; return (
+      {(() => {
+        // Los anulados no cuentan como firmados ni por firmar, ni en el %.
+        const nF = docs.filter((d) => d.estado === "firmado").length, nP = docs.filter((d) => d.estado === "pendiente").length, nA = docs.length - nF - nP;
+        const pct = nF + nP ? Math.round((nF / (nF + nP)) * 100) : 0; return (
         <section className="dc-esp-hero dc-form-hero">
           <div className="dc-esp-hero__txt">
             <div className="dc-esp-hero__num"><b>{pct}%</b><span>firmados</span></div>
@@ -8381,8 +8406,9 @@ function Consentimientos({ pacientes: pacProp, notify }) {
           </div>
           <div className="dc-esp-hero__cifras">
             <div><b>{nF}</b><span>Firmados</span></div>
-            <div><b>{docs.length - nF}</b><span>Por firmar</span></div>
+            <div><b>{nP}</b><span>Por firmar</span></div>
             <div><b>{docs.length}</b><span>Documentos</span></div>
+            {nA > 0 && <div><b>{nA}</b><span>{nA === 1 ? "Anulado" : "Anulados"}</span></div>}
           </div>
           <div className="dc-form-hero__barra" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
           {puedeCrear
@@ -8412,6 +8438,12 @@ function Consentimientos({ pacientes: pacProp, notify }) {
         </Modal>
       )}
       {(() => {
+        // Tres estados: por firmar, firmado y anulado (un firmado que se anuló con motivo).
+        const firmado = (d) => d.estado === "firmado";
+        const anulado = (d) => d.estado === "anulado";
+        const etiqueta = (d) => (firmado(d) ? "Firmado" : anulado(d) ? "Anulado" : "Por firmar");
+        const textoAnulado = (d) => (d.motivoAnulacion ? `Anulado: ${d.motivoAnulacion}` : "Anulado");
+        const TONO_ANUL = estadoInfo("documento", "anulado").color;
         const verPdf = (d) => {
               const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
               // H-14: el servidor guarda firmanteNombre también cuando firma el propio paciente.
@@ -8423,34 +8455,52 @@ function Consentimientos({ pacientes: pacProp, notify }) {
               const firma = d.firmaUrl ? `<div class="cs-firma"><div class="cs-l">${porApoderado ? "Firma del apoderado" : "Firma del paciente"}</div><img src="${esc(d.firmaUrl)}" alt="Firma">${porApoderado ? `<div class="cs-rep">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteRelacion ? ` (${esc(d.firmanteRelacion.toLowerCase())})` : ""}${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}, en representación del paciente por ser menor de edad.</div>` : d.firmanteNombre ? `<div class="cs-rep">Firmado por <b>${esc(d.firmanteNombre)}</b>${d.firmanteDni ? ` &middot; DNI ${esc(d.firmanteDni)}` : ""}.</div>` : ""}</div>` : "";
               const ok = abrirDocumento({
                 titulo: d.tipo, tituloVentana: `${d.tipo} - ${d.paciente}`,
-                sub: `Consentimiento informado · ${d.estado === "firmado" ? "Firmado" : "Por firmar"}`,
+                sub: `Consentimiento informado · ${etiqueta(d)}`,
                 css: `.cs-meta{display:flex;gap:22px;flex-wrap:wrap;border:1px solid #D9D3CA;border-left:3px solid #1B1614;background:#F4F1EA;padding:8px 12px;font-size:12px;margin:6px 0 14px}
                   .cs-box{border:1px solid #D9D3CA;border-radius:6px;padding:14px 16px;font-size:12px;line-height:1.7;white-space:pre-wrap}.cs-nota{margin-top:10px;font-size:10.5px;color:#7d746a;font-style:italic}
                   .cs-firma{margin-top:26px;border-top:1px solid #D9D3CA;padding-top:12px}.cs-l{font-size:11px;color:#7d746a;margin-bottom:6px}
-                  .cs-firma img{max-width:260px;border:1px solid #D9D3CA;border-radius:6px}.cs-rep{font-size:12px;margin-top:8px}`,
+                  .cs-firma img{max-width:260px;border:1px solid #D9D3CA;border-radius:6px}.cs-rep{font-size:12px;margin-top:8px}
+                  .cs-anul{border:1px solid #C9C3BA;background:#ECEAE6;color:#3F3A35;padding:8px 12px;font-size:12px;font-weight:600;margin:6px 0 0}`,
                 // M5-14: la fecha en dd/mm/aaaa y, si está firmado, con la hora de la firma (hora de
                 // Lima); antes salía «2026-10-11» y sin hora, aunque el servidor la guarda.
-                cuerpo: `<div class="cs-meta"><span><b>Paciente:</b> ${esc(d.paciente)}</span>${d.estado === "firmado"
+                // Anulado: se imprime el texto original con el aviso y el motivo de la anulación.
+                cuerpo: `${anulado(d) ? `<div class="cs-anul">Consentimiento anulado: ya no está vigente.</div>` : ""}<div class="cs-meta"><span><b>Paciente:</b> ${esc(d.paciente)}</span>${d.estado === "firmado"
                   ? `<span><b>Firmado:</b> ${esc(fechaHoraLima(d.fechaFirma || d.fecha))}${d.fechaFirma && String(d.fechaFirma).length > 10 ? " (hora de Lima)" : ""}</span>${d.creadoEn && ymdLima(d.creadoEn) !== ymdLima(d.fechaFirma) ? `<span><b>Registrado:</b> ${esc(fechaHoraLima(d.creadoEn))}</span>` : ""}`
-                  : `<span><b>Registrado:</b> ${esc(fechaHoraLima(d.creadoEn || d.fecha))}</span>`}<span><b>Estado:</b> ${d.estado === "firmado" ? "Firmado" : "Por firmar"}</span></div>`
+                  : `<span><b>Registrado:</b> ${esc(fechaHoraLima(d.creadoEn || d.fecha))}</span>`}<span><b>Estado:</b> ${etiqueta(d)}</span>${anulado(d) ? `<span><b>Motivo de la anulación:</b> ${esc(d.motivoAnulacion || "—")}</span>` : ""}</div>`
                   // M4-11: el texto registrado; si el consentimiento se creó sin él, el de la plantilla de su tipo (avisado).
                   + `<div class="cs-box">${d.contenido ? esc(d.contenido) : `${esc(textoConsentimiento(d.tipo, { paciente: d.paciente }))}<div class="cs-nota">Texto de la plantilla de «${esc(d.tipo)}»: este consentimiento se registró sin texto propio.</div>`}</div>${firma}`,
               });
               if (!ok) notify("Permite ventanas emergentes para descargar el PDF.");
             };
-        const firmado = (d) => d.estado === "firmado";
-        const accion = (d) => !firmado(d)
+        // Solo el que está por firmar ofrece «Firmar». Un firmado se descarga y, con permiso de
+        // registrar, se anula desde ⋯ (acción discreta). Un anulado solo se descarga.
+        const accion = (d) => d.estado === "pendiente"
           ? <ActionBtn color="var(--dc-primary-alt)" onClick={() => abrirFirma(d)}><Pencil size={12} strokeWidth={2} style={{ marginRight: 6 }} />Firmar</ActionBtn>
-          : <ActionBtn subtle onClick={() => verPdf(d)}><FileText size={12} strokeWidth={2} style={{ marginRight: 6 }} />PDF</ActionBtn>;
-        const pill = (d) => firmado(d) ? <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmado</span> : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Por firmar</span>;
+          : <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <ActionBtn subtle onClick={() => verPdf(d)}><FileText size={12} strokeWidth={2} style={{ marginRight: 6 }} />PDF</ActionBtn>
+              {firmado(d) && puedeCrear && <MenuAcciones etiqueta="Más acciones del consentimiento" opciones={[{ label: "Anular consentimiento", peligro: true, onClick: () => pedirAnular(d) }]} />}
+            </span>;
+        const pill = (d) => firmado(d) ? <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmado</span>
+          : anulado(d) ? <span className="dc-pill" style={{ "--c": TONO_ANUL }} title={textoAnulado(d)}><X size={12} strokeWidth={2} /> Anulado</span>
+          : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Por firmar</span>;
         const av = (nom, sz = 34) => { const col = colorDe(nom); return <span className="dc-rec__av" style={{ width: sz, height: sz, fontSize: sz > 36 ? 13 : 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(nom)}</span>; };
         const tarjeta = (d) => (
-          <article key={d.id} className={`dc-cns__card${firmado(d) ? " is-ok" : " is-pend"}`}>
+          <article key={d.id} className={`dc-cns__card${firmado(d) ? " is-ok" : anulado(d) ? " is-anul" : " is-pend"}`}>
             <header>{av(d.paciente, 38)}<div><b>{d.paciente}</b><span><Calendar size={12} strokeWidth={2} /> {fechaLegible(d.fecha)}</span></div>{pill(d)}</header>
             <div className="dc-cns__doc"><span><Shield size={15} strokeWidth={1.9} /></span><b>{d.tipo}</b></div>
-            <footer><small>{firmado(d) ? "Archivado con fecha y hora" : "Esperando la firma del paciente"}</small>{accion(d)}</footer>
+            <footer><small>{firmado(d) ? "Archivado con fecha y hora" : anulado(d) ? textoAnulado(d) : "Esperando la firma del paciente"}</small>{accion(d)}</footer>
           </article>
         );
+        // Los anulados van aparte, al final, en su propio grupo (gris).
+        const colAnulados = (items) => (
+          <section key="anul" className="dc-cns__col is-anul" style={{ "--c": TONO_ANUL }}>
+            <header><span><X size={16} strokeWidth={2} /></span><div><h4>Anulados <i>{items.length}</i></h4><small>No se borran: quedan con su motivo</small></div></header>
+            <div className="dc-cns__grid">{items.map(tarjeta)}</div>
+          </section>
+        );
+        const tarjetas = (lst) => { const vig = lst.filter((d) => !anulado(d)), anul = lst.filter(anulado); return !anul.length
+          ? <div className="dc-cns__grid">{lst.map(tarjeta)}</div>
+          : <div style={{ display: "grid", gap: 14 }}>{vig.length > 0 && <div className="dc-cns__grid">{vig.map(tarjeta)}</div>}{colAnulados(anul)}</div>; };
         if (!docs.length) return <Card><Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo="Sin consentimientos" sub={!puedeCrear ? "Aún no hay consentimientos registrados." : conectado ? "Registra el primero con «Nuevo consentimiento»: queda por firmar en consultorio." : "Envía el primer consentimiento para que el paciente lo firme en línea."} /></Card>;
         return (
           <Card className="dc-env">
@@ -8459,33 +8509,48 @@ function Consentimientos({ pacientes: pacProp, notify }) {
               vistas={[{ id: "estado", label: "Por estado", icon: Columns3 }]}
               tabla={{ primero: true, minWidth: 720, cols: [
                 { key: "paciente", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (d) => <span className="dc-tp__quien">{av(d.paciente)}<b>{d.paciente}</b></span> },
-                { key: "tipo", label: "Documento", w: "minmax(200px,1.5fr)", cell: (d) => <span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span> },
+                { key: "tipo", label: "Documento", w: "minmax(200px,1.5fr)", cell: (d) => <><span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span>{anulado(d) && <small className="dc-cns__motivo">{textoAnulado(d)}</small>}</> },
                 { key: "fecha", label: "Fecha", w: "140px", a: "center", cell: (d) => <span className="dc-tp__sub">{fechaLegible(d.fecha)}</span> },
                 { key: "estado", label: "Estado", w: "130px", a: "center", cell: pill },
-                { key: "acc", label: "", w: "110px", a: "right", cell: accion },
+                { key: "acc", label: "", w: "140px", a: "right", cell: accion },
               ] }} cols={[
                 { key: "paciente", label: "Paciente", get: (d) => d.paciente || "" },
                 { key: "tipo", label: "Documento", get: (d) => d.tipo || "" },
                 { key: "fecha", label: "Fecha", get: (d) => d.fecha || "" },
-                { key: "estado", label: "Estado", get: (d) => (firmado(d) ? "Firmado" : "Por firmar") },
+                { key: "estado", label: "Estado", get: etiqueta },
               ]}>{(lst, vista) => {
-                if (vista === "tarjetas") return <div className="dc-cns__grid">{lst.map(tarjeta)}</div>;
-                if (vista === "estado") return (
+                if (vista === "tarjetas") return tarjetas(lst);
+                if (vista === "estado") { const anul = lst.filter(anulado); return (
                   <div className="dc-cns__kanban">
-                    {[["pend", "Por firmar", "Esperan la firma del paciente", "#D97706", Clock, lst.filter((d) => !firmado(d))], ["ok", "Firmados", "Archivados con fecha y hora", "#16A36A", ShieldCheck, lst.filter(firmado)]].map(([k, t, sub2, c, I, items]) => (
+                    {[["pend", "Por firmar", "Esperan la firma del paciente", "#D97706", Clock, lst.filter((d) => d.estado === "pendiente")], ["ok", "Firmados", "Archivados con fecha y hora", "#16A36A", ShieldCheck, lst.filter(firmado)]].map(([k, t, sub2, c, I, items]) => (
                       <section key={k} className="dc-cns__col" style={{ "--c": c }}>
                         <header><span><I size={16} strokeWidth={2} /></span><div><h4>{t} <i>{items.length}</i></h4><small>{sub2}</small></div></header>
                         {items.length ? items.map(tarjeta) : <p className="dc-cns__nada">Nada por aquí.</p>}
                       </section>
                     ))}
+                    {anul.length > 0 && colAnulados(anul)}
                   </div>
-                );
-                return <div className="dc-cns__grid">{lst.map(tarjeta)}</div>;
+                ); }
+                return tarjetas(lst);
               }}</ListaFiltrable>
           </Card>
         );
       })()}
       {firmaDoc && <FirmaModal doc={firmaDoc} onClose={() => setFirmaDoc(null)} onConfirm={confirmarFirma} esMenor={firmaEsDeMenor} firmante={firmante} setFirmante={setFirmante} />}
+      {anularDoc && (() => { const d = anularDoc.d; const ok = !validarMotivoAnulacion(anularDoc.motivo); return (
+        <Modal icon={<X size={20} strokeWidth={1.75} />} tone="var(--dc-danger-700)" titulo="Anular consentimiento" sub={`${d.tipo} · ${d.paciente}`} onClose={() => setAnularDoc(null)} maxW={460}
+          footer={<><Btn small kind="ghost" onClick={() => setAnularDoc(null)}>Cancelar</Btn><Btn small kind="red" disabled={!ok} busy={anularDoc.enviando} onClick={confirmarAnular}><X size={15} strokeWidth={1.75} /> Anular</Btn></>}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--dc-ink-700)", lineHeight: 1.5 }}>Un consentimiento firmado no se borra: queda en la lista como <b>anulado</b>, con su motivo, y deja de contar como firmado. Si hace falta, registra uno nuevo para que el paciente lo firme.</p>
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Motivo de la anulación
+              <textarea className="dc-premium-inp" autoFocus rows={3} value={anularDoc.motivo} onChange={(e) => { const motivo = e.target.value; setAnularDoc((x) => ({ ...x, motivo, error: "" })); }} placeholder="Ej. Se firmó con los datos de otro paciente" style={{ ...inp, marginTop: 5, resize: "vertical", cursor: "text" }} />
+            </label>
+            {anularDoc.error
+              ? <div className="fm-aviso-edad is-mal" role="alert"><AlertTriangle size={15} strokeWidth={2} /><span>{anularDoc.error}</span></div>
+              : !ok && <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Obligatorio: al menos {MOTIVO_ANULAR_CONSENT_MIN} caracteres.</small>}
+          </div>
+        </Modal>
+      ); })()}
     </div>
   );
 }
@@ -10161,7 +10226,8 @@ function useDocumentosApi(pacienteId) {
       const cs = c.status === "fulfilled" && Array.isArray(c.value) ? c.value : [];
       const fs = f.status === "fulfilled" && Array.isArray(f.value) ? f.value : [];
       setDocs([
-        ...cs.map((x) => ({ id: x.id, clase: "consentimiento", pacienteId: x.pacienteId, tipo: x.tipo || x.titulo || "Consentimiento", contenido: x.contenido || null, fecha: String(x.fechaFirma || x.creadoEn || "").slice(0, 10), estado: x.firmado ? "firmado" : "pendiente" })),
+        // Un anulado (título «[ANULADO] …») no está por firmar: estado «anulado», con su motivo.
+        ...cs.map((x) => ({ id: x.id, clase: "consentimiento", pacienteId: x.pacienteId, tipo: tituloLimpio(x) || "Consentimiento", contenido: contenidoSinMarcas(x.contenido) || null, fecha: String(x.fechaFirma || x.creadoEn || "").slice(0, 10), estado: estadoConsentimiento(x), motivoAnulacion: motivoAnulacion(x) })),
         ...fs.map((e) => ({ id: e.id, clase: "formulario", pacienteId: e.pacienteId ?? null, paciente: e.paciente || "", tipo: e.tipo, fecha: String(e.enviadoEn || "").slice(0, 10), estado: e.estado === "completado" ? "completado" : "pendiente" })),
       ].filter((d) => pacienteId == null || String(d.pacienteId) === String(pacienteId)));
     });
@@ -10194,6 +10260,9 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
   const [firmaDoc, setFirmaDoc] = useState(null);
   const [firmante, setFirmante] = useState({ nombre: "", dni: "", relacion: "" });
   const hecho = (d) => d.estado === "firmado" || d.estado === "completado";
+  // Consentimiento anulado: ni hecho ni pendiente; sin «Firmar», con su motivo.
+  const anulado = (d) => d.estado === "anulado";
+  const textoAnulado = (d) => (d.motivoAnulacion ? `Anulado: ${d.motivoAnulacion}` : "Anulado");
   const etiquetaPend = (d) => (d.clase === "consentimiento" ? "Por firmar" : "Por completar");
   const reenviar = (d) => {
     if (conectado) {
@@ -10234,7 +10303,7 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
     setDocs((xs) => [{ id: `${form.clase[0]}${Date.now()}`, clase: form.clase, pacienteId: pid, sede: sedeCx.activa ?? undefined, tipo: form.tipo, ...(form.clase === "consentimiento" ? { contenido: textoConsentimiento(form.tipo, { paciente: pacDe(pid)?.nombre || "", detalle: form.detalle }) } : {}), fecha: fmt(hoy), estado: "pendiente" }, ...xs]);
     notify(form.clase === "consentimiento" ? "Consentimiento enviado al paciente para firma en línea." : "Formulario enviado al paciente."); setForm(null);
   };
-  const nPend = docs.filter((d) => !hecho(d)).length;
+  const nPend = docs.filter((d) => !hecho(d) && !anulado(d)).length;
   return (
     <Card className="dc-docs">
       <div className="dc-docs__cab">
@@ -10251,8 +10320,10 @@ function DocumentosPaciente({ pacienteFijo = null, pacientes = [], notify = () =
           { key: "tipo", label: "Documento", w: "minmax(180px,1.4fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span className="dc-doc-tipo"><span>{d.clase === "consentimiento" ? <Shield size={14} strokeWidth={1.9} /> : <FileText size={14} strokeWidth={1.9} />}</span>{d.tipo}</span> },
           { key: "clase", label: "Tipo", w: "120px", a: "left", get: (d) => (d.clase === "consentimiento" ? "Consentimiento" : "Formulario") },
           { key: "fecha", label: "Fecha", w: "110px", a: "left", get: (d) => d.fecha, cell: (d) => <span className="dc-tp__sub">{fechaLegible(d.fecha)}</span> },
-          { key: "estado", label: "Estado", w: "130px", a: "center", get: (d) => (hecho(d) ? (d.clase === "consentimiento" ? "Firmado" : "Completado") : etiquetaPend(d)), cell: (d) => hecho(d) ? <EstadoPill entidad="documento" estado={d.estado} /> : <EstadoPill entidad="documento" estado="enviado">{etiquetaPend(d)}</EstadoPill> },
-          { key: "acc", label: "Acciones", w: "220px", a: "right", noSort: true, noFilter: true, cell: (d) => hecho(d)
+          { key: "estado", label: "Estado", w: "130px", a: "center", get: (d) => (hecho(d) ? (d.clase === "consentimiento" ? "Firmado" : "Completado") : anulado(d) ? "Anulado" : etiquetaPend(d)), cell: (d) => hecho(d) || anulado(d) ? <EstadoPill entidad="documento" estado={d.estado} /> : <EstadoPill entidad="documento" estado="enviado">{etiquetaPend(d)}</EstadoPill> },
+          { key: "acc", label: "Acciones", w: "220px", a: "right", noSort: true, noFilter: true, cell: (d) => anulado(d)
+            ? <span className="dc-tp__sub" title={textoAnulado(d)} style={{ display: "inline-block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", verticalAlign: "middle" }}>{textoAnulado(d)}</span>
+            : hecho(d)
             ? <span className="dc-tp__sub">{d.clase === "consentimiento" ? "Archivado con fecha y hora" : "Respuestas guardadas"}</span>
             : <span style={{ display: "inline-flex", gap: 6 }}>
                 {(!conectado || d.clase === "formulario") && <Btn small kind="ghost" onClick={() => reenviar(d)}><Send size={13} strokeWidth={1.9} /> {conectado ? "Recordar" : "Reenviar enlace"}</Btn>}

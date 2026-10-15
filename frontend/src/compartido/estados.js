@@ -63,7 +63,8 @@ export const ESTADOS = {
     recibido: ["Recibido", "ok"],
     entregado: ["Entregado", "ok"],
   },
-  // Enviado → Visto → Firmado o Completado · (Vencido)
+  // Enviado → Visto → Firmado o Completado · (Vencido · Anulado)
+  // Anulado: consentimiento firmado que se anuló con motivo (no se borra).
   documento: {
     enviado: ["Enviado", "info"],
     pendiente: ["Enviado", "info"],
@@ -71,6 +72,7 @@ export const ESTADOS = {
     firmado: ["Firmado", "ok"],
     completado: ["Completado", "ok"],
     vencido: ["Vencido", "peligro"],
+    anulado: ["Anulado", "neutro"],
   },
   // Programado → Entregado → Leído → Respondió · (No enviado)
   mensaje: {

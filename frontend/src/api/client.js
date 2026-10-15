@@ -665,6 +665,8 @@ export const api = {
     // (un nino no consiente por si mismo) y lo ignora si es adulto.
     firmar: (id, firmaUrl, firmante) => request("PATCH", `/consentimientos/${id}/firmar`, { firmaUrl, ...(firmante || {}) }),
     borrar: (id) => request("DELETE", `/consentimientos/${id}`),
+    // Un firmado no se borra: se anula con motivo obligatorio.
+    anular: (id, motivo) => request("POST", `/consentimientos/${id}/anular`, { motivo }),
   },
   recetas: {
     listar: (pacienteId) => request("GET", `/recetas${pacienteId ? `?pacienteId=${pacienteId}` : ""}`),

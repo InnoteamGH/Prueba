@@ -4,7 +4,7 @@ import { estadoLabel, estadoFaseUi } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth, msgServidor } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint} from "./comun";
+import {BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint, EstadoPill} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -27,6 +27,7 @@ import { imprimirReceta } from "./util/recetaDoc";
 import { filasADatos, listaHallazgos } from "./util/odontogramaHallazgos";
 import { medicoEn } from "./compartido/catalogoApi";
 import { medicoDeSesionEnCitas } from "./util/medicoSesion";
+import { estadoConsentimiento, motivoAnulacion, tituloLimpio } from "./util/consentimientoEstado";
 import { EVENTO_CITA_ATENCION, atencionPorCita, guardarCitaAtencion, leerCitaAtencion, limpiarCitaAtencion, ponerIdsCitas } from "./compartido/citaAtencion";
 import { metaEstado, inicialCara } from "./util/odontogramaEstado";
 import OdontogramaAnatomico from "./modulos/OdontogramaAnatomico";
@@ -2260,22 +2261,24 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 {consentimientos.length === 0
                   ? <div style={{ fontSize: 13, color: MUTED }}>No hay consentimientos registrados para este paciente.</div>
                   : <div style={{ display: "grid", gap: 10 }}>
-                      {consentimientos.map((c) => (
+                      {consentimientos.map((c) => { const est = estadoConsentimiento(c); const motivo = est === "anulado" ? motivoAnulacion(c) : ""; return (
                         <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid var(--dc-line)", flexWrap: "wrap" }}>
                           <div>
-                            <div style={{ fontWeight: 500, color: NAVY, fontSize: 13 }}>{c.tipo || c.titulo || "Consentimiento"}</div>
-                            <div style={{ fontSize: 12, color: MUTED }}>{fechaHoraLima(c.fechaFirma || c.creadoEn) || "—"} – {c.firmado ? "Firmado" : "Pendiente"}</div>
+                            <div style={{ fontWeight: 500, color: est === "anulado" ? MUTED : NAVY, fontSize: 13 }}>{tituloLimpio(c) || "Consentimiento"}</div>
+                            <div style={{ fontSize: 12, color: MUTED }}>{fechaHoraLima(c.fechaFirma || c.creadoEn) || "—"} – {est === "anulado" ? (motivo ? `Anulado: ${motivo}` : "Anulado") : est === "firmado" ? "Firmado" : "Pendiente"}</div>
                           </div>
-                          {!c.firmado && !conectado && (
+                          {/* Anulado (título «[ANULADO] …», firmado: false): no se vuelve a firmar. */}
+                          {est === "anulado" && <EstadoPill entidad="documento" estado="anulado" />}
+                          {est === "pendiente" && !conectado && (
                             <button onClick={() => { setConsentimientos((cur) => cur.map((y) => y.id === c.id ? { ...y, firmado: true, fechaFirma: hoy, firmanteNombre: p.apoderadoNombre || p.nombre, local: true } : y)); anotar("firma", "Firmó un consentimiento", c.tipo || ""); notify("Consentimiento firmado."); }}
                               style={{ ...btn("ghost"), fontSize: 13 }}>Firmar</button>
                           )}
-                          {!c.firmado && conectado && (
+                          {est === "pendiente" && conectado && (
                             <button onClick={() => api.consentimientos.firmar(c.id, `firma://${c.id}`, { firmanteNombre: p.nombre, firmanteDni: p.dni }).then(() => { notify("Consentimiento firmado."); api.consentimientos.listar(pacienteId).then((r) => setConsentimientos(r || [])); }).catch(() => notify("No se pudo firmar."))}
                               style={{ ...btn("ghost"), fontSize: 13 }}>Firmar</button>
                           )}
                         </div>
-                      ))}
+                      ); })}
                     </div>}
               </div>
             )}

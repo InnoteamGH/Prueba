@@ -3539,6 +3539,11 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-cns__col small { font-size: 12px; color: var(--dc-ink-400); }
 .dc-cns__nada { margin: 0; padding: 18px; text-align: center; font-size: 13px; color: var(--dc-ink-400); }
 @media (max-width: 767px) { .dc-cns__kanban { grid-template-columns: minmax(0, 1fr); } }
+/* Anulados: grupo aparte al final, a todo el ancho y en gris (no cuentan como firmados ni por firmar). */
+.dc-cns__col.is-anul { grid-column: 1 / -1; }
+.dc-cns__card.is-anul .dc-cns__doc { background: var(--dc-bg); }
+.dc-cns__card.is-anul .dc-cns__doc b { color: var(--dc-ink-500); }
+.dc-cns__motivo { display: block; margin: 4px 0 0 40px; font-size: 12px; color: var(--dc-ink-500); }
 
 /* Nueva receta (módulo): medicamento, presentación, dosis, frecuencia y duración (M5-10).
    En el celular cada medicamento ocupa dos columnas y los rótulos quedan en el placeholder. */
@@ -3683,6 +3688,7 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 /* El estado se lee en un halo suave de su color en la esquina, no en una raya */
 .dc-cns__card { background: radial-gradient(130% 70% at 100% 0%, rgba(217,119,6,.09), transparent 55%), #fff !important; }
 .dc-cns__card.is-ok { background: radial-gradient(130% 70% at 100% 0%, rgba(22,163,106,.09), transparent 55%), #fff !important; }
+.dc-cns__card.is-anul { background: radial-gradient(130% 70% at 100% 0%, rgba(102,112,133,.09), transparent 55%), #fff !important; }
 .dc-rx2 { padding: 18px !important; background: radial-gradient(130% 70% at 100% 0%, rgba(20,163,168,.09), transparent 55%), #fff !important; }
 .dc-jor__card { background: radial-gradient(90% 120% at 0% 50%, color-mix(in srgb, var(--c) 7%, transparent), transparent 45%), #fff !important; }
 .dc-emp__cuenta { background: radial-gradient(130% 70% at 100% 0%, rgba(14,145,153,.08), transparent 55%), #fff !important; }
