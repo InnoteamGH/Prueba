@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { estadoLink, horaLimaDe, idCorto, resumenLinks, vencioYa } from "./linksPago.js";
+import { estadoLink, horaLimaDe, idCorto, mapConLimite, resumenLinks, vencioYa } from "./linksPago.js";
 
 describe("estadoLink", () => {
   it("los cuatro estados del servidor", () => {
@@ -94,5 +94,21 @@ describe("idCorto", () => {
     assert.equal(idCorto("abc"), "abc");
     assert.equal(idCorto(null), "");
     assert.equal(idCorto(12345678901), "12345678");
+  });
+});
+
+describe("mapConLimite", () => {
+  it("respeta el límite de pedidos simultáneos y conserva el orden", async () => {
+    let enCurso = 0, maximo = 0;
+    const r = await mapConLimite([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 4, async (n) => {
+      enCurso++; maximo = Math.max(maximo, enCurso);
+      await new Promise((ok) => setTimeout(ok, 5));
+      enCurso--; return n * 2;
+    });
+    assert.deepEqual(r, [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    assert.ok(maximo <= 4, `hubo ${maximo} a la vez`);
+  });
+  it("lista vacía", async () => {
+    assert.deepEqual(await mapConLimite([], 4, async (n) => n), []);
   });
 });

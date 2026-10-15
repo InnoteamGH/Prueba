@@ -81,3 +81,19 @@ export function resumenLinks(lista) {
 export function idCorto(pagoId) {
   return String(pagoId ?? "").trim().slice(0, 8);
 }
+
+/** Revisión 18: como Promise.all, pero con a lo más `limite` pedidos en curso a la vez (el
+ *  servidor responde 503 con unas 30 lecturas simultáneas). Devuelve los resultados en orden. */
+export async function mapConLimite(items, limite, fn) {
+  const lista = Array.from(items || []);
+  const out = new Array(lista.length);
+  let i = 0;
+  const trabajador = async () => {
+    while (i < lista.length) {
+      const k = i++;
+      out[k] = await fn(lista[k], k);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limite || 1, lista.length)) }, trabajador));
+  return out;
+}

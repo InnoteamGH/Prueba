@@ -40,7 +40,7 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
-import { estadoLink, horaLimaDe, idCorto, resumenLinks, vencioYa } from "./util/linksPago";
+import { estadoLink, horaLimaDe, idCorto, mapConLimite, resumenLinks, vencioYa } from "./util/linksPago";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
 import { bloqueoTocaHora, bloqueosDelDia, bloqueosParcialesDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
@@ -5417,7 +5417,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     recargarLinks();
   }, [conectado, tab]); // eslint-disable-line react-hooks/exhaustive-deps
   // El link no trae el paciente: se pide la reserva de los que se muestran (los 30 más
-  // recientes de la sede, en paralelo) y de ella salen el paciente y el concepto. El nombre se
+  // recientes de la sede, de a 4 a la vez para no saturar el servidor) y de ella salen el paciente y el concepto. El nombre se
   // toma de lo ya cargado (pacientes, citas, saldos de caja) o, si no está, de GET
   // /pacientes/{id}. Lo que falle queda «Paciente» y se reintenta al actualizar.
   const MAX_LINKS = 30;
@@ -5439,7 +5439,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     const faltan = reservasVis.filter((id) => !reservasPedidas.current.has(id));
     if (!faltan.length) return;
     faltan.forEach((id) => reservasPedidas.current.add(id));
-    Promise.all(faltan.map((id) => api.pagos.reserva(id).then((r) => [id, r], () => [id, null]))).then((pares) => {
+    mapConLimite(faltan, 4, (id) => api.pagos.reserva(id).then((r) => [id, r], () => [id, null])).then((pares) => {
       const nuevas = {};
       pares.forEach(([id, r]) => { if (r) nuevas[id] = { pacienteId: r.pacienteId ?? null, concepto: r.concepto || "" }; else reservasPedidas.current.delete(id); });
       if (Object.keys(nuevas).length) setReservasLink((m) => ({ ...m, ...nuevas }));
@@ -5450,7 +5450,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       .filter((p) => !nombreCargado(p) && !pacPedidos.current.has(p));
     if (!pids.length) return;
     pids.forEach((p) => pacPedidos.current.add(p));
-    Promise.all(pids.map((p) => api.pacientes.ver(p).then((r) => [p, r?.nombre || ""], () => [p, ""]))).then((pares) => {
+    mapConLimite(pids, 4, (p) => api.pacientes.ver(p).then((r) => [p, r?.nombre || ""], () => [p, ""])).then((pares) => {
       const nombres = {};
       pares.forEach(([p, n]) => { if (n) nombres[p] = n; else pacPedidos.current.delete(p); });
       if (Object.keys(nombres).length) setNombresPac((m) => ({ ...m, ...nombres }));
