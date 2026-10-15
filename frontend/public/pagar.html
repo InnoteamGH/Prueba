@@ -232,7 +232,11 @@
                       code: code || "00",
                       orderNumber: orderNumber,
                       transactionId: transactionId,
-                      payloadHttp: response && response.payloadHttp,
+                      payloadHttp: (function () {
+                        var ph = response && response.payloadHttp;
+                        if (ph == null) return null;
+                        return typeof ph === "string" ? ph : JSON.stringify(ph);
+                      })(),
                       signature: response && response.signature,
                       response: response
                     });
