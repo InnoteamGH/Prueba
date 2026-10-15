@@ -384,3 +384,9 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Motivo de anulación del procedimiento:** la respuesta del `PATCH` ya lo trae; `GET /tratamientos` también debe devolverlo (`motivo` o `motivoCancelacion`).
    - **Consentimiento anulado:** no modificar el título ni el texto firmado (hoy agrega «[ANULADO]» y «[Anulado: motivo]»); guardar `anuladoEn` y `anuladoPor`.
    - **Link con reserva liberada:** el link debe quedar «anulado», no «pendiente». El cobro ya se bloquea con «pago caducado».
+101. Cobro por WhatsApp (revisión 17):
+   - **Firma (sigue fallando):** `docs/izipay-firma-sandbox-R17.json` trae un `payloadHttp` y su `signature` reales de un pago aprobado en el sandbox. Con la clave Hash del comercio 4004353, `Base64(HMAC-SHA256(payloadHttp, claveHash))` debe dar exactamente esa `signature`. No es un SHA-256 sin clave: se comprobó que no coincide. Probar el cálculo del backend con ese archivo antes de desplegar.
+   - **Pagos aprobados sin cita:** los pagos de prueba aprobados de R16 y R17 quedaron «caducado» sin cita. Al corregir la firma, conciliar con Izipay por `izipayRef` y crear las citas, o marcarlos para devolución si el cupo ya no existe.
+   - **Estado de la IA:** al vencer la reserva, la conversación debe enterarse. Hoy, dos horas después de vencida, la IA sigue diciendo «Ya tiene un cupo reservado… a la espera de la confirmación del pago». Al vencer, la IA avisa al paciente que el cupo se liberó y ofrece un link nuevo.
+   - **Hora del cupo:** la IA dijo «hasta las 14:50» para una reserva que vencía a las 13:39 (hora de Lima). Debe leer el `caducaEn` de la reserva del link enviado y convertirlo a hora de Lima.
+   - **Procedimiento anulado:** el servidor agrega «[Motivo: …]» al nombre. El motivo ya viaja en `motivo`; el nombre no se modifica (el frontend lo quita al mostrar).
