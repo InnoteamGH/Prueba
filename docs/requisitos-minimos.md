@@ -425,3 +425,39 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Falso negativo al conciliar:** los dos pagos aprobados en el sandbox en R16 (`fc6c14a2…`, ref 1792079217, «00 Operación exitosa»; y `c9456a43…`, ref 1792079822) responden 409 «Izipay no registra el pago». Probable causa: en esos links `izipayRef` guarda el **número de pedido** (10 dígitos); en los pagos nuevos guarda el **transactionId** (14 dígitos, p. ej. 17921526794040), y la consulta a Izipay usa este último. Para los links antiguos, consultar por número de pedido, o guardar ambos (`orderNumber` y `transactionId`) desde el token de sesión.
    - **IA sin herramientas:** «No hay atención en la sede Surco el viernes 6 de noviembre» sin consultar `disponibilidad`, cuando ese día sí hay cupo (una reserva de prueba del 06/11 a las 10:00 con el doctor de Surco se aceptó). Toda respuesta sobre días u horarios debe salir de la herramienta.
    - **Link de R9 `8bd43be7…`:** sigue «pagado» sin pago real; anularlo.
+106. Datos reales de la clínica (16/10/2026): detalle en `DATOS-REALES-CLINICA-2026-10-16.md` y tabla en `datos-reales/servicios-precios-por-sede.csv` / `.json`.
+   - **Empresa (`/clinica`):**
+     - PEZZUTTI FAMILY DENTISTRY S.A.C., RUC **20612478636**, nombre comercial OdontoSonrisa Clínica Dental;
+     - domicilio fiscal: Av. Santiago Antúnez de Mayolo 1094, Int. 201, Urb. Covida Et. Uno, Los Olivos;
+     - emisor electrónico de factura y boleta; Renta MYPE Tributario.
+   - **Sedes (`/sedes`):** dos, que reemplazan a San Isidro y Surco.
+     - **Miraflores:** Av. Alfredo Benavides 2150, Of. 503. Es **dueña del número de WhatsApp actual**.
+     - **Los Olivos:** Av. Antúnez de Mayolo 1094-A, Of. 201. Sin WhatsApp propio por ahora: el número de Miraflores atiende las dos y la IA pregunta la sede.
+     - Nombre y dirección de la sede en los mensajes de la IA y en los documentos: siempre desde `/sedes`.
+   - **Servicios (`/servicios`):** 242 ítems con precio y pago al doctor por sede. Para cargarlos hace falta:
+     - **`pagoMedicoSede: { [sedeId]: monto }`:** monto fijo en soles por servicio y sede. Las comisiones de `/comisiones` se calculan sumando ese monto por cada procedimiento atendido, en lugar del % por doctor. Si falta el monto: «sin pago definido», no 0.
+     - **Servicio no disponible en una sede:** si no tiene precio en una sede, no se ofrece ahí (agenda, IA ni Caja). Hoy cae en `precioBase`.
+     - **`moneda` por servicio:** 4 ítems en USD.
+     - **Productos de venta (44):** no agendables, sin pago al doctor.
+     - **`codigo`:** el número de ítem de la planilla.
+     - Desactivar (no borrar) los 22 servicios de la demo.
+   - **Link de pago por WhatsApp:** el importe sale del precio del servicio en la sede de la cita. Consulta general: **S/ 100 en Miraflores** (precio de marcha blanca; el regular será 150) y **S/ 50 en Los Olivos**.
+   - **Faltan de la clínica:**
+     - doctores reales por sede con su horario;
+     - horario de cada sede;
+     - sillones por sede;
+     - teléfonos y correo a publicar;
+     - series de comprobantes;
+     - duración de los servicios;
+     - si los precios incluyen IGV;
+     - las observaciones de la planilla (pagos al doctor vacíos o en 0, ítems sin descripción, posibles errores de tipeo).
+107. Agendamiento con pago, idempotencia de cobros y confirmaciones de la IA (revisión 22):
+   - **`POST /reservas` → 500 siempre** (todo paciente, sede y doctor). Sin esto no hay cupo retenido ni link de pago, ni por la IA ni por recepción. Cuando `agendar` falla por un error del servidor, la IA no debe decir «no quedan cupos». Debe decir que no pudo reservar y derivar a recepción.
+   - **`GET /pagos/links` → 500** para todos los perfiles: Caja › Links de pago no carga.
+   - **Un pago, un cobro.** El registro del cobro en Caja debe ser idempotente por link de pago (o por referencia de Izipay):
+     - `POST /pagos/{id}/reconciliar` sobre un pago ya conciliado responde «idempotente», pero hoy inserta otro cobro;
+     - reenviar el aviso firmado de un pago ya registrado (`/public/izipay/resultado`, y por lo mismo un reintento del IPN) hoy responde «OK PAID» e inserta otro cobro.
+
+     Si el link ya tiene su cobro, responder OK sin insertar nada. Conviene además una restricción única en la base de datos. El QA anuló 7 duplicados del 16/10.
+   - **Confirmación de la IA tras «ya pagué»:** la fecha, la hora y la sede de la cita deben salir del pago y de la cita que devuelve `estado_pago`, nunca del último horario ofrecido en el chat. La IA confirmó «viernes 6 de noviembre a las 17:30» sin que existiera esa cita ni un link para esa hora.
+   - **Dos pagos para la misma cita:** cuando un pago conciliado corresponde a una cita que ya está pagada por el mismo paciente (23/10 17:00: pedido 1792079217 y transacción 17920879194230), no basta con asociarlo a esa cita. Marcarlo como saldo a favor o devolución, o crear la cita en una hora alternativa.

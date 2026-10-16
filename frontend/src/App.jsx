@@ -6619,7 +6619,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         );
         const vacio = (icon, titulo, sub) => <Card style={{ display: "grid", justifyItems: "center", gap: 10, padding: 18 }}><Vacio icon={icon} titulo={titulo} sub={sub} />{actualizar}</Card>;
         if (!links.length && cargando) return <div style={{ display: "grid", gap: 16 }}>{aviso}<Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Clock size={22} strokeWidth={1.75} />} titulo="Cargando links de pago…" sub="Trayendo los links de la sede desde el servidor." /></Card></div>;
-        if (!links.length && linksCarga === "error") return <div style={{ display: "grid", gap: 16 }}>{aviso}{vacio(<AlertTriangle size={22} strokeWidth={1.75} />, "No se pudieron cargar los links de pago", "No llegó la respuesta del servidor. Vuelve a intentarlo.")}</div>;
+        if (!links.length && linksCarga === "error") return <div style={{ display: "grid", gap: 16 }}>{aviso}{vacio(<AlertTriangle size={22} strokeWidth={1.75} />, "No se pudieron cargar los links de pago", "El servidor no entregó la lista. Los pagos ya registrados no se pierden: vuelve a intentarlo en unos minutos.")}</div>;
         return (
         <div style={{ display: "grid", gap: 16 }}>
           {aviso}
