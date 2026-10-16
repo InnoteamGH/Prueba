@@ -410,3 +410,14 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Aviso al paciente (sigue faltando):** al confirmarse el pago, la IA escribe por el mismo chat que la cita quedó confirmada, con fecha, hora y sede.
    - **`caducaEn` en `/pagos/links` y `/reservas/{id}`:** pasó a llegar como hora sola («13:39»), sin fecha, así que no se puede saber si un link venció. Mantener el instante completo (ISO con zona); si hace falta la hora de Lima, agregarla en otro campo (`caducaEnLima`). El frontend ya acepta los dos formatos.
    - **IA:** no afirmar que un día no tiene atención sin consultar `disponibilidad` (dijo que el viernes 30 no había atención sin usar la herramienta). Si el paciente ya está registrado, no volver a pedirle edad y celular.
+104. Conciliación segura y mensaje de confirmación (revisión 20):
+   - **`POST /pagos/{id}/reconciliar` debe consultar a Izipay antes de crear nada.** Hoy basta con que el link tenga `izipayRef`, y esa referencia se asigna apenas se abre el formulario, aunque no se pague. Al conciliar el link `5aa82a2b…` (R13, el pago se rechazó y nunca se cobró), el servidor:
+     - creó una cita confirmada;
+     - registró S/ 50 por Izipay en la Caja de Surco;
+     - envió al chat «✅ Pago recibido».
+
+     El QA lo revirtió (cobro anulado y cita cancelada), pero el link sigue apuntando a esa cita: dejarlo «caducado» sin cita. Regla: crear la cita y el cobro solo si Izipay confirma la transacción como pagada (consulta por `transactionId`/`orderNumber`, o el IPN firmado guardado). Si no, 409 «Izipay no registra el pago».
+   - **Estado del link conciliado:** tras conciliar, el link debe pasar a «pagado»; hoy queda «caducado» con `citaId`.
+   - **Mensaje de confirmación:** «📍 Sede Sede Surco · » y «👤  · Consulta…»: falta el nombre del doctor, sobra «Sede» y queda un «·» suelto. Formato sugerido: «📍 Sede Surco · Dr. Miguel Flores».
+   - **IA:** no ofrecer horarios ni reenviar links sin consultar las herramientas. Ofreció las 09:00 del 31/10, ya ocupadas, y reenvió el link ya pagado de otra cita con la hora límite del día anterior.
+   - **Link de R9 `8bd43be7…`:** sigue «pagado» sin pago real; anularlo como se hizo con `0cf3f401…`.
