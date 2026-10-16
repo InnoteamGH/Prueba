@@ -534,6 +534,8 @@ export const api = {
     // Links de pago de Izipay que creó la IA de WhatsApp, el más reciente primero (recepción
     // solo recibe los de su sede). No traen el nombre del paciente: sale de su reserva.
     links: () => request("GET", "/pagos/links"),
+    // Publicado por el programador (revisión 19): reintenta crear la cita de un pago confirmado.
+    reconciliar: (pagoId) => request("POST", `/pagos/${pagoId}/reconciliar`),
     // Reserva retenida de un link: { pacienteId, medicoId, estado, fecha, hora, sedeId, importe, concepto, caducaEn, citaId }.
     reserva: (id) => request("GET", `/reservas/${id}`),
     // Niubiz: crear sesión de pago (paso A) y confirmar tras el checkout (paso B)

@@ -6672,8 +6672,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-ticket__corte" aria-hidden="true" />
                 <div className="dc-ticket__pie">
                   <span className="dc-ticket__url" title={`Pedido ${l.pagoId || ""}`}><Receipt size={13} strokeWidth={2} /> Pedido {idCorto(l.pagoId) || "—"}</span>
-                  {copiable(l) && <div className="dc-ticket__acc">
-                    <button type="button" onClick={() => copiar(l)} title="Copiar el link para el paciente"><Copy size={14} strokeWidth={2} /> Copiar link</button>
+                  {(copiable(l) || (pagado && !l.citaId && l.pagoId)) && <div className="dc-ticket__acc">
+                    {copiable(l) && <button type="button" onClick={() => copiar(l)} title="Copiar el link para el paciente"><Copy size={14} strokeWidth={2} /> Copiar link</button>}
+                    {/* Publicado por el programador (revisión 19): pago confirmado sin cita → reintentar. */}
+                    {pagado && !l.citaId && l.pagoId && <button type="button" title="Reintentar crear la cita tras un pago confirmado" onClick={() => {
+                      api.pagos.reconciliar(l.pagoId).then((r) => { notify(r?.citaId ? "Cita creada tras conciliar el pago." : "Sigue sin cita: revisa paciente, sede y médico de la reserva."); recargarLinks(); }, () => notify("No se pudo conciliar este pago."));
+                    }}><RotateCcw size={14} strokeWidth={2} /> Conciliar</button>}
                   </div>}
                 </div>
               </article>
