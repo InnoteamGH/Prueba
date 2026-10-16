@@ -127,3 +127,16 @@ describe("formato de la revisión 19", () => {
     assert.equal(porConciliar(null), false);
   });
 });
+
+describe("link conciliado después de vencer (QA 20)", () => {
+  it("«caducado» con cita se muestra como pagado", () => {
+    assert.equal(estadoLink({ estado: "caducado", citaId: "c1" }).clave, "pagado");
+    assert.equal(estadoLink({ estado: "pendiente", citaId: "c1" }).clave, "pagado");
+  });
+  it("«caducado» sin cita sigue vencido", () => {
+    assert.equal(estadoLink({ estado: "caducado", citaId: null }).clave, "caducado");
+  });
+  it("instante con zona de Lima y microsegundos", () => {
+    assert.equal(horaLimaDe("2026-10-15T13:39:57.727435-05:00"), "13:39");
+  });
+});

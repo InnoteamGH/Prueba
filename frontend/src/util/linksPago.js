@@ -18,7 +18,10 @@ const ESTADOS = {
 /** { clave, etiqueta, tono } del link. Un estado que no se conoce sale tal cual (con
     mayúscula) y en tono neutro; sin estado, «Sin estado». tono: aviso | ok | mute | neutro. */
 export function estadoLink(l) {
-  const clave = String((l && l.estado) || "").trim().toLowerCase();
+  let clave = String((l && l.estado) || "").trim().toLowerCase();
+  // QA 20: un link conciliado después de vencer queda «caducado» (o «pendiente») pero ya tiene
+  // su cita: el pago entró, así que se muestra como pagado.
+  if (l && l.citaId && (clave === "caducado" || clave === "pendiente")) clave = "pagado";
   const e = ESTADOS[clave];
   if (e) return { clave, ...e };
   return { clave: clave || "desconocido", etiqueta: clave ? clave.charAt(0).toUpperCase() + clave.slice(1) : "Sin estado", tono: "neutro" };
