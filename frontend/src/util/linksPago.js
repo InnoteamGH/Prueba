@@ -46,6 +46,9 @@ function instanteUtc(v) {
 
 /** «14:38»: la hora de Lima (America/Lima) de `caducaEn`. Lo que no se puede leer, "". */
 export function horaLimaDe(caducaEn) {
+  // QA 19: el servidor pasó a mandar solo la hora de Lima («13:39»), sin fecha.
+  const hm = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(String(caducaEn ?? ""));
+  if (hm) return `${hm[1].padStart(2, "0")}:${hm[2]}`;
   const d = instanteUtc(caducaEn);
   if (!d) return "";
   const m = /(\d{2}:\d{2})$/.exec(fechaHoraLima(d));
@@ -96,4 +99,10 @@ export async function mapConLimite(items, limite, fn) {
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(limite || 1, lista.length)) }, trabajador));
   return out;
+}
+
+/** QA 19: el servidor marca `conciliacionPendiente` cuando Izipay cobró pero el pago todavía
+ *  no se convirtió en cita (p. ej. el link venció mientras se pagaba). No se vuelve a cobrar. */
+export function porConciliar(l) {
+  return !!(l && l.conciliacionPendiente);
 }

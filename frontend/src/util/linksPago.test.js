@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { estadoLink, horaLimaDe, idCorto, mapConLimite, resumenLinks, vencioYa } from "./linksPago.js";
+import { estadoLink, horaLimaDe, idCorto, mapConLimite, porConciliar, resumenLinks, vencioYa } from "./linksPago.js";
 
 describe("estadoLink", () => {
   it("los cuatro estados del servidor", () => {
@@ -110,5 +110,20 @@ describe("mapConLimite", () => {
   });
   it("lista vacía", async () => {
     assert.deepEqual(await mapConLimite([], 4, async (n) => n), []);
+  });
+});
+
+describe("formato de la revisión 19", () => {
+  it("caducaEn como hora sola de Lima («13:39») se muestra tal cual", () => {
+    assert.equal(horaLimaDe("13:39"), "13:39");
+    assert.equal(horaLimaDe("9:05"), "09:05");
+  });
+  it("con la hora sola no se puede saber si venció (no hay fecha)", () => {
+    assert.equal(vencioYa("13:39", Date.now()), false);
+  });
+  it("conciliacionPendiente", () => {
+    assert.equal(porConciliar({ conciliacionPendiente: true }), true);
+    assert.equal(porConciliar({ conciliacionPendiente: false }), false);
+    assert.equal(porConciliar(null), false);
   });
 });

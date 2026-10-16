@@ -40,7 +40,7 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
-import { estadoLink, horaLimaDe, idCorto, mapConLimite, resumenLinks, vencioYa } from "./util/linksPago";
+import { estadoLink, horaLimaDe, idCorto, mapConLimite, porConciliar, resumenLinks, vencioYa } from "./util/linksPago";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
 import { bloqueoTocaHora, bloqueosDelDia, bloqueosParcialesDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
@@ -6591,13 +6591,19 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const ICO_EST = { pendiente: Clock, pagado: CheckCircle2, caducado: Hourglass, anulado: X };
         const pill = (l, enTarjeta = false) => { const e = estadoLink(l); const Ic = ICO_EST[e.clave] || Clock; return <span className={`dc-pill ${e.tono === "aviso" ? (enTarjeta ? "is-warn" : "is-aviso") : PILL[e.tono] || ""}`}><Ic size={12} strokeWidth={2} /> {e.etiqueta}</span>; };
         // Solo se copia un link que todavía se puede pagar (pendiente y sin vencer).
-        const copiable = (l) => estadoLink(l).clave === "pendiente" && !vencioYa(l.caducaEn) && !!l.url;
+        const copiable = (l) => estadoLink(l).clave === "pendiente" && !porConciliar(l) && !vencioYa(l.caducaEn) && !!l.url;
+        // Pago cobrado por Izipay sin cita: «pagado» sin cita o «pendiente» por conciliar. Solo con
+        // referencia de Izipay (un «pagado» sin ella no viene de un pago real).
+        const conciliable = (l) => !l.citaId && !!l.pagoId && !!l.izipayRef && (estadoLink(l).clave === "pagado" || porConciliar(l));
         // Lo que sigue según el estado: hasta cuándo se retiene el cupo o qué pasó con la cita.
         // QA 17: hay links pagados sin cita (el pago no llegó a convertirse en cita).
         const detalleTxt = (l) => {
           const e = estadoLink(l).clave, hora = horaLimaDe(l.caducaEn);
+          if (e === "pendiente" && porConciliar(l)) return "Pago recibido en Izipay: falta conciliar";
           if (e === "pendiente") return hora ? `${vencioYa(l.caducaEn) ? "Venció" : "Vence"} a las ${hora} (hora de Lima)` : "";
-          if (e === "pagado") return l.citaId ? "Cita creada" : "Pago confirmado, todavía sin cita";
+          // QA 19: un «pagado» sin referencia de Izipay no viene de un pago real (p. ej. los de la
+          // prueba de R9): se marca para revisión y no se ofrece «Conciliar».
+          if (e === "pagado") return l.citaId ? "Cita creada" : l.izipayRef ? "Pago confirmado, todavía sin cita" : "Pagado sin referencia de Izipay: revisar";
           return "";
         };
         const copiar = (l) => {
@@ -6672,10 +6678,10 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-ticket__corte" aria-hidden="true" />
                 <div className="dc-ticket__pie">
                   <span className="dc-ticket__url" title={`Pedido ${l.pagoId || ""}`}><Receipt size={13} strokeWidth={2} /> Pedido {idCorto(l.pagoId) || "—"}</span>
-                  {(copiable(l) || (pagado && !l.citaId && l.pagoId)) && <div className="dc-ticket__acc">
+                  {(copiable(l) || conciliable(l)) && <div className="dc-ticket__acc">
                     {copiable(l) && <button type="button" onClick={() => copiar(l)} title="Copiar el link para el paciente"><Copy size={14} strokeWidth={2} /> Copiar link</button>}
                     {/* Publicado por el programador (revisión 19): pago confirmado sin cita → reintentar. */}
-                    {pagado && !l.citaId && l.pagoId && <button type="button" title="Reintentar crear la cita tras un pago confirmado" onClick={() => {
+                    {conciliable(l) && <button type="button" title="Reintentar crear la cita tras un pago confirmado" onClick={() => {
                       api.pagos.reconciliar(l.pagoId).then((r) => { notify(r?.citaId ? "Cita creada tras conciliar el pago." : "Sigue sin cita: revisa paciente, sede y médico de la reserva."); recargarLinks(); }, () => notify("No se pudo conciliar este pago."));
                     }}><RotateCcw size={14} strokeWidth={2} /> Conciliar</button>}
                   </div>}
