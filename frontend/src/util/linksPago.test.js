@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { estadoLink, horaLimaDe, idCorto, mapConLimite, porConciliar, resumenLinks, vencioYa } from "./linksPago.js";
+import { estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa } from "./linksPago.js";
 
 describe("estadoLink", () => {
   it("los cuatro estados del servidor", () => {
@@ -138,5 +138,24 @@ describe("link conciliado después de vencer (QA 20)", () => {
   });
   it("instante con zona de Lima y microsegundos", () => {
     assert.equal(horaLimaDe("2026-10-15T13:39:57.727435-05:00"), "13:39");
+  });
+});
+
+describe("pago iniciado en Izipay (QA 23)", () => {
+  it("número de pedido desde «pedido|transacción» y desde una referencia sola", () => {
+    assert.equal(pedidoIzipay({ izipayRef: "1792172702|17921727025540" }), "1792172702");
+    assert.equal(pedidoIzipay({ izipayRef: "17921727025540|1792172702" }), "1792172702");
+    assert.equal(pedidoIzipay({ izipayRef: "1792079217" }), "1792079217");
+    assert.equal(pedidoIzipay({ izipayRef: "17921526794040" }), "17921526794040");
+    assert.equal(pedidoIzipay({ izipayRef: null }), "");
+    assert.equal(pedidoIzipay(null), "");
+  });
+  it("solo un link pendiente con referencia, sin cita y sin conciliación pendiente", () => {
+    assert.equal(pagoIniciado({ estado: "pendiente", izipayRef: "1792172702|17921727025540" }), true);
+    assert.equal(pagoIniciado({ estado: "pendiente", izipayRef: null }), false);
+    assert.equal(pagoIniciado({ estado: "pendiente", izipayRef: "1792172702", conciliacionPendiente: true }), false);
+    assert.equal(pagoIniciado({ estado: "pendiente", izipayRef: "1792172702", citaId: "c1" }), false);
+    assert.equal(pagoIniciado({ estado: "caducado", izipayRef: "1792172702" }), false);
+    assert.equal(pagoIniciado({ estado: "pagado", izipayRef: "1792172702" }), false);
   });
 });

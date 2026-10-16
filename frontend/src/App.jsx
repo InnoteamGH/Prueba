@@ -40,7 +40,7 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
-import { estadoLink, horaLimaDe, idCorto, mapConLimite, porConciliar, resumenLinks, vencioYa } from "./util/linksPago";
+import { estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa } from "./util/linksPago";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
 import { bloqueoTocaHora, bloqueosDelDia, bloqueosParcialesDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
@@ -6600,7 +6600,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const detalleTxt = (l) => {
           const e = estadoLink(l).clave, hora = horaLimaDe(l.caducaEn);
           if (e === "pendiente" && porConciliar(l)) return "Pago recibido en Izipay: falta conciliar";
-          if (e === "pendiente") return hora ? `${vencioYa(l.caducaEn) ? "Venció" : "Vence"} a las ${hora} (hora de Lima)` : "";
+          if (e === "pendiente") {
+            const plazo = hora ? `${vencioYa(l.caducaEn) ? "Venció" : "Vence"} a las ${hora} (hora de Lima)` : "";
+            // QA 23: un pago aprobado en Izipay quedó «pendiente» porque no llegó el aviso. Si el
+            // paciente ya abrió el formulario, se avisa antes de reenviarle el link.
+            if (pagoIniciado(l)) return `${plazo ? `${plazo} · ` : ""}Abrió el pago en Izipay (pedido ${pedidoIzipay(l)}): si dice que pagó, revísalo en Izipay antes de reenviar el link`;
+            return plazo;
+          }
           // QA 19: un «pagado» sin referencia de Izipay no viene de un pago real (p. ej. los de la
           // prueba de R9): se marca para revisión y no se ofrece «Conciliar».
           if (e === "pagado") return l.citaId ? "Cita creada" : l.izipayRef ? "Pago confirmado, todavía sin cita" : "Pagado sin referencia de Izipay: revisar";

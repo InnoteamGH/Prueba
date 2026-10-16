@@ -461,3 +461,16 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
      Si el link ya tiene su cobro, responder OK sin insertar nada. Conviene además una restricción única en la base de datos. El QA anuló 7 duplicados del 16/10.
    - **Confirmación de la IA tras «ya pagué»:** la fecha, la hora y la sede de la cita deben salir del pago y de la cita que devuelve `estado_pago`, nunca del último horario ofrecido en el chat. La IA confirmó «viernes 6 de noviembre a las 17:30» sin que existiera esa cita ni un link para esa hora.
    - **Dos pagos para la misma cita:** cuando un pago conciliado corresponde a una cita que ya está pagada por el mismo paciente (23/10 17:00: pedido 1792079217 y transacción 17920879194230), no basta con asociarlo a esa cita. Marcarlo como saldo a favor o devolución, o crear la cita en una hora alternativa.
+108. Agendamiento por WhatsApp, IPN y un link por paciente (revisión 23):
+   - **La IA no logra agendar:** la herramienta `agendar` falla en todos los casos probados:
+     - chat existente y chat nuevo;
+     - paciente registrado y paciente nuevo;
+     - sedes Surco y San Isidro.
+
+     Los cupos estaban libres (reserva por API: 200). Al paciente le responde «ese horario ya no está disponible». Si la causa es el `slotToken`, la IA debe pedir el cupo otra vez con un token nuevo. Un error interno nunca debe presentarse como falta de cupo.
+   - **IPN:** un pago aprobado en Izipay debe registrarse aunque el navegador del paciente no avise (`/public/izipay/resultado`). Prueba: link `08194686…`, pedido 1792172702, aprobado a las 12:45:50 del 16/10. Siguió «pendiente» y «Conciliar» respondió 409. Verificar que el IPN llegue (URL de notificación configurada en Izipay) y que se procese igual que el aviso del navegador: firma, link «pagado», cita, un cobro y aviso. Mientras no llegue, la reserva «retenida» debe bloquear de verdad el cupo: hoy otro paciente puede reservar el mismo horario. Además, la página de pago no debe decirle «pago caducado» a quien ya pagó.
+   - **Un link vigente por paciente también desde recepción:** `POST /pagos/link` no debe crear otro link si el paciente ya tiene uno pendiente y sin vencer, como ya hace la IA según el MD del programador.
+   - **Horas descartadas con fecha:** `franjasDescartadas` guarda horas sin fecha que se acumulan entre pedidos y ocultan cupos libres de cualquier día. Guardarlas con fecha y limpiarlas al empezar un pedido nuevo.
+   - **Búsqueda del paciente por celular:** excluir pacientes eliminados.
+   - **Confirmación por WhatsApp** también al pagar un link creado por recepción. La página de pago la promete.
+   - **«Ya pagué» sin pago registrado:** responder que no se encuentra un pago a su nombre y ofrecer ayuda, sin desviar a agendar.

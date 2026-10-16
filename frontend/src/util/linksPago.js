@@ -109,3 +109,18 @@ export async function mapConLimite(items, limite, fn) {
 export function porConciliar(l) {
   return !!(l && l.conciliacionPendiente);
 }
+
+/** QA 23: `izipayRef` se guarda apenas el paciente abre el formulario de pago, pague o no
+ *  («pedido|transacción», p. ej. «1792172702|17921727025540»; los links viejos traen un solo
+ *  número). Devuelve el número de pedido de Izipay (10 dígitos) o, si no lo hay, la referencia. */
+export function pedidoIzipay(l) {
+  const partes = String((l && l.izipayRef) || "").split("|").map((s) => s.trim()).filter(Boolean);
+  return partes.find((p) => /^\d{10}$/.test(p)) || partes[0] || "";
+}
+
+/** QA 23: link «pendiente» cuyo formulario de pago ya se abrió. Si Izipay no avisó (el IPN no
+ *  llegó y el navegador se cerró), el paciente pudo haber pagado igual: hay que revisarlo en
+ *  Izipay antes de mandarle otro link. */
+export function pagoIniciado(l) {
+  return !!l && estadoLink(l).clave === "pendiente" && !porConciliar(l) && !!pedidoIzipay(l);
+}
