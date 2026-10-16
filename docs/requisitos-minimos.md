@@ -401,3 +401,12 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **`/pagos/historial?pacienteId=`** ignora el filtro y devuelve pagos de otros pacientes.
    - **Canal de la cita:** una cita creada desde un link de recepción queda con `canalOrigen: whatsapp_ia`; debe reflejar el origen real del link.
    - **Hora del cupo en el chat:** sigue mal (dijo «16:47» para un cupo que vence a las 14:38 hora de Lima).
+103. Cobro por WhatsApp: conciliación y aviso (revisión 19):
+   - **No contar pagos que no existieron.** La recuperación de pagos registró en Caja S/ 50 por Izipay y creó una cita confirmada («QA Izipay Prueba», 23/10 a las 16:30) a partir del link `0cf3f401…`. Ese link se marcó «pagado» en R9 con la ruta insegura de entonces: no tiene `izipayRef` ni hubo cobro en Izipay. Revertir ese cobro y esa cita. Conciliar solo pagos confirmados por Izipay: consultar la transacción con `izipayRef` y no confiar en el estado guardado.
+   - **`POST /pagos/{id}/reconciliar`:**
+     - con el pago real de R17 (`18d74c9c…`, `izipayRef` 1792087822, `conciliacionPendiente: true`) responde **500**: debe consultar a Izipay y crear la cita;
+     - con el link de R9 sin `izipayRef` (`8bd43be7…`) responde 200 «listoParaCrearCita»: debe rechazarlo (400 «sin pago de Izipay que conciliar»);
+     - los tres pagos aprobados de R16 (estado «caducado») también deben poder conciliarse.
+   - **Aviso al paciente (sigue faltando):** al confirmarse el pago, la IA escribe por el mismo chat que la cita quedó confirmada, con fecha, hora y sede.
+   - **`caducaEn` en `/pagos/links` y `/reservas/{id}`:** pasó a llegar como hora sola («13:39»), sin fecha, así que no se puede saber si un link venció. Mantener el instante completo (ISO con zona); si hace falta la hora de Lima, agregarla en otro campo (`caducaEnLima`). El frontend ya acepta los dos formatos.
+   - **IA:** no afirmar que un día no tiene atención sin consultar `disponibilidad` (dijo que el viernes 30 no había atención sin usar la herramienta). Si el paciente ya está registrado, no volver a pedirle edad y celular.
