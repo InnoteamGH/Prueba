@@ -1,0 +1,26 @@
+{
+  "name": "dentalcloud-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:demo": "VITE_DEMO=1 vite build --base ./ --outDir dist-demo",
+    "test": "node --test src/util/periodontal.test.js src/util/fechaLima.test.js src/util/formatearFDI.test.js src/util/planInversion.test.js src/util/planInversionPaginacion.test.js src/util/odontogramaBridge.test.js src/util/odontogramaHydrate.test.js src/util/odontogramaAnatomicoDom.test.js src/util/conformanceChecklist.test.js src/api/clientClinicoGuard.test.js src/api/clientClinicaShape.test.js src/api/reintentos.test.js src/FichaMedica.sprint4.test.js src/comun.kpi.test.js src/comun.color.test.js src/sprint0.matriz.test.js src/spec-v7.matriz.test.js src/spec-v8.matriz.test.js src/modulos/panelGerencialUtil.test.js src/modulos/produccionComisionesUtil.test.js src/compartido/cajaMoneda.test.js src/compartido/sedeElegida.test.js src/compartido/recetaItems.test.js src/compartido/whatsappSede.test.js src/util/ultimoPaciente.test.js src/compartido/agendaDia.test.js src/util/miProduccionComp.test.js src/compartido/cajaJornada.test.js src/compartido/agendaBloqueos.test.js src/compartido/menuDesplegable.test.js src/util/planInversionCuenta.test.js src/util/plurales.test.js src/util/auditoriaUsuarios.test.js src/util/medicoSesion.test.js src/util/odontogramaSync.test.js src/compartido/medicoEnSede.test.js src/compartido/integraciones.test.js src/util/portalPaciente.test.js src/compartido/citaAtencion.test.js src/compartido/guardaSalida.test.js src/compartido/citaEstadoInicial.test.js src/compartido/modulosRol.test.js src/util/metasComision.test.js src/util/procedimientoAcciones.test.js src/api/clientUsuariosClave.test.js src/util/claveNueva.test.js src/util/consentimientoEstado.test.js src/util/linksPago.test.js"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^0.383.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  }
+}

@@ -1,0 +1,243 @@
+﻿codigo,servicio,tipo,categoria_sugerida,moneda,precio_los_olivos,pago_dr_los_olivos,precio_miraflores,pago_dr_miraflores,disponible_los_olivos,disponible_miraflores,nota_planilla,observaciones
+1,FLUOR BARNIZ,servicio,Odontología general,PEN,80.0,25.6,120.0,31.48,sí,sí,,
+2,SELLANTE DE FOSAS Y FISURAS,servicio,Odontología general,PEN,70.0,16.0,100.0,26.24,sí,sí,,
+3,BLANQUEAMIENTO LASER POR SESIÓN,servicio,Estética,PEN,250.0,80.0,350.0,80.0,sí,sí,"Definir costo de materiales , evaluar si se vende por paquete ejemplo : 2 sesiones. Como es que las otras clinicas hacen por sesion , cada sesion de blanqueamient, darle los costos , que revise cuanto paga las otras clinicas (odonto studio)",
+5,CURACION CON RESINA FULL,servicio,Odontología general,PEN,200.0,64.0,200.0,64.0,sí,sí,,
+6,CURACION CON IONOMERO,servicio,Odontología general,PEN,100.0,32.0,150.0,39.0,sí,sí,,
+7,ENDODONCIA UNIRRADICULAR ( ANTERIORES ),servicio,Endodoncia,PEN,700.0,230.0,950.0,250.0,sí,sí,preguntar al endodoncista al dr alejando (pago x doctor de los olivos),
+8,ENDODONCIA BIRRADICULAR ( PREMOLARES ),servicio,Endodoncia,PEN,700.0,0.0,1000.0,250.0,sí,sí,,Pago al doctor 0 en Los Olivos: confirmar
+9,ENDODONCIA MULTIRRADICULAR (MOLARES ),servicio,Endodoncia,PEN,850.0,0.0,1200.0,280.0,sí,sí,,Pago al doctor 0 en Los Olivos: confirmar
+11,PERNOS FIBRA DE VIDRIO,servicio,Rehabilitación oral,PEN,450.0,96.0,650.0,144.0,sí,sí,,
+15,CORONAS PORCELANA SOBRE ZIRCONIO,servicio,Rehabilitación oral,PEN,1600.0,361.6,1950.0,400.0,sí,sí,,
+16,PPR METALICA DIENTES IVOCLAR,servicio,Rehabilitación oral,PEN,2000.0,249.6,2500.0,500.0,sí,sí,"preguntar al laboratorio tecnico pedir a cuspide , lista de precio actualizado. Se le quita el 18% , costo de laboratorio, lo que queda el 32%",
+18,PROTESIS TOTAL DIENTES IVOSTAR SUP/INF,servicio,Rehabilitación oral,PEN,2000.0,406.4,2500.0,600.0,sí,sí,,
+20,EXODONCIA SIMPLE,servicio,Cirugía,PEN,95.0,25.6,120.0,38.4,sí,sí,,
+21,EXODONCIA COMPLEJA,servicio,Cirugía,PEN,600.0,250.0,850.0,300.0,sí,sí,,
+22,CIRUGIAS COMPLEJAS,servicio,Cirugía,PEN,850.0,300.0,1200.0,500.0,sí,sí,,
+23,RADIOGRAFIA PERIAPICAL,servicio,Consulta y diagnóstico,PEN,35.0,11.2,40.0,11.2,sí,sí,,
+24,PULPOTOMIA,servicio,Endodoncia,PEN,450.0,128.0,550.0,130.0,sí,sí,,
+25,CORONA ACRILICO PROVISIONAL CON DIENTE DE STOCK,servicio,Rehabilitación oral,PEN,350.0,96.0,350.0,96.0,sí,sí,,
+26,CARILLAS RESINAS DIRECTA,servicio,Estética,PEN,500.0,135.6,750.0,250.0,sí,sí,,
+27,SEDACION CONSCIENTE,servicio,Sedación,PEN,350.0,112.0,,,sí,no,,Miraflores: «NO VA VER» (no se ofrece); Marcado en rojo en la planilla
+28,CONSULTA GENERAL,servicio,Consulta y diagnóstico,PEN,50.0,16.0,100.0,30.0,sí,sí,"marcha blanca 100 SOLES , PRECIO REGULAR 150",
+29,CONTENCION DE ACETATO,servicio,Ortodoncia,PEN,400.0,112.0,500.0,130.0,sí,sí,,
+30,MODELO DE ESTUDIO IMPRESA,servicio,Consulta y diagnóstico,PEN,200.0,40.0,300.0,50.0,sí,sí,,
+31,CERA DE ORTODONCIA,producto,Productos,PEN,15.0,0.0,,,sí,no,,Sin precio en Miraflores
+32,MANTENEDOR DE ESPACIO BANDA ANSA/CORONA ANSA,servicio,Rehabilitación oral,PEN,360.0,96.0,450.0,112.0,sí,sí,,
+34,APARATO ARCO LINGUAL,servicio,Ortopedia,PEN,500.0,89.6,600.0,100.0,sí,sí,,
+35,INSTALACION DE BRACKETS AUTOLIGABLES METALICOS,servicio,Ortodoncia,PEN,2000.0,450.0,2500.0,400.0,sí,sí,,
+36,CARILLA DE RESINA INDEXADA,servicio,Estética,PEN,750.0,203.3,950.0,270.0,sí,sí,,
+37,NUEVO BRACKETS AUTOLIGABLE X DIENTE,servicio,Ortodoncia,PEN,70.0,24.0,80.0,24.0,sí,sí,,
+38,ENCERADO DE DIAGNOSTICO X MAXILAR,servicio,Estética,PEN,380.0,89.6,450.0,89.6,sí,sí,,
+39,MINITORNILLO INTRAALVEOLAR,servicio,Ortodoncia,PEN,350.0,80.0,400.0,88.0,sí,sí,,
+40,PPR FLEXIBLE SUP O INF,servicio,Rehabilitación oral,PEN,2000.0,360.0,2500.0,464.0,sí,sí,,
+41,CORONA METAL PORCELANA + PILAR SOBRE IMPLANTE,servicio,Implantología,PEN,5500.0,1800.0,6000.0,1800.0,sí,sí,,
+42,CEMENTACION PROVISIONAL POR CORONA,servicio,Rehabilitación oral,PEN,100.0,32.0,150.0,40.0,sí,sí,,
+44,RETIRO DE BRACKETS UN MAXILAR,servicio,Ortodoncia,PEN,170.0,55.7,250.0,64.0,sí,sí,,
+45,CONTROL PROTESIS,servicio,Rehabilitación oral,PEN,100.0,35.0,150.0,35.0,sí,sí,,
+46,ATP ORTOPEDIA,servicio,Ortopedia,PEN,750.0,140.0,1000.0,214.0,sí,sí,,
+47,INSTALACIÓN DE BRACKETS CERÁMICOS AUTOLIGABLES ESTÉTICOS,servicio,Ortodoncia,PEN,4000.0,600.0,4000.0,600.0,sí,sí,,
+48,PRUEBA PATOLOGICA,servicio,Cirugía,PEN,250.0,80.0,300.0,80.0,sí,sí,,
+49,CEPILLO VITIS ORTHODONTIC,producto,Productos,PEN,22.5,0.0,,,sí,no,,Sin precio en Miraflores
+50,INCRUSTACIÓN DE CERÓMERO,servicio,Rehabilitación oral,PEN,850.0,169.6,950.0,200.0,sí,sí,,
+51,CONTROL DE ORTOPEDIA,servicio,Ortopedia,PEN,200.0,48.0,250.0,70.0,sí,sí,,
+52,MICROABRASIÓN (POR PIEZA),servicio,Estética,PEN,375.0,100.0,375.0,100.0,sí,sí,,
+53,DRENAJE DE ABSCESO,servicio,Cirugía,PEN,300.0,90.0,350.0,96.0,sí,sí,,
+54,APICOGENESIS/APICOFORMACION DIENTE PERMANENTE,servicio,Endodoncia,PEN,650.0,208.0,850.0,,sí,sí,,Falta pago al doctor en Miraflores
+55,RELOJ DE ARENA,producto,Productos,PEN,15.0,0.0,,,sí,no,,Sin precio en Miraflores
+56,CARILLAS CERAMICAS LENTES DE CONTACTO,servicio,Estética,PEN,1750.0,409.6,1850.0,450.0,sí,sí,,
+57,RECUBRIMIENTO PULPAR CON MTA + RESINA,servicio,Endodoncia,PEN,350.0,112.0,500.0,150.0,sí,sí,,
+58,INSTALACION DE APARATO HYRAX ORTOPEDIA,servicio,Ortopedia,PEN,1200.0,285.0,1500.0,383.0,sí,sí,,
+59,CORONA DE ACERO,servicio,Rehabilitación oral,PEN,350.0,105.6,450.0,105.6,sí,sí,,
+60,DESTARTRAJE SUPERIOR E INFERIOR,servicio,Odontología general,PEN,100.0,32.0,200.0,64.0,sí,sí,,
+61,BLANQUEAMIENTO LASER 3 SESIONES,servicio,Estética,PEN,620.0,168.0,750.0,250.0,sí,sí,,
+62,FLUOROTERAPIA (INCLUYE 4 SESIONES),servicio,Odontología general,PEN,320.0,102.4,350.0,102.4,sí,sí,,Marcado en rojo en la planilla
+63,CONTROL MENSUAL METALICOS CONVENCIONAL,servicio,Ortodoncia,PEN,200.0,60.0,220.0,60.0,sí,sí,,
+64,CONTROL MENSUAL BK AUTOLIGABLES METALICOS,servicio,Ortodoncia,PEN,220.0,80.0,250.0,60.0,sí,sí,,
+65,CONTROL MENSUAL BRACKETS ZAFIRO,servicio,Ortodoncia,PEN,250.0,80.0,300.0,70.0,sí,sí,,
+66,CONSULTA CIRUJANO MAXILO FACIAL,servicio,Cirugía,PEN,200.0,51.2,250.0,,sí,sí,,Falta pago al doctor en Miraflores
+67,LIGAS INTERMAXILAR,producto,Productos,PEN,10.0,0.0,,,sí,no,,Sin precio en Miraflores
+68,PASTA DENTAL RESTORE,producto,Productos,PEN,120.0,0.0,,,sí,no,,Sin precio en Miraflores
+69,REEDUCADOR LINGUAL C/U,servicio,Ortopedia,PEN,80.0,20.0,80.0,25.0,sí,sí,,
+70,CONTROL DE APARATO KLAMMT 1,servicio,Ortopedia,PEN,200.0,48.0,250.0,60.0,sí,sí,,
+71,INSTALACION APARATO ORTOPEDICO KLAMMT 1,servicio,Ortopedia,PEN,2000.0,410.0,2500.0,400.0,sí,sí,,
+72,FERULA DE MIORELAJANTE 3D,servicio,Oclusión / ATM,PEN,750.0,195.2,950.0,195.2,sí,sí,,
+73,ENJUAGUE ENCIAS VITIS 150 ML,producto,Productos,PEN,25.0,0.0,,,sí,no,,Sin precio en Miraflores
+74,NECESER KIDS ( PASTA + CEPILLO ),producto,Productos,PEN,30.0,0.0,,,sí,no,,Sin precio en Miraflores
+75,RETIRO DE BRACKETS AMBOS MAXILARES,servicio,Ortodoncia,PEN,300.0,100.0,400.0,128.0,sí,sí,,
+76,MOCK UP,servicio,Estética,PEN,750.0,240.0,750.0,240.0,sí,sí,,Marcado en rojo en la planilla
+77,DESPIGMENTACION POR SESIÓN,servicio,Periodoncia,PEN,70.0,22.4,100.0,32.0,sí,sí,,
+78,GUIA QX PARA IMPLANTE,servicio,Implantología,PEN,350.0,115.2,500.0,,sí,sí,,Falta pago al doctor en Miraflores
+79,RECUPERACIÓN DE ESPACIO BIOLÓGICO,servicio,Periodoncia,PEN,500.0,160.0,750.0,224.0,sí,sí,,
+80,CONSULTA IMPLANTOLOGO,servicio,Implantología,PEN,200.0,32.0,250.0,,sí,sí,,Falta pago al doctor en Miraflores
+81,ENJUAGATORIO ORTODONCIA VITIS,producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+82,APARATO DE HAWLEY + TORNILLO DE EXPANSION,servicio,Ortopedia,PEN,1300.0,250.0,1500.0,280.0,sí,sí,,Marcado en rojo en la planilla
+83,CONTROL MENSUAL AUTOLIGABLES CERAMICOS,servicio,Ortodoncia,PEN,250.0,80.0,280.0,70.0,sí,sí,,
+84,CAJA FIFTYDENT,producto,Productos,PEN,60.0,0.0,,,sí,no,,Sin precio en Miraflores
+85,UNIDAD DE FIFTYDENT,producto,Productos,PEN,2.5,0.0,,,sí,no,,Sin precio en Miraflores
+86,RASPAJE A COLGAJO (POR ARCADA),servicio,Periodoncia,PEN,400.0,128.0,450.0,128.0,sí,sí,,
+87,REGENERACION OSEA,servicio,Implantología,PEN,1500.0,384.0,2000.0,,sí,sí,,Falta pago al doctor en Miraflores
+88,CEPILLO ORTODONCIA DE OBSEQUIO,producto,Productos,PEN,0.0,0.0,,,sí,no,,Sin precio en Miraflores
+89,CAJA DE CONTENCIONES,producto,Productos,PEN,10.0,0.0,,,sí,no,,Sin precio en Miraflores
+90,MINITORNILLO IZC,servicio,Ortodoncia,PEN,350.0,88.0,400.0,80.0,sí,sí,,Marcado en rojo en la planilla
+91,MINITORNILLO BUCCALSHELFT,servicio,Ortodoncia,PEN,400.0,88.0,400.0,80.0,sí,sí,,Marcado en rojo en la planilla
+92,EXODONCIA SEMICOMPLEJA 3° MOLAR,servicio,Cirugía,PEN,500.0,160.0,650.0,160.0,sí,sí,,
+93,CONTROL DE REJILLA LINGUAL,servicio,Ortodoncia,PEN,150.0,48.0,200.0,48.0,sí,sí,,
+94,KIT DE CONTENCIÓN,producto,Productos,PEN,40.0,0.0,,,sí,no,,Sin precio en Miraflores
+95,NECESER JUNIOR ( PASTA + CEPILLO ),producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+96,HILO DENTAL,producto,Productos,PEN,25.0,0.0,,,sí,no,,Sin precio en Miraflores
+97,INSTALACION BRACKETS METALICOS SOLO UN MAXILAR,servicio,Ortodoncia,PEN,800.0,250.0,1500.0,150.0,sí,sí,,
+98,CONTROL MENSUAL BRACKETS METALICOS SOLO UN MAXILAR,servicio,Ortodoncia,PEN,150.0,75.0,180.0,50.0,sí,sí,,
+99,CONTENCION DE ACRILICO CON DIENTE DE STOCK,servicio,Ortodoncia,PEN,500.0,160.0,750.0,120.0,sí,sí,,
+100,CIRUGIA APICECTOMIA,servicio,Cirugía,PEN,600.0,192.0,800.0,192.0,sí,sí,,
+101,CONTROL POST ORTODONCIA,servicio,Ortodoncia,PEN,100.0,16.0,100.0,32.0,sí,sí,,Marcado en rojo en la planilla
+102,MASCARA DE PETIT + HYRAX,servicio,Ortopedia,PEN,500.0,130.0,3000.0,768.0,sí,sí,,Diferencia de precio entre sedes muy grande: confirmar
+103,RETIRO DE ESPIGOS,servicio,Rehabilitación oral,PEN,150.0,48.0,350.0,100.0,sí,sí,,
+104,IMPLANTE DENTAL,servicio,Implantología,PEN,3600.0,0.0,4000.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+105,PULIDO DE RESINA,servicio,Estética,PEN,60.0,19.2,100.0,32.0,sí,sí,,
+108,SEMI CARILLAS,servicio,Estética,PEN,350.0,96.0,350.0,110.0,sí,sí,,
+109,ENJUAGUE JUNIOR,producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+110,IMPLANTE y PILAR y CORONA DE PORCELANA SOBRE METAL AL CONTADO,servicio,Implantología,PEN,5500.0,0.0,5500.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+111,FRENECTOMIA,servicio,Cirugía,PEN,850.0,160.0,850.0,160.0,sí,sí,,
+112,TUBO NUEVO,servicio,Ortodoncia,PEN,60.0,19.2,70.0,22.4,sí,sí,,
+113,TUBO - BANDA ( REPEGADO ),servicio,Ortodoncia,PEN,60.0,20.0,80.0,22.4,sí,sí,,
+114,HILO DENTAL ORAL B,producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+115,OPERCULECTOMIA LEVE-MODERADA,servicio,Cirugía,PEN,250.0,80.0,350.0,100.0,sí,sí,,
+116,INSTALACION DE APARATO BIONATOR ORTOPEDIA,servicio,Ortopedia,PEN,1500.0,0.0,2500.0,400.0,sí,sí,,Pago al doctor 0 en Los Olivos: confirmar
+117,CEPILLO TEPE,producto,Productos,PEN,20.0,0.0,,,sí,no,,Sin precio en Miraflores
+118,LIMPIADOR LINGUAL TEPE,producto,Productos,PEN,25.0,0.0,,,sí,no,,Sin precio en Miraflores
+119,CINTA DENTAL,producto,Productos,PEN,25.0,0.0,,,sí,no,,Sin precio en Miraflores
+120,INTERPROXIMALES VITIS 6 UNI,producto,Productos,PEN,25.0,0.0,,,sí,no,,Sin precio en Miraflores
+122,BLANQUEAMIENTO INTERNO X DIENTE,servicio,Estética,PEN,250.0,64.0,350.0,84.0,sí,sí,,
+123,PACK SONRISA BRILLANTE (CONSULTA + PROFILAXIS+ BLANQUEAMIENTO LASER 1 SESION),pack,Estética,PEN,399.0,95.68,499.0,159.0,sí,sí,,
+124,INFORME DE CIRUGÍA ORTONAGTICA,servicio,Cirugía,PEN,350.0,112.0,,,sí,no,,Sin precio en Miraflores
+125,CONSULTA MAXILLO POST EVALUACIÓN,servicio,Cirugía,PEN,450.0,144.0,,,sí,no,,Sin precio en Miraflores
+126,ADAPTACION DE PPR CON DIENTE DE STOCK,servicio,Rehabilitación oral,PEN,150.0,48.0,200.0,48.0,sí,sí,,
+131,CURACION CON RESINA ESENCIAL,servicio,Odontología general,PEN,85.0,20.8,100.0,35.0,sí,sí,,
+133,PACK DIENTES FUERTES KIDS (CONSULTA + 4 SELLANTES DE FOSAS Y FISURAS),pack,Odontopediatría,PEN,250.0,48.0,299.0,60.0,sí,sí,,
+135,REBASADO DE PROTESIS,servicio,Rehabilitación oral,PEN,350.0,112.0,500.0,140.0,sí,sí,,
+136,TOPE,servicio,Odontología general,PEN,50.0,16.0,50.0,16.0,sí,sí,,
+137,CONSULTA+ PROFILAXIS DENTAL,servicio,Consulta y diagnóstico,PEN,159.0,50.88,,,sí,no,,Sin precio en Miraflores; Marcado en rojo en la planilla
+138,CONSULTA ORTODONCIA,servicio,Ortodoncia,PEN,50.0,16.0,100.0,30.0,sí,sí,,
+139,APERTURA CAMERAL,servicio,Endodoncia,PEN,100.0,32.0,200.0,60.0,sí,sí,,
+140,CEPILLO VITIS MEDIO,producto,Productos,PEN,20.0,0.0,,,sí,no,,Sin precio en Miraflores
+141,RETRATAMIENTO ENDODONCIA MULTIRRADICULAR ( MOLARES ),servicio,Endodoncia,PEN,1200.0,224.0,1350.0,360.0,sí,sí,,
+144,CIRUGIA - PERIODONCIA GINGIVECTOMIA CON REMODELACION OSEA,servicio,Cirugía,PEN,2500.0,800.0,,,sí,no,,Sin precio en Miraflores; Marcado en rojo en la planilla
+145,CONTROL PREVENTIVO MEDICAL,servicio,Consulta y diagnóstico,PEN,159.0,50.88,199.0,50.8,sí,sí,,
+146,CONTROL PREVENTIVO KIDS,servicio,Odontopediatría,PEN,159.0,50.88,199.0,50.88,sí,sí,,
+147,MARPE,servicio,Ortopedia,PEN,4500.0,800.0,4500.0,800.0,sí,sí,,
+150,CONSULTA ANESTESIOLOGO,servicio,Sedación,PEN,200.0,0.0,200.0,0.0,sí,sí,,Pago al doctor 0 en Los Olivos: confirmar; Pago al doctor 0 en Miraflores: confirmar
+151,SEDACION ENDOVENOSA 1 hora,servicio,Sedación,PEN,1950.0,0.0,1900.0,0.0,sí,sí,falta pago por doctor,Pago al doctor 0 en Los Olivos: confirmar; Pago al doctor 0 en Miraflores: confirmar; Marcado en rojo en la planilla
+152,TECNICA DE HALL,servicio,Odontopediatría,PEN,350.0,112.0,380.0,112.0,sí,sí,,
+154,EXODONCIA MESIODENS,servicio,Cirugía,PEN,150.0,48.0,150.0,50.0,sí,sí,,
+155,APICOGENESIS/APICOFORMACION DIENTE DECIDUO,servicio,Endodoncia,PEN,400.0,128.0,500.0,128.0,sí,sí,,
+156,INACTIVADOR DE CARIES + RESTAURACION,servicio,Odontopediatría,PEN,110.0,35.2,200.0,64.0,sí,sí,,
+158,CEMENTADO MANTENEDOR DE ESPACIO,servicio,Odontopediatría,PEN,70.0,22.4,100.0,35.0,sí,sí,,
+159,OPERCULECTOMIA SEVERA CON LASER,servicio,Cirugía,PEN,500.0,135.0,650.0,200.0,sí,sí,,
+160,REJILLA LINGUAL ORTOPEDIA,servicio,Ortodoncia,PEN,750.0,150.0,750.0,185.0,sí,sí,,
+161,CORONA DE ACETATO/CELULOIDE,servicio,Rehabilitación oral,PEN,350.0,112.0,350.0,112.0,sí,sí,,
+162,INACTIVACION DE CARIES,servicio,Odontopediatría,PEN,80.0,25.6,100.0,35.0,sí,sí,,
+163,ESTABILIZACION PROTECTORA,servicio,Odontopediatría,PEN,100.0,32.0,120.0,32.0,sí,sí,,
+164,FERULIZACION POR PIEZA,servicio,Odontología general,PEN,65.0,20.8,75.0,20.8,sí,sí,,
+165,AJUSTE OCLUSAL POR DESGASTE SELECTIVO,servicio,Oclusión / ATM,PEN,50.0,16.0,50.0,16.0,sí,sí,,
+166,ATP + BOTON DE NANCE ORTOPEDIA,servicio,Ortopedia,PEN,950.0,170.0,1200.0,234.0,sí,sí,,
+167,INSTALACION DE APARATO EXTROBUCAL (AEB),servicio,Ortodoncia,PEN,1500.0,350.0,2500.0,500.0,sí,sí,,
+168,CONTROL MENSUAL DE (AEB),servicio,Ortodoncia,PEN,200.0,60.0,250.0,70.0,sí,sí,,
+171,CURACION RESINA PLUS,servicio,Odontología general,PEN,140.0,38.4,160.0,38.4,sí,sí,,
+172,APARATO DE HOWLEY,servicio,Ortopedia,PEN,1200.0,300.0,1500.0,375.0,sí,sí,,
+173,MANTENEDOR DE ESPACIO TELESCOPICO,servicio,Odontopediatría,PEN,750.0,140.0,950.0,150.0,sí,sí,,
+175,PACK PREVENTIVO BABY (0 a 24 meses),pack,Odontopediatría,PEN,189.0,38.4,299.0,70.0,sí,sí,,
+176,RECONSTRUCCIÓN MOLAR CON BANDA,servicio,Odontología general,PEN,300.0,96.0,350.0,96.0,sí,sí,,
+180,NUEVO BRACKETS AUTOLIGABLE ESTETICO,servicio,Ortodoncia,PEN,100.0,24.0,120.0,24.0,sí,sí,,
+182,INSTALACION DE BRACKETS METALICOS CONVENCIONALES,servicio,Ortodoncia,PEN,1800.0,250.0,2000.0,250.0,sí,sí,,
+184,colutorio clorhexidina PERIO AID 500ml,producto,Productos,PEN,40.0,0.0,,,sí,no,,Sin precio en Miraflores
+185,EXODONCIA CON ODONTOSECCION,servicio,Cirugía,PEN,650.0,208.0,850.0,272.0,sí,sí,,
+186,Levantamiento de seno maxilar + regeneración osea,servicio,Implantología,PEN,1500.0,480.0,1500.0,480.0,sí,sí,,
+188,GINGIVECTOMIA,servicio,Periodoncia,PEN,350.0,112.0,500.0,112.0,sí,sí,,
+189,RETIRO DE PUENTE,servicio,Rehabilitación oral,PEN,300.0,96.0,350.0,100.0,sí,sí,,
+191,CARILLA MANTENIMIENTO POR DIENTE,servicio,Estética,PEN,100.0,32.0,200.0,87.5,sí,sí,,
+192,REPARACIÓN DE CARILLA X DIENTE,servicio,Estética,PEN,200.0,64.0,250.0,87.5,sí,sí,,
+199,CONSULTA ODONTOPEDIATRÍA,servicio,Odontopediatría,PEN,50.0,16.0,120.0,38.0,sí,sí,,
+202,RETIRO DE CORONAS,servicio,Rehabilitación oral,PEN,50.0,16.0,100.0,30.0,sí,sí,,
+203,FLOSSER VITIS 30 UDS,producto,Productos,PEN,25.0,0.0,,,sí,no,,Sin precio en Miraflores
+204,PULPECTOMIA,servicio,Endodoncia,PEN,500.0,150.0,600.0,150.0,sí,sí,,
+205,PASTA DENTAL VITIS,producto,Productos,PEN,25.0,0.0,,,sí,no,,Sin precio en Miraflores
+208,TERAPIA DE CHOQUE,servicio,Odontopediatría,PEN,260.0,83.2,320.0,83.2,sí,sí,,
+210,TERAPIA EN GINGIVOESTOMATITIS X SESIÓN,servicio,Odontopediatría,PEN,50.0,16.0,100.0,32.0,sí,sí,,
+211,SEDACIÓN ENDOVENOSA 2 horas,servicio,Sedación,PEN,3000.0,0.0,2600.0,0.0,sí,sí,,Pago al doctor 0 en Los Olivos: confirmar; Pago al doctor 0 en Miraflores: confirmar; Marcado en rojo en la planilla
+212,FRENECTOMIA CON LASER,servicio,Cirugía,PEN,1500.0,400.0,1500.0,400.0,sí,sí,,
+217,CEPILLO + DEDAL BABY,producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+218,DEDAL + BALSAMO VITIS BABY,producto,Productos,PEN,15.0,0.0,,,sí,no,,Sin precio en Miraflores
+220,CEPILLO VITIS KIDS,producto,Productos,PEN,20.0,0.0,,,sí,no,,Sin precio en Miraflores
+221,CURETAJE DE BOLSA PERIODONTAL X MAXILAR,servicio,Periodoncia,PEN,1200.0,500.0,1500.0,500.0,sí,sí,,
+222,NECESER ORTODONCIA,producto,Productos,PEN,45.0,0.0,,,sí,no,,Sin precio en Miraflores
+225,FERULA ESTABILIZADORA DE ACRILICO,servicio,Oclusión / ATM,PEN,1200.0,195.2,1500.0,250.0,sí,sí,,
+227,EXODONCIA COMPLEJA + CIERRE DE COMUNICACIÓN BUCOSINUSAL/ LIMPIEZA DEL SENO MAXILAR,servicio,Implantología,PEN,1000.0,550.0,1350.0,550.0,sí,sí,,
+228,Traccionamiento quirúrgico por pieza dental,servicio,Cirugía,PEN,550.0,0.0,800.0,350.0,sí,sí,,Pago al doctor 0 en Los Olivos: confirmar
+229,CONSULTA ENDODONCISTA,servicio,Endodoncia,PEN,200.0,32.0,200.0,32.0,sí,sí,,
+230,ESCANEO DE ESTUDIO DIGITAL,servicio,Consulta y diagnóstico,PEN,200.0,64.0,280.0,64.0,sí,sí,,
+231,RETIRO DE CONTENCION FIJA,servicio,Ortodoncia,PEN,120.0,30.0,150.0,35.0,sí,sí,,
+232,NECESER ALOE VERA,producto,Productos,PEN,40.0,0.0,55.0,,sí,sí,,
+241,INCRUSTACION DE NANO HIBRIDO,servicio,Rehabilitación oral,PEN,850.0,169.6,950.0,180.0,sí,sí,,
+244,CONTROL DE FERULA,servicio,Oclusión / ATM,PEN,200.0,54.23,250.0,54.23,sí,sí,TODO LO QUE VIENE DEL LABORATORIO EN OBS,
+246,INSTALACION DE BRACKETS CONVENCIONALES TÉCNICA 4*2,servicio,Ortodoncia,PEN,1200.0,250.0,1500.0,200.0,sí,sí,,
+249,DISYUNTOR INFERIOR (mini hyrax ),servicio,Ortopedia,PEN,1800.0,448.0,2000.0,450.0,sí,sí,,
+252,CONTROL POST QUIRURGICO,servicio,Cirugía,PEN,100.0,28.0,150.0,48.0,sí,sí,,
+258,FLOSSER VITIS INFANTIL,producto,Productos,PEN,22.0,0.0,,,sí,no,,Sin precio en Miraflores
+259,NECESER BLANQUEADOR (CEPILLO + ENJUAGLE + PASTA BLANQUEADORA),producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+260,NECESER ENCIAS ROSA (CEPILLO+PASTA ENCIAS+ENJUAGUE ENCIAS),producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+261,PROTESIS FLEXIBLE UNA SOLA PIEZA,servicio,Rehabilitación oral,PEN,800.0,203.0,800.0,203.0,sí,sí,,
+262,PACK SONRISA SEGURA,pack,Consulta y diagnóstico,PEN,229.0,50.88,299.0,50.88,sí,sí,,
+263,PACK SONRISA SEGURA KIDS,pack,Odontopediatría,PEN,229.0,50.88,299.0,50.88,sí,sí,,
+265,PORTA FERULA,producto,Productos,PEN,10.0,0.0,15.0,,sí,sí,,
+266,PLATO JUNIOR,servicio,Ortopedia,PEN,350.0,0.0,500.0,,sí,sí,"Ver al laboratorio (lista de precio, dentaid, legari, cuspide)",Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+267,CONTROL OCLUSAL,servicio,Oclusión / ATM,PEN,50.0,16.0,50.0,16.0,sí,sí,,
+269,FERULA ESTABILIZADOR OCLUSAL DE RESINA IMPRESA,servicio,Oclusión / ATM,PEN,850.0,195.2,850.0,195.2,sí,sí,,
+270,PASTILLAS EFERVESCENTES ORTHODONTIC,producto,Productos,PEN,10.0,0.0,,,sí,no,,Sin precio en Miraflores
+271,ENJUAGUE ENCIAS VITIS 500 ML,producto,Productos,PEN,45.0,0.0,,,sí,no,,Sin precio en Miraflores
+272,NECESER SENSIBLE (CEPILLO + ENJUAGLE + PASTA ),producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+273,INSTALACION DE ARCO EXTRAORAL,servicio,Ortodoncia,PEN,2000.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+274,PACK GESTANTE (CONSULTA + PROFILAXIS DENTAL + 2 RS + 2 SELLANTES O 2 RS),pack,Consulta y diagnóstico,PEN,399.0,104.48,429.0,,sí,sí,falta pago x doctor se estipula 130,Falta pago al doctor en Miraflores; Marcado en rojo en la planilla
+275,PACK NIÑO SANO (CONSULTA + PROFILAXIS DENTAL + 2 RS + 2 SELLANTES O 2 RS),pack,Odontopediatría,PEN,399.0,104.48,499.0,,sí,sí,falta pago x doctor se estipula 130,Falta pago al doctor en Miraflores; Marcado en rojo en la planilla
+276,CEPILLO ELECTRICO VITIS S20,producto,Productos,PEN,270.0,0.0,,,sí,no,,Sin precio en Miraflores
+277,MORDEDOR PARA ALINEADORES,producto,Productos,PEN,15.0,0.0,,,sí,no,,Sin precio en Miraflores
+278,PACK DIAGNOSTICO (CONSULTA + 4 RX ),pack,Consulta y diagnóstico,PEN,120.0,32.5,220.0,32.5,sí,sí,,
+279,PACK DIENTES FUERTES (CONSULTA + 4 SELLANTES DE FOSAS Y FISURAS),pack,Consulta y diagnóstico,PEN,350.0,48.0,350.0,50.0,sí,sí,,
+280,CEPILLO EDUCATIVO KIDS,producto,Productos,PEN,35.0,0.0,,,sí,no,,Sin precio en Miraflores
+281,PACK SONRISA SEGURA FAMILIAR,pack,Consulta y diagnóstico,PEN,199.0,50.88,250.0,50.88,sí,sí,,
+,PORTA FERULA INTERNACIONAL,producto,Productos,PEN,50.0,0.0,,,sí,no,,Sin precio en Miraflores; Sin número de ítem
+284,VITIS ANTIMANCHAS 50 ML,producto,Productos,PEN,40.0,0.0,,,sí,no,,Sin precio en Miraflores
+285,CONTENCIÓN FIJA,servicio,Ortodoncia,PEN,350.0,90.0,500.0,130.0,sí,sí,,
+286,CEPILLO BABY VITIS,producto,Productos,PEN,15.0,0.0,,,sí,no,,Sin precio en Miraflores
+288,CORONA NANO HIBRIDA,servicio,Rehabilitación oral,PEN,850.0,209.6,950.0,209.6,sí,sí,,
+290,Enjuague Bucal Perio-Aid 0.12% Intensive Care - 150 ML,producto,Productos,PEN,22.5,0.0,,,sí,no,,Sin precio en Miraflores
+291,CURACION CON RESINA INFILTRANTE,servicio,Odontología general,PEN,260.0,50.0,260.0,50.0,sí,sí,,
+292,ALARGAMIENTO CORONARIO,servicio,Periodoncia,PEN,2000.0,0.0,2400.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+293,INSTALACION DE APARATO INTERCEPTIVO NITE-GUIDE,servicio,Ortopedia,PEN,1600.0,0.0,2000.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+294,DRENAJE INTRAORAL,servicio,Cirugía,PEN,1100.0,0.0,1500.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+297,INSTALACION DE APARATO MC NAMARA,servicio,Ortopedia,PEN,1500.0,0.0,1900.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+298,RETRATAMIENTO DE PULPECTOMIA + RESINA,servicio,Endodoncia,PEN,850.0,130.0,950.0,180.0,sí,sí,,
+299,PLANIFICACION ALINEADORES 3D,servicio,Ortodoncia (alineadores),PEN,5200.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+300,EXODONCIA SEMI COMPLEJA,servicio,Cirugía,PEN,250.0,71.75,,,sí,no,,Sin precio en Miraflores
+301,RETIRO DE ATTACHMEN,servicio,Ortodoncia (alineadores),PEN,150.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+302,REMODELACION OSEA,servicio,Periodoncia,PEN,500.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+303,ADICIONAL SEDACION ENDOVENOSA x 1/2 HORA,servicio,Sedación,PEN,350.0,0.0,350.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+304,ESTABILIZACION PROTECTORA DE INFANTE,servicio,Odontopediatría,PEN,150.0,43.05,,,sí,no,,Sin precio en Miraflores
+305,Exodoncia de supernumerario,servicio,Cirugía,PEN,750.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+306,INSTALACION DE APARATO HASS,servicio,Ortopedia,PEN,1200.0,0.0,2000.0,,sí,sí,,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+307,INSTALACION DE PLACA ESCHLER,servicio,Ortopedia,PEN,950.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+308,INATALACION DE APARATO LIP BUMPER,servicio,Ortopedia,PEN,850.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+309,CEMENTADO DE APARATO ORTOPEDIA,servicio,Ortopedia,PEN,100.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+310,INSTALACION DE HABITAT CORRECTOR,servicio,Ortopedia,PEN,1600.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+311,CLINCHECK (SIMULACION),servicio,Ortodoncia (alineadores),USD,300.0,0.0,300.0,,sí,sí,DOLARES,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar; Precio en dólares
+312,CONTENCION VIVERO (1 MAXILAR) #3,servicio,Ortodoncia,PEN,0.0,0.0,,,sí,no,,Sin precio en Miraflores
+313,CONTENCION VIVERO (2 MAXILAR) #3,servicio,Ortodoncia,PEN,550.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+317,INVISALIGN LITE (2 MAXILAR) #14,servicio,Ortodoncia (alineadores),USD,2700.0,0.0,3000.0,,sí,sí,DOLARES,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar; Precio en dólares
+319,INVISALIGN MODERATE (2 MAXILAR) #26,servicio,Ortodoncia (alineadores),USD,3200.0,0.0,3500.0,,sí,sí,DOLARES,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar; Precio en dólares
+320,INVISALIGN COMPREHENSIVE ILIMITADO (5 AÑOS ),servicio,Ortodoncia (alineadores),USD,4200.0,0.0,4500.0,,sí,sí,DOLARES,Falta pago al doctor en Miraflores; Pago al doctor 0 en Los Olivos: confirmar; Precio en dólares
+321,INSTALACION DE DISYUNTOR MCNAMARA HASS,servicio,Ortopedia,PEN,1800.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+322,WEEK INVISALING EXPERIENCE,servicio,Por clasificar,PEN,100.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+323,CIRUGÍA COLGAJO,servicio,Cirugía,PEN,1200.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+324,EXODONCIA COMPLEA 3° MOLAR,servicio,Cirugía,PEN,650.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar
+325,CONTENCION CONTINUA DE ACRILICO,servicio,Ortodoncia,PEN,550.0,112.0,,,sí,no,,Sin precio en Miraflores
+326,INSTALACION DE APARATO ERTTY GAP CON ARCO SCHLER Y PISTAS OCLUSALES,servicio,Ortopedia,PEN,3500.0,0.0,,,sí,no,,Sin precio en Miraflores; Pago al doctor 0 en Los Olivos: confirmar

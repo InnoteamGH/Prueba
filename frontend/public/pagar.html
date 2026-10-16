@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pago seguro</title>
+  <style>
+    :root { color-scheme: light; --ink: #14213d; --muted: #5c677d; --bg: #f6f3ee; --card: #fff; --accent: #0b6e4f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: radial-gradient(1200px 600px at 10% -10%, #dfe9e4, transparent), var(--bg); color: var(--ink); min-height: 100vh; }
+    main { max-width: 420px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    h1 { font-size: 1.35rem; margin: 0 0 .35rem; }
+    p { color: var(--muted); margin: 0 0 1.25rem; line-height: 1.45; }
+    .panel { background: var(--card); border-radius: 16px; padding: 1.25rem; box-shadow: 0 12px 40px rgba(20,33,61,.08); }
+    .err { color: #9b2226; background: #fff0f0; padding: .75rem 1rem; border-radius: 10px; margin-bottom: 1rem; }
+    .ok { color: var(--accent); }
+    .amt { font-size: 1.6rem; font-weight: 700; margin: .5rem 0 1rem; }
+    #formHost { min-height: 48px; }
+    #formHost:empty::before { content: "Abriendo pasarela…"; color: var(--muted); }
+    button.pay { margin-top: 1rem; width: 100%; padding: .85rem 1rem; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 600; font-size: 1rem; cursor: pointer; }
+    button.pay:disabled { opacity: .55; cursor: wait; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="brand">Pago seguro</h1>
+    <p>Paga tu cita de forma segura con Izipay</p>
+    <div id="msg" hidden class="err"></div>
+    <div class="panel">
+      <div id="meta"></div>
+      <div id="formHost"></div>
+      <button type="button" class="pay" id="btnPay" hidden>Pagar ahora</button>
+    </div>
+  </main>
+  <script>
+    (function () {
+      const params = new URLSearchParams(location.search);
+      // Revisión 13: la IA envía el id sin guiones (32 caracteres) y el servidor solo lo encuentra
+      // con guiones: se normaliza al formato UUID.
+      const pagoIdCrudo = String(params.get("pagoId") || params.get("id") || "").trim();
+      const pagoId = /^[0-9a-f]{32}$/i.test(pagoIdCrudo)
+        ? pagoIdCrudo.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5")
+        : pagoIdCrudo;
+      const apiBase = (params.get("api") || localStorage.getItem("dc_api") || "https://o6xu3m6s78.execute-api.us-east-1.amazonaws.com").replace(/\/$/, "");
+      const msg = document.getElementById("msg");
+      const meta = document.getElementById("meta");
+      const formHost = document.getElementById("formHost");
+      const btnPay = document.getElementById("btnPay");
+
+      function showErr(t) {
+        msg.hidden = false;
+        msg.textContent = t;
+        formHost.textContent = "";
+        btnPay.hidden = true;
+      }
+
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          if (document.querySelector('script[src="' + src + '"]')) {
+            resolve();
+            return;
+          }
+          const s = document.createElement("script");
+          s.src = src;
+          s.async = true;
+          s.onload = function () { resolve(); };
+          s.onerror = function () { reject(new Error("No se cargó el SDK de Izipay")); };
+          document.head.appendChild(s);
+        });
+      }
+
+      // Revisión 13: el formulario va incrustado en la página. En el SDK el modo emergente se
+      // llama POP_UP (no POPUP) y, abierto desde el link de WhatsApp en el celular, una ventana
+      // emergente puede quedar bloqueada.
+      function typeFormEmbebido() {
+        try {
+          if (window.Izipay && Izipay.enums && Izipay.enums.typeForm) {
+            const tf = Izipay.enums.typeForm;
+            return tf.EMBEDDED || tf.POP_UP || "embedded";
+          }
+        } catch (e) { /* ignore */ }
+        return "embedded";
+      }
+
+      function processTypeAuth() {
+        try {
+          if (window.Izipay && Izipay.enums && Izipay.enums.processType) {
+            return Izipay.enums.processType.AUTHORIZATION || Izipay.enums.processType.AT || "AT";
+          }
+        } catch (e) { /* ignore */ }
+        return "AT";
+      }
+
+      function payAction() {
+        try {
+          if (window.Izipay && Izipay.enums && Izipay.enums.payActions) {
+            return Izipay.enums.payActions.PAY || "pay";
+          }
+        } catch (e) { /* ignore */ }
+        return "pay";
+      }
+
+      // Revisión 16: textos para el paciente. Izipay a veces responde un rechazo sin texto útil
+      // («Mensaje no configurado») y el servidor explica un link vencido con un texto técnico.
+      function textoRechazo(response) {
+        const t = String((response && (response.messageUser || response.message)) || "").trim();
+        if (!t || /no configurado|not configured/i.test(t)) {
+          return "El banco no aprobó el pago. Prueba con otra tarjeta u otro medio de pago.";
+        }
+        if (/token/i.test(t)) return "La sesión de pago venció. Toca «Intentar de nuevo».";
+        return "El pago no se completó: " + t;
+      }
+      function textoLinkNoDisponible(t) {
+        if (/caducad|vencid|expir/i.test(t)) {
+          return "Este link de pago venció: el cupo se guarda 30 minutos. Escríbenos por WhatsApp y te enviamos un link nuevo.";
+        }
+        if (/anulad/i.test(t)) {
+          return "Este link de pago ya no está vigente. Escríbenos por WhatsApp y te enviamos uno nuevo.";
+        }
+        return t;
+      }
+
+      function notifyResult(payload) {
+        return fetch(apiBase + "/api/public/izipay/resultado", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(function () { /* no bloquear UX */ });
+      }
+
+      if (!pagoId) {
+        showErr("Falta pagoId en la URL (?pagoId=…).");
+        return;
+      }
+
+      fetch(apiBase + "/api/public/izipay/checkout/" + encodeURIComponent(pagoId))
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok) throw new Error(textoLinkNoDisponible(String((res.j && (res.j.error || res.j.message)) || "No se pudo iniciar el pago")));
+          if (res.j.estado === "pagado") {
+            meta.innerHTML = '<p class="ok">Este pago ya está registrado. Puedes cerrar esta ventana.</p>';
+            formHost.textContent = "";
+            return;
+          }
+
+          const authorization = res.j.authorization || res.j.formToken;
+          const merchantCode = res.j.merchantCode;
+          const transactionId = res.j.transactionId;
+          const orderNumber = res.j.orderNumber;
+          const amount = String(res.j.amount || Number(res.j.importe).toFixed(2));
+          // keyRSA: "RSA" o la clave pública. Si el servidor manda otra cosa (p. ej. una variable
+          // de entorno mal cargada, «IZIPAY_API_URL=…»), se usa "RSA".
+          const kr = String(res.j.keyRSA || "").trim();
+          const keyRSA = kr && (kr === "RSA" || /BEGIN PUBLIC KEY/.test(kr) || /^[A-Za-z0-9+/=\s-]{64,}$/.test(kr)) ? kr : "RSA";
+          const sdkUrl = res.j.sdkUrl || "https://sandbox-checkout.izipay.pe/payments/v1/js/index.js";
+          const email = res.j.email || "";
+          const clinica = res.j.clinicaNombre || "Clínica";
+          const firstName = res.j.billingFirstName || "Paciente";
+          const lastName = res.j.billingLastName || clinica;
+          const phone = res.j.billingPhone || "900000000";
+          const docNumber = res.j.billingDocument || "00000000";
+          document.title = "Pagar — " + clinica;
+          const brand = document.getElementById("brand");
+          if (brand) brand.textContent = clinica;
+
+          if (!authorization || !merchantCode || !transactionId || !orderNumber) {
+            throw new Error("Respuesta incompleta de Izipay (token de sesión)");
+          }
+
+          meta.innerHTML = '<div class="amt">S/ ' + Number(amount).toFixed(2) + '</div>' +
+            '<p style="margin:0;color:var(--muted);font-size:.9rem">Pedido ' + orderNumber + '</p>';
+
+          return loadScript(sdkUrl).then(function () {
+            function openCheckout() {
+              msg.hidden = true;
+              btnPay.disabled = true;
+              formHost.textContent = "Cargando formulario…";
+              const now = String(Date.now());
+              const iziConfig = {
+                config: {
+                  transactionId: transactionId,
+                  action: payAction(),
+                  merchantCode: merchantCode,
+                  order: {
+                    orderNumber: orderNumber,
+                    currency: "PEN",
+                    amount: amount,
+                    processType: processTypeAuth(),
+                    merchantBuyerId: String(pagoId).replace(/-/g, "").slice(0, 16),
+                    dateTimeTransaction: now
+                  },
+                  billing: {
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email || ("pagos@" + String(clinica).toLowerCase().replace(/[^a-z0-9]+/g, "") + ".local"),
+                    phoneNumber: phone,
+                    street: "Lima",
+                    city: "Lima",
+                    state: "Lima",
+                    country: "PE",
+                    postalCode: "15001",
+                    documentType: "DNI",
+                    document: docNumber
+                  },
+                  render: {
+                    typeForm: typeFormEmbebido(),
+                    container: "#formHost"
+                  },
+                  urlIPN: apiBase + "/api/public/izipay/ipn"
+                }
+              };
+
+              try {
+                const checkout = new Izipay(iziConfig);
+                const onResponse = function (response) {
+                  console.log("Izipay response", response);
+                  const code = response && (response.code || (response.response && response.response.code));
+                  // Revisión 16: pagado solo si Izipay devuelve «00» con el comprobante firmado
+                  // (payloadHttp + signature). Antes bastaba un «OK» de cualquier aviso del SDK y,
+                  // al reintentar, la página llegó a decir «Pago aprobado» sin que hubiera pago.
+                  const ok = code === "00" && !!(response && response.payloadHttp && response.signature);
+                  if (!ok && code === "00") return;   // aviso intermedio del SDK (no es un pago)
+                  if (ok) {
+                    // La cita la confirma el servidor al validar el aviso firmado de Izipay; el
+                    // paciente recibe la confirmación por el mismo chat de WhatsApp.
+                    meta.innerHTML = '<p class="ok">¡Pago aprobado! En unos minutos te confirmamos la cita por WhatsApp. Ya puedes cerrar esta ventana.</p>';
+                    formHost.textContent = "";
+                    btnPay.hidden = true;
+                    notifyResult({
+                      pagoId: pagoId,
+                      pagado: true,
+                      code: code || "00",
+                      orderNumber: orderNumber,
+                      transactionId: transactionId,
+                      payloadHttp: (function () {
+                        var ph = response && response.payloadHttp;
+                        if (ph == null) return null;
+                        return typeof ph === "string" ? ph : JSON.stringify(ph);
+                      })(),
+                      signature: response && response.signature,
+                      response: response
+                    });
+                  } else {
+                    showErr(textoRechazo(response));
+                    // Izipay invalida la sesión tras un intento (P54 «Token is not valid»): para
+                    // reintentar se recarga la página y el servidor genera una sesión nueva.
+                    btnPay.textContent = "Intentar de nuevo";
+                    btnPay.onclick = function () { location.reload(); };
+                    btnPay.disabled = false;
+                    btnPay.hidden = false;
+                  }
+                };
+                // El SDK dibuja el formulario dentro de #formHost: no se vacía después (antes se
+                // borraba el formulario recién creado y la página quedaba en «Abriendo pasarela…»).
+                formHost.textContent = "";
+                checkout.LoadForm({
+                  authorization: authorization,
+                  keyRSA: keyRSA,
+                  callbackResponse: onResponse
+                });
+                btnPay.hidden = true;
+              } catch (err) {
+                showErr((err && (err.message || err.Errors)) || String(err));
+                btnPay.disabled = false;
+                btnPay.hidden = false;
+              }
+            }
+
+            btnPay.hidden = false;
+            btnPay.onclick = openCheckout;
+            openCheckout();
+          });
+        })
+        .catch(function (e) { showErr(e.message || String(e)); });
+    })();
+  </script>
+</body>
+</html>
