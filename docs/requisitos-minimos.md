@@ -474,3 +474,13 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Búsqueda del paciente por celular:** excluir pacientes eliminados.
    - **Confirmación por WhatsApp** también al pagar un link creado por recepción. La página de pago la promete.
    - **«Ya pagué» sin pago registrado:** responder que no se encuentra un pago a su nombre y ofrecer ayuda, sin desviar a agendar.
+109. Agendamiento por WhatsApp y pagos sin registrar (revisión 24):
+   - **La IA no llega a `agendar`.** Después de ofrecer horarios, al elegir uno o al dar los datos responde frases genéricas («Puedo agendarte una cita, darte precios, horarios…», «¡Con gusto te agendo! ¿Qué necesitas?…») y la conversación queda en `S7_DATOS` o `S9_CONFIRMA`. Las 3 conversaciones del 17/10 (15:21–15:26) terminaron sin reserva, link ni paciente. La IA debe continuar con lo que ya sabe (especialidad, sede, día, hora y datos) y llamar a `agendar`.
+   - **IPN** (2.ª vez): pedido 1792268793, pagado a las 15:27:15 del 17/10 sin aviso del navegador, siguió «pendiente».
+   - **Salida manual para pagos sin registrar:** sin IPN no hay forma de destrabar a un paciente cuyo link quedó pagado en Izipay y «pendiente» aquí. Hoy «QA Izipay Once» no puede reservar («Ya hay un link de pago pendiente»), su link dice «pago caducado» y «Conciliar» da 409. Agregar, para el administrador y con auditoría:
+     - «registrar pago verificado en Izipay» con el código de autorización;
+     - «anular link» con motivo.
+   - **Siguen de R23:**
+     - la búsqueda por celular vincula pacientes eliminados;
+     - no llega el WhatsApp de confirmación al pagar un link de recepción;
+     - «ya pagué» sin pago da una respuesta genérica.
