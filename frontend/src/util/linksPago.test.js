@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa } from "./linksPago.js";
+import { codigoAutorizacionValido, estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa, verificable } from "./linksPago.js";
 
 describe("estadoLink", () => {
   it("los cuatro estados del servidor", () => {
@@ -157,5 +157,28 @@ describe("pago iniciado en Izipay (QA 23)", () => {
     assert.equal(pagoIniciado({ estado: "pendiente", izipayRef: "1792172702", citaId: "c1" }), false);
     assert.equal(pagoIniciado({ estado: "caducado", izipayRef: "1792172702" }), false);
     assert.equal(pagoIniciado({ estado: "pagado", izipayRef: "1792172702" }), false);
+  });
+});
+
+describe("Registrar verificado (QA 25)", () => {
+  it("solo links pendientes o vencidos, sin cita y con pedido de Izipay", () => {
+    assert.equal(verificable({ pagoId: "p1", estado: "pendiente", izipayRef: "1792172702|17921727025540" }), true);
+    assert.equal(verificable({ pagoId: "p1", estado: "caducado", izipayRef: "1792172702" }), true);
+    assert.equal(verificable({ pagoId: "p1", estado: "pendiente", izipayRef: null }), false, "sin formulario abierto no hubo pago");
+    assert.equal(verificable({ pagoId: "p1", estado: "caducado", izipayRef: "" }), false);
+    assert.equal(verificable({ pagoId: "p1", estado: "pagado", izipayRef: "1792172702" }), false);
+    assert.equal(verificable({ pagoId: "p1", estado: "caducado", izipayRef: "1792172702", citaId: "c1" }), false);
+    assert.equal(verificable({ pagoId: "p1", estado: "pendiente", izipayRef: "1792172702", conciliacionPendiente: true }), false);
+    assert.equal(verificable({ pagoId: "p1", estado: "anulado", izipayRef: "1792172702" }), false);
+    assert.equal(verificable(null), false);
+  });
+  it("código de autorización de 6 letras o números", () => {
+    assert.equal(codigoAutorizacionValido("S26802"), true);
+    assert.equal(codigoAutorizacionValido(" s67444 "), true);
+    assert.equal(codigoAutorizacionValido("123456"), true);
+    assert.equal(codigoAutorizacionValido("S0000"), false);
+    assert.equal(codigoAutorizacionValido("S-2680"), false);
+    assert.equal(codigoAutorizacionValido(""), false);
+    assert.equal(codigoAutorizacionValido(null), false);
   });
 });

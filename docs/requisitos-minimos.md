@@ -484,3 +484,15 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
      - la búsqueda por celular vincula pacientes eliminados;
      - no llega el WhatsApp de confirmación al pagar un link de recepción;
      - «ya pagué» sin pago da una respuesta genérica.
+110. Registro manual de pagos de Izipay y cierre del IPN (revisión 25):
+   - **`POST /pagos/{id}/registrar-verificado` debe ser solo del administrador.** Hoy recepción lo usa (200, `"verificadoAdmin": true`) sobre un link que el paciente nunca abrió, con un código inventado («S00000»), y se crean una cita confirmada y un cobro de S/ 50 sin ninguna prueba. El QA lo revirtió; el link `283a9eba…` sigue «pagado» con `izipayRef: "admin|S00000"` y hay que corregirlo desde el servidor. Reglas:
+     - 403 para recepción y los demás perfiles sin permiso de aprobar en Caja;
+     - 409 si el link no tiene pedido de Izipay (`izipayRef` del formulario);
+     - código de autorización de 6 letras o números;
+     - guardar en el pago y en la auditoría quién lo registró, no «admin».
+   - **IPN:** del lado de la aplicación está completo: `urlIPN` en `pagar.html`, `/public/izipay/ipn` procesa el aviso firmado y no duplica. Falta confirmar en el log si Izipay sandbox envió algo para los pedidos 1792282736 (17/10 19:19), 1792268793 (17/10 15:27) y 1792172702 (16/10 12:45), incluidos los POST rechazados con 400. Si no envió nada, queda cubierto con «Registrar verificado».
+   - **Saldo a favor:** marcar solo el pago adicional (el segundo), no los dos pagos de la cita.
+   - **Siguen:**
+     - la IA no llega a `agendar`: responde frases genéricas al elegir hora;
+     - «ya pagué» sin pago da una respuesta genérica;
+     - datos reales de la clínica sin cargar.

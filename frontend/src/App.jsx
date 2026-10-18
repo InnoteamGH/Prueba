@@ -40,7 +40,7 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
-import { estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa } from "./util/linksPago";
+import { codigoAutorizacionValido, estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa, verificable } from "./util/linksPago";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
 import { bloqueoTocaHora, bloqueosDelDia, bloqueosParcialesDelDia, fechaFocoVigente, textoBloqueo } from "./compartido/agendaDia";
@@ -4869,6 +4869,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // reclasificarlo es de quien aprueba. Autorización granular: con `can` manda la matriz.
   const puedeRegistrarEgreso = puedeAbrirCaja;
   const puedeAnularEgreso = can ? can("facturacion", "aprobar") : rol !== "recepcion" && rol !== "gerencia";
+  // QA 25: registrar a mano un pago de Izipay crea la cita y el cobro sin prueba del servidor;
+  // lo hace administración (el mismo permiso que anula egresos), no recepción.
+  const puedeVerificarPago = puedeAnularEgreso;
   const puedeConfig = can ? can("facturacion", "configurar") : rol !== "recepcion" && rol !== "gerencia";
   const conectado = !!auth.token;
   // Conectado se dice la verdad; en demostracion se conserva el ejemplo de siempre.
@@ -6595,14 +6598,18 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         // Pago cobrado por Izipay sin cita: «pagado» sin cita o «pendiente» por conciliar. Solo con
         // referencia de Izipay (un «pagado» sin ella no viene de un pago real).
         const conciliable = (l) => !l.citaId && !!l.pagoId && !!l.izipayRef && (estadoLink(l).clave === "pagado" || porConciliar(l));
-        // Publicado por el programador (revisión 25): si el aviso de Izipay no llegó, se registra el
-        // pago verificado en el panel de Izipay o se anula el link y se libera el cupo.
-        const verificable = (l) => { const e = estadoLink(l).clave; return !!l.pagoId && (e === "pendiente" || e === "caducado" || (e === "pagado" && !l.citaId && pagoIniciado(l))); };
+        // Publicado por el programador (revisión 25): si el aviso de Izipay no llegó, administración
+        // registra el pago que vio aprobado en el panel de Izipay, o anula el link y libera el cupo.
+        // QA 25: «Registrar verificado» solo con pedido de Izipay (el paciente abrió el formulario)
+        // y para administración; el código de autorización se valida antes de enviarlo.
+        const verificableAqui = (l) => puedeVerificarPago && verificable(l);
+        // Un link vencido sin pedido de Izipay ya liberó su cupo: anularlo no cambia nada.
+        const anulable = (l) => !!l.pagoId && !l.citaId && !porConciliar(l) && (estadoLink(l).clave === "pendiente" || (estadoLink(l).clave === "caducado" && !!pedidoIzipay(l)));
         const registrarVerificado = (l) => {
-          const cod = window.prompt("Código de autorización Izipay (ej. S26802):");
+          const cod = window.prompt(`Pedido de Izipay ${pedidoIzipay(l)} (${l.paciente || "paciente"}, S/ ${M.sol2(l.monto)}).\nBúscalo en el panel de Izipay y escribe su código de autorización (ej. S26802):`);
           if (cod == null) return;
-          if (!String(cod).trim()) { notify("Indica el código de autorización."); return; }
-          api.pagos.registrarVerificado(l.pagoId, String(cod).trim())
+          if (!codigoAutorizacionValido(cod)) { notify("El código de autorización tiene 6 letras o números (ej. S26802)."); return; }
+          api.pagos.registrarVerificado(l.pagoId, String(cod).trim().toUpperCase())
             .then((r) => { notify(r?.citaId ? "Pago verificado: cita creada." : "Pago verificado registrado."); recargarLinks(); })
             .catch((e) => notify(e?.message || "No se pudo registrar el pago verificado."));
         };
@@ -6623,7 +6630,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             const plazo = hora ? `${vencioYa(l.caducaEn) ? "Venció" : "Vence"} a las ${hora} (hora de Lima)` : "";
             // QA 23: un pago aprobado en Izipay quedó «pendiente» porque no llegó el aviso. Si el
             // paciente ya abrió el formulario, se avisa antes de reenviarle el link.
-            if (pagoIniciado(l)) return `${plazo ? `${plazo} · ` : ""}Abrió el pago en Izipay (pedido ${pedidoIzipay(l)}): si dice que pagó, usa «Registrar verificado» o revisa en Izipay`;
+            if (pagoIniciado(l)) return `${plazo ? `${plazo} · ` : ""}Abrió el pago en Izipay (pedido ${pedidoIzipay(l)}): si dice que pagó, ${puedeVerificarPago ? "usa «Registrar verificado» o revisa" : "pide a administración que lo revise"} en Izipay antes de reenviar el link`;
             return plazo;
           }
           // Publicado por el programador (revisión 25): segundo pago sobre una cita ya cobrada.
@@ -6705,14 +6712,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-ticket__corte" aria-hidden="true" />
                 <div className="dc-ticket__pie">
                   <span className="dc-ticket__url" title={`Pedido ${l.pagoId || ""}`}><Receipt size={13} strokeWidth={2} /> Pedido {idCorto(l.pagoId) || "—"}</span>
-                  {(copiable(l) || conciliable(l) || verificable(l)) && <div className="dc-ticket__acc">
+                  {(copiable(l) || conciliable(l) || verificableAqui(l) || anulable(l)) && <div className="dc-ticket__acc">
                     {copiable(l) && <button type="button" onClick={() => copiar(l)} title="Copiar el link para el paciente"><Copy size={14} strokeWidth={2} /> Copiar link</button>}
                     {/* Publicado por el programador (revisión 19): pago confirmado sin cita → reintentar. */}
                     {conciliable(l) && <button type="button" title="Reintentar crear la cita tras un pago confirmado" onClick={() => {
                       api.pagos.reconciliar(l.pagoId).then((r) => { notify(r?.citaId ? "Cita creada tras conciliar el pago." : "Sigue sin cita: revisa paciente, sede y médico de la reserva."); recargarLinks(); }, () => notify("No se pudo conciliar este pago."));
                     }}><RotateCcw size={14} strokeWidth={2} /> Conciliar</button>}
-                    {verificable(l) && estadoLink(l).clave !== "pagado" && <button type="button" title="Registrar pago verificado en Izipay (código de autorización)" onClick={() => registrarVerificado(l)}>Registrar verificado</button>}
-                    {verificable(l) && ["pendiente", "caducado"].includes(estadoLink(l).clave) && <button type="button" title="Anular link y liberar cupo" onClick={() => anularLink(l)}>Anular link</button>}
+                    {verificableAqui(l) && <button type="button" title="Registrar el pago que viste aprobado en Izipay (código de autorización)" onClick={() => registrarVerificado(l)}><CheckCircle2 size={14} strokeWidth={2} /> Registrar verificado</button>}
+                    {anulable(l) && <button type="button" title="Anular el link y liberar el cupo" onClick={() => anularLink(l)}><X size={14} strokeWidth={2} /> Anular link</button>}
                   </div>}
                 </div>
               </article>

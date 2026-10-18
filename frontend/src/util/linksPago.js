@@ -124,3 +124,17 @@ export function pedidoIzipay(l) {
 export function pagoIniciado(l) {
   return !!l && estadoLink(l).clave === "pendiente" && !porConciliar(l) && !!pedidoIzipay(l);
 }
+
+/** QA 25: «Registrar verificado» (registrar a mano un pago que el administrador vio aprobado en
+ *  Izipay) solo tiene sentido si el paciente abrió el formulario de pago: sin pedido de Izipay
+ *  no pudo haber pago. Links pendientes o vencidos sin cita, con pedido. */
+export function verificable(l) {
+  if (!l || !l.pagoId || l.citaId || porConciliar(l)) return false;
+  const e = estadoLink(l).clave;
+  return (e === "pendiente" || e === "caducado") && !!pedidoIzipay(l);
+}
+
+/** QA 25: el código de autorización de una tarjeta tiene 6 letras o números (p. ej. S26802). */
+export function codigoAutorizacionValido(c) {
+  return /^[A-Za-z0-9]{6}$/.test(String(c ?? "").trim());
+}

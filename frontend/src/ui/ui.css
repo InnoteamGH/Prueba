@@ -2076,8 +2076,10 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-ticket__corte::after { right: -24px; clip-path: inset(0 50% 0 0); }
 .dc-ticket__pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 12px 16px 14px; }
 .dc-ticket__url { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #0A6C76; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dc-ticket__acc { display: flex; gap: 6px; }
-.dc-ticket__acc button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 650; color: #0A6C76; background: #E6F5F5; }
+.dc-ticket__acc { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+/* QA 25: con dos acciones («Registrar verificado» y «Anular link») bajan a su propia fila en vez de partir el texto. */
+.dc-ticket__acc:has(> button + button) { flex-basis: 100%; justify-content: flex-start; }
+.dc-ticket__acc button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 650; color: #0A6C76; background: #E6F5F5; white-space: nowrap; }
 .dc-ticket__acc button.is-wa { color: #fff; background: linear-gradient(118deg, #16A34A, #22C55E); }
 .dc-ticket__acc button:focus-visible { box-shadow: var(--dc-focus); }
 
