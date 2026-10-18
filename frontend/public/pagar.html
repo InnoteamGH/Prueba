@@ -120,12 +120,30 @@
         return t;
       }
 
+      // QA R24 F-2: reintentar aviso al servidor (si el IPN de Izipay no llega, el browser
+      // es el refuerzo). 3 intentos con backoff corto; no bloquea la UX.
       function notifyResult(payload) {
-        return fetch(apiBase + "/api/public/izipay/resultado", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }).catch(function () { /* no bloquear UX */ });
+        var body = JSON.stringify(payload);
+        var intento = 0;
+        function once() {
+          intento += 1;
+          return fetch(apiBase + "/api/public/izipay/resultado", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body,
+            keepalive: true
+          }).then(function (r) {
+            if (!r.ok && intento < 3) {
+              return new Promise(function (res) { setTimeout(res, 800 * intento); }).then(once);
+            }
+            return r;
+          }).catch(function () {
+            if (intento < 3) {
+              return new Promise(function (res) { setTimeout(res, 800 * intento); }).then(once);
+            }
+          });
+        }
+        return once();
       }
 
       if (!pagoId) {

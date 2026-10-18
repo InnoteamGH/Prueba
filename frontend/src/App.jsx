@@ -6595,6 +6595,25 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         // Pago cobrado por Izipay sin cita: «pagado» sin cita o «pendiente» por conciliar. Solo con
         // referencia de Izipay (un «pagado» sin ella no viene de un pago real).
         const conciliable = (l) => !l.citaId && !!l.pagoId && !!l.izipayRef && (estadoLink(l).clave === "pagado" || porConciliar(l));
+        // Publicado por el programador (revisión 25): si el aviso de Izipay no llegó, se registra el
+        // pago verificado en el panel de Izipay o se anula el link y se libera el cupo.
+        const verificable = (l) => { const e = estadoLink(l).clave; return !!l.pagoId && (e === "pendiente" || e === "caducado" || (e === "pagado" && !l.citaId && pagoIniciado(l))); };
+        const registrarVerificado = (l) => {
+          const cod = window.prompt("Código de autorización Izipay (ej. S26802):");
+          if (cod == null) return;
+          if (!String(cod).trim()) { notify("Indica el código de autorización."); return; }
+          api.pagos.registrarVerificado(l.pagoId, String(cod).trim())
+            .then((r) => { notify(r?.citaId ? "Pago verificado: cita creada." : "Pago verificado registrado."); recargarLinks(); })
+            .catch((e) => notify(e?.message || "No se pudo registrar el pago verificado."));
+        };
+        const anularLink = (l) => {
+          const motivo = window.prompt("Motivo para anular el link (libera el cupo):");
+          if (motivo == null) return;
+          if (String(motivo).trim().length < 3) { notify("El motivo debe tener al menos 3 caracteres."); return; }
+          api.pagos.anularLink(l.pagoId, String(motivo).trim())
+            .then(() => { notify("Link anulado y cupo liberado."); recargarLinks(); })
+            .catch((e) => notify(e?.message || "No se pudo anular el link."));
+        };
         // Lo que sigue según el estado: hasta cuándo se retiene el cupo o qué pasó con la cita.
         // QA 17: hay links pagados sin cita (el pago no llegó a convertirse en cita).
         const detalleTxt = (l) => {
@@ -6604,9 +6623,11 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             const plazo = hora ? `${vencioYa(l.caducaEn) ? "Venció" : "Vence"} a las ${hora} (hora de Lima)` : "";
             // QA 23: un pago aprobado en Izipay quedó «pendiente» porque no llegó el aviso. Si el
             // paciente ya abrió el formulario, se avisa antes de reenviarle el link.
-            if (pagoIniciado(l)) return `${plazo ? `${plazo} · ` : ""}Abrió el pago en Izipay (pedido ${pedidoIzipay(l)}): si dice que pagó, revísalo en Izipay antes de reenviar el link`;
+            if (pagoIniciado(l)) return `${plazo ? `${plazo} · ` : ""}Abrió el pago en Izipay (pedido ${pedidoIzipay(l)}): si dice que pagó, usa «Registrar verificado» o revisa en Izipay`;
             return plazo;
           }
+          // Publicado por el programador (revisión 25): segundo pago sobre una cita ya cobrada.
+          if (e === "pagado" && l.saldoAFavor) return "Saldo a favor (pago adicional sobre una cita ya cobrada)";
           // QA 19: un «pagado» sin referencia de Izipay no viene de un pago real (p. ej. los de la
           // prueba de R9): se marca para revisión y no se ofrece «Conciliar».
           if (e === "pagado") return l.citaId ? "Cita creada" : l.izipayRef ? "Pago confirmado, todavía sin cita" : "Pagado sin referencia de Izipay: revisar";
@@ -6684,12 +6705,14 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-ticket__corte" aria-hidden="true" />
                 <div className="dc-ticket__pie">
                   <span className="dc-ticket__url" title={`Pedido ${l.pagoId || ""}`}><Receipt size={13} strokeWidth={2} /> Pedido {idCorto(l.pagoId) || "—"}</span>
-                  {(copiable(l) || conciliable(l)) && <div className="dc-ticket__acc">
+                  {(copiable(l) || conciliable(l) || verificable(l)) && <div className="dc-ticket__acc">
                     {copiable(l) && <button type="button" onClick={() => copiar(l)} title="Copiar el link para el paciente"><Copy size={14} strokeWidth={2} /> Copiar link</button>}
                     {/* Publicado por el programador (revisión 19): pago confirmado sin cita → reintentar. */}
                     {conciliable(l) && <button type="button" title="Reintentar crear la cita tras un pago confirmado" onClick={() => {
                       api.pagos.reconciliar(l.pagoId).then((r) => { notify(r?.citaId ? "Cita creada tras conciliar el pago." : "Sigue sin cita: revisa paciente, sede y médico de la reserva."); recargarLinks(); }, () => notify("No se pudo conciliar este pago."));
                     }}><RotateCcw size={14} strokeWidth={2} /> Conciliar</button>}
+                    {verificable(l) && estadoLink(l).clave !== "pagado" && <button type="button" title="Registrar pago verificado en Izipay (código de autorización)" onClick={() => registrarVerificado(l)}>Registrar verificado</button>}
+                    {verificable(l) && ["pendiente", "caducado"].includes(estadoLink(l).clave) && <button type="button" title="Anular link y liberar cupo" onClick={() => anularLink(l)}>Anular link</button>}
                   </div>}
                 </div>
               </article>

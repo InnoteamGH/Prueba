@@ -536,6 +536,10 @@ export const api = {
     links: () => request("GET", "/pagos/links"),
     // Publicado por el programador (revisión 19): reintenta crear la cita de un pago confirmado.
     reconciliar: (pagoId) => request("POST", `/pagos/${pagoId}/reconciliar`),
+    // Publicado por el programador (revisión 25): el administrador registra un pago que vio
+    // aprobado en el panel de Izipay (código de autorización) o anula el link y libera el cupo.
+    registrarVerificado: (pagoId, autorizacion) => request("POST", `/pagos/${pagoId}/registrar-verificado`, { autorizacion }),
+    anularLink: (pagoId, motivo) => request("POST", `/pagos/${pagoId}/anular-link`, { motivo }),
     // Reserva retenida de un link: { pacienteId, medicoId, estado, fecha, hora, sedeId, importe, concepto, caducaEn, citaId }.
     reserva: (id) => request("GET", `/reservas/${id}`),
     // Niubiz: crear sesión de pago (paso A) y confirmar tras el checkout (paso B)
