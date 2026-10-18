@@ -496,3 +496,9 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
      - la IA no llega a `agendar`: responde frases genéricas al elegir hora;
      - «ya pagué» sin pago da una respuesta genérica;
      - datos reales de la clínica sin cargar.
+111. Respuestas de la IA fuera del camino principal (revisión 26):
+   - **«Ya pagué» con el link pendiente o sin pago:** responder con el estado real del pago, por ejemplo: «Todavía no figura su pago; el link vence a las 22:09 (hora de Lima)». Sin desviar a agendar ni confirmar nada.
+   - **Pedir otro horario con un link pendiente:** decir que ya tiene un cupo retenido (fecha y hora) y ofrecer cambiarlo; no responder con información general.
+   - **No inventar horarios de atención:** dijo «Atendemos de lunes a sábado de 8:00 a 18:00», cuando `/clinica` dice de lunes a viernes de 08:00 a 20:00 y el sábado de 08:00 a 13:00. Todo dato de horario o sede debe salir de `/clinica` y `/sedes`.
+   - **Paciente creado por la IA:** guardar la fecha de nacimiento (o, al menos, el año estimado por la edad que dio) y el celular en 9 dígitos. Hoy la ficha no se puede guardar hasta completar la fecha.
+   - **Link `283a9eba…`:** sigue «pagado» con `admin|S00000` desde la prueba de R25; dejarlo «anulado».
