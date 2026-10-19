@@ -527,3 +527,12 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
      - registrarlo en la auditoría;
      - avisar a recepción.
    - **Cambiar una cita:** «Quiero cambiar mi cita del 17 al 18 a las 11:30» se trató como una reserva nueva con otro pago. Debe reconocer la cita existente, mencionar el link pendiente si lo hay y, al no poder, explicar por qué; no responder «No pude completar la reserva ahora».
+116. Derivar a recepción por WhatsApp (revisión 31):
+   - **Decisión adoptada:** la IA no cancela ni mueve citas pagadas; deriva a recepción y la cita queda intacta.
+   - **La derivación tiene que llegar a recepción.** Hoy la IA dice «recepción le escribirá por aquí en breve», pero el chat sigue en modo IA, con 0 mensajes por responder, sin notificación ni nota del pedido. Al derivar:
+     - el chat pasa a modo recepción, como con «Tomar control»: aparece en el filtro «Recepción» de la bandeja y la IA deja de responder;
+     - el pedido queda escrito donde recepción lo vea: qué cita, y qué fecha nueva si es un cambio.
+   - **Ningún texto interno llega al paciente.** Hoy salió «No diga que se canceló una cita.» al final de una respuesta.
+   - **Reserva sin pagar:** no hace falta recepción. La IA anula su propio link o dice que el cupo se libera solo a la hora de vencimiento.
+   - **Cambio de cita con cualquier frase** («cambiar», «reprogramar», «pasar», «mover»): reconocer la cita pagada y no ofrecer cupos de una cita nueva.
+   - **Fecha equivocada:** si el paciente nombra un día en que no tiene cita, decirle qué cita sí tiene; no responder «No encontramos una cita activa».
