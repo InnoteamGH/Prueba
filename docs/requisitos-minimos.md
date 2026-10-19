@@ -512,3 +512,10 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Paciente nuevo:** al recibir nombre y DNI, `agendar` responde «No pude reservar ese horario ahora» (2 de 2, 18/10 22:57–23:00, cupos libres). Debe crear el paciente, la reserva y el link.
    - **Paciente registrado:** ofrecer cupos del día que pidió (pidió el 17/12 y la IA ofreció el 10/12, la fecha de su cita anterior). Antes de crear el link, mostrar el resumen y pedir confirmación, como con un paciente nuevo. Hoy al elegir la hora creó el link del 10/12 sin preguntar.
    - **«Ya pagué» con una cita pagada y un link pendiente:** mencionar los dos.
+114. Cierre del agendamiento por WhatsApp (revisión 29):
+   - **Funciona de punta a punta** con pacientes nuevos (3 de 3). Con pacientes registrados ofrece el día pedido, y «ya pagué» informa cita y link pendiente con la hora correcta.
+   - **Pendiente menor:** con un paciente registrado, mostrar el resumen y pedir «sí, confirmo» antes de enviar el link, igual que con un paciente nuevo.
+   - **Para salir en vivo falta cargar los datos reales** (requisito 106):
+     - empresa y RUC;
+     - sedes Miraflores y Los Olivos, con el WhatsApp actual en Miraflores;
+     - los 242 servicios con precio y pago al doctor por sede.
