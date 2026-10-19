@@ -519,3 +519,11 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
      - empresa y RUC;
      - sedes Miraflores y Los Olivos, con el WhatsApp actual en Miraflores;
      - los 242 servicios con precio y pago al doctor por sede.
+115. Cancelar y cambiar citas por WhatsApp (revisión 30):
+   - **No confirmar lo que no pasó.** Ante «Quiero cancelar mi cita del jueves 17 de diciembre», la IA (`cancelar_cita`) respondió «ha sido cancelada exitosamente», pero la cita pagada `13aef5ec…` siguió confirmada, con su cobro y sin registro en la auditoría.
+   - **Decisión pendiente** sobre citas pagadas: la propuesta del QA es que la IA no cancele ni mueva citas pagadas y derive a recepción con un mensaje claro. Si se decide que la IA cancela, debe:
+     - cambiar el estado de la cita;
+     - dejar el importe a favor, como promete el mensaje del link;
+     - registrarlo en la auditoría;
+     - avisar a recepción.
+   - **Cambiar una cita:** «Quiero cambiar mi cita del 17 al 18 a las 11:30» se trató como una reserva nueva con otro pago. Debe reconocer la cita existente, mencionar el link pendiente si lo hay y, al no poder, explicar por qué; no responder «No pude completar la reserva ahora».
