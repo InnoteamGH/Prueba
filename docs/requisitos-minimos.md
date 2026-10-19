@@ -507,3 +507,8 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Hora de vencimiento:** con `estado_pago` dijo «el link vence a las 05:00 (hora de Lima)» para un link que vence a las 19:48. Usar el `caducaEn` del link convertido a hora de Lima, igual que el mensaje del link.
    - **Fechas para el paciente:** «jueves 10/12», no «2026-12-10».
    - **Horario de atención:** a «¿Cuál es su horario de atención?» responder con el horario de `/clinica` (lunes a viernes de 08:00 a 20:00, sábado de 08:00 a 13:00), no con cupos.
+113. Retroceso del agendamiento por WhatsApp (revisión 28):
+   - **«¿Qué horarios hay?» con día y especialidad pide cupos, no el horario de atención.** Hoy la palabra «horarios» activa la respuesta de horario de atención (`catalogo`) en 3 de 3 chats nuevos. El horario de atención va solo cuando la pregunta es por la atención en general («¿cuál es su horario de atención?», «¿a qué hora abren?»).
+   - **Paciente nuevo:** al recibir nombre y DNI, `agendar` responde «No pude reservar ese horario ahora» (2 de 2, 18/10 22:57–23:00, cupos libres). Debe crear el paciente, la reserva y el link.
+   - **Paciente registrado:** ofrecer cupos del día que pidió (pidió el 17/12 y la IA ofreció el 10/12, la fecha de su cita anterior). Antes de crear el link, mostrar el resumen y pedir confirmación, como con un paciente nuevo. Hoy al elegir la hora creó el link del 10/12 sin preguntar.
+   - **«Ya pagué» con una cita pagada y un link pendiente:** mencionar los dos.
