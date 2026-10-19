@@ -502,3 +502,8 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **No inventar horarios de atención:** dijo «Atendemos de lunes a sábado de 8:00 a 18:00», cuando `/clinica` dice de lunes a viernes de 08:00 a 20:00 y el sábado de 08:00 a 13:00. Todo dato de horario o sede debe salir de `/clinica` y `/sedes`.
    - **Paciente creado por la IA:** guardar la fecha de nacimiento (o, al menos, el año estimado por la edad que dio) y el celular en 9 dígitos. Hoy la ficha no se puede guardar hasta completar la fecha.
    - **Link `283a9eba…`:** sigue «pagado» con `admin|S00000` desde la prueba de R25; dejarlo «anulado».
+112. Detalles de la IA de WhatsApp (revisión 27):
+   - **No trabarse al recibir los datos:** en 1 de 2 conversaciones nuevas, después de pedir nombre y DNI, la IA respondió «Puedo ayudarle a agendar una cita o consultarle precios. ¿Qué necesita?» a cada mensaje (con los datos, con «Sí, confirmo» y con nombre y DNI solos). La conversación quedó en `S7_DATOS` sin crear paciente ni reserva (chat 51900000989, 18/10 19:16–19:18). Con `datoPendiente: dni_celular`, un mensaje con nombre y DNI debe ir siempre a `agendar`.
+   - **Hora de vencimiento:** con `estado_pago` dijo «el link vence a las 05:00 (hora de Lima)» para un link que vence a las 19:48. Usar el `caducaEn` del link convertido a hora de Lima, igual que el mensaje del link.
+   - **Fechas para el paciente:** «jueves 10/12», no «2026-12-10».
+   - **Horario de atención:** a «¿Cuál es su horario de atención?» responder con el horario de `/clinica` (lunes a viernes de 08:00 a 20:00, sábado de 08:00 a 13:00), no con cupos.
