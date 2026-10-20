@@ -537,7 +537,11 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Cambio de cita con cualquier frase** («cambiar», «reprogramar», «pasar», «mover»): reconocer la cita pagada y no ofrecer cupos de una cita nueva.
    - **Fecha equivocada:** si el paciente nombra un día en que no tiene cita, decirle qué cita sí tiene; no responder «No encontramos una cita activa».
 117. Textos que el servidor manda a la pantalla (revisión UX del 20/10):
-   - **Mensajes de la IA sin saltos a mitad de frase.** Hoy llegan cortados («si el pago no entra a esa / hora», «si no puede venir, se / aplica»). Mandar párrafos enteros y, si se quiere negrita, usar un formato que la bandeja convierta: hoy se ve «*Sábado 19*» con los asteriscos.
+   - **Mensajes de la IA sin saltos a mitad de frase.** Hoy llegan cortados («si el pago no entra a esa / hora», «si no puede venir, se / aplica»). Mandar párrafos enteros. La negrita de WhatsApp (`*Jueves 24*`) está bien: la bandeja ya la muestra como negrita.
    - **Sin datos técnicos en los estados.** El estado del asistente llega como «Activo (gpt-4o)». La pantalla ya quita el modelo, pero el servidor debería mandar solo «Activo».
    - **Conceptos de cobro sin códigos.** El concepto de los cobros de Izipay trae el número de pedido y un identificador interno («… · 17924388549950 · 9edcb490-…»). La pantalla ya los oculta; deberían ir en campos aparte.
    - **Estado real de Izipay en Integraciones.** Izipay aparece para «Conectar» aunque Caja ya recibe sus pagos.
+118. Derivación a recepción y días sin atención (revisión 32):
+   - **La derivación cuenta como pendiente.** Al derivar, el chat pasa a recepción y queda la nota de sistema, pero con `porResponder: 0`: no suma al contador de WhatsApp ni aparece en «Pendientes» hasta que el paciente vuelve a escribir. Debe quedar con al menos 1 por responder.
+   - **La notificación dice de quién y de qué cita.** `derivacion_recepcion` llega sin `pacienteId` ni `citaId`.
+   - **Día pedido sin doctor de la especialidad.** Si el paciente pide un día en que nadie de esa especialidad atiende en la sede, la IA debe decirlo antes de ofrecer el siguiente día («El martes 22 no hay odontología general en Surco; el siguiente es el jueves 24»).

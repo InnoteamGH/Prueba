@@ -8,6 +8,7 @@ import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, E
 import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 import { AgendarRecepcionModal, CamposPacienteRapido, PAC_RAPIDO_VACIO, celular9, registrarPacienteRapido, validarPacienteRapido } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
+import { partesWa, sinFormatoWa } from "../util/formatoWa";
 import { proximaCita, cuentaPaciente } from "../compartido/metricas";
 import { fichaDeSede, sedeEnLista } from "../compartido/cajaSede";
 import { datosImpresion } from "../util/membrete";
@@ -493,7 +494,7 @@ function WhatsAppInbox({ notify = () => {} }) {
         <div className={cls}>
           {primero && m.de === "ia" && <div className="wa-b__autor"><Bot size={12} strokeWidth={2} /> Asistente IA</div>}
           {primero && m.de === "agente" && <div className="wa-b__autor wa-b__autor--rec"><UserCheck size={12} strokeWidth={2} /> Recepción</div>}
-          <span className="wa-b__txt">{m.txt}</span>
+          <span className="wa-b__txt">{partesWa(m.txt).map((p, k) => p.b ? <b key={k}>{p.t}</b> : p.i ? <i key={k}>{p.t}</i> : p.s ? <s key={k}>{p.t}</s> : p.t)}</span>
           {m.tools?.length > 0 && <div className="wa-b__tools">{m.tools.map((tl, k) => <span key={k} title={tl}><Zap size={10} strokeWidth={2} /> {accionIa(tl)}</span>)}</div>}
           <span className="wa-b__meta">{m.ts ? hora24(m.ts) : m.t}{sale && ticks(m.estado)}</span>
         </div>
@@ -728,7 +729,7 @@ function WhatsAppInbox({ notify = () => {} }) {
                     {c.actualizado && <span className={`wa-item__hora${(conectado ? c.porResponder : c.noLeidos) > 0 ? " is-nuevo" : ""}`}>{cuandoLista(c.actualizado)}</span>}
                   </div>
                   <div className="wa-item__fila">
-                    <span className={`wa-item__prev${(conectado ? c.porResponder : c.noLeidos) > 0 ? " is-nuevo" : ""}`}>{c.msgs.length ? c.msgs[c.msgs.length - 1].txt : (c.ultimoMensaje || c.tel)}</span>
+                    <span className={`wa-item__prev${(conectado ? c.porResponder : c.noLeidos) > 0 ? " is-nuevo" : ""}`}>{sinFormatoWa(c.msgs.length ? c.msgs[c.msgs.length - 1].txt : (c.ultimoMensaje || c.tel))}</span>
                     <span className={`wa-item__modo${c.modo === "ia" ? "" : " is-rec"}`}>{c.modo === "ia" ? "IA" : "Recepción"}</span>
                     {(conectado ? c.porResponder : c.noLeidos) > 0 && <span className="wa-item__nuevos" title="Mensajes sin leer">{conectado ? c.porResponder : c.noLeidos}</span>}
                   </div>
