@@ -73,19 +73,20 @@ describe("panelGerencialUtil — meta vacía (P12)", () => {
   it("con meta real formatea dinero", () => {
     const e = metaEstado(true, 3000);
     assert.equal(e.vacia, false);
-    assert.match(e.label, /S\/\s*3\s*000/);
+    assert.match(e.label, /S\/\s*3,000/);
   });
 });
 
 describe("panelGerencialUtil — moneyFmt y micro", () => {
-  it("moneyFmt usa espacios de miles", () => {
-    assert.equal(moneyFmt(1396), "S/ 1 396");
+  it("moneyFmt usa coma de miles, como Caja", () => {
+    assert.equal(moneyFmt(1396), "S/ 1,396.00");
+    assert.equal(moneyFmt(1396, { dec: 0 }), "S/ 1,396");
   });
 
   it("filtraMicro quita repetición de cifra grande", () => {
     const out = filtraMicro(
-      [["Total", "S/ 1 500"], ["Ticket", "S/ 80"]],
-      "S/ 1 500",
+      [["Total", "S/ 1,500"], ["Ticket", "S/ 80"]],
+      "S/ 1,500",
       "100%",
     );
     assert.equal(out.length, 1);

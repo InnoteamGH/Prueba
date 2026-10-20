@@ -150,7 +150,8 @@
 
 /* ---- Pie: compositor y sugerencias ---- */
 .wa-pie { flex-shrink: 0; background: #F0F2F5; padding: 8px 14px 10px; display: grid; gap: 8px; border-top: 1px solid var(--dc-line); }
-.wa-pie--nota { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dc-ok-700); }
+.wa-pie--nota { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.45; color: var(--dc-ok-700); }
+.wa-pie--nota > svg { flex: none; margin-top: 2px; }
 .wa-pie__ayuda { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dc-ink-500); }
 .wa-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
 .wa-chips::-webkit-scrollbar { display: none; }
@@ -271,3 +272,9 @@
 .wa-item__sede.is-sin { background: var(--dc-bg); color: var(--dc-ink-500); }
 .wa-pie__desde { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dc-ink-500); font-variant-numeric: tabular-nums; }
 .wa-pie__desde svg { color: #1FA855; flex-shrink: 0; }
+
+/* La bandeja llena el alto que queda debajo de los avisos («Con fallos…», conexión, error):
+   con un alto fijo de pantalla, el aviso de arriba empujaba la nota del pie fuera de la vista. */
+.wa-raiz { display: flex; flex-direction: column; height: calc(calc(100dvh / var(--dc-z, 1)) - 36px); }
+.wa-raiz > .dc-inbox.wa { flex: 1 1 auto; height: auto; min-height: 420px; }
+@media (max-width: 767px) { .wa-raiz { height: calc(calc(100dvh / var(--dc-z, 1)) - 128px); } }

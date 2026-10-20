@@ -958,7 +958,8 @@
 .dc-tarea__ico svg { width: 17px; height: 17px; }
 .dc-tarea__txt { gap: 1px; }
 .dc-tarea__txt b { font-size: 14px; font-weight: 650; }
-.dc-tarea__txt span { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Hasta dos líneas: en una sola se cortaba justo el dato («…S/ 220 de trabajo ya terminado, listo par…»). */
+.dc-tarea__txt span { font-size: 12px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .dc-tarea > .dc-btn { flex-shrink: 0; }
 .dc-hoy__pct { font-size: 13px; font-weight: 700; color: var(--dc-brand-600); font-variant-numeric: tabular-nums; }
 .dc-hoy__estado-cuerpo { padding: 14px 18px 12px; display: grid; gap: 12px; }
@@ -971,6 +972,7 @@
 .dc-cita__txt b { font-size: 14px; }
 @media (max-width: 1023px) { .dc-hoy__grid { grid-template-columns: 1fr; } }
 @media (max-width: 767px) { .dc-tarea__txt span { white-space: normal; } .dc-tarea > .dc-btn { margin-left: 46px; } }
+
 
 /* Tarjetas de cifras (todos los módulos): más bajas y con la cifra en su sitio. */
 .dc-kpi { padding: 12px 14px; align-items: center; border-radius: 14px; }
@@ -1368,11 +1370,13 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 }
 /* Lista de espera: franja compacta (sin repetir el título de la vista). */
 .dc-esp-hero { grid-template-columns: auto auto minmax(0, 1fr); padding: 12px 14px 12px 22px; gap: 10px 28px; border-radius: 16px; margin-bottom: 14px; }
-.dc-esp-hero__txt { gap: 0; }
+.dc-esp-hero__txt { gap: 0; min-width: min(240px, 100%); }
 .dc-esp-hero__num { gap: 8px; }
 .dc-esp-hero__num b { font-size: 26px; line-height: 1.1; }
 .dc-esp-hero__num span { font-size: 14px; }
-.dc-esp-hero__txt p { margin: 0; font-size: 12px; white-space: nowrap; cursor: help; }
+/* El subtítulo pasa a dos líneas si no cabe: en una sola línea se montaba sobre las cifras
+   («…19/10 – 24/10» encima de «Libres en sillón»). */
+.dc-esp-hero__txt p { margin: 0; font-size: 12px; white-space: normal; text-wrap: pretty; max-width: 420px; }
 .dc-esp-hero__cifras > div { padding: 0 16px; }
 .dc-esp-hero__cifras > div:first-child { padding-left: 18px; border-left: 1px solid rgba(255,255,255,.18); }
 .dc-esp-hero__cifras b { font-size: 19px; line-height: 1.15; }
@@ -1495,6 +1499,8 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
    ====================================================================== */
 /* Etiquetas de estado: tinte suave, sin borde, punto de color. */
 .dc-pill { --c: var(--dc-primary-alt); display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--c); background: color-mix(in srgb, var(--c) 11%, #fff); }
+.dc-pill.dc-pill--wrap { white-space: normal; height: auto; min-height: 26px; padding: 4px 11px; line-height: 1.25; }
+.dc-pill.dc-pill--wrap > i { flex: none; }
 .dc-pill > i { width: 6px; height: 6px; border-radius: 999px; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
 .dc-pill.is-ok { --c: #15803D; }
 .dc-pill.is-aviso { --c: #B45309; background: #FEF3E2; }
@@ -1675,8 +1681,9 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 }
 .dc-odo-bar__av { --av: #0E8C95; width: 38px; height: 38px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; font-family: var(--dc-font-title); font-size: 13px; font-weight: 800; color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--av) 70%, #fff), var(--av)); box-shadow: 0 0 0 3px rgba(255,255,255,.25); }
 .dc-odo-bar > div:has(> button[aria-haspopup]), .dc-odo-bar > div:has(> [role="combobox"]) { }
-.dc-odo-bar button[aria-haspopup="listbox"] { background: rgba(255,255,255,.14) !important; border: 0 !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22) !important; color: #fff !important; font-family: var(--dc-font-title) !important; font-weight: 700 !important; font-size: 15px !important; border-radius: 999px !important; }
-.dc-odo-bar button[aria-haspopup="listbox"] svg { color: rgba(255,255,255,.8) !important; }
+.dc-odo-bar button[aria-haspopup="listbox"] { background: #fff !important; border: 0 !important; box-shadow: 0 1px 2px rgba(16,40,48,.12) !important; color: var(--dc-navy) !important; font-family: var(--dc-font-title) !important; font-weight: 700 !important; font-size: 15px !important; border-radius: 12px !important; }
+.dc-odo-bar button[aria-haspopup="listbox"] svg { color: var(--dc-ink-500) !important; }
+.dc-odo-bar button[aria-haspopup="listbox"] span { color: var(--dc-navy) !important; }
 .dc-odo-bar [role="listbox"] button { color: var(--dc-ink-900) !important; font-family: var(--dc-font) !important; font-weight: 500 !important; }
 
 .dc-odo-bar .dc-btn { background: #fff !important; color: var(--dc-brand-600) !important; border: 0 !important; box-shadow: 0 8px 18px -10px rgba(0,0,0,.45) !important; }
@@ -1748,9 +1755,11 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 
 /* ---- Radiografías / Fotos ---- */
 .dc-rx-acc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.dc-rx-sede { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 4px 0 12px; border-radius: 999px; background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); color: #CFF3F2; }
-.dc-rx-sede > span { font-size: 12px; color: rgba(255,255,255,.75); white-space: nowrap; }
-.dc-rx-sede button[aria-haspopup="listbox"] { font-size: 13px !important; height: 30px !important; min-height: 30px !important; background: rgba(255,255,255,.14) !important; box-shadow: none !important; font-family: var(--dc-font) !important; font-weight: 600 !important; }
+/* «Registrar en [sede]»: la barra del paciente es blanca. Con los colores de franja oscura
+   (texto blanco translúcido) la etiqueta no se veía y el select parecía deshabilitado. */
+.dc-rx-sede { display: inline-flex; align-items: center; gap: 8px; color: #0E9199; }
+.dc-rx-sede > span { font-size: 13px; color: var(--dc-ink-500); white-space: nowrap; }
+.dc-rx-sede button[aria-haspopup="listbox"] { font-size: 13px !important; font-weight: 600 !important; }
 .dc-gal__cifras { display: flex; flex-wrap: wrap; gap: 6px; }
 .dc-gal__c { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 11px; border-radius: 999px; font-size: 12px; color: var(--dc-ink-600, #4A6168); background: var(--dc-bg); }
 .dc-gal__c b { color: var(--dc-ink-900); }
@@ -2999,8 +3008,11 @@ h2.dc-title, .dc-hoy__cab h3 { font-weight: 700 !important; letter-spacing: -.01
 .dc-go__n { width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; font-size: 12px; font-weight: 800; color: #fff; background: var(--c); }
 .dc-go__ico { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; color: var(--c); background: color-mix(in srgb, var(--c) 11%, #fff); }
 .dc-go__tag { font-size: 11px; font-weight: 700; color: var(--dc-ink-500); background: #F1F6F6; padding: 2px 9px; border-radius: 999px; }
-.dc-go__paso > button { all: unset; cursor: pointer; height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 750; color: #fff; background: var(--c); }
-.dc-go__paso > button:focus-visible { box-shadow: var(--dc-focus); }
+.dc-go__accion { flex: none; width: 96px; display: flex; justify-content: flex-end; }
+.dc-go__accion > button { all: unset; cursor: pointer; height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 750; color: #fff; background: var(--c); }
+.dc-go__accion > button:focus-visible { box-shadow: var(--dc-focus); }
+.dc-go__tag { flex: none; }
+@media (max-width: 640px) { .dc-go__paso { flex-wrap: wrap; } .dc-go__accion { width: auto; } }
 @media (max-width: 640px) { .dc-go__tag { display: none; } }
 .dc-cfg__main input[type="checkbox"] { accent-color: #0E9199; width: 16px; height: 16px; }
 
@@ -3441,7 +3453,8 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 @media (max-width: 767px) { .dc-fcab__buscar { max-width: none; flex-basis: 100%; order: 2; } .dc-fcab__extra { margin-left: auto; } }
 /* Encabezado de columna ordenable */
 .dc-th-ord { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; font: inherit; color: inherit; transition: color .12s, background .12s; }
-.dc-th-ord span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Cabeceras en dos líneas si no caben, en vez de «ÚLTIMA CI…» / «PRÓXIMA …». */
+.dc-th-ord span { white-space: normal; line-height: 1.2; overflow-wrap: normal; }
 .dc-th-ord .dc-th-ord__ic { opacity: 0; color: var(--dc-ink-400); transition: opacity .12s; }
 .dc-th-ord:hover { color: var(--dc-ink-900); background: rgba(14,145,153,.07); }
 .dc-th-ord:hover .dc-th-ord__ic, .dc-th-ord:focus-visible .dc-th-ord__ic { opacity: 1; }
@@ -3572,12 +3585,19 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 
 /* ═══ Recetas: tarjetas, lista y por paciente ═══ */
 .dc-rx2__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
-.dc-rx2 { position: relative; display: grid; gap: 12px; align-content: start; padding: 16px 16px 16px 20px; border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.05), inset 0 0 0 1px var(--dc-line); overflow: hidden; }
+.dc-rx2 { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 16px 20px; border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.05), inset 0 0 0 1px var(--dc-line); overflow: hidden; }
 .dc-rx2::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #14A3A8, #0B6C78); }
 .dc-rx2 header { display: flex; align-items: center; gap: 11px; }
 .dc-rx2 header > div { flex: 1; min-width: 0; display: grid; }
 .dc-rx2 header b { font-size: 15px; font-weight: 600; color: var(--dc-navy); }
-.dc-rx2 header span:not(.dc-pill):not(.dc-rec__av) { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--dc-ink-400); }
+.dc-rx2 header .dc-rx2__meta { display: flex; align-items: flex-start; gap: 5px; margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--dc-ink-400); }
+.dc-rx2 header .dc-rx2__meta svg { flex: none; margin-top: 2px; }
+.dc-rx2 header .dc-rx2__meta > span { min-width: 0; }
+.dc-rx2__doc { white-space: nowrap; }
+.dc-rx2__sin { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 12px; color: var(--dc-ink-400); background: #F6F8F9; }
+.dc-rx2__alerta { margin: 0; display: flex; gap: 7px; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; color: #8A3B12; background: #FDF1E7; }
+.dc-rx2__alerta svg { flex: none; margin-top: 2px; color: #C2410C; }
+.dc-rx2__gi--alerta { color: #8A3B12 !important; }
 .dc-rx2 ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .dc-rx2 li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #F3F9F9; }
 .dc-rx2 li b { display: block; font-size: 14px; font-weight: 600; color: var(--dc-navy); }
@@ -3678,8 +3698,12 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-table-row:hover { background: #F5FBFB !important; }
 .dc-tp__txt { font-size: 14px; color: var(--dc-ink-700, #334155); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 100%; }
 .dc-tp__row > div:first-child .dc-tp__txt, .dc-tp__strong { font-weight: 600; color: var(--dc-navy); }
-.dc-tp__quien { display: inline-flex; align-items: center; gap: 11px; min-width: 0; }
-.dc-tp__quien b { font-size: 14px; font-weight: 600; color: var(--dc-navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* flex (no inline-flex): con inline-flex la celda medía lo que el nombre y este se cortaba a
+   mitad de letra («QA Doctor Carla Fluj») en vez de terminar en «…». */
+.dc-tp__quien { display: flex; align-items: center; gap: 11px; min-width: 0; max-width: 100%; }
+.dc-tp__quien > .dc-rec__av { flex: none; }
+.dc-tp__quien > span:not(.dc-rec__av) { flex: 1 1 auto; min-width: 0; display: grid; }
+.dc-tp__quien b { min-width: 0; font-size: 14px; font-weight: 600; color: var(--dc-navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-tp__quien small { display: block; font-size: 12px; color: var(--dc-ink-400); }
 .dc-tp__num { font-size: 14px; font-weight: 600; color: var(--dc-navy); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dc-tp__sub { font-size: 13px; color: var(--dc-ink-500); white-space: nowrap; }
@@ -3950,23 +3974,25 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
   .dc-esp-hero__num b { font-size: 22px !important; }
   .dc-esp-hero__num span { font-size: 12px !important; }
   .dc-hero__txt h2, .dc-ag-hero__dia h2 { font-size: 17px !important; }
-  /* Cifras: una fila, deslizable si no entran */
+  /* Cifras: rejilla de 2 columnas. En una fila deslizable la cuarta cifra quedaba cortada
+     («S/ 100.», «Recomendadas») sin ninguna señal de que había más. */
   .dc-hero__cifras, .dc-ag-hero__cifras, .dc-esp-hero__cifras {
-    display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none;
-    gap: 0 !important; margin: 0 -14px !important; padding: 0 14px !important; grid-column: 1 / -1 !important;
+    display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; overflow: visible;
+    gap: 10px 0 !important; margin: 0 !important; padding: 0 !important; grid-column: 1 / -1 !important;
   }
-  .dc-hero__cifras::-webkit-scrollbar, .dc-ag-hero__cifras::-webkit-scrollbar, .dc-esp-hero__cifras::-webkit-scrollbar { display: none; }
-  .dc-hero__cifras > div, .dc-ag-hero__cifras > div, .dc-esp-hero__cifras > div { flex: none; padding: 0 12px !important; }
-  .dc-hero__cifras > div:first-child, .dc-ag-hero__cifras > div:first-child, .dc-esp-hero__cifras > div:first-child { padding-left: 0 !important; border-left: 0 !important; }
-  .dc-hero__cifras b, .dc-ag-hero__cifras b, .dc-esp-hero__cifras b { font-size: 17px !important; }
-  .dc-hero__cifras span, .dc-ag-hero__cifras span, .dc-esp-hero__cifras span { font-size: 11px !important; }
+  .dc-hero__cifras > div, .dc-ag-hero__cifras > div, .dc-esp-hero__cifras > div { flex: none; min-width: 0; padding: 0 12px !important; }
+  .dc-hero__cifras > div:nth-child(odd), .dc-ag-hero__cifras > div:nth-child(odd), .dc-esp-hero__cifras > div:nth-child(odd) { padding-left: 0 !important; border-left: 0 !important; }
+  .dc-hero__cifras b, .dc-ag-hero__cifras b, .dc-esp-hero__cifras b { font-size: 17px !important; white-space: nowrap; }
+  .dc-hero__cifras span, .dc-ag-hero__cifras span, .dc-esp-hero__cifras span { font-size: 11px !important; white-space: normal !important; overflow: visible !important; max-width: none !important; }
   /* Recuadros "próxima / a reactivar": una línea */
   .dc-esp-hero__prox, .dc-ag-hero__prox { padding: 6px 8px !important; border-radius: 12px !important; max-width: none !important; }
   .dc-ag-hero__prox-fila { gap: 10px !important; }
   .dc-esp-hero__prox .dc-pac-hero__ico { display: none; }
   /* Laboratorio: flujo en una fila */
-  .dc-lab-flujo { display: flex !important; overflow-x: auto; scrollbar-width: none; gap: 6px !important; }
-  .dc-lab-flujo li { flex: none; min-width: 92px; padding: 6px 10px !important; }
+  .dc-lab-flujo { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px !important; }
+  .dc-lab-flujo li { min-width: 0; margin-right: 0 !important; padding: 6px 4px !important; }
+  .dc-lab-flujo__fl { display: none; }
+  .dc-lab-flujo span { font-size: 11px; }
   .dc-hero__btn { height: 32px !important; padding: 0 12px !important; }
   .dc-esp-hero__btn { height: 32px !important; padding: 0 12px !important; font-size: 12px !important; }
   /* Paciente activo (odontograma, periodontograma…): avatar chico y datos en línea */
@@ -4062,7 +4088,7 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
    buscadores propios de cada módulo (Usuarios, Permisos, Cobros…) toman el mismo aspecto. */
 .dc-dt__th { font-size: 12px; font-weight: 600; color: var(--dc-ink-500); letter-spacing: .01em; }
 .dc-dt__th .dc-th-ord { text-align: inherit; }
-.dc-dt__lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-dt__lbl { white-space: normal; line-height: 1.2; }
 .dc-tp__th .dc-th-ord { font-weight: inherit; }
 .dc-dt__acc { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 .dc-dt__acc .dc-dt__buscar { flex: 0 1 260px; }
@@ -4093,7 +4119,7 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
    Mismo comportamiento en todas las tablas (DataTable, vista Tabla de las listas y las
    tablas propias de Producción, Ausentismo y Equipo). */
 .dc-th { display: inline-flex; align-items: center; gap: 3px; min-width: 0; max-width: 100%; }
-.dc-th__lbl { all: unset; box-sizing: border-box; cursor: text; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 5px; margin: 0 -1px; border-radius: 6px; font: inherit !important; color: inherit; letter-spacing: inherit; text-transform: inherit; transition: background .12s, color .12s; }
+.dc-th__lbl { all: unset; box-sizing: border-box; cursor: text; min-width: 0; overflow-wrap: normal; white-space: normal; line-height: 1.2; padding: 3px 5px; margin: 0 -1px; border-radius: 6px; font: inherit !important; color: inherit; letter-spacing: inherit; text-transform: inherit; transition: background .12s, color .12s; }
 .dc-th__lbl:hover:not(:disabled) { background: rgba(14,145,153,.08); color: var(--dc-ink-900); }
 .dc-th__lbl:disabled { cursor: default; }
 .dc-th__lbl:focus-visible { outline: 2px solid #0E9199; outline-offset: 1px; }
@@ -4266,7 +4292,8 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-sel > button[aria-haspopup="listbox"] { border-radius: 12px !important; border-color: #D5E4E5 !important; box-shadow: 0 1px 2px rgba(16,40,48,.04); transition: border-color .15s, box-shadow .15s, background .15s !important; }
 .dc-sel > button[aria-haspopup="listbox"]:hover:not(:disabled) { border-color: #A9D3D5 !important; background: #FBFEFE !important; }
 .dc-sel.is-open > button[aria-haspopup="listbox"] { border-color: #0E9199 !important; box-shadow: 0 0 0 4px rgba(14,145,153,.13) !important; }
-.dc-sel > button[aria-haspopup="listbox"]:disabled { background: #F4F7F8 !important; color: var(--dc-ink-400) !important; }
+/* Deshabilitado: el mismo campo blanco, con el texto atenuado (en gris parecía otro control). */
+.dc-sel > button[aria-haspopup="listbox"]:disabled { background: #fff !important; color: var(--dc-ink-400) !important; cursor: not-allowed; border-style: dashed !important; }
 .dc-sel.is-sm > button[aria-haspopup="listbox"] { border-radius: 10px !important; }
 .dc-sel__panel {
   border: 1px solid #DCEBEC !important; border-radius: 14px !important; padding: 6px !important;
@@ -4446,7 +4473,8 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-bolrow { display: grid !important; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-areas: "ic txt monto" "ic txt acc"; align-items: center; gap: 2px 10px; padding: 12px 14px; }
 .dc-bolrow > div:nth-of-type(1) { grid-area: ic; }
 .dc-bolrow > div:nth-of-type(2) { grid-area: txt; }
-.dc-bolrow > div:nth-of-type(2) > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Columna angosta: nombre y concepto en hasta dos líneas en vez de «QA Izipay Treinta...». */
+.dc-bolrow > div:nth-of-type(2) > div { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.35; overflow-wrap: anywhere; }
 .dc-bolrow > div:nth-of-type(3) { grid-area: monto; }
 .dc-bolrow > button { grid-area: acc; justify-self: end; padding: 4px 10px !important; font-size: 12px !important; }
 .dc-bolrow > button + button { grid-area: auto; grid-column: 2 / -1; justify-self: end; }
@@ -4996,7 +5024,8 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-cons__hero p { color: rgba(255,255,255,.78) !important; }
 .dc-cons__ico { background: rgba(255,255,255,.16) !important; box-shadow: none !important; }
 .dc-cons__rango label { color: rgba(255,255,255,.75) !important; }
-.dc-cons__rango input, .dc-cons__rango select { background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.28) !important; color: #fff !important; color-scheme: dark; }
+/* Campos blancos también sobre la franja oscura, como el resto de selects de la app. */
+.dc-cons__rango input, .dc-cons__rango select { background: #fff !important; border-color: transparent !important; color: var(--dc-navy) !important; color-scheme: light; }
 .dc-cons__rango select option { color: var(--dc-navy); background: #fff; }
 .dc-cons__exp { background: #fff !important; border-color: #fff !important; color: #0B6C78 !important; }
 .dc-cons__hero .dc-moneda-sel { background: rgba(255,255,255,.12) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22) !important; }
@@ -5171,6 +5200,13 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-pest button:hover { background: #EDF3F4; color: var(--dc-ink-900, #12313A); }
 .dc-pest button.is-on { color: #fff; background: linear-gradient(125deg, #0F4553, #0C6B75 55%, #0E8C95); }
 .dc-pest button:focus-visible { outline: 2px solid #0E9199; }
+.dc-pest.has-mas { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+/* Celular: todas las pestañas a la vista, en dos filas si hace falta, sin scroll escondido. */
+@media (max-width: 640px) {
+  .dc-pest { flex-wrap: wrap; overflow-x: visible; }
+  .dc-pest.has-mas { -webkit-mask-image: none; mask-image: none; }
+  .dc-pest button { flex: 1 1 auto; justify-content: center; padding: 0 12px; }
+}
 .dc-pest em { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 99px; background: #FFF4DE; color: #93590B; }
 /* Módulo fuera del plan (NAV-08) */
 .dc-bloq { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 22px !important; }
@@ -5335,6 +5371,11 @@ button.dc-sb__titulo i { font-style: normal; font-size: 10px; letter-spacing: 0;
 .dc-ocz__c.is-na { background: repeating-linear-gradient(135deg, #F6F8F9 0 6px, #EEF1F3 6px 12px); box-shadow: none; }
 .dc-ocz__c.is-na small { color: var(--dc-ink-400); }
 .dc-ocz__c.is-hoy { box-shadow: inset 0 0 0 1px #7FCFCB, 0 0 0 3px #EAF6F6; }
+.dc-ocz__c.is-suelta { --tone: #F3E3B8; }
+.dc-ocz__c.is-suelta::before { height: 100%; }
+.dc-ocz__c.is-suelta b { color: #7A5A12; font-size: 14px; }
+.dc-ocz__fila.is-suelta .dc-ocz__ico { color: #8A6A1C; background: #FBF3DF; }
+.dc-ocz__vacio { margin: 0; padding: 18px 20px; font-size: 14px; color: var(--dc-ink-500); }
 .dc-ocz__sem { display: flex; align-items: center; gap: 10px; padding-left: 8px; }
 .dc-ocz__sem small { font-size: 12px; line-height: 1.25; color: var(--dc-ink-500); }
 .dc-ocz__fila.is-tot { padding-top: 8px; border-top: 1px dashed var(--dc-line); }
@@ -5584,7 +5625,9 @@ button, input, select, textarea { font-family: inherit; }
 /* Ocupación: el botón central muestra la semana elegida y vuelve a la actual */
 .dc-ocs__nav--hero .is-otra { display: inline-grid; line-height: 1.1; padding: 4px 12px; height: auto; min-height: 30px; text-align: center; }
 .dc-ocs__nav--hero .is-otra small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }
-.dc-rx2__pie { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--dc-line); margin-top: 6px; }
+.dc-rx2__pie { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid var(--dc-line); margin-top: auto; }
+/* Borrar va al otro extremo: pegado a «Imprimir receta» se tocaba por error. */
+.dc-rx2__pie { flex-direction: row-reverse; justify-content: space-between; }
 
 /* ── Botón Imprimir / PDF (BotonPDF) ── */
 .dc-btn-pdf { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 9px; height: 38px; padding: 0 8px 0 5px; border-radius: 999px;
@@ -5628,3 +5671,82 @@ button, input, select, textarea { font-family: inherit; }
   .dc-wasd__fila { grid-template-columns: 34px minmax(0, 1fr) auto; }
   .dc-wasd__num { grid-column: 2 / 4; grid-row: 2; }
 }
+
+/* Botón de icono chico (quitar, imprimir, borrar, anular). La clase se usaba en toda la app
+   pero no tenía estilo: salía el botón gris del navegador con borde negro. */
+.dc-mini-btn { all: unset; box-sizing: border-box; cursor: pointer; flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; color: var(--dc-ink-500); background: #fff; box-shadow: inset 0 0 0 1px var(--dc-line); transition: background .12s, color .12s, box-shadow .12s; }
+.dc-mini-btn:hover:not(:disabled) { background: #F6FAFA; color: var(--dc-ink-900); box-shadow: inset 0 0 0 1px #BFDDE0; }
+.dc-mini-btn:focus-visible { box-shadow: var(--dc-focus); }
+.dc-mini-btn.is-mal { color: var(--dc-danger-700); }
+.dc-mini-btn.is-mal:hover:not(:disabled) { color: var(--dc-danger-700); background: #FDF1EF; box-shadow: inset 0 0 0 1px #F2C4BB; }
+.dc-mini-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Celular: los atajos de rango del Consolidado («Hoy», «Semana», «Próximos 30 días»…) y la
+   barra «Registrar en [sede] · Subir» de Radiografías/Fotos se salían por la derecha. */
+@media (max-width: 640px) {
+  .dc-cons__rango .dc-moneda-sel { display: flex; flex-wrap: wrap; width: 100%; }
+  .dc-cons__rango .dc-moneda-sel button { flex: 1 1 auto; white-space: nowrap; }
+  .dc-rx-acc { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .dc-rx-sede { display: flex !important; flex: 1 1 100%; width: 100%; min-width: 0; }
+  .dc-rx-sede .dc-sel { flex: 1 1 auto; min-width: 0; max-width: 100%; width: auto !important; }
+  .dc-rx-sede .dc-sel > button { width: 100% !important; min-width: 0 !important; }
+}
+
+/* ---- Revisión responsive 20/10: celular ---- */
+.dc-us__roles button { white-space: nowrap; flex: none; }
+@media (max-width: 640px) {
+  /* Caja: las pestañas propias también a la vista, en dos filas si hace falta. */
+  .dc-cj4__tabs { flex-wrap: wrap; overflow-x: visible; -webkit-mask-image: none !important; mask-image: none !important; }
+  .dc-cj4__tabs button { flex: 1 1 auto; justify-content: center; }
+  .dc-cj4__btn[role="radio"] { height: 34px !important; }
+  /* Configuración: menú en una columna, con el nombre completo de cada sección. */
+  .dc-cfg__nav { grid-template-columns: 1fr !important; position: static; }
+  .dc-cfg__nav b, .dc-cfg__nav small { white-space: normal; overflow: visible; }
+  /* Puesta en marcha: el botón del paso baja bajo el texto en vez de aplastarlo. */
+  .dc-go__paso { flex-wrap: wrap; }
+  .dc-go__paso > div { flex: 1 1 calc(100% - 90px); }
+  .dc-go__paso > .dc-go__accion, .dc-go__paso > button, .dc-go__paso > a { margin-left: auto; }
+  /* Permisos: la descripción del rol a todo el ancho y las cifras debajo. */
+  .dc-perm__cab > div:nth-child(2) { flex: 1 1 calc(100% - 60px); }
+  .dc-perm__cab > div:nth-child(n+3) { margin-left: 52px; }
+  /* WhatsApp por sede: el estado baja a su propia línea. */
+  .dc-wasd__fila { grid-template-columns: 34px minmax(0, 1fr) !important; }
+  .dc-wasd__fila > :nth-child(n+3) { grid-column: 2; justify-self: start; }
+  /* Ausentismo y producción: cifras del encabezado en una columna, sin «89.…». */
+  .dc-kpis.dc-kpis--hero { grid-template-columns: 1fr !important; }
+  .dc-kpis--hero .dc-kpi__label, .dc-kpis--hero .dc-kpi__value, .dc-kpis--hero .dc-kpi__sub { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+  /* Consolidado de citas: cifras en 3 columnas parejas. */
+  .dc-cons__cifras { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; row-gap: 12px; }
+  .dc-cons__cifras > div:nth-child(3n+1) { border-left: 0; padding-left: 0; }
+  .dc-cons__cifras > div { padding: 0 10px; }
+  .dc-cons__cifras dt { align-items: flex-start; min-height: 30px; line-height: 1.25; }
+  .dc-cons__cifras dt::before { margin-top: 4px; flex: none; }
+  /* Ocupación de sillones: columna del sillón angosta y fija; los días se deslizan. */
+  .dc-ocz__scroll { padding: 6px 12px 14px; }
+  .dc-ocz__grid { min-width: max-content; }
+  .dc-ocz__fila { grid-template-columns: 112px repeat(var(--dias, 6), 70px) 92px !important; }
+  .dc-ocz__fila > :first-child { position: sticky; left: 0; z-index: 2; background: #fff; box-shadow: 6px 0 8px -8px rgba(11,52,64,.35); }
+  .dc-ocz__fila .dc-ocz__ico { display: none; }
+  /* Montos: «S/» y la cifra en la misma línea. */
+  .dc-split__rule b, .dc-acep b, .dc-esp-hero__num b { white-space: nowrap; }
+  /* Radiografías: la fila «Registrar en … / Subir radiografía» no se sale de la pantalla. */
+  .dc-rx-acc { width: 100%; }
+  .dc-rx-acc > * { flex: 1 1 100%; min-width: 0; }
+  /* Su contenedor no se encogía (flex-shrink: 0) y tomaba el ancho de la fila entera. */
+  div:has(> .dc-rx-acc) { flex: 1 1 100% !important; min-width: 0; max-width: 100%; }
+  /* Toques de al menos 36 px en chips y botones chicos. */
+  .dc-us__roles button, .wa-filtros > button { min-height: 36px; }
+  /* Filas de chips deslizables: un degradado al borde avisa que hay más a la derecha. */
+  .dc-chips-fila, .dc-us__roles { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); padding-right: 32px !important; }
+  .dc-go__accion > button { height: 34px; }
+}
+
+/* Agenda: canceladas agrupadas en la celda. */
+.dc-cal__canc { all: unset; box-sizing: border-box; cursor: pointer; align-self: stretch; padding: 3px 7px; border-radius: 8px; font-size: 11px; font-weight: 650; color: var(--dc-ink-500); background: repeating-linear-gradient(45deg, #F6F8F9, #F6F8F9 5px, #EEF2F3 5px, #EEF2F3 10px); box-shadow: inset 0 0 0 1px #E2E8EA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-cal__canc:hover { color: var(--dc-ink-900); }
+.dc-cal__canc:focus-visible { outline: 2px solid #0E9199; }
+/* Consolidado: los atajos de rango en su propia fila y Desde/Hasta juntos debajo. */
+@media (max-width: 1280px) { .dc-cons__rango .dc-moneda-sel { flex: 1 1 100%; } }
+@media (max-width: 1280px) { .dc-cons__rango .dc-moneda-sel button { flex: 1 1 auto; } }
+/* Celular: el menú cerrado (fuera de pantalla) dejaba su sombra como una franja gris al borde izquierdo. */
+@media (max-width: 767px) { .dc-side:not(.open) { box-shadow: none !important; } }

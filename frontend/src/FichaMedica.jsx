@@ -2599,7 +2599,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
               const lista = todos.filter((e) => (regFiltro === "todo" || (regFiltro === "cambios" ? e.tipo !== "acceso" : e.tipo === regFiltro)) && (!q || [e.usuario, e.accion, e.detalle, e.rol].join(" ").toLowerCase().includes(q)));
               const accesos = todos.filter((e) => e.tipo === "acceso");
               const personas = new Set(todos.map((e) => e.usuario).filter((u) => u && u !== "—")).size;
-              const fh = (ts) => { const x = new Date(ts); return isNaN(x) ? { dia: String(ts).slice(0, 10), hora: "" } : { dia: ymdLima(x), hora: x.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }) }; };
+              const fh = (ts) => { const x = new Date(ts); return isNaN(x) ? { dia: String(ts).slice(0, 10), hora: "" } : { dia: ymdLima(x), hora: x.toLocaleTimeString("es-PE", { hour: "2-digit", hour12: false, minute: "2-digit", timeZone: "America/Lima" }) }; };
               const ultimo = accesos[0] ? fh(accesos[0].ts) : null;
               const grupos = [];
               lista.forEach((e) => { const { dia } = fh(e.ts); const g = grupos.find((x) => x.dia === dia); if (g) g.items.push(e); else grupos.push({ dia, items: [e] }); });

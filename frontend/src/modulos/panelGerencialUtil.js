@@ -6,14 +6,15 @@ import { medicosDeSedes } from "../compartido/medicoEnSede.js";
 
 const META_VACIA = "Sin meta configurada";
 
-/** Formato soles con espacio de miles (estilo clínica). */
-export function moneyFmt(n, { dec = 0, prefijo = "S/ " } = {}) {
+/** Formato soles con coma de miles y dos decimales, igual que Caja y el resto de la app («S/ 1,880.00»).
+ *  Antes usaba espacio («S/ 1 880») y en la misma app convivían los dos formatos. */
+export function moneyFmt(n, { dec = 2, prefijo = "S/ " } = {}) {
   const num = Number(n);
   if (!Number.isFinite(num)) return `${prefijo}—`;
   const fixed = dec > 0 ? num.toFixed(dec) : String(Math.round(num));
   const [ent, frac] = fixed.split(".");
-  const conEspacios = ent.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return frac != null ? `${prefijo}${conEspacios}.${frac}` : `${prefijo}${conEspacios}`;
+  const conMiles = ent.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return frac != null ? `${prefijo}${conMiles}.${frac}` : `${prefijo}${conMiles}`;
 }
 
 /** Porcentaje de un valor sobre el total del grupo (no sobre el máximo). */

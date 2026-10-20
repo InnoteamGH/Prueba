@@ -326,8 +326,10 @@ export const etiquetaSedes = (v) => {
   if (v === "all") return "Todas las sedes";
   const a = normSedes(v);
   if (!a.length) return "—";
-  if (a.length === 1) return nombreSede(a[0]);
-  return a.map(cortaSede).join(" – ");
+  // Siempre con el mismo prefijo y en orden alfabético: antes salían «San Isidro – Surco» y
+  // «Surco – San Isidro» en filas vecinas, y una sola sede como «Sede San Isidro».
+  if (a.length === 1) return cortaSede(a[0]);
+  return a.map(cortaSede).sort((x, y) => String(x).localeCompare(String(y), "es")).join(" · ");
 };
 
 /* Personal de la clínica que administra el perfil de TI.
@@ -652,8 +654,19 @@ export function exportarPDF({ titulo, subtitulo, columnas, filas }) {
       + (filas.length ? "" : `<p class="doc-nota">Sin registros para este filtro.</p>`),
   });
 }
-export const fechaLegible = (s) => new Date(s + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" });
+// «lun, 19 oct.»; fuera del año en curso lleva el año («jue, 15 abr. 2027»): sin él no se
+// sabía si un vencimiento o una entrega era de este año o del siguiente.
+export const fechaLegible = (s) => {
+  const d = new Date(String(s || "").slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return "—";
+  const conAnio = d.getFullYear() !== new Date().getFullYear();
+  return d.toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short", ...(conAnio ? { year: "numeric" } : {}) });
+};
 export const calcEdad = (s) => { if (!s) return null; const b = new Date(s + "T00:00:00"); if (isNaN(b)) return null; let e = hoy.getFullYear() - b.getFullYear(); const m = hoy.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && hoy.getDate() < b.getDate())) e--; return e >= 0 && e < 120 ? e : null; };
+
+/** Concepto de un cobro sin la referencia interna de Izipay que el servidor le pega al final
+    («Izipay · Consulta general · 17924388549950 · 9edcb490-…»): pedido y pago van en el detalle. */
+export const conceptoVisible = (c) => String(c || "").replace(/(\s*·\s*(\d{6,}[^\s·]*|[0-9a-f]{8}-[0-9a-f-]{20,}))+\s*$/i, "").trim();
 
 /** Pluralización simple en español: pluralEs(3, "paciente", "pacientes") → "3 pacientes" */
 export const pluralEs = (n, uno, muchos) => `${n} ${n === 1 ? uno : muchos}`;
@@ -1715,9 +1728,23 @@ export function useVista(clave, opciones) {
    opciones: [{ id, label, icon, badge }]. */
 export function Pestanas({ opciones = [], valor, onChange, etiqueta = "Secciones" }) {
   const lista = opciones.filter(Boolean);
+  const ref = useRef(null);
+  const [mas, setMas] = useState(false);
+  // Si no caben, la activa se centra a la vista y un degradado avisa que hay más a la derecha.
+  useEffect(() => {
+    const nav = ref.current;
+    if (!nav) return undefined;
+    const on = nav.querySelector(".is-on");
+    if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = on.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2;
+    const medir = () => setMas(nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
+    medir();
+    nav.addEventListener("scroll", medir, { passive: true });
+    window.addEventListener("resize", medir);
+    return () => { nav.removeEventListener("scroll", medir); window.removeEventListener("resize", medir); };
+  }, [valor, lista.length]);
   if (lista.length < 2) return null;
   return (
-    <nav className="dc-pest" role="tablist" aria-label={etiqueta}>
+    <nav ref={ref} className={`dc-pest${mas ? " has-mas" : ""}`} role="tablist" aria-label={etiqueta}>
       {lista.map((o) => { const Ic = o.icon; const on = valor === o.id; return (
         <button key={o.id} type="button" role="tab" aria-selected={on} className={on ? "is-on" : ""} onClick={() => onChange(o.id)}>
           {Ic && <Ic size={14} strokeWidth={2} />} {o.label}{o.badge ? <em>{o.badge}</em> : null}
@@ -1749,12 +1776,14 @@ export function PersonaCelda({ nombre, sub, size = 34 }) {
 export function TablaPremium({ cols, rows, onRowClick, minWidth = 640, st = null }) {
   const COL = cols.map((c) => anchoElastico(c, c.w || "minmax(0,1fr)")).join(" ");
   const al = (c) => (c.a === "right" ? "end" : c.a === "center" ? "center" : "start");
+  const necesario = anchoMinimoCols(cols, 14, 36);
+  const [refWrap, tarjetas] = useTarjetasSiNoCabe(necesario);
   return (
-    <div className="dc-table-wrap dc-tp">
+    <div ref={refWrap} className={`dc-table-wrap dc-tp${tarjetas ? " is-tarjetas" : ""}`}>
       <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth, width: "100%" }}>
+        <div style={{ minWidth: Math.max(minWidth, necesario), width: "100%" }}>
           <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 14, padding: "0 18px", alignItems: "center", minHeight: 46 }}>
-            {cols.map((c) => <span key={c.key} className="dc-tp__th" style={{ justifySelf: al(c), textAlign: c.a || "left" }}>{st ? <ThOrden st={st} k={c.orden || (st.cols.some((x) => x.key === c.key) ? c.key : (st.cols.find((x) => x.label === c.label) || {}).key)} a={c.a}>{c.label}</ThOrden> : c.label}</span>)}
+            {cols.map((c) => <span key={c.key} className="dc-tp__th" style={{ justifySelf: al(c), textAlign: c.a || "left" }}>{st ? <ThOrden st={st} a={c.a || "left"} k={c.orden || (st.cols.some((x) => x.key === c.key) ? c.key : (st.cols.find((x) => x.label === c.label) || {}).key)} a={c.a}>{c.label}</ThOrden> : c.label}</span>)}
           </div>
           {rows.map((r, i) => (
             <div key={r.id ?? i} className="dc-table-row dc-tp__row" onClick={onRowClick ? () => onRowClick(r) : undefined}
@@ -1799,6 +1828,31 @@ export function ListaFiltrable({ rows, cols, defaultSort, sub, className = "", e
   );
 }
 
+/* Ancho mínimo que piden las columnas (sus px fijos o el mínimo de un minmax) más huecos
+   y relleno. Si la tabla es más angosta, la rejilla se desborda de su fila y la columna
+   fija de acciones se queda encima de Estado o Saldo. */
+export function anchoMinimoCols(cols, gap, pad) {
+  const min = (w) => { const s = String(w || "").trim(); const m = /^(\d+)px$/.exec(s) || /^minmax\(\s*(\d+)px/.exec(s); return m ? Number(m[1]) : 0; };
+  return cols.reduce((t, c) => t + min(c.w), 0) + gap * Math.max(0, cols.length - 1) + pad;
+}
+/* Tableta: una tabla que no cabe en su tarjeta pasa a filas-tarjeta (como en celular)
+   en vez de esconder columnas detrás de un scroll horizontal. En escritorio se queda en
+   tabla con scroll. */
+export function useTarjetasSiNoCabe(necesario) {
+  const ref = useRef(null);
+  const [tarjetas, setTarjetas] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const medir = () => setTarjetas(window.innerWidth <= 1180 && el.clientWidth + 2 < necesario);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [necesario]);
+  return [ref, tarjetas];
+}
+
 /* Columnas equilibradas: un ancho fijo («120px») pasa a ser su mínimo y también
    reparte el espacio sobrante en proporción a ese ancho. Así no queda una columna de
    texto enorme y las cifras apretadas a la derecha. Las fijas (acciones) no cambian. */
@@ -1835,8 +1889,10 @@ export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empt
   const scrollStyle = maxHeight
     ? { overflowX: "auto", overflowY: "auto", maxHeight }
     : { overflowX: "auto" };
+  const necesario = anchoMinimoCols(cols, 12, 32);
+  const [refWrap, tarjetas] = useTarjetasSiNoCabe(necesario);
   return (
-    <div className={bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
+    <div ref={refWrap} className={`${bare ? "dc-table-wrap" : "dc-rise dc-table-wrap"}${tarjetas ? " is-tarjetas" : ""}`} style={bare ? { overflow: "hidden" } : { background: "var(--dc-surface)", borderRadius: "var(--dc-r-lg)", boxShadow: "var(--dc-sh-1)", border: "1px solid var(--dc-line)", overflow: "hidden", ...(maxHeight ? { maxHeight: typeof maxHeight === "number" ? maxHeight + 56 : maxHeight } : {}) }}>
       {titulo && <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-surface)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><h2 className="dc-title" style={{ margin: 0, color: "var(--dc-ink-900)", fontSize: 14, fontWeight: 500 }}>{titulo}</h2><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)", background: "var(--dc-bg)", borderRadius: 999, padding: "2px 9px" }}>{lista.length} {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}{hayMas ? ` – mostrando ${mostradas.length}` : ""}</span>{anyF && <button type="button" className="dc-dt__limpiar" onClick={limpiar}>Limpiar filtros</button>}</div><div className="dc-dt__acc">{cajaBuscar}{accion}{exportar && lista.length > 0 && <BotonExportar titulo={exportTitulo || titulo} cols={colsTodas} filas={lista} sub={etiquetaCant(lista.length, sub)} />}</div></div>}
       {!titulo && cajaBuscar && <div className="dc-dt__barra"><span className="dc-fcab__cant"><b>{lista.length}</b> {etiquetaCant(lista.length, sub)}{anyF ? ` de ${(rows || []).length}` : ""}</span>{cajaBuscar}</div>}
       <div style={scrollStyle}>
@@ -1845,7 +1901,7 @@ export function DataTable({ cols: colsTodas, rows, onRowClick, titulo, sub, empt
         {/* La tabla ocupa todo el ancho de la tarjeta; minWidth solo fija desde dónde
             aparece el scroll horizontal. Con "max-content" las columnas fr se encogían
             a su contenido y la tabla quedaba más angosta que su tarjeta. */}
-        <div style={minWidth > 0 ? { minWidth, width: "100%" } : { width: "100%", minWidth: 0, maxWidth: "100%" }}>
+        <div style={minWidth > 0 ? { minWidth: Math.max(minWidth, necesario), width: "100%" } : { width: "100%", minWidth: necesario, maxWidth: necesario ? undefined : "100%" }}>
           <div className="dc-table-head" style={{ display: "grid", gridTemplateColumns: COL, gap: 12, padding: "4px 16px", borderBottom: "1px solid var(--dc-line)", background: "var(--dc-bg-soft)", ...(maxHeight ? { position: "sticky", top: 0, zIndex: 3 } : {}) }}>
             {cols.map((col) => {
               const just = col.a === "left" ? "flex-start" : col.a === "right" ? "flex-end" : "center";

@@ -163,6 +163,9 @@ body {
      cv08: "I" con remates, distinta de la "l". */
   font-feature-settings: "cv05", "cv08", "calt";
   letter-spacing: -0.006em;
+  /* Un poco más de espacio entre palabras: con Manrope en negrita («Asistente de configuración»,
+     «Datos de la clínica») las palabras se veían pegadas. */
+  word-spacing: .04em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: var(--dc-fs-md);
@@ -174,6 +177,9 @@ h1, h2, h3, h4, .dc-title {
   font-weight: var(--dc-fw-bold);
   color: var(--dc-ink-900);
   letter-spacing: -.015em;
+  /* Manrope tiene el espacio angosto: con el espaciado negativo las palabras se pegaban
+     («Dóndeestálaclínica»). */
+  word-spacing: .08em;
   text-wrap: balance;
 }
 button, input, select, textarea { font-family: inherit; word-spacing: inherit; }
@@ -353,6 +359,70 @@ button[aria-label]:not(.dc-btn):not([class*="dc-btn"]):not(.dc-col-sort):not(.dc
   }
   .dc-table-row > div[data-label="Acciones"]::before, .dc-table-row > div[data-label="Acción"]::before { display: none; }
   .dc-table-row > div[data-label="Acciones"]:not(:has(button, a)), .dc-table-row > div[data-label="Acción"]:not(:has(button, a)) { display: none !important; }
+}
+/* Tableta: la tabla que no cabe (DataTable/TablaPremium añaden .is-tarjetas al medir) pasa
+   a filas apiladas: la persona arriba, los datos en varias columnas con su etiqueta encima
+   y las acciones al pie. Así no se corta Estado ni la columna fija tapa otra. */
+@media (min-width: 768px) {
+  .dc-table-wrap.is-tarjetas div[style*="overflow"] { overflow-x: visible !important; }
+  .dc-table-wrap.is-tarjetas div[style*="min-width"] { min-width: 0 !important; width: 100% !important; }
+  .dc-table-wrap.is-tarjetas .dc-table-head { display: none !important; }
+  .dc-table-wrap.is-tarjetas .dc-table-row {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+    align-items: start !important;
+    gap: 10px 18px !important;
+    padding: 14px 18px !important;
+    min-height: 0 !important;
+  }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    justify-self: stretch !important;
+    text-align: left !important;
+    padding: 0 !important;
+    min-width: 0 !important;
+    gap: 2px !important;
+  }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div > * { max-width: 100%; }
+  .dc-table-wrap.is-tarjetas .dc-table-row > .dc-col-sticky { position: static !important; box-shadow: none !important; background: transparent !important; }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--dc-ink-400);
+    line-height: 1.2;
+  }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label=""]::before { display: none; }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div:has(.dc-tp__quien),
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Paciente"], .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Nombre"],
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Usuario"], .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Producto"],
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Servicio"], .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Persona"],
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Insumo"], .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Proveedor"] { grid-column: 1 / -1; order: -1; }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div:has(.dc-tp__quien)::before,
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Paciente"]::before, .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Nombre"]::before,
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Usuario"]::before, .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Producto"]::before,
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Servicio"]::before, .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Persona"]::before,
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Insumo"]::before, .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Proveedor"]::before { display: none; }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-vacio] { display: none !important; }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Acciones"], .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Acción"] {
+    grid-column: 1 / -1; order: 99; flex-direction: row !important; justify-content: flex-end !important; align-items: center !important;
+    flex-wrap: wrap; gap: 6px !important;
+  }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Acciones"]::before, .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Acción"]::before { display: none; }
+  /* Con la persona arriba, las acciones van a su derecha y no gastan una fila más.
+     (:has no admite otro :has dentro: cada caso va en su propio selector). */
+  .dc-table-wrap.is-tarjetas .dc-table-row:has(> div:is([data-label="Paciente"], [data-label="Nombre"], [data-label="Usuario"], [data-label="Persona"], [data-label="Insumo"], [data-label="Proveedor"])) > div:is([data-label="Acciones"], [data-label="Acción"]),
+  .dc-table-wrap.is-tarjetas .dc-table-row:has(.dc-tp__quien) > div:is([data-label="Acciones"], [data-label="Acción"]) {
+    position: absolute !important; top: 12px; right: 18px; width: auto !important;
+  }
+  .dc-table-wrap.is-tarjetas .dc-table-row:has(> div:is([data-label="Acciones"], [data-label="Acción"]) :is(button, a)) > div:is([data-label="Paciente"], [data-label="Nombre"], [data-label="Usuario"], [data-label="Persona"], [data-label="Insumo"], [data-label="Proveedor"]),
+  .dc-table-wrap.is-tarjetas .dc-table-row:has(> div:is([data-label="Acciones"], [data-label="Acción"]) :is(button, a)) > div:has(.dc-tp__quien) { padding-right: 230px !important; }
+  .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Acciones"]:not(:has(button, a)), .dc-table-wrap.is-tarjetas .dc-table-row > div[data-label="Acción"]:not(:has(button, a)) { display: none !important; }
 }
 @media (max-width: 479px) {
   .dc-kpi__value { font-size: 20px !important; }

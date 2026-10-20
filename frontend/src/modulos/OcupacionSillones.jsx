@@ -53,9 +53,16 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
       const cap = celdas.reduce((a, c) => a + c.cap, 0), min = celdas.reduce((a, c) => a + c.min, 0);
       return { s, celdas, cap, min, pct: cap ? Math.round(min / cap * 100) : null };
     });
-    const porDia = dias.map((fecha, i) => { const cap = filas.reduce((a, f) => a + f.celdas[i].cap, 0), min = filas.reduce((a, f) => a + f.celdas[i].min, 0); return { fecha, cap, min, pct: cap ? Math.round(min / cap * 100) : null }; });
-    const cap = filas.reduce((a, f) => a + f.cap, 0), min = filas.reduce((a, f) => a + f.min, 0);
-    return { filas, porDia, cap, min, pct: cap ? Math.round(min / cap * 100) : null };
+    // Citas activas sin sillón (o con uno que ya no existe): la IA y muchas altas no lo asignan.
+    // Ocupan la sede igual; antes no se contaban y la sede salía en 0 % con citas agendadas.
+    const sedesS = [...new Set(sillones.map((s) => String(s.sede)))];
+    const sueltasDe = (sd, fecha) => citas.filter((c) => c.fecha === fecha && !INACTIVAS.includes(c.estado) && mismaSede(c.sede, sd) && !sillones.some((s) => mismaSede(s.sede, sd) && String(s.numero) === String(c.sillon)));
+    const sinSillon = Object.fromEntries(sedesS.map((sd) => [sd, dias.map((fecha) => sueltasDe(sd, fecha).reduce((a, c) => a + (Number(c.duracionMin) || 30), 0))]));
+    const sinSillonN = Object.fromEntries(sedesS.map((sd) => [sd, dias.map((fecha) => sueltasDe(sd, fecha).length)]));
+    const sueltoDia = (i) => sedesS.reduce((a, sd) => a + sinSillon[sd][i], 0);
+    const porDia = dias.map((fecha, i) => { const cap = filas.reduce((a, f) => a + f.celdas[i].cap, 0), min = filas.reduce((a, f) => a + f.celdas[i].min, 0) + sueltoDia(i); return { fecha, cap, min, pct: cap ? Math.min(100, Math.round(min / cap * 100)) : null }; });
+    const cap = filas.reduce((a, f) => a + f.cap, 0), min = porDia.reduce((a, d) => a + d.min, 0);
+    return { filas, porDia, cap, min, sinSillon, sinSillonN, pct: cap ? Math.min(100, Math.round(min / cap * 100)) : null };
   }, [sillones, dias, citas, hor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Médicos y especialidades para la etiqueta de uso: los del servidor con sesión.
@@ -81,9 +88,12 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
   const sedes = [...new Set(sillones.map((s) => String(s.sede)))];
   const nomSede = (id) => { const n = nombreSede(/^\d+$/.test(String(id)) ? Number(id) : id); return n && n !== "—" ? n : "Sede"; };
   const corta = (id) => nomSede(id).replace(/^Sede\s+/i, "");
-  const masLibre = [...conPct].sort((a, b) => a.pct - b.pct)[0];
-  const diaLleno = [...datos.porDia].filter((d) => d.pct != null).sort((a, b) => b.pct - a.pct)[0];
-  const horasLibres = Math.round((datos.cap - datos.min) / 60);
+  const hayCitas = datos.min > 0;
+  // «Más libre» y «Día más lleno» solo dicen algo si hay diferencias: con todo en 0 % no.
+  const masLibre = conPct.some((f) => f.pct > 0) ? [...conPct].sort((a, b) => a.pct - b.pct)[0] : null;
+  const diaLleno = [...datos.porDia].filter((d) => d.pct > 0).sort((a, b) => b.pct - a.pct)[0];
+  const horasLibres = Math.max(0, Math.round((datos.cap - datos.min) / 60));
+  const semanaTxt = off === 0 ? "esta semana" : "esa semana";
   const rango = `${dias[0].split("-").reverse().slice(0, 2).join("/")} – ${dias[5].split("-").reverse().slice(0, 2).join("/")}`;
   const hoyF = fmt(new Date());
   const usoTxt = (s) => { try { return etiquetaUso(s, { medicos: conectado ? medicos : MEDICOS, especialidades: conectado ? especialidades : ESPECIALIDADES })?.txt || "Flexible"; } catch (e) { return "Flexible"; } };
@@ -116,6 +126,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{horasLibres} h</b><span>Libres en sillón</span></div>
+          {!hayCitas && <div><b>Sin citas</b><span>Agendadas {semanaTxt}</span></div>}
           {masLibre && <div><b>{masLibre.s.nombre}{sedes.length > 1 ? ` · ${corta(masLibre.s.sede)}` : ""}</b><span>Más libre · {masLibre.pct}%</span></div>}
           {diaLleno && <div><b>{DIAS[datos.porDia.indexOf(diaLleno)]} {diaLleno.fecha.slice(8)}</b><span>Día más lleno · {diaLleno.pct}%</span></div>}
         </div>
@@ -134,19 +145,25 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
       {/* Una tarjeta por sede: cada celda se llena desde abajo según lo agendado. */}
       {sedes.map((sd) => {
         const filas = datos.filas.filter((f) => String(f.s.sede) === sd);
-        const cap = filas.reduce((a, f) => a + f.cap, 0), min = filas.reduce((a, f) => a + f.min, 0);
-        const pctS = cap ? Math.round((min / cap) * 100) : null;
-        const porDia = dias.map((fecha, i) => { const c = filas.reduce((a, f) => a + f.celdas[i].cap, 0), m = filas.reduce((a, f) => a + f.celdas[i].min, 0); return { fecha, cap: c, min: m, pct: c ? Math.round((m / c) * 100) : null }; });
+        const sueltas = datos.sinSillon?.[sd] || dias.map(() => 0);
+        const sueltasN = datos.sinSillonN?.[sd] || dias.map(() => 0);
+        const minSuelto = sueltas.reduce((a, m) => a + m, 0);
+        const cap = filas.reduce((a, f) => a + f.cap, 0), min = filas.reduce((a, f) => a + f.min, 0) + minSuelto;
+        const pctS = cap ? Math.min(100, Math.round((min / cap) * 100)) : null;
+        const porDia = dias.map((fecha, i) => { const c = filas.reduce((a, f) => a + f.celdas[i].cap, 0), m = filas.reduce((a, f) => a + f.celdas[i].min, 0) + sueltas[i]; return { fecha, cap: c, min: m, pct: c ? Math.min(100, Math.round((m / c) * 100)) : null }; });
         return (
           <article key={sd} className="dc-ocz">
             <header className="dc-ocz__cab">
               <Anillo pct={pctS} size={48} />
               <div className="dc-ocz__tit">
                 <h3>{nomSede(sd)}</h3>
-                <span>{filas.length} {filas.length === 1 ? "sillón" : "sillones"} · {horas(min)} h agendadas de {horas(cap)} h</span>
+                <span>{filas.length} {filas.length === 1 ? "sillón" : "sillones"} · {horas(min)} h agendadas de {horas(cap)} h{minSuelto > 0 ? ` · ${horas(minSuelto)} h sin sillón asignado` : ""}</span>
               </div>
-              <span className="dc-ocz__libre"><Clock size={14} strokeWidth={2} /><b>{Math.round((cap - min) / 60)} h</b> libres {off === 0 ? "esta semana" : "esa semana"}</span>
+              <span className="dc-ocz__libre"><Clock size={14} strokeWidth={2} /><b>{Math.max(0, Math.round((cap - min) / 60))} h</b> libres {semanaTxt}</span>
             </header>
+            {min === 0 ? (
+              <p className="dc-ocz__vacio">Sin citas agendadas {semanaTxt}: los {filas.length} {filas.length === 1 ? "sillón está libre" : "sillones están libres"}.</p>
+            ) : (
             <div className="dc-ocz__scroll">
               <div className="dc-ocz__grid" role="table" aria-label={`Ocupación ${nomSede(sd)}`} style={{ "--dias": dias.length }}>
                 <div className="dc-ocz__fila is-cab" role="row">
@@ -167,6 +184,17 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
                     <span role="cell" className="dc-ocz__sem"><Anillo pct={f.pct} size={38} /><small>{horas(f.cap - f.min)} h<br />libres</small></span>
                   </div>
                 ))}
+                {minSuelto > 0 && (
+                  <div className="dc-ocz__fila is-suelta" role="row">
+                    <span role="cell" className="dc-ocz__nom"><span className="dc-ocz__ico"><Armchair size={15} strokeWidth={1.9} /></span><span><b>Sin sillón</b><small>Asígnalo en la Agenda</small></span></span>
+                    {sueltas.map((m, i) => (
+                      <span key={dias[i]} role="cell" className={`dc-ocz__c ${m ? "is-suelta" : "is-cero"}${dias[i] === hoyF ? " is-hoy" : ""}`} title={m ? `${horas(m)} h de citas sin sillón` : "Sin citas sin sillón"}>
+                        {m ? <><b>{horas(m)} h</b><small>{sueltasN[i]} {sueltasN[i] === 1 ? "cita" : "citas"}</small></> : <small>—</small>}
+                      </span>
+                    ))}
+                    <span role="cell" className="dc-ocz__sem"><small>{horas(minSuelto)} h<br />sin asignar</small></span>
+                  </div>
+                )}
                 <div className="dc-ocz__fila is-tot" role="row">
                   <span role="cell">Total del día</span>
                   {porDia.map((d) => <span key={d.fecha} role="cell" className={`${d.fecha === hoyF ? "is-hoy" : ""}`}>{d.pct == null ? "—" : <><b>{d.pct}%</b><i><u style={{ width: `${d.pct}%` }} /></i></>}</span>)}
@@ -174,12 +202,13 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
                 </div>
               </div>
             </div>
+            )}
           </article>
         );
       })}
 
       <div className="dc-ocz__pie">
-        {huecos.length > 0 && (
+        {hayCitas && huecos.length > 0 && (
           <section className="dc-ocz__huecos" aria-label="Huecos para llenar">
             <header>
               <div><h3>Huecos para llenar</h3><span>Los sillones con más horas libres de hoy en adelante.</span></div>

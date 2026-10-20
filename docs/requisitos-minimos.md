@@ -536,3 +536,8 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Reserva sin pagar:** no hace falta recepción. La IA anula su propio link o dice que el cupo se libera solo a la hora de vencimiento.
    - **Cambio de cita con cualquier frase** («cambiar», «reprogramar», «pasar», «mover»): reconocer la cita pagada y no ofrecer cupos de una cita nueva.
    - **Fecha equivocada:** si el paciente nombra un día en que no tiene cita, decirle qué cita sí tiene; no responder «No encontramos una cita activa».
+117. Textos que el servidor manda a la pantalla (revisión UX del 20/10):
+   - **Mensajes de la IA sin saltos a mitad de frase.** Hoy llegan cortados («si el pago no entra a esa / hora», «si no puede venir, se / aplica»). Mandar párrafos enteros y, si se quiere negrita, usar un formato que la bandeja convierta: hoy se ve «*Sábado 19*» con los asteriscos.
+   - **Sin datos técnicos en los estados.** El estado del asistente llega como «Activo (gpt-4o)». La pantalla ya quita el modelo, pero el servidor debería mandar solo «Activo».
+   - **Conceptos de cobro sin códigos.** El concepto de los cobros de Izipay trae el número de pedido y un identificador interno («… · 17924388549950 · 9edcb490-…»). La pantalla ya los oculta; deberían ir en campos aparte.
+   - **Estado real de Izipay en Integraciones.** Izipay aparece para «Conectar» aunque Caja ya recibe sus pagos.

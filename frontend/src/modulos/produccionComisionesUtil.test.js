@@ -11,6 +11,7 @@ import {
   resumenAusentismoClinica,
   techoRinde,
   UMBRAL_AUSENTISMO,
+  escalaAusentismoMax,
   rangoPeriodo,
   mesesDelPeriodo,
   ritmoDelPeriodo,
@@ -229,5 +230,21 @@ describe("R4-12 / R4-14: deuda desde GET /caja", () => {
   });
   it("tramosDeuda: sin fecha o con fecha futura va al tramo corriente", () => {
     assert.deepEqual(tramosDeuda([{ pendiente: 10, dias: null }, { pendiente: 5, dias: -2 }, { pendiente: 7, dias: 31 }, { pendiente: 1, dias: 400 }]).map((t) => t.v), [15, 7, 0, 1]);
+  });
+});
+
+describe("escala de ausentismo", () => {
+  it("se queda en 20 % mientras todo quepa", () => {
+    assert.equal(escalaAusentismoMax(12.5, [3, 19.9]), 20);
+  });
+  it("sube a la decena siguiente si alguna tasa pasa del 20 % (máx. 100)", () => {
+    assert.equal(escalaAusentismoMax(89.3, [50, 100]), 100);
+    assert.equal(escalaAusentismoMax(34, []), 40);
+  });
+  it("la barra por odontólogo usa la misma escala que la clínica", () => {
+    const citas = [{ medicoId: "a", estado: "cancelada" }, { medicoId: "a", estado: "cancelada" }, { medicoId: "a", estado: "atendida" }];
+    const { rows, escala } = ausentismoPorOdontologo(citas, [{ id: "a", nombre: "Ana" }]);
+    assert.equal(escala, 70);
+    assert.ok(rows[0].pctEscala < 100);
   });
 });

@@ -77,14 +77,14 @@ describe("resumenLinks", () => {
       { estado: "anulado", importe: 70 },
       { estado: "otro", importe: 10 },
     ];
-    assert.deepEqual(resumenLinks(lista), { pendientes: 2, pagados: 2, caducados: 1, montoPagado: 170.3 });
+    assert.deepEqual(resumenLinks(lista), { pendientes: 2, pagados: 2, caducados: 1, anulados: 1, montoPagado: 170.3 });
   });
   it("un importe ilegible no rompe la suma", () => {
     assert.equal(resumenLinks([{ estado: "pagado", importe: null }, { estado: "pagado", importe: "abc" }, { estado: "pagado", importe: 40 }]).montoPagado, 40);
   });
   it("lista vacía o inválida", () => {
-    assert.deepEqual(resumenLinks([]), { pendientes: 0, pagados: 0, caducados: 0, montoPagado: 0 });
-    assert.deepEqual(resumenLinks(null), { pendientes: 0, pagados: 0, caducados: 0, montoPagado: 0 });
+    assert.deepEqual(resumenLinks([]), { pendientes: 0, pagados: 0, caducados: 0, anulados: 0, montoPagado: 0 });
+    assert.deepEqual(resumenLinks(null), { pendientes: 0, pagados: 0, caducados: 0, anulados: 0, montoPagado: 0 });
   });
 });
 

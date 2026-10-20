@@ -68,11 +68,13 @@ export function vencioYa(caducaEn, ahora = Date.now()) {
 
 /** Conteos para la cabecera: { pendientes, pagados, caducados, montoPagado } (S/, 2 decimales). */
 export function resumenLinks(lista) {
-  const r = { pendientes: 0, pagados: 0, caducados: 0, montoPagado: 0 };
+  // Los anulados también se cuentan: sin ellos los contadores no sumaban el total de la sede.
+  const r = { pendientes: 0, pagados: 0, caducados: 0, anulados: 0, montoPagado: 0 };
   (Array.isArray(lista) ? lista : []).forEach((l) => {
     const { clave } = estadoLink(l);
     if (clave === "pendiente") r.pendientes++;
     else if (clave === "caducado") r.caducados++;
+    else if (clave === "anulado") r.anulados++;
     else if (clave === "pagado") {
       r.pagados++;
       const n = Number(l.importe ?? l.monto);

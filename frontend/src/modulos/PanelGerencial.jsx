@@ -324,7 +324,8 @@ function CanvasCaja({ puntos, onOpen, abre = 8, cierra = 20 }) {
         ctx.stroke();
         ctx.fillStyle = ink;
         ctx.font = "10px 'Inter Variable', 'Inter', sans-serif";
-        ctx.textAlign = "center";
+        // Las horas de los extremos se alinean hacia adentro: centradas, «20:00» quedaba cortado.
+        ctx.textAlign = h <= Math.ceil(abre) ? "left" : h + 2 > cierra ? "right" : "center";
         ctx.fillText(`${String(h).padStart(2, "0")}:00`, x, H - 8);
       }
 
@@ -607,7 +608,7 @@ function CanvasEsfera({ pacientes, onPick }) {
   return (
     <div className="lienzo" ref={wrapRef}>
       <canvas ref={canvasRef} className="clic" />
-      <span className="rot" ref={rotRef} />
+      <span className="rot" ref={rotRef} aria-hidden="true" hidden />
       <div className="ficha" ref={fichaRef} />
     </div>
   );
@@ -758,7 +759,7 @@ function CanvasCubo({ pacientes, onPick, esc = ESCALA_CUBO_DEF }) {
   return (
     <div className="lienzo" ref={wrapRef}>
       <canvas ref={canvasRef} className="clic" />
-      <span className="rot" ref={rotRef} />
+      <span className="rot" ref={rotRef} aria-hidden="true" hidden />
       <div className="ficha" ref={fichaRef} />
     </div>
   );
@@ -1275,7 +1276,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
             })} />
           </div>
           <p className="dc-card__foot">Cada cobro del registro añade un punto y estira la línea.
-            Pasa el ratón para leer cualquier momento del día.</p>
+            Señala o toca la línea para leer cualquier momento del día.</p>
         </section>
 
         {/* Hoy en la clínica: lo del día que mira un gerente (producción, pacientes,
@@ -1624,7 +1625,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                     color={COLORES_ESP[i % COLORES_ESP.length]}
                     onOpen={() => abrir({
                       t: t.nombre || "Tratamiento",
-                      s: `${t.numeroDeVentas ?? 0} ventas`,
+                      s: `${t.numeroDeVentas ?? 0} ${(t.numeroDeVentas ?? 0) === 1 ? "venta" : "ventas"}`,
                       cifra: moneyFmt(t.importeTotal),
                       cols: [["Campo"], ["Valor"]],
                       filas: [["Ventas", String(t.numeroDeVentas ?? 0)], ["Importe", moneyFmt(t.importeTotal)]],
@@ -1641,7 +1642,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                       <div className="camp__lab">El que más vendes</div>
                       <div className="camp__nom">{tratSorted[0].nombre}</div>
                     </div>
-                    <div className="camp__cif">{moneyFmt(tratSorted[0].importeTotal)}<span>{tratSorted[0].numeroDeVentas} ventas</span></div>
+                    <div className="camp__cif">{moneyFmt(tratSorted[0].importeTotal)}<span>{tratSorted[0].numeroDeVentas} {tratSorted[0].numeroDeVentas === 1 ? "venta" : "ventas"}</span></div>
                   </div>
                 )}
                 {tratSorted.length > 1 && (() => {
@@ -1674,7 +1675,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
                         </div>
                         <div className="camp__cif">
                           {moneyFmt(bot.importeTotal)}
-                          <span>{bot.numeroDeVentas} ventas</span>
+                          <span>{bot.numeroDeVentas} {bot.numeroDeVentas === 1 ? "venta" : "ventas"}</span>
                         </div>
                       </div>
                       {uplift != null && uplift > 0 && (
@@ -1807,7 +1808,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
               />
             </div>}
           </div>
-          <p className="dc-card__foot">Color = estado, tamaño = saldo. Al pasar el ratón se detiene.</p>
+          <p className="dc-card__foot">Color = estado, tamaño = saldo. Se detiene al señalarlo o tocarlo.</p>
         </section>
 
         <section className="dc-card">
@@ -1865,7 +1866,7 @@ export default function PanelGerencial({ citas: citasProp = [], sede, sedes = nu
             </div>}
           </div>
           <p className="dc-card__foot">
-            Ancla las explicaciones al <b>color de la arista</b>: al girar, “izquierda” cambia.
+            Cada arista tiene su color y su explicación; al girar el cubo cambia de lado, no de color.
           </p>
         </section>
       </div>

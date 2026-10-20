@@ -45,9 +45,31 @@ export const nombreItemReceta = (it) => [it?.medicamento, it?.presentacion].map(
 /** «1 tableta – c/8 h – 3 días»: cómo tomarlo. */
 export const indicacionItemReceta = (it) => [it?.dosis, it?.frecuencia, it?.duracion, it?.detalle].map(txt).filter(Boolean).join(" – ");
 
-/** Indicaciones para mostrar. Algunas guardadas por el servidor traen la alerta de alergia
-    como JSON escapado («Ibuprofeno ↔ alergia…» con la barra literal): se decodifica. */
-export const textoIndicaciones = (t) => txt(t).replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+const decodificar = (t) => txt(t).replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+const RE_ALERTA = /\[ALERTA ALERGIA[^\]]*\]\s*(\[[^\]]*\])?/i;
+
+/** Separa la marca que agrega el servidor al emitir pese a una alergia
+    («[ALERTA ALERGIA — emitida con override] ["Ibuprofeno ↔ alergia a Aspirina"]») del texto
+    del médico. Se veía tal cual en la tarjeta, con corchetes y comillas. */
+export function partirIndicaciones(t) {
+  const s = decodificar(t);
+  const m = s.match(RE_ALERTA);
+  if (!m) return { texto: s, alertas: [] };
+  let alertas = [];
+  if (m[1]) {
+    try { const v = JSON.parse(m[1]); if (Array.isArray(v)) alertas = v.map(txt).filter(Boolean); }
+    catch { alertas = [m[1].slice(1, -1).replace(/"/g, "").trim()].filter(Boolean); }
+  }
+  const texto = `${s.slice(0, m.index)} ${s.slice(m.index + m[0].length)}`.replace(/\s+/g, " ").trim();
+  return { texto, alertas: alertas.length ? alertas : ["sin detalle"] };
+}
+
+/** Indicaciones para mostrar o imprimir: el texto del médico y, si la hay, la alerta de
+    alergia en una frase legible. */
+export const textoIndicaciones = (t) => {
+  const { texto, alertas } = partirIndicaciones(t);
+  return alertas.length ? [texto, `Emitida pese a alerta de alergia: ${alertas.join("; ")}.`].filter(Boolean).join(" · ") : texto;
+};
 
 /** Formulario del módulo Recetas ({ med, pres, dosis, frec, dur }) → esquema único para guardar.
     M5-10: el formulario no tenía dosis (su campo «dosis» era la presentación, «500 mg») y la

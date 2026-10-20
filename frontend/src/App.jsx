@@ -89,11 +89,11 @@ import { MOTIVO_ANULAR_MIN, accionesProcedimiento, cuerpoAnulacion, motivoAnulac
 import { puedeSalir } from "./compartido/guardaSalida";
 import { cruceAlergias, listaAlergias } from "./compartido/alergias";
 import { horasSemana, horarioConfigurado } from "./comun";
-import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, textoIndicaciones } from "./compartido/recetaItems";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, partirIndicaciones } from "./compartido/recetaItems";
 import { imprimirReceta as imprimirRecetaDoc } from "./util/recetaDoc";
 import { textoConsentimiento } from "./compartido/consentimientoTexto";
 import { MOTIVO_ANULAR_CONSENT_MIN, contenidoSinMarcas, estadoConsentimiento, motivoAnulacion, tituloLimpio, validarMotivoAnulacion } from "./util/consentimientoEstado";
-import {BotonPDF, SedeCtx, useSede, useEmiteCobros, coincideBusqueda, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {BotonPDF, conceptoVisible, SedeCtx, useSede, useEmiteCobros, coincideBusqueda, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -429,7 +429,7 @@ function MiniBar({ data, color }) {
  * último valor. `formato` permite que salgan como moneda.
  */
 function AreaChart({ data, color = DS.c.primary, labels, formato }) {
-  const fmtV = formato || ((v) => Number(v || 0).toLocaleString());
+  const fmtV = formato || ((v) => Number(v || 0).toLocaleString("es-PE"));
   // La escala arranca en CERO a proposito: escalar entre min y max hace que una
   // diferencia de dos citas ocupe toda la altura y parezca un despegue.
   const max = Math.max(...data, 1), min = 0;
@@ -671,7 +671,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     : (pagosHistFalló ? null : (pagosHist == null ? null : cobradoHoyCaja));
   const cobrosHoyRows = !esMed && conectado && pagosHistOk
     ? pagosSede.filter((p) => (p.fecha || "").toString().slice(0, 10) === hoyIso)
-        .map((p) => ({ izq: p.paciente || "—", der: `S/ ${Number(p.monto || 0).toLocaleString()}` }))
+        .map((p) => ({ izq: p.paciente || "—", der: `S/ ${Number(p.monto || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }))
     : null;
   // La jornada de hoy sale del horario de la clínica: una que abre 9–19 y otra que abre
   // solo sábados por la mañana no pueden tener la misma rejilla ni la misma capacidad.
@@ -728,7 +728,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     ["Mis citas hoy", citasHoyKpi.length, Calendar, NAVY, rowsCitas(citasHoyKpi)],
     ["Atendidas", ch.filter((c) => c.estado === "atendida").length, CheckCircle2, "var(--dc-ok-700)", rowsCitas(ch.filter((c) => c.estado === "atendida"))],
     ["En atención", ch.filter((c) => c.estado === "en_atencion").length, Activity, "var(--dc-purple)", rowsCitas(ch.filter((c) => c.estado === "en_atencion"))],
-    ["Producción de hoy", `S/ ${(ingresos ?? 0).toLocaleString()}`, Wallet, RED, prodRows],
+    ["Producción de hoy", `S/ ${(ingresos ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, Wallet, RED, prodRows],
     // Es el total de la SEDE, no los pacientes del médico: sale el mismo número que le
     // sale al administrador de la sede. Se llama como lo que es hasta que exista un
     // recuento propio por médico.
@@ -738,7 +738,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     ["Confirmadas", ch.filter((c) => c.estado === "confirmada").length, CheckCircle2, DS.c.primary, rowsCitas(ch.filter((c) => c.estado === "confirmada"))],
     ["En atención", ch.filter((c) => c.estado === "en_atencion").length, Activity, "var(--dc-purple)", rowsCitas(ch.filter((c) => c.estado === "en_atencion"))],
     ["Atendidas", ch.filter((c) => c.estado === "atendida").length, CheckCircle2, "var(--dc-ok-700)", rowsCitas(ch.filter((c) => c.estado === "atendida"))],
-    ["Ingresos del día", pagosHistFalló ? "No disponible" : (pagosHist == null && conectado ? "…" : `S/ ${(ingresos ?? 0).toLocaleString()}`), Wallet, RED, pagosHistFalló ? [{ izq: "No se pudo cargar el historial de pagos", der: "Reintenta" }] : prodRows],
+    ["Ingresos del día", pagosHistFalló ? "No disponible" : (pagosHist == null && conectado ? "…" : `S/ ${(ingresos ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`), Wallet, RED, pagosHistFalló ? [{ izq: "No se pudo cargar el historial de pagos", der: "Reintenta" }] : prodRows],
     ["Pacientes", pacientes.length, Users, DS.c.primary, pacRows],
   ];
   const horaAhora = new Date().getHours();
@@ -753,7 +753,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const cuposLibres = conectado
     ? (sinHorarioReal || !silDash || !silsDash.length ? null : M.cuposLibres({ citas: citasHoyKpi, sillones: silsDash, fecha: fmt(hoy), sede: null, jornadaDe: jornadaDeDash }).cupos30)
     : M.cuposLibres({ citas, sillones: dbDash?.sillones || [], fecha: fmt(hoy), sede: sedeActiva, jornadaDe: jornadaDeDash }).cupos30;
-  const num = (v) => Number(v || 0).toLocaleString();
+  const num = (v) => Number(v || 0).toLocaleString("es-PE");
   const bloque = (valor, color, pie) => (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
       <div style={{ fontSize: 21, fontWeight: 600, color, fontFamily: DISPLAY_FONT, lineHeight: 1.1 }}>{valor}</div>
@@ -869,9 +869,9 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
     // INI-04: una sola tarjeta de confirmaciones (hoy + mañana) con una sola acción.
     !esTI && (sinConfHoy.length + (esMed ? 0 : mananaSinConf.length)) > 0 && { id: "conf", tono: sinConfHoy.length ? "aviso" : "info", icon: <CalendarCheck size={18} strokeWidth={1.75} />, titulo: `Confirmaciones pendientes · hoy ${sinConfHoy.length}${esMed ? "" : ` · mañana ${mananaSinConf.length}`}`, detalle: nombres([...sinConfHoy].sort((a, b) => a.hora.localeCompare(b.hora)).map((c) => ({ paciente: `${c.hora} ${c.paciente}` }))) || "Las de hoy ya están confirmadas.", accion: esMed ? "Ir a la agenda" : "Enviar confirmaciones", ir: esMed ? () => onIr("agenda") : () => { if (conectado) enviarConfMañana(); else notify(`Confirmaciones enviadas por WhatsApp a ${sinConfHoy.length + mananaSinConf.length} pacientes.`); } },
     verCaja && deudores.length > 0 && (conectado
-      ? { id: "deuda", tono: vencidoCaja > 0 ? "peligro" : "aviso", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo por cobrar", "pacientes con saldo por cobrar")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}${vencidoCaja > 0 ? ` · S/ ${vencidoCaja.toLocaleString("es-PE")} vencido` : ""}`,
-        detalle: `${nombres(deudores, "n")}.${vencidoCaja > 0 ? ` Vencido = trabajo terminado hace más de ${M.UMBRAL_VENCIDO_DIAS} días sin pagar.` : deudaCaja && deudaCaja.hecho > 0 ? ` S/ ${deudaCaja.hecho.toLocaleString("es-PE")} de trabajo ya terminado, listo para cobrar.` : ""}`, accion: "Ir a caja", ir: () => onIr("facturacion") }
-      : { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE")}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") }),
+      ? { id: "deuda", tono: vencidoCaja > 0 ? "peligro" : "aviso", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo por cobrar", "pacientes con saldo por cobrar")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${vencidoCaja > 0 ? ` · S/ ${vencidoCaja.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vencido` : ""}`,
+        detalle: `${nombres(deudores, "n")}.${vencidoCaja > 0 ? ` Vencido = trabajo terminado hace más de ${M.UMBRAL_VENCIDO_DIAS} días sin pagar.` : deudaCaja && deudaCaja.hecho > 0 ? ` S/ ${deudaCaja.hecho.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de trabajo ya terminado, listo para cobrar.` : ""}`, accion: "Ir a caja", ir: () => onIr("facturacion") }
+      : { id: "deuda", tono: "peligro", icon: <Wallet size={18} strokeWidth={1.75} />, titulo: `${pluralEs(deudores.length, "paciente con saldo vencido", "pacientes con saldo vencido")} – S/ ${deudores.reduce((a, d) => a + d.v, 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, detalle: nombres(deudores, "n"), accion: "Ir a caja", ir: () => onIr("facturacion") }),
     (esAdmin || esAdmSede) && liqObs.length > 0 && { id: "seguros", tono: "aviso", icon: <Umbrella size={18} strokeWidth={1.75} />, titulo: `${pluralEs(liqObs.length, "liquidación de seguro observada", "liquidaciones de seguro observadas")}`, detalle: `${liqObs.map((l) => `${l.aseg} (${l.paciente || nomPac(l.pid)})`).join(", ")}${liqBorr.length ? ` · ${pluralEs(liqBorr.length, "borrador", "borradores")} por enviar` : ""}.`, accion: "Ver seguros", ir: () => onIr("seguros") },
     !esTI && !esRec && labAtr.length > 0 && { id: "lab", tono: "aviso", icon: <FlaskConical size={18} strokeWidth={1.75} />, titulo: `${pluralEs(labAtr.length, "caso de laboratorio atrasado", "casos de laboratorio atrasados")}`, detalle: labAtr.map((c) => `${c.trabajo} – ${c.paciente || nomPac(c.pacienteId)}`).slice(0, 3).join(", "), accion: "Ver laboratorio", ir: () => onIr("laboratorio") },
     !esTI && !esGer && docsPend.length > 0 && { id: "docs", tono: "info", icon: <FileCheck size={18} strokeWidth={1.75} />, titulo: `${pluralEs(docsPend.length, "documento sin firmar", "documentos sin firmar")}`, detalle: `${[...new Set(docsPend.map((d) => nomPac(d.pacienteId)))].slice(0, 3).join(", ")}. Envía el enlace o fírmalo en consultorio.`, accion: "Ver pacientes", ir: () => onIr("pacientes") },
@@ -894,7 +894,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   } : null);
   const cifras = esTI
     ? [[cuentaTI.activas === 1 ? "Integración activa" : "Integraciones activas", cuentaTI.activas, irSiVe("integraciones")], ["Con incidencia", cuentaTI.incidencia, irSiVe("integraciones")], ["Por activar", cuentaTI.porActivar, irSiVe("integraciones")], ["Usuarios", usrTiDash ? usrTiDash.length : conectado ? "…" : STAFF_INIT.length, irSiVe("usuarios")]]
-    : [["Citas hoy", citasHoyKpi.length, irAgenda(null)], ["Atendidas", atendidasHoy, irAgenda("atendida")], ["Por confirmar", sinConfirmar, irAgenda("pendiente")], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE")}`, esMed ? irSiVe("miproduccion") : irSiVe("facturacion")]];
+    : [["Citas hoy", citasHoyKpi.length, irAgenda(null)], ["Atendidas", atendidasHoy, irAgenda("atendida")], ["Por confirmar", sinConfirmar, irAgenda("pendiente")], [esMed ? "Producción hoy" : "Cobrado hoy", ingresos == null ? "—" : `S/ ${Number(ingresos).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, esMed ? irSiVe("miproduccion") : irSiVe("facturacion")]];
   return (
     <div className="dc-hoy">
       <section className="dc-hero">
@@ -1020,6 +1020,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
   const [estadoF, setEstadoF] = useState("all");
   const [sedeF, setSedeF] = useState("all");     // filtro por sede
   const [drag, setDrag] = useState(null);        // cita arrastrada
+  const [cancVer, setCancVer] = useState(null);   // celda con sus canceladas desplegadas
   const [over, setOver] = useState(null);        // celda destino resaltada
   const [overOk, setOverOk] = useState(null);    // ¿se puede soltar en la celda resaltada? { ok, motivo }
   const [turno, setTurno] = useState(null);      // modal de turno del sillón: { s, fecha, medicoId, desde, hasta }
@@ -1483,7 +1484,14 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
                       const ts = parc.map(textoBloq);
                       return <span className="dc-cal__bloqp" title={`${parc.length === 1 ? "Horario bloqueado" : "Horarios bloqueados"}: ${ts.map((t) => t.linea).join(" | ")}. Los demás doctores y sillones siguen libres.`}><Lock size={11} strokeWidth={2.2} aria-hidden="true" /><span>{parc.length === 1 ? `${ts[0].quien === "Toda la agenda" ? "" : `${ts[0].quien.replace(/^Dra?\.\s*/, "")} · `}${ts[0].motivo}` : `${parc.length} bloqueos`}</span></span>;
                     })()}
-                    {cs.map((c) => <Bloque key={c.id} c={c} />)}
+                    {(() => {
+                      // Canceladas, no asistidas o movidas no ocupan la celda: con dos o más se
+                      // agrupan en «+N canceladas» y se despliegan al tocar (antes se apilaban
+                      // y una hora llegaba a medir 1.000 px).
+                      const fuera = cs.filter((c) => !ACTIVA(c));
+                      if (fuera.length < 2 || cancVer === overKey) return <>{cs.map((c) => <Bloque key={c.id} c={c} />)}{fuera.length >= 2 && <button type="button" className="dc-cal__canc" onClick={(e) => { e.stopPropagation(); setCancVer(null); }}>Ocultar canceladas</button>}</>;
+                      return <>{cs.filter(ACTIVA).map((c) => <Bloque key={c.id} c={c} />)}<button type="button" className="dc-cal__canc" title={`Canceladas, no asistidas o movidas: ${fuera.map((c) => `${c.hora || ""} ${c.paciente || ""}`.trim()).join(" · ")}`} onClick={(e) => { e.stopPropagation(); setCancVer(overKey); }}>+{fuera.length} canceladas</button></>;
+                    })()}
                   </div>
                 ); })}
               </div>
@@ -1546,7 +1554,7 @@ function SalaTV({ onClose, citasDemo = [], sede = null }) {
   const corto = (n) => { const p = (n || "").trim().split(" ").filter(Boolean); return p.length > 1 ? `${p[0]} ${p[1][0]}.` : (n || "—"); };
   const enAtencion = fuente.filter((c) => c.estado === "en_atencion");
   const enEspera = fuente.filter((c) => c.llegada && c.estado !== "en_atencion" && c.estado !== "atendida" && !CITA_INACTIVA.includes(c.estado)).sort((a, b) => a.hora.localeCompare(b.hora));
-  const hh = reloj.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+  const hh = reloj.toLocaleTimeString("es-PE", { hour: "2-digit", hour12: false, minute: "2-digit" });
   const fecha = reloj.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 400, background: "radial-gradient(1200px 700px at 20% -10%, var(--dc-brand-700), var(--dc-ink-900) 60%)", color: "#fff", display: "flex", flexDirection: "column", padding: "calc(3vh / var(--dc-z, 1)) 3vw", fontFamily: DISPLAY_FONT }}>
@@ -2819,7 +2827,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // PAC-03: «Saldo» = monto por pagar del plan (en rojo si tiene vencido) o «—». Sin barra.
     { key: "presupuesto", label: "Saldo", w: "minmax(110px,0.8fr)", a: "right", get: (p) => { if (conectado) { const q = saldos ? saldos[p.id] : null; return q ? Math.max(0, q.total - q.pagado) : 0; } return ctaSede(p).saldoPlan; },
       cell: (p) => { let saldo, venc = 0; if (conectado) { const q = saldos ? saldos[p.id] : null; saldo = q ? Math.max(0, (Number(q.total) || 0) - (Number(q.pagado) || 0)) : 0; } else { const c = ctaSede(p); saldo = c.saldoPlan; venc = c.vencido; }
-        return saldo > 0 ? <span title={venc > 0 ? `S/ ${venc.toLocaleString("es-PE")} vencido (más de ${M.UMBRAL_VENCIDO_DIAS} días)` : "Saldo del plan"} style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: venc > 0 ? "var(--dc-danger-700)" : "var(--dc-ink-900, #0B1220)" }}>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>; } },
+        return saldo > 0 ? <span title={venc > 0 ? `S/ ${venc.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vencido (más de ${M.UMBRAL_VENCIDO_DIAS} días)` : "Saldo del plan"} style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: venc > 0 ? "var(--dc-danger-700)" : "var(--dc-ink-900, #0B1220)" }}>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>; } },
     { key: "acc", label: "Acciones", w: "128px", a: "right", sticky: true, noFilter: true, noSort: true, cell: (p) => (
       <div className="dc-row-actions" style={{ display: "inline-flex", gap: 4, justifyContent: "flex-end", alignItems: "center", flexWrap: "nowrap" }} onClick={(e) => e.stopPropagation()}>
         {/* PAC-04: una acción principal con texto + menú ⋯. */}
@@ -3861,10 +3869,10 @@ function Odontograma({ pacientes: pacProp, fichas, updFicha, notify, pacienteAct
                     <thead><tr><th>Procedimiento</th><th>Estado</th><th className="num">Precio</th></tr></thead>
                     <tbody>
                       {items.map((f) => (
-                        <tr key={f.id}><td>{f.nombre}</td><td><EstadoPill entidad="procedimiento" estado={f.estado} /></td><td className="num">S/ {(Number(f.costo) || 0).toLocaleString("es-PE")}</td></tr>
+                        <tr key={f.id}><td>{f.nombre}</td><td><EstadoPill entidad="procedimiento" estado={f.estado} /></td><td className="num">S/ {(Number(f.costo) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
                       ))}
                     </tbody>
-                    <tfoot><tr><td colSpan={2}>Total del plan</td><td className="num">S/ {total.toLocaleString("es-PE")}</td></tr></tfoot>
+                    <tfoot><tr><td colSpan={2}>Total del plan</td><td className="num">S/ {total.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr></tfoot>
                   </table>
                 )}
               </section>
@@ -4371,7 +4379,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
       )}
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }} className="dc-trat">
       <Card className="dc-trat-plan" style={{ padding: 0, overflow: "hidden", height: "fit-content" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan {planListo && <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span>}</h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && planListo && <BotonPDF chico onClick={() => { if ((conectado && verPagos && pagosRem == null) || pagadoLeyendo) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []), pagado: conectado && !verPagos ? pagadoPagos : null, sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}{puedeAgregarProc && <Btn small disabled={!planListo || !pacienteId} title={planListo ? undefined : (tratLeyendo ? "Leyendo el plan del paciente…" : "Se habilita cuando se pueda leer el plan del paciente")} onClick={() => { if (!planListo) return; setNueva({ nombre: "", costo: "", pieza: "", cara: "" }); }}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn>}</div></div>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}><h3 style={{ margin: 0, color: NAVY, fontSize: 15, fontWeight: 700 }}>Procedimientos del plan {planListo && <span className="dc-trat-plan__n">{atendidas}/{fases.length} pagados</span>}</h3><div style={{ display: "flex", gap: 8 }}>{fases.length > 0 && planListo && <BotonPDF chico onClick={() => { if ((conectado && verPagos && pagosRem == null) || pagadoLeyendo) { notify("Aún no se cargan los pagos del paciente; inténtalo en un momento."); return; } const ok = imprimirPresupuesto({ paciente, items: fases, pagos: conectado ? (verPagos ? pagosRem : null) : (fichas[pacienteId]?.pagos || []), pagado: conectado && !verPagos ? pagadoPagos : null, sede: conectado ? null : sedeTrab }); if (!ok) notify("Permite ventanas emergentes para ver el presupuesto."); }} title="Presupuesto para el paciente (PDF)">Presupuesto</BotonPDF>}{puedeAgregarProc && pacienteId && <Btn small disabled={!planListo} title={planListo ? undefined : (tratLeyendo ? "Leyendo el plan del paciente…" : "Se habilita cuando se pueda leer el plan del paciente")} onClick={() => { if (!planListo) return; setNueva({ nombre: "", costo: "", pieza: "", cara: "" }); }}><Plus size={15} strokeWidth={1.75} /> Procedimiento</Btn>}</div></div>
         {nueva && (
           <div style={{ padding: "14px 20px", background: "var(--dc-bg)", borderBottom: "1px solid var(--dc-line)", display: "grid", gap: 10 }}>
             <label style={{ fontSize: 12, color: "var(--dc-ink-700)", fontWeight: 500 }}>Del catálogo de servicios <span style={{ color: "var(--dc-ink-400)", fontWeight: 500 }}>– autocompleta procedimiento y precio</span><br />
@@ -4397,7 +4405,8 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
           </div>
         )}
         {conectado && !tratCargado && !tratError && !tratSinPermiso && pacienteId && <div style={{ padding: 20, fontSize: 13, color: "var(--dc-ink-500)" }}>Leyendo el plan del paciente…</div>}
-        {fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && planListo && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub={puedeAgregarProc ? "Agrega el primer procedimiento o pásalos desde el odontograma." : "Aún no hay procedimientos en el plan de este paciente."} />}
+        {!pacienteId && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Elige un paciente" sub="Arriba eliges al paciente y aquí aparece su plan de tratamiento." />}
+        {pacienteId && fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && planListo && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub={puedeAgregarProc ? "Agrega el primer procedimiento o pásalos desde el odontograma." : "Aún no hay procedimientos en el plan de este paciente."} />}
         {fases.length > 0 && (
           <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="procedimientos" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
             vistas={[{ id: "recorrido", label: "Recorrido", icon: Route }]}
@@ -4677,7 +4686,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
             {conectado ? <p>Ordenados por urgencia</p> : <p title="Si se libera un cupo, se ofrece por WhatsApp al primero compatible; si no responde en 15 min, pasa al siguiente.">Ordenados por urgencia – oferta automática por WhatsApp</p>}
           </div>
           <div className="dc-esp-hero__cifras">
-            <div><b>{nAlta}</b><span>Urgentes</span></div>
+            <div><b>{nAlta}</b><span>{nAlta === 1 ? "Urgente" : "Urgentes"}</span></div>
             <div><b>{nOf}</b><span>Con oferta</span></div>
             <div><b>{nEsp}</b><span>Especialidades</span></div>
           </div>
@@ -4720,7 +4729,7 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
                       </div>
                       <ul className="dc-esp-card__meta">
                         <li><Stethoscope size={13} strokeWidth={1.75} /> {p.e}</li>
-                        <li><User size={13} strokeWidth={1.75} /> {p.medico}</li>
+                        <li><User size={13} strokeWidth={1.75} /> {!p.medico || /^cualquiera$/i.test(String(p.medico).trim()) ? "Cualquier doctor" : p.medico}</li>
                         <li><Clock size={13} strokeWidth={1.75} /> Espera {String(p.desde).toLowerCase()} – {String(p.pref || "").toLowerCase() === "indiferente" ? "horario indiferente" : `prefiere ${String(p.pref || "").toLowerCase()}`}</li>
                       </ul>
                       {p.ofrecido.length > 0 && <div className="dc-esp-card__oferta"><Bell size={12} strokeWidth={1.75} /> {p.ofrecido.length === 1 ? "1 oferta enviada" : `${p.ofrecido.length} ofertas enviadas`}{p.ofrecido[p.ofrecido.length - 1] ? ` – ${p.ofrecido[p.ofrecido.length - 1]}` : ""}</div>}
@@ -5383,7 +5392,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
     api.pagos.historial({ sedeIds: sedesApi }).then((h) => {
       setHist((h || []).map((p) => ({
         id: p.id, paciente: p.paciente || "—", sede: p.sede || "—", sedeId: p.sedeId || null,
-        concepto: p.concepto || "", monto: Number(p.monto) || 0, metodo: String(p.metodo || ""),
+        concepto: conceptoVisible(p.concepto), monto: Number(p.monto) || 0, metodo: String(p.metodo || ""),
         moneda: p.moneda || "PEN", montoOriginal: p.montoOriginal != null ? Number(p.montoOriginal) : null, tipoCambio: p.tipoCambio != null ? Number(p.tipoCambio) : null,
         dni: p.dni || p.pacienteDni || "", usuario: p.usuarioNombre || p.cobradoPorNombre || "",
         comprobante: `${p.comprobanteTipo || ""} ${p.comprobanteSerie || ""} ${p.comprobanteNumero != null ? fmtComprobante(p.comprobanteNumero) : ""}`.trim(),
@@ -5521,7 +5530,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const porCobrarHoy = conectado ? porCobrar.filter((x) => pacsHoy.has(x.p.id)) : [];
   const boletasSrv = caja.boletasHoy || [];
   const boletasHoy = conectado
-    ? boletasSrv.filter((b) => deCaja(b.sedeId)).map((b) => ({ id: b.id, sedeId: b.sedeId || null, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: b.concepto, monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null,
+    ? boletasSrv.filter((b) => deCaja(b.sedeId)).map((b) => ({ id: b.id, sedeId: b.sedeId || null, sunatEstado: b.sunatEstado || null, sunatMensaje: b.sunatMensaje || "", paciente: b.paciente, concepto: conceptoVisible(b.concepto), monto: Number(b.monto) || 0, metodo: String(b.metodo || ""), fecha: fmt(hoy), comprobanteSerie: b.comprobanteSerie, comprobanteNumero: b.comprobanteNumero, anulado: !!b.anulado, anuladoMotivo: b.anuladoMotivo || "", moneda: b.moneda || "PEN", montoOriginal: b.montoOriginal != null ? Number(b.montoOriginal) : null,
         // Boleta (C1/C6) y sesión de caja (C7): TC del cobro, documento y dirección del paciente,
         // quién cobró, a qué apertura pertenece y cuándo se registró.
         tipoCambio: b.tipoCambio != null ? Number(b.tipoCambio) : null, dni: b.dni || b.pacienteDni || "", direccion: b.direccion || "", usuario: b.usuarioNombre || b.cobradoPorNombre || "", cajaSesion: b.aperturaId || null, creadoEn: b.creadoEn || b.createdAt || null, hora: b.hora || "" }))
@@ -5688,7 +5697,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   // Un solo lugar con el estado de la caja, las cifras del día y el proceso en pasos:
   // Apertura → Cobros → Ingresos y egresos → Cierre. Antes cada pestaña tenía su propia
   // franja con cifras distintas y se navegaba sólo desde el menú lateral.
-  const horaDe = (iso) => { if (!iso) return ""; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }); };
+  const horaDe = (iso) => { if (!iso) return ""; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("es-PE", { hour: "2-digit", hour12: false, minute: "2-digit" }); };
   const cerradaHoyReg = !cajaAbierta && apertura && apertura.abierta === false && apertura.cerradaEn ? apertura : null;
   const cobradoUsdHoy = totCobHoy.usd;
   // C7: el arqueo es de la sesión de caja abierta. Si se reabre el mismo día, el esperado
@@ -5919,7 +5928,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         <Card style={{ overflow: "hidden", border: "1px solid var(--dc-amber-soft)" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-warn-soft)", background: "var(--dc-white)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "var(--dc-r-sm)", background: "var(--dc-warn-600)", display: "grid", placeItems: "center" }}><Clock size={17} strokeWidth={1.75} color="#fff" /></div><div><div style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Por cobrar de hoy</div><div style={{ fontSize: 13, color: "var(--dc-warn-700)" }}>{pluralEs(porCobrarHoy.length, "paciente", "pacientes")} del día con saldo – cobra aquí al salir de atención</div></div></div>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-warn-600)", fontFamily: DISPLAY_FONT }}>S/ {porCobrarHoy.reduce((s, x) => s + x.saldo, 0).toLocaleString()}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-warn-600)", fontFamily: DISPLAY_FONT }}>S/ {porCobrarHoy.reduce((s, x) => s + x.saldo, 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           {porCobrarHoy.map((x, i) => (
             <div key={x.p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
@@ -5946,7 +5955,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               { key: "p", label: "Paciente", w: "minmax(150px,1.2fr)", cell: (x) => <PersonaCelda nombre={x.p.nombre} /> },
               { key: "sede", label: "Sede", w: "minmax(130px,1fr)", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") || "—" },
               { key: "listo", label: "Listo para cobrar", w: "minmax(160px,1.2fr)", cell: (x) => x.porCobrar > 0 ? <span style={{ display: "grid", minWidth: 0 }}><span className="dc-tp__num is-mal" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>S/ {M.sol2(x.porCobrar)}{x.vencido > 0 ? <small className="dc-cob__venc"> · vencido</small> : null}</span>{(x.terminadosItems || []).length > 0 && <small className="dc-tp__sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(x.terminadosItems || []).map((f) => f.nombre).filter(Boolean).join(" · ")}</small>}</span> : <span className="dc-tp__sub">—</span> },
-              { key: "cob", label: "Pagado del plan", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE")} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
+              { key: "cob", label: "Pagado del plan", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
               { key: "saldo", label: "Saldo del plan", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {M.sol2(x.saldo)}</span> },
               { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
             ] }} cols={[
@@ -5979,7 +5988,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             {!cajaAbierta && (jornadaAbiertaPrevia?.id || puedeAbrirCaja) && <button type="button" onClick={() => setTab(jornadaAbiertaPrevia?.id ? "historial" : "apertura")}>{jornadaAbiertaPrevia?.id ? "Ir a historial" : "Abrir caja"}</button>}
           </div>
           <div className="dc-cob__hoy" hidden={!boletasHoyActivas.some((b) => b.moneda === "USD")}>
-            <div><small>Cobrado hoy</small><b>S/ {montoHoy.toLocaleString("es-PE")}</b></div>
+            <div><small>Cobrado hoy</small><b>S/ {montoHoy.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></div>
             <div><small>Boletas hoy</small><b className="is-neutro">{boletasHoyActivas.length}</b></div>            {boletasHoyActivas.some((b) => b.moneda === "USD") && <div className="dc-cob__usd"><small>Recibido en dólares</small><b>US$ {boletasHoyActivas.filter((b) => b.moneda === "USD").reduce((a, b) => a + (Number(b.montoOriginal) || 0), 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</b><span>Ya sumado en soles al tipo de cambio del cobro</span></div>}
           </div>
           <Card className="dc-cob__boletas">
@@ -5987,8 +5996,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         {boletasHoy.length === 0 ? <Vacio icon={<FileText size={24} strokeWidth={1.75} />} titulo="Sin boletas hoy" sub="Los comprobantes del día aparecerán aquí." />
           : boletasHoy.map((b, i) => (
             <div key={b.id || i} className="dc-bolrow" style={{ borderTop: i ? "1px solid var(--dc-line)" : "none", opacity: b.anulado ? 0.65 : 1 }}>
-              <div style={{ background: b.anulado ? "var(--dc-danger-soft)" : "var(--dc-ok-soft)", color: b.anulado ? "var(--dc-danger-700)" : "var(--dc-ok-700)", width: 34, height: 34, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center", flexShrink: 0 }}><CheckCircle2 size={17} strokeWidth={1.75} /></div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }}>{b.paciente}{b.anulado ? <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-danger-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>Anulado</span> : null}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{b.concepto} – {b.metodo}{b.anulado && b.anuladoMotivo ? ` – ${b.anuladoMotivo}` : ""}</div></div>
+              <div style={{ background: b.anulado ? "var(--dc-danger-soft)" : "var(--dc-ok-soft)", color: b.anulado ? "var(--dc-danger-700)" : "var(--dc-ok-700)", width: 34, height: 34, borderRadius: "var(--dc-r-sm)", display: "grid", placeItems: "center", flexShrink: 0 }}><Receipt size={17} strokeWidth={1.75} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY }} title={b.paciente}>{b.paciente}{b.anulado ? <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 500, color: "var(--dc-danger-700)", background: "var(--dc-danger-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>Anulado</span> : null}</div><div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{conceptoVisible(b.concepto)} – {b.metodo}{b.anulado && b.anuladoMotivo ? ` – ${b.anuladoMotivo}` : ""}</div></div>
               <SunatChip estado={conectado ? b.sunatEstado : "demo"} mensaje={b.sunatMensaje} />
               <div style={{ fontWeight: 600, color: b.anulado ? "var(--dc-ink-400)" : NAVY, fontFamily: DISPLAY_FONT, textDecoration: b.anulado ? "line-through" : "none", textAlign: "right" }}>S/ {M.sol2(b.monto)}{b.moneda === "USD" && b.montoOriginal != null && <small className="dc-usd-chip">US$ {Number(b.montoOriginal).toFixed(2)}</small>}</div>
               <button onClick={() => abrirBoleta(b)} style={{ background: "none", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", color: DS.c.primary, fontWeight: 500, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}><FileText size={14} strokeWidth={1.75} /> Boleta</button>
@@ -6007,7 +6016,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {conectado && (
         <Card style={{ overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: verHist ? "1px solid var(--dc-line)" : "none", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Todos los pagos</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{histFiltrado.length} pagos este mes – S/ {histFiltrado.reduce((s, p) => s + p.monto, 0).toLocaleString()} – {sedeNombre()}</div></div>
+            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Todos los pagos</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{histFiltrado.length} pagos este mes · {sol(histFiltrado.reduce((s, p) => s + (Number(p.monto) || 0), 0))} · {sedeNombre()}</div></div>
             <Btn small kind="ghost" onClick={() => setVerHist((v) => !v)}>{verHist ? "Ocultar" : "Ver historial"}</Btn>
           </div>
           {histError && (
@@ -6292,7 +6301,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   ]}>{(lista) => lista.map((m, i) => { const [Ico, col] = medioUi(m.metodo); return (
                     <div key={m.id || m._k || i} className="dc-cz__mov">
                       <span className="dc-cz__mico" style={{ "--m": col }}><Ico size={14} strokeWidth={2} /></span>
-                      <div><b>{m.paciente}</b><small>{m.hora ? `${m.hora} – ` : ""}{m.concepto || "Cobro"}</small></div>
+                      <div><b>{m.paciente}</b><small>{m.hora ? `${m.hora} – ` : ""}{conceptoVisible(m.concepto) || "Cobro"}</small></div>
                       <em>{nfmt(m.monto)}</em>
                       {m.id && <div className="dc-cz__macc">
                         <button type="button" className="dc-mini-btn" title="Enviar boleta por WhatsApp" aria-label="Enviar boleta por WhatsApp" onClick={() => api.pagos.enviarWa(m.id).then((r) => notify(r?.ok ? `Boleta enviada a ${m.paciente} por WhatsApp.` : "No se pudo enviar (¿el paciente tiene teléfono?).")).catch(() => notify("No se pudo enviar la boleta."))}><MessageSquare size={13} strokeWidth={2} /></button>
@@ -6340,7 +6349,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             // R-07: al reabrir una jornada el servidor guarda los cierres anteriores
             // (sesionesPrevias); antes la pantalla solo mostraba el último y los demás
             // desaparecían. Hora de Lima con el día si no es el de la jornada (reaperturas).
-            const horaHist = (x) => { if (!x) return "—"; const t = new Date(x); return Number.isNaN(t.getTime()) ? "—" : t.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }); };
+            const horaHist = (x) => { if (!x) return "—"; const t = new Date(x); return Number.isNaN(t.getTime()) ? "—" : t.toLocaleTimeString("es-PE", { hour: "2-digit", hour12: false, minute: "2-digit", timeZone: "America/Lima" }); };
             const diaHist = (x, fecha) => { const y = x ? ymdLima(x) : null; return y && y !== fecha ? ` (${fechaDMA(y).slice(0, 5)})` : ""; };
             const resTxt = (dif, fmtM) => { const e = resultadoCierre(dif); return e == null ? "sin arqueo" : e === "cuadra" ? "cuadra" : `${e === "falta" ? "faltan" : "sobran"} ${fmtM(Math.abs(dif))}`; };
             const textoCierrePrevio = (c, fecha) => [
@@ -6389,7 +6398,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           <div className="dc-jor">
             {lista.map((r) => {
               const f = new Date(`${r.fecha}T12:00:00`);
-              const hora = (x) => x ? new Date(x).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "—";
+              const hora = (x) => x ? new Date(x).toLocaleTimeString("es-PE", { hour: "2-digit", hour12: false, minute: "2-digit" }) : "—";
               const d = r.diferencia != null ? Number(r.diferencia) : null;
               const est = estDe(r, d);
               // El color de la tarjeta avisa también un descuadre en dólares (C3).
@@ -6471,7 +6480,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         // C5: cada movimiento lleva su monto en soles (`soles`, el que suma) y, si fue en
         // dólares, su monto en US$ para mostrarlo tal cual.
         const movs = [
-          ...boletasHoyActivas.map((b, i) => ({ id: "i" + i, tipo: "ingreso", concepto: b.concepto || "Cobro", detalle: b.paciente, soles: Number(b.monto) || 0, usd: b.moneda === "USD" ? Number(b.montoOriginal) || null : null, metodo: b.mixto ? "mixto" : String(b.metodo || "").toLowerCase() })),
+          ...boletasHoyActivas.map((b, i) => ({ id: "i" + i, tipo: "ingreso", concepto: conceptoVisible(b.concepto) || "Cobro", detalle: b.paciente, soles: Number(b.monto) || 0, usd: b.moneda === "USD" ? Number(b.montoOriginal) || null : null, metodo: b.mixto ? "mixto" : String(b.metodo || "").toLowerCase() })),
           ...egresosHoy.map((e) => ({ id: "e" + e.id, tipo: "egreso", concepto: e.concepto, detalle: e.categoria, soles: egresoEnSoles(e, tcRef), usd: e.moneda === "USD" ? Number(e.monto) : null, metodo: e.metodo, eg: e })),
         ];
         const totUsd = { ingreso: totCobHoy.usd, egreso: totEgresosHoyUsd };
@@ -6495,7 +6504,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <header>
                   <span className="dc-flujo__ico"><Ico size={18} strokeWidth={2} /></span>
                   <div><h3>{tit}</h3><span>{sub} – {lista.length} {lista.length === 1 ? "movimiento" : "movimientos"}{totUsd[t] ? ` · incluye ${usd2(totUsd[t])} al TC de cada uno` : ""}</span></div>
-                  <b>{t === "ingreso" ? "+" : "−"} S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+                  <b>{tot ? (t === "ingreso" ? "+ " : "− ") : ""}S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
                 </header>
                 {t === "egreso" && egresosSinPermiso ? (
                   <div className="dc-flujo__vacio">Sin permiso para ver los egresos de esta caja.</div>
@@ -6663,6 +6672,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             <span className="dc-flujo__neto is-aviso" title="Con el cupo retenido hasta que vence el link">Esperando pago <b>{r.pendientes}</b></span>
             <span className="dc-flujo__neto" title="Pago confirmado por Izipay">Pagados <b>{r.pagados}</b> · <b>S/ {M.sol2(r.montoPagado)}</b></span>
             <span className="dc-flujo__neto is-mute" title="Vencieron sin pago: el cupo se liberó">Vencidos <b>{r.caducados}</b></span>
+            {r.anulados > 0 && <span className="dc-flujo__neto is-mute" title="Anulados por la clínica">Anulados <b>{r.anulados}</b></span>}
+            {linksVis.length > MAX_LINKS && <span className="dc-flujo__neto is-mute" title="La lista muestra los más recientes; los contadores suman todos los de la sede">Se ven los {MAX_LINKS} más recientes de <b>{linksVis.length}</b></span>}
             {actualizar}
             {nuevoLink}
           </>} vistaClave="caja_links" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 980, cols: [
@@ -6748,8 +6759,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           </div>
           {linksVis.length === 0 ? <Card style={{ display: "grid", justifyItems: "center", padding: 18 }}><Vacio icon={<Zap size={22} strokeWidth={1.75} />} titulo="Sin links" sub="Crea el primer link de pago." />{nuevoLink}</Card> : (
           <ListaFiltrable rows={linksVis} sub="links" extra={<>
-            {pend > 0 && <span className="dc-flujo__neto is-aviso" title={`${activos.length} esperando pago`}>Pendiente <b>S/ {pend.toLocaleString("es-PE")}</b></span>}
-            {cobrado > 0 && <span className="dc-flujo__neto" title="Pagado por link">Cobrado <b>S/ {cobrado.toLocaleString("es-PE")}</b></span>}
+            {pend > 0 && <span className="dc-flujo__neto is-aviso" title={`${activos.length} esperando pago`}>Pendiente <b>S/ {pend.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>}
+            {cobrado > 0 && <span className="dc-flujo__neto" title="Pagado por link">Cobrado <b>S/ {cobrado.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>}
             {nuevoLink}
           </>} vistaClave="caja_links" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 700, cols: [
             { key: "p", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (l) => <PersonaCelda nombre={l.paciente} /> },
@@ -6937,7 +6948,7 @@ function Tickets({ citas, setCitas, fichas = {}, notify }) {
         <KpiCard label="Tickets de hoy" value={ordenadas.length} color={NAVY} icon={<Ticket size={18} strokeWidth={1.75} />} sub="citas de tu sede" />
         <KpiCard label="En sala" value={enSala} color="var(--dc-ok-700)" icon={<UserCheck size={18} strokeWidth={1.75} />} sub="pacientes presentes" />
         <KpiCard label="Por cobrar" value={porCobrar.length} color={porCobrar.length ? RED : "var(--dc-ok-700)"} icon={<CreditCard size={18} strokeWidth={1.75} />} sub="con saldo pendiente" />
-        <KpiCard label="Saldo en sala" value={`S/ ${saldoTotal.toLocaleString()}`} color={TEAL} icon={<Wallet size={18} strokeWidth={1.75} />} sub="por recaudar hoy" />
+        <KpiCard label="Saldo en sala" value={`S/ ${saldoTotal.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} color={TEAL} icon={<Wallet size={18} strokeWidth={1.75} />} sub="por recaudar hoy" />
       </div>
       <DataTable titulo="Tickets de citas" sub="tickets" minWidth={1040} rows={ordenadas} onRowClick={(c) => setDetalle(c)} defaultSort={{ key: "hora", dir: "asc" }} empty={<Vacio icon={<Ticket size={24} strokeWidth={1.75} />} titulo="Sin tickets" sub="No hay citas en tu sede por ahora." />} cols={[
         { key: "id", label: "Ticket", w: "minmax(72px,0.6fr)", a: "right", get: (c) => String(c.id).padStart(3, "0"), cell: (c) => <span style={{ fontWeight: 600, color: NAVY, fontSize: 13, fontFamily: DISPLAY_FONT }}>#{String(c.id).padStart(3, "0")}</span> },
@@ -7126,18 +7137,18 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     );
   }
   const kpis = [
-    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString()}`, icon: Wallet, color: NAVY, delta: deltaProd, deltaTxt: compTxt,
-      sub: mesAnterior > 0 && deltaProd == null ? (comp ? `${comp.rango}: sin producción para comparar` : `mes anterior: S/ ${mesAnterior.toLocaleString()} en total`) : undefined,
-      desc: deltaProd != null ? `Suma de tus procedimientos terminados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% frente a lo que llevabas del ${comp.rango} (S/ ${Math.round(baseComp).toLocaleString()}).`
-        : mesAnterior > 0 ? (comp ? `Suma de tus procedimientos terminados este mes. Del ${comp.rango} no tuviste producción, así que no hay porcentaje que comparar (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`
-          : `Suma de tus procedimientos terminados este mes. No hay dato de lo que llevabas el mes anterior a estas alturas, así que no se calcula porcentaje (S/ ${mesAnterior.toLocaleString()} en todo el mes anterior).`)
+    { l: "Producción del mes", v: `S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Wallet, color: NAVY, delta: deltaProd, deltaTxt: compTxt,
+      sub: mesAnterior > 0 && deltaProd == null ? (comp ? `${comp.rango}: sin producción para comparar` : `mes anterior: S/ ${mesAnterior.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en total`) : undefined,
+      desc: deltaProd != null ? `Suma de tus procedimientos terminados este mes. Vas ${deltaProd >= 0 ? "+" : ""}${deltaProd}% frente a lo que llevabas del ${comp.rango} (S/ ${Math.round(baseComp).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
+        : mesAnterior > 0 ? (comp ? `Suma de tus procedimientos terminados este mes. Del ${comp.rango} no tuviste producción, así que no hay porcentaje que comparar (S/ ${mesAnterior.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en todo el mes anterior).`
+          : `Suma de tus procedimientos terminados este mes. No hay dato de lo que llevabas el mes anterior a estas alturas, así que no se calcula porcentaje (S/ ${mesAnterior.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en todo el mes anterior).`)
         : "Suma de tus procedimientos terminados este mes. Aún no hay mes anterior para comparar." },
     // El porcentaje sale del que tiene pactado este médico (backend: porcentajeComision),
     // no de un 40% escrito a mano: el importe ya se calculaba con el suyo y la etiqueta
     // decía otra cosa.
-    { l: pctComision != null ? `Mi comisión (${pctComision}%)` : "Mi comisión", v: `S/ ${comision.toLocaleString()}`, icon: Percent, color: RED, sub: conectado ? undefined : "Se paga el 5 del mes", desc: pctComision != null ? `El ${pctComision}% de tu producción (S/ ${mesProd.toLocaleString()}).${conectado ? "" : " Se liquida el día 5 del mes siguiente."}` : `Sobre una producción de S/ ${mesProd.toLocaleString()}.${conectado ? "" : " Se liquida el día 5 del mes siguiente."} Tu porcentaje lo fija administración.` },
+    { l: pctComision != null ? `Mi comisión (${pctComision}%)` : "Mi comisión", v: `S/ ${comision.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Percent, color: RED, sub: conectado ? undefined : "Se paga el 5 del mes", desc: pctComision != null ? `El ${pctComision}% de tu producción (S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).${conectado ? "" : " Se liquida el día 5 del mes siguiente."}` : `Sobre una producción de S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.${conectado ? "" : " Se liquida el día 5 del mes siguiente."} Tu porcentaje lo fija administración.` },
     // M4-12: «1 cita hoy», «1 atención del mes» (decía «1 citas», «1 atenciones»).
-    { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString()}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: restaHoy > 0 ? `S/ ${restaHoy.toLocaleString()} esperan su evolución` : `${pluralEs(citasHoyN, "cita", "citas")} hoy`, desc: `Lo producido en tus atenciones de hoy (${pluralEs(citasHoyN, "cita programada", "citas programadas")}).${restaHoy > 0 ? ` No suma S/ ${restaHoy.toLocaleString()} de atenciones con la evolución pendiente: cuentan al completarla.` : ""}` },
+    { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: restaHoy > 0 ? `S/ ${restaHoy.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} esperan su evolución` : `${pluralEs(citasHoyN, "cita", "citas")} hoy`, desc: `Lo producido en tus atenciones de hoy (${pluralEs(citasHoyN, "cita programada", "citas programadas")}).${restaHoy > 0 ? ` No suma S/ ${restaHoy.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de atenciones con la evolución pendiente: cuentan al completarla.` : ""}` },
     { l: "Promedio por atención", v: `S/ ${ticket}`, icon: CreditCard, color: DS.c.primary, sub: `${pluralEs(atenciones, "atención", "atenciones")} del mes`, desc: `Producción del mes dividida entre ${atenciones === 1 ? "tu única atención" : `tus ${atenciones} atenciones`}. Subirlo con tratamientos de mayor valor mejora tu comisión.` },
     { l: "Tasa de ausentismo", v: noShow != null ? `${noShow}%` : "—", icon: TrendingDown, color: DS.c.primary, sub: "de tus citas", desc: `Porcentaje de citas canceladas o no asistidas sobre tu agenda. Los recordatorios automáticos ayudan a bajarlo.` },
     // La calificación real de este médico (backend: calificacion / resenas). Era un
@@ -7162,7 +7173,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     <div style={{ display: "grid", gap: 16 }}>
       <Card style={{ padding: 16, background: "linear-gradient(90deg,var(--dc-bg),#fff)", border: "1px solid var(--dc-info-soft)" }}>
         <div style={{ fontSize: 14, color: "var(--dc-info-ink)", display: "flex", alignItems: "center", gap: 9 }}><Shield size={17} strokeWidth={1.75} /> Reporte personal de {usuario.nombre}. Solo tú ves estos números — tus colegas no aparecen aquí.</div>
-        {restaMes > 0 && <div role="note" style={{ fontSize: 13, color: "var(--dc-warn-700)", display: "flex", alignItems: "center", gap: 9, marginTop: 8 }}><ClipboardList size={16} strokeWidth={1.75} /> S/ {restaMes.toLocaleString()} de {pluralEs(pendEvoMes.length, "atención", "atenciones")} con la evolución pendiente todavía no cuentan: suman a tu producción y comisión al completarla.</div>}
+        {restaMes > 0 && <div role="note" style={{ fontSize: 13, color: "var(--dc-warn-700)", display: "flex", alignItems: "center", gap: 9, marginTop: 8 }}><ClipboardList size={16} strokeWidth={1.75} /> S/ {restaMes.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de {pluralEs(pendEvoMes.length, "atención", "atenciones")} con la evolución pendiente todavía no cuentan: suman a tu producción y comisión al completarla.</div>}
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 14 }}>
@@ -7182,7 +7193,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
         <Card style={{ padding: 22 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
             <h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Mi producción — últimos 6 meses</h3>
-            <span style={{ fontSize: 12, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 0, borderTop: "2px dashed var(--dc-ink-200)" }} /> Promedio S/ {promedio.toLocaleString()}</span>
+            <span style={{ fontSize: 12, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 0, borderTop: "2px dashed var(--dc-ink-200)" }} /> Promedio S/ {promedio.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 10, height: 160 }}>
             {tend.length === 0 ? (
@@ -7204,7 +7215,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
           <div style={{ textAlign: "center", marginBottom: 14 }}>
             <div style={{ fontSize: 27, fontWeight: 600, color: meta == null ? "var(--dc-ink-400)" : pct >= 100 ? "var(--dc-ok-700)" : NAVY, fontFamily: DISPLAY_FONT }}>{meta == null ? "—" : pct + "%"}</div>
             <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>
-              {meta == null ? `S/ ${mesProd.toLocaleString()} producidos este mes` : `S/ ${mesProd.toLocaleString()} de S/ ${meta.toLocaleString()}`}
+              {meta == null ? `S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} producidos este mes` : `S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de S/ ${meta.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </div>
           </div>
           <div style={{ height: 12, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${pct || 0}%`, height: "100%", background: pct >= 100 ? "var(--dc-ok)" : `linear-gradient(90deg,${RED},var(--dc-red))` }} /></div>
@@ -7215,8 +7226,8 @@ function MiProduccion({ usuario, citas, sedes = null }) {
             {meta == null
               ? <>Aún no tienes una meta del mes. La fija gerencia o administración desde <strong style={{ color: NAVY }}>Producción y comisiones</strong>.</>
               : mesProd >= meta
-                ? <>Meta cumplida: llevas <strong style={{ color: "var(--dc-ok-700)" }}>S/ {(mesProd - meta).toLocaleString()}</strong> por encima.</>
-                : <>Te faltan <strong style={{ color: NAVY }}>S/ {(meta - mesProd).toLocaleString()}</strong> para tu meta.{ticket > 0 && <> Son <strong>{Math.ceil((meta - mesProd) / ticket)}</strong> atenciones más a tu ticket promedio.</>}</>}
+                ? <>Meta cumplida: llevas <strong style={{ color: "var(--dc-ok-700)" }}>S/ {(mesProd - meta).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> por encima.</>
+                : <>Te faltan <strong style={{ color: NAVY }}>S/ {(meta - mesProd).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> para tu meta.{ticket > 0 && <> Son <strong>{Math.ceil((meta - mesProd) / ticket)}</strong> atenciones más a tu ticket promedio.</>}</>}
           </div>
         </Card>
       </div>
@@ -7230,7 +7241,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
             {porTrat.length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>Aún no hay producción registrada este mes por tipo de tratamiento.</div>}
             {porTrat.map((t) => { const p = Math.round((t.v / totalTrat) * 100); return (
               <div key={t.n}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}><span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontWeight: 500 }}><span style={{ width: 10, height: 10, borderRadius: "var(--dc-r-sm)", background: t.c }} /> {t.n}</span><span style={{ fontWeight: 500, color: NAVY }}>S/ {t.v.toLocaleString()} <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– {p}%</span></span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}><span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontWeight: 500 }}><span style={{ width: 10, height: 10, borderRadius: "var(--dc-r-sm)", background: t.c }} /> {t.n}</span><span style={{ fontWeight: 500, color: NAVY }}>S/ {t.v.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style={{ color: "var(--dc-ink-500)", fontWeight: 500 }}>– {p}%</span></span></div>
                 <div style={{ height: 8, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${p}%`, height: "100%", background: t.c }} /></div>
               </div>
             ); })}
@@ -7322,7 +7333,7 @@ function Integraciones({ notify }) {
           <p>Proveedores reales del mercado peruano para tu clínica</p>
         </div>
         <div className="dc-esp-hero__cifras">
-          {incidenciasInt > 0 && <div><b style={{ color: "var(--dc-warn-600)" }}>{incidenciasInt}</b><span>Con incidencia</span></div>}
+          {incidenciasInt > 0 && <div><b>{incidenciasInt}</b><span>Con incidencia</span></div>}
           <div><b>{pendientesInt}</b><span>Por activar</span></div>
           <div><b>{cuentaInt.disponibles}</b><span>Disponibles</span></div>
           <div><b>{its.filter((i) => i.rec).length}</b><span>Recomendadas</span></div>
@@ -7408,7 +7419,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     if (ua) {
       try {
         const d = new Date(ua);
-        ultimo = Number.isNaN(d.getTime()) ? String(ua) : d.toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" });
+        ultimo = Number.isNaN(d.getTime()) ? String(ua) : d.toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
       } catch { ultimo = String(ua); }
     }
     // Todas sus sedes (UUID), no solo la primera. Sin ninguna, solo los roles de toda la
@@ -7676,7 +7687,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
           { key: "email", label: "Correo", w: "minmax(160px,1.4fr)", a: "left", get: (u) => u.email || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || "—"}</span> },
           { key: "rol", label: "Rol", w: "132px", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
           { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? "Sin sede" : etiquetaSedes(u.sedes)), cell: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>Sin sede</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span>) },
-          { key: "ultimo", label: "Acceso", w: "104px", a: "center", get: (u) => u.ultimo, cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{u.ultimo}</span> },
+          { key: "ultimo", label: "Último acceso", w: "116px", a: "center", get: (u) => u.ultimo, cell: (u) => { const [f, h] = String(u.ultimo || "").split(", "); return <span style={{ display: "grid", fontSize: 13, lineHeight: 1.3, color: "var(--dc-ink-500)", whiteSpace: "nowrap" }}><span>{f}</span>{h && <small style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{h}</small>}</span>; } },
           { key: "estado", label: "Estado", w: "96px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
           { key: "acc", label: "Acciones", w: conectado && puedeResetUs ? "136px" : "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !(puedeEditarUs || puedeBajaUs) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Tu rol puede ver los usuarios, pero no cambiarlos.">Solo lectura</span> : !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc">{puedeEditarUs && <button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button>}{conectado && puedeResetUs && u.activo && <button type="button" className="dc-row-action" aria-label={`Restablecer clave de ${u.nombre}`} title="Restablecer clave" onClick={() => resetPass(u)}><KeyRound size={14} strokeWidth={2} /></button>}{/* Desactivar es DELETE (baja); reactivar es PUT (editar). */}{(u.activo ? puedeBajaUs : puedeEditarUs) && <button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : puedeBajaUs ? "Activar" : "Activar (darlo de baja otra vez lo hace la administración general)"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button>}{/* H-T6: con sesión «Eliminar» hacía el mismo DELETE que Desactivar (no borra): queda solo Desactivar. */}{!conectado && puedeBajaUs && <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button>}</div> },
         ]} />
@@ -7822,7 +7833,7 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       {!!auth.token && matrizError && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span><b>Error al cargar permisos.</b> {matrizError} Lo que ves puede ser solo local.</span></div>}
-      {!!auth.token && !matrizError && <div className="fm-aviso-edad is-info"><Shield size={15} strokeWidth={2} /><span><b>Fuente de verdad: el servidor.</b> {desdeServidor ? "Matriz cargada del servidor. Pulsa «Guardar en el servidor» para persistir; el menú se refresca al guardar." : "Cargando la matriz del servidor…"}</span></div>}
+      {!!auth.token && !matrizError && <div className="fm-aviso-edad is-info"><Shield size={15} strokeWidth={2} /><span>{desdeServidor ? <>Los permisos que ves son los vigentes. Los cambios se aplican al pulsar <b>Guardar cambios</b>; el menú de cada usuario se actualiza al guardar.</> : "Cargando los permisos…"}</span></div>}
       <section className="dc-esp-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>{ROLES_ASIGNABLES.length}</b><span>roles del personal</span></div>
@@ -7830,13 +7841,12 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{MODULOS.length}</b><span>Módulos</span></div>
-          <div><b>{ACCIONES.length}</b><span>Acciones por módulo</span></div>
           <div><b>{nAcc}</b><span>Permisos de {R.label.toLowerCase()}</span></div>
         </div>
         <span />
         <div className="dc-hero-acc">
           <button type="button" className="dc-esp-hero__agregar" onClick={restaurar}><Repeat size={14} strokeWidth={1.9} /> Restaurar rol</button>
-          <button type="button" className="dc-esp-hero__btn" onClick={guardar} disabled={guardando}><Check size={14} strokeWidth={2} /> {guardando ? "Guardando…" : auth.token ? "Guardar en el servidor" : "Guardar"}</button>
+          <button type="button" className="dc-esp-hero__btn" onClick={guardar} disabled={guardando}><Check size={14} strokeWidth={2} /> {guardando ? "Guardando…" : "Guardar cambios"}</button>
         </div>
       </section>
       <div className="dc-perm dc-perm--h">
@@ -7891,7 +7901,7 @@ function Plataforma({ notify }) {
   const PLANC = { grande: "var(--dc-navy)", mediana: DS.c.primary, pequena: DS.c.accent };
   const widgets = [
     { id: "mrr", title: "MRR – ingreso recurrente mensual", icon: TrendingUp, color: DS.c.primary, w: 2, h: 2, render: () => (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}><div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}><span style={{ fontSize: 21, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>S/ {mrr.toLocaleString()}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)" }}>+9% MoM</span></div><div style={{ flex: 1, minHeight: 0 }}><AreaChart data={mrrTrend} color={DS.c.primary} formato={(v) => `S/ ${Math.round(v).toLocaleString()}`} /></div></div>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}><div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}><span style={{ fontSize: 21, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT }}>S/ {mrr.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)" }}>+9% MoM</span></div><div style={{ flex: 1, minHeight: 0 }}><AreaChart data={mrrTrend} color={DS.c.primary} formato={(v) => `S/ ${Math.round(v).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} /></div></div>
     ) },
     { id: "clinicas", title: "Clínicas conectadas", icon: Building2, color: NAVY, w: 1, h: 1, render: () => kpiBig(clinicas.length, `${activas} activas`, NAVY) },
     { id: "activas", title: "Activas", icon: CheckCircle2, color: "var(--dc-ok-700)", w: 1, h: 1, render: () => kpiBig(activas, "de pago", "var(--dc-ok-700)") },
@@ -8082,18 +8092,18 @@ function Auditoria() {
         const accion = a.accion || "—";
         const creado = a.creadoEn ? new Date(a.creadoEn) : null;
         const fecha = creado && !isNaN(creado)
-          ? creado.toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" })
+          ? creado.toLocaleString("es-PE", { timeZone: "America/Lima", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
           : "—";
         return {
           ...base,
           fecha,
           dia: creado && !isNaN(creado) ? ymdLima(creado) : "",
           diaTxt: creado && !isNaN(creado) ? creado.toLocaleDateString("es-PE", { timeZone: "America/Lima", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }) : "",
-          hora: creado && !isNaN(creado) ? creado.toLocaleTimeString("es-PE", { timeZone: "America/Lima", hour: "2-digit", minute: "2-digit" }) : null,
+          hora: creado && !isNaN(creado) ? creado.toLocaleTimeString("es-PE", { timeZone: "America/Lima", hour: "2-digit", hour12: false, minute: "2-digit" }) : null,
           usuario: a.usuario || "—",
           rol: a.rol || "—",
           // H-12 (admin): los códigos del servidor se muestran con su nombre, no en crudo.
-          accion: ({ HC_ACCESO: "Acceso a historia clínica", LOGIN: "Inicio de sesión", LOGOUT: "Cierre de sesión", PAGO: "Cobro registrado", PAGO_ANULADO: "Cobro anulado", CAJA_APERTURA: "Apertura de caja", CAJA_CIERRE: "Cierre de caja", EGRESO: "Egreso de caja", USUARIO_ALTA: "Alta de usuario", USUARIO_BAJA: "Baja de usuario", USUARIO_CAMBIO: "Cambio de usuario" })[accion] || accion,
+          accion: ({ HC_ACCESO: "Acceso a historia clínica", LOGIN: "Inicio de sesión", LOGOUT: "Cierre de sesión", PAGO: "Cobro registrado", PAGO_ANULADO: "Cobro anulado", PAGO_ANULACION: "Cobro anulado", CAJA_APERTURA: "Apertura de caja", CAJA_CIERRE: "Cierre de caja", EGRESO: "Egreso de caja", USUARIO_ALTA: "Alta de usuario", USUARIO_BAJA: "Baja de usuario", USUARIO_CAMBIO: "Cambio de usuario" })[accion] || (/^[A-Z0-9_]+$/.test(String(accion || "")) ? String(accion).toLowerCase().replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : accion),
           nivel: "ok",
           dispositivo: base.dispositivo || resumenDispositivo(base.userAgent),
         };
@@ -8205,6 +8215,8 @@ function Auditoria() {
 
 /* ---- Recetas médicas con firma electrónica (paridad con Doctocliq) ---- */
 // Estado de la receta: «Firmada» solo si consta; si no, «Emitida».
+// Indicaciones de la receta: el texto del médico, la alerta de alergia aparte y el original para el PDF.
+const indicRx = (raw) => { const { texto, alertas } = partirIndicaciones(raw); return { indic: texto, alertasRx: alertas, indicRaw: raw ?? "" }; };
 const EstadoRx = ({ r }) => (r.firmada
   ? <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
   : <span className="dc-pill"><FileText size={12} strokeWidth={2} /> Emitida</span>);
@@ -8236,7 +8248,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       if (!p) return;
       // H-08: los dos formatos de ítem (ficha y módulo) se leen con la misma función.
       const items = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) }));
-      out.push({ id: pid + "-" + i, pacienteId: p.id, paciente: p.nombre, dni: p.dni || "", fecha: r.fecha, items, itemsRaw: itemsDeReceta(r), indic: textoIndicaciones(r.indicaciones), firmada: true, medico: r.medico || "", sede: r.sede, demoIdx: i });
+      out.push({ id: pid + "-" + i, pacienteId: p.id, paciente: p.nombre, dni: p.dni || "", fecha: r.fecha, items, itemsRaw: itemsDeReceta(r), ...indicRx(r.indicaciones), firmada: true, medico: r.medico || "", sede: r.sede, demoIdx: i });
     }));
     return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   }, [fichas, pacProp]);
@@ -8254,7 +8266,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     setRecetasLeyendo(true);
     api.recetas.listar().then((rows) => {
       setRecetasError(null); setRecetasLeyendo(false);
-      setRecetasRem((rows || []).map((r) => { const its = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) })); const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); const cop = r.cop || med?.cop || ""; return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, indic: textoIndicaciones(r.indicaciones), firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl || (r.medicoId && conCop(cop))), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop, items: its, itemsRaw: itemsDeReceta(r) }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")));
+      setRecetasRem((rows || []).map((r) => { const its = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) })); const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); const cop = r.cop || med?.cop || ""; return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, ...indicRx(r.indicaciones), firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl || (r.medicoId && conCop(cop))), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop, items: its, itemsRaw: itemsDeReceta(r) }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")));
     }).catch((e) => { setRecetasLeyendo(false); setRecetasError(esSinPermiso(e) ? "sin permiso" : msgServidor(e, "error del servidor")); });
   };
   useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto, medRemoto]); // eslint-disable-line
@@ -8281,7 +8293,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     const pac = pacientes.find((p) => (r.pacienteId != null && String(p.id) === String(r.pacienteId)) || p.nombre === r.paciente) || {};
     const ok = imprimirRecetaDoc({
       paciente: { nombre: r.paciente, dni: r.dni || pac.dni || "", fechaNacimiento: pac.nacimiento || pac.fechaNacimiento || "" },
-      receta: { fecha: r.fecha, items: r.itemsRaw ?? r.items.map((it) => ({ medicamento: it.med, detalle: it.detalle })), indicaciones: r.indic, medico: r.medico, medicoId: r.medicoId },
+      receta: { fecha: r.fecha, items: r.itemsRaw ?? r.items.map((it) => ({ medicamento: it.med, detalle: it.detalle })), indicaciones: r.indicRaw ?? r.indic, medico: r.medico, medicoId: r.medicoId },
       cop: med?.cop || "",
       datos: !conectado && r.sede != null ? datosDemo(numSede(r.sede)) : undefined,
     });
@@ -8418,13 +8430,16 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
               <article key={r.id} className="dc-rx2">
                 <header>
                   {av(r.paciente)}
-                  <div><b>{r.paciente}</b><span><Calendar size={12} strokeWidth={1.9} /> {fechaLegible(r.fecha)}{r.medico ? ` · ${r.medico}` : ""}</span></div>
+                  <div><b>{r.paciente}</b><span className="dc-rx2__meta"><Calendar size={12} strokeWidth={1.9} /><span>{fechaLegible(r.fecha)}{r.medico ? <> · <span className="dc-rx2__doc">{r.medico}</span></> : null}</span></span></div>
                   <EstadoRx r={r} />
                 </header>
-                <ul>
-                  {(r.items || []).map((it, k) => <li key={k}><span className="dc-rx2__rx">℞</span><div><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div></li>)}
-                </ul>
-                {r.indic && <p className="dc-rx2__indic"><Info size={13} strokeWidth={2} /> {r.indic}</p>}
+                {(r.items || []).length > 0 ? (
+                  <ul>
+                    {r.items.map((it, k) => <li key={k}><span className="dc-rx2__rx">℞</span><div><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div></li>)}
+                  </ul>
+                ) : <p className="dc-rx2__sin">Sin medicamentos registrados.</p>}
+                {(r.alertasRx || []).length > 0 && <p className="dc-rx2__alerta"><AlertTriangle size={13} strokeWidth={2} /><span>Emitida pese a alerta de alergia: {r.alertasRx.join(" · ")}</span></p>}
+                {r.indic && <p className="dc-rx2__indic"><Info size={13} strokeWidth={2} /><span>{r.indic}</span></p>}
                 <footer className="dc-rx2__pie"><BotonPDF chico onClick={() => imprimirReceta(r)}>Imprimir receta</BotonPDF>{puedeBorrarRx && <button type="button" className="dc-mini-btn" aria-label={`Eliminar receta de ${r.paciente}`} title="Eliminar receta" onClick={() => borrarReceta(r)} style={{ color: "var(--dc-danger-700)", marginLeft: 6 }}><Trash2 size={13} strokeWidth={2} /></button>}</footer>
               </article>
             );
@@ -8454,7 +8469,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                         {g.items.map((r) => (
                           <li key={r.id}>
                             <span className="dc-rx2__gf">{fechaLegible(r.fecha)}</span>
-                            <div>{(r.items || []).map((it, k) => <div key={k} className="dc-rx2__gm"><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div>)}{r.indic && <small className="dc-rx2__gi">{r.indic}</small>}</div>
+                            <div>{(r.items || []).map((it, k) => <div key={k} className="dc-rx2__gm"><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div>)}{(r.alertasRx || []).length > 0 && <small className="dc-rx2__gi dc-rx2__gi--alerta">Emitida pese a alerta de alergia: {r.alertasRx.join(" · ")}</small>}{r.indic && <small className="dc-rx2__gi">{r.indic}</small>}</div>
                           </li>
                         ))}
                       </ol>
@@ -8648,7 +8663,8 @@ function Consentimientos({ pacientes: pacProp, notify }) {
         const pct = nF + nP ? Math.round((nF / (nF + nP)) * 100) : 0; return (
         <section className="dc-esp-hero dc-form-hero">
           <div className="dc-esp-hero__txt">
-            <div className="dc-esp-hero__num"><b>{pct}%</b><span>firmados</span></div>
+            {/* «100% firmados» con 22 anulados confundía: el % es de los documentos vigentes. */}
+            <div className="dc-esp-hero__num"><b>{pct}%</b><span>{nF + nP ? `de los ${nF + nP} vigentes, firmados` : "sin documentos vigentes"}</span></div>
             <p>{conectado ? "Se firma en consultorio y queda archivado con fecha y hora" : "El paciente firma en línea y queda archivado con fecha y hora"}</p>
           </div>
           <div className="dc-esp-hero__cifras">
@@ -8676,9 +8692,9 @@ function Consentimientos({ pacientes: pacProp, notify }) {
           <div style={{ marginTop: 16, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-info-soft)", borderRadius: "var(--dc-r-lg)", padding: "13px 15px" }}>
             <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: ".05em", textTransform: "uppercase", color: DS.c.primary, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} /> Así lo recibe el paciente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 13, color: "var(--dc-brand-600)" }}>
-              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Llega un enlace por WhatsApp a <strong>{pacForm?.nombre || "el paciente"}</strong>.</span>
+              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /><span>Llega un enlace por WhatsApp a <strong>{pacForm?.nombre || "el paciente"}</strong>.</span></span>
               <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Pencil size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Lee el documento y firma con el dedo en su celular.</span>
-              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><ShieldCheck size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Queda archivado con <strong>fecha y hora registrada</strong>.</span>
+              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><ShieldCheck size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /><span>Queda archivado con <strong>fecha y hora registrada</strong>.</span></span>
             </div>
           </div>
           )}
@@ -8755,9 +8771,9 @@ function Consentimientos({ pacientes: pacProp, notify }) {
             <ListaFiltrable rows={docs} sub="documentos" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="consentimientos"
               vistas={[{ id: "estado", label: "Por estado", icon: Columns3 }]}
               tabla={{ primero: true, minWidth: 720, cols: [
-                { key: "paciente", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (d) => <span className="dc-tp__quien">{av(d.paciente)}<b>{d.paciente}</b></span> },
+                { key: "paciente", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (d) => <span className="dc-tp__quien" title={d.paciente}>{av(d.paciente)}<b>{d.paciente}</b></span> },
                 { key: "tipo", label: "Documento", w: "minmax(200px,1.5fr)", cell: (d) => <><span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span>{anulado(d) && <small className="dc-cns__motivo">{textoAnulado(d)}</small>}</> },
-                { key: "fecha", label: "Fecha", w: "140px", a: "center", cell: (d) => <span className="dc-tp__sub">{fechaLegible(d.fecha)}</span> },
+                { key: "fecha", label: "Fecha", w: "120px", a: "center", cell: (d) => <span className="dc-tp__sub" style={{ whiteSpace: "nowrap" }}>{fechaLegible(d.fecha)}</span> },
                 { key: "estado", label: "Estado", w: "130px", a: "center", cell: pill },
                 { key: "acc", label: "", w: "140px", a: "right", cell: accion },
               ] }} cols={[
@@ -9041,8 +9057,8 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
             : puedeGestionar ? "Precios con IGV incluido; la tabla muestra el desglose y el total por sede" : "Catálogo de consulta (precios con IGV)"}</p>
         </div>
         <div className="dc-esp-hero__cifras">
-          {puedeGestionar && <div><b>S/ {ticket.toLocaleString("es-PE")}</b><span>Precio medio</span></div>}
-          {puedeGestionar && <div><b>S/ {Math.max(0, ...serviciosConPrecioSafe(itemsVista).map((s) => s.monto)).toLocaleString("es-PE")}</b><span>Más caro</span></div>}
+          {puedeGestionar && <div><b>S/ {ticket.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b><span>Precio medio</span></div>}
+          {puedeGestionar && <div><b>S/ {Math.max(0, ...serviciosConPrecioSafe(itemsVista).map((s) => s.monto)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b><span>Más caro</span></div>}
           <div><b>{cats.length}</b><span>Especialidades</span></div>
         </div>
         <span />
@@ -9055,20 +9071,20 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
           ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="El servidor aún no lista los servicios inactivos" sub="Los servicios desactivados antes no llegan desde el servidor, así que no se pueden ver ni reactivar desde aquí. Los que desactives ahora sí aparecerán en esta lista hasta que cierres la pantalla." />
           : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios inactivos" sub="Los servicios que desactives aparecerán aquí para reactivarlos." />) : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin servicios" sub="Crea el primer servicio del catálogo." />} cols={[
         ...(verInactivos && puedeCatalogo ? [{ key: "reactivar", label: "", w: "120px", a: "center", noFilter: true, noSort: true, noExport: true, cell: (s) => <Btn small kind="ghost" onClick={(e) => { e.stopPropagation(); reactivar(s); }}><Repeat size={13} strokeWidth={2} /> Reactivar</Btn> }] : []),
-        { key: "servicio", label: "Servicio", w: "minmax(200px,1.6fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</span>{s.activo === false && <span className="dc-pill" style={{ "--c": "#8A9CA1", flexShrink: 0 }}><i /> Inactivo</span>}</span>; } },
-        { key: "esp", label: "Especialidad", w: "minmax(140px,1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
-        { key: "dur", label: "Duración", w: "104px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
+        { key: "servicio", label: "Servicio", w: "minmax(200px,2fr)", a: "left", get: (s) => s.nombre, cell: (s) => { const col = SERV_CAT_COL[s.especialidad || s.cat] || "var(--dc-primary-alt)"; return <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-serv-ico" style={{ "--c": col }}><ClipboardList size={15} strokeWidth={1.9} /></span><span title={s.nombre} style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, lineHeight: 1.3, minWidth: 0, overflowWrap: "anywhere" }}>{s.nombre}</span>{s.activo === false && <span className="dc-pill" style={{ "--c": "#8A9CA1", flexShrink: 0 }}><i /> Inactivo</span>}</span>; } },
+        { key: "esp", label: "Especialidad", w: "minmax(140px,1fr)", a: "left", get: (s) => s.especialidad || s.cat || "—", cell: (s) => { const k = s.especialidad || s.cat; return k ? <span className="dc-pill dc-pill--wrap" style={{ "--c": SERV_CAT_COL[k] || "var(--dc-primary-alt)" }}><i /> {k}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span>; } },
+        { key: "dur", label: "Duración", w: "100px", a: "center", get: (s) => s.duracionMin || 30, cell: (s) => <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{s.duracionMin || 30} min</span> },
         // Desglose del IGV: el precio del catálogo es el total (IGV incluido), como en Caja.
-        { key: "sinIgv", label: "Sin IGV", w: "104px", a: "right", get: (s) => desgloseIgv(precioVista(s)).base, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(precioVista(s)).base)}</span> },
-        { key: "igv", label: "IGV 18%", w: "96px", a: "right", get: (s) => desgloseIgv(precioVista(s)).igv, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(precioVista(s)).igv)}</span> },
+        { key: "sinIgv", label: "Sin IGV", w: "96px", a: "right", get: (s) => desgloseIgv(precioVista(s)).base, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(precioVista(s)).base)}</span> },
+        { key: "igv", label: "IGV 18%", w: "88px", a: "right", get: (s) => desgloseIgv(precioVista(s)).igv, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(precioVista(s)).igv)}</span> },
         // Con una sede a la vista, su total: el propio en negrita; el base que hereda, atenuado
         // (igual que las columnas por sede).
-        { key: "monto", label: sedesLista.length > 1 ? "Total base" : sedeUnica && multiSede ? `Total ${cortaSede(sedeUnica.id)}` : "Total", w: "128px", a: "right", get: (s) => precioVista(s), cell: (s) => { const heredado = sedeUnica && multiSede && !propioEn(s, sedeUnica.id); return <span className="dc-money" title={sedeUnica && multiSede ? (heredado ? `${sedeUnica.nombre} cobra el precio base` : `Precio propio de ${sedeUnica.nombre} · base S/ ${M.sol2(Number(s.monto))}`) : undefined} style={{ fontWeight: heredado ? 500 : 600, color: heredado ? "var(--dc-ink-500)" : NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioVista(s))}</span>; } },
-        ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "130px", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={`${propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} · sin IGV S/ ${M.sol2(desgloseIgv(precioServicio({ ...s, precio: s.monto }, sd.id)).base)}`} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
+        { key: "monto", label: sedesLista.length > 1 ? "Total base" : sedeUnica && multiSede ? `Total ${cortaSede(sedeUnica.id)}` : "Total", w: "110px", a: "right", get: (s) => precioVista(s), cell: (s) => { const heredado = sedeUnica && multiSede && !propioEn(s, sedeUnica.id); return <span className="dc-money" title={sedeUnica && multiSede ? (heredado ? `${sedeUnica.nombre} cobra el precio base` : `Precio propio de ${sedeUnica.nombre} · base S/ ${M.sol2(Number(s.monto))}`) : undefined} style={{ fontWeight: heredado ? 500 : 600, color: heredado ? "var(--dc-ink-500)" : NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioVista(s))}</span>; } },
+        ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "112px", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={`${propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} · sin IGV S/ ${M.sol2(desgloseIgv(precioServicio({ ...s, precio: s.monto }, sd.id)).base)}`} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
         // SRV-02: la columna Margen solo aparece cuando hay algún costo cargado.
         // El costo y el margen son internos: quien solo consulta el catálogo (el doctor) no los ve.
         // R6-09: margen = precio sin IGV − costo directo (antes se restaba al total con IGV).
-        ...(puedeGestionar && items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen sin IGV", w: "140px", a: "right", get: (s) => margenCatalogo({ ...s, monto: precioVista(s) }) ?? -1, cell: (s) => { const m = margenCatalogo({ ...s, monto: precioVista(s) }); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span title={`Precio sin IGV S/ ${M.sol2(desgloseIgv(precioVista(s)).base)} − costo S/ ${M.sol2(s.coste)}`} style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {M.sol2(m)}</span>; } }] : []),
+        ...(puedeGestionar && items.some((x) => margenCatalogo(x) != null) ? [{ key: "margen", label: "Margen sin IGV", w: "120px", a: "right", get: (s) => margenCatalogo({ ...s, monto: precioVista(s) }) ?? -1, cell: (s) => { const m = margenCatalogo({ ...s, monto: precioVista(s) }); if (m == null) return <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>sin coste cargado</span>; return <span title={`Precio sin IGV S/ ${M.sol2(desgloseIgv(precioVista(s)).base)} − costo S/ ${M.sol2(s.coste)}`} style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: m >= 0 ? "var(--dc-ok-700)" : "var(--dc-danger-700)" }}>S/ {M.sol2(m)}</span>; } }] : []),
         // Estado: la mayoría está activa; solo se marca el inactivo junto al nombre.
         { key: "estado", label: "Estado", soloExport: true, get: (s) => s.activo === false ? "Inactivo" : "Activo" },
         // Sin columna de lápiz: toda la fila abre la edición del servicio.
@@ -9268,7 +9284,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
       if (f && (!a.ultima || f > a.ultima)) a.ultima = f;
       m.set(k, a);
     }
-    return [...m.values()].map((x) => ({ ...x, categoria: x.ultima ? `última compra ${fechaLegible(x.ultima)}` : "—" }));
+    // La fecha de la última compra va en su propia columna: antes ocupaba «Categoría».
+    return [...m.values()];
   }, [ordenesVis]);
   // INV-02: en la demostración también se agregan desde las órdenes de Compras, así el
   // «Total comprado» es la suma de las órdenes. El laboratorio no es proveedor de
@@ -9459,6 +9476,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         const totalOC = filas.filter((c) => c.estado !== "anulada").reduce((a, c) => a + (Number(c.total) || 0), 0);
         const pendOC = filas.filter((c) => c.estado === "borrador" || c.estado === "enviada" || c.estado === "en_camino").length;
         const recOC = filas.filter((c) => c.estado === "recibida").length;
+        const anuOC = filas.filter((c) => c.estado === "anulada").length;
         const OC_COL = { borrador: "#8A9CA1", enviada: "#D97706", en_camino: "#2563EB", recibida: "#16A36A", anulada: "#D0563F" };
         return (
         <>
@@ -9469,9 +9487,11 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             <p>El stock de la sede que pidió sube al marcar la orden como recibida</p>
           </div>
           <div className="dc-esp-hero__cifras">
-            <div><b>S/ {totalOC.toLocaleString("es-PE")}</b><span>Total comprado</span></div>
+            <div><b>S/ {totalOC.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b><span>Total comprado</span></div>
             <div><b>{pendOC}</b><span>Por recibir</span></div>
             <div><b>{recOC}</b><span>Recibidas</span></div>
+            {/* Las anuladas también se muestran: sin ellas las cifras no sumaban el total de órdenes. */}
+            {anuOC > 0 && <div><b>{anuOC}</b><span>{anuOC === 1 ? "Anulada" : "Anuladas"}</span></div>}
           </div>
           <span />
           <div className="dc-hero-acc"><button type="button" className="dc-esp-hero__btn" onClick={() => conectado ? setNuevaOC({ sede: sedePorDefecto, proveedor: "", nota: "", lineas: [] }) : notify("Disponible al iniciar sesión.")}><Plus size={14} strokeWidth={2} /> Nueva compra</button></div>
@@ -9528,11 +9548,11 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             <div className="dc-esp-hero__cifras">
               <div><b>{hoyN}</b><span>Hoy</span></div>
               <div><b>{new Set(movs.map((m) => m.paciente)).size}</b><span>Pacientes</span></div>
-              <div title={top ? top[0] : undefined}><b>{top ? top[1] : 0}</b><span>{top ? `Más usado: ${top[0]}` : "Más usado"}</span></div>
+              <div title={top ? top[0] : undefined}><b>{top ? top[1] : "—"}</b><span>{top ? `Más usado: ${top[0]}` : "Más usado: sin consumos"}</span></div>
             </div>
           </section>
         ); })()}
-        <DataTable titulo="Consumo de insumos" sub="movimientos" minWidth={variasSedes ? 930 : 820} rows={movsVis} empty={<Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo={conectado ? "Registro de consumo no disponible" : "Sin consumo"} sub={conectado ? "El sistema ajusta el stock pero todavía no guarda un movimiento por cada uso, así que no hay nada que listar aquí. Se verá cuando se registren los movimientos de inventario." : variasSedes ? "El uso de insumos por atención aparecerá aquí." : `El uso de insumos en las atenciones de ${nombreSede(verSedes[0])} aparecerá aquí.`} />} cols={[
+        <DataTable titulo="Consumo de insumos" sub="movimientos" minWidth={variasSedes ? 930 : 820} rows={movsVis} empty={<Vacio icon={<Activity size={22} strokeWidth={1.75} />} titulo={conectado ? "Todavía no hay consumos registrados" : "Sin consumo"} sub={conectado ? "Cuando se use un insumo en una atención, aquí aparecerá qué se usó, para qué paciente y cuándo. El stock de la pestaña Productos ya se descuenta." : variasSedes ? "El uso de insumos por atención aparecerá aquí." : `El uso de insumos en las atenciones de ${nombreSede(verSedes[0])} aparecerá aquí.`} />} cols={[
           { key: "fecha", label: "Fecha", w: "minmax(120px,0.8fr)", a: "left", get: (c) => c.fecha, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(c.fecha)}</span> },
           ...colSede,
           { key: "insumo", label: "Insumo", w: "minmax(160px,1.3fr)", a: "left", get: (c) => c.insumo, cell: (c) => <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 500, color: NAVY, fontSize: 13 }}><span style={{ width: 30, height: 30, borderRadius: "var(--dc-r-sm)", background: (tint(DS.c.primary, 0.078)), color: DS.c.primary, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={15} strokeWidth={1.75} /></span>{c.insumo}</span> },
@@ -9552,18 +9572,19 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
               <p>La lista se arma sola con las órdenes de compra de {variasSedes ? "estas sedes" : "la sede"}</p>
             </div>
             <div className="dc-esp-hero__cifras">
-              <div><b>S/ {tot.toLocaleString("es-PE")}</b><span>Total comprado</span></div>
+              <div><b>S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b><span>Total comprado</span></div>
               <div><b>{comp}</b><span>Compras</span></div>
-              <div title={top ? top.nombre : undefined}><b>{top ? `S/ ${Number(top.total).toLocaleString("es-PE")}` : "—"}</b><span>{top ? `Principal: ${top.nombre}` : "Principal"}</span></div>
+              <div title={top ? top.nombre : undefined}><b>{top ? `S/ ${Number(top.total).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}</b><span>{top ? `Principal: ${top.nombre}` : "Principal"}</span></div>
             </div>
           </section>
         ); })()}
         <DataTable titulo="Proveedores" sub="proveedores" minWidth={780} rows={conectado ? proveedoresReales : proveedoresDemo} defaultSort={{ key: "total", dir: "desc" }} empty={<Vacio icon={<Building2 size={22} strokeWidth={1.75} />} titulo="Sin proveedores" sub="La lista se arma sola con las órdenes de compra: registra una y el proveedor aparece aquí." />} cols={[
           { key: "nombre", label: "Proveedor", w: "minmax(180px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg, ${tint(colorDe(p.nombre), 0.22)}, ${tint(colorDe(p.nombre), 0.08)})`, color: colorDe(p.nombre), fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div></div></div> },
           { key: "contacto", label: "Contacto", w: "minmax(150px,1fr)", a: "left", get: (p) => p.contacto || "", cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.contacto || "—"}</span> },
-          { key: "categoria", label: "Categoría", w: "minmax(150px,1fr)", a: "left", get: (p) => p.categoria, cell: (p) => p.categoria ? <span className="dc-pill" style={{ "--c": colorDe(p.categoria) }}><i /> {p.categoria}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span> },
+          ...((conectado ? proveedoresReales : proveedoresDemo).some((p) => p.categoria && p.categoria !== "—") ? [{ key: "categoria", label: "Categoría", w: "minmax(150px,1fr)", a: "left", get: (p) => p.categoria, cell: (p) => p.categoria && p.categoria !== "—" ? <span className="dc-pill dc-pill--wrap" style={{ "--c": colorDe(p.categoria) }}><i /> {p.categoria}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span> }] : []),
+          ...((conectado ? proveedoresReales : proveedoresDemo).some((p) => p.ultima) ? [{ key: "ultima", label: "Última compra", w: "140px", a: "left", get: (p) => p.ultima || "", cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{p.ultima ? fechaLegible(p.ultima) : "—"}</span> }] : []),
           { key: "compras", label: "Compras", w: "110px", a: "center", get: (p) => p.compras, cell: (p) => <span className="dc-pill">{p.compras} {p.compras === 1 ? "compra" : "compras"}</span> },
-          { key: "total", label: "Total comprado", w: "150px", a: "right", get: (p) => p.total, cell: (p) => <span style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {p.total.toLocaleString()}</span> },
+          { key: "total", label: "Total comprado", w: "150px", a: "right", get: (p) => p.total, cell: (p) => <span style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {p.total.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
         ]} />
         </>
       )}
@@ -9573,11 +9594,11 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           <div className="dc-esp-hero__txt">
             {rotuloSede}
             <div className="dc-esp-hero__num"><b>{requieren.length}</b><span>{requieren.length === 1 ? "insumo requiere compra" : "insumos requieren compra"}</span></div>
-            <p>{agotadosN} agotado{agotadosN === 1 ? "" : "s"} y {bajosN} bajo mínimo{requieren.length ? `, reposición sugerida de ${totalPedir} unidades` : ""}</p>
+            <p>{agotadosN} agotado{agotadosN === 1 ? "" : "s"} y {bajosN} bajo mínimo{requieren.length ? `, ${requieren.length === 1 ? "1 insumo por reponer" : `${requieren.length} insumos por reponer`}` : ""}</p>
           </div>
           <div className="dc-esp-hero__cifras">
             {/* Redondeado como el «Inventario valorizado» del Panel gerencial: la misma cifra en los dos. */}
-            {puedeGestionar && <div><b>S/ {Math.round(valorTotal).toLocaleString("es-PE")}</b><span>Valor en stock</span></div>}
+            {puedeGestionar && <div><b>S/ {Math.round(valorTotal).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b><span>Valor en stock</span></div>}
             <div title={covMinInsumo ? covMinInsumo.nombre : undefined}><b>{covMinHoy === Infinity ? "—" : covMinHoy <= 0 ? "Hoy" : `${covMinHoy} d`}</b><span>{covMinInsumo ? `Se acaba primero: ${covMinInsumo.nombre}` : "Cobertura mínima"}</span></div>
             <div><b>{vencenPronto.length}</b><span>Vencen pronto</span></div>
           </div>
@@ -9590,34 +9611,34 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           </div>
         </section>
       ); })()}
-      <DataTable titulo="Insumos" sub="insumos" minWidth={variasSedes ? 1150 : 1040} rows={items} defaultSort={{ key: "estado", dir: "asc" }} onRowClick={puedeEditarInv ? (it) => editar(it) : undefined} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub={!puedeEditarInv
+      <DataTable titulo="Insumos" sub="insumos" minWidth={variasSedes ? 1120 : 1010} rows={items} defaultSort={{ key: "estado", dir: "asc" }} onRowClick={puedeEditarInv ? (it) => editar(it) : undefined} empty={<Vacio icon={<Package size={22} strokeWidth={1.75} />} titulo="Inventario vacío" sub={!puedeEditarInv
             // M5-12: un rol de solo lectura (el médico) no puede agregar insumos: no se le pide.
             ? `No hay insumos registrados${variasSedes ? "" : ` en ${nombreSede(verSedes[0])}`}. Si falta alguno, avisa a administración.`
             : variasSedes ? "Agrega tu primer insumo para controlar stock y cobertura." : `${nombreSede(verSedes[0])} aún no tiene insumos. Agrégalos para controlar su stock y cobertura.`} />} cols={[
-        { key: "insumo", label: "Insumo", w: "minmax(180px,1.5fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div></div></div>; } },
+        { key: "insumo", label: "Insumo", w: "minmax(160px,1.4fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div></div></div>; } },
         // Con «Todas las sedes» el mismo insumo sale una vez por almacén: la sede dice cuál es.
         ...colSede,
-        { key: "cat", label: "Categoría", w: "minmax(110px,0.8fr)", a: "left", get: (it) => it.cat || "—" },
-        ...(items.some((it) => it.lote) ? [{ key: "lote", label: "Lote", w: "90px", a: "left", get: (it) => it.lote || "", cell: (it) => <span style={{ fontSize: 13, color: it.lote ? "var(--dc-ink-700)" : "var(--dc-ink-400)" }}>{it.lote || "—"}</span> }] : []),
-        ...(items.some((it) => it.fechaVencimiento) ? [{ key: "vence", label: "Vence", w: "112px", a: "left", get: (it) => it.fechaVencimiento || "", cell: (it) => {
+        { key: "cat", label: "Categoría", w: "minmax(100px,0.7fr)", a: "left", get: (it) => it.cat || "—" },
+        ...(items.some((it) => it.lote) ? [{ key: "lote", label: "Lote", w: "96px", a: "left", get: (it) => it.lote || "", cell: (it) => <span style={{ fontSize: 13, whiteSpace: "nowrap", color: it.lote ? "var(--dc-ink-700)" : "var(--dc-ink-400)" }}>{it.lote || "—"}</span> }] : []),
+        ...(items.some((it) => it.fechaVencimiento) ? [{ key: "vence", label: "Vence", w: "124px", a: "left", get: (it) => it.fechaVencimiento || "", cell: (it) => {
           const dv = diasVenc(it.fechaVencimiento);
           if (!it.fechaVencimiento) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>;
           const estVenc = dv === null ? null : dv < 0 ? "vencido" : dv <= 60 ? "alerta" : "ok";
           return (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, whiteSpace: "nowrap" }}>
               <span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(it.fechaVencimiento)}</span>
               {estVenc === "vencido" ? <span style={{ fontSize: 11, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>Vencido</span>
                 : estVenc === "alerta" ? <span style={{ fontSize: 11, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{dv === 0 ? "Hoy" : `${dv} d`}</span> : null}
             </span>
           );
         } }] : []),
-        { key: "stock", label: "Stock", w: "minmax(140px,1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{it.unidad}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto" }}>mín {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div> : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
+        { key: "stock", label: "Stock", w: "minmax(124px,1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{it.unidad}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto" }}>mín {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div> : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
         // INV-01: una sola columna de urgencia (Estado) con los días de cobertura como subtítulo.
-        { key: "estado", label: "Estado", w: "minmax(130px,0.9fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); return <span style={{ display: "inline-grid", justifyItems: "center", gap: 2 }}>{badge(estado(it))}{d < 999 && <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{d <= 0 ? "se acaba hoy" : `~${Math.round(d)} d de cobertura`}</small>}</span>; } },
-        { key: "pedir", label: "Sugerido", w: "minmax(130px,0.9fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)" }}>+{q} {it.unidad}</span>; } },
+        { key: "estado", label: "Estado", w: "minmax(118px,0.8fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); return <span style={{ display: "inline-grid", justifyItems: "center", gap: 2 }}>{badge(estado(it))}{d < 999 && <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{d <= 0 ? "se acaba hoy" : `~${Math.round(d)} d de cobertura`}</small>}</span>; } },
+        { key: "pedir", label: "Sugerido", w: "minmax(118px,0.8fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>+{q} {it.unidad}</span>; } },
         // Ajustar o editar el stock es gestion: quien solo consulta no lo ve.
         // Ajuste rápido de stock (usar / ingresar una unidad); editar es tocar la fila.
-        ...(puedeGestionar ? [{ key: "acc", label: "Ajustar", w: "120px", a: "center", noFilter: true, noSort: true, sticky: false, fijo: true, cell: (it) => <span className="dc-inv__step" onClick={(e) => e.stopPropagation()}><button type="button" aria-label={`Usar 1 de ${it.nombre}`} title="Usar una unidad" onClick={() => ajustar(it.id, -1)}><Minus size={14} strokeWidth={2} /></button><b>{it.stock}</b><button type="button" aria-label={`Ingresar 1 de ${it.nombre}`} title="Ingresar una unidad" onClick={() => ajustar(it.id, 1)}><Plus size={14} strokeWidth={2} /></button></span> }] : []),
+        ...(puedeGestionar ? [{ key: "acc", label: "Ajustar", w: "96px", a: "center", noFilter: true, noSort: true, sticky: false, fijo: true, cell: (it) => <span className="dc-inv__step" onClick={(e) => e.stopPropagation()}><button type="button" aria-label={`Usar 1 de ${it.nombre}`} title="Usar una unidad" onClick={() => ajustar(it.id, -1)}><Minus size={14} strokeWidth={2} /></button><b>{it.stock}</b><button type="button" aria-label={`Ingresar 1 de ${it.nombre}`} title="Ingresar una unidad" onClick={() => ajustar(it.id, 1)}><Plus size={14} strokeWidth={2} /></button></span> }] : []),
       ]} />
       </>)}
       {form && <Modal icon={<Package size={20} strokeWidth={1.75} />} titulo={form.id ? "Editar insumo" : "Nuevo insumo"} sub={form.id ? (form.sede == null || form.sede === "" ? "Insumo sin almacén de sede asignado" : `Almacén de ${nomSede(form.sede)}`) : "Agrega un insumo al almacén de una sede"} onClose={() => setForm(null)} size="corto" maxW={560}
@@ -9647,7 +9668,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
         {(() => { const st = Number(form.stock) || 0, di = Number(form.dia) || 0, pr = Number(form.precio) || 0; const cob = di > 0 ? Math.round(st / di) : null; return (
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 140, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "10px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>Cobertura estimada</div><div style={{ fontSize: 16, fontWeight: 600, color: cob === null ? "var(--dc-ink-500)" : covColor(cob), fontFamily: DISPLAY_FONT, marginTop: 2 }}>{cob === null ? "—" : `~${cob} días`}</div></div>
-            <div style={{ flex: 1, minWidth: 140, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "10px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>Valor en stock</div><div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>S/ {(st * pr).toLocaleString()}</div></div>
+            <div style={{ flex: 1, minWidth: 140, background: "var(--dc-bg)", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: "10px 13px" }}><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontWeight: 500 }}>Valor en stock</div><div style={{ fontSize: 16, fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, marginTop: 2 }}>S/ {(st * pr).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
           </div>
         ); })()}
       </Modal>}
@@ -9836,9 +9857,12 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
         { key: "lab", label: "Laboratorio", w: "minmax(140px,1.1fr)", a: "left", get: (c) => c.lab, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{c.lab}</span> },
         // Con más de una sede a la vista, de qué sede es cada caso.
         ...(variasSedes ? [{ key: "sede", label: "Sede", w: "120px", a: "center", get: (c) => cortaSede(sedeDelCaso(c)), cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{cortaSede(sedeDelCaso(c))}</span> }] : []),
-        { key: "entrega", label: "Entrega", w: "minmax(160px,1.1fr)", a: "center", get: (c) => c.entrega, cell: (c) => { const d = faltanDias(c); const done = c.estado === "entregado" || c.estado === "recibido"; const atr = labAtrasado(c, fmt(hoy)); const lbl = done ? (c.estado === "recibido" ? "Recibido" : "Entregado") : atr ? `Atrasado ${Math.abs(d)} d` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : d < 0 ? "Vencido" : `Faltan ${d} d`; const col = done ? "var(--dc-ok-700)" : atr ? "var(--dc-red)" : d <= 2 ? "var(--dc-warn-600)" : DS.c.primary; return <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}><span style={{ fontSize: 13, fontWeight: 500, color: col, background: tint(col, 0.078), padding: "3px 11px", borderRadius: "var(--dc-r-full)" }}>{lbl}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{fechaLegible(c.entrega)}</span></div>; } },
+        { key: "entrega", label: "Entrega", w: "minmax(160px,1.1fr)", a: "center", get: (c) => c.entrega, cell: (c) => { const d = faltanDias(c); const done = c.estado === "entregado" || c.estado === "recibido"; const atr = labAtrasado(c, fmt(hoy)); const lbl = atr ? `Atrasado ${Math.abs(d)} d` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : d < 0 ? "Vencido" : `Faltan ${d} d`; const col = atr ? "var(--dc-red)" : d <= 2 ? "var(--dc-warn-600)" : DS.c.primary;
+          // Recibido o entregado ya lo dice «Estado»: aquí solo la fecha, sin repetir el estado.
+          if (done) return <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{fechaLegible(c.entrega)}</span>;
+          return <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}><span style={{ fontSize: 13, fontWeight: 500, color: col, background: tint(col, 0.078), padding: "3px 11px", borderRadius: "var(--dc-r-full)" }}>{lbl}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{fechaLegible(c.entrega)}</span></div>; } },
         { key: "estado", label: "Estado", w: "130px", a: "center", get: (c) => (LAB_INFO[c.estado] || { l: c.estado || "—" }).l, cell: (c) => { const I = LAB_INFO[c.estado] || { l: c.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; return <span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>; } },
-        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? (puedeAvanzar ? <span onClick={(e) => e.stopPropagation()}><Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn></span> : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{LAB_INFO[c.estado]?.l || c.estado}</span>) : <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>Entregado</span> },
+        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? (puedeAvanzar ? <span onClick={(e) => e.stopPropagation()}><Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn></span> : <span style={{ color: "var(--dc-ink-300, #B6C2C9)" }}>—</span>) : <span style={{ color: "var(--dc-ink-300, #B6C2C9)" }}>—</span> },
       ]} />
       {detalle && (() => { const I = LAB_INFO[detalle.estado] || { l: detalle.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; const atrasado = labAtrasado(detalle, fmt(hoy)); return (
         <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detalle.trabajo} sub={detalle.paciente} onClose={() => setDetalle(null)} maxW={520} footer={detalle.estado !== "entregado" && puedeAvanzar ? <Btn small onClick={() => { avanzar(detalle.id); setDetalle(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
@@ -9862,7 +9886,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
               <div className="dc-lab-amarres">
                 {pid && <button type="button" className="dc-link" onClick={() => { setDetalle(null); window.location.hash = `#/pacientes/${pid}/archivos`; }}>Ver ficha de {detalle.paciente}</button>}
                 <span>Procedimiento: <b>{proc ? proc.nombre : "sin vincular"}</b></span>
-                <span>Egreso en Caja: {egr ? <button type="button" className="dc-link" onClick={() => { setDetalle(null); window.location.hash = "#/caja_movimientos"; }}>S/ {Number(egr.monto).toLocaleString("es-PE")} · {fechaLegible(egr.fecha)}</button> : <b>sin registrar</b>}</span>
+                <span>Egreso en Caja: {egr ? <button type="button" className="dc-link" onClick={() => { setDetalle(null); window.location.hash = "#/caja_movimientos"; }}>S/ {Number(egr.monto).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {fechaLegible(egr.fecha)}</button> : <b>sin registrar</b>}</span>
               </div>
             ); })()}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12 }}><span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontWeight: 500 }}>Estado actual</span><span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "4px 12px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span></div>
@@ -10344,7 +10368,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
   const aseguradoras = [...new Set(liqView.map((l) => l.aseg).filter(Boolean))];
   const pendConv = (n) => liqView.filter((l) => l.aseg === n && l.estado !== "pagado").reduce((s, l) => s + l.cob, 0);
   const nLiq = (n) => liqView.filter((l) => l.aseg === n).length;
-  const kpis = [["Por liquidar", segurosError ? "—" : `S/ ${porCobrar.toLocaleString()}`, "var(--dc-warn-600)", <Umbrella size={18} strokeWidth={1.75} />], ["Recuperado del seguro", segurosError ? "—" : `S/ ${recuperado.toLocaleString()}`, "var(--dc-ok-700)", <ShieldCheck size={18} strokeWidth={1.75} />], ["Cobertura promedio", segurosError ? "—" : (cobVals.length ? `${cobProm}%` : "—"), DS.c.primary, <Percent size={18} strokeWidth={1.75} />], ["Aseguradoras", segurosError ? "—" : String(aseguradoras.length), NAVY, <Building2 size={18} strokeWidth={1.75} />]];
+  const kpis = [["Por liquidar", segurosError ? "—" : `S/ ${porCobrar.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "var(--dc-warn-600)", <Umbrella size={18} strokeWidth={1.75} />], ["Recuperado del seguro", segurosError ? "—" : `S/ ${recuperado.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "var(--dc-ok-700)", <ShieldCheck size={18} strokeWidth={1.75} />], ["Cobertura promedio", segurosError ? "—" : (cobVals.length ? `${cobProm}%` : "—"), DS.c.primary, <Percent size={18} strokeWidth={1.75} />], ["Aseguradoras", segurosError ? "—" : String(aseguradoras.length), NAVY, <Building2 size={18} strokeWidth={1.75} />]];
   // Convenios derivados de liquidaciones cuando no hay catálogo de convenios (modo conectado).
   const conveniosVista = convenios.length
     ? convenios
@@ -10359,11 +10383,11 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
     <div style={{ display: "grid", gap: 14 }}>
       <section className="dc-esp-hero">
         <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>{segurosError ? "—" : `S/ ${porCobrar.toLocaleString("es-PE")}`}</b><span>por liquidar</span></div>
+          <div className="dc-esp-hero__num"><b>{segurosError ? "—" : `S/ ${porCobrar.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</b><span>por liquidar</span></div>
           <p>{liqView.length} {liqView.length === 1 ? "liquidación" : "liquidaciones"} con aseguradoras y EPS</p>
         </div>
         <div className="dc-esp-hero__cifras">
-          <div><b>{segurosError ? "—" : `S/ ${recuperado.toLocaleString("es-PE")}`}</b><span>Recuperado</span></div>
+          <div><b>{segurosError ? "—" : `S/ ${recuperado.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</b><span>Recuperado</span></div>
           <div><b>{segurosError ? "—" : (cobVals.length ? `${cobProm}%` : "—")}</b><span>Cobertura promedio</span></div>
           <div><b>{segurosError ? "—" : conveniosVista.length}</b><span>Aseguradoras</span></div>
         </div>
@@ -10393,7 +10417,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
                   <div><b>{c.n}</b><span className={`dc-pill ${c.estado === "activo" ? "is-ok" : "is-warn"}`}>{c.estado === "activo" ? "Activo" : "En evaluación"}</span></div>
                   <span className="dc-seg__anillo" style={{ "--p": c.cob }}><b>{c.cob}%</b></span>
                 </div>
-                <div className="dc-seg__pie"><span>{nLiq(c.n)} {nLiq(c.n) === 1 ? "caso" : "casos"}</span><b className={pend > 0 ? "is-pend" : "is-ok"}>{pend > 0 ? `S/ ${pend.toLocaleString("es-PE")} por liquidar` : "Al día"}</b></div>
+                <div className="dc-seg__pie"><span>{nLiq(c.n)} {nLiq(c.n) === 1 ? "caso" : "casos"}</span><b className={pend > 0 ? "is-pend" : "is-ok"}>{pend > 0 ? `S/ ${pend.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por liquidar` : "Al día"}</b></div>
               </article>
             ); })}
           </div>
@@ -10402,9 +10426,9 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
       <ListaFiltrable rows={liqView} sub="liquidaciones" vistaClave="seguros" vistas={[{ id: "tablero", label: "Tablero", icon: Columns3 }]} tabla={{ minWidth: 820, onRowClick: (x) => setDetalleLiq(x), cols: [
         { key: "p", label: "Paciente", w: "minmax(170px,1.1fr)", cell: (x) => <PersonaCelda nombre={x.paciente} /> },
         { key: "aseg", label: "Aseguradora", w: "minmax(140px,1fr)", get: (x) => x.aseg || "—" },
-        { key: "cob", label: "Seguro", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-ok">S/ {Number(x.cob).toLocaleString("es-PE")}</span> },
-        { key: "cop", label: "Copago", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</span> },
-        { key: "tot", label: "Total", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {Number(x.total).toLocaleString("es-PE")}</span> },
+        { key: "cob", label: "Seguro", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-ok">S/ {Number(x.cob).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
+        { key: "cop", label: "Copago", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-warn">S/ {Number(x.copago).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
+        { key: "tot", label: "Total", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {Number(x.total).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
         { key: "est", label: "Estado", w: "150px", a: "center", cell: (x) => <EstadoPill entidad="liquidacion" estado={x.estado} /> },
       ] }} cols={[
         { key: "paciente", label: "Paciente", get: (x) => x.paciente || "" },
@@ -10415,15 +10439,15 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
       <div className="dc-seg__tablero">
         {COLS_LIQ.map(([k, tit, sub, col, Ico]) => { const items = listaLq.filter((l) => l.estado === k); const tot = items.reduce((a, l) => a + (Number(l.cob) || 0), 0); return (
           <section key={k} className="dc-seg__col" style={{ "--c": col }}>
-            <header><span className="dc-seg__cico"><Ico size={16} strokeWidth={2} /></span><div><h4>{tit} <i>{items.length}</i></h4><small>{sub}</small></div><b>S/ {tot.toLocaleString("es-PE")}</b></header>
+            <header><span className="dc-seg__cico"><Ico size={16} strokeWidth={2} /></span><div><h4>{tit} <i>{items.length}</i></h4><small>{sub}</small></div><b>S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></header>
             {items.length === 0 ? <p className="dc-seg__nada">Sin liquidaciones aquí.</p> : items.map((x) => { const pc = x.total ? Math.round((x.cob / x.total) * 100) : 0; return (
               <article key={x.id} className="dc-seg__liq" onClick={() => setDetalleLiq(x)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setDetalleLiq(x); }}>
                 <div className="dc-seg__lq1"><b>{x.paciente}</b><span>{x.aseg}</span></div>
                 <div className="dc-seg__split" title={`Seguro ${pc}%, copago ${100 - pc}%`}><i style={{ width: `${pc}%` }} /></div>
                 <div className="dc-seg__lq2">
-                  <span>Seguro <b className="is-ok">S/ {Number(x.cob).toLocaleString("es-PE")}</b></span>
-                  <span>Copago <b className="is-warn">S/ {Number(x.copago).toLocaleString("es-PE")}</b></span>
-                  <span>Total <b>S/ {Number(x.total).toLocaleString("es-PE")}</b></span>
+                  <span>Seguro <b className="is-ok">S/ {Number(x.cob).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
+                  <span>Copago <b className="is-warn">S/ {Number(x.copago).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
+                  <span>Total <b>S/ {Number(x.total).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
                 </div>
                 {x.estado !== "pagado" && puedeEditarLiq && <button type="button" className="dc-seg__av" onClick={(e) => { e.stopPropagation(); avanzar(x.id); }}>{({ borrador: "Enviar", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={13} strokeWidth={2.2} /></button>}
               </article>
@@ -10706,8 +10730,8 @@ function Formularios({ pacientes: pacProp, notify }) {
           <div style={{ marginTop: 16, background: "var(--dc-accent-soft)", border: "1px solid var(--dc-info-soft)", borderRadius: "var(--dc-r-lg)", padding: "13px 15px" }}>
             <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: ".05em", textTransform: "uppercase", color: DS.c.primary, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={13} strokeWidth={1.75} /> Así lo recibe el paciente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 13, color: "var(--dc-brand-600)" }}>
-              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Llega un enlace por WhatsApp a <strong>{pacForm?.nombre || "el paciente"}</strong> antes de su cita.</span>
-              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><ClipboardList size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> Completa <strong>{form.tipo}</strong> desde su celular en 2 minutos.</span>
+              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><Send size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /><span>Llega un enlace por WhatsApp a <strong>{pacForm?.nombre || "el paciente"}</strong> antes de su cita.</span></span>
+              <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><ClipboardList size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /><span>Completa <strong>{form.tipo}</strong> desde su celular en 2 minutos.</span></span>
               <span style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>{/* Decía "llega lista a la ficha, sin transcribir a mano": la respuesta se guarda en
                   el envío y ahí se queda; nadie la vuelca sobre la ficha del paciente. */}
               <CheckCircle2 size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 1 }} /> La respuesta queda guardada en el envío y se consulta desde aquí, sin papel.</span>
@@ -10939,7 +10963,7 @@ function Radiografias({ pacienteFijo = null, pacientes: pacProp, notify, sedeAct
           <Vacio icon={<Lock size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin permiso para ver las fotos" : "Sin permiso para ver las radiografías"} sub="Tu rol no tiene acceso a las imágenes de este paciente." />
         ) : base.length === 0 ? (
           // M7-03: sin paciente elegido no se habla de «este paciente» (el botón Subir está deshabilitado).
-          <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={esFotos ? "Sin fotos" : "Sin radiografías"} sub={/* R-39: sin permiso de subir (recepción) no se invita a «Subir». */ pid == null || pid === ""
+          <Vacio icon={esFotos ? <Camera size={24} strokeWidth={1.75} /> : <Scan size={24} strokeWidth={1.75} />} titulo={pid == null || pid === "" ? "Elige un paciente" : esFotos ? "Sin fotos" : "Sin radiografías"} sub={/* R-39: sin permiso de subir (recepción) no se invita a «Subir». */ pid == null || pid === ""
             ? (esFotos ? `Elige un paciente para ver${puedeSubirRx ? " y subir" : ""} sus fotos clínicas.` : `Elige un paciente para ver${puedeSubirRx ? " y subir" : ""} sus radiografías.`)
             : !puedeSubirRx ? (esFotos ? "Aún no hay fotos clínicas de este paciente." : "Aún no hay radiografías de este paciente.")
             : esFotos ? "Sube la primera foto clínica de este paciente." : "Sube la primera radiografía de este paciente."} />
@@ -12147,7 +12171,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         <header className="dc-top">
           <div className="dc-top__izq">
             <button aria-label="Abrir o cerrar el menú" className="dc-burger" onClick={() => setSidebarOpen((s) => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: NAVY, display: "none", minWidth: "var(--dc-tap-min)", minHeight: "var(--dc-tap-min)" }}><Menu size={22} strokeWidth={1.75} /></button>
-            <h1 className="dc-top__titulo">{NAV.find((n) => n.id === vista)?.label}</h1>
+            {/* Subvistas (caja_historial, permisos, auditoria…) no están en el menú: se nombra su módulo. */}
+            <h1 className="dc-top__titulo">{NAV.find((n) => n.id === vista)?.label || NAV.find((n) => vista.startsWith(n.id + "_"))?.label || MODULOS.find((m) => m.id === modDeVista(vista))?.label || NAV.find((n) => n.id === modDeVista(vista))?.label || ""}</h1>
           </div>
           {/* CFG-01: un solo aviso de modo demostración para toda la app. */}
           {!auth.token && <span className="dc-top__demo" title="Datos de ejemplo. Los cambios se guardan solo en este navegador.">Modo demostración</span>}
@@ -12249,7 +12274,7 @@ const hydrateEmisor = (r) => {
    pendiente → aceptado | observado | rechazado. Sin integración se dice tal cual. */
 const SUNAT_ESTADOS = {
   aceptado: ["Aceptado SUNAT", "is-ok"], observado: ["Observado", "is-aviso"], rechazado: ["Rechazado", "is-mal"],
-  pendiente: ["Pendiente de envío", "is-pend"], demo: ["Demo · sin SUNAT", "is-demo"],
+  pendiente: ["Por enviar", "is-pend"], demo: ["Demo · sin SUNAT", "is-demo"],
 };
 function SunatChip({ estado, mensaje }) {
   const [l, c] = SUNAT_ESTADOS[estado] || SUNAT_ESTADOS.pendiente;
@@ -13798,10 +13823,10 @@ const PLANES = [
     incluye: ["1 sede – 2 odontólogos", "Usuarios de apoyo ilimitados", "Pacientes ilimitados + portal", "Agenda, odontograma e historia clínica", "Boleta electrónica SUNAT – 100/mes", "Odontólogo adicional S/59/mes"] },
   { id: "mediana", nombre: "Clínica", precio: 349, tagline: "Para la clínica en crecimiento", destacado: true,
     sedesIncl: 1, sedeExtra: 149, odontologos: 6, odontologoExtra: 49, usuarios: "ilim", pacientes: "ilim",
-    incluye: ["1 sede incluida – +S/149 por sede", "6 odontólogos – usuarios ilimitados", "Pacientes ilimitados + auto-registro por link", "Agente de IA en WhatsApp – 500 conv./mes", "Recall, comisiones y reportes", "SUNAT – 500 comprobantes/mes"] },
+    incluye: ["1 sede incluida (+ S/ 149.00 por sede adicional)", "6 odontólogos – usuarios ilimitados", "Pacientes ilimitados + auto-registro por link", "Agente de IA en WhatsApp – 500 conv./mes", "Recall, comisiones y reportes", "SUNAT – 500 comprobantes/mes"] },
   { id: "grande", nombre: "Cadena", precio: 699, tagline: "Para varias sedes y franquicias",
     sedesIncl: 3, sedeExtra: 119, odontologos: "ilim", odontologoExtra: null, usuarios: "ilim", pacientes: "ilim",
-    incluye: ["3 sedes incluidas – +S/119 por sede", "Odontólogos y usuarios ilimitados", "Pacientes ilimitados", "Seguros y EPS – panel multi-sede", "Auditoría, API y control de accesos", "Bolsas ampliadas de IA, WhatsApp y SUNAT"] },
+    incluye: ["3 sedes incluidas (+ S/ 119.00 por sede adicional)", "Odontólogos y usuarios ilimitados", "Pacientes ilimitados", "Seguros y EPS – panel multi-sede", "Auditoría, API y control de accesos", "Bolsas ampliadas de IA, WhatsApp y SUNAT"] },
 ];
 
 /* ===========================================================================
@@ -14067,7 +14092,7 @@ function AwgSuscripciones({ notify }) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
-        <KpiCard label="MRR total" value={`S/ ${mrr.toLocaleString()}`} color={DS.c.primary} icon={<TrendingUp size={18} strokeWidth={1.75} />} sub="ingreso recurrente" />
+        <KpiCard label="MRR total" value={`S/ ${mrr.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} color={DS.c.primary} icon={<TrendingUp size={18} strokeWidth={1.75} />} sub="ingreso recurrente" />
         <KpiCard label="Activas" value={activas} color="var(--dc-ok-700)" icon={<CheckCircle2 size={18} strokeWidth={1.75} />} sub="de pago" />
         <KpiCard label="En prueba" value={trial} color="var(--dc-warn-600)" icon={<Star size={18} strokeWidth={1.75} />} sub="por convertir" />
         <KpiCard label="Suspendidas" value={susp} color="var(--dc-danger-700)" icon={<Power size={18} strokeWidth={1.75} />} sub="sin servicio" />

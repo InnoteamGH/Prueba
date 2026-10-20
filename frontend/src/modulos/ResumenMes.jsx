@@ -21,7 +21,7 @@ import { medicoEnSedes } from "../compartido/medicosSede";
 import { equipoDeSede, metaDeSede, totalResumen } from "./panelGerencialUtil";
 import NoDisponible from "../ui/NoDisponible";
 
-const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
+const soles = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"];
 
@@ -187,8 +187,9 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
             <ol className="dc-rm__rank">
               {equipo.map((x, i) => { const pct = x.meta ? (x.prod / x.meta) * 100 : 0; const tono = !x.meta ? "sin" : pct >= ritmo ? "ok" : pct >= ritmo * 0.8 ? "cerca" : "bajo"; return (
                 <li key={x.nombre} className={`is-${tono}`}>
-                  <span className={`dc-rm__pos p${i + 1}`}>{i + 1}</span>
-                  <div className="dc-rm__rn"><b>{x.nombre}</b><small>{soles(x.prod)}{x.meta ? ` de ${soles(x.meta)}` : " · sin meta"}</small></div>
+                  {/* Sin producción no hay puesto ni medalla: «2.º» y «3.º» con S/ 0.00 confundían. */}
+                  <span className={`dc-rm__pos${x.prod > 0 ? ` p${i + 1}` : " is-cero"}`}>{x.prod > 0 ? i + 1 : "–"}</span>
+                  <div className="dc-rm__rn"><b>{x.nombre}</b><small>{soles(x.prod)}{x.meta ? ` de ${soles(x.meta)}` : ""}</small></div>
                   <em className="dc-rm__rv">{x.meta ? `${Math.round(pct)}%` : "—"}<small>{tono === "ok" ? "al día" : tono === "cerca" ? "cerca del ritmo" : tono === "bajo" ? "bajo el ritmo" : "sin meta"}</small></em>
                   <div className="dc-rm__rbar"><i style={{ width: `${Math.min(100, pct)}%` }} />{x.meta > 0 && <span style={{ left: `${Math.min(100, ritmo)}%` }} title={`Ritmo esperado a hoy: ${Math.round(ritmo)}%`} />}</div>
                 </li>

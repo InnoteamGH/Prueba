@@ -310,7 +310,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   };
   const pasoGoLive = (it0) => {
     // R7-09: «2 sede(s)», «6 doctor(es)»… del servidor se escriben con el plural que toca.
-    const it = it0 && typeof it0.detalle === "string" ? { ...it0, detalle: pluralizarParentesis(it0.detalle) } : it0;
+    // El backend añade el modelo de IA al estado («Activo (gpt-4o)»): es un dato técnico.
+    const it = it0 && typeof it0.detalle === "string" ? { ...it0, detalle: pluralizarParentesis(it0.detalle).replace(/\s*\((?:gpt|claude|o\d|gemini|llama)[^)]*\)/gi, "") } : it0;
     if (it?.clave !== "whatsapp" || !conectado || !waSalud) return it;
     const w = estadoWhatsApp(waSalud);
     if (w.estado === "operativo") return { ...it, detalle: `${w.detalle}${notaUltimoEnvioOk(waSalud)}` };
@@ -668,30 +669,44 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
         const listo = goLive?.listoParaOperar;
         const total = goLive?.total || 0; const hechos = goLive?.completados || 0;
         const pct = total ? Math.round(hechos * 100 / total) : 0;
+        // «Todo listo para operar» con 67 % y «8 de 12 pasos» se contradecía: listo significa
+        // que lo obligatorio está hecho; el titular dice además qué queda.
+        const pasos = (goLive?.items || []).map(pasoGoLive);
+        const conAviso = pasos.filter((it) => it.aviso).length;
+        const opcPend = pasos.filter((it) => !it.ok && !it.aviso && !it.obligatorio).length;
+        const titulo = !listo ? "Puesta en marcha de la clínica" : conAviso ? "Lista para operar, con avisos" : hechos < total ? "Lista para operar" : "Todo listo para operar";
+        const bajada = !listo
+          ? `${(() => { const n = Number(goLive?.obligatoriosPendientes) || 0; return n === 1 ? "1 punto obligatorio pendiente" : `${n} puntos obligatorios pendientes`; })()} para que el asistente pueda agendar y atender.`
+          : conAviso
+            ? `Lo obligatorio está configurado, pero ${conAviso === 1 ? "un paso tiene" : `${conAviso} pasos tienen`} avisos por revisar${opcPend ? ` y quedan ${opcPend} opcionales` : ""}.`
+            : opcPend ? `Lo obligatorio está configurado. ${opcPend === 1 ? "Queda 1 paso opcional" : `Quedan ${opcPend} pasos opcionales`}.` : "Sedes, servicios, doctores y horarios están configurados.";
         const ICO = { sedes: Building2, especialidades: ClipboardList, servicios: ClipboardList, doctores: Stethoscope, horarios: Clock, promos: Megaphone };
         return (
           <section className="dc-cfg__panel">
             <div className={`dc-go${listo ? " is-listo" : ""}`}>
               <span className="dc-go__anillo" style={{ "--p": pct }}><b>{pct}%</b></span>
               <div className="dc-go__txt">
-                <h3>{listo ? "Todo listo para operar" : "Puesta en marcha de la clínica"}</h3>
-                <p>{listo ? "Sedes, servicios, doctores y horarios están configurados." : `${(() => { const n = Number(goLive?.obligatoriosPendientes) || 0; return n === 1 ? "1 punto obligatorio pendiente" : `${n} puntos obligatorios pendientes`; })()} para que el asistente pueda agendar y atender.`}</p>
+                <h3>{titulo}</h3>
+                <p>{bajada}</p>
                 <small>{total ? `${hechos} de ${total} pasos completos` : "Cargando checklist…"}</small>
               </div>
               <div className="dc-go__acc">
-                <button type="button" className="dc-cfg__nuevo" onClick={() => setWizard(true)}><Sparkles size={14} strokeWidth={2.2} /> {limitarSede ? "Configurar mi sede" : "Configurar en 4 pasos"}</button>
+                <button type="button" className="dc-cfg__nuevo" onClick={() => setWizard(true)}><Sparkles size={14} strokeWidth={2.2} /> {limitarSede ? "Configurar mi sede" : "Asistente de configuración"}</button>
                 <button type="button" className="dc-row-action" aria-label="Actualizar" title="Actualizar" onClick={cargarGoLive}><Repeat size={14} strokeWidth={2} /></button>
               </div>
             </div>
             <div className="dc-go__pasos">
-              {(goLive?.items || []).map(pasoGoLive).map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["servicios", "especialidades"].includes(it.clave) ? () => { window.location.hash = "#/servicios"; } : ["sedes", "doctores", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave) : null; return (
+              {pasos.map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["servicios", "especialidades"].includes(it.clave) ? () => { window.location.hash = "#/servicios"; } : ["sedes", "doctores", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave) : null; return (
                 <div key={it.clave} className={`dc-go__paso ${it.aviso ? "is-aviso" : it.ok ? "is-ok" : it.obligatorio ? "is-falta" : "is-opc"}`}>
                   <span className="dc-go__n">{it.aviso ? <AlertTriangle size={13} strokeWidth={2.4} /> : it.ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
                   <span className="dc-go__ico"><I size={16} strokeWidth={2} /></span>
                   <div><b>{it.titulo}</b><small>{it.detalle || it.descripcion}</small></div>
                   <span className="dc-go__tag">{it.obligatorio ? "Obligatorio" : "Opcional"}</span>
-                  {!it.ok && ir && <button type="button" onClick={ir}>Configurar</button>}
-                  {it.aviso && (!can || can("whatsapp", "ver")) && <button type="button" onClick={() => { window.location.hash = "#/whatsapp"; }}>Revisar</button>}
+                  {/* Una sola columna de acción, aunque el paso no tenga botón: así las etiquetas quedan alineadas. */}
+                  <span className="dc-go__accion">
+                    {it.aviso && (!can || can("whatsapp", "ver")) ? <button type="button" onClick={() => { window.location.hash = "#/whatsapp"; }}>Revisar</button>
+                      : !it.ok && ir ? <button type="button" onClick={ir}>Configurar</button> : null}
+                  </span>
                 </div>
               ); })}
               {conectado && !goLive && <p className="dc-cfg__nada">Cargando estado…</p>}
@@ -928,7 +943,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
               // Sedes donde atiende (las que se ven); sin sede, se marca para asignarla.
               { key: "sd", label: "Sedes", w: "minmax(130px,.9fr)", cell: (m) => { const l = sedesMedico(m); return l.length ? <span className="dc-tp__sub">{l.filter(sedeVisible).map((x) => nomSedeCfg(x).replace(/^Sede\s+/i, "")).join(" – ")}</span> : <span className="dc-tp__sub" style={{ color: "var(--dc-warn-600)" }}>Sin sede</span>; } },
               { key: "c", label: "Comisión", w: "100px", a: "center", cell: (m) => { const c = comisionVista(m); return <span className="dc-tp__sub">{c != null ? `${c}%` : "—"}</span>; } },
-              { key: "mt", label: "Meta", w: "120px", a: "right", cell: (m) => { const mt = metaVista(m); return <span className="dc-tp__num">{mt != null ? `S/ ${Number(mt).toLocaleString("es-PE")}` : "—"}</span>; } },
+              { key: "mt", label: "Meta", w: "120px", a: "right", cell: (m) => { const mt = metaVista(m); return <span className="dc-tp__num">{mt != null ? `S/ ${Number(mt).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}</span>; } },
               { key: "s", label: "Estado", w: "110px", a: "right", cell: (m) => <span className={`dc-pill ${m.activo ? "is-ok" : ""}`}>{m.activo ? "Activo" : "Inactivo"}</span> },
             ] }} cols={[
               { key: "nombre", label: "Doctor", get: (m) => m.nombre || "" },
@@ -946,7 +961,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                   </div>
                   <div className="dc-cfg__dnums">
                     <div><Percent size={12} strokeWidth={2.2} /><span>Comisión</span><b>{comisionVista(m) != null ? `${comisionVista(m)}%` : "—"}</b></div>
-                    <div><Target size={12} strokeWidth={2.2} /><span>Meta</span><b>{metaVista(m) != null ? `S/ ${Number(metaVista(m)).toLocaleString("es-PE")}` : "—"}</b></div>
+                    <div><Target size={12} strokeWidth={2.2} /><span>Meta</span><b>{metaVista(m) != null ? `S/ ${Number(metaVista(m)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}</b></div>
                     <button type="button" onClick={() => abrirDoctor(m)}><Pencil size={13} strokeWidth={2} /> {medAjeno(m) ? "Ver" : "Editar"}</button>
                   </div>
                 </article>
@@ -1144,7 +1159,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                 {/* La meta es por sede: un solo lugar para editarla (Metas y comisiones). */}
                 <div className="dc-cfg__metas">
                   <div><b>Meta mensual por sede</b><span>Se fija sede por sede. El % de comisión es el mismo en todas.</span></div>
-                  {porSede.length > 0 && <ul>{porSede.map((x) => <li key={String(x.sede)}><span>{nomSedeCfg(x.sede)}</span><b>{x.meta != null ? `S/ ${Number(x.meta).toLocaleString("es-PE")}` : "Sin meta"}</b></li>)}</ul>}
+                  {porSede.length > 0 && <ul>{porSede.map((x) => <li key={String(x.sede)}><span>{nomSedeCfg(x.sede)}</span><b>{x.meta != null ? `S/ ${Number(x.meta).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Sin meta"}</b></li>)}</ul>}
                   <button type="button" onClick={() => { setEdit(null); window.location.hash = "#/metas"; }}><Target size={13} strokeWidth={2.2} /> Editar en Metas y comisiones</button>
                 </div>
                 <p style={{ margin: 0, fontSize: 12, color: "var(--dc-ink-500)" }}>Su sillón fijo, si lo tiene, se define en Configuración › Sillones.</p>

@@ -213,8 +213,10 @@ export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sede
           { key: "tipo", label: "Tipo", w: "96px", a: "left", get: (c) => c.tipo, cell: (c) => <span className={`dc-fe__tipo ${TIPO[c.tipo] || ""}`}>{c.tipo}</span> },
           { key: "id", label: "Número", w: "128px", a: "left", get: (c) => c.id, cell: (c) => <span className="dc-fe__mono" title={c.ref ? `Referencia: ${c.ref}` : undefined}>{c.id}</span> },
           { key: "cliente", label: "Cliente", w: "minmax(140px,1.4fr)", a: "left", get: (c) => c.cliente, cell: (c) => <span className="dc-fe__txt1" title={c.tipo === "Factura" && c.paciente ? `Paciente: ${c.paciente}` : undefined}>{c.cliente}</span> },
-          { key: "doc", label: "Documento", w: "128px", a: "left", get: (c) => (c.docNum ? `${c.docTipo} ${c.docNum}` : "—"), cell: (c) => c.docNum ? <span className="dc-fe__mono"><small>{c.docTipo}</small> {c.docNum}</span> : <span className="dc-tp__sub">—</span> },
-          { key: "moneda", label: "Moneda", w: "100px", a: "left", get: (c) => (c.moneda === "USD" ? "Dólares" : "Soles"), cell: (c) => <span className={`dc-fe__mon${c.moneda === "USD" ? " is-usd" : ""}`}>{c.moneda === "USD" ? "US$" : "S/"}</span> },
+          // Documento y Moneda solo cuando aportan: con todas las boletas sin DNI y en soles eran
+          // columnas de «—» y «S/» repetidos que le quitaban ancho al cliente.
+          ...(comprobantes.some((c) => c.docNum) ? [{ key: "doc", label: "Documento", w: "128px", a: "left", get: (c) => (c.docNum ? `${c.docTipo} ${c.docNum}` : "—"), cell: (c) => c.docNum ? <span className="dc-fe__mono"><small>{c.docTipo}</small> {c.docNum}</span> : <span className="dc-tp__sub">—</span> }] : []),
+          ...(comprobantes.some((c) => c.moneda === "USD") ? [{ key: "moneda", label: "Moneda", w: "100px", a: "left", get: (c) => (c.moneda === "USD" ? "Dólares" : "Soles"), cell: (c) => <span className={`dc-fe__mon${c.moneda === "USD" ? " is-usd" : ""}`}>{c.moneda === "USD" ? "US$" : "S/"}</span> }] : []),
           { key: "base", label: "Base", soloExport: true, w: "96px", a: "right", get: (c) => dinero(c.base, c.moneda), sortVal: (c) => c.base },
           { key: "igv", label: "IGV", soloExport: true, w: "86px", a: "right", get: (c) => dinero(c.igv, c.moneda), sortVal: (c) => c.igv },
           { key: "total", label: "Total", w: "108px", a: "right", get: (c) => dinero(c.total, c.moneda), sortVal: (c) => c.total, cell: (c) => <b className="dc-fe__total" title={`Base ${dinero(c.base, c.moneda)} + IGV ${dinero(c.igv, c.moneda)}`}>{dinero(c.total, c.moneda)}</b> },
@@ -327,7 +329,10 @@ export function ConexionSunat({ notify = () => {}, sedes = null }) {
           <h3>{conectadoProv ? `Conectado con ${(PROVEEDORES.find((p) => p.id === cfg.proveedor) || {}).n || "el proveedor"} · ${cfg.ambiente === "produccion" ? "producción" : "pruebas"}` : "Sin proveedor conectado"}</h3>
           <p>{conectadoProv ? `Emisor ${emisor.razonSocial || emisor.nombre || ""}${emisor.ruc ? ` · RUC ${emisor.ruc}` : ""} · ${(AFECTACION.find((a) => a.v === cfg.afectacion) || {}).l} · resumen diario de boletas a las ${cfg.horaResumen}.` : "Mientras no se conecte, Caja emite boletas sin envío a SUNAT."}</p>
           <div className="dc-fe__series dc-fe__series--fila">
-            {listaSedes.map((s) => { const x = seriesDe(cfg, s.id) || {}; return <div key={s.id}><b>{s.nombre}</b><span><i>Boleta</i>{x.boleta || "—"}</span><span><i>Factura</i>{x.factura || "—"}</span><span><i>NC</i>{x.ncBoleta || "—"}/{x.ncFactura || "—"}</span></div>; })}
+            {listaSedes.map((s) => { const x = seriesDe(cfg, s.id) || {}; return <div key={s.id}><b>{s.nombre}</b>{/* Sin series cargadas se dice una vez, en vez de «Boleta —», «Factura —», «NC —/—». */}
+              {x.boleta || x.factura || x.ncBoleta || x.ncFactura
+                ? <><span><i>Boleta</i>{x.boleta || "Sin serie"}</span><span><i>Factura</i>{x.factura || "Sin serie"}</span><span><i>Nota de crédito</i>{[x.ncBoleta, x.ncFactura].filter(Boolean).join(" · ") || "Sin serie"}</span></>
+                : <span className="is-vacio"><i>Series</i>Sin configurar</span>}</div>; })}
           </div>
         </div>
         <div className="dc-fe__eacc"><button type="button" className="dc-fe__btn is-pri" onClick={() => setEditCfg({ ...cfg, token: "" })}><KeyRound size={15} strokeWidth={2} /> {conectadoProv ? "Configurar" : "Conectar proveedor"}</button></div>

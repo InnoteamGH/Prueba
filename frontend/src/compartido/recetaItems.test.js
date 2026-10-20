@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, listaItemsReceta } from "./recetaItems.js";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, listaItemsReceta, partirIndicaciones, textoIndicaciones } from "./recetaItems.js";
 
 describe("recetaItems H-08: un solo esquema, se leen los dos formatos", () => {
   it("lee el formato de la ficha", () => {
@@ -31,5 +31,18 @@ describe("recetaItems H-08: un solo esquema, se leen los dos formatos", () => {
   it("M5-10: el formulario del módulo guarda presentación y dosis por separado", () => {
     assert.deepEqual(itemRecetaDesdeFormulario({ med: "Paracetamol", pres: "500 mg", dosis: " 1 tableta ", frec: "c/8 h", dur: "3 días" }),
       { medicamento: "Paracetamol", presentacion: "500 mg", dosis: "1 tableta", frecuencia: "c/8 h", duracion: "3 días" });
+  });
+});
+
+describe("indicaciones con alerta de alergia", () => {
+  const crudo = 'QA prueba [ALERTA ALERGIA — emitida con override] ["Ibuprofeno ↔ alergia a Aspirina (familia AINE)"]';
+  it("separa el texto del médico de la alerta del servidor", () => {
+    assert.deepEqual(partirIndicaciones(crudo), { texto: "QA prueba", alertas: ["Ibuprofeno ↔ alergia a Aspirina (familia AINE)"] });
+  });
+  it("sin alerta devuelve el texto tal cual", () => {
+    assert.deepEqual(partirIndicaciones("Reposo 24 h"), { texto: "Reposo 24 h", alertas: [] });
+  });
+  it("el texto para mostrar o imprimir no lleva corchetes ni comillas", () => {
+    assert.equal(textoIndicaciones(crudo), "QA prueba · Emitida pese a alerta de alergia: Ibuprofeno ↔ alergia a Aspirina (familia AINE).");
   });
 });

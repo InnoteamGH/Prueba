@@ -214,7 +214,7 @@ export default function PeriodontogramaClinico({ pacienteId, pacienteNombre = ""
     setGuardado({ tipo: "guardando" });
     timers.current[n] = setTimeout(() => {
       api.perio.guardar(aApi(pacienteId, n, p))
-        .then(() => setGuardado({ tipo: "ok", hora: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) }))
+        .then(() => setGuardado({ tipo: "ok", hora: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", hour12: false, minute: "2-digit" }) }))
         .catch(() => { setGuardado({ tipo: "error" }); notify(`No se pudo guardar la pieza ${n}.`); });
     }, 600);
   };

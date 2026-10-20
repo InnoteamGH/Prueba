@@ -54,8 +54,18 @@ export const UMBRAL_AUSENTISMO = 15;
 /** Escala visual 0–20% para barras de ausentismo. */
 export const ESCALA_AUSENTISMO_MAX = 20;
 
+/** Tope de la escala: 20% mientras todo quepa. Si alguna tasa lo pasa, sube a la decena
+ *  siguiente (máx. 100%): con un tope fijo la barra se llenaba y la etiqueta «89.3% la clínica»
+ *  quedaba encima de la del 20%. */
+export function escalaAusentismoMax(...tasas) {
+  const vals = tasas.flat().map(Number).filter((t) => Number.isFinite(t));
+  const pico = vals.length ? Math.max(...vals) : 0;
+  if (pico <= ESCALA_AUSENTISMO_MAX) return ESCALA_AUSENTISMO_MAX;
+  return Math.min(100, Math.ceil(pico / 10) * 10);
+}
+
 const ESTADOS_NUM = new Set(["cancelada", "no_show"]);
-/** AUS-02: reprogramada fuera del cálculo hasta decisión de producto. */
+/** AUS-02: la reprogramada sale del cálculo: la cita se cuenta en su nueva fecha. */
 const ESTADO_FUERA = "reprogramada";
 
 /** Citas que entran en el cálculo de ausentismo (excluye reprogramada). */
@@ -165,23 +175,24 @@ export function ausentismoPorOdontologo(citas, medicos = [], ticketMedio = null)
       row.perdidas++;
     }
   }
-  const rows = [...docs.values()]
+  const clinica = resumenAusentismoClinica(citas);
+  const conTasa = [...docs.values()]
     .filter((r) => r.agenda > 0)
+    .map((r) => ({ ...r, tasa: r.agenda > 0 ? Math.round((r.perdidas / r.agenda) * 1000) / 10 : null }));
+  const escala = escalaAusentismoMax(clinica.tasa, conTasa.map((r) => r.tasa));
+  const rows = conTasa
     .map((r) => {
-      const tasa = r.agenda > 0 ? Math.round((r.perdidas / r.agenda) * 1000) / 10 : null;
       const coste = ticket != null && r.perdidas > 0 ? Math.round(r.perdidas * ticket * 100) / 100 : (ticket != null ? 0 : null);
       return {
         ...r,
-        tasa,
         coste,
-        pctEscala: tasa != null ? pctEnEscalaAusentismo(tasa) : 0,
-        dibujarBarra: (tasa || 0) > 0,
+        pctEscala: r.tasa != null ? pctEnEscalaAusentismo(r.tasa, escala) : 0,
+        dibujarBarra: (r.tasa || 0) > 0,
       };
     }).sort((a, b) => (b.tasa ?? -1) - (a.tasa ?? -1));
 
-  const clinica = resumenAusentismoClinica(citas);
   const costeTotal = ticket != null ? Math.round(clinica.perdidas * ticket * 100) / 100 : null;
-  return { rows, clinica, ticketMedio: ticket, costeTotal };
+  return { rows, clinica, ticketMedio: ticket, costeTotal, escala };
 }
 
 export { layoutProgreso, moneyFmt, pctOfTotal };

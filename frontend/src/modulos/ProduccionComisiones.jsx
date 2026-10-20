@@ -331,7 +331,7 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
         if (v) {
           ctx.font = '600 11px "Inter Variable", sans-serif';
           ctx.fillStyle = v >= 1000 ? c1 : cssVar("--dc-warn-700", "#92400E");
-          ctx.fillText(`+${Math.round(v).toLocaleString("es-PE").replace(/,/g, " ")}`, X(i), H - 8);
+          ctx.fillText(`+${Math.round(v).toLocaleString("es-PE")}`, X(i), H - 8);
         } else {
           ctx.font = '400 11px "Inter Variable", sans-serif';
           ctx.fillStyle = cssVar("--dc-ink-200", "#C4CBD6");
@@ -341,7 +341,7 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
       ctx.font = '400 11px "Inter Variable", sans-serif';
       ctx.fillStyle = fa;
       ctx.textAlign = "left";
-      ctx.fillText(`S/ ${Math.round(mx).toLocaleString("es-PE").replace(/,/g, " ")}`, pad.l + 2, pad.t - 5);
+      ctx.fillText(`S/ ${Math.round(mx).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pad.l + 2, pad.t - 5);
 
       ctx.beginPath();
       ctx.moveTo(X(poly[0][0]), H - pad.b);
@@ -443,13 +443,16 @@ function fmtTasa(t) {
 }
 
 function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
-  const { rows, clinica, ticketMedio: ticket, costeTotal } = useMemo(
+  const { rows, clinica, ticketMedio: ticket, costeTotal, escala } = useMemo(
     () => ausentismoPorOdontologo(citas, medicos, ticketMedio),
     [citas, medicos, ticketMedio],
   );
-  const umbralLeft = pctEnEscalaAusentismo(UMBRAL_AUSENTISMO);
-  const clinicaLeft = clinica.tasa != null ? pctEnEscalaAusentismo(clinica.tasa) : 0;
+  const umbralLeft = pctEnEscalaAusentismo(UMBRAL_AUSENTISMO, escala);
+  const clinicaLeft = clinica.tasa != null ? pctEnEscalaAusentismo(clinica.tasa, escala) : 0;
   const sobreUmbral = clinica.tasa != null && clinica.tasa >= UMBRAL_AUSENTISMO;
+  /* La etiqueta de la clínica va sobre la barra y se ancla al borde cerca de los extremos,
+     para no pisar «0%», la alerta ni el tope de la escala. */
+  const anclaClinica = clinicaLeft > 85 ? "fin" : clinicaLeft < 12 ? "ini" : "";
 
   const fichaPerdidas = () => onOpen?.({
     t: "Citas que se pierden",
@@ -467,8 +470,8 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
     filas: [
       ["Cancelada", "Suma", "Lista de espera: el hueco avisado se puede revender"],
       ["No asistió", "Suma", "Recordatorios: el hueco se quema"],
-      ["Reprogramada", "Fuera", "Decisión de producto: si se mueve tarde, el hueco también se pierde"],
-      ["Pendiente – Confirmada – En atención – Atendida", "Denominador", "Siguen en pie o se atendieron"],
+      ["Reprogramada", "Fuera", "Se cuenta en su nueva fecha"],
+      ["Pendiente, confirmada, en atención o atendida", "Base", "Siguen en pie o se atendieron"],
     ],
     fuente: "Agenda del periodo – estados de cada cita.",
     tono: "aviso",
@@ -484,7 +487,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
     cols: [["Concepto"], ["Valor", "n"]],
     filas: [
       ["Umbral", `${UMBRAL_AUSENTISMO}%`],
-      ["Escala de esta pantalla", `0 – ${ESCALA_AUSENTISMO_MAX}%`],
+      ["Escala de esta pantalla", `0 – ${escala}%`],
       ["La clínica ahora", clinica.sinDato ? "—" : fmtTasa(clinica.tasa)],
     ],
     fuente: "Producción = procedimientos terminados × precio del catálogo.",
@@ -502,7 +505,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
     filas: [
       ["Ticket medio", ticket != null ? moneyFmt(ticket) : "—"],
       ["Citas perdidas", String(clinica.perdidas)],
-      ["Coste estimado", costeTotal != null ? moneyFmt(costeTotal) : "—"],
+      ["Costo estimado", costeTotal != null ? moneyFmt(costeTotal) : "—"],
     ],
     fuente: "Producción y citas del mismo periodo que la pestaña principal.",
     tono: "brand",
@@ -510,19 +513,19 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
 
   const fichaEscala = () => onOpen?.({
     t: "Dónde está la clínica",
-    s: `Escala 0 – ${ESCALA_AUSENTISMO_MAX}% – umbral ${UMBRAL_AUSENTISMO}%`,
+    s: `Escala 0 – ${escala}% – alerta ${UMBRAL_AUSENTISMO}%`,
     cifra: clinica.sinDato ? "—" : fmtTasa(clinica.tasa),
     parte: sobreUmbral ? "sobre el umbral" : "bajo el umbral",
     sub: clinica.sinDato
       ? "Sin citas en agenda para medir."
       : `De cada cien citas, unas ${Math.round(clinica.tasa)} se pierden.`,
-    como: "La raya roja es el 15% de la app. Canceladas y no asistidas se suman en el %; se enseñan aparte porque piden acciones distintas.",
+    como: `La raya roja es la alerta del ${UMBRAL_AUSENTISMO}%. La escala llega al ${escala}%${escala > ESCALA_AUSENTISMO_MAX ? " porque hay tasas por encima del 20%" : ""}. Canceladas y no asistidas se suman en el %; se enseñan aparte porque piden acciones distintas.`,
     cols: [["Estado"], ["Rol"], ["Nota"]],
     filas: [
       ["Cancelada", "Cuenta (arriba)", "El paciente avisó"],
       ["No asistió", "Cuenta (arriba)", "El paciente no avisó"],
-      ["Reprogramada", "Fuera", "A decidir (AUS-02)"],
-      ["Pendiente / Confirmada / En atención / Atendida", "Denominador", "No son pérdida"],
+      ["Reprogramada", "Fuera", "Se cuenta en su nueva fecha"],
+      ["Pendiente, confirmada, en atención o atendida", "Base", "No son pérdida"],
     ],
     fuente: "Citas de agenda del periodo.",
     tono: "ok",
@@ -540,7 +543,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
       ["Agenda", String(r.agenda)],
       ["Canceladas", String(r.cancelada)],
       ["No asistió", String(r.noShow)],
-      ["Coste", r.coste != null ? moneyFmt(r.coste) : "—"],
+      ["Costo", r.coste != null ? moneyFmt(r.coste) : "—"],
     ],
     como: "Sus citas del tramo, contando canceladas y no asistidas. El coste es esas citas por el ticket medio de la clínica.",
     cols: [["Concepto"], ["Valor", "n"]],
@@ -549,7 +552,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
       ["Canceladas", String(r.cancelada)],
       ["No asistió", String(r.noShow)],
       ["Tasa", r.tasa == null ? "—" : fmtTasa(r.tasa)],
-      ["Coste", r.coste != null ? moneyFmt(r.coste) : "—"],
+      ["Costo", r.coste != null ? moneyFmt(r.coste) : "—"],
     ],
     fuente: "Agenda agrupada por odontólogo (dato real).",
     tono: "cian",
@@ -581,13 +584,20 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
         <div className="dc-card__head">
           <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
           <h2>Dónde está la clínica</h2>
-          <span className="dc-card__meta">escala 0 – {ESCALA_AUSENTISMO_MAX}% – la raya roja es el umbral de la app</span>
+          <span className="dc-card__meta">raya roja: alerta del {UMBRAL_AUSENTISMO}%</span>
           <button type="button" className="dc-info" aria-label="Qué mide esta escala" onClick={fichaEscala}>i</button>
         </div>
         <div className="dc-card__body">
           <div className="dc-split" style={{ gridTemplateColumns: "1.15fr 1fr" }}>
             <div>
               <div className="dc-escala">
+                {!clinica.sinDato && (
+                  <div className="tope">
+                    <span className={`op${anclaClinica ? ` op--${anclaClinica}` : ""}`} style={{ left: `${clinicaLeft}%` }}>
+                      <b>{clinica.tasa}%</b> la clínica
+                    </span>
+                  </div>
+                )}
                 <div className="pista pista--escala">
                   {!clinica.sinDato && (
                     <i
@@ -603,11 +613,8 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                 </div>
                 <div className="ejes">
                   <span className="eje-ini">0%</span>
-                  {!clinica.sinDato && (
-                    <span className="op" style={{ left: `${clinicaLeft}%` }}>{clinica.tasa}% – la clínica</span>
-                  )}
-                  <span style={{ left: `${umbralLeft}%` }}><b>{UMBRAL_AUSENTISMO}% – alerta</b></span>
-                  <span className="eje-fin">{ESCALA_AUSENTISMO_MAX}%</span>
+                  <span style={{ left: `${umbralLeft}%` }}><b>{UMBRAL_AUSENTISMO}% alerta</b></span>
+                  <span className="eje-fin">{escala}%</span>
                 </div>
               </div>
               <p className="dc-nota" style={{ marginTop: "var(--dc-sp-5)" }}>
@@ -617,8 +624,8 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                     ({clinica.perdidas} de {clinica.total}). Canceladas: <b>{clinica.canceladas}</b> –
                     no asistió: <b>{clinica.noShows}</b>.
                     {sobreUmbral
-                      ? " Está en o por encima del umbral: conviene reforzar recordatorios."
-                      : " Está por debajo del 15%: la asistencia no es el problema principal."}</>}
+                      ? ` Está por encima de la alerta del ${UMBRAL_AUSENTISMO}%: conviene reforzar recordatorios.`
+                      : ` Está por debajo del ${UMBRAL_AUSENTISMO}%: la asistencia no es el problema principal.`}</>}
               </p>
             </div>
             <div className="dc-split__rule">
@@ -633,19 +640,19 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                   <span className="dc-chip dc-chip--riesgo">cuenta</span>
                 </button>
                 <button type="button" className="fila" onClick={fichaEscala}>
-                  <span className="nm">Reprogramada<em>ni suma ni resta: hoy sale del cálculo entero</em></span>
-                  <span className="dc-chip dc-chip--info">a decidir</span>
+                  <span className="nm">Reprogramada<em>se movió a otra fecha: se cuenta en la nueva</em></span>
+                  <span className="dc-chip dc-chip--info">fuera</span>
                 </button>
                 <button type="button" className="fila" onClick={fichaEscala}>
-                  <span className="nm">Pendiente – Confirmada – En atención – Atendida<em>son el denominador</em></span>
-                  <span className="dc-chip dc-chip--ok">no cuenta</span>
+                  <span className="nm">Pendiente, confirmada, en atención o atendida<em>siguen en pie o se atendieron: forman el total</em></span>
+                  <span className="dc-chip dc-chip--ok">base</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
         <p className="dc-card__foot">
-          Canceladas y no asistidas se enseñan <b>por separado</b>: una cancelación se arregla con
+          Canceladas y no asistidas se muestran <b>por separado</b>: una cancelación se arregla con
           lista de espera; una falta, con recordatorios.
         </p>
       </section>
@@ -663,7 +670,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
             cifra: clinica.sinDato ? "—" : fmtTasa(clinica.tasa),
             parte: `${clinica.perdidas} perdidas`,
             como: "Agenda agrupada por odontólogo a partir de las citas del periodo (médico y estado de cada una).",
-            cols: [["Odontólogo"], ["Agenda", "n"], ["Perdidas", "n"], ["%", "n"], ["Coste", "n"]],
+            cols: [["Odontólogo"], ["Agenda", "n"], ["Perdidas", "n"], ["%", "n"], ["Costo", "n"]],
             filas: rows.map((r) => [
               r.nombre,
               String(r.agenda),
@@ -683,16 +690,16 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
             { key: "agenda", label: "Agenda", get: (r) => String(r.agenda ?? ""), sortVal: (r) => Number(r.agenda) || 0 },
             { key: "perdidas", label: "Se pierden", get: (r) => String(r.perdidas ?? ""), sortVal: (r) => Number(r.perdidas) || 0 },
             { key: "tasa", label: "%", get: (r) => (r.tasa == null ? "" : String(r.tasa)), sortVal: (r) => (r.tasa == null ? -1 : Number(r.tasa)) },
-            { key: "coste", label: "Coste", get: (r) => (r.coste != null ? String(r.coste) : ""), sortVal: (r) => Number(r.coste) || 0 },
+            { key: "coste", label: "Costo", get: (r) => (r.coste != null ? String(r.coste) : ""), sortVal: (r) => Number(r.coste) || 0 },
           ]} modoTabla>{(lstA, _v, stA) => (
           <div className="dc-tabla-doc dc-tabla-doc--aus" role="table" aria-label="Ausentismo por odontólogo">
             <div className="fila cab" role="row">
               <ThOrden st={stA} k="nombre">Odontólogo</ThOrden>
               <ThOrden st={stA} k="agenda" a="right" className="der">Agenda</ThOrden>
-              <span>Escala 0 – {ESCALA_AUSENTISMO_MAX}% – raya {UMBRAL_AUSENTISMO}%</span>
+              <span>Escala 0 – {escala}% · alerta {UMBRAL_AUSENTISMO}%</span>
               <ThOrden st={stA} k="perdidas" a="right" className="der">Se pierden</ThOrden>
               <ThOrden st={stA} k="tasa" a="right" className="der">%</ThOrden>
-              <ThOrden st={stA} k="coste" a="right" className="der">Coste</ThOrden>
+              <ThOrden st={stA} k="coste" a="right" className="der">Costo</ThOrden>
             </div>
             {lstA.map((r) => (
               <div
@@ -992,7 +999,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                     <div className="dc-kpi__label">Al ritmo de su meta</div>
                     <div className="dc-kpi__value">{alRitmo} de {conMeta.length}</div>
                     {/* Producción de quien tiene meta ÷ su meta del mismo periodo (antes: la producción de todo el equipo ÷ una sola meta mensual). */}
-                    <div className="dc-kpi__sub">{metaTot ? `${Math.round((conMeta.reduce((a, m) => a + (Number(m.produccion) || 0), 0) / metaTot) * 100)}% de la meta del ${mesesPer > 1 ? "periodo" : "mes"}` : "Sin metas definidas"}</div>
+                    <div className="dc-kpi__sub">{metaTot ? `odontólogos · ${Math.round((conMeta.reduce((a, m) => a + (Number(m.produccion) || 0), 0) / metaTot) * 100)}% de la meta del ${mesesPer > 1 ? "periodo" : "mes"}` : "Sin metas definidas"}</div>
                   </div>
                 </button>
               );
@@ -1014,14 +1021,12 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
             })}>
               <span className="dc-kpi__icon" style={{ background: "var(--dc-warn-100)", color: "var(--dc-warn-700)" }} aria-hidden="true">☐</span>
               <div className="dc-kpi__body">
-                <div className="dc-kpi__label">
-                  Pendiente de liquidar
-                  {sinDato && <span className="marca-demo">sin dato</span>}
-                </div>
+                {/* Sin pagos de comisión registrados: un solo mensaje (antes «sin dato», «—» y «Sin pagos registrados» a la vez). */}
+                <div className="dc-kpi__label">Pendiente de liquidar</div>
                 <div className="dc-kpi__value" style={sinDato ? { color: "var(--dc-ink-400)" } : undefined}>
                   {sinDato ? "—" : moneyFmt(pendiente)}
                 </div>
-                <div className="dc-kpi__sub">{sinDato ? "Sin pagos registrados" : "Comisión − pagos"}</div>
+                <div className="dc-kpi__sub">{sinDato ? "Sin pagos de comisión registrados" : "Comisión − pagos"}</div>
               </div>
             </button>
           </section>

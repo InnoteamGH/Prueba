@@ -14,7 +14,7 @@ import { atiendeEnSedes } from "../compartido/medicoEnSede";
 import { sedeApiUuid } from "../routing";
 import NoDisponible from "../ui/NoDisponible";
 
-const soles = (n) => "S/ " + Math.round(Number(n) || 0).toLocaleString("es-PE");
+const soles = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const miles = (v) => (v === "" || v == null ? "" : Number(v).toLocaleString("es-PE"));
 const k = (mid, sid) => `${mid}:${sid}`;
 
@@ -24,7 +24,8 @@ function Monto({ value, onChange, disabled, label }) {
   return (
     <label className={`dc-mtz__monto${disabled ? " is-off" : ""}`}>
       <span>S/</span>
-      <input type="text" inputMode="numeric" disabled={disabled} aria-label={label} placeholder="Sin meta"
+      {/* «S/ Sin meta» se leía raro: el placeholder es solo el número de ejemplo. */}
+      <input type="text" inputMode="numeric" disabled={disabled} aria-label={label} placeholder="0"
         value={foco ? (value ?? "") : miles(value)}
         onFocus={(e) => { setFoco(true); requestAnimationFrame(() => e.target.select()); }}
         onBlur={() => setFoco(false)}
@@ -314,7 +315,7 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
         );
       })}
 
-      <p className="dc-mtz__nota"><Info size={13} strokeWidth={2} /> La comisión es el % del médico sobre su producción en cada sede: el valor de los procedimientos terminados, al precio de esa sede (el servidor todavía la calcula con las citas atendidas). Quién va al ritmo y cuánto lleva ganado está en <b>Reportes › Producción y comisiones</b>.</p>
+      <p className="dc-mtz__nota"><Info size={13} strokeWidth={2} /><span>La comisión es el % del médico sobre su producción en cada sede: el valor de los procedimientos terminados, al precio de esa sede. Quién va al ritmo y cuánto lleva ganado está en <b>Reportes › Producción y comisiones</b>.</span></p>
 
       {puedeEditar && cambiados.length > 0 && (
         <div className="dc-mtz__barra" role="region" aria-label="Cambios sin guardar">

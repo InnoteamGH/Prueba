@@ -40,8 +40,9 @@
 .dc-pc .dc-card__head {
   display: flex; align-items: center; gap: 10px; padding: 14px 18px 0; flex-wrap: wrap;
 }
+/* flex-basis: en celular el título se encogía a 7 px en vez de dejar bajar la nota y el (i). */
 .dc-pc .dc-card__head h2 {
-  margin: 0; font-size: var(--dc-fs-md); font-weight: var(--dc-fw-bold); flex: 1; min-width: 0;
+  margin: 0; font-size: var(--dc-fs-md); font-weight: var(--dc-fw-bold); flex: 1 1 180px; min-width: 0;
 }
 .dc-pc .dc-card__meta { font-size: var(--dc-fs-xs); color: var(--dc-ink-400); display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dc-pc .vin { width: 8px; height: 8px; border-radius: 50%; flex: none; }
@@ -215,6 +216,14 @@
 .dc-pc .dc-escala .ejes span.eje-ini { transform: none; left: 0; }
 .dc-pc .dc-escala .ejes span.eje-fin { transform: none; right: 0; left: auto; }
 .dc-pc .dc-escala .ejes b { color: var(--dc-danger-700); font-weight: var(--dc-fw-semibold); }
+.dc-pc .dc-escala .tope {
+  position: relative; height: 20px; margin-bottom: 6px;
+  font-size: var(--dc-fs-xs); color: var(--dc-ink-500);
+}
+.dc-pc .dc-escala .tope .op { position: absolute; top: 0; white-space: nowrap; transform: translateX(-50%); }
+.dc-pc .dc-escala .tope .op--fin { transform: translateX(-100%); }
+.dc-pc .dc-escala .tope .op--ini { transform: none; }
+.dc-pc .dc-escala .tope b { color: var(--dc-ink-900); font-weight: var(--dc-fw-semibold); }
 
 .dc-pc .dc-estados { display: flex; flex-direction: column; }
 .dc-pc .dc-estados .fila {
@@ -256,7 +265,6 @@
 @media (max-width: 720px) {
   .dc-pc .dc-kpis,
   .dc-pc .dc-kpis--3 { grid-template-columns: 1fr; }
-  .dc-pc .dc-escala .ejes .op { display: none; }
   .dc-pc .dc-tabla-doc .fila,
   .dc-pc .dc-tabla-doc--aus .fila {
     grid-template-columns: 1fr 78px 78px; gap: var(--dc-sp-2);
@@ -274,3 +282,16 @@
 
 .dc-pc .dc-kpi__value { font-size: 22px !important; }
 .dc-pc .dc-card__head h2 { font-size: 15px !important; font-weight: 600 !important; }
+
+/* Tablet: las 6 columnas no caben (a 768 px «Comisión» y «Coste» quedaban fuera de la
+   pantalla). Se usa la misma tabla compacta que en celular. */
+@media (max-width: 960px) {
+  .dc-pc .dc-tabla-doc .fila,
+  .dc-pc .dc-tabla-doc--aus .fila { grid-template-columns: minmax(0, 1fr) 96px 96px; gap: var(--dc-sp-2); }
+  .dc-pc .dc-tabla-doc .fila > *:nth-child(2),
+  .dc-pc .dc-tabla-doc .fila > *:nth-child(3),
+  .dc-pc .dc-tabla-doc .fila > *:nth-child(5),
+  .dc-pc .dc-tabla-doc--aus .fila > *:nth-child(2),
+  .dc-pc .dc-tabla-doc--aus .fila > *:nth-child(3),
+  .dc-pc .dc-tabla-doc--aus .fila > *:nth-child(5) { display: none; }
+}

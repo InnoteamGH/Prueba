@@ -42,7 +42,7 @@ export function proveedorSunat() {
    el inicio «incidencia» y WhatsApp «Con fallos – 2 en 24 h» con el mismo dato.
    estado: "operativo" | "incidencia" | "pendiente". */
 const msDe = (x) => { const t = x ? new Date(x).getTime() : NaN; return Number.isFinite(t) ? t : null; };
-const fechaHoraLima = (x) => new Date(x).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" }).replace(/\.$/, "");
+const fechaHoraLima = (x) => new Date(x).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", hour12: false, minute: "2-digit", timeZone: "America/Lima" }).replace(/\.$/, "");
 /** « Último envío correcto: 02/10, 10:39 a. m.» si el servidor lo informa (si no, ""). */
 export const notaUltimoEnvioOk = (s) => (s && msDe(s.ultimoEnvioOk) != null ? ` Último envío correcto: ${fechaHoraLima(s.ultimoEnvioOk)}.` : "");
 

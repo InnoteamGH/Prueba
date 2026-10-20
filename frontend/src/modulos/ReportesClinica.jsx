@@ -29,7 +29,8 @@ function rango(id, hoy = M.hoyISO()) {
   }
 }
 const enRango = (f, r) => { const x = String(f || "").slice(0, 10); return x && x >= r.desde && x <= r.hasta; };
-const soles = (n) => `S/ ${M.sol0(n)}`;
+// Dos decimales, como el resto de la app («S/ 220.00»).
+const soles = (n) => `S/ ${M.sol2(n)}`;
 // H-20: los montos de las tablas y del Excel van con céntimos (311.25, no 311) y con su
 // signo pegado al número, para que el Excel los lea como números y se puedan sumar.
 const soles2 = (n) => `S/ ${M.sol2(n)}`;
