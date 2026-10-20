@@ -1,6 +1,6 @@
-# Entrega al programador: servidor y frontend (20/10/2026)
+# Pendientes del servidor y cambios del frontend (20/10/2026)
 
-**Qué incluye:**
+**Archivos:**
 - **Este documento:** lo que ya quedó bien y lo que falta en el servidor, en orden de prioridad.
 - **`cambio-frontend-completo-2026-10-20.patch`:** todos los cambios del frontend desde la versión publicada.
 - **Evidencia:**
@@ -13,7 +13,7 @@ Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 20/10/202
 
 ## 1. Ya quedó bien ✅
 
-Lo que corregiste después de la revisión 31 funciona:
+Lo corregido después de la revisión 31 funciona:
 
 | Tema | Cómo responde ahora |
 |---|---|
@@ -72,16 +72,13 @@ Lo que corregiste después de la revisión 31 funciona:
 | 26 | **Imágenes fuera de la base de datos.** | Se guardan en base64. | 29 |
 | 27 | **IPN de Izipay:** confirmar en el log si llegan los POST a `/public/izipay/ipn`. | Sin confirmar. No se cuenta como defecto. | — |
 
-Los requisitos 117 y 118 de `requisitos-minimos.md` recogen los puntos 1, 2, 3, 21, 22 y 23.
-
 ---
 
 ## 3. Frontend
 
 **Archivo:** `cambio-frontend-completo-2026-10-20.patch`.
 - **Base:** la versión publicada hoy (`index-D3Ylj-i5.js`, commit `f5370c6` de la rama). Se comprobó que aplica limpio sobre ella.
-- **Alcance:** solo toca `frontend/`. **No toca tu pantalla de cambio de clave.**
-- **Reemplaza** a `cambio-frontend-UX.patch`: lo incluye, junto con el cambio de la bandeja de WhatsApp de la revisión 32.
+- **Alcance:** solo toca `frontend/`. **No toca la pantalla de cambio de clave.**
 
 **Cómo aplicarlo** (desde la raíz del repositorio):
 1. `git apply --check cambio-frontend-completo-2026-10-20.patch` (no debe decir nada).

@@ -16,7 +16,7 @@
 
 **Resultado:**
 - **Corregido:** unas 100 incidencias, todas en el frontend: unas 70 de diseño y textos, y unas 30 de diseño adaptable para tablet y celular (sección 4).
-- **Archivo de cambio:** `cambio-frontend-UX.patch`.
+- **Archivo de cambio:** `cambio-frontend-completo-2026-10-20.patch`. Incluye también el cambio de la bandeja de WhatsApp del mismo día (negrita de WhatsApp).
 - **Pruebas:** 446 pruebas automáticas; fallan las mismas 3 que ya fallaban antes de los cambios. Se agregaron pruebas para la alerta de alergia y la escala de ausentismo.
 - **Pendiente:** al final, lo que depende del servidor o es menor.
 
