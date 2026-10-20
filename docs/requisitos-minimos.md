@@ -545,3 +545,7 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **La derivación cuenta como pendiente.** Al derivar, el chat pasa a recepción y queda la nota de sistema, pero con `porResponder: 0`: no suma al contador de WhatsApp ni aparece en «Pendientes» hasta que el paciente vuelve a escribir. Debe quedar con al menos 1 por responder.
    - **La notificación dice de quién y de qué cita.** `derivacion_recepcion` llega sin `pacienteId` ni `citaId`.
    - **Día pedido sin doctor de la especialidad.** Si el paciente pide un día en que nadie de esa especialidad atiende en la sede, la IA debe decirlo antes de ofrecer el siguiente día («El martes 22 no hay odontología general en Surco; el siguiente es el jueves 24»).
+119. Cancelar un link sin pagar con cualquier frase (revisión 33):
+   - **Revisar qué tiene el paciente antes de responder.** Con un link pendiente y sin cita, «Mejor no, ya no quiero la cita» recibió la respuesta de una cita pagada («Su cita sigue confirmada hasta que recepción la gestione»), sin usar ninguna herramienta; el link siguió vivo y el chat pasó a recepción. Con un link sin pagar, la IA debe anularlo (como ya hace con «Ya no quiero la cita, cancélela por favor»); solo con una cita pagada deriva a recepción.
+   - **Notificación legible.** El texto de `derivacion_recepcion` debe nombrar al paciente y la fecha de la cita, sin identificadores internos (ya van en `pacienteId` y `citaId`).
+   - **Días y especialidades en minúscula** a mitad de frase: «el martes 22 no hay odontología general…».
