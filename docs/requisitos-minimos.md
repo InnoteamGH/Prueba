@@ -549,3 +549,8 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Revisar qué tiene el paciente antes de responder.** Con un link pendiente y sin cita, «Mejor no, ya no quiero la cita» recibió la respuesta de una cita pagada («Su cita sigue confirmada hasta que recepción la gestione»), sin usar ninguna herramienta; el link siguió vivo y el chat pasó a recepción. Con un link sin pagar, la IA debe anularlo (como ya hace con «Ya no quiero la cita, cancélela por favor»); solo con una cita pagada deriva a recepción.
    - **Notificación legible.** El texto de `derivacion_recepcion` debe nombrar al paciente y la fecha de la cita, sin identificadores internos (ya van en `pacienteId` y `citaId`).
    - **Días y especialidades en minúscula** a mitad de frase: «el martes 22 no hay odontología general…».
+120. Flujo de WhatsApp guiado (prueba real del 20/10; detalle en `FLUJO-WHATSAPP-GUIADO-2026-10-20.md`):
+   - **El código lleva el flujo y la IA solo interpreta** el texto del paciente: convierte lo que escribe en datos y el código decide la siguiente pregunta, con textos fijos.
+   - **Una pregunta por mensaje**, sin volver a pedir lo ya dicho; los datos se guardan en la conversación apenas se entienden.
+   - **El estado se reinicia** tras 12 horas sin mensajes o con un saludo solo: un chat creado el 06/08 retomó con «Hola» una reserva de agosto.
+   - **Nada se asume:** la especialidad se pregunta antes de buscar cupos (hoy reservó ortodoncia sin preguntar); «mañana» y «2 pm» los resuelve el código con la hora de Lima; máximo 3 opciones.
