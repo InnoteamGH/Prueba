@@ -570,3 +570,8 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Una pregunta por mensaje**, también para nombre, DNI y edad.
    - **Solo «sí, confirmo» (o equivalente) confirma** una reserva; «Para mí» responde a otra pregunta.
    - **Dos mensajes sin entender** pasan el chat a recepción; un saludo o 12 horas sin mensajes reinician la conversación.
+123. Elegir de la lista y no perder lo que ya funcionaba (revisión 35; detalle en `ESCENARIOS-WHATSAPP-2026-10-23.md`):
+   - **Elegir una hora de la lista siempre reserva esa hora**, la diga el paciente como la diga: «a las 10», «10», «10:00», «el de las 10», «1» o «la primera».
+   - **La validación usa el día ofrecido**, no el que pidió el paciente cuando ese día no tenía doctor.
+   - **Cada versión nueva repite las 16 conversaciones de aceptación** antes de publicarse: en esta ronda volvieron dos fallas ya corregidas (anular un link sin pagar y no pedir datos al paciente registrado).
+   - **El nombre de la clínica sale de su configuración**, el mismo en WhatsApp, en la página de pago y en los documentos.
