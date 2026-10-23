@@ -182,7 +182,7 @@
    - «2 sede(s)»;
    - conceptos de Izipay con códigos.
 
-   El frontend ya los oculta o los corrige al mostrarlos. Detalle en `PENDIENTES-Y-CAMBIOS-2026-10-20.md`, puntos 17 a 24.
+   El frontend ya los oculta o los corrige al mostrarlos. Detalle en `PENDIENTES-Y-CAMBIOS-2026-10-23.md`, puntos 16 a 23.
 3. **Detalles menores que no se tocaron:**
    - en Puesta en marcha, la fecha del último fallo de WhatsApp sale «(20/10, 14:44)», con el formato del módulo de integraciones;
    - el Consolidado no agrupa la tabla por día (sí lo hace la vista «Por día»);

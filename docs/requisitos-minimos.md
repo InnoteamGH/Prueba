@@ -563,3 +563,10 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Un estilo por botón y un verbo claro:** un solo «Cobrar», «Actualizar» con flecha circular, y botones que dicen el paso siguiente («Marcar recibido», no «Avanzar»).
    - **Colores con significado:** los ceros en gris; el rojo solo para alertas reales.
    - **Antes de mostrar el sistema a un cliente** se limpian los datos de prueba «QA» o se usa otra clínica.
+122. WhatsApp guiado: lo mínimo para darlo por bueno (revisión 34; detalle en `QA-REVISION-34-2026-10-23.md`):
+   - **Las 16 conversaciones de aceptación** de `FLUJO-WHATSAPP-GUIADO-2026-10-20.md` deben pasar todas antes de dar el flujo por terminado; el 23/10 pasaron 7.
+   - **Lo dicho se guarda y no se vuelve a pedir:** sede, especialidad, día, hora y para quién quedan en la conversación apenas se entienden, en el orden en que lleguen y aunque vengan juntos en un mensaje.
+   - **Se usa el día que dijo el paciente:** nunca se ofrece hoy por defecto ni otro día sin decirlo.
+   - **Una pregunta por mensaje**, también para nombre, DNI y edad.
+   - **Solo «sí, confirmo» (o equivalente) confirma** una reserva; «Para mí» responde a otra pregunta.
+   - **Dos mensajes sin entender** pasan el chat a recepción; un saludo o 12 horas sin mensajes reinician la conversación.
