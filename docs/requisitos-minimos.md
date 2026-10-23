@@ -575,3 +575,8 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **La validación usa el día ofrecido**, no el que pidió el paciente cuando ese día no tenía doctor.
    - **Cada versión nueva repite las 16 conversaciones de aceptación** antes de publicarse: en esta ronda volvieron dos fallas ya corregidas (anular un link sin pagar y no pedir datos al paciente registrado).
    - **El nombre de la clínica sale de su configuración**, el mismo en WhatsApp, en la página de pago y en los documentos.
+124. Responder por la hora que pide el paciente (revisión 36; detalle en `ESCENARIOS-WHATSAPP-2026-10-23.md`):
+   - **La hora pedida se busca en la agenda, no solo en la lista mostrada:** si está libre ese día, se reserva («2 pm» → 14:00), aunque no esté entre las 3 opciones que se mostraron.
+   - **Si no está libre, se dice y se ofrecen las más cercanas:** «A las 11:00 ya no hay cupo el jueves 5; tengo 10:30 y 11:30». No se ofrecen las primeras del día sin avisar.
+   - **Al elegir de la lista vale también el número de la opción** («2» = la segunda).
+   - **La hora dicha antes del servicio se guarda** y se usa al buscar cupos, como el día y la sede.

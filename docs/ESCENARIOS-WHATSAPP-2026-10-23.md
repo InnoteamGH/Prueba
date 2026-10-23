@@ -1,19 +1,22 @@
-# WhatsApp con IA: escenarios para reproducir (23/10/2026, 12:15)
+# WhatsApp con IA: escenarios para reproducir (23/10/2026, 14:46)
 
-**Estado tras la nueva versión** (probada de 11:57 a 12:15, hora de Lima): pasan **11 de 16** conversaciones de aceptación. A las 11:30 pasaban 7.
+**Estado tras la última versión:**
+- **Probada:** de 14:36 a 14:46, hora de Lima.
+- **Aceptación:** pasan **14 de 16** conversaciones (13 completas y 1 a medias). Al mediodía pasaban 11 y a las 11:30, 7.
+- **Ya se puede:**
+  - elegir una hora de la lista (6 de 7 intentos);
+  - anular un link sin pagar desde el chat.
+- **Paciente registrado:** ya no se le piden datos.
+- **Flujo completo:** se agendó eligiendo de la lista y se pagó sin problemas.
 
 **Lo que queda, por orden de prioridad:**
-1. **Bloqueo:** elegir una hora de la lista que ofrece la IA no funciona (0 de 9 intentos). Hoy solo se puede reservar si el paciente dice la hora antes de ver la lista.
-2. **Regresiones:**
-   - ya no se anula un link sin pagar desde el chat;
-   - al paciente registrado se le vuelven a pedir nombre, DNI y edad.
-3. **Sigue igual:**
-   - «2 pm» se rechaza aunque esté libre;
-   - dos mensajes sin sentido no pasan a recepción.
-4. **Detalles:**
-   - un nombre escrito solo no se reconoce;
-   - pide «sí, confirmo» dos veces;
-   - el saludo dice «Odonto Sonrisa».
+1. **E1.** La hora pedida que no está en la lista o no está libre:
+   - no avisa que no está libre;
+   - no ofrece las horas más cercanas.
+2. **E2.** Dos mensajes sin sentido no pasan a recepción.
+3. **E3.** Elegir con el número de la opción («2») no funciona.
+4. **E4.** La hora dicha antes del servicio se pierde (caso 4). En la versión anterior se guardaba.
+5. **E5.** Mayúsculas a mitad de frase.
 
 **Para reproducir:**
 - **Paso 1:** crear un chat de prueba con un número ficticio (`POST /conversaciones`).
@@ -23,114 +26,118 @@
 
 ---
 
-## B1. Elegir una hora de la lista: falla siempre (bloqueo)
+## E1. La hora pedida no está en la lista o no está libre
 
-**Pasos (chat 51900000938, conversación `d1c3d984-8580-49d5-9356-2f5c291fa8b1`):**
-
-| Hora | Paciente | IA |
-|---|---|---|
-| 11:57:54 | Hola | Saludo con menú. |
-| 11:58:07 | Quiero una cita | ¿En qué sede le atendemos? |
-| 11:58:19 | En Surco | ¿Qué servicio necesita? |
-| 11:58:31 | El viernes 30 | ¿Qué servicio necesita? (guarda el día ✅) |
-| 11:59:03 | Consulta general | 🕐 *Viernes 30* — 9:00, 9:30, 10:00. ¿Cuál le reservo? |
-| 11:59:35 | **A las 10** | ❌ «Esa hora no está disponible el viernes 30/10.» 🕐 11:30, 12:00, 12:30 |
-| 11:59:48 | Para mí | ❌ «Esa hora no está disponible…» 🕐 14:00, 14:30, 15:00 |
-| 12:00:30 | **A las 14:00** | ❌ No disponible. 🕐 16:30, 17:00, 17:30 |
-| 12:01:13 | **El de las 16:30** | ❌ No disponible. «El viernes 30 no hay odontología general en Sede Surco; el siguiente día es el sábado 31» (antes ofreció 9 horas ese día). |
-| 12:07:45 | **8:30** (del sábado 31) | ❌ «Esa hora no está disponible el **viernes 30**/10.» |
-
-**Lo mismo en otros chats:**
-
-| Chat (conversación) | Hora | Elige | Respuesta |
-|---|---|---|---|
-| 51900000942 (`32cde693-6511-49cb-8033-8d6e6c58113a`) | 12:02:04 | «A las 11:30» (ofrecida) | No disponible |
-| 51900000942 | 12:07:32 | «1» | No disponible |
-| 51900000941 (`336873ad-3c11-45a7-b6ee-ea32fcac22ac`) | 12:02:06 | «El de las 9:00» (ofrecida para el jueves 29) | «No disponible el **martes 27**/10» (el día pedido, no el ofrecido) |
-| 51900000941 | 12:07:27 | «12:30» | Igual |
-| 51900000975 (`ba793442-bd4f-4af9-b4fc-15f402d47500`) | 11:58:36 | «La primera» | «No entendí…» y vuelve a preguntar la sede |
-
-**Debería:** reservar la hora elegida, sea «A las 10», «10», «10:00», «el de las 10», «1» o «la primera», siempre que esté en la lista.
-
-**Pista:** `slotsOfrecidos` guarda `2026-10-30T16:30:00`, la lista muestra «16:30» o «9:00», y la validación usa a veces el día pedido en vez del ofrecido.
-
----
-
-## B2. Anular un link sin pagar: ya no funciona (regresión)
-
-Chat 51900000975 (`ba793442-bd4f-4af9-b4fc-15f402d47500`). A las 12:10:26 la IA envió el link para el 05/11 a las 09:30. Después:
+**Caso A: «2 pm» después de ver la lista** (chat 51900000925, conversación `a076fa74-ea67-458a-8fe6-91263b1e77c6`):
 
 | Hora | Paciente | IA |
 |---|---|---|
-| 12:10:58 | Mejor no, ya no quiero la cita | ❌ «Resumen: jueves 5/11 a las 09:30 en surco. ¿Confirma la reserva?» |
-| 12:11:35 | Ya no quiero la cita, cancélela por favor | ❌ Lo mismo |
+| 14:37:43 | Quiero una cita de consulta general en San Isidro | ¿Qué día prefiere? |
+| 14:37:57 | El lunes 26 | 🕐 *Lunes 26* — 9:00, 9:30, 10:00. ¿Cuál le reservo? |
+| 14:38:10 | **2 pm** | ❌ «Esa hora no está en la lista que le ofrecí. ¿Cuál le reservo?» |
 
-El link siguió **pendiente**; se anuló a mano desde Caja.
-
-**Debería:** anular el link y decirlo, como a las 11:15 de hoy: «Listo: anulé el link de pago pendiente… El cupo quedó libre».
-
----
-
-## B3. Paciente registrado: le pide nombre, DNI y edad (regresión)
-
-Chat 51900000975 («QA Izipay Treinta Ocho», ya registrado con DNI 99771259):
+**Caso B: la hora va en el pedido y no está libre** (chat 51900000921, conversación `42f6c982-493b-4a4e-9bb8-3cfd7680e783`; igual en el chat 971, `007fd370-22bf-4d76-8286-0e4a5df41cf5`, a las 14:38:31):
 
 | Hora | Paciente | IA |
 |---|---|---|
-| 12:07:25 | Quiero una consulta general en Surco el jueves 5 de noviembre a las 9:30 | ❌ Para reservar las 09:30 necesito su nombre completo. |
-| 12:08:28 | Me llamo QA Izipay Treinta Ocho | ❌ …necesito su DNI (8 dígitos). |
-| 12:09:17 | Mi DNI es 99771259 | ❌ …necesito su edad. |
+| 14:45:19 | Consulta general en Surco el jueves 5 de noviembre **a las 11:00** para mí | ❌ 🕐 *Jueves 5* — 9:00, 9:30, 10:00. ¿Cuál le reservo? (no dice nada de las 11:00) |
 
-**Debería:** reconocer el celular y preguntar solo «¿La cita es para usted, QA Izipay Treinta Ocho?». A las 11:13 de hoy (chat 972) sí lo hacía.
+**Debería:**
+- **Si la hora pedida está libre ese día** (aunque no esté en las 3 que mostró), reservarla.
+- **Si no está libre:**
+  - decirlo: «A las 11:00 ya no hay cupo el jueves 5»;
+  - ofrecer las más cercanas antes y después (por ejemplo 10:30 y 11:30), no las primeras del día.
 
 ---
 
-## B4. «2 pm»: la entiende, pero dice que no está libre
+## E2. Dos mensajes sin sentido no pasan a recepción
 
-Chat 51900000943 (`a87bd5e3-c7ab-4f05-802d-fb306a312af9`):
+Chats 51900000924 (`b6d7d747-815c-4886-9206-435ad3e043d5`) y 51900000923 (`bda27c46-1218-49a5-bb39-25193ce7a2f8`):
 
 | Hora | Paciente | IA |
 |---|---|---|
-| 11:57:30 | 2 pm | ❌ «Esa hora no está disponible el lunes 26/10.» 🕐 11:30, 12:00, 12:30 |
-| 12:07:32 | Para mí | «Para reservar las **14:00** necesito su nombre completo.» |
+| 14:37:48 | asdfgh qwerty | No entiendo su mensaje. ¿Podría indicarme en qué puedo ayudarle hoy? |
+| 14:38:02 | zxcvb ñlkjh | ❌ No entiendo su mensaje… ¿En qué puedo ayudarle hoy? |
 
-Las 14:00 del lunes 26 en San Isidro **estaban libres**: la IA las ofreció en el chat 942 a las 12:02. Es probable que sea el mismo error que B1.
+`intentosFallidos` queda en 0, el chat sigue en `S1_INTENCION` y en la IA.
 
----
-
-## B5. Dos mensajes sin sentido no pasan a recepción
-
-Chats 51900000940 (`41df0630-512f-48ab-a3e8-b42e7cc14e0b`) y 51900000939 (`10b9a9d1-afbe-4087-a41d-f5169498499c`):
-- el paciente escribe «asdfgh qwerty» y luego «zxcvb ñlkjh»;
-- la IA responde dos veces «No entiendo…»;
-- `intentosFallidos` queda en 0 y el chat sigue en la IA.
+**Debería:**
+- al segundo mensaje que no entiende, pasar el chat a recepción (`modo` humano, `porResponder` 1);
+- avisar al paciente que recepción le escribirá.
 
 ---
 
-## B6. Detalles
+## E3. Elegir con el número de la opción
 
-| Qué pasa | Dónde | Debería |
+Chat 51900000931 (`9c1c9108-bc71-4701-bd8a-edefbd26cba3`):
+
+| Hora | Paciente | IA |
 |---|---|---|
-| Un nombre escrito solo («QA Izipay Cuarenta Seis») no se reconoce y repite «necesito su nombre completo». | Chat 945, 12:02:57 | Tomar el texto como nombre cuando se está pidiendo el nombre. |
-| Pide «sí, confirmo» dos veces: primero un resumen corto («… en surco»), luego otro con el doctor. | Chat 945, 12:03:55 y 12:04:31 | Un solo resumen completo (doctor, sede con mayúscula) y una sola confirmación. |
-| El saludo dice «Odonto Sonrisa». | Todos los chats | El nombre de la clínica es «Clínica Dental Sonríe+» (`/clinica` y página de pago). |
-| Días y especialidades en mayúscula a mitad de frase. | Chat 941 | «el martes 27 no hay odontología general…» |
+| 14:37:06 | El martes 27 | 🕐 *Martes 27* — 9:00, 9:30, 10:00. ¿Cuál le reservo? |
+| 14:37:17 | **2** | ❌ Vuelve a mostrar 9:00, 9:30 y 10:00. |
+
+«La segunda» sí funciona (chat 932).
+
+**Debería:** tomar «2» como la segunda opción (9:30) cuando se está eligiendo de la lista.
 
 ---
 
-## Corregido en la nueva versión ✅ (no debe romperse)
+## E4. La hora dicha antes del servicio se pierde
 
-| Antes (11:30) | Ahora (12:00) |
+Chat 51900000927 (`847fc901-c5c1-46e1-9c37-80665a0e9b73`):
+
+| Hora | Paciente | IA |
+|---|---|---|
+| 14:37:41 | Quiero sacar una cita | ¿En qué sede le atendemos? |
+| 14:37:55 | En San Isidro | ¿Qué servicio necesita? |
+| 14:38:09 | Mañana | ¿Qué servicio necesita? |
+| 14:38:21 | **A las 10** | ¿Qué servicio necesita? |
+| 14:38:36 | Para mí | ¿Qué servicio necesita? |
+| 14:38:49 | Consulta general | ❌ 🕐 *Sábado 24* — 8:00, 8:30, 9:00. ¿Cuál le reservo? |
+
+**Qué pasó:**
+- guardó la sede y el día;
+- perdió la hora, aunque las 10:00 estaban libres (figuran en `slotsOfrecidos`: `2026-10-24T10:00:00`);
+- tampoco usó «Para mí».
+
+**En la versión del mediodía sí funcionaba:** respondía «Para reservar las 10:00 necesito su nombre completo».
+
+**Debería:** reservar las 10:00 y pasar a los datos.
+
+---
+
+## E5. Mayúsculas a mitad de frase
+
+Chat 51900000930, a las 14:37:06: «El **M**artes 27 no hay **O**dontología general en Sede Surco; el siguiente día es el **J**ueves 29».
+
+**Debería:** «el martes 27 no hay odontología general en Sede Surco; el siguiente día es el jueves 29».
+
+---
+
+## Corregido ✅ (no debe romperse)
+
+| Antes | Ahora (14:36 a 14:46) |
 |---|---|
-| Ofrecía el viernes (hoy) y horas ya pasadas. | Pregunta el día: «¿Qué día prefiere?». |
-| Volvía a pedir sede y día ya dichos. | Guarda sede, día y hora aunque lleguen antes de tiempo (chats 938 y 947). |
-| No entendía un pedido completo en un mensaje. | Pasa directo a los datos (chats 945 y 944). |
-| No reiniciaba un chat viejo. | «Hola» empieza de cero con el menú (chats 967, 969 y 975). |
-| Pedía nombre, DNI y edad juntos. | Uno por mensaje, y pregunta «¿La cita es para usted o para otra persona?». |
-| Saludo sin menú. | Menú 1) Agendar 2) Ver o cambiar 3) Otra consulta. |
+| **Elegir de la lista:** fallaba siempre («Esa hora no está disponible»). | Funcionan «A las 9:30», «9:30», «El de las 9:30», «La segunda» y una hora de otro día ofrecido (chats 930 a 935 y 971). |
+| **Link sin pagar:** «Mejor no, ya no quiero la cita» devolvía el resumen. | «Listo: anulé el link de pago pendiente del jueves 5/11. El cupo quedó libre» (chat 971, 14:40:33). El link quedó anulado. |
+| **Paciente registrado:** le pedía nombre, DNI y edad. | «¿La cita es para usted, QA Izipay Cuarenta Uno?» y pasa al resumen (chat 971). |
+| **Nombre:** uno escrito solo no se reconocía. | «QA Izipay Cuarenta Siete» se toma como nombre (chat 922). |
+| **Confirmación:** pedía «sí, confirmo» dos veces. | Un solo resumen, con el doctor, y una sola confirmación (chat 935). |
+| **Saludo:** decía «Odonto Sonrisa». | «le saluda *Clínica Dental Sonríe+*». |
 
-**También sigue bien:**
-- el pago en el sandbox, con cita, aviso y un solo cobro (chat 945);
-- la derivación de una cita pagada (chat 995);
-- el día sin doctor (chat 941);
-- «Mañana» = sábado.
+**Corregido antes (también sigue bien):**
+- saludo con menú;
+- un dato por mensaje;
+- pregunta el día en vez de ofrecer hoy;
+- pedido completo en un mensaje (chats 926 y 922);
+- «Hola» reinicia un chat viejo (chat 976);
+- «Mañana» = sábado;
+- día sin doctor (chat 930).
+
+**El flujo completo funciona (chat 935, `ac796200-a79b-4a8e-bead-75bf07d4549c`):**
+1. El paciente elige «A las 9:30» de la lista.
+2. Da sus datos y confirma una sola vez.
+3. Recibe el link y paga en el sandbox.
+4. Queda la cita confirmada el 30/10, con aviso por WhatsApp y **un solo cobro**.
+
+**Derivación de una cita pagada:** «Quiero cancelar mi cita» pasa el chat a recepción y la cita sigue confirmada (chat 945, 14:41:33).
