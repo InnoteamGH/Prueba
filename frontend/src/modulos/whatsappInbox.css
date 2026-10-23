@@ -66,7 +66,7 @@
    ====================================================================== */
 .dc-inbox.wa {
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr) 280px;
+  grid-template-columns: 300px minmax(0, 1fr) 280px;
   height: calc(calc(100dvh / var(--dc-z, 1)) - 56px - 32px);
   min-height: 460px;
   padding: 0 !important;
@@ -84,6 +84,20 @@
 .dc-inbox-list > div:first-child { padding: 12px 12px !important; }
 .dc-inbox-list input { font-size: 14px !important; border-radius: 999px !important; border: 1px solid transparent !important; background: var(--dc-bg-alt) !important; padding: 9px 12px 9px 34px !important; }
 .dc-inbox-list input:focus { background: #fff !important; border-color: var(--dc-brand-100) !important; }
+.wa-lista__chats { flex: 1; min-height: 0; overflow-y: auto; }
+.wa-lista__vacio { padding: 28px 18px; text-align: center; color: var(--dc-ink-500); font-size: 13px; }
+.wa-lista__reintentar { all: unset; cursor: pointer; font-weight: 600; color: var(--dc-primary-alt); }
+.wa-lista__reintentar:hover { text-decoration: underline; }
+.wa-lista__reintentar:focus-visible { border-radius: 4px; box-shadow: var(--dc-focus); }
+/* Carga de la lista: filas grises con la forma de un chat (antes, «Cargando…» suelto). */
+.wa-esq { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--dc-line); }
+.wa-esq i { display: block; height: 10px; border-radius: 999px; background: linear-gradient(90deg, var(--dc-bg-alt) 30%, #F5F9FA 50%, var(--dc-bg-alt) 70%) 0 0 / 300% 100%; animation: wa-esq 1.3s ease-in-out infinite; }
+.wa-esq > span { flex: 1; display: grid; gap: 9px; }
+.wa-esq > span > i:first-child { height: 12px; }
+.wa-esq > span > i:last-child { width: 85%; }
+.wa-esq .wa-esq__av { width: 42px; height: 42px; flex-shrink: 0; }
+@keyframes wa-esq { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .wa-esq i { animation: none; } }
 .wa-item { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: center; width: 100%; padding: 9px 12px; border-bottom: 1px solid var(--dc-line); transition: background .12s; }
 .wa-item:hover { background: var(--dc-bg-soft2); }
 .wa-item.is-on { background: var(--dc-brand-050); box-shadow: inset 3px 0 0 var(--dc-primary-alt); }
@@ -150,9 +164,12 @@
 
 /* ---- Pie: compositor y sugerencias ---- */
 .wa-pie { flex-shrink: 0; background: #F0F2F5; padding: 8px 14px 10px; display: grid; gap: 8px; border-top: 1px solid var(--dc-line); }
-.wa-pie--nota { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.45; color: var(--dc-ok-700); }
-.wa-pie--nota > svg { flex: none; margin-top: 2px; }
+.wa-pie--nota { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.45; color: var(--dc-ok-700); }
+.wa-pie--nota > svg { flex: none; }
 .wa-pie__ayuda { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dc-ink-500); }
+.wa-pie__ayuda > svg { flex-shrink: 0; }
+/* Pie en una sola línea corta: el detalle va en el title. */
+.wa-pie--nota > span, .wa-pie__ayuda > span, .wa-pie__desde > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
 .wa-chips::-webkit-scrollbar { display: none; }
 .wa-chips__et { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--dc-ink-400); white-space: nowrap; }
@@ -171,7 +188,7 @@
 
 /* Pantallas medianas: el panel del contacto se abre encima con el botón (i). */
 @media (max-width: 1500px) {
-  .dc-inbox.wa { grid-template-columns: 280px minmax(0, 1fr); }
+  .dc-inbox.wa { grid-template-columns: 300px minmax(0, 1fr); }
   .dc-inbox.wa > .dc-inbox-side { position: absolute; right: 0; top: 0; bottom: 0; width: 290px; z-index: 5; box-shadow: -12px 0 30px -12px rgba(14,42,51,.3); transform: translateX(105%); transition: transform .2s ease; }
   .dc-inbox.wa.is-info > .dc-inbox-side { transform: none; }
   .dc-inbox.wa { position: relative; }
@@ -180,7 +197,7 @@
 
 /* Pantallas grandes: panel fijo que se puede ocultar con (i) o con la ✕. */
 @media (min-width: 1501px) {
-  .dc-inbox.wa.sin-info { grid-template-columns: 290px minmax(0, 1fr); }
+  .dc-inbox.wa.sin-info { grid-template-columns: 300px minmax(0, 1fr); }
   .dc-inbox.wa.sin-info > .dc-inbox-side { display: none; }
   .dc-inbox.wa.sin-info .wa-vacio { grid-column: 2 / 3; }
 }
@@ -211,13 +228,16 @@
 .wa-item__fila .wa-item__nom { flex: 1; min-width: 0; }
 .wa-item__prev { flex: 1; min-width: 0; font-size: 13px; color: #667781; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-item__prev.is-nuevo { color: var(--dc-ink-900); font-weight: 500; }
-.wa-item__modo { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--dc-ok-100); color: var(--dc-ok-700); }
-.wa-item__modo.is-rec { background: var(--dc-warn-100); color: var(--dc-warn-700); }
+/* Solo en los chats que atiende recepción (los de la IA no llevan chip). */
+.wa-item__modo { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--dc-warn-100); color: var(--dc-warn-700); }
 .wa-item__hora { flex-shrink: 0; margin-left: auto; }
-/* Filtros de la lista en una sola fila. */
-.dc-inbox-list > div:first-child > div:last-child { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; gap: 4px !important; }
-.dc-inbox-list > div:first-child > div:last-child::-webkit-scrollbar { display: none; }
-.dc-inbox-list > div:first-child > div:last-child > button { padding: 4px 8px !important; font-size: 12px !important; white-space: nowrap; flex-shrink: 0; }
+/* Filtros de la lista: una fila de píldoras de 32 px (36 px en celular, para el dedo). */
+.wa-filtros { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.wa-filtros::-webkit-scrollbar { display: none; }
+.dc-inbox.wa .wa-filtros > button { flex-shrink: 0; min-height: 32px; padding: 0 9px; border-radius: 999px; border: 1.5px solid var(--dc-line); background: var(--dc-white); color: var(--dc-ink-400); font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.dc-inbox.wa .wa-filtros > button[aria-pressed="true"] { border-color: var(--dc-accent-cyan); background: color-mix(in srgb, var(--dc-primary-alt) 7%, transparent); color: var(--dc-primary-alt); }
+.dc-inbox.wa .wa-filtros > button:focus-visible { outline: 0; box-shadow: var(--dc-focus); }
+@media (max-width: 767px) { .dc-inbox.wa .wa-filtros > button { min-height: 36px; } }
 
 /* Sin barra superior: la bandeja ocupa toda la altura. */
 @media (min-width: 768px) { .dc-inbox.wa { height: calc(calc(100dvh / var(--dc-z, 1)) - 36px); } }
@@ -232,15 +252,11 @@
 .wa-lista__btn { all: unset; box-sizing: border-box; cursor: pointer; width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: var(--dc-primary-alt); }
 .wa-lista__btn:hover { background: var(--dc-bg); }
 .wa-lista__btn:focus-visible { box-shadow: var(--dc-focus); }
-.wa-filtro__n { font-size: 11px; font-weight: 700; opacity: .75; font-variant-numeric: tabular-nums; }
 .wa-avisos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .wa-aviso { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 5px 12px; line-height: 1.35; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .wa-aviso.is-aviso { background: #FEF4DC; color: #946009; }
 .wa-aviso.is-ok { background: #E3F7EC; color: #15803D; }
 .wa-aviso.is-error { background: #FDECEA; color: #B23A2B; }
-.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { gap: 4px !important; flex-wrap: nowrap !important; }
-.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 8px !important; font-size: 12px !important; gap: 4px !important; white-space: nowrap; }
-.dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] { overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; } .dc-inbox.wa .dc-inbox-list [style*="flex-wrap"] > button { padding: 4px 7px !important; flex-shrink: 0; }
 /* Avatares con el color de cada contacto (como en la agenda y pacientes). */
 .wa-av { --av: #0E8C95; color: var(--av); background: linear-gradient(135deg, color-mix(in srgb, var(--av) 22%, #fff), color-mix(in srgb, var(--av) 8%, #fff)); font-family: var(--dc-font-title); font-weight: 750; }
 .wa-av--xl { width: 84px; height: 84px; font-size: 28px; margin: 0 auto 14px; box-shadow: 0 0 0 5px #fff, 0 14px 30px -14px color-mix(in srgb, var(--av) 60%, transparent); }
@@ -262,9 +278,9 @@
 
 /* WhatsApp por sede: número de la sede en la cabecera, filtro por sede, sede de cada chat y
    número desde el que sale la respuesta. */
-.wa-lista__num { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.35; color: var(--dc-ink-500); margin-top: -4px; }
-.wa-lista__num svg { flex-shrink: 0; margin-top: 1px; color: #1FA855; }
-.wa-lista__num span { min-width: 0; font-variant-numeric: tabular-nums; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.wa-lista__num { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.35; color: var(--dc-ink-500); margin-top: -4px; }
+.wa-lista__num svg { flex-shrink: 0; color: #1FA855; }
+.wa-lista__num span { min-width: 0; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wa-lista__sede { display: flex; }
 .wa-lista__sede > * { flex: 1; min-width: 0; }
 .wa-item__sede { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 15px; font-weight: 600; padding: 0 7px; border-radius: 999px; background: #EAF4FF; color: #1D5FB8; }
@@ -278,3 +294,19 @@
 .wa-raiz { display: flex; flex-direction: column; height: calc(calc(100dvh / var(--dc-z, 1)) - 36px); }
 .wa-raiz > .dc-inbox.wa { flex: 1 1 auto; height: auto; min-height: 420px; }
 @media (max-width: 767px) { .wa-raiz { height: calc(calc(100dvh / var(--dc-z, 1)) - 128px); } }
+/* Celular, viendo la lista: alto natural y scroll de la página. Con scroll interno la última
+   fila quedaba cortada, y mientras cargaba la tarjeta medía toda la pantalla con «Cargando…»
+   arriba. La conversación sigue a pantalla completa. */
+@media (max-width: 767px) {
+  .wa-raiz.is-lista { height: auto; }
+  .wa-raiz.is-lista > .dc-inbox.wa { min-height: 0; }
+  .wa-raiz.is-lista .dc-inbox.wa > .dc-inbox-list { height: auto; }
+  .wa-raiz.is-lista .wa-lista__chats { flex: none; overflow: visible; }
+}
+
+/* Tooltip de los botones de solo icono (Actualizar, datos del contacto): el title nativo
+   tarda en salir y no aparece con el teclado. Va alineado a la derecha para no salirse. */
+.wa-tip { position: relative; }
+.wa-tip::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; padding: 4px 8px; border-radius: 6px; background: var(--dc-ink-900); color: #fff; font-size: 12px; font-weight: 500; line-height: 1.3; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s; }
+.wa-tip:focus-visible::after { opacity: 1; }
+@media (hover: hover) { .wa-tip:hover::after { opacity: 1; transition-delay: .3s; } }

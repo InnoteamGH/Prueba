@@ -4,14 +4,17 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Armchair, ChevronLeft, ChevronRight, Clock, Info, Send } from "lucide-react";
 import api, { auth } from "../api/client";
-import { BotonExportar, DatosDemoCtx, ESPECIALIDADES, MEDICOS, fmt, horarioDeSede, jornadaClinica, mismaSede, nombreSede, toMin } from "../comun";
+import { BotonExportar, DatosDemoCtx, ESPECIALIDADES, MEDICOS, fechaLegible, fmt, horarioDeSede, jornadaClinica, mismaSede, nombreSede, toMin } from "../comun";
 import { useReglasAgenda } from "../compartido/useReglasAgenda";
 import { horarioConfigurado } from "../compartido/horarioReal";
 import { etiquetaUso } from "../compartido/sillones";
 import { tienePermiso } from "../compartido/permisos";
 import NoDisponible from "../ui/NoDisponible";
+import { pctTxt, rotuloPeriodo } from "./produccionComisionesUtil";
+import "./reportes.css";
 
-const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+// En minúscula, como fechaLegible («vie 23 oct»).
+const DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb"];
 const INACTIVAS = ["cancelada", "no_show", "reprogramada", "cerrada_sistema"];
 
 export function useOcupacionSillones(off = 0, sedesVisibles = null) {
@@ -69,14 +72,18 @@ export function useOcupacionSillones(off = 0, sedesVisibles = null) {
   return { conectado, sillones, dias, datos, sinHorario, citasErr: conectado && citasErr, recargar: () => setNRecarga((n) => n + 1), medicos: reglas.medicos || [], especialidades: reglas.especialidades || [] };
 }
 
-const horas = (min) => { const h = Math.round((min / 60) * 10) / 10; return Number.isInteger(h) ? String(h) : h.toFixed(1).replace(".", ","); };
+// Punto decimal, como los montos («1.5 h»).
+const horas = (min) => { const h = Math.round((min / 60) * 10) / 10; return Number.isInteger(h) ? String(h) : h.toFixed(1); };
+// % ocupado: con citas nunca «0%» (se lee «<1%»); sin horas de atención, «—».
+const ocupTxt = (min, cap) => (cap ? pctTxt(Math.min(100, (min / cap) * 100)) : "—");
+const diaNum = (fecha) => String(Number(fecha.slice(8)));
 
 /* Anillo con el % de la semana (conic-gradient, sin librerías). */
-function Anillo({ pct, size = 44 }) {
+function Anillo({ pct, txt, size = 44 }) {
   const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
   return (
     <span className={`dc-ocz__ring${pct != null && pct >= 85 ? " is-full" : ""}`} style={{ "--p": p, width: size, height: size }} aria-hidden="true">
-      <b>{pct == null ? "—" : `${pct}%`}</b>
+      <b>{txt}</b>
     </span>
   );
 }
@@ -89,46 +96,49 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
   const nomSede = (id) => { const n = nombreSede(/^\d+$/.test(String(id)) ? Number(id) : id); return n && n !== "—" ? n : "Sede"; };
   const corta = (id) => nomSede(id).replace(/^Sede\s+/i, "");
   const hayCitas = datos.min > 0;
-  // «Más libre» y «Día más lleno» solo dicen algo si hay diferencias: con todo en 0 % no.
-  const masLibre = conPct.some((f) => f.pct > 0) ? [...conPct].sort((a, b) => a.pct - b.pct)[0] : null;
-  const diaLleno = [...datos.porDia].filter((d) => d.pct > 0).sort((a, b) => b.pct - a.pct)[0];
+  // «Más libre» y «Día más lleno» solo dicen algo si hay diferencias: sin citas no.
+  const masLibre = conPct.some((f) => f.min > 0) ? [...conPct].sort((a, b) => a.min / a.cap - b.min / b.cap)[0] : null;
+  const diaLleno = [...datos.porDia].filter((d) => d.cap && d.min > 0).sort((a, b) => b.min / b.cap - a.min / a.cap)[0];
   const horasLibres = Math.max(0, Math.round((datos.cap - datos.min) / 60));
   const semanaTxt = off === 0 ? "esta semana" : "esa semana";
-  const rango = `${dias[0].split("-").reverse().slice(0, 2).join("/")} – ${dias[5].split("-").reverse().slice(0, 2).join("/")}`;
+  const rango = rotuloPeriodo(dias[0], dias[5]);
   const hoyF = fmt(new Date());
-  const usoTxt = (s) => { try { return etiquetaUso(s, { medicos: conectado ? medicos : MEDICOS, especialidades: conectado ? especialidades : ESPECIALIDADES })?.txt || "Flexible"; } catch (e) { return "Flexible"; } };
+  // «Flexible» es jerga: un sillón sin doctor ni especialidad fijos no lleva rótulo.
+  const usoTxt = (s) => { try { const u = etiquetaUso(s, { medicos: conectado ? medicos : MEDICOS, especialidades: conectado ? especialidades : ESPECIALIDADES }); return u && u.tono !== "flex" ? u.txt : ""; } catch (e) { return ""; } };
   // Los tres sillón-día (de hoy en adelante) con más horas libres: lo primero que ofrecer.
-  const huecos = datos.filas.flatMap((f) => f.celdas.map((c, i) => ({ k: `${f.s.id}-${c.fecha}`, sillon: f.s.nombre, sede: sedes.length > 1 ? corta(f.s.sede) : "", dia: `${DIAS[i]} ${c.fecha.slice(8)}`, fecha: c.fecha, libres: (c.cap - c.min) / 60, pct: c.pct })))
+  const huecos = datos.filas.flatMap((f) => f.celdas.map((c, i) => ({ k: `${f.s.id}-${c.fecha}`, sillon: f.s.nombre, sede: sedes.length > 1 ? corta(f.s.sede) : "", diaSem: DIAS[i], fecha: c.fecha, libres: (c.cap - c.min) / 60, min: c.min, cap: c.cap })))
     .filter((h) => h.fecha >= hoyF && h.libres > 0).sort((a, b) => b.libres - a.libres).slice(0, 3);
   if (!sillones.length) return conectado ? <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>No hay sillones activos registrados en las sedes que se ven. Se dan de alta en Configuración › Sillones.</p></section> : null;
   if (sinHorario) return <section className="dc-ocs dc-ocs--rep"><p style={{ color: "var(--dc-ink-500)", fontSize: 14 }}>La clínica todavía no tiene cargado su horario de atención: sin él no se puede calcular la ocupación. Se configura en Configuración › Horarios.</p></section>;
-  if (citasErr) return <section className="dc-ocs dc-ocs--rep"><NoDisponible bloque onReintentar={recargar} texto="Ocupación no disponible" detalle={`No se pudieron leer las citas de la semana (${rango}). Sin ellas la ocupación no es 0 %: falta el dato.`} /></section>;
+  if (citasErr) return <section className="dc-ocs dc-ocs--rep"><NoDisponible bloque onReintentar={recargar} texto="Ocupación no disponible" detalle={`No se pudieron leer las citas de la semana (${rango}). Sin ellas la ocupación no es 0%: falta el dato.`} /></section>;
   // H-29: la misma exportación Excel/PDF que el resto de reportes: un sillón por fila, el %
   // de cada día y el total de la semana (números, para poder sumarlos en el Excel).
   const pctExp = (p) => (p == null ? "Cerrado" : `${p}%`);
   const colsExp = [
     ...(sedes.length > 1 ? [{ key: "sede", label: "Sede", get: (f) => nomSede(f.s.sede) }] : []),
     { key: "sillon", label: "Sillón", get: (f) => f.s.nombre },
-    { key: "uso", label: "Uso", get: (f) => usoTxt(f.s) },
-    ...dias.map((fecha, i) => ({ key: `d${i}`, label: `${DIAS[i]} ${fecha.slice(8)}/${fecha.slice(5, 7)}`, get: (f) => pctExp(f.celdas[i].pct) })),
+    { key: "uso", label: "Uso", get: (f) => usoTxt(f.s) || "Cualquier doctor" },
+    ...dias.map((fecha, i) => ({ key: `d${i}`, label: fechaLegible(fecha), get: (f) => pctExp(f.celdas[i].pct) })),
     { key: "semana", label: "Semana", get: (f) => pctExp(f.pct) },
     { key: "agendadas", label: "Horas agendadas", get: (f) => Math.round((f.min / 60) * 10) / 10 },
     { key: "libres", label: "Horas libres", get: (f) => Math.round(((f.cap - f.min) / 60) * 10) / 10 },
   ];
-  const tonoCelda = (p) => (p == null ? "is-na" : p === 0 ? "is-cero" : p >= 85 ? "is-full" : p >= 60 ? "is-alta" : p >= 30 ? "is-media" : "is-baja");
+  // Una celda sin citas no es «0%»: queda atenuada y sin texto; solo resaltan las ocupadas.
+  const tonoCelda = (c) => (c.pct == null ? "is-na" : !c.min ? "is-cero" : c.pct >= 85 ? "is-full" : c.pct >= 60 ? "is-alta" : c.pct >= 30 ? "is-media" : "is-baja");
   return (
     <section className="dc-ocs dc-ocs--rep" aria-label="Ocupación de sillones">
       {/* Misma franja que el resto de pantallas: cifra principal, cifras con punto y acción. */}
       <section className="dc-esp-hero dc-ocs-hero">
         <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>{datos.pct ?? "—"}%</b><span>ocupación {off === 0 ? "de esta semana" : off === 1 ? "de la próxima semana" : off === -1 ? "de la semana pasada" : `de la semana del ${rango.split(" – ")[0]}`}</span></div>
+          <div className="dc-esp-hero__num"><b>{ocupTxt(datos.min, datos.cap)}</b><span>ocupación {off === 0 ? "de esta semana" : off === 1 ? "de la próxima semana" : off === -1 ? "de la semana pasada" : `de la semana del ${fechaLegible(dias[0])}`}</span></div>
           <p>Horas agendadas sobre las horas que abre cada sede · {rango}</p>
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{horasLibres} h</b><span>Libres en sillón</span></div>
-          {!hayCitas && <div><b>Sin citas</b><span>Agendadas {semanaTxt}</span></div>}
-          {masLibre && <div><b>{masLibre.s.nombre}{sedes.length > 1 ? ` · ${corta(masLibre.s.sede)}` : ""}</b><span>Más libre · {masLibre.pct}%</span></div>}
-          {diaLleno && <div><b>{DIAS[datos.porDia.indexOf(diaLleno)]} {diaLleno.fecha.slice(8)}</b><span>Día más lleno · {diaLleno.pct}%</span></div>}
+          {!hayCitas && <div><b>0</b><span>Citas agendadas {semanaTxt}</span></div>}
+          {masLibre && <div><b>{masLibre.s.nombre}{sedes.length > 1 ? ` · ${corta(masLibre.s.sede)}` : ""}</b><span>Más libre · {ocupTxt(masLibre.min, masLibre.cap)}</span></div>}
+          {/* Con varias sedes el día se mide sobre todas: no coincide con el «Total del día» de cada tabla. */}
+          {diaLleno && <div><b>{fechaLegible(diaLleno.fecha)}</b><span>Día más lleno · {ocupTxt(diaLleno.min, diaLleno.cap)}{sedes.length > 1 ? " (todas las sedes)" : ""}</span></div>}
         </div>
         <span />
         <div className="dc-hero-acc">
@@ -154,7 +164,7 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
         return (
           <article key={sd} className="dc-ocz">
             <header className="dc-ocz__cab">
-              <Anillo pct={pctS} size={48} />
+              <Anillo pct={pctS} txt={ocupTxt(min, cap)} size={48} />
               <div className="dc-ocz__tit">
                 <h3>{nomSede(sd)}</h3>
                 <span>{filas.length} {filas.length === 1 ? "sillón" : "sillones"} · {horas(min)} h agendadas de {horas(cap)} h{minSuelto > 0 ? ` · ${horas(minSuelto)} h sin sillón asignado` : ""}</span>
@@ -168,28 +178,29 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
               <div className="dc-ocz__grid" role="table" aria-label={`Ocupación ${nomSede(sd)}`} style={{ "--dias": dias.length }}>
                 <div className="dc-ocz__fila is-cab" role="row">
                   <span role="columnheader">Sillón</span>
-                  {dias.map((f, i) => <span key={f} role="columnheader" className={f === hoyF ? "is-hoy" : ""}><small>{f === hoyF ? "Hoy" : DIAS[i]}</small><b>{f.slice(8)}</b></span>)}
+                  {dias.map((f, i) => <span key={f} role="columnheader" className={f === hoyF ? "is-hoy" : ""}><small>{f === hoyF ? "hoy" : DIAS[i]}</small><b>{diaNum(f)}</b></span>)}
                   <span role="columnheader">Semana</span>
                 </div>
-                {filas.map((f) => (
+                {filas.map((f) => { const uso = usoTxt(f.s); return (
                   <div key={f.s.id} className="dc-ocz__fila" role="row">
-                    <span role="cell" className="dc-ocz__nom"><span className="dc-ocz__ico"><Armchair size={15} strokeWidth={1.9} /></span><span><b>{f.s.nombre}</b><small>{usoTxt(f.s)}</small></span></span>
+                    <span role="cell" className="dc-ocz__nom"><span className="dc-ocz__ico"><Armchair size={15} strokeWidth={1.9} /></span><span><b>{f.s.nombre}</b>{uso && <small>{uso}</small>}</span></span>
                     {f.celdas.map((c) => (
-                      <span key={c.fecha} role="cell" className={`dc-ocz__c ${tonoCelda(c.pct)}${c.fecha === hoyF ? " is-hoy" : ""}`}
+                      <span key={c.fecha} role="cell" className={`dc-ocz__c ${tonoCelda(c)}${c.fecha === hoyF ? " is-hoy" : ""}`}
                             style={c.pct == null ? undefined : { "--p": `${c.pct}%` }}
+                            aria-label={c.pct != null && !c.min ? `Libre, ${horas(c.cap)} h` : undefined}
                             title={c.pct == null ? "Cerrado" : `${horas(c.min)} h agendadas de ${horas(c.cap)} h · ${horas(c.cap - c.min)} h libres`}>
-                        {c.pct == null ? <small>Cerrado</small> : c.pct === 0 ? <><b>Libre</b><small>{horas(c.cap)} h</small></> : <><b>{c.pct}%</b><small>{horas(c.min)} de {horas(c.cap)} h</small></>}
+                        {c.pct == null ? <small>Cerrado</small> : c.min > 0 && <><b>{ocupTxt(c.min, c.cap)}</b><small>{horas(c.min)} de {horas(c.cap)} h</small></>}
                       </span>
                     ))}
-                    <span role="cell" className="dc-ocz__sem"><Anillo pct={f.pct} size={38} /><small>{horas(f.cap - f.min)} h<br />libres</small></span>
+                    <span role="cell" className="dc-ocz__sem"><Anillo pct={f.pct} txt={ocupTxt(f.min, f.cap)} size={38} /><small>{horas(f.cap - f.min)} h<br />libres</small></span>
                   </div>
-                ))}
+                ); })}
                 {minSuelto > 0 && (
                   <div className="dc-ocz__fila is-suelta" role="row">
                     <span role="cell" className="dc-ocz__nom"><span className="dc-ocz__ico"><Armchair size={15} strokeWidth={1.9} /></span><span><b>Sin sillón</b><small>Asígnalo en la Agenda</small></span></span>
                     {sueltas.map((m, i) => (
                       <span key={dias[i]} role="cell" className={`dc-ocz__c ${m ? "is-suelta" : "is-cero"}${dias[i] === hoyF ? " is-hoy" : ""}`} title={m ? `${horas(m)} h de citas sin sillón` : "Sin citas sin sillón"}>
-                        {m ? <><b>{horas(m)} h</b><small>{sueltasN[i]} {sueltasN[i] === 1 ? "cita" : "citas"}</small></> : <small>—</small>}
+                        {m ? <><b>{horas(m)} h</b><small>{sueltasN[i]} {sueltasN[i] === 1 ? "cita" : "citas"}</small></> : <small>0 h</small>}
                       </span>
                     ))}
                     <span role="cell" className="dc-ocz__sem"><small>{horas(minSuelto)} h<br />sin asignar</small></span>
@@ -197,8 +208,8 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
                 )}
                 <div className="dc-ocz__fila is-tot" role="row">
                   <span role="cell">Total del día</span>
-                  {porDia.map((d) => <span key={d.fecha} role="cell" className={`${d.fecha === hoyF ? "is-hoy" : ""}`}>{d.pct == null ? "—" : <><b>{d.pct}%</b><i><u style={{ width: `${d.pct}%` }} /></i></>}</span>)}
-                  <span role="cell"><b>{pctS ?? "—"}%</b></span>
+                  {porDia.map((d) => <span key={d.fecha} role="cell" className={`${d.fecha === hoyF ? "is-hoy" : ""}`}>{d.pct == null ? "—" : <><b>{ocupTxt(d.min, d.cap)}</b><i><u style={{ width: `${d.pct}%` }} /></i></>}</span>)}
+                  <span role="cell"><b>{ocupTxt(min, cap)}</b></span>
                 </div>
               </div>
             </div>
@@ -218,8 +229,8 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
             <div className="dc-ocz__hlist">
               {huecos.map((h) => (
                 <div key={h.k} className="dc-ocz__h">
-                  <span className="dc-ocz__hdia"><small>{h.dia.split(" ")[0]}</small><b>{h.dia.split(" ")[1]}</b></span>
-                  <span className="dc-ocz__htxt"><b>{h.sillon}</b><small>{h.sede ? `${h.sede} · ` : ""}{h.pct ?? 0}% ocupado</small></span>
+                  <span className="dc-ocz__hdia"><small>{h.diaSem}</small><b>{diaNum(h.fecha)}</b></span>
+                  <span className="dc-ocz__htxt"><b>{h.sillon}</b><small>{h.sede ? `${h.sede} · ` : ""}{ocupTxt(h.min, h.cap)} ocupado</small></span>
                   <span className="dc-ocz__hh"><b>{horas(h.libres * 60)} h</b><small>libres</small></span>
                 </div>
               ))}
@@ -230,13 +241,13 @@ export default function OcupacionSillones({ sedes: sedesVer = null }) {
           <h3>Cómo leerlo</h3>
           <div className="dc-ocz__ley" aria-label="Escala">
             <span><i className="is-cero" />Sin citas</span>
-            <span><i className="is-baja" />Menos de 30 %</span>
-            <span><i className="is-media" />30 a 59 %</span>
-            <span><i className="is-alta" />60 a 84 %</span>
-            <span><i className="is-full" />85 % o más</span>
+            <span><i className="is-baja" />Menos de 30%</span>
+            <span><i className="is-media" />30 a 59%</span>
+            <span><i className="is-alta" />60 a 84%</span>
+            <span><i className="is-full" />85% o más</span>
             <span><i className="is-na" />Cerrado</span>
           </div>
-          <p><Info size={13} strokeWidth={2} /> Bajo 30 % conviene ofrecer esos cupos (recordatorios, lista de espera) o asignar el sillón a otro doctor. Sobre 85 % hay riesgo de demoras.</p>
+          <p><Info size={13} strokeWidth={2} /> Bajo 30% conviene ofrecer esos cupos (recordatorios, lista de espera) o asignar el sillón a otro doctor. Sobre 85% hay riesgo de demoras.</p>
         </aside>
       </div>
     </section>
@@ -253,7 +264,7 @@ export function ResumenOcupacion({ onVer, variante, sedes = null }) {
       <span className="dc-hoy__ico" style={{ background: "#EFEAFE", color: "#6D4FD1" }} aria-hidden="true"><Armchair size={16} strokeWidth={2} /></span>
       <div className="dc-hoy__tb">
         <div className="dc-hoy__tl">Ocupación de sillones · semana</div>
-        <div className="dc-hoy__tv">{citasErr ? "—" : `${datos.pct ?? 0}%`}</div>
+        <div className="dc-hoy__tv">{citasErr ? "—" : ocupTxt(datos.min, datos.cap)}</div>
         <div className="dc-hoy__ts">{citasErr ? <NoDisponible onReintentar={recargar} /> : `${libres} h libres en ${sillones.length} sillones`}</div>
       </div>
     </div>
@@ -263,7 +274,7 @@ export function ResumenOcupacion({ onVer, variante, sedes = null }) {
       <span className="dc-kpi__icon" style={{ background: "#EFEAFE", color: "#6D4FD1" }} aria-hidden="true"><Armchair size={16} strokeWidth={2} /></span>
       <div className="dc-kpi__body">
         <div className="dc-kpi__label">Ocupación de sillones · semana</div>
-        <div className="dc-kpi__value">{citasErr ? "—" : `${datos.pct ?? 0}%`}</div>
+        <div className="dc-kpi__value">{citasErr ? "—" : ocupTxt(datos.min, datos.cap)}</div>
         <div className="dc-kpi__sub">{citasErr ? <NoDisponible onReintentar={recargar} /> : <>{sillones.length} sillones · {libres} h libres{onVer && <> · <button type="button" className="dc-kpi__link" onClick={onVer}>Ver detalle</button></>}</>}</div>
       </div>
     </div>

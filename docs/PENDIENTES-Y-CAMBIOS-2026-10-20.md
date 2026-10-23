@@ -2,7 +2,7 @@
 
 **Archivos:**
 - **Este documento:** lo que ya quedó bien y lo que falta en el servidor, en orden de prioridad.
-- **`cambio-frontend-QA33.patch`:** un ajuste chico del frontend sobre la versión publicada hoy.
+- **`cambio-frontend-diseno-2026-10-23.patch`:** el cambio del frontend de la revisión de diseño del 23/10 (cifras, fechas, textos y botones en todas las pantallas). Reemplaza a `cambio-frontend-QA33.patch`, que ya va incluido. Detalle en `REVISION-DISENO-2026-10-23.md`.
 - **Evidencia:** `QA-REVISION-33-2026-10-20.md`, con las pruebas en producción del 20/10 (frases, respuestas y conteo de veces).
 
 Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 20/10/2026, con datos de prueba «QA» y el sandbox de Izipay.
@@ -73,15 +73,15 @@ Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 20/10/202
 
 ## 3. Frontend
 
-**El parche completo anterior ya está publicado.** Se compiló la rama y se comparó con lo publicado: todo coincide, salvo la pantalla de cambio de clave.
+**El parche completo anterior ya está publicado.** Se compiló la rama y se comparó con lo publicado: todo coincide, salvo la pantalla de cambio de clave. El ajuste `cambio-frontend-QA33.patch` todavía no está publicado (producción sigue con `index-DjK7jcE6.js` el 23/10).
 
-**Ajuste nuevo:** `cambio-frontend-QA33.patch` (1 archivo, 2 líneas).
-- **Qué cambia:** en «Pendientes de hoy», en celular, «S/» quedaba al final de una línea y el monto en la siguiente («…saldo por cobrar – S/ / 2,299.25»). Ahora el monto va junto.
-- **Base:** la versión publicada hoy (`index-DjK7jcE6.js`).
-- **Alcance:** solo `frontend/src/App.jsx`. No toca la pantalla de cambio de clave.
+**Cambio nuevo:** `cambio-frontend-diseno-2026-10-23.patch`, la revisión de diseño del 23/10.
+- **Qué cambia:** solo cómo se ven los datos. Cifras como cifras, montos con 2 decimales, un solo formato de fecha, nombres sin cortar y un estilo por botón, en todas las pantallas. La lista completa está en `REVISION-DISENO-2026-10-23.md`.
+- **Base:** la versión publicada hoy (`index-DjK7jcE6.js`). **Ya incluye el ajuste de `cambio-frontend-QA33.patch`**: no hay que aplicar ese parche aparte.
+- **Alcance:** 33 archivos de `frontend/` (4 nuevos). No toca la pantalla de cambio de clave, ni llamadas al servidor, ni datos guardados.
 
 **Cómo aplicarlo** (desde la raíz del repositorio):
-1. `git apply --check cambio-frontend-QA33.patch` (no debe decir nada).
-2. `git apply cambio-frontend-QA33.patch`.
-3. En `frontend/`: `npm test` debe dar 450 pruebas con las mismas 3 fallas de siempre (A30, SRV-01/02 y CONFORMANCE ronda 2), y `npm run build` debe terminar sin errores.
+1. `git apply --check cambio-frontend-diseno-2026-10-23.patch` (no debe decir nada).
+2. `git apply cambio-frontend-diseno-2026-10-23.patch`.
+3. En `frontend/`: `npm test` debe dar 461 pruebas con las mismas 3 fallas de siempre (A30, SRV-01/02 y CONFORMANCE ronda 2), y `npm run build` debe terminar sin errores.
 4. Publicar.

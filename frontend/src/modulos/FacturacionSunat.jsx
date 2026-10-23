@@ -10,9 +10,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock, Cloud, FileCheck2, FileText, FileX2, KeyRound, Link2, PlugZap, Receipt, RefreshCw, Smartphone, Undo2, Wallet } from "lucide-react";
 import api, { auth } from "../api/client";
-import { BotonExportar, Btn, DataTable, MenuAcciones, Modal, SEDES, Select, fmt, hoy, mismaSede, nombreSede } from "../comun";
+import { BotonExportar, Btn, DataTable, MenuAcciones, Modal, SEDES, Select, fechaLegible, fmt, hoy, mismaSede, nombreSede } from "../comun";
 import { datosImpresion } from "../util/membrete";
 import { fijarProveedorSunat } from "../compartido/integraciones";
+import "./modulos2.css";
 
 const CLAVE_CFG = "dc_data_v1_sunat_cfg";
 const CLAVE_EST = "dc_data_v1_sunat_estados";
@@ -30,18 +31,19 @@ const AFECTACION = [
   { v: "exonerado", l: "Exonerado" },
   { v: "inafecto", l: "Inafecto" },
 ];
+// «Por enviar» en todo: sin proveedor (sin_enviar) o con él (pendiente) el comprobante aún no llegó a SUNAT.
 const ESTADO = {
-  sin_enviar: { l: "Sin enviar", c: "is-off", ic: Clock },
+  sin_enviar: { l: "Por enviar", c: "is-pend", ic: Clock },
   aceptado: { l: "Aceptado", c: "is-ok", ic: CheckCircle2 },
   pendiente: { l: "Por enviar", c: "is-pend", ic: Clock },
   observado: { l: "Observado", c: "is-aviso", ic: AlertTriangle },
   rechazado: { l: "Rechazado", c: "is-mal", ic: FileX2 },
   anulado: { l: "Anulado con NC", c: "is-off", ic: Undo2 },
 };
-const TIPO = { Boleta: "is-bol", Factura: "is-fac", "Nota de crédito": "is-nc" };
+const POR_ENVIAR = ["pendiente", "sin_enviar"];
 const dinero = (n, moneda = "PEN") => `${moneda === "USD" ? "US$" : "S/"} ${Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num8 = (n) => String(n).padStart(8, "0");
-const fechaCorta = (iso) => String(iso || "").slice(0, 10).split("-").reverse().join("/");
+const fechaCorta = (iso) => String(iso || "").slice(0, 10).split("-").reverse().join("/");   // en el Excel
 
 const cfgDefecto = (sedes) => ({
   proveedor: "", ambiente: "pruebas", url: "", token: "", afectacion: "gravado", envioAuto: true, horaResumen: "23:00",
@@ -104,7 +106,7 @@ function simular(pagos, cfg, overrides) {
     const total = moneda === "USD" ? (p.montoOriginal != null ? Number(p.montoOriginal) : Math.round((Number(p.monto) || 0) / 3.75 * 100) / 100) : (Number(p.monto) || 0);
     const base = cfg.afectacion === "gravado" ? Math.round((total / 1.18) * 100) / 100 : total;
     let estado = String(p.fecha).slice(0, 10) >= hoyISO ? "pendiente" : "aceptado", mensaje = "";
-    // FAC-01: sin proveedor conectado nada llega a SUNAT: todos quedan «Sin enviar».
+    // FAC-01: sin proveedor conectado nada llega a SUNAT: todos quedan «Por enviar».
     if (!cfg.proveedor) { estado = "sin_enviar"; }
     else if (i === iObs) { estado = "observado"; mensaje = "La dirección del cliente supera los 100 caracteres. SUNAT lo aceptó con observación."; }
     if (i === iRech) { estado = "rechazado"; mensaje = "El número de documento del cliente no es válido. Corrígelo y vuelve a enviar."; }
@@ -155,7 +157,8 @@ export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sede
   const [cfg, setCfg] = useState(() => leerCfg(listaSedes));
   const [overrides, setOverrides] = useState(() => leer(CLAVE_EST, {}));
   const [remoto, setRemoto] = useState(null);
-  const [filtro, setFiltro] = useState("todos");
+  const [tipoF, setTipoF] = useState("todos");
+  const [estadoF, setEstadoF] = useState("todos");
   const [nc, setNc] = useState(null);
   useEffect(() => { guardar(CLAVE_EST, overrides); }, [overrides]);
   useEffect(() => {
@@ -174,19 +177,14 @@ export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sede
     return [...srv, ...deCaja].filter((c) => seVe(c.sedeId ?? c.sede));
   }, [conectado, remoto, pagos, cobrosServidor, cfg, overrides, claveVer]); // eslint-disable-line react-hooks/exhaustive-deps
   const deCajaN = comprobantes.filter((c) => c.origen === "caja").length;
-  const cuenta = (e) => comprobantes.filter((c) => c.estado === e).length;
-  const atender = comprobantes.filter((c) => c.estado === "observado" || c.estado === "rechazado");
-  const FILTROS = [
-    ["todos", "Todos", comprobantes.length],
-    ["Boleta", "Boletas", comprobantes.filter((c) => c.tipo === "Boleta").length],
-    ["Factura", "Facturas", comprobantes.filter((c) => c.tipo === "Factura").length],
-    ...(cfg.proveedor || conectado ? [["pendiente", "Por enviar", cuenta("pendiente")]] : [["sin_enviar", "Sin enviar", cuenta("sin_enviar")]]),
-    ["atender", "Por atender", atender.length],
-  ];
-  const visibles = filtro === "todos" ? comprobantes
-    : filtro === "atender" ? atender
-    : (filtro === "Boleta" || filtro === "Factura") ? comprobantes.filter((c) => c.tipo === filtro)
-    : comprobantes.filter((c) => c.estado === filtro);
+  // Tipo y estado son dos filtros aparte (antes un solo selector mezclaba «Boletas» con «Por
+  // enviar»); cada conteo respeta el otro filtro.
+  const esTipo = (c, t) => t === "todos" || c.tipo === t;
+  const esEstado = (c, e) => e === "todos" || (e === "atender" ? c.estado === "observado" || c.estado === "rechazado" : POR_ENVIAR.includes(c.estado));
+  const F_TIPO = [["todos", "Todos"], ["Boleta", "Boletas"], ["Factura", "Facturas"]].map(([k, l]) => [k, l, comprobantes.filter((c) => esTipo(c, k) && esEstado(c, estadoF)).length]);
+  const F_ESTADO = [["todos", "Todos"], ["por_enviar", "Por enviar"], ["atender", "Por atender"]].map(([k, l]) => [k, l, comprobantes.filter((c) => esEstado(c, k) && esTipo(c, tipoF)).length]);
+  const visibles = comprobantes.filter((c) => esTipo(c, tipoF) && esEstado(c, estadoF));
+  const porEnviar = comprobantes.filter((c) => POR_ENVIAR.includes(c.estado));
   const totalesMes = ["PEN", "USD"].map((m) => [m, comprobantes.filter((c) => c.moneda === m && c.fecha.slice(0, 7) === fmt(hoy).slice(0, 7)).reduce((a, c) => a + c.total, 0)]);
 
   const reenviar = (c) => {
@@ -209,8 +207,9 @@ export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sede
   };
 
   const cols = [
-          { key: "fecha", label: "Fecha", w: "88px", a: "left", get: (c) => fechaCorta(c.fecha), sortVal: (c) => c.fecha },
-          { key: "tipo", label: "Tipo", w: "96px", a: "left", get: (c) => c.tipo, cell: (c) => <span className={`dc-fe__tipo ${TIPO[c.tipo] || ""}`}>{c.tipo}</span> },
+          { key: "fecha", label: "Fecha", w: "104px", a: "left", get: (c) => fechaLegible(c.fecha), exportar: (c) => fechaCorta(c.fecha), sortVal: (c) => c.fecha },
+          // Texto plano: un chip «Boleta» igual en todas las filas no distinguía nada.
+          { key: "tipo", label: "Tipo", w: "104px", a: "left", get: (c) => c.tipo },
           { key: "id", label: "Número", w: "128px", a: "left", get: (c) => c.id, cell: (c) => <span className="dc-fe__mono" title={c.ref ? `Referencia: ${c.ref}` : undefined}>{c.id}</span> },
           { key: "cliente", label: "Cliente", w: "minmax(140px,1.4fr)", a: "left", get: (c) => c.cliente, cell: (c) => <span className="dc-fe__txt1" title={c.tipo === "Factura" && c.paciente ? `Paciente: ${c.paciente}` : undefined}>{c.cliente}</span> },
           // Documento y Moneda solo cuando aportan: con todas las boletas sin DNI y en soles eran
@@ -221,12 +220,13 @@ export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sede
           { key: "igv", label: "IGV", soloExport: true, w: "86px", a: "right", get: (c) => dinero(c.igv, c.moneda), sortVal: (c) => c.igv },
           { key: "total", label: "Total", w: "108px", a: "right", get: (c) => dinero(c.total, c.moneda), sortVal: (c) => c.total, cell: (c) => <b className="dc-fe__total" title={`Base ${dinero(c.base, c.moneda)} + IGV ${dinero(c.igv, c.moneda)}`}>{dinero(c.total, c.moneda)}</b> },
           { key: "estado", label: "Estado", w: "128px", a: "left", get: (c) => (ESTADO[c.estado] || {}).l, cell: (c) => <EstadoChip e={c.estado} msg={c.mensaje} /> },
-          ...(filtro === "atender" ? [{ key: "mensaje", label: "Qué dijo SUNAT", w: "minmax(220px,1.6fr)", a: "left", get: (c) => c.mensaje || "", cell: (c) => <span className="dc-fe__msg">{c.mensaje}</span> }] : []),
-          { key: "acc", label: "", w: "116px", a: "right", noFilter: true, noSort: true, sticky: true, cell: (c) => (
+          ...(estadoF === "atender" ? [{ key: "mensaje", label: "Qué dijo SUNAT", w: "minmax(220px,1.6fr)", a: "left", get: (c) => c.mensaje || "", cell: (c) => <span className="dc-fe__msg">{c.mensaje}</span> }] : []),
+          { key: "acc", label: "", w: "136px", a: "right", noFilter: true, noSort: true, sticky: true, cell: (c) => (
             <span className="dc-fe__acc">
               {/* abrirBoleta recibe el cobro como en Caja: monto en soles y, si fue en dólares,
-                  montoOriginal (US$) y su TC; así la boleta es la misma que la del cobro. */}
-              <button type="button" title="Ver comprobante" aria-label={`Ver ${c.id}`} onClick={(e) => { e.stopPropagation(); abrirBoleta({ ...(c.pago || {}), paciente: c.cliente, comprobanteSerie: c.serie, comprobanteNumero: c.numero, fecha: c.fecha, ...(c.moneda === "USD" ? { monto: Number(c.pago?.monto) || null, montoOriginal: Math.abs(c.total), tipoCambio: c.tipoCambio ?? c.pago?.tipoCambio ?? null } : { monto: Math.abs(c.total) }), moneda: c.moneda, concepto: c.concepto, metodo: c.metodo, tipo: c.tipo, docTipo: c.docTipo, docNum: c.docNum, refComprobante: c.ref }); }}><FileText size={14} strokeWidth={2} /></button>
+                  montoOriginal (US$) y su TC; así la boleta es la misma que la del cobro.
+                  Con texto «PDF»: el ícono solo, sin encabezado, no decía qué abría. */}
+              <button type="button" className="dc-fe__pdf" title="Ver comprobante" aria-label={`Ver PDF de ${c.id}`} onClick={(e) => { e.stopPropagation(); abrirBoleta({ ...(c.pago || {}), paciente: c.cliente, comprobanteSerie: c.serie, comprobanteNumero: c.numero, fecha: c.fecha, ...(c.moneda === "USD" ? { monto: Number(c.pago?.monto) || null, montoOriginal: Math.abs(c.total), tipoCambio: c.tipoCambio ?? c.pago?.tipoCambio ?? null } : { monto: Math.abs(c.total) }), moneda: c.moneda, concepto: c.concepto, metodo: c.metodo, tipo: c.tipo, docTipo: c.docTipo, docNum: c.docNum, refComprobante: c.ref }); }}><FileText size={14} strokeWidth={2} /> PDF</button>
               {(c.estado === "rechazado" || c.estado === "observado" || c.estado === "pendiente")
                 ? puedeEmitir && c.origen !== "caja" && <button type="button" title="Reenviar a SUNAT" aria-label={`Reenviar ${c.id}`} onClick={(e) => { e.stopPropagation(); reenviar(c); }}><RefreshCw size={14} strokeWidth={2} /></button>
                 : null}
@@ -255,22 +255,31 @@ export default function FacturacionSunat({ pagos = [], cobrosServidor = [], sede
           <h3><Receipt size={16} strokeWidth={2} /> Comprobantes electrónicos</h3>
           <span>
             Emitido este mes: <b>{dinero(totalesMes[0][1])}</b>{totalesMes[1][1] ? <> · <b>{dinero(totalesMes[1][1], "USD")}</b></> : null}
-            {!conectado ? " · comprobantes de ejemplo" : !cfg.proveedor ? " · envío a SUNAT aún no activo" : ""}
+            {!conectado ? " · comprobantes de ejemplo" : ""}
           </span>
         </div>
-        <div className="dc-fe__filtros" role="tablist" aria-label="Filtrar comprobantes">
-          {FILTROS.map(([k, l, n]) => (
-            <button key={k} type="button" role="tab" aria-selected={filtro === k} className={`${filtro === k ? "is-on" : ""}${k === "atender" && n ? " is-alerta" : ""}`} onClick={() => setFiltro(k)}>{l} <i>{n}</i></button>
-          ))}
-        </div>
+        {[["Tipo", F_TIPO, tipoF, setTipoF], ["Estado", F_ESTADO, estadoF, setEstadoF]].map(([g, ops, val, fijar]) => (
+          <div key={g} className="dc-fe__fgrupo">
+            <span>{g}</span>
+            <div className="dc-fe__filtros" role="tablist" aria-label={`Filtrar por ${g.toLowerCase()}`}>
+              {ops.map(([k, l, n]) => (
+                <button key={k} type="button" role="tab" aria-selected={val === k} className={`${val === k ? "is-on" : ""}${k === "atender" && n ? " is-alerta" : ""}`} onClick={() => fijar(k)}>{l} <i>{n}</i></button>
+              ))}
+            </div>
+          </div>
+        ))}
         <BotonExportar titulo="Comprobantes electrónicos" cols={cols} filas={visibles} sub="comprobantes" />
       </div>
 
-      {conectado && deCajaN > 0 && (
+      {/* Un solo aviso: sin proveedor, el subtítulo, el aviso de Caja y este decían lo mismo. */}
+      {!cfg.proveedor ? (
+        <div className="dc-fe__aviso-sin dc-fe__aviso-uno"><PlugZap size={18} strokeWidth={2} />
+          <div><b>Envío a SUNAT inactivo: conecta un proveedor OSE/PSE{porEnviar.length ? ` · ${porEnviar.length} ${porEnviar.every((c) => c.tipo === "Boleta") ? (porEnviar.length === 1 ? "boleta" : "boletas") : (porEnviar.length === 1 ? "comprobante" : "comprobantes")} por enviar` : ""}</b>{!onIntegraciones && <span>Lo conecta quien administra Integraciones.</span>}</div>
+          {/* R-33: el botón solo para quien puede abrir Integraciones (recepción volvía a Inicio sin aviso). */}
+          {onIntegraciones && <button type="button" className="dc-fe__btn" onClick={onIntegraciones}>Ir a Integraciones</button>}
+        </div>
+      ) : conectado && deCajaN > 0 && (
         <div className="dc-fe__aviso-sin"><Receipt size={18} strokeWidth={2} /><div><b>{deCajaN} {deCajaN === 1 ? "comprobante emitido" : "comprobantes emitidos"} en Caja aún sin registro electrónico</b><span>Son las boletas de los cobros: se muestran aquí con su serie y número hasta que el servidor las registre para el envío a SUNAT.</span></div></div>
-      )}
-      {!cfg.proveedor && (
-        <div className="dc-fe__aviso-sin"><PlugZap size={18} strokeWidth={2} /><div><b>Sin proveedor de facturación electrónica</b><span>Los comprobantes se emiten en el sistema y quedan «Sin enviar» hasta conectar un proveedor (OSE/PSE).{onIntegraciones ? "" : " Lo conecta quien administra Integraciones."}</span></div>{/* R-33: el botón solo para quien puede abrir Integraciones (recepción volvía a Inicio sin aviso). */}{onIntegraciones &&<button type="button" className="dc-fe__btn" onClick={onIntegraciones}>Ir a Integraciones</button>}</div>
       )}
       <DataTable sub="comprobantes" minWidth={0} rows={visibles} defaultSort={{ key: "fecha", dir: "desc" }}
         empty={<div className="dc-fe__vacio"><Receipt size={22} strokeWidth={1.75} /><b>Sin comprobantes</b><span>Los cobros de caja generan aquí su boleta o factura.</span></div>}

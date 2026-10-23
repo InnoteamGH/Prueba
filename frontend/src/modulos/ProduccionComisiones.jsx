@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
 import api, { auth } from "../api/client";
-import { ESPECIALIDADES, EnCabecera, ListaFiltrable, MEDICOS, ThOrden, mismaSede, useSede } from "../comun";
+import { ESPECIALIDADES, ListaFiltrable, MEDICOS, ThOrden, fechaLegible, mismaSede, useSede } from "../comun";
 import { sedeApiUuid } from "../routing";
 import { medicoEnSedes } from "../compartido/medicosSede";
 import { medicosDeSedes } from "../compartido/medicoEnSede";
@@ -53,6 +53,7 @@ import {
   mesesDelPeriodo,
   ritmoDelPeriodo,
   rotuloPeriodo,
+  rotuloMeses,
   ESCALA_AUSENTISMO_MAX,
   acumularCobros,
   ausentismoPorOdontologo,
@@ -61,18 +62,14 @@ import {
   marcaMediaPct,
   moneyFmt,
   pctEnEscalaAusentismo,
+  pctTxt,
   techoRinde,
 } from "./produccionComisionesUtil";
 import "./panelGerencial.css";
 import "./produccionComisiones.css";
 
-const COLORES = [
-  "var(--dc-amber-ink)",
-  "var(--dc-accent-cyan)",
-  "var(--dc-purple)",
-  "var(--dc-ok-700)",
-  "var(--dc-brand-600)",
-];
+// Un solo color de marca para las barras: el color no codifica nada (no hay leyenda).
+const COLOR_BARRA = "var(--dc-brand-600)";
 
 function prefersReducedMotion() {
   return typeof window !== "undefined"
@@ -325,23 +322,17 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
       ctx.fillStyle = fa;
       ctx.textAlign = "center";
       labels.forEach((m, i) => ctx.fillText(m, X(i), H - 24));
+      // Lo cobrado de cada mes, con «S/»; los meses sin cobro no se rotulan.
+      ctx.font = '600 11px "Inter Variable", sans-serif';
+      ctx.fillStyle = c1;
       labels.forEach((_, i) => {
-        if (i > st.vis + 0.001) return;
         const v = mensuales[i] || 0;
-        if (v) {
-          ctx.font = '600 11px "Inter Variable", sans-serif';
-          ctx.fillStyle = v >= 1000 ? c1 : cssVar("--dc-warn-700", "#92400E");
-          ctx.fillText(`+${Math.round(v).toLocaleString("es-PE")}`, X(i), H - 8);
-        } else {
-          ctx.font = '400 11px "Inter Variable", sans-serif';
-          ctx.fillStyle = cssVar("--dc-ink-200", "#C4CBD6");
-          ctx.fillText("0", X(i), H - 8);
-        }
+        if (i <= st.vis + 0.001 && v) ctx.fillText(`+${moneyFmt(v, { dec: 0 })}`, X(i), H - 8);
       });
       ctx.font = '400 11px "Inter Variable", sans-serif';
       ctx.fillStyle = fa;
       ctx.textAlign = "left";
-      ctx.fillText(`S/ ${Math.round(mx).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pad.l + 2, pad.t - 5);
+      ctx.fillText(moneyFmt(Math.round(mx)), pad.l + 2, pad.t - 5);
 
       ctx.beginPath();
       ctx.moveTo(X(poly[0][0]), H - pad.b);
@@ -408,7 +399,7 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
         ctx.fillStyle = ink;
         ctx.font = '600 11px "Inter Variable", sans-serif';
         ctx.textAlign = kx > W * 0.66 ? "right" : "left";
-        const extra = mensuales[iR] ? `  (+${Math.round(mensuales[iR])})` : "";
+        const extra = mensuales[iR] ? `  (+${moneyFmt(mensuales[iR])})` : "";
         ctx.fillText(`${labels[iR]}  ${moneyFmt(acum[iR] || 0)}${extra}`, kx + (kx > W * 0.66 ? -10 : 10), pad.t + 2);
       }
 
@@ -437,11 +428,6 @@ function CanvasIngresos({ meses, cobrados, onOpen }) {
   );
 }
 
-function fmtTasa(t) {
-  if (t == null) return "—";
-  return `${t}%`;
-}
-
 function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   const { rows, clinica, ticketMedio: ticket, costeTotal, escala } = useMemo(
     () => ausentismoPorOdontologo(citas, medicos, ticketMedio),
@@ -453,45 +439,36 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   /* La etiqueta de la clínica va sobre la barra y se ancla al borde cerca de los extremos,
      para no pisar «0%», la alerta ni el tope de la escala. */
   const anclaClinica = clinicaLeft > 85 ? "fin" : clinicaLeft < 12 ? "ini" : "";
+  // «0%» y «15% alerta» se enciman si la alerta queda cerca del inicio (escala alta).
+  const verCero = umbralLeft >= 30;
+  // Cuántas de cada 100 citas se pierden y qué hacer, según lo que más pesa.
+  const deCien = clinica.sinDato ? "" : clinica.perdidas === 0 ? "No se perdió ninguna cita"
+    : clinica.tasa < 0.5 ? "Menos de 1 de cada 100 citas se pierde" : `${Math.round(clinica.tasa)} de cada 100 citas se pierden`;
+  const accion = !sobreUmbral ? `Por debajo de la alerta del ${UMBRAL_AUSENTISMO}%: la asistencia no es el problema principal.`
+    : clinica.canceladas >= clinica.noShows ? "La mayoría son cancelaciones: ofrece esos huecos a la lista de espera."
+    : "La mayoría son faltas sin aviso: refuerza los recordatorios.";
 
   const fichaPerdidas = () => onOpen?.({
     t: "Citas que se pierden",
     s: "Canceladas y no asistidas sobre la agenda",
-    cifra: clinica.sinDato ? "—" : fmtTasa(clinica.tasa),
+    cifra: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
     parte: clinica.sinDato ? "sin dato" : `${clinica.perdidas} de ${clinica.total}`,
     sub: "Se mide sobre la agenda del periodo, no sobre la producción.",
     micro: [
       ["Canceladas", String(clinica.canceladas)],
       ["No asistió", String(clinica.noShows)],
-      ["Reprogramadas", "Fuera del cálculo"],
+      ["Reprogramadas", "No suman"],
     ],
     como: "Se cuentan las citas canceladas y las no asistidas, y se dividen entre todas las citas de agenda del tramo excepto las reprogramadas.",
     cols: [["Estado"], ["En la cifra"], ["Qué implica"]],
     filas: [
       ["Cancelada", "Suma", "Lista de espera: el hueco avisado se puede revender"],
       ["No asistió", "Suma", "Recordatorios: el hueco se quema"],
-      ["Reprogramada", "Fuera", "Se cuenta en su nueva fecha"],
-      ["Pendiente, confirmada, en atención o atendida", "Base", "Siguen en pie o se atendieron"],
+      ["Reprogramada", "No suma", "Se cuenta en su nueva fecha"],
+      ["Pendiente, confirmada, en atención o atendida", "Total", "Siguen en pie o se atendieron"],
     ],
-    fuente: "Agenda del periodo – estados de cada cita.",
+    fuente: "Agenda del periodo.",
     tono: "aviso",
-  });
-
-  const fichaUmbral = () => onOpen?.({
-    t: "Umbral de alerta",
-    s: "El criterio de la propia aplicación",
-    cifra: `${UMBRAL_AUSENTISMO}%`,
-    parte: "de la app",
-    sub: "A partir de aquí la app pinta el ausentismo en rojo y sugiere reforzar recordatorios.",
-    como: "No es un criterio inventado por QA: es el umbral que ya usa Dento Check en sus paneles.",
-    cols: [["Concepto"], ["Valor", "n"]],
-    filas: [
-      ["Umbral", `${UMBRAL_AUSENTISMO}%`],
-      ["Escala de esta pantalla", `0 – ${escala}%`],
-      ["La clínica ahora", clinica.sinDato ? "—" : fmtTasa(clinica.tasa)],
-    ],
-    fuente: "Producción = procedimientos terminados × precio del catálogo.",
-    tono: "riesgo",
   });
 
   const fichaCoste = () => onOpen?.({
@@ -514,18 +491,16 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   const fichaEscala = () => onOpen?.({
     t: "Dónde está la clínica",
     s: `Escala 0 – ${escala}% – alerta ${UMBRAL_AUSENTISMO}%`,
-    cifra: clinica.sinDato ? "—" : fmtTasa(clinica.tasa),
+    cifra: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
     parte: sobreUmbral ? "sobre el umbral" : "bajo el umbral",
-    sub: clinica.sinDato
-      ? "Sin citas en agenda para medir."
-      : `De cada cien citas, unas ${Math.round(clinica.tasa)} se pierden.`,
-    como: `La raya roja es la alerta del ${UMBRAL_AUSENTISMO}%. La escala llega al ${escala}%${escala > ESCALA_AUSENTISMO_MAX ? " porque hay tasas por encima del 20%" : ""}. Canceladas y no asistidas se suman en el %; se enseñan aparte porque piden acciones distintas.`,
-    cols: [["Estado"], ["Rol"], ["Nota"]],
+    sub: clinica.sinDato ? "Sin citas en agenda para medir." : `${deCien}.`,
+    como: `La raya roja es la alerta del ${UMBRAL_AUSENTISMO}%. La escala llega al ${escala}%${escala > ESCALA_AUSENTISMO_MAX ? ` porque hay tasas por encima del ${ESCALA_AUSENTISMO_MAX}%` : ""}. Canceladas y no asistidas se suman en el %; se enseñan aparte porque piden acciones distintas.`,
+    cols: [["Estado"], ["En la cifra"], ["Nota"]],
     filas: [
-      ["Cancelada", "Cuenta (arriba)", "El paciente avisó"],
-      ["No asistió", "Cuenta (arriba)", "El paciente no avisó"],
-      ["Reprogramada", "Fuera", "Se cuenta en su nueva fecha"],
-      ["Pendiente, confirmada, en atención o atendida", "Base", "No son pérdida"],
+      ["Cancelada", "Suma", "El paciente avisó"],
+      ["No asistió", "Suma", "El paciente no avisó"],
+      ["Reprogramada", "No suma", "Se cuenta en su nueva fecha"],
+      ["Pendiente, confirmada, en atención o atendida", "Total", "No son pérdida"],
     ],
     fuente: "Citas de agenda del periodo.",
     tono: "ok",
@@ -534,7 +509,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   const fichaDoc = (r) => onOpen?.({
     t: r.nombre,
     s: `${r.especialidad || "Odontólogo"} – ausentismo del periodo`,
-    cifra: r.tasa == null ? "—" : fmtTasa(r.tasa),
+    cifra: pctTxt(r.tasa),
     parte: `${r.perdidas} perdidas`,
     sub: r.perdidas
       ? "Citas de su agenda que quedaron canceladas o sin asistir."
@@ -545,13 +520,13 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
       ["No asistió", String(r.noShow)],
       ["Costo", r.coste != null ? moneyFmt(r.coste) : "—"],
     ],
-    como: "Sus citas del tramo, contando canceladas y no asistidas. El coste es esas citas por el ticket medio de la clínica.",
+    como: "Sus citas del tramo, contando canceladas y no asistidas. El costo es esas citas por el ticket medio de la clínica.",
     cols: [["Concepto"], ["Valor", "n"]],
     filas: [
       ["Citas en agenda", String(r.agenda)],
       ["Canceladas", String(r.cancelada)],
       ["No asistió", String(r.noShow)],
-      ["Tasa", r.tasa == null ? "—" : fmtTasa(r.tasa)],
+      ["Tasa", pctTxt(r.tasa)],
       ["Costo", r.coste != null ? moneyFmt(r.coste) : "—"],
     ],
     fuente: "Agenda agrupada por odontólogo (dato real).",
@@ -565,7 +540,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
           <span className="dc-kpi__icon" style={{ background: "var(--dc-warn-100)", color: "var(--dc-warn-700)" }} aria-hidden="true">⊘</span>
           <div className="dc-kpi__body">
             <div className="dc-kpi__label">Citas que se pierden</div>
-            <div className="dc-kpi__value">{clinica.sinDato ? "—" : fmtTasa(clinica.tasa)}</div>
+            <div className="dc-kpi__value">{clinica.sinDato ? "—" : pctTxt(clinica.tasa)}</div>
             <div className="dc-kpi__sub">Canceladas y no asistidas</div>
           </div>
         </button>
@@ -594,7 +569,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                 {!clinica.sinDato && (
                   <div className="tope">
                     <span className={`op${anclaClinica ? ` op--${anclaClinica}` : ""}`} style={{ left: `${clinicaLeft}%` }}>
-                      <b>{clinica.tasa}%</b> la clínica
+                      <b>{pctTxt(clinica.tasa)}</b> la clínica
                     </span>
                   </div>
                 )}
@@ -612,40 +587,39 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                   <i className="marca" style={{ left: `${umbralLeft}%` }} title={`Umbral ${UMBRAL_AUSENTISMO}%`} />
                 </div>
                 <div className="ejes">
-                  <span className="eje-ini">0%</span>
+                  {verCero && <span className="eje-ini">0%</span>}
                   <span style={{ left: `${umbralLeft}%` }}><b>{UMBRAL_AUSENTISMO}% alerta</b></span>
                   <span className="eje-fin">{escala}%</span>
                 </div>
               </div>
-              <p className="dc-nota" style={{ marginTop: "var(--dc-sp-5)" }}>
-                {clinica.sinDato
-                  ? <>Sin citas de agenda en el periodo para medir ausentismo.</>
-                  : <>De cada cien citas de la agenda, <b>{Math.round(clinica.tasa)}</b> se pierden
-                    ({clinica.perdidas} de {clinica.total}). Canceladas: <b>{clinica.canceladas}</b> –
-                    no asistió: <b>{clinica.noShows}</b>.
-                    {sobreUmbral
-                      ? ` Está por encima de la alerta del ${UMBRAL_AUSENTISMO}%: conviene reforzar recordatorios.`
-                      : ` Está por debajo del ${UMBRAL_AUSENTISMO}%: la asistencia no es el problema principal.`}</>}
-              </p>
+              {clinica.sinDato ? (
+                <p className="dc-nota" style={{ marginTop: "var(--dc-sp-5)" }}>Sin citas de agenda en el periodo para medir ausentismo.</p>
+              ) : (
+                <>
+                  <p className="dc-nota" style={{ marginTop: "var(--dc-sp-5)", marginBottom: 4 }}><b>{deCien}</b> ({clinica.perdidas} de {clinica.total}).</p>
+                  <p className="dc-nota">{accion}</p>
+                </>
+              )}
             </div>
             <div className="dc-split__rule">
               <p className="dc-rotulo">Qué se suma en esa cifra</p>
+              {/* Misma palabra, mismo color: «Suma» (pérdida), «No suma» y «Total» (solo cuentan en la base). */}
               <div className="dc-estados">
                 <button type="button" className="fila" onClick={fichaEscala}>
                   <span className="nm">Cancelada<em>el paciente avisó: el hueco se puede volver a vender</em></span>
-                  <span className="dc-chip dc-chip--aviso">cuenta</span>
+                  <span className="dc-chip dc-chip--riesgo">Suma</span>
                 </button>
                 <button type="button" className="fila" onClick={fichaEscala}>
                   <span className="nm">No asistió<em>el paciente no avisó: el hueco se quema</em></span>
-                  <span className="dc-chip dc-chip--riesgo">cuenta</span>
+                  <span className="dc-chip dc-chip--riesgo">Suma</span>
                 </button>
                 <button type="button" className="fila" onClick={fichaEscala}>
                   <span className="nm">Reprogramada<em>se movió a otra fecha: se cuenta en la nueva</em></span>
-                  <span className="dc-chip dc-chip--info">fuera</span>
+                  <span className="dc-chip dc-chip--gris">No suma</span>
                 </button>
                 <button type="button" className="fila" onClick={fichaEscala}>
-                  <span className="nm">Pendiente, confirmada, en atención o atendida<em>siguen en pie o se atendieron: forman el total</em></span>
-                  <span className="dc-chip dc-chip--ok">base</span>
+                  <span className="nm">Pendiente, confirmada, en atención o atendida<em>siguen en pie o se atendieron: solo cuentan en el total</em></span>
+                  <span className="dc-chip dc-chip--info">Total</span>
                 </button>
               </div>
             </div>
@@ -667,28 +641,29 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
           <button type="button" className="dc-info" aria-label="Qué mide este módulo" onClick={() => onOpen?.({
             t: "Ausentismo por odontólogo",
             s: "Quién pierde citas y cuánto cuesta",
-            cifra: clinica.sinDato ? "—" : fmtTasa(clinica.tasa),
+            cifra: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
             parte: `${clinica.perdidas} perdidas`,
-            como: "Agenda agrupada por odontólogo a partir de las citas del periodo (médico y estado de cada una).",
+            como: "Citas de la agenda del periodo, agrupadas por odontólogo.",
             cols: [["Odontólogo"], ["Agenda", "n"], ["Perdidas", "n"], ["%", "n"], ["Costo", "n"]],
             filas: rows.map((r) => [
               r.nombre,
               String(r.agenda),
               String(r.perdidas),
-              r.tasa == null ? "—" : fmtTasa(r.tasa),
+              pctTxt(r.tasa),
               r.coste != null ? moneyFmt(r.coste) : "—",
             ]),
-            total: clinica.sinDato ? "—" : fmtTasa(clinica.tasa),
+            total: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
             fuente: "Dato real de la agenda – sin reparto de ejemplo.",
             tono: "cian",
           })}>i</button>
         </div>
         <div className="dc-card__body">
-          {/* R4-13: el Excel y el PDF se llamaban «Odontólogos», igual que los de Producción. */}
-          <ListaFiltrable rows={rows} sub="odontólogos" exportTitulo="Ausentismo por odontólogo" cols={[
+          {/* R4-13: el Excel y el PDF se llamaban «Odontólogos», igual que los de Producción.
+              Orden por % de pérdida, de mayor a menor (el encabezado lo marca). */}
+          <ListaFiltrable rows={rows} sub="odontólogos" exportTitulo="Ausentismo por odontólogo" alfabetico={false} defaultSort={{ key: "tasa", dir: "desc" }} cols={[
             { key: "nombre", label: "Odontólogo", get: (r) => r.nombre || "" },
             { key: "agenda", label: "Agenda", get: (r) => String(r.agenda ?? ""), sortVal: (r) => Number(r.agenda) || 0 },
-            { key: "perdidas", label: "Se pierden", get: (r) => String(r.perdidas ?? ""), sortVal: (r) => Number(r.perdidas) || 0 },
+            { key: "perdidas", label: "Perdidas", get: (r) => String(r.perdidas ?? ""), sortVal: (r) => Number(r.perdidas) || 0 },
             { key: "tasa", label: "%", get: (r) => (r.tasa == null ? "" : String(r.tasa)), sortVal: (r) => (r.tasa == null ? -1 : Number(r.tasa)) },
             { key: "coste", label: "Costo", get: (r) => (r.coste != null ? String(r.coste) : ""), sortVal: (r) => Number(r.coste) || 0 },
           ]} modoTabla>{(lstA, _v, stA) => (
@@ -696,8 +671,8 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
             <div className="fila cab" role="row">
               <ThOrden st={stA} k="nombre">Odontólogo</ThOrden>
               <ThOrden st={stA} k="agenda" a="right" className="der">Agenda</ThOrden>
-              <span>Escala 0 – {escala}% · alerta {UMBRAL_AUSENTISMO}%</span>
-              <ThOrden st={stA} k="perdidas" a="right" className="der">Se pierden</ThOrden>
+              <span title={`Escala 0 – ${escala}% · alerta ${UMBRAL_AUSENTISMO}% (raya roja)`}>Pérdida</span>
+              <ThOrden st={stA} k="perdidas" a="right" className="der">Perdidas</ThOrden>
               <ThOrden st={stA} k="tasa" a="right" className="der">%</ThOrden>
               <ThOrden st={stA} k="coste" a="right" className="der">Costo</ThOrden>
             </div>
@@ -731,10 +706,10 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                     <i className="marca" style={{ left: `${umbralLeft}%` }} />
                   </span>
                 ) : (
-                  <span className="vacia" style={{ color: "var(--dc-ok-700)" }}>ninguna perdida</span>
+                  <span className="vacia" style={{ color: "var(--dc-ok-700)" }}>0%</span>
                 )}
                 <span className="der num">{r.perdidas}</span>
-                <span className="der pc">{r.tasa == null ? "—" : fmtTasa(r.tasa)}</span>
+                <span className="der pc">{pctTxt(r.tasa)}</span>
                 <span className="der num">{r.coste != null ? moneyFmt(r.coste) : "—"}</span>
               </div>
             ))}
@@ -747,7 +722,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
                 <span className="der num">{clinica.total}</span>
                 <span />
                 <span className="der num">{clinica.perdidas}</span>
-                <span className="der pc">{clinica.sinDato ? "—" : fmtTasa(clinica.tasa)}</span>
+                <span className="der pc">{clinica.sinDato ? "—" : pctTxt(clinica.tasa)}</span>
                 <span className="der num">{costeTotal != null ? moneyFmt(costeTotal) : "—"}</span>
               </div>
             )}
@@ -755,8 +730,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
           )}</ListaFiltrable>
         </div>
         <p className="dc-card__foot">
-          Agrupado real por odontólogo a partir de la agenda (<b>médico</b> y <b>estado</b> de cada cita).
-          El coste es citas perdidas × ticket medio
+          El costo es citas perdidas × lo que produce una cita en promedio
           {ticket != null ? <> (<b>{moneyFmt(ticket)}</b>)</> : null}.
         </p>
       </section>
@@ -769,7 +743,7 @@ function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
   );
 }
 
-export default function ProduccionComisiones({ citas: citasProp = [], can, tab = "resumen", sedes = null }) {
+export default function ProduccionComisiones({ citas: citasProp = [], tab = "resumen", sedes = null }) {
   const conectado = !!auth.token;
   // Sedes para la API como UUID (antes iban los números 1/2/3). Con «Todas» y un usuario
   // de toda la clínica, null: las decide el servidor.
@@ -862,8 +836,10 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   const mesesConCobro = Number(data?.mesesConCobro) || 0;
   const cobros = data?.cobrosPorMes || [];
   const mediaClinica = Number(data?.mediaTicketClinica) || (totalCitas > 0 ? totalProd / totalCitas : 0);
-  const tickets = porMedico.map((m) => (m.atendidas > 0 ? Number(m.produccion) / m.atendidas : 0));
-  const techo = techoRinde(tickets, 250);
+  // Cuánto rinde cada cita, de mayor a menor (sin citas, S/ 0.00 al final).
+  const rinde = porMedico.map((m) => ({ m, ticket: m.atendidas > 0 ? Number(m.produccion) / m.atendidas : 0 }))
+    .sort((a, b) => b.ticket - a.ticket);
+  const techo = techoRinde(rinde.map((x) => x.ticket), 250);
   const mediaPct = marcaMediaPct(mediaClinica, techo);
   const filasEjemplo = porMedico.filter((m) => m.ejemplo).length;
   const quieto = prefersReducedMotion();
@@ -873,18 +849,21 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
   const perHasta = conectado ? (data?.hasta || rango.hasta) : null;
   const mesesPer = conectado ? mesesDelPeriodo(perDesde, perHasta) : 1;
   const ritmoPer = conectado ? ritmoDelPeriodo(perDesde, perHasta) : null;
-  const rangoLabel = useMemo(() => {
-    if (!cobros.length) return "Últimos 6 meses";
-    const a = cobros[0]?.mesLargo || cobros[0]?.mes;
-    const b = cobros[cobros.length - 1]?.mesLargo || cobros[cobros.length - 1]?.mes;
-    return a && b ? `${a} a ${b}` : "Periodo";
-  }, [cobros]);
+  // «may – oct 2026»: los meses de la curva (sin sesión, los 6 últimos del ejemplo).
+  const rangoLabel = rotuloMeses(perDesde || rango.desde, perHasta || rango.hasta);
+  const citasTxt = (n) => `${n || 0} ${n === 1 ? "cita" : "citas"}`;
+  // Sin pagos de comisión registrados, lo pendiente es toda la comisión devengada.
+  const pendienteVal = sinDato ? totalCom : Number(pendiente) || 0;
+  // Cobrado − producción con su signo; el rótulo dice hacia dónde va la diferencia.
+  const difTxt = `${descuadre >= 0 ? "+" : "−"}${moneyFmt(Math.abs(descuadre))}`;
+  const difRotulo = descuadre >= 0 ? "Cobrado sobre la producción" : "Producción sin cobrar";
+  const difCifra = descuadre >= 0 ? difTxt : moneyFmt(-descuadre);
 
   const fichaDoc = (m) => ({
     t: m.nombre,
     s: m.especialidad || "Odontólogo",
     cifra: moneyFmt(m.produccion),
-    parte: `${m.atendidas || 0} citas`,
+    parte: citasTxt(m.atendidas),
     sub: `Comisión ${moneyFmt(m.comision)} (${m.porcentaje}%).`,
     como: `${CRITERIO_PRODUCCION} Hoy: citas atendidas × precio base de la especialidad de cada cita. Comisión = producción × % del odontólogo (el mismo en todas sus sedes).`,
     cols: [["Concepto"], ["Valor", "n"]],
@@ -910,7 +889,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
 
       {tab === "ausencias" && conectado && !citasErr && (
         <p className="dc-nota" style={{ marginBottom: 12 }}>
-          {citasSrv == null ? "Cargando citas del servidor…" : `Agenda del mes en curso: del ${desdeMes.split("-").reverse().join("/")} al ${hastaHoy.split("-").reverse().join("/")}.`}
+          {citasSrv == null ? "Cargando citas del servidor…" : `Agenda del mes en curso: ${rotuloPeriodo(desdeMes, hastaHoy)}.`}
         </p>
       )}
       {tab === "ausencias" && conectado && citasErr ? (
@@ -931,7 +910,17 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                   <button key={k} type="button" role="tab" aria-selected={periodo === k} className={periodo === k ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setPeriodo(k)}>{l}</button>
                 ))}
               </div>
-              <span className="dc-nota" style={{ margin: 0 }}>Periodo: <b>{rotuloPeriodo(perDesde, perHasta)}</b>{mesesPer > 1 ? ` (${mesesPer} meses: la meta se cuenta ${mesesPer} veces)` : ""}</span>
+              <span className="dc-nota" style={{ margin: 0 }}>Periodo: <b>{rotuloPeriodo(perDesde, perHasta)}</b></span>
+              {/* La regla de la meta en periodos de varios meses va en el «i», no en el rótulo. */}
+              {mesesPer > 1 && <button type="button" className="dc-info" aria-label="Cómo se cuenta la meta en el periodo" onClick={() => abrir({
+                t: "Periodo del reporte",
+                s: rotuloPeriodo(perDesde, perHasta),
+                cifra: `${mesesPer} meses`,
+                como: `La meta de cada odontólogo es mensual: en un periodo de ${mesesPer} meses se cuenta ${mesesPer} veces para medir el avance.`,
+                cols: [["Concepto"], ["Valor", "n"]],
+                filas: [["Desde", fechaLegible(perDesde)], ["Hasta", fechaLegible(perHasta)], ["Meses", String(mesesPer)]],
+                tono: "cian",
+              })}>i</button>}
             </div>
           )}
           {!err && <>
@@ -940,7 +929,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               t: "Producción del periodo",
               s: "Valor de los procedimientos terminados",
               cifra: moneyFmt(totalProd),
-              parte: `${totalCitas} citas`,
+              parte: citasTxt(totalCitas),
               como: `${CRITERIO_PRODUCCION} Hoy es la suma atribuida a cada odontólogo por sus citas atendidas (precio base de la especialidad de la cita).`,
               cols: [["Odontólogo"], ["Citas", "n"], ["Producción", "n"]],
               filas: porMedico.map((m) => [m.nombre, String(m.atendidas || 0), moneyFmt(m.produccion)]),
@@ -981,52 +970,50 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               const conMeta = porMedico.filter(deLaSede).map((m) => { const md = conectado ? null : MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const metaMes = Number(m.meta ?? (conectado ? metaSrv(m) : md ? medicoEnSedes(md, sedes).meta : 0)) || 0; const meta = metaMes * mesesPer; return { ...m, metaMes, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
               const alRitmo = conMeta.filter((m) => m.pct >= ritmoM).length;
               const metaTot = conMeta.reduce((a, m) => a + m.meta, 0);
+              // Producción de quien tiene meta ÷ su meta del mismo periodo (antes: la producción de todo el equipo ÷ una sola meta mensual).
+              const avanceTot = metaTot ? (conMeta.reduce((a, m) => a + (Number(m.produccion) || 0), 0) / metaTot) * 100 : null;
               return (
                 <button type="button" className="dc-kpi" onClick={() => abrir({
                   t: "Cumplimiento de metas",
-                  s: `Ritmo esperado a hoy: ${Math.round(ritmoM)}% de la meta`,
+                  s: `Ritmo esperado a hoy: ${pctTxt(ritmoM)} de la meta`,
                   cifra: `${alRitmo} de ${conMeta.length}`,
+                  parte: "con meta",
                   como: mesesPer > 1
                     ? `Producción del odontólogo en el periodo ÷ (su meta mensual × ${mesesPer} meses). Está al ritmo si su avance es igual o mayor a la parte del periodo que ya pasó.`
                     : "Producción del odontólogo ÷ su meta mensual. Está al ritmo si su avance es igual o mayor al porcentaje del mes que ya pasó.",
                   cols: [["Odontólogo"], ["Producción", "n"], [mesesPer > 1 ? `Meta (${mesesPer} meses)` : "Meta", "n"], ["Avance", "n"]],
-                  filas: conMeta.map((m) => [m.nombre, moneyFmt(m.produccion), moneyFmt(m.meta), `${Math.round(m.pct)}%`]),
+                  filas: conMeta.map((m) => [m.nombre, moneyFmt(m.produccion), moneyFmt(m.meta), pctTxt(m.pct)]),
                   vacio: "Sin metas definidas: se fijan en Metas y comisiones.",
                   tono: "cian",
                 })}>
                   <span className="dc-kpi__icon" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">◎</span>
                   <div className="dc-kpi__body">
                     <div className="dc-kpi__label">Al ritmo de su meta</div>
-                    <div className="dc-kpi__value">{alRitmo} de {conMeta.length}</div>
-                    {/* Producción de quien tiene meta ÷ su meta del mismo periodo (antes: la producción de todo el equipo ÷ una sola meta mensual). */}
-                    <div className="dc-kpi__sub">{metaTot ? `odontólogos · ${Math.round((conMeta.reduce((a, m) => a + (Number(m.produccion) || 0), 0) / metaTot) * 100)}% de la meta del ${mesesPer > 1 ? "periodo" : "mes"}` : "Sin metas definidas"}</div>
+                    <div className="dc-kpi__value">{alRitmo} de {conMeta.length} <small>con meta</small></div>
+                    <div className="dc-kpi__sub">{avanceTot != null ? `${pctTxt(avanceTot)} del total de metas` : "Sin metas definidas"}</div>
                   </div>
                 </button>
               );
             })()}
             <button type="button" className="dc-kpi" onClick={() => abrir({
               t: "Pendiente de liquidar",
-              s: "Comisión ganada − pagos al odontólogo",
-              cifra: sinDato ? "—" : moneyFmt(pendiente),
-              como: "Requiere registrar pagos de comisión (fecha, importe, periodo). Distinto de liquidación de seguros.",
-              falta: sinDato ? "Aún no hay pagos de comisión registrados en el sistema." : undefined,
-              vacio: sinDato ? "Sin pagos registrados." : undefined,
+              s: "Comisión devengada − pagos al odontólogo",
+              cifra: moneyFmt(pendienteVal),
+              parte: sinDato ? "0 pagos registrados" : undefined,
+              como: "Comisión devengada menos los pagos de comisión registrados. Sin pagos registrados, toda la comisión devengada está pendiente.",
               cols: [["Concepto"], ["Valor", "n"]],
-              filas: sinDato ? [] : [
-                ["Comisión ganada", moneyFmt(totalCom)],
-                ["Pagado", moneyFmt(data?.totalPagado)],
-                ["Pendiente", moneyFmt(pendiente)],
+              filas: [
+                ["Comisión devengada", moneyFmt(totalCom)],
+                ["Pagado", moneyFmt(sinDato ? 0 : data?.totalPagado)],
+                ["Pendiente", moneyFmt(pendienteVal)],
               ],
               tono: "aviso",
             })}>
               <span className="dc-kpi__icon" style={{ background: "var(--dc-warn-100)", color: "var(--dc-warn-700)" }} aria-hidden="true">☐</span>
               <div className="dc-kpi__body">
-                {/* Sin pagos de comisión registrados: un solo mensaje (antes «sin dato», «—» y «Sin pagos registrados» a la vez). */}
                 <div className="dc-kpi__label">Pendiente de liquidar</div>
-                <div className="dc-kpi__value" style={sinDato ? { color: "var(--dc-ink-400)" } : undefined}>
-                  {sinDato ? "—" : moneyFmt(pendiente)}
-                </div>
-                <div className="dc-kpi__sub">{sinDato ? "Sin pagos de comisión registrados" : "Comisión − pagos"}</div>
+                <div className="dc-kpi__value">{moneyFmt(pendienteVal)}</div>
+                <div className="dc-kpi__sub">{sinDato ? "0 pagos registrados" : "Comisión menos pagos"}</div>
               </div>
             </button>
           </section>
@@ -1055,7 +1042,9 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               })}>i</button>
             </div>
             <div className="dc-card__body">
-              <ListaFiltrable rows={porMedico} sub="odontólogos" exportTitulo="Producción por odontólogo" cols={[
+              {/* Orden por producción, de mayor a menor (el encabezado lo marca); por nombre, el
+                  alfabético ponía a todos los «Dr.» antes que las «Dra.». */}
+              <ListaFiltrable rows={porMedico} sub="odontólogos" exportTitulo="Producción por odontólogo" alfabetico={false} defaultSort={{ key: "prod", dir: "desc" }} cols={[
                 { key: "nombre", label: "Odontólogo", get: (m) => m.nombre || "" },
                 { key: "esp", label: "Especialidad", get: (m) => m.especialidad || "" },
                 { key: "citas", label: "Citas", get: (m) => String(m.atendidas || 0), sortVal: (m) => Number(m.atendidas) || 0 },
@@ -1067,9 +1056,8 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                   <ThOrden st={stP} k="nombre">Odontólogo</ThOrden><ThOrden st={stP} k="citas" a="right" className="der">Citas</ThOrden><span>Parte del total</span>
                   <ThOrden st={stP} k="prod" a="right" className="der">Producción</ThOrden><span className="der">%</span><ThOrden st={stP} k="com" a="right" className="der">Comisión</ThOrden>
                 </div>
-                {lstP.map((m) => { const i = porMedico.indexOf(m);
+                {lstP.map((m) => {
                   const lay = layoutProgreso(m.produccion, totalProd);
-                  const color = COLORES[i % COLORES.length];
                   const nula = !(Number(m.produccion) > 0);
                   return (
                     <div
@@ -1093,11 +1081,11 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                         <span className="vacia">sin producción</span>
                       ) : (
                         <span className="pista">
-                          <i className="seg" style={{ width: animReady || quieto ? `${lay.pct}%` : "0%", background: color }} />
+                          <i className="seg" style={{ width: animReady || quieto ? `${lay.pct}%` : "0%", background: COLOR_BARRA }} />
                         </span>
                       )}
                       <span className="der num">{moneyFmt(m.produccion)}</span>
-                      <span className="der pc">{lay.dibujar ? `${lay.pct.toFixed(1)}%` : "0%"}</span>
+                      <span className="der pc">{pctTxt(lay.pct)}</span>
                       <span className={`der num${nula ? "" : " c-ok"}`}>{moneyFmt(m.comision)}</span>
                     </div>
                   );
@@ -1127,7 +1115,7 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                   cifra: moneyFmt(totalCobrado),
                   micro: [
                     ["Producción", moneyFmt(totalProd)],
-                    ["Diferencia", `${descuadre >= 0 ? "+" : ""}${moneyFmt(Math.abs(descuadre)).replace("S/ ", "S/ ")}`],
+                    ["Diferencia", difTxt],
                   ],
                   como: "Cobrado = pagos registrados en Caja, sumados por mes. La diferencia con la producción (procedimientos terminados) puede venir de saldos de meses anteriores o de trabajo aún sin cobrar.",
                   cols: [["Mes"], ["Cobrado", "n"]],
@@ -1139,19 +1127,19 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <div className="dc-card__body dc-card__body--alto">
                 <dl className="dc-datos">
                   <div><dt>Cobrado</dt><dd>{moneyFmt(totalCobrado)}</dd></div>
+                  {/* No es una alerta: cobrar más que lo producido sale de saldos de antes (verde);
+                      lo contrario es trabajo aún sin cobrar (neutro). */}
                   <div onClick={() => abrir({
-                    t: "Cobrado vs producción",
-                    s: "Misma ventana de fechas",
-                    cifra: `${descuadre >= 0 ? "+" : "−"}${moneyFmt(Math.abs(descuadre))}`,
+                    t: difRotulo,
+                    s: "Cobrado − producción, misma ventana de fechas",
+                    cifra: difCifra,
                     como: `Cobrado del periodo (pagos en Caja) − producción del mismo tramo. Puede ser positivo si se cobran tratamientos de antes. ${CRITERIO_PRODUCCION}`,
                     cols: [["Concepto"], ["Monto", "n"]],
-                    filas: [["Cobrado", moneyFmt(totalCobrado)], ["Producción", moneyFmt(totalProd)], ["Diferencia", moneyFmt(descuadre)]],
-                    tono: "aviso",
+                    filas: [["Cobrado", moneyFmt(totalCobrado)], ["Producción", moneyFmt(totalProd)], ["Diferencia", difTxt]],
+                    tono: descuadre >= 0 ? "ok" : "brand",
                   })}>
-                    <dt>Cobrado vs producción</dt>
-                    <dd style={{ color: "var(--dc-warn-700)" }}>
-                      {descuadre >= 0 ? "+" : "−"}{moneyFmt(Math.abs(descuadre))}
-                    </dd>
+                    <dt>{difRotulo}</dt>
+                    <dd style={descuadre >= 0 ? { color: "var(--dc-ok-700)" } : undefined}>{difCifra}</dd>
                   </div>
                   <div><dt>Meses con cobro</dt><dd>{mesesConCobro} de {cobros.length || 6}</dd></div>
                 </dl>
@@ -1173,7 +1161,6 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
               <div className="dc-card__head">
                 <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
                 <h2>Cuánto rinde cada cita</h2>
-                <span className="dc-card__meta">escala hasta {moneyFmt(techo)}</span>
                 <button type="button" className="dc-info" aria-label="Detalle de rendimiento" onClick={() => abrir({
                   t: "Cuánto rinde cada cita",
                   s: "Producción ÷ citas",
@@ -1181,26 +1168,20 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                   parte: "media clínica",
                   como: `Escala fija a ${moneyFmt(techo)} (no al máximo de la serie). La marca gris es la media de la clínica.`,
                   cols: [["Odontólogo"], ["Citas", "n"], ["Ticket", "n"]],
-                  filas: porMedico.map((m) => [
-                    m.nombre,
-                    String(m.atendidas || 0),
-                    m.atendidas > 0 ? moneyFmt(Number(m.produccion) / m.atendidas) : "—",
-                  ]),
+                  filas: rinde.map(({ m, ticket }) => [m.nombre, String(m.atendidas || 0), moneyFmt(ticket)]),
                   tono: "ok",
                 })}>i</button>
               </div>
               <div className="dc-card__body">
                 <div className="dc-barras">
-                  {porMedico.map((m, i) => {
-                    const ticket = m.atendidas > 0 ? Number(m.produccion) / m.atendidas : 0;
+                  {rinde.map(({ m, ticket }) => {
                     const lay = layoutRinde(ticket, techo);
-                    const color = COLORES[i % COLORES.length];
                     if (!lay.dibujar) {
                       return (
-                        <div key={String(m.medicoId)} className="hb hb--nula" title={`${m.nombre} – sin citas`}>
+                        <div key={String(m.medicoId)} className="hb hb--nula" title={`${m.nombre} – ${citasTxt(m.atendidas)}`}>
                           <span className="n">{m.nombre}</span>
-                          <span className="v">—</span>
-                          <span className="pc">0 citas</span>
+                          <span className="v">{moneyFmt(0)}</span>
+                          <span className="pc">{citasTxt(m.atendidas)}</span>
                         </div>
                       );
                     }
@@ -1214,9 +1195,9 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
                       >
                         <span className="n">{m.nombre}</span>
                         <span className="v">{moneyFmt(ticket)}</span>
-                        <span className="pc">{m.atendidas} citas</span>
+                        <span className="pc">{citasTxt(m.atendidas)}</span>
                         <div className="pista">
-                          <div className="seg" style={{ width: animReady || quieto ? `${lay.pct}%` : "0%", background: color }} />
+                          <div className="seg" style={{ width: animReady || quieto ? `${lay.pct}%` : "0%", background: COLOR_BARRA }} />
                           {mediaPct != null && <i className="marca" style={{ left: `${mediaPct}%` }} />}
                         </div>
                       </div>
@@ -1233,9 +1214,6 @@ export default function ProduccionComisiones({ citas: citasProp = [], can, tab =
           <div className="dc-pie">
             <span>Comisión sobre la <b>producción</b> (procedimientos terminados), no sobre lo cobrado</span>
             <span>El porcentaje es del odontólogo, el mismo en todas sus sedes</span>
-            {can?.("comisiones", "editar") && (
-              <span>Puedes registrar pagos de comisión desde esta pantalla</span>
-            )}
           </div>
           </>}
         </>

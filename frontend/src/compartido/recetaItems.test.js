@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, listaItemsReceta, partirIndicaciones, textoIndicaciones } from "./recetaItems.js";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, posologiaItemReceta, nombreVisibleReceta, itemRecetaDesdeFormulario, listaItemsReceta, partirIndicaciones, textoIndicaciones } from "./recetaItems.js";
 
 describe("recetaItems H-08: un solo esquema, se leen los dos formatos", () => {
   it("lee el formato de la ficha", () => {
@@ -44,5 +44,11 @@ describe("indicaciones con alerta de alergia", () => {
   });
   it("el texto para mostrar o imprimir no lleva corchetes ni comillas", () => {
     assert.equal(textoIndicaciones(crudo), "QA prueba · Emitida pese a alerta de alergia: Ibuprofeno ↔ alergia a Aspirina (familia AINE).");
+  });
+  it("posología legible en pantalla", () => {
+    assert.equal(posologiaItemReceta({ dosis: "1", frecuencia: "c/8h", duracion: "3 días" }), "Dosis 1 · cada 8 h · por 3 días");
+    assert.equal(posologiaItemReceta({ dosis: "1 tableta", frecuencia: "c/ 12 horas", duracion: "" }), "1 tableta · cada 12 h");
+    assert.equal(posologiaItemReceta({ detalle: "c/8h – 3 días" }), "cada 8 h · 3 días");
+    assert.equal(nombreVisibleReceta({ medicamento: "paracetamol", presentacion: "pastilla" }), "Paracetamol pastilla");
   });
 });

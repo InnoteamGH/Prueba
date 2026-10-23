@@ -554,3 +554,12 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Una pregunta por mensaje**, sin volver a pedir lo ya dicho; los datos se guardan en la conversación apenas se entienden.
    - **El estado se reinicia** tras 12 horas sin mensajes o con un saludo solo: un chat creado el 06/08 retomó con «Hola» una reserva de agosto.
    - **Nada se asume:** la especialidad se pregunta antes de buscar cupos (hoy reservó ortodoncia sin preguntar); «mañana» y «2 pm» los resuelve el código con la hora de Lima; máximo 3 opciones.
+121. Formato y diseño uniformes en todas las pantallas (revisión de diseño del 23/10; detalle en `REVISION-DISENO-2026-10-23.md`):
+   - **Una cifra va como cifra:** sin palabras en el lugar de un número («Sin meta», «sin saldo», «aparte», «0.4k», «— Cobertura mínima»). Si no hay dato, la tarjeta no se muestra o la explicación va debajo, en pequeño.
+   - **Montos con «S/» y 2 decimales** en pantalla («S/ 699.00», «plan de S/ 340.00»).
+   - **Un solo formato de fecha:** «vie 23 oct» en listas (con año si no es el actual) y «23 oct 2026» en documentos y registros; los campos de fecha muestran dd/mm/aaaa.
+   - **Palabras completas:** «38 días», «77 días de atraso», «unidades», plurales correctos.
+   - **Nombres sin cortar:** hasta dos líneas; los escritos todo en mayúsculas se muestran como nombre propio sin cambiar el dato guardado.
+   - **Un estilo por botón y un verbo claro:** un solo «Cobrar», «Actualizar» con flecha circular, y botones que dicen el paso siguiente («Marcar recibido», no «Avanzar»).
+   - **Colores con significado:** los ceros en gris; el rojo solo para alertas reales.
+   - **Antes de mostrar el sistema a un cliente** se limpian los datos de prueba «QA» o se usa otra clínica.

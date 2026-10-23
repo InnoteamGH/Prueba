@@ -236,10 +236,36 @@ export function ritmoDelPeriodo(desde, hasta, hoy = new Date()) {
   return Math.max(0, Math.min(100, (pasados / total) * 100));
 }
 
-/** «del 01/05/2026 al 05/10/2026». */
-export const rotuloPeriodo = (desde, hasta) => (desde && hasta
-  ? `del ${String(desde).slice(0, 10).split("-").reverse().join("/")} al ${String(hasta).slice(0, 10).split("-").reverse().join("/")}`
-  : "");
+/* Meses cortos como fechaLegible de comun.jsx («vie 23 oct»). */
+const MESES_C = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+const partesFecha = (s) => { const [y, m, d] = String(s).slice(0, 10).split("-").map(Number); return { y, d, mes: MESES_C[m - 1] }; };
+
+/** Rango corto: «1 may – 5 oct 2026»; en un mismo mes «1 – 23 oct 2026»; entre años
+ *  «1 dic 2025 – 31 ene 2026». */
+export function rotuloPeriodo(desde, hasta) {
+  if (!desde || !hasta) return "";
+  const a = partesFecha(desde), b = partesFecha(hasta);
+  const fin = `${b.d} ${b.mes} ${b.y}`;
+  if (a.y !== b.y) return `${a.d} ${a.mes} ${a.y} – ${fin}`;
+  if (a.mes !== b.mes) return `${a.d} ${a.mes} – ${fin}`;
+  return a.d === b.d ? fin : `${a.d} – ${fin}`;
+}
+
+/** Solo los meses del periodo: «may – oct 2026» («oct 2026» si es uno; «dic 2025 – ene 2026»). */
+export function rotuloMeses(desde, hasta) {
+  if (!desde || !hasta) return "";
+  const a = partesFecha(desde), b = partesFecha(hasta);
+  const fin = `${b.mes} ${b.y}`;
+  if (a.y !== b.y) return `${a.mes} ${a.y} – ${fin}`;
+  return a.mes === b.mes ? fin : `${a.mes} – ${fin}`;
+}
+
+/** Porcentaje sin decimales, igual en toda la pantalla. Lo que no es cero no se lee «0%»: «<1%». */
+export function pctTxt(v) {
+  const n = Number(v);
+  if (v == null || !Number.isFinite(n)) return "—";
+  return n > 0 && n < 0.5 ? "<1%" : `${Math.round(n)}%`;
+}
 
 /* R6-02: /comisiones ya filtra por sedeIds (producción, comisión y cobrado de la sede
    elegida, médico por médico). Se quitó el recálculo local con GET /citas y

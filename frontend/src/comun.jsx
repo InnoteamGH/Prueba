@@ -14,6 +14,7 @@ import { estadoInfo, ESTADOS } from "./compartido/estados.js";
 import { registrarSedes, sedesRegistradas, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
 import { ymdLima } from "./util/fechaLima";
 import { etiquetaCantidad } from "./util/plurales";
+import { nombrePropio } from "./util/nombres";
 import { enfocarPrimera, moverFocoMenu, useMenuDesplegable } from "./compartido/menuDesplegable";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -118,7 +119,8 @@ export const ROLES = {
     // Sin "reportes": ese módulo es la producción y el pago de TODO el equipo. Lo suyo
     // es "miproduccion", que además le promete que sus colegas no aparecen ahí.
     mods: ["dashboard","agenda","disponibilidad","pacientes","odontograma","tratamientos","recetas","consentimientos","servicios","laboratorio","inventario","perio","formularios","radiografias","miproduccion","resenas"] },
-  recepcion: { label: "Recepcionista", icon: UserCheck, color: RED,
+  // Sin rojo: es el color de los errores y el rol se veía como una alerta en chips y avatares.
+  recepcion: { label: "Recepcionista", icon: UserCheck, color: "#2F6FDE",
     desc: "Atención diaria de su(s) sede(s): agenda, admisión y registro de pacientes, citas, confirmación de citas, cobros y caja, y el historial básico del paciente. Sin acceso a configuraciones ni a información gerencial.",
     mods: ["dashboard","whatsapp","agenda","espera","pacientes","facturacion","recall","formularios","radiografias","resenas"] },
   paciente:  { label: "Paciente", icon: Smile, color: DS.c.primary,
@@ -654,14 +656,45 @@ export function exportarPDF({ titulo, subtitulo, columnas, filas }) {
       + (filas.length ? "" : `<p class="doc-nota">Sin registros para este filtro.</p>`),
   });
 }
-// «lun, 19 oct.»; fuera del año en curso lleva el año («jue, 15 abr. 2027»): sin él no se
-// sabía si un vencimiento o una entrega era de este año o del siguiente.
+// Un solo formato corto en toda la app: «vie 23 oct». Fuera del año en curso lleva el año
+// («jue 15 abr 2027»): sin él no se sabía si un vencimiento era de este año o del siguiente.
+const DIAS_C = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const MESES_C = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
 export const fechaLegible = (s) => {
   const d = new Date(String(s || "").slice(0, 10) + "T00:00:00");
   if (Number.isNaN(d.getTime())) return "—";
   const conAnio = d.getFullYear() !== new Date().getFullYear();
-  return d.toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short", ...(conAnio ? { year: "numeric" } : {}) });
+  return `${DIAS_C[d.getDay()]} ${d.getDate()} ${MESES_C[d.getMonth()]}${conAnio ? ` ${d.getFullYear()}` : ""}`;
 };
+// Documentos (recetas, consentimientos, formularios): siempre con año, sin día de la semana.
+export const fechaDoc = (s) => {
+  const d = new Date(String(s || "").slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${d.getDate()} ${MESES_C[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+/* Campo de fecha que siempre se lee dd/mm/aaaa: el nativo sigue el idioma del navegador
+   y en uno en inglés mostraba «10/23/2026». El calendario sigue siendo el del navegador;
+   encima va el texto con el formato peruano y la misma letra y color del campo. */
+export function CampoFecha({ value, style, className, ...rest }) {
+  const ref = useRef(null), txtRef = useRef(null);
+  useEffect(() => {
+    const i = ref.current, t = txtRef.current;
+    if (!i || !t) return;
+    const c = getComputedStyle(i);
+    t.style.font = c.font; t.style.color = c.color;
+    t.style.left = `${parseFloat(c.paddingLeft) + parseFloat(c.borderLeftWidth)}px`;
+  });
+  const v = String(value || "");
+  const txt = /^\d{4}-\d{2}-\d{2}/.test(v) ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : "dd/mm/aaaa";
+  const ancho = style && (style.width === "100%" || style.flex) ? "100%" : undefined;
+  return (
+    <span className="dc-fecha" style={{ width: ancho, ...(style && style.flex ? { flex: style.flex } : {}) }}>
+      <input ref={ref} type="date" value={value} className={className} style={style} {...rest} />
+      <span ref={txtRef} className={`dc-fecha__txt${v ? "" : " is-vacio"}`} aria-hidden="true">{txt}</span>
+    </span>
+  );
+}
 export const calcEdad = (s) => { if (!s) return null; const b = new Date(s + "T00:00:00"); if (isNaN(b)) return null; let e = hoy.getFullYear() - b.getFullYear(); const m = hoy.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && hoy.getDate() < b.getDate())) e--; return e >= 0 && e < 120 ? e : null; };
 
 /** Concepto de un cobro sin la referencia interna de Izipay que el servidor le pega al final
@@ -1258,9 +1291,9 @@ export const Field = ({ label, value, onChange, placeholder, type = "text", icon
     {label && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", display: "block", marginBottom: 6, letterSpacing: .2 }}>{label}</span>}
     <div style={{ position: "relative" }}>
       {icon && <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--dc-ink-500)", display: "grid", placeItems: "center" }}>{icon}</span>}
-      <input className="dc-premium-inp" type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+      {(() => { const Campo = type === "date" ? CampoFecha : "input"; return <Campo className="dc-premium-inp" {...(type === "date" ? {} : { type })} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
         style={{ width: "100%", minHeight: "var(--dc-tap-min)", padding: icon ? "12px 14px 12px 40px" : "12px 14px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)", fontSize: "var(--dc-fs-md)", outline: "none", boxSizing: "border-box", color: NAVY, transition: "border-color .15s, background .15s, box-shadow .15s" }}
-        onFocus={(e) => { e.target.style.borderColor = "var(--dc-brand-500)"; e.target.style.background = "var(--dc-surface)"; e.target.style.boxShadow = "var(--dc-focus)"; }} onBlur={(e) => { e.target.style.borderColor = "var(--dc-line)"; e.target.style.background = "var(--dc-bg)"; e.target.style.boxShadow = "none"; }} />
+        onFocus={(e) => { e.target.style.borderColor = "var(--dc-brand-500)"; e.target.style.background = "var(--dc-surface)"; e.target.style.boxShadow = "var(--dc-focus)"; }} onBlur={(e) => { e.target.style.borderColor = "var(--dc-line)"; e.target.style.background = "var(--dc-bg)"; e.target.style.boxShadow = "none"; }} />; })()}
     </div>
     {hint && <span style={{ fontSize: 12, color: "var(--dc-ink-500)", marginTop: 5, display: "block" }}>{hint}</span>}
   </label>
@@ -1765,7 +1798,7 @@ export function PersonaCelda({ nombre, sub, size = 34 }) {
   return (
     <span className="dc-tp__quien">
       <span className="dc-rec__av" style={{ width: size, height: size, fontSize: size > 36 ? 13 : 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(nombre || "")}</span>
-      <span style={{ minWidth: 0 }}><b>{nombre || "—"}</b>{sub ? <small>{sub}</small> : null}</span>
+      <span style={{ minWidth: 0 }}><b>{nombrePropio(nombre) || "—"}</b>{sub ? <small>{sub}</small> : null}</span>
     </span>
   );
 }
@@ -1952,7 +1985,6 @@ export function BotonPDF({ onClick, children = "Imprimir", solido = false, chico
     <button type="button" onClick={onClick} title={title} className={`dc-btn-pdf${solido ? " is-solido" : ""}${chico ? " is-chico" : ""}${className ? ` ${className}` : ""}`} {...rest}>
       <span className="dc-btn-pdf__ico" aria-hidden="true"><Printer size={chico ? 12 : 14} strokeWidth={2.1} /></span>
       <span className="dc-btn-pdf__txt">{children}</span>
-      <em className="dc-btn-pdf__tag" aria-hidden="true">PDF</em>
     </button>
   );
 }
@@ -2037,7 +2069,7 @@ export const PacienteBar = ({ pacientes, pacienteId, setPacienteId, modulo, acci
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
             {modulo && <div style={{ fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>{modulo}</div>}
-            <div style={{ fontWeight: 500, color: NAVY, marginBottom: 8 }}>Elige un paciente</div>
+            <div style={{ fontWeight: 500, color: NAVY, marginBottom: 8 }}>Paciente</div>
             <Select width={280} ariaLabel="Paciente" value="" placeholder="Selecciona un paciente…"
                     onChange={(v) => setPacienteId(/^\d+$/.test(String(v)) ? Number(v) : v)}
                     options={[{ value: "", label: "Selecciona un paciente…", disabled: true }, ...pacientes.map((x) => ({ value: x.id, label: x.nombre }))]} />

@@ -16,6 +16,8 @@ import {
   mesesDelPeriodo,
   ritmoDelPeriodo,
   rotuloPeriodo,
+  rotuloMeses,
+  pctTxt,
 } from "./produccionComisionesUtil.js";
 import { deudaDeCaja, tramosDeuda } from "../compartido/metricas.js";
 import { layoutProgreso } from "./panelGerencialUtil.js";
@@ -175,8 +177,28 @@ describe("H-G5: periodo de Producción y comisiones", () => {
     assert.equal(ritmoDelPeriodo("2026-09-01", "2026-09-30", hoy), 100);
     assert.equal(Math.round(ritmoDelPeriodo("2026-10-01", "2026-10-05", hoy)), Math.round((5 / 31) * 100));
   });
-  it("rótulo legible", () => {
-    assert.equal(rotuloPeriodo("2026-05-01", "2026-10-05"), "del 01/05/2026 al 05/10/2026");
+  it("rótulo corto del rango", () => {
+    assert.equal(rotuloPeriodo("2026-05-01", "2026-10-05"), "1 may – 5 oct 2026");
+    assert.equal(rotuloPeriodo("2026-10-01", "2026-10-23"), "1 – 23 oct 2026");
+    assert.equal(rotuloPeriodo("2026-10-23", "2026-10-23"), "23 oct 2026");
+    assert.equal(rotuloPeriodo("2025-12-01", "2026-01-31"), "1 dic 2025 – 31 ene 2026");
+    assert.equal(rotuloPeriodo(null, "2026-10-05"), "");
+  });
+  it("rótulo de los meses del periodo", () => {
+    assert.equal(rotuloMeses("2026-05-01", "2026-10-05"), "may – oct 2026");
+    assert.equal(rotuloMeses("2026-09-01", "2026-09-30"), "set 2026");
+    assert.equal(rotuloMeses("2025-12-01", "2026-01-31"), "dic 2025 – ene 2026");
+  });
+});
+
+describe("porcentajes de una pantalla", () => {
+  it("sin decimales; lo que no es cero no sale «0%»", () => {
+    assert.equal(pctTxt(37.33), "37%");
+    assert.equal(pctTxt(100), "100%");
+    assert.equal(pctTxt(0), "0%");
+    assert.equal(pctTxt(0.2), "<1%");
+    assert.equal(pctTxt(0.5), "1%");
+    assert.equal(pctTxt(null), "—");
   });
 });
 

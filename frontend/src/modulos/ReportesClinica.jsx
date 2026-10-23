@@ -7,11 +7,12 @@ import React, { useContext, useEffect, useMemo, useState } from "react";
 import { BellRing, ClipboardList, Stethoscope, UserPlus, Wallet, Wallet2 } from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
-import { DataTable, DatosDemoCtx, Pestanas, Vacio, mismaSede, useSede } from "../comun";
+import { DataTable, DatosDemoCtx, Pestanas, Vacio, fechaLegible, mismaSede, useSede } from "../comun";
 import * as M from "../compartido/metricas";
 import { fichaDeSede, sedeDeEgreso, sedeEnLista } from "../compartido/cajaSede";
 import { egresoEnSoles, r2, TC_DEFECTO } from "../compartido/cajaMoneda";
 import NoDisponible from "../ui/NoDisponible";
+import { pctTxt, rotuloPeriodo } from "./produccionComisionesUtil";
 
 const PERIODOS = [["hoy", "Hoy"], ["semana", "Esta semana"], ["mes", "Este mes"], ["mes_ant", "Mes anterior"], ["3m", "Últimos 3 meses"], ["anio", "Este año"]];
 const iso = M.isoDe;
@@ -35,8 +36,9 @@ const soles = (n) => `S/ ${M.sol2(n)}`;
 // signo pegado al número, para que el Excel los lea como números y se puedan sumar.
 const soles2 = (n) => `S/ ${M.sol2(n)}`;
 const solesExp = (n) => (n == null ? "" : `${Number(n) < 0 ? "-" : ""}S/ ${Math.abs(Number(n) || 0).toFixed(2)}`);
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const mesTxt = (ym) => { const [y, m] = ym.split("-"); return `${MESES[Number(m) - 1]} ${y.slice(2)}`; };
+// Meses como fechaLegible y con el año entero («oct 2026»; «oct 26» se leía como un día).
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+const mesTxt = (ym) => { const [y, m] = ym.split("-"); return `${MESES[Number(m) - 1]} ${y}`; };
 const servicioBase = (nombre) => String(nombre || "Procedimiento").split(" · ")[0];
 const usd2 = (n) => `US$ ${(Number(n) || 0).toFixed(2)}`;
 /* R5-09: egresos por categoría en soles. Los de dólares se convierten con el tipo de cambio
@@ -56,12 +58,13 @@ function egresosPorCategoria(lista, tcRef) {
   return { filas, soles, usd };
 }
 
+// cant: lo que cuenta cada fila de la tabla («1 procedimiento», no «1 fila»).
 const REPORTES = [
-  { id: "procedimientos", label: "Procedimientos", icon: Stethoscope, sub: "Qué se hizo, cuántas veces y cuánto sumó" },
-  { id: "saldo", label: "Pacientes con saldo", icon: Wallet, sub: "Trabajo hecho sin pagar y saldo del plan, al día de hoy" },
-  { id: "recuperar", label: "Pacientes por recuperar", icon: BellRing, sub: "No vienen hace 6 meses o más y no tienen cita" },
-  { id: "pacientes", label: "Nuevos y atendidos", icon: UserPlus, sub: "Pacientes nuevos, atendidos y recurrentes por mes" },
-  { id: "caja", label: "Ingresos y egresos", icon: Wallet2, sub: "Lo cobrado por medio de pago, los egresos y el neto" },
+  { id: "procedimientos", label: "Procedimientos", icon: Stethoscope, sub: "Qué se hizo, cuántas veces y cuánto sumó", cant: "procedimientos" },
+  { id: "saldo", label: "Pacientes con saldo", icon: Wallet, sub: "Trabajo hecho sin pagar y saldo del plan, al día de hoy", cant: "pacientes" },
+  { id: "recuperar", label: "Pacientes por recuperar", icon: BellRing, sub: "No vienen hace 6 meses o más y no tienen cita", cant: "pacientes" },
+  { id: "pacientes", label: "Nuevos y atendidos", icon: UserPlus, sub: "Pacientes nuevos, atendidos y recurrentes por mes", cant: "meses" },
+  { id: "caja", label: "Ingresos y egresos", icon: Wallet2, sub: "Lo cobrado por medio de pago, los egresos y el neto", cant: "conceptos" },
 ];
 
 export default function ReportesClinica({ pacientes: pacProp = null, citas: citasProp = null, sedes = null }) {
@@ -126,7 +129,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       const filas = dSrv.trat.map((t, i) => ({ id: t.nombre || `t${i}`, nombre: t.nombre || "—", cantidad: Number(t.numeroDeVentas) || 0, importe: Number(t.importeTotal) || 0 }))
         .map((x) => ({ ...x, promedio: x.cantidad ? x.importe / x.cantidad : 0 })).sort((a, b) => b.importe - a.importe);
       const tot = filas.reduce((a, x) => a + x.importe, 0), n = filas.reduce((a, x) => a + x.cantidad, 0);
-      return { filas: filas.map((x) => ({ ...x, parte: tot ? (x.importe / tot) * 100 : 0 })), kpis: [["Procedimientos", String(n)], ["Importe", soles(tot)], ["Precio promedio", soles(n ? tot / n : 0)], ["Tipos distintos", String(filas.length)]], cifra: soles(tot), etiqueta: "en procedimientos realizados" };
+      return { filas: filas.map((x) => ({ ...x, parte: tot ? (x.importe / tot) * 100 : 0 })), kpis: [["Realizados", String(n)], ["Tipos distintos", String(filas.length)]], cifra: soles(tot), etiqueta: "en procedimientos realizados" };
     }
     const nombreDe = (id) => (dSrv.pac || []).find((p) => String(p.id) === String(id))?.nombre || "Paciente";
     if (rep === "saldo") {
@@ -146,7 +149,8 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       const sum = (k) => filas.reduce((a, f) => a + (Number(f[k]) || 0), 0);
       const conDetalle = filas.some((f) => f.porCobrar != null);
       const conVencido = filas.some((f) => f.vencido != null);
-      return { filas, kpis: [["Pacientes", String(filas.length)], ["Hecho sin pagar", conDetalle ? soles2(sum("porCobrar")) : "—"], ["Vencido (+30 días)", conVencido ? soles2(sum("vencido")) : "—"], ["Saldo de planes", soles2(sum("saldoPlan"))]], cifra: soles2(conDetalle ? sum("porCobrar") : sum("saldoPlan")), etiqueta: conDetalle ? "por cobrar de trabajo ya hecho" : "de saldo en planes de tratamiento", sinDetalle: !conVencido && filas.length > 0, sinPorCobrar: !conDetalle, conDetalle: conDetalle && filas.length > 0 };
+      // La cifra grande no se repite abajo; lo que el servidor no informa no sale como «—».
+      return { filas, kpis: [["Pacientes", String(filas.length)], ...(conVencido ? [["Vencido (+30 días)", soles2(sum("vencido"))]] : []), ...(conDetalle ? [["Saldo de planes", soles2(sum("saldoPlan"))]] : [])], cifra: soles2(conDetalle ? sum("porCobrar") : sum("saldoPlan")), etiqueta: conDetalle ? "por cobrar de trabajo ya hecho" : "de saldo en planes de tratamiento", sinDetalle: !conVencido && filas.length > 0, sinPorCobrar: !conDetalle, conDetalle: conDetalle && filas.length > 0 };
     }
     if (rep === "recuperar") {
       const res = new Map(dSrv.res.map((x) => [String(x.pacienteId), x]));
@@ -157,7 +161,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
         .filter((p) => p.ultima && !p._proxima);
       const filas = M.porReactivar(base, [], { hoy }).map((p) => ({ id: p.id, paciente: p.nombre, ultima: p.ultima, meses: p.meses, telefono: p.telefono || p.celular || "—" })).sort((a, b) => b.meses - a.meses);
       const sinTel = filas.filter((f) => f.telefono === "—").length;
-      return { filas, kpis: [["Para llamar", String(filas.length)], ["Más de 12 meses", String(filas.filter((f) => f.meses >= 12).length)], ["Sin teléfono", String(sinTel)]], cifra: String(filas.length), etiqueta: "pacientes por recuperar" };
+      return { filas, kpis: [["Más de 12 meses", String(filas.filter((f) => f.meses >= 12).length)], ["Sin teléfono", String(sinTel)]], cifra: String(filas.length), etiqueta: "pacientes por recuperar" };
     }
     if (rep === "pacientes") {
       // Atendidos: citas atendidas del periodo (GET /citas). «Nuevo» exige la primera visita
@@ -174,7 +178,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       const filas = [...meses.values()].sort((a, b) => a.id.localeCompare(b.id)).map((a) => ({ id: a.id, mes: a.mes, atendidos: a.atendidos.size, nuevos: conPrimera ? a.nuevos.size : null, recurrentes: conPrimera ? a.atendidos.size - a.nuevos.size : null }));
       const atT = new Set(at.map((c) => String(c.pacienteId ?? c.paciente))).size;
       const nuT = filas.reduce((a, f) => a + (f.nuevos || 0), 0);
-      return { filas, kpis: [["Pacientes atendidos", String(atT)], ["Nuevos", conPrimera ? String(nuT) : "—"], ["Recurrentes", conPrimera ? String(Math.max(0, atT - nuT)) : "—"], ["Nuevos del total", conPrimera && atT ? `${Math.round((nuT / atT) * 100)}%` : "—"]], cifra: String(atT), etiqueta: "pacientes atendidos", sinPrimera: !conPrimera };
+      return { filas, kpis: conPrimera ? [["Nuevos", String(nuT)], ["Recurrentes", String(Math.max(0, atT - nuT))], ["Nuevos del total", atT ? pctTxt((nuT / atT) * 100) : "—"]] : [], cifra: String(atT), etiqueta: "pacientes atendidos", sinPrimera: !conPrimera };
     }
     // caja: cobros (GET /pagos/historial) por medio de pago y egresos (GET /egresos) por categoría.
     const ing = new Map(); let ingTot = 0;
@@ -189,7 +193,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       ...[...ing.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ id: `i-${k}`, tipo: "Ingreso", concepto: `Cobros · ${k}`, monto: v })),
       ...eg.filas,
     ];
-    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)], ["Neto", `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)",
+    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)",
       notaUsd: eg.usd ? `Los egresos en dólares (${usd2(eg.usd)}) se suman en soles con el tipo de cambio guardado en cada egreso o, si no lo tiene, con el de la clínica (S/ ${tcRef.toFixed(2)} por dólar).` : null };
   }, [conectado, dSrv, rep, clave]); // eslint-disable-line react-hooks/exhaustive-deps
   // Aviso honesto de lo que el servidor todavía no informa. R6-02: /tratamientos/resumen ya
@@ -213,17 +217,17 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       }
       const filas = [...g.values()].map((x) => ({ ...x, promedio: x.cantidad ? x.importe / x.cantidad : 0 })).sort((a, b) => b.importe - a.importe);
       const tot = filas.reduce((a, x) => a + x.importe, 0), n = filas.reduce((a, x) => a + x.cantidad, 0);
-      return { filas: filas.map((x) => ({ ...x, parte: tot ? (x.importe / tot) * 100 : 0 })), kpis: [["Procedimientos", String(n)], ["Importe", soles(tot)], ["Precio promedio", soles(n ? tot / n : 0)], ["Tipos distintos", String(filas.length)]], cifra: soles(tot), etiqueta: "en procedimientos realizados" };
+      return { filas: filas.map((x) => ({ ...x, parte: tot ? (x.importe / tot) * 100 : 0 })), kpis: [["Realizados", String(n)], ["Tipos distintos", String(filas.length)]], cifra: soles(tot), etiqueta: "en procedimientos realizados" };
     }
     if (rep === "saldo") {
       const c = M.cartera(fichas, pacientes, { hoy });
       const filas = c.filas.filter((f) => f.porCobrar > 0 || f.saldoPlan > 0).map((f) => ({ id: f.p.id, paciente: f.p.nombre, porCobrar: f.porCobrar, vencido: f.vencido, saldoPlan: f.saldoPlan, dias: f.porCobrarItems.reduce((a, it) => Math.max(a, it.dias || 0), 0) })).sort((a, b) => b.porCobrar - a.porCobrar);
-      return { filas, kpis: [["Pacientes", String(filas.length)], ["Hecho sin pagar", soles(c.porCobrar)], ["Vencido (+30 días)", soles(c.vencido)], ["Saldo de planes", soles(c.saldoPlan)]], cifra: soles(c.porCobrar), etiqueta: "por cobrar de trabajo ya hecho" };
+      return { filas, kpis: [["Pacientes", String(filas.length)], ["Vencido (+30 días)", soles(c.vencido)], ["Saldo de planes", soles(c.saldoPlan)]], cifra: soles(c.porCobrar), etiqueta: "por cobrar de trabajo ya hecho" };
     }
     if (rep === "recuperar") {
       const filas = M.porReactivar(pacientes, citas, { hoy }).map((p) => ({ id: p.id, paciente: p.nombre, ultima: p.ultima, meses: p.meses, telefono: p.telefono || p.celular || "—" })).sort((a, b) => b.meses - a.meses);
       const sinTel = filas.filter((f) => f.telefono === "—").length;
-      return { filas, kpis: [["Para llamar", String(filas.length)], ["Más de 12 meses", String(filas.filter((f) => f.meses >= 12).length)], ["Sin teléfono", String(sinTel)]], cifra: String(filas.length), etiqueta: "pacientes por recuperar" };
+      return { filas, kpis: [["Más de 12 meses", String(filas.filter((f) => f.meses >= 12).length)], ["Sin teléfono", String(sinTel)]], cifra: String(filas.length), etiqueta: "pacientes por recuperar" };
     }
     if (rep === "pacientes") {
       const at = citas.filter((c) => c.estado === "atendida");
@@ -239,7 +243,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       const filas = [...meses.values()].sort((a, b) => a.id.localeCompare(b.id)).map((a) => ({ id: a.id, mes: a.mes, atendidos: a.atendidos.size, nuevos: a.nuevos.size, recurrentes: a.atendidos.size - a.nuevos.size }));
       const atT = new Set(at.filter((c) => enRango(c.fecha, r)).map((c) => String(c.pacienteId ?? c.paciente))).size;
       const nuT = filas.reduce((a, f) => a + f.nuevos, 0);
-      return { filas, kpis: [["Pacientes atendidos", String(atT)], ["Nuevos", String(nuT)], ["Recurrentes", String(Math.max(0, atT - nuT))], ["Nuevos del total", atT ? `${Math.round((nuT / atT) * 100)}%` : "—"]], cifra: String(atT), etiqueta: "pacientes atendidos" };
+      return { filas, kpis: [["Nuevos", String(nuT)], ["Recurrentes", String(Math.max(0, atT - nuT))], ["Nuevos del total", atT ? pctTxt((nuT / atT) * 100) : "—"]], cifra: String(atT), etiqueta: "pacientes atendidos" };
     }
     // caja
     const ing = new Map(); let ingTot = 0;
@@ -253,7 +257,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       ...[...ing.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ id: `i-${k}`, tipo: "Ingreso", concepto: `Cobros · ${k}`, monto: v })),
       ...eg.filas,
     ];
-    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)], ["Neto", `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)",
+    return { filas, kpis: [["Ingresos", soles(ingTot)], ["Egresos", soles(egrTot)]], cifra: `${ingTot - egrTot < 0 ? "− " : ""}${soles(Math.abs(ingTot - egrTot))}`, etiqueta: "neto de caja (soles)",
       notaUsd: eg.usd ? `Los egresos en dólares (${usd2(eg.usd)}) se suman en soles con el tipo de cambio guardado en cada egreso.` : null };
   }, [rep, per, fichas, pacientes, citas, egresos]); // eslint-disable-line
   const datos = conectado ? datosSrv : datosDemo;
@@ -264,7 +268,8 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       { key: "cantidad", label: "Cantidad", w: "110px", a: "right", get: (x) => x.cantidad },
       { key: "promedio", label: "Precio promedio", w: "150px", a: "right", get: (x) => Math.round(x.promedio), cell: (x) => soles(x.promedio), exportar: (x) => solesExp(x.promedio) },
       { key: "importe", label: "Importe", w: "140px", a: "right", get: (x) => x.importe, cell: (x) => <b>{soles(x.importe)}</b>, exportar: (x) => solesExp(x.importe) },
-      { key: "parte", label: "Parte del total", w: "minmax(160px,1fr)", get: (x) => Math.round(x.parte), cell: (x) => <span className="dc-rcx__bar"><i style={{ width: `${x.parte}%` }} /><em>{x.parte.toFixed(1)}%</em></span> },
+      // Numérica: encabezado y valor a la derecha; % sin decimales, como el resto de la pantalla.
+      { key: "parte", label: "Parte del total", w: "minmax(160px,1fr)", a: "right", get: (x) => Math.round(x.parte), cell: (x) => <span className="dc-rcx__bar"><i style={{ width: `${x.parte}%` }} /><em>{pctTxt(x.parte)}</em></span> },
     ],
     saldo: [
       { key: "paciente", label: "Paciente", w: "minmax(200px,1.5fr)", a: "left", get: (x) => x.paciente, cell: (x) => <b style={{ color: "var(--dc-navy)" }}>{x.paciente}</b> },
@@ -275,7 +280,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     ].filter((c) => !(conectado && (c.key === "vencido" || c.key === "dias") && datos.filas.length && datos.filas.every((f) => f[c.key] == null))),
     recuperar: [
       { key: "paciente", label: "Paciente", w: "minmax(200px,1.5fr)", a: "left", get: (x) => x.paciente, cell: (x) => <b style={{ color: "var(--dc-navy)" }}>{x.paciente}</b> },
-      { key: "ultima", label: "Última visita", w: "150px", a: "left", get: (x) => x.ultima, cell: (x) => M.fechaDoc(x.ultima) },
+      { key: "ultima", label: "Última visita", w: "150px", a: "left", get: (x) => x.ultima, cell: (x) => fechaLegible(x.ultima) },
       { key: "meses", label: "Meses sin venir", w: "140px", a: "right", get: (x) => x.meses },
       { key: "telefono", label: "Teléfono", w: "160px", a: "left", get: (x) => x.telefono },
     ],
@@ -293,7 +298,8 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
     ],
   }[rep];
   const R = REPORTES.find((x) => x.id === rep);
-  const periodoTxt = r.desde === r.hasta ? M.fechaDoc(r.desde) : `${M.fechaDoc(r.desde)} al ${M.fechaDoc(r.hasta)}`;
+  // «vie 23 oct» o un rango corto («1 – 23 oct 2026»).
+  const periodoTxt = r.desde === r.hasta ? fechaLegible(r.desde) : rotuloPeriodo(r.desde, r.hasta);
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -316,7 +322,7 @@ export default function ReportesClinica({ pacientes: pacProp = null, citas: cita
       {datos.error && <NoDisponible bloque onReintentar={reintentar} texto="Reporte no disponible" detalle="No se pudieron obtener los datos del servidor para este reporte. Las cifras de arriba no son ceros: faltan los datos." />}
       {avisoSrv && <div className="fm-aviso-edad is-info"><ClipboardList size={15} strokeWidth={2} /><span>{avisoSrv}</span></div>}
       {datos.notaUsd && <div className="fm-aviso-edad is-info"><Wallet2 size={15} strokeWidth={2} /><span>{datos.notaUsd}</span></div>}
-      <DataTable titulo={R.label} sub="filas" rows={datos.filas} cols={cols} minWidth={720} exportTitulo={`${R.label}${usaPeriodo ? ` · ${periodoTxt}` : ""}`}
+      <DataTable titulo={R.label} sub={R.cant} rows={datos.filas} cols={cols} minWidth={720} exportTitulo={`${R.label}${usaPeriodo ? ` · ${periodoTxt}` : ""}`}
         accion={rep === "recuperar" && datos.filas.length ? <button type="button" className="dc-rcx__ir" onClick={() => { window.location.hash = "#/recall"; }}><BellRing size={13} strokeWidth={2} /> Ir a Recordatorios</button> : null}
         empty={datos.cargando ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Cargando…" sub="Pidiendo los datos al servidor." /> : datos.error ? <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="No disponible" sub="No se pudo obtener este reporte. Pulsa «Reintentar» arriba." /> : <Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo={rep === "recuperar" ? "Nadie por recuperar" : rep === "saldo" ? "Nadie debe" : "Sin datos en este periodo"} sub={rep === "recuperar" ? "Todos los pacientes vinieron en los últimos 6 meses o ya tienen cita." : rep === "saldo" ? "No hay trabajo hecho sin pagar ni saldos de planes." : "Prueba con un periodo más amplio."} />} />
     </div>

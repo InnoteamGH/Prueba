@@ -9,23 +9,28 @@ import { Check, Info, MapPin, Minus, Plus, RotateCcw, Target, TrendingUp } from 
 import api, { auth, msgServidor } from "../api/client";
 import { Card, ESPECIALIDADES, MEDICOS, SEDE_IDS, Vacio, colorDe, iniciales, mismaSede, nombreSede, tint, useSede } from "../comun";
 import { guardarMetaSedeDemo, metaSede, sedesMed } from "../compartido/medicosSede";
-import { NOTA_COMISION_GLOBAL, comisionMedico, cuerpoMetaSede, puedeEditarComision } from "../util/metasComision";
+import { comisionMedico, cuerpoMetaSede, puedeEditarComision } from "../util/metasComision";
 import { atiendeEnSedes } from "../compartido/medicoEnSede";
 import { sedeApiUuid } from "../routing";
 import NoDisponible from "../ui/NoDisponible";
+import "./reportes.css";
 
 const soles = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const miles = (v) => (v === "" || v == null ? "" : Number(v).toLocaleString("es-PE"));
+// Al salir del campo, el monto se lee como el resto («1,500.00», no «1,500»).
+const miles = (v) => (v === "" || v == null ? "" : Number(v).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+// La comisión es del odontólogo, igual en todas sus sedes (la regla, en util/metasComision.js).
+const NOTA_COMISION = "La comisión es igual en todas las sedes del odontólogo; la cambia el administrador general en «Todas las sedes».";
 const k = (mid, sid) => `${mid}:${sid}`;
 
 /* Monto con separador de miles; al editar se ve el número limpio. */
 function Monto({ value, onChange, disabled, label }) {
   const [foco, setFoco] = useState(false);
+  const vacio = value === "" || value == null;
   return (
     <label className={`dc-mtz__monto${disabled ? " is-off" : ""}`}>
-      <span>S/</span>
-      {/* «S/ Sin meta» se leía raro: el placeholder es solo el número de ejemplo. */}
-      <input type="text" inputMode="numeric" disabled={disabled} aria-label={label} placeholder="0"
+      {/* Vacío, la ayuda va en el campo («Define la meta»), sin «S/» delante ni un «0» gris. */}
+      {(!vacio || foco) && <span>S/</span>}
+      <input type="text" inputMode="numeric" disabled={disabled} aria-label={label} placeholder={disabled ? "Sin meta" : "Define la meta"}
         value={foco ? (value ?? "") : miles(value)}
         onFocus={(e) => { setFoco(true); requestAnimationFrame(() => e.target.select()); }}
         onBlur={() => setFoco(false)}
@@ -266,8 +271,8 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
         ? <>El servidor no indica en qué sede atiende cada doctor: se muestran los que tienen horario en la sede elegida (Configuración › Horarios por doctor).{ocultosSinHorario.length ? ` ${ocultosSinHorario.length === 1 ? "1 doctor sin horario aquí no se lista" : `${ocultosSinHorario.length} doctores sin horario aquí no se listan`}${usuarioGlobal ? ": están en «Todas las sedes»." : ": su meta la fija quien administra su sede."}` : ""}</>
         : <>El servidor no indica en qué sede atiende cada doctor: {sinSede.length === 1 ? "este doctor se muestra" : `estos ${sinSede.length} doctores se muestran`} en la sede elegida. Indícalo en Configuración › Doctores.</>}</span></div>}
       {puedeEditar && medsBloqueados.length > 0 && <div className="fm-aviso-edad" role="note"><Info size={15} strokeWidth={2} /><span>El servidor no deja guardar metas de médicos sin sede asignada, y no indica la sede de {medsBloqueados.length === 1 ? "este doctor" : `estos ${medsBloqueados.length} doctores`}: {medsBloqueados.length === 1 ? "su meta y su comisión se ven" : "sus metas y comisiones se ven"} en solo lectura. Las fija el administrador general.</span></div>}
-      {!puedeComGlobal && grupos.length > 0 && !todasBloqueadas && <div className="fm-aviso-edad" role="note" data-nota-comision><Info size={15} strokeWidth={2} /><span>{puedeEditar ? "Puedes fijar la meta de cada odontólogo en esta sede. " : ""}{NOTA_COMISION_GLOBAL}</span></div>}
-      {puedeComGlobal && grupos.length > 0 && <div className="fm-aviso-edad is-info" role="note"><Info size={15} strokeWidth={2} /><span>El % de comisión es del médico en todas sus sedes: si lo cambias en una fila, cambia en todas las suyas.</span></div>}
+      {!puedeComGlobal && grupos.length > 0 && !todasBloqueadas && <div className="fm-aviso-edad" role="note" data-nota-comision><Info size={15} strokeWidth={2} /><span>{puedeEditar ? "Puedes fijar la meta de cada odontólogo en esta sede. " : ""}{NOTA_COMISION}</span></div>}
+      {puedeComGlobal && grupos.length > 0 && <div className="fm-aviso-edad is-info" role="note"><Info size={15} strokeWidth={2} /><span>La comisión es igual en todas las sedes del odontólogo: si la cambias en una fila, cambia en todas las suyas.</span></div>}
       {conectado && !error && meds.length === 0 && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo="Sin odontólogos" sub="Regístralos en Configuración, Doctores." /></Card>}
       {sinDocsAqui && <Card><Vacio icon={<Target size={22} strokeWidth={1.75} />} titulo={vistaUnica ? `Ningún doctor tiene horario en ${nomSede(vistaUnica)}` : "Ningún doctor tiene horario en estas sedes"} sub="La meta se fija para los doctores que atienden en la sede. Carga su horario en Configuración › Horarios por doctor." /></Card>}
 
@@ -303,10 +308,12 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
                       <span className="dc-mtz__av" style={{ background: `linear-gradient(135deg, ${tint(col, 0.22)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(m.nombre.replace(/^Dra?\.\s*/, ""))}</span>
                       <span className="dc-mtz__dn"><b>{m.nombre}{cambio && <em className="dc-mtz__tag">Editado</em>}</b><small>{nomEsp(m)}{m.sinSede && !esGlobal ? <> · <i>sede no indicada por el servidor{bloq ? ": solo lectura" : ""}</i></> : null}{otras.length ? <> · <i>también en {otras.map((s) => nomSede(s).replace(/^Sede\s+/i, "")).join(", ")}</i></> : null}</small></span>
                     </span>
-                    <span role="cell" title={tituloBloq}><Monto value={draft[key]?.meta} disabled={!puedeEditar || bloq} label={`Meta mensual de ${m.nombre} en ${nomSede(g.sede)}`} onChange={(v) => set(key, "meta", v)} /></span>
-                    <span role="cell"><Porcentaje value={draft[key]?.com} disabled={!puedeComGlobal || bloq} title={tituloBloq || (!puedeComGlobal ? `Solo lectura. ${NOTA_COMISION_GLOBAL}` : undefined)} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>
-                    <span role="cell" className="dc-mtz__gana">{/* H-G10: pide solo lo que falta (antes decía «Define meta y %» con el % ya en 40). */}{met && pc != null ? <><b>{soles((met * pc) / 100)}</b><small>{pc}% de {soles(met)}</small></> : <small>{!met && pc == null ? "Define meta y %" : !met ? `Define la meta (comisión ${pc}%)` : `Define el % (meta ${soles(met)})`}</small>}</span>
-                    <span role="cell" className="dc-mtz__parte"><i><u style={{ width: `${parte}%`, background: col }} /></i><b>{parte ? `${parte}%` : "—"}</b></span>
+                    {/* data-rot: en celular no hay encabezados y cada cifra lleva su rótulo (reportes.css). */}
+                    <span role="cell" data-rot="Meta mensual" title={tituloBloq}><Monto value={draft[key]?.meta} disabled={!puedeEditar || bloq} label={`Meta mensual de ${m.nombre} en ${nomSede(g.sede)}`} onChange={(v) => set(key, "meta", v)} /></span>
+                    <span role="cell" data-rot="Comisión"><Porcentaje value={draft[key]?.com} disabled={!puedeComGlobal || bloq} title={tituloBloq || (!puedeComGlobal ? `Solo lectura. ${NOTA_COMISION}` : undefined)} label={`comisión de ${m.nombre}`} onChange={(v) => set(key, "com", v)} /></span>
+                    {/* Sin meta o sin %, «—»: lo que falta se pide en el propio campo. */}
+                    <span role="cell" data-rot="Gana al cumplir" className="dc-mtz__gana">{met && pc != null ? <><b>{soles((met * pc) / 100)}</b><small>{pc}% de {soles(met)}</small></> : <small>—</small>}</span>
+                    <span role="cell" data-rot="Parte de la meta" className="dc-mtz__parte"><i><u style={{ width: `${parte}%`, background: col }} /></i><b>{parte ? `${parte}%` : "—"}</b></span>
                   </div>
                 );
               })}
@@ -315,7 +322,7 @@ export default function Metas({ notify = () => {}, can, sedes = null, rol = auth
         );
       })}
 
-      <p className="dc-mtz__nota"><Info size={13} strokeWidth={2} /><span>La comisión es el % del médico sobre su producción en cada sede: el valor de los procedimientos terminados, al precio de esa sede. Quién va al ritmo y cuánto lleva ganado está en <b>Reportes › Producción y comisiones</b>.</span></p>
+      <p className="dc-mtz__nota"><Info size={13} strokeWidth={2} /><span>La comisión es el % del odontólogo sobre su producción en cada sede: el valor de los procedimientos terminados, al precio de esa sede. Quién va al ritmo y cuánto lleva ganado está en <b>Reportes › Producción y comisiones</b>.</span></p>
 
       {puedeEditar && cambiados.length > 0 && (
         <div className="dc-mtz__barra" role="region" aria-label="Cambios sin guardar">

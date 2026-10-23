@@ -210,11 +210,20 @@
 .dc-pg .dc-pgacc:last-child{border-bottom:none}
 .dc-pg .dc-pgacc:hover{background:var(--dc-bg-alt)}
 .dc-pg .rail{width:3px;align-self:stretch;border-radius:2px;flex:none;min-height:32px}
-.dc-pg .dc-pgacc__txt{min-width:0;flex:1;max-width:78%}
+.dc-pg .dc-pgacc__txt{min-width:0;flex:1}
 .dc-pg .dc-pgacc h3{font-size:var(--dc-fs-sm);line-height:var(--dc-lh-sm);font-weight:var(--dc-fw-semibold);
   font-family:var(--dc-font)}
 .dc-pg .dc-pgacc p{margin:2px 0 0;font-size:var(--dc-fs-xs);line-height:var(--dc-lh-xs);color:var(--dc-ink-500)}
-.dc-pg .dc-pgacc .dc-chip{min-width:74px;justify-content:center}
+/* la cifra del asunto es un dato, no un botón; la acción es el botón secundario del panel */
+.dc-pg .dc-pgacc__cif{flex:none;font-size:var(--dc-fs-sm);font-weight:var(--dc-fw-semibold);
+  color:var(--dc-ink-900);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dc-pg .dc-pgacc .dc-btn{flex:none}
+/* en celular, cifra y botón bajan a su propia línea, alineados con el texto */
+@media (max-width:640px){
+.dc-pg .dc-pgacc{flex-wrap:wrap;row-gap:var(--dc-sp-2)}
+.dc-pg .dc-pgacc__txt{flex-basis:calc(100% - 15px)}
+.dc-pg .dc-pgacc__txt + *{margin-left:15px}
+}
 /* ── registro en vivo ── */
 .dc-pg .log{font-size:var(--dc-fs-sm);height:264px;overflow:hidden;position:relative}
 .dc-pg .lg{display:grid;grid-template-columns:46px 90px 1fr;gap:var(--dc-sp-3);padding:7px 0;
@@ -587,8 +596,7 @@
 .dc-pg .dc-kpi__value { font-size: 20px; }
 .dc-pg .dc-kpi__sub { font-size: 12px; margin-top: 1px; }
 /* ── Hoy en la clínica ── */
-.dc-pg .dc-hoy__ver{all:unset;cursor:pointer;font-size:12px;font-weight:600;color:var(--dc-brand-600);padding:4px 10px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--dc-line)}
-.dc-pg .dc-hoy__ver:hover{background:var(--dc-bg-alt)}
+.dc-pg .dc-hoy .dc-card__head .dc-btn{margin-left:auto}
 .dc-pg .dc-hoy__kpis{display:grid;grid-template-columns:1fr;gap:10px}
 .dc-pg .dc-hoy__kpis .dc-kpi{margin:0;box-shadow:none;border:1px solid var(--dc-line);padding:12px 14px}
 .dc-pg .dc-hoy__kpis .dc-kpi__value{font-size:20px}
@@ -605,8 +613,9 @@
 .dc-pg .dc-acep{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
 .dc-pg .dc-acep>div{padding:14px 16px;border-radius:14px;background:var(--dc-bg-soft,#F4F9F9);border:1px solid var(--dc-line)}
 .dc-pg .dc-acep b{display:block;font:800 26px/1.1 var(--dc-font-title);color:var(--dc-navy);font-variant-numeric:tabular-nums}
-.dc-pg .dc-acep>div:first-child b{color:var(--dc-ok-700)}
 .dc-pg .dc-acep span{display:block;margin-top:4px;font-size:12px;color:var(--dc-ink-500)}
+/* en celular las dos cifras van una bajo otra: lado a lado, el monto se salía de la tarjeta */
+@media (max-width:640px){.dc-pg .dc-acep{grid-template-columns:1fr}}
 /* Por tratamiento: columnas equilibradas y campaña más compacta */
 .dc-pg .dc-split--trat .camp__nom{font-size:15px;line-height:1.25}
 .dc-pg .dc-split--trat .camp__f{padding:10px 12px}
@@ -621,6 +630,18 @@
 .dc-pg .dc-hoy__tl{font-size:13px;font-weight:600;color:var(--dc-ink-700)}
 .dc-pg .dc-hoy__ts{grid-column:1;font-size:12px;color:var(--dc-ink-500)}
 .dc-pg .dc-hoy__tv{grid-column:2;grid-row:1 / span 2;font:800 20px/1 var(--dc-font-title);color:var(--dc-navy);font-variant-numeric:tabular-nums}
+/* Flujo del día sin horario: el rótulo y el botón a Configuración en una fila */
+.dc-pg .dc-flujo__falta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  gap:var(--dc-sp-2) var(--dc-sp-3);margin:0 0 var(--dc-sp-4)}
+.dc-pg .dc-flujo__falta .dc-rotulo{margin:0}
+/* Cubo de pacientes: en celular, la lista de a quién llamar en lugar del cubo 3D */
+.dc-pg .dc-cubo__cifras{margin-top:var(--dc-sp-4);padding-top:var(--dc-sp-3);border-top:1px solid var(--dc-line)}
+.dc-pg .dc-cubo__lista{display:none}
+@media (max-width:640px){
+.dc-pg .dc-cubo .dc-rotulo, .dc-pg .dc-cubo .ejes, .dc-pg .dc-cubo .lienzo{display:none}
+.dc-pg .dc-cubo__cifras{margin-top:0;padding-top:0;border-top:0}
+.dc-pg .dc-cubo__lista{display:block}
+}
 /* Tops más compactos */
 .dc-rm__rank li{padding:7px 10px;row-gap:5px}
 /* R4-01: rótulo de los bloques que el servidor aún no filtra por sede (cifras de toda la clínica). */

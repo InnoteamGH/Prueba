@@ -28,17 +28,18 @@ export function pctOfTotal(valor, total) {
 /**
  * Layout de barra de progreso / segmento.
  * Valor 0 → no dibujar. Escala relativa al total del grupo.
+ * La etiqueta es un entero, con el criterio de pctTxt de Producción y comisiones («0%», «37%»,
+ * y «<1%» para lo que no es cero pero redondearía a 0). Antes, sin valor decía «sin saldo».
  * @returns {{ dibujar: boolean, pct: number, etiquetaPct: string }}
  */
 export function layoutProgreso(valor, total) {
   const v = Number(valor) || 0;
   const t = Number(total) || 0;
   if (v <= 0 || t <= 0) {
-    return { dibujar: false, pct: 0, etiquetaPct: "sin saldo" };
+    return { dibujar: false, pct: 0, etiquetaPct: "0%" };
   }
   const pct = pctOfTotal(v, t);
-  const etiquetaPct = `${pct.toFixed(pct >= 10 || pct === Math.round(pct) ? 1 : 1)}%`.replace(/\.0%$/, "%");
-  return { dibujar: true, pct, etiquetaPct: `${Math.round(pct * 10) / 10}%` };
+  return { dibujar: true, pct, etiquetaPct: pct < 0.5 ? "<1%" : `${Math.round(pct)}%` };
 }
 
 /** Layout de una serie: cada ítem escala al total; la suma de pct dibujados ≈ 100. */
@@ -214,6 +215,16 @@ export function metaDeSede(ranking, medicos) {
   return (Array.isArray(ranking) ? ranking : []).filter((r) => medicos.has(idMed(r))).reduce((a, r) => a + (Number(r?.meta) || 0), 0);
 }
 
+/* La producción del mes que el ranking no reparte entre los doctores (procedimientos sin
+   odontólogo asignado) va como una fila más del equipo. Antes «Top del equipo» decía «Sin
+   producción del equipo este mes» con S/ 220 de «Producción del mes» en la misma pantalla. */
+export function rankingConSinAsignar(ranking, produccionMes) {
+  const lista = Array.isArray(ranking) ? ranking : [];
+  const repartido = lista.reduce((a, r) => a + (Number(r?.produccion) || 0), 0);
+  const resto = Math.round(((Number(produccionMes) || 0) - repartido) * 100) / 100;
+  return resto > 0 ? [...lista, { medicoId: null, nombre: "Sin odontólogo asignado", produccion: resto, meta: 0, atendidas: 0 }] : lista;
+}
+
 /* R8-06: con una sede elegida, el pie del Panel decía «Inventario valorizado S/ 1 749», la cifra
    de toda la clínica: los 5 insumos no tienen sede y entraban en todas. Ahora la cifra de la sede
    suma solo los insumos de esa sede, y los que no tienen sede se informan aparte (no son de
@@ -241,7 +252,7 @@ export function valorInventario(items, { enSede = null, costoDe = costoApi } = {
 
 /** Producción por especialidad a partir del resumen de tratamientos y el catálogo:
  *  [{ nombre, valor }] de mayor a menor. Lo que no se reconoce va a «Sin especialidad». */
-export function produccionPorEspecialidad(lista, servicios, sinEsp = "Sin especialidad en el catálogo") {
+export function produccionPorEspecialidad(lista, servicios, sinEsp = "Sin especialidad") {
   const acc = new Map();
   for (const t of Array.isArray(lista) ? lista : []) {
     const v = Number(t?.importeTotal) || 0;

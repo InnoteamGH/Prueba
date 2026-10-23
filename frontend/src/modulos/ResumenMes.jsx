@@ -13,12 +13,13 @@
  * Demo: cifras de ejemplo coherentes con el equipo de demostración.
  */
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, Target, Trophy, Users, Wallet } from "lucide-react";
+import { Receipt, Target, TrendingUp, Trophy, Users, Wallet } from "lucide-react";
 import api, { auth } from "../api/client";
 import { DatosDemoCtx, MEDICOS, mismaSede } from "../comun";
 import { salidasMes } from "../compartido/metricas";
 import { medicoEnSedes } from "../compartido/medicosSede";
-import { equipoDeSede, metaDeSede, totalResumen } from "./panelGerencialUtil";
+import { equipoDeSede, metaDeSede, moneyFmt, totalResumen } from "./panelGerencialUtil";
+import { pctTxt, rotuloPeriodo } from "./produccionComisionesUtil";
 import NoDisponible from "../ui/NoDisponible";
 
 const soles = (n) => "S/ " + (Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -131,6 +132,7 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
   const neto = d.facturado - d.salidas;
   const delta = d.anterior ? ((d.facturado - d.anterior) / d.anterior) * 100 : null;
   const maxTop = Math.max(1, ...d.top.map((t) => t.importe));
+  const totTop = d.top.reduce((a, x) => a + x.importe, 0);
   const equipo = [...d.equipo].sort((a, b) => (b.meta ? b.prod / b.meta : 0) - (a.meta ? a.prod / a.meta : 0));
   // Rótulo solo para la meta cuando no se sabe qué doctores atienden en la sede elegida (sin
   // horario a la vista): entonces vale la de toda la clínica.
@@ -141,40 +143,41 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
       <div className="dc-rm__hero">
       <header className="dc-rm__tit">
         <h2>Resumen de {MESES[hoy.getMonth()]}</h2>
-        <span>Del 1 al {hoy.getDate()} · día {hoy.getDate()} de {diasMes}</span>
+        <span>{rotuloPeriodo(desde, hasta)} · día {hoy.getDate()} de {diasMes}</span>
         {acciones && <div className="dc-rm__acc">{acciones}</div>}
       </header>
 
       <div className="dc-rm__kpis">
         <article className="dc-rm__kpi" style={{ "--c": "#0E9199" }}>
-          <span className="dc-rm__ico"><ArrowDownRight size={18} strokeWidth={2.2} /></span>
+          <span className="dc-rm__ico"><TrendingUp size={18} strokeWidth={2.2} /></span>
           <small>Producción del mes</small>
           <b>{sinFacturado ? "—" : soles(d.facturado)}</b>
-          <em>{sinFacturado ? nd({ texto: "Ventas por tratamiento no disponibles" }) : delta == null ? (conectado ? "Suma del Top de tratamientos; sin mes anterior para comparar" : "Sin mes anterior para comparar") : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%</i> vs. mes anterior</>}</em>
+          <em>{sinFacturado ? nd({ texto: "Ventas por tratamiento no disponibles" }) : delta == null ? "Sin mes anterior para comparar" : <><i className={delta >= 0 ? "is-up" : "is-down"}>{delta >= 0 ? "▲" : "▼"} {pctTxt(Math.abs(delta))}</i> vs. mes anterior</>}</em>
         </article>
         <article className="dc-rm__kpi" style={{ "--c": "#E0694F" }}>
-          <span className="dc-rm__ico"><ArrowUpRight size={18} strokeWidth={2.2} /></span>
+          <span className="dc-rm__ico"><Receipt size={18} strokeWidth={2.2} /></span>
           <small>Salidas del mes</small>
           <b>{sinSalidas ? "—" : soles(d.salidas)}</b>
-          <em>{sinSalidas ? (egErr === "sin permiso" ? "Sin permiso para ver los egresos" : nd({ texto: "Egresos no disponibles" })) : <>{d.salidasUsd ? `+ US$ ${d.salidasUsd.toFixed(2)} en dólares · ` : ""}{d.salidasCat[0] ? `Mayor gasto: ${d.salidasCat[0][0]}` : "Sin egresos registrados"}</>}</em>
+          <em>{sinSalidas ? (egErr === "sin permiso" ? "Sin permiso para ver los egresos" : nd({ texto: "Egresos no disponibles" })) : <>{d.salidasUsd ? `+ ${moneyFmt(d.salidasUsd, { prefijo: "US$ " })} en dólares · ` : ""}{d.salidasCat[0] ? `Mayor gasto: ${d.salidasCat[0][0]}` : "Sin egresos registrados"}</>}</em>
         </article>
         <article className="dc-rm__kpi" style={{ "--c": neto >= 0 ? "#0B6C78" : "#D0563F" }}>
           <span className="dc-rm__ico"><Wallet size={18} strokeWidth={2.2} /></span>
           <small>Resultado del mes</small>
           {/* R6-02: también por sede: producción y salidas ya son de la sede elegida. */}
           <b>{sinSalidas || sinFacturado ? "—" : <>{neto < 0 ? "− " : ""}{soles(Math.abs(neto))}</>}</b>
-          <em>{sinSalidas ? "No se calcula sin los egresos" : sinFacturado ? "No se calcula sin la producción" : <>Producción menos salidas{d.facturado ? ` · margen ${Math.round((neto / d.facturado) * 100)}%` : ""}</>}</em>
+          <em>{sinSalidas ? "No se calcula sin los egresos" : sinFacturado ? "No se calcula sin la producción" : <>Producción menos salidas{d.facturado ? ` · margen ${neto < 0 ? "−" : ""}${pctTxt(Math.abs(neto / d.facturado) * 100)}` : ""}</>}</em>
         </article>
         <article className="dc-rm__kpi dc-rm__kpi--meta" style={{ "--c": "#C98A12" }}>
           <span className="dc-rm__ico"><Target size={18} strokeWidth={2.2} /></span>
           <small>{sedeElegida && !d.metaClinica ? "Meta de la sede" : "Meta mensual"}{todaMeta}</small>
-          <b>{sinKpis || d.metaCargando ? "—" : d.meta ? soles(d.meta) : "Sin meta"}</b>
+          {/* Sin meta, la cifra es «—» (no un texto en su lugar); el porqué va debajo. */}
+          <b>{sinKpis || d.metaCargando || !d.meta ? "—" : soles(d.meta)}</b>
           {sinKpis ? <em>{nd({ texto: "Meta no disponible" })}</em> : d.metaCargando ? <em>Calculando la meta de la sede…</em> : d.metaClinica ? <em>Sin el horario de los doctores no se sabe la meta de la sede</em> : d.meta > 0 ? (
             sinFacturado ? <em>Avance no disponible: falta la producción del mes</em> : <>
-              <div className="dc-rm__meta" role="img" aria-label={`Avance ${avance.toFixed(0)}% de la meta`}><i style={{ width: `${Math.min(100, avance)}%` }} /><span style={{ left: `${Math.min(100, ritmo)}%` }} title="Ritmo esperado a hoy" /></div>
-              <em><i className={avance >= ritmo ? "is-up" : "is-down"}>{avance.toFixed(0)}%</i> logrado · {hoy.getDate() >= 5 ? `cierre estimado ${soles(proyeccion)}` : "estimado de cierre desde el día 5"}</em>
+              <div className="dc-rm__meta" role="img" aria-label={`Avance ${pctTxt(avance)} de la meta`}><i style={{ width: `${Math.min(100, avance)}%` }} /><span style={{ left: `${Math.min(100, ritmo)}%` }} title="Ritmo esperado a hoy" /></div>
+              <em><i className={avance >= ritmo ? "is-up" : "is-down"}>{pctTxt(avance)}</i> logrado · {hoy.getDate() >= 5 ? `cierre estimado ${soles(proyeccion)}` : "estimado de cierre desde el día 5"}</em>
             </>
-          ) : <em>{sedeElegida ? "Ningún doctor de la sede tiene meta: defínela en Metas" : "Define las metas del equipo en Metas"}</em>}
+          ) : <em>{sedeElegida ? "Sin meta: ningún doctor de la sede la tiene; defínela en Metas" : "Sin meta: define las metas del equipo en Metas"}</em>}
         </article>
       </div>
       </div>
@@ -182,30 +185,30 @@ export default function ResumenMes({ kd, acciones = null, sedes = null, sedesApi
       {/* Dos rankings con el mismo diseño: posición, nombre, barra y cifra. */}
       <div className="dc-rm__dos">
         <article className="dc-rm__card">
-          <div className="dc-rm__cab"><Users size={16} strokeWidth={2} /><h3>Top del equipo</h3><span>{sedeElegida ? "en esta sede · avance a su meta" : "avance a su meta · la raya es el ritmo a hoy"}</span></div>
+          <div className="dc-rm__cab"><Users size={16} strokeWidth={2} /><h3>Top del equipo</h3><span>{sedeElegida ? "en esta sede · avance a su meta" : "avance a su meta"}</span></div>
           {sinKpis ? <p className="dc-rm__vacio">{nd({ texto: "Producción del equipo no disponible" })}</p> : equipo.length === 0 ? <p className="dc-rm__vacio">{sedeElegida ? "Nadie atendió en esta sede este mes." : "Sin producción del equipo este mes."}</p> : (
             <ol className="dc-rm__rank">
               {equipo.map((x, i) => { const pct = x.meta ? (x.prod / x.meta) * 100 : 0; const tono = !x.meta ? "sin" : pct >= ritmo ? "ok" : pct >= ritmo * 0.8 ? "cerca" : "bajo"; return (
                 <li key={x.nombre} className={`is-${tono}`}>
                   {/* Sin producción no hay puesto ni medalla: «2.º» y «3.º» con S/ 0.00 confundían. */}
-                  <span className={`dc-rm__pos${x.prod > 0 ? ` p${i + 1}` : " is-cero"}`}>{x.prod > 0 ? i + 1 : "–"}</span>
+                  <span className={`dc-rm__pos${x.prod > 0 ? ` p${i + 1}` : " is-cero"}`}>{x.prod > 0 ? i + 1 : ""}</span>
                   <div className="dc-rm__rn"><b>{x.nombre}</b><small>{soles(x.prod)}{x.meta ? ` de ${soles(x.meta)}` : ""}</small></div>
-                  <em className="dc-rm__rv">{x.meta ? `${Math.round(pct)}%` : "—"}<small>{tono === "ok" ? "al día" : tono === "cerca" ? "cerca del ritmo" : tono === "bajo" ? "bajo el ritmo" : "sin meta"}</small></em>
-                  <div className="dc-rm__rbar"><i style={{ width: `${Math.min(100, pct)}%` }} />{x.meta > 0 && <span style={{ left: `${Math.min(100, ritmo)}%` }} title={`Ritmo esperado a hoy: ${Math.round(ritmo)}%`} />}</div>
+                  <em className="dc-rm__rv">{x.meta ? pctTxt(pct) : null}<small>{tono === "ok" ? "al día" : tono === "cerca" ? "cerca del ritmo" : tono === "bajo" ? "bajo el ritmo" : "sin meta"}</small></em>
+                  <div className="dc-rm__rbar"><i style={{ width: `${Math.min(100, pct)}%` }} />{x.meta > 0 && <span style={{ left: `${Math.min(100, ritmo)}%` }} title={`Ritmo esperado a hoy: ${pctTxt(ritmo)}`} />}</div>
                 </li>
               ); })}
             </ol>
           )}
         </article>
         <article className="dc-rm__card">
-          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>{sedeElegida ? "en esta sede · " : ""}por importe producido del mes</span></div>
+          <div className="dc-rm__cab"><Trophy size={16} strokeWidth={2} /><h3>Top de tratamientos</h3><span>{sedeElegida ? "en esta sede · " : ""}por importe del mes</span></div>
           {conectado && topErr ? <p className="dc-rm__vacio">{topErr === "sin permiso" ? "Sin permiso para ver las ventas por tratamiento." : nd({ texto: "Ventas por tratamiento no disponibles" })}</p> : d.top.length === 0 ? <p className="dc-rm__vacio">Aún no hay ventas vinculadas a servicios del catálogo este mes.</p> : (
             <ol className="dc-rm__rank is-trat">
               {d.top.map((t, i) => (
                 <li key={t.nombre}>
                   <span className={`dc-rm__pos p${i + 1}`}>{i + 1}</span>
                   <div className="dc-rm__rn"><b>{t.nombre}</b><small>{t.ventas} {t.ventas === 1 ? "venta" : "ventas"} · ticket {soles(t.ventas ? t.importe / t.ventas : 0)}</small></div>
-                  <em className="dc-rm__rv">{soles(t.importe)}<small>{d.top.reduce((a, x) => a + x.importe, 0) ? `${Math.round((t.importe / d.top.reduce((a, x) => a + x.importe, 0)) * 100)}% del top` : ""}</small></em>
+                  <em className="dc-rm__rv">{soles(t.importe)}<small>{totTop ? `${pctTxt((t.importe / totTop) * 100)} del top` : ""}</small></em>
                   <div className="dc-rm__rbar"><i style={{ width: `${(t.importe / maxTop) * 100}%` }} /></div>
                 </li>
               ))}

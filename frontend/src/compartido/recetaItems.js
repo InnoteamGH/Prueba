@@ -77,3 +77,19 @@ export const textoIndicaciones = (t) => {
 export const itemRecetaDesdeFormulario = (x) => (x && x.pres !== undefined
   ? { medicamento: txt(x.med), presentacion: txt(x.pres), dosis: txt(x.dosis), frecuencia: txt(x.frec), duracion: txt(x.dur) }
   : { medicamento: txt(x?.med), presentacion: txt(x?.dosis), dosis: "", frecuencia: txt(x?.frec), duracion: txt(x?.dur) });
+
+/* Para leer en pantalla: «c/8h» pasa a «cada 8 h», una dosis sin unidad («1») a «Dosis 1» y la
+   duración lleva «por». La receta impresa usa sus propios campos; el dato guardado no cambia. */
+const cada = (s) => s.replace(/\bc\s*\/\s*(\d+)\s*(?:h|hs|hrs|horas?)?\b\.?/gi, "cada $1 h");
+export function posologiaItemReceta(it) {
+  const dosis = txt(it?.dosis), dur = txt(it?.duracion);
+  return [
+    /^\d+([.,]\d+)?$/.test(dosis) ? `Dosis ${dosis}` : dosis,
+    cada(txt(it?.frecuencia)),
+    /^\d/.test(dur) ? `por ${dur}` : dur,
+    cada(txt(it?.detalle)).replace(/\s+[–-]\s+/g, " · "),
+  ].filter(Boolean).join(" · ");
+}
+
+/** «paracetamol pastilla» → «Paracetamol pastilla». */
+export const nombreVisibleReceta = (it) => { const s = nombreItemReceta(it); return s.charAt(0).toUpperCase() + s.slice(1); };

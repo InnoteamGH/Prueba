@@ -1,0 +1,61 @@
+/* Ajustes de diseño de Configuración, Recordatorios, Consolidado de citas y Comprobantes SUNAT
+   (revisión por capturas). Selectores con el contenedor del módulo para ganar a ui.css. */
+
+/* ── Configuración ───────────────────────────────────────────── */
+/* Puesta en marcha: «Configurar» y «Revisar» con el mismo botón discreto en todos los pasos
+   (antes uno naranja relleno y los demás pendientes sin botón). */
+.dc-cfg .dc-go__paso .dc-go__accion > button { color: #0A6C76; background: #fff; box-shadow: inset 0 0 0 1px #CFE3E3; }
+.dc-cfg .dc-go__paso .dc-go__accion > button:hover { background: #F0F8F8; }
+.dc-cfg .dc-go__paso .dc-go__accion > button:focus-visible { box-shadow: var(--dc-focus); }
+/* Paso pendiente: un anillo vacío en vez de su número (solo los pendientes iban numerados). */
+.dc-cfg .dc-go__paso:is(.is-falta, .is-opc) .dc-go__n { background: #fff; box-shadow: inset 0 0 0 2px var(--c); }
+/* Celular: un desplegable «Sección» en vez de la lista de secciones. */
+.dc-cfg > .dc-cfg__navsel { display: none; }
+@media (max-width: 640px) {
+  .dc-cfg > .dc-cfg__nav { display: none; }
+  .dc-cfg > .dc-cfg__navsel { display: flex; align-items: center; gap: 10px; }
+  .dc-cfg > .dc-cfg__navsel > span { font-size: 13px; font-weight: 600; color: var(--dc-ink-500); }
+  .dc-cfg > .dc-cfg__navsel > .dc-sel { flex: 1; min-width: 0; }
+}
+
+/* ── Recordatorios ───────────────────────────────────────────── */
+/* Interruptor encendido: un solo color para «activo» (antes el del paso: turquesa, naranja o verde). */
+.dc-rec .dc-rec__paso .dc-rec__switch.is-on { background: var(--dc-primary-alt, #0E8C95); box-shadow: 0 4px 10px -4px var(--dc-primary-alt, #0E8C95); }
+/* Historial: un estado sin envíos no se puede elegir. */
+.dc-env .dc-env__filtros button:disabled { opacity: .45; cursor: default; }
+
+/* ── Consolidado de citas ────────────────────────────────────── */
+/* La lista de esos Select se abre por fuera de la franja (overflow: hidden la cortaba). */
+.dc-cons .dc-cons__hero { overflow: visible; }
+/* Odontólogo y Estado: el Select de la app con el alto, el radio y el borde de las fechas. */
+.dc-cons .dc-cons__rango .dc-sel > button[aria-haspopup="listbox"] { height: 38px; padding: 0 30px 0 10px !important; border-radius: 10px !important; font-size: 13px !important; }
+.dc-cons .dc-cons__rango .dc-sel:not(.is-open) > button[aria-haspopup="listbox"] { border-color: transparent !important; }
+@media (max-width: 700px) {
+  .dc-cons .dc-cons__rango .dc-sel { width: 100% !important; }
+}
+/* Celular: los atajos de rango en una sola fila que se desliza (eran tres filas). */
+@media (max-width: 640px) {
+  .dc-cons .dc-cons__rango .dc-moneda-sel { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-right: 28px; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+  .dc-cons .dc-cons__rango .dc-moneda-sel::-webkit-scrollbar { display: none; }
+  .dc-cons .dc-cons__rango .dc-moneda-sel button { flex: none; }
+}
+
+/* ── Comprobantes SUNAT ──────────────────────────────────────── */
+/* Filtros en dos grupos con su nombre: Tipo y Estado. */
+.dc-fe .dc-fe__fgrupo { display: inline-flex; align-items: center; gap: 6px; }
+.dc-fe .dc-fe__fgrupo > span { font-size: 12px; font-weight: 600; color: var(--dc-ink-500); }
+/* Aviso único: «Ir a Integraciones» a la derecha; en celular debajo, a todo el ancho y en una línea. */
+.dc-fe .dc-fe__aviso-uno { align-items: center; }
+.dc-fe .dc-fe__aviso-uno > div { flex: 1; min-width: 0; }
+.dc-fe .dc-fe__aviso-uno > .dc-fe__btn { flex: none; white-space: nowrap; }
+@media (max-width: 640px) {
+  .dc-fe .dc-fe__aviso-uno { flex-wrap: wrap; }
+  .dc-fe .dc-fe__aviso-uno > div { flex: 1 1 calc(100% - 28px); }
+  .dc-fe .dc-fe__aviso-uno > .dc-fe__btn { flex: 1 1 100%; justify-content: center; }
+}
+/* «PDF» con texto junto al ícono (la regla de botones con aria-label los pone en rejilla). */
+.dc-fe .dc-fe__acc .dc-fe__pdf { display: inline-flex !important; align-items: center; gap: 4px; padding: 0 9px !important; font-size: 12px; font-weight: 600; }
+/* Filas de una línea a 48 px (eran 62). */
+@media (min-width: 768px) {
+  .dc-fe .dc-table-wrap:not(.is-tarjetas) .dc-table-row { min-height: 48px; padding-top: 6px !important; padding-bottom: 6px !important; }
+}

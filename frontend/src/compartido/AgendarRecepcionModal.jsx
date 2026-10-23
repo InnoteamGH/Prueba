@@ -10,7 +10,7 @@ import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
 import { medicoDeSesionEnLista } from "../util/medicoSesion";
 import { estadoInicialCita, textoCitaAgendada } from "./citaEstadoInicial";
-import {Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, calcEdad, espsDe, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, mismaSede, sedeNum, sedesDe, toMin, tint, useSede, validarFormPaciente} from "../comun";
+import {CampoFecha, Btn, DS, DatosDemoCtx, ESPECIALIDADES, HORAS_SEL, MEDICOS, Modal, NAVY, SEDES, Select, addDays, calcEdad, espsDe, fechaLegible, fmt, hoy, horarioDeSede, jornadaClinica, mismaSede, sedeNum, sedesDe, toMin, tint, useSede, validarFormPaciente} from "../comun";
 
 /* ---- RENIEC: autocompletar nombres desde el DNI (solo datos reales del backend) ---- */
 export async function reniecLookup(dni) {
@@ -96,7 +96,7 @@ export function CamposPacienteRapido({ v, set, err = {}, notify, existente = nul
       <div><input className="dc-premium-inp" value={v.nombre} aria-label="Nombre completo" aria-invalid={!!err.nombre} onChange={(e) => set({ nombre: e.target.value })} placeholder="Nombre completo" style={inpR(err.nombre)} />{msg("nombre")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
         <label><span style={lblR}>Celular</span><input className="dc-premium-inp" value={v.telefono} inputMode="tel" aria-invalid={!!err.telefono} onChange={(e) => set({ telefono: e.target.value.replace(/[^\d+\s]/g, "").slice(0, 16) })} placeholder="9 dígitos" style={inpR(err.telefono)} />{msg("telefono")}</label>
-        <label><span style={lblR}>Fecha de nacimiento</span><input className="dc-premium-inp" type="date" min={`${Number(fmt(hoy).slice(0, 4)) - 120}${fmt(hoy).slice(4)}`} max={fmt(hoy)} value={v.nacimiento} aria-invalid={!!err.nacimiento} onChange={(e) => set({ nacimiento: e.target.value })} style={inpR(err.nacimiento)} />{msg("nacimiento")}</label>
+        <label><span style={lblR}>Fecha de nacimiento</span><CampoFecha className="dc-premium-inp" min={`${Number(fmt(hoy).slice(0, 4)) - 120}${fmt(hoy).slice(4)}`} max={fmt(hoy)} value={v.nacimiento} aria-invalid={!!err.nacimiento} onChange={(e) => set({ nacimiento: e.target.value })} style={inpR(err.nacimiento)} />{msg("nacimiento")}</label>
       </div>
       {menor && <div style={{ display: "grid", gap: 8, padding: 10, borderRadius: "var(--dc-r-md)", background: "var(--dc-bg-soft, #F7FAFB)", border: "1px solid var(--dc-line)" }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dc-ink-700)" }}>Menor de edad ({edad} años): datos del apoderado</span>
@@ -669,7 +669,7 @@ export function AgendarRecepcionModal({ onClose, onCreada, notify, base, rol: ro
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, border: `1.5px solid ${pasada ? "var(--dc-red)" : "var(--dc-line)"}`, borderRadius: "var(--dc-r-md)", padding: "8px 11px" }}>
               <Clock size={16} strokeWidth={1.75} color={pasada ? "var(--dc-red)" : "var(--dc-ink-400)"} style={{ flexShrink: 0 }} />
-              <input className="dc-premium-inp" type="date" min={fmt(hoy)} aria-label="Fecha de la cita" value={f.fecha} onChange={(e) => { horaAutoSiNoEligio(); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
+              <CampoFecha className="dc-premium-inp" min={fmt(hoy)} aria-label="Fecha de la cita" value={f.fecha} onChange={(e) => { horaAutoSiNoEligio(); setF({ ...f, fecha: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, flex: 1, minWidth: 0, background: "transparent" }} />
               <input className="dc-premium-inp" type="time" aria-label="Hora de la cita" value={f.hora} onChange={(e) => { elegirHora(true); setF({ ...f, hora: e.target.value }); }} style={{ border: "none", outline: "none", fontSize: 13, color: NAVY, width: 92, background: "transparent" }} />
             </div>
             {pasada && <div role="alert" style={{ fontSize: 12, color: "var(--dc-red)", fontWeight: 500, marginTop: 5 }}>{msgPasada}</div>}

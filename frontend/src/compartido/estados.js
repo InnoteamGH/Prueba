@@ -24,7 +24,7 @@ export const ESTADOS = {
     no_show: ["No asistió", "peligro"],
     cancelada: ["Cancelada", "peligro"],
     reprogramada: ["Reprogramada", "neutro"],
-    cerrada_sistema: ["Cerrada por sistema", "neutro"],
+    cerrada_sistema: ["Cerrada automáticamente", "neutro"],
   },
   // Propuesto → Por realizar → En curso → Terminado (por cobrar) → Pagado · (Anulado)
   // En los datos: pendiente = en el plan, por hacer; terminada = hecho sin pagar,

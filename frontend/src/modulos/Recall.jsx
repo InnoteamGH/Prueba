@@ -9,6 +9,13 @@ import { useSedesWhatsapp } from "../compartido/useSedesWhatsapp";
 import { tienePermiso } from "../compartido/permisos";
 import { pedirChatPaciente } from "../compartido/chatPaciente";
 import { formatearWhatsappPe, sedesSinNumero, whatsappDeSede } from "../compartido/whatsappSede";
+import "./modulos2.css";
+
+// Nombres a la vista: «recall» y «no-show» eran jerga. La clave y lo que guarda el servidor no cambian.
+const NOMBRE_VISIBLE = { "Recall de control": "Control periódico", "Recuperar no-show": "Recuperar inasistencias" };
+const nombreVisible = (l) => NOMBRE_VISIBLE[l] || l;
+// «−48 h» / «+6 meses» → «48 h antes» / «6 meses después» (el signo no se entendía).
+const cuandoVisible = (t) => String(t || "").replace(/^[−-]\s*(.+)$/, "$1 antes").replace(/^\+\s*(.+)$/, "$1 después");
 
 function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   // Activar una automatización o pulsar "Enviar a todos" manda WhatsApp a los pacientes.
@@ -39,13 +46,13 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
     recuperar_noshow: { icon: AlertTriangle, color: "var(--dc-red)" },
     cumpleanos: { icon: Smile, color: DS.c.primary } };
   const DEFAULT_REGLAS = [
-    { clave: "confirmacion", l: "Confirmación al agendar", timing: "Al instante", antes: true, on: true, stat: "por WhatsApp", icon: CalendarCheck, color: DS.c.primary, plantilla: "¡Hola {nombre}! 😊 Tu cita quedó agendada para el {fecha} a las {hora} con {doctor} en {sede}. ¡Te esperamos! 🦷" },
-    { clave: "recordatorio_48h", l: "Recordatorio 48 h antes", timing: "−48 h", antes: true, on: true, stat: "por WhatsApp", icon: Clock, color: DS.c.primary, plantilla: "Hola {nombre}, te recordamos tu cita el {fecha} a las {hora} con {doctor} en {sede}. Responde *SÍ* para confirmar. 🦷" },
-    { clave: "recordatorio_2h", l: "Recordatorio 2 h antes", timing: "−2 h", antes: true, on: true, stat: "por WhatsApp", icon: BellRing, color: DS.c.primary, plantilla: "Hola {nombre}, tu cita es hoy a las {hora} con {doctor} en {sede}. ¡Te esperamos! 😁" },
-    { clave: "encuesta", l: "Encuesta de satisfacción", timing: "Tras atender", antes: false, on: true, stat: "por WhatsApp", icon: Star, color: "var(--dc-warn)", plantilla: "Hola {nombre}, ¿cómo estuvo tu atención en {sede}? Cuéntanos con una calificación del 1 al 10 🙏 Tu opinión nos ayuda a mejorar." },
-    { clave: "recall", l: "Recall de control", timing: "+6 meses", antes: false, on: true, stat: "por WhatsApp", icon: Repeat, color: "var(--dc-ok-700)", plantilla: "Hola {nombre} 😊 Ya pasaron 6 meses de tu último control. ¿Agendamos tu limpieza para mantener tu sonrisa sana? Escríbenos y te doy el próximo cupo. 🦷" },
-    { clave: "recuperar_noshow", l: "Recuperar no-show", timing: "Si falta", antes: false, on: false, stat: "sin activar", icon: AlertTriangle, color: "var(--dc-red)", plantilla: "Hola {nombre}, notamos que no pudiste asistir a tu cita del {fecha}. ¿La reagendamos? Escríbenos y te damos el próximo cupo disponible. 🦷" },
-    { clave: "cumpleanos", l: "Saludo de cumpleaños", timing: "En su día", antes: false, on: false, stat: "sin activar", icon: Smile, color: DS.c.primary, plantilla: "¡Feliz cumpleaños, {nombre}! 🎉🎂 De parte de todo el equipo. Este mes te regalamos 20% en tu próxima limpieza. 😁" },
+    { clave: "confirmacion", l: "Confirmación al agendar", timing: "Al instante", antes: true, on: true, icon: CalendarCheck, color: DS.c.primary, plantilla: "¡Hola {nombre}! 😊 Tu cita quedó agendada para el {fecha} a las {hora} con {doctor} en {sede}. ¡Te esperamos! 🦷" },
+    { clave: "recordatorio_48h", l: "Recordatorio 48 h antes", timing: "48 h antes", antes: true, on: true, icon: Clock, color: DS.c.primary, plantilla: "Hola {nombre}, te recordamos tu cita el {fecha} a las {hora} con {doctor} en {sede}. Responde *SÍ* para confirmar. 🦷" },
+    { clave: "recordatorio_2h", l: "Recordatorio 2 h antes", timing: "2 h antes", antes: true, on: true, icon: BellRing, color: DS.c.primary, plantilla: "Hola {nombre}, tu cita es hoy a las {hora} con {doctor} en {sede}. ¡Te esperamos! 😁" },
+    { clave: "encuesta", l: "Encuesta de satisfacción", timing: "Tras atender", antes: false, on: true, icon: Star, color: "var(--dc-warn)", plantilla: "Hola {nombre}, ¿cómo estuvo tu atención en {sede}? Cuéntanos con una calificación del 1 al 10 🙏 Tu opinión nos ayuda a mejorar." },
+    { clave: "recall", l: "Control periódico", timing: "6 meses después", antes: false, on: true, icon: Repeat, color: "var(--dc-ok-700)", plantilla: "Hola {nombre} 😊 Ya pasaron 6 meses de tu último control. ¿Agendamos tu limpieza para mantener tu sonrisa sana? Escríbenos y te doy el próximo cupo. 🦷" },
+    { clave: "recuperar_noshow", l: "Recuperar inasistencias", timing: "Si falta", antes: false, on: false, icon: AlertTriangle, color: "var(--dc-red)", plantilla: "Hola {nombre}, notamos que no pudiste asistir a tu cita del {fecha}. ¿La reagendamos? Escríbenos y te damos el próximo cupo disponible. 🦷" },
+    { clave: "cumpleanos", l: "Saludo de cumpleaños", timing: "En su día", antes: false, on: false, icon: Smile, color: DS.c.primary, plantilla: "¡Feliz cumpleaños, {nombre}! 🎉🎂 De parte de todo el equipo. Este mes te regalamos 20% en tu próxima limpieza. 😁" },
   ];
   // Con sesión no se dan por activas hasta que el servidor lo confirme: si la carga
   // falla, decir que las cinco están "funcionando solas" hace que nadie revise por qué
@@ -59,9 +66,10 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
   const [histReal, setHistReal] = useState(null);
   const [resenasNps, setResenasNps] = useState(null);
   const mapReglas = (items) => (items || []).map((a) => ({
-    clave: a.clave, l: a.label, timing: a.timing, antes: a.antes, on: a.activo, plantilla: a.plantilla || "",
+    clave: a.clave, l: nombreVisible(a.label), timing: cuandoVisible(a.timing), antes: a.antes, on: a.activo, plantilla: a.plantilla || "",
     hsmNombre: a.hsmNombre || "", hsmIdioma: a.hsmIdioma || "es",
-    stat: a.enviadasMes ? `${a.enviadasMes} este mes` : (a.enviadas ? `${a.enviadas} enviadas` : "sin envíos aún"),
+    // Sin envíos no se dice nada: «sin envíos aún» se repetía en cada paso (las cifras de arriba ya lo dicen).
+    stat: a.enviadasMes ? `${a.enviadasMes} este mes` : (a.enviadas ? `${a.enviadas} enviadas` : ""),
     ...(AUT_META[a.clave] || { icon: Zap, color: NAVY }) }));
   const cargar = () => {
     if (!conectado) return;
@@ -219,7 +227,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
     { id: 2, paciente: "Pedro Gómez", regla: "Confirmación al agendar", fecha: fmt(hoy), hora: "08:05", estado: "entregado" },
     { id: 3, paciente: "María Chávez", regla: "Recordatorio 2 h antes", fecha: fmt(hoy), hora: "07:40", estado: "leido" },
     { id: 4, paciente: "Elena Ríos", regla: "Encuesta de satisfacción", fecha: addDays(-1), hora: "18:30", estado: "respondido", nps: 9, calificacion: 5, comentario: "Muy buena atención, la Dra. fue clara con el plan." },
-    { id: 5, paciente: "Diego Castro", regla: "Recall de control", fecha: addDays(-1), hora: "10:15", estado: "entregado" },
+    { id: 5, paciente: "Diego Castro", regla: "Control periódico", fecha: addDays(-1), hora: "10:15", estado: "entregado" },
     { id: 6, paciente: "Lucía Vega", regla: "Recordatorio 48 h antes", fecha: addDays(-2), hora: "09:00", estado: "leido" },
   ];
   const RESENAS_DEMO = [
@@ -231,7 +239,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
     { paciente: "Sofía Herrera", nps: 5, calificacion: 2, comentario: "Me cambiaron la hora dos veces y nadie me avisó a tiempo." },
     { paciente: "Lucía Vega", nps: 9, calificacion: 5, comentario: "La endodoncia me daba miedo y fue muy tranquila. Gracias, Dra. Quispe." },
   ];
-  const ESTADO_ENVIO = { entregado: { l: "Entregado", bg: "var(--dc-line)", fg: "var(--dc-ink-700)", ic: Check }, leido: { l: "Leído", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)", ic: CheckCircle2 }, respondido: { l: "Respondió", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)", ic: MessageSquare }, error: { l: "No enviado", bg: "var(--dc-fee2)", fg: "var(--dc-danger-700)", ic: AlertTriangle } };
+  const ESTADO_ENVIO = { entregado: { l: "Entregado", bg: "var(--dc-line)", fg: "var(--dc-ink-700)", ic: Check }, leido: { l: "Leído", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)", ic: CheckCircle2 }, respondido: { l: "Respondido", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)", ic: MessageSquare }, error: { l: "No enviado", bg: "var(--dc-fee2)", fg: "var(--dc-danger-700)", ic: AlertTriangle } };
   // Demostración: los envíos y respuestas de ejemplo se cruzan con los pacientes visibles
   // (filtro de sede); el NPS de una sede no mezcla comentarios de otra.
   const deMisPacientes = (h) => !pacientes || pacientes.some((p) => p.nombre === h.paciente || (h.pacienteId != null && String(p.id) === String(h.pacienteId)));
@@ -331,8 +339,9 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
               <div className="dc-env__cab">
                 <h3>Historial de envíos</h3>
                 <div className="dc-env__filtros" role="tablist" aria-label="Filtrar por estado">
-                  {[["todos", "Todos", histView.length], ["entregado", "Entregado", cuenta("entregado")], ["leido", "Leído", cuenta("leido")], ["respondido", "Respondió", cuenta("respondido")], ["error", "No enviado", cuenta("error")]].map(([k, l, c]) => (
-                    <button key={k} type="button" role="tab" aria-selected={filtroEnv === k} onClick={() => setFiltroEnv(k)}>{l} <span>{c}</span></button>
+                  {/* Un estado sin envíos no se puede elegir (llevaba a una lista vacía). */}
+                  {[["todos", "Todos", histView.length], ["entregado", "Entregado", cuenta("entregado")], ["leido", "Leído", cuenta("leido")], ["respondido", "Respondido", cuenta("respondido")], ["error", "No enviado", cuenta("error")]].map(([k, l, c]) => (
+                    <button key={k} type="button" role="tab" aria-selected={filtroEnv === k} disabled={k !== "todos" && !c && filtroEnv !== k} onClick={() => setFiltroEnv(k)}>{l} <span>{c}</span></button>
                   ))}
                 </div>
               </div>
@@ -340,16 +349,16 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
               {filtrados.length > 0 && <ListaFiltrable rows={filtrados} sub="envíos" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} cols={[
                 { key: "fecha", label: "Fecha", get: (h) => String(h.fecha || "").slice(0, 10), sortVal: (h) => `${String(h.fecha || "").slice(0, 10)} ${h.hora || ""}` },
                 { key: "paciente", label: "Paciente", get: (h) => h.paciente || "" },
-                { key: "regla", label: "Mensaje", get: (h) => h.regla || "" },
+                { key: "regla", label: "Mensaje", get: (h) => nombreVisible(h.regla || "") },
                 { key: "estado", label: "Estado", get: (h) => (ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado).l },
               ]}>{(lst) => agrupar(lst).map((g) => (
                 <div key={g.d} className="dc-env__dia">
                   <div className="dc-env__fecha">{etiquetaDia(g.d)}</div>
-                  {g.items.map((h) => { const es = ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado; const EIc = es.ic; const col = colorDe(h.paciente); const rg = reglas.find((r) => r.l === h.regla); const RIc = (rg && rg.icon) || MessageSquare; const rc = (rg && rg.color) || DS.c.primary; return (
+                  {g.items.map((h) => { const es = ESTADO_ENVIO[h.estado] || ESTADO_ENVIO.entregado; const EIc = es.ic; const col = colorDe(h.paciente); const regla = nombreVisible(h.regla); const rg = reglas.find((r) => r.l === regla); const RIc = (rg && rg.icon) || MessageSquare; const rc = (rg && rg.color) || DS.c.primary; return (
                     <div key={h.id} className="dc-env__fila">
                       <span className="dc-env__hora">{h.hora}</span>
                       <span className="dc-rec__av" style={{ width: 36, height: 36, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(h.paciente)}</span>
-                      <div className="dc-env__txt"><b>{h.paciente}</b><span style={{ "--paso": rc }}><RIc size={12} strokeWidth={2} /> {h.regla}</span></div>
+                      <div className="dc-env__txt"><b>{h.paciente}</b><span style={{ "--paso": rc }}><RIc size={12} strokeWidth={2} /> {regla}</span></div>
                       <span className={`dc-env__estado is-${h.estado}`}><EIc size={13} strokeWidth={2} /> {es.l}</span>
                     </div>
                   ); })}
@@ -364,10 +373,12 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
         <span>Cada mensaje sale desde el número de WhatsApp de la sede de la cita o, si no hay cita, de la sede del paciente.
           {sedesWaVer.some((s) => whatsappDeSede(s)) && <> {sedesWaVer.filter((s) => whatsappDeSede(s)).map((s) => `${String(s.nombre || "Sede").replace(/^Sede\s+/i, "")}: ${formatearWhatsappPe(whatsappDeSede(s))}`).join(" · ")}.</>}</span>
       </div>
+      {/* Corto: cuántas sedes y un botón; los nombres y el número compartido quedan en el título. */}
       {sinNumeroWa.length > 0 && (
-        <div className="fm-aviso-edad dc-rec__wa">
+        <div className="fm-aviso-edad dc-rec__wa" title={`${sinNumeroWa.map((s) => s.nombre || "Sede").join(", ")}${numCompartido ? ` · número compartido ${formatearWhatsappPe(numCompartido)}` : ""}`}>
           <AlertTriangle size={15} strokeWidth={2} />
-          <span>{sinNumeroWa.map((s) => s.nombre || "Sede").join(", ")} aún no {sinNumeroWa.length === 1 ? "tiene" : "tienen"} número de WhatsApp propio{conectado ? `: sus mensajes salen desde el número compartido${numCompartido ? ` (${formatearWhatsappPe(numCompartido)})` : ""}` : ""}. Se agrega en Configuración › Sedes.</span>
+          <span>{sinNumeroWa.length === 1 ? `${sinNumeroWa[0].nombre || "1 sede"} ${conectado ? "usa el número compartido" : "no tiene WhatsApp propio"}` : `${sinNumeroWa.length} sedes ${conectado ? "usan el número compartido" : "no tienen WhatsApp propio"}`}</span>
+          {(!can || can("config", "ver")) && <button type="button" onClick={() => { window.location.hash = "#/config/sedes"; }}>Configurar</button>}
         </div>
       )}
       <Card className="dc-rec">
@@ -390,14 +401,13 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
               {reglas.filter((r) => !!r.antes === antes).map((r) => { const Ic = r.icon || (AUT_META[r.clave] || {}).icon || Zap; const color = r.color || (AUT_META[r.clave] || {}).color || DS.c.primary; return (
                 <div key={r.clave} className={`dc-rec__paso${r.on ? " is-on" : ""}`} style={{ "--paso": color }} onClick={() => abrirCfg(r)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") abrirCfg(r); }} title={puedeEditar ? "Editar mensaje" : "Ver mensaje"}>
                   <span className="dc-rec__ico" style={{ background: tint(color, 0.12), color }}><Ic size={16} strokeWidth={1.75} /></span>
-                  <div className="dc-rec__txt"><b>{r.l}</b><span>{!r.on ? "Pausado" : r.stat === "por WhatsApp" ? "Activo" : r.stat}<em className="dc-rec__cuando-m"> – {r.timing}</em></span></div>
+                  <div className="dc-rec__txt"><b>{r.l}</b><span>{!r.on ? "Pausado" : r.stat || "Activo"}<em className="dc-rec__cuando-m"> – {r.timing}</em></span></div>
                   <span className="dc-rec__cuando">{r.timing}</span>
                   {puedeEditar && <button type="button" className={`dc-rec__switch${r.on ? " is-on" : ""}`} role="switch" aria-checked={r.on} aria-label={`${r.on ? "Pausar" : "Activar"} ${r.l}`} aria-busy={guardandoClave === r.clave} disabled={!!guardandoClave} onClick={(e) => { e.stopPropagation(); toggle(r.clave); }}><i /></button>}
                 </div>
               ); })}
             </section>
           ))}
-          <span className="dc-rec__dia" title="Día de la cita" aria-hidden="true"><CalendarCheck size={16} strokeWidth={1.75} /></span>
         </div>
       </Card>
 

@@ -4,7 +4,7 @@ import { estadoLabel, estadoFaseUi } from "./compartido/estados";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import api, { auth, msgServidor } from "./api/client";
 import { buscarCie10 } from "./cie10";
-import {BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint, EstadoPill} from "./comun";
+import {CampoFecha, fechaDoc, fechaLegible, BotonPDF, comprimirImagen, AvatarPaciente, Modal, DatosDemoCtx, DataTable, FICHA_CLINICA, MEDICOS, CITAS_INIT, DS, nombreSede, sedesDe, useSede, EDAD_PEDIATRICA, EmblemaNino, Select, aniosParaAdulto, colorPediatrico, denticionPorEdad, esPediatrico, etapaFicha, tint, EstadoPill} from "./comun";
 import {
   ESTADOS_ODO,
   FASES_ODO,
@@ -64,7 +64,8 @@ const rotuloMedico = (n) => {
 };
 const edadDe = (iso) => { if (!iso) return null; const b = new Date(iso + "T00:00:00"); if (isNaN(b)) return null; const h = new Date(); let e = h.getFullYear() - b.getFullYear(); const m = h.getMonth() - b.getMonth(); if (m < 0 || (m === 0 && h.getDate() < b.getDate())) e--; return e >= 0 && e < 120 ? e : null; };
 const iniciales = (n) => (n || "?").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-const fmtFecha = (iso) => { if (!iso) return ""; const d = new Date(iso + "T00:00:00"); if (isNaN(d)) return iso; return d.toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" }); };
+// Un solo formato corto en toda la app («23 oct 2026»); antes «23 de octubre de 2026».
+const fmtFecha = (iso) => { if (!iso) return ""; const r = fechaDoc(iso); return r === "—" ? iso : r; };
 const arr = (x) => (Array.isArray(x) ? x : []);
 // Estados de laboratorio del servidor → los del catálogo (compartido/estados.js), como en el Inicio.
 const ESTADO_LAB_API = { solicitado: "enviado", en_proceso: "en_proceso", listo: "recibido", entregado: "entregado" };
@@ -520,10 +521,10 @@ function Ortodoncia({ pacienteId, notify }) {
       <div style={card}>
         <div style={{ fontWeight: 500, color: NAVY, fontSize: 14, marginBottom: 12 }}>Nuevo control de ortodoncia</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div><label style={lbl}>Fecha</label><input type="date" style={inp} value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} /></div>
+          <div><label style={lbl}>Fecha</label><CampoFecha style={inp} value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} /></div>
           <div><label style={lbl}>Aparato</label><Select value={f.aparato} onChange={(v) => setF({ ...f, aparato: v })} options={APARATOS.map((a) => ({ value: a, label: a }))} /></div>
           <div style={{ gridColumn: "1 / -1" }}><label style={lbl}>Actividad realizada</label><input style={inp} placeholder="Ej. Cambio de arco 0.016, activación…" value={f.actividad} onChange={(e) => setF({ ...f, actividad: e.target.value })} /></div>
-          <div><label style={lbl}>Próximo control</label><input type="date" style={inp} value={f.proximoControl} onChange={(e) => setF({ ...f, proximoControl: e.target.value })} /></div>
+          <div><label style={lbl}>Próximo control</label><CampoFecha style={inp} value={f.proximoControl} onChange={(e) => setF({ ...f, proximoControl: e.target.value })} /></div>
           <div><label style={lbl}>Nota</label><input style={inp} value={f.nota} onChange={(e) => setF({ ...f, nota: e.target.value })} /></div>
         </div>
         <div style={{ marginTop: 14, textAlign: "right" }}><button onClick={guardar} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: "var(--dc-r-md)", border: "none", background: TEAL, color: "var(--dc-white)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Plus size={15} strokeWidth={1.75} /> Registrar control</button></div>
@@ -848,7 +849,7 @@ const VITALES_NINO = [["pa", "P. Arterial", "95/60"], ["fc", "Pulso", "90 lpm"],
 // Peso y talla: en pediatria se miden en cada control para seguir el crecimiento.
 const VITALES_PED = [["peso", "Peso", "kg"], ["talla", "Talla", "cm"]];
 const TIPOS_ARCHIVO = ["Radiografía panorámica", "Radiografía periapical", "Radiografía bitewing", "Tomografía", "Foto intraoral", "Foto extraoral", "Documento", "Otro"];
-const ESTADO_CITA = { pendiente: "Pendiente", confirmada: "Confirmada", en_atencion: "En atención", atendida: "Atendida", cancelada: "Cancelada", no_show: "No asistió", cerrada_sistema: "Cerrada por sistema" };
+const ESTADO_CITA = { pendiente: "Pendiente", confirmada: "Confirmada", en_atencion: "En atención", atendida: "Atendida", cancelada: "Cancelada", no_show: "No asistió", cerrada_sistema: "Cerrada automáticamente" };
 // Plantillas rápidas para no escribir de cero (el doctor solo ajusta el detalle).
 /* ── Registro de actividad de la historia clínica ──
    Quién abrió o cambió el expediente y cuándo (NTS 139-MINSA y Ley 29733). La fuente
@@ -2075,7 +2076,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                 {!errorFicha && sinAlergias && <span className="is-debe">Alergias sin confirmar</span>}
                 {esPed && (p.apoderadoNombre ? <span>Apoderado: {p.apoderadoNombre}</span> : <span className="is-debe">Menor sin apoderado</span>)}
                 {/* GLO-08: la próxima cita vive en el encabezado único del paciente. */}
-                {!errorFicha && !parcial && proximaCita && <span className="is-info">Próxima cita: {proximaCita.fecha === M.hoyISO() ? "hoy" : new Date(proximaCita.fecha + "T00:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "short" })}{proximaCita.hora ? ` · ${String(proximaCita.hora).slice(0, 5)}` : ""}</span>}
+                {!errorFicha && !parcial && proximaCita && <span className="is-info">Próxima cita: {proximaCita.fecha === M.hoyISO() ? "hoy" : fechaLegible(proximaCita.fecha)}{proximaCita.hora ? ` · ${String(proximaCita.hora).slice(0, 5)}` : ""}</span>}
                 {errorFicha && <span className="is-debe">{fueraSede ? "Paciente de otra sede" : "Error al consultar datos clínicos"}</span>}
                 {!errorFicha && parcial && <span className="is-debe">Ficha incompleta</span>}
               </div>
@@ -2304,7 +2305,7 @@ export default function FichaMedica({ pacienteId, onClose, notify = () => { }, c
                     <div className="fm-fil__g">
                       {campo("Nombre completo", fil.nombre, (v) => setFil({ ...fil, nombre: v }))}
                       {campo("DNI", fil.dni, (v) => setFil({ ...fil, dni: v.replace(/\D/g, "").slice(0, 8) }), { inputMode: "numeric" })}
-                      <div className="fm-fil__c"><label style={lbl}>Fecha de nacimiento</label><input type="date" max={hoy} style={inp} value={fil.fechaNacimiento || ""} onChange={(e) => setFil({ ...fil, fechaNacimiento: e.target.value })} /></div>
+                      <div className="fm-fil__c"><label style={lbl}>Fecha de nacimiento</label><CampoFecha max={hoy} style={inp} value={fil.fechaNacimiento || ""} onChange={(e) => setFil({ ...fil, fechaNacimiento: e.target.value })} /></div>
                       <div className="fm-fil__c"><label style={lbl}>Sexo</label>
                         <Select value={fil.genero} onChange={(v) => setFil({ ...fil, genero: v })} placeholder="—"
                           options={[{ value: "", label: "—" }, ...["Femenino", "Masculino", "Prefiere no decir"].map((g) => ({ value: g, label: g }))]} />

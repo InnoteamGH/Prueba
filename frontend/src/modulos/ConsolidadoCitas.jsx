@@ -6,12 +6,13 @@
  * Demo: usa las citas en memoria de la agenda (ya filtradas por sede).
  */
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarRange, CheckCircle2, Clock, Download, UserX, XCircle, Users, CalendarDays, Stethoscope, TrendingUp } from "lucide-react";
+import { CalendarRange, CheckCircle2, Clock, UserX, XCircle, Users, CalendarDays, Stethoscope, Table2, TrendingUp } from "lucide-react";
 import api from "../api/client";
 import { sedeApiUuid } from "../routing";
-import { ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, exportarExcel, colorDe, useSede } from "../comun";
+import { CampoFecha, DataTable, EstadoPill, ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Select, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, colorDe, useSede } from "../comun";
 import { estadoCita } from "../compartido/estados";
 import { motivoVisible } from "../util/textoCita";
+import "./modulos2.css";
 
 const PROGRAMADA = ["pendiente", "confirmada", "en_sala", "en_atencion"];
 const PERDIDA = ["cancelada", "reprogramada"];
@@ -20,7 +21,8 @@ const PERDIDA = ["cancelada", "reprogramada"];
 const CERRADA = ["cerrada_sistema"];
 const lunes = (d) => { const x = new Date(d); const dia = (x.getDay() + 6) % 7; x.setDate(x.getDate() - dia); return x; };
 const ymd = (d) => fmt(d);
-const KPI_EST = { Programadas: "programadas", Atendidas: "atendidas", "No asistió": "no_show", Canceladas: "canceladas", "Cerradas por sistema": "cerradas" };
+const KPI_EST = { Programadas: "programadas", Atendidas: "atendidas", "No asistió": "no_show", Canceladas: "canceladas", "Cerradas automáticamente": "cerradas" };
+const ESTADOS_SEL = [["todos", "Todos"], ["programadas", "Programadas"], ["atendidas", "Atendidas"], ["no_show", "No asistió"], ["canceladas", "Canceladas"], ["cerradas", "Cerradas automáticamente"]];
 
 export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuario, conectado, notify = () => {}, onAbrirCita }) {
   const esMedico = rol === "medico";
@@ -87,12 +89,17 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
   }, [filasF]);
   const maxDoc = Math.max(1, ...porDoctor.map((d) => d.total));
 
-  const badge = (e) => { const b = ESTADO_BADGE[e] || { l: e, bg: "var(--dc-bg)", fg: "var(--dc-ink-500)" }; return <span className="dc-pill" style={{ background: b.bg, color: b.fg }}>{b.l}</span>; };
-  const exportar = () => exportarExcel({
-    nombreArchivo: `citas_${rango.desde}_${rango.hasta}.xlsx`, hoja: "Citas", titulo: `Consolidado de citas${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`,
-    columnas: [{ key: "fecha", label: "Fecha", w: 12 }, { key: "hora", label: "Hora", w: 8 }, { key: "paciente", label: "Paciente", w: 26 }, { key: "medico", label: "Doctor", w: 24 }, { key: "motivo", label: "Motivo", w: 26 }, { key: "estadoL", label: "Estado", w: 14 }, { key: "sedeNombre", label: "Sede", w: 16 }],
-    filas: filasF.map((c) => ({ ...c, estadoL: (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado })),
-  }).catch(() => notify("No se pudo generar el Excel."));
+  // Búsqueda y Excel de la lista (lo filtrado). Memorizadas: si cambiaran en cada render, la
+  // tabla volvería a 25 filas después de «Cargar más».
+  const colsLista = useMemo(() => [
+    { key: "fecha", label: "Fecha", get: (c) => fechaLegible(c.fecha), exportar: (c) => String(c.fecha || "").split("-").reverse().join("/") },
+    { key: "hora", label: "Hora", get: (c) => c.hora },
+    { key: "paciente", label: "Paciente", get: (c) => c.paciente },
+    { key: "motivo", label: "Motivo", get: (c) => c.motivo || "—" },
+    ...(esMedico ? [] : [{ key: "medico", label: "Odontólogo", get: (c) => c.medico }]),
+    { key: "estado", label: "Estado", get: (c) => (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado },
+    { key: "sede", label: "Sede", get: (c) => c.sedeNombre },
+  ], [esMedico]);
 
   const KPIS = [
     ["Total", k.total, CalendarRange, "#0E9199", `${fechaLegible(rango.desde)}${rango.hasta !== rango.desde ? ` – ${fechaLegible(rango.hasta)}` : ""}`],
@@ -100,7 +107,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
     ["Atendidas", k.atendidas, CheckCircle2, "#16A36A", k.asistencia == null ? "Sin citas cerradas" : `${k.asistencia}% de asistencia`],
     ["No asistió", k.noShow, UserX, "#D97706", "Para reprogramar"],
     ["Canceladas", k.perdidas, XCircle, "#E0694F", "Incluye reprogramadas"],
-    ["Cerradas por sistema", k.cerradasSis, Clock, "#667085", "Quedaron abiertas y el sistema las cerró"],
+    ["Cerradas automáticamente", k.cerradasSis, Clock, "#667085", "Quedaron abiertas y el sistema las cerró"],
   ];
 
   return (
@@ -114,10 +121,11 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
           <div className="dc-moneda-sel" role="radiogroup" aria-label="Rango">
             {[["hoy", "Hoy"], ["semana", "Semana"], ["mes", "Este mes"], ["30", "Últimos 30 días"], ["prox7", "Próximos 7 días"], ["prox30", "Próximos 30 días"]].map(([id, l]) => <button key={id} type="button" role="radio" aria-checked={preset === id} className={preset === id ? "is-on" : ""} onClick={() => aplicarPreset(id)}>{l}</button>)}
           </div>
-          <label><span>Desde</span><input type="date" value={rango.desde} max={rango.hasta} onChange={(e) => { setPreset("x"); setRango({ ...rango, desde: e.target.value }); }} /></label>
-          <label><span>Hasta</span><input type="date" value={rango.hasta} min={rango.desde} onChange={(e) => { setPreset("x"); setRango({ ...rango, hasta: e.target.value }); }} /></label>
-          {!esMedico && doctoresRango.length > 1 && <label><span>Doctor</span><select value={docSel} onChange={(e) => setDocSel(e.target.value)}><option value="todos">Todos</option>{doctoresRango.map((d) => <option key={d} value={d}>{d}</option>)}</select></label>}
-          <label><span>Estado</span><select value={estSel} onChange={(e) => setEstSel(e.target.value)}><option value="todos">Todos</option><option value="programadas">Programadas</option><option value="atendidas">Atendidas</option><option value="no_show">No asistió</option><option value="canceladas">Canceladas</option><option value="cerradas">Cerradas por sistema</option></select></label>
+          <label><span>Desde</span><CampoFecha value={rango.desde} max={rango.hasta} onChange={(e) => { setPreset("x"); setRango({ ...rango, desde: e.target.value }); }} /></label>
+          <label><span>Hasta</span><CampoFecha value={rango.hasta} min={rango.desde} onChange={(e) => { setPreset("x"); setRango({ ...rango, hasta: e.target.value }); }} /></label>
+          {/* El Select de la app (no el nativo), del mismo alto que las fechas. */}
+          {!esMedico && doctoresRango.length > 1 && <label><span>Odontólogo</span><Select width={200} ariaLabel="Odontólogo" value={docSel} onChange={setDocSel} options={[{ value: "todos", label: "Todos" }, ...doctoresRango.map((d) => ({ value: d, label: d }))]} /></label>}
+          <label><span>Estado</span><Select width={190} ariaLabel="Estado" value={estSel} onChange={setEstSel} options={ESTADOS_SEL.map(([value, label]) => ({ value, label }))} /></label>
           {/* GLO-04: se exporta desde la barra de la tabla (lo filtrado). */}
         </div>
         <dl className="dc-cons__cifras">
@@ -136,29 +144,26 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
       {rango.desde && rango.hasta && rango.hasta < rango.desde ? (
         <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo="Rango de fechas inválido" sub="La fecha «Hasta» es anterior a «Desde». Corrígela para ver las citas." /></Card>
       ) : filasF.length === 0 ? (
-        <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : filas.length ? "Ninguna cita con estos filtros" : "Sin citas en el rango"} sub={filas.length ? (esMedico ? "Cambia el estado o las fechas." : "Cambia el doctor o el estado.") : "Cambia las fechas para ver otro periodo."} /></Card>
+        <Card><Vacio icon={<CalendarDays size={24} strokeWidth={1.75} />} titulo={cargando ? "Cargando citas…" : filas.length ? "Ninguna cita con estos filtros" : "Sin citas en el rango"} sub={filas.length ? (esMedico ? "Cambia el estado o las fechas." : "Cambia el odontólogo o el estado.") : "Cambia las fechas para ver otro periodo."} /></Card>
       ) : (
         <ListaFiltrable rows={filasF} sub="citas" vistaClave="citas_consolidado" alfabetico={false}
-          exportTitulo={`Consolidado de citas${rol === "medico" && usuario?.nombre ? ` · ${usuario.nombre}` : ""}${docSel !== "todos" ? ` · ${docSel}` : ""}${estSel !== "todos" ? ` · ${{ programadas: "Programadas", atendidas: "Atendidas", no_show: "No asistió", canceladas: "Canceladas", cerradas: "Cerradas por sistema" }[estSel]}` : ""}${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`}
-          vistas={[{ id: "dia", label: "Por día", icon: CalendarDays }]}
-          tabla={{ primero: true, minWidth: 860, onRowClick: onAbrirCita, cols: [
-            { key: "f", label: "Fecha", w: "120px", exportar: (c) => String(c.fecha || "").split("-").reverse().join("/"), cell: (c) => <span className="dc-tp__num">{fechaLegible(c.fecha)}</span> },
-            { key: "h", label: "Hora", w: "70px", cell: (c) => <span className="dc-tp__num">{c.hora}</span> },
-            { key: "p", label: "Paciente", w: "minmax(170px,1.2fr)", get: (c) => c.paciente, cell: (c) => <PersonaCelda nombre={c.paciente} /> },
-            { key: "m", label: "Motivo", w: "minmax(150px,1.1fr)", get: (c) => c.motivo || "—" },
-            ...(esMedico ? [] : [{ key: "d", label: "Doctor", w: "minmax(150px,1fr)", get: (c) => c.medico }]),
-            { key: "s", label: "Sede", w: "130px", get: (c) => c.sedeNombre },
-            { key: "e", label: "Estado", w: "130px", a: "center", cell: (c) => badge(estadoCita(c)) },
-          ] }}
-          cols={[
-            { key: "fecha", label: "Fecha", get: (c) => c.fecha },
-            { key: "hora", label: "Hora", get: (c) => c.hora },
-            { key: "paciente", label: "Paciente", get: (c) => c.paciente },
-            ...(esMedico ? [] : [{ key: "medico", label: "Doctor", get: (c) => c.medico }]),
-            { key: "estado", label: "Estado", get: (c) => (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado },
-            { key: "sede", label: "Sede", get: (c) => c.sedeNombre },
-          ]}>
+          exportTitulo={`Consolidado de citas${rol === "medico" && usuario?.nombre ? ` · ${usuario.nombre}` : ""}${docSel !== "todos" ? ` · ${docSel}` : ""}${estSel !== "todos" ? ` · ${Object.fromEntries(ESTADOS_SEL)[estSel]}` : ""}${sede !== "all" ? ` · ${nombreSede(sede)}` : ""} — ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}`}
+          vistas={[{ id: "tabla", label: "Tabla", icon: Table2 }, { id: "dia", label: "Por día", icon: CalendarDays }]}
+          cols={colsLista}>
           {(lista, vista) => {
+            // Tabla de 25 en 25 («Cargar más»). Fecha y hora angostas y fijas; el ancho que
+            // sobra es para paciente y motivo. La fecha va en gris: se repite fila tras fila.
+            if (vista === "tabla") return (
+              <DataTable rows={lista} sub="citas" minWidth={860} exportar={false} onRowClick={onAbrirCita} cols={[
+                { key: "f", label: "Fecha", w: "100px", fijo: true, a: "left", noFilter: true, get: (c) => fechaLegible(c.fecha), sortVal: (c) => `${c.fecha} ${c.hora}`, cell: (c) => <span className="dc-tp__sub">{fechaLegible(c.fecha)}</span> },
+                { key: "h", label: "Hora", w: "64px", fijo: true, a: "left", noFilter: true, get: (c) => c.hora, cell: (c) => <span className="dc-tp__num">{c.hora}</span> },
+                { key: "p", label: "Paciente", w: "minmax(180px,1.6fr)", a: "left", noFilter: true, get: (c) => c.paciente, cell: (c) => <PersonaCelda nombre={c.paciente} /> },
+                { key: "m", label: "Motivo", w: "minmax(160px,1.6fr)", a: "left", noFilter: true, get: (c) => c.motivo || "—", cell: (c) => <span className="dc-tp__txt" title={c.motivo || undefined}>{c.motivo || "—"}</span> },
+                ...(esMedico ? [] : [{ key: "d", label: "Odontólogo", w: "minmax(140px,1fr)", a: "left", noFilter: true, get: (c) => c.medico }]),
+                { key: "s", label: "Sede", w: "minmax(100px,.7fr)", a: "left", noFilter: true, get: (c) => c.sedeNombre },
+                { key: "e", label: "Estado", w: "140px", fijo: true, a: "center", noFilter: true, get: (c) => (ESTADO_BADGE[estadoCita(c)] || {}).l || c.estado, cell: (c) => <EstadoPill entidad="cita" estado={estadoCita(c)} /> },
+              ]} />
+            );
             const clave = vista === "doctor" ? (c) => c.medico : (c) => c.fecha;
             const grupos = [];
             lista.forEach((c) => { const g = clave(c); let x = grupos.find((y) => y.g === g); if (!x) { x = { g, items: [] }; grupos.push(x); } x.items.push(c); });
@@ -178,7 +183,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
                             <span className="dc-cons__hora">{vista === "doctor" ? <><b>{c.hora}</b><small>{fechaLegible(c.fecha)}</small></> : <b>{c.hora}</b>}</span>
                             <span className="dc-cons__dot" style={{ background: colorDe(c.paciente) }} />
                             <div><b>{c.paciente}</b><small>{c.motivo || "Consulta"}{vista !== "doctor" && !esMedico ? ` · ${c.medico}` : ""}</small></div>
-                            {badge(estadoCita(c))}
+                            <EstadoPill entidad="cita" estado={estadoCita(c)} />
                           </li>
                         ))}
                       </ul>

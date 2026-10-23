@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useContext } from "react";
-import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture} from "lucide-react";
+import {UserX, Armchair, Calendar, Clock, Users, Stethoscope, Bell, CheckCircle2, MessageSquare, CreditCard, FileText, Plus, Search, ChevronRight, LayoutDashboard, Building2, Activity, Send, Bot, UserCheck, Sparkles, Lock, Smile, MapPin, ClipboardList, DollarSign, Zap, Menu, ArrowRight, TrendingUp, TrendingDown, LogOut, Eye, EyeOff, Shield, UserCog, Plug, Star, AlertTriangle, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Percent, Wallet, CalendarCheck, X, Settings, Phone, ShieldCheck, UserPlus, Power, Trash2, KeyRound, Pencil, Mail, Check, Globe, Ticket, Repeat, Package, FlaskConical, AlertCircle, Minus, Umbrella, BellRing, Scan, Camera, Upload, Crown, Navigation, ChevronDown, Download, Copy, Layers, SlidersHorizontal, Link2, Hourglass, CalendarClock, Info, FileCheck, Printer, Pill, HeartPulse, ShieldPlus, Target, ArrowUpDown, Megaphone, User, CheckCheck, Monitor, FileSpreadsheet, Banknote, Smartphone, Landmark, Coins, Calculator, Vault, Receipt, Scale, Tag, Compass, Pin, PinOff, CornerDownLeft, LayoutGrid, List, History, Table2, Columns3, Route, Sun, Contrast, ZoomIn, RotateCcw, Columns2, Aperture, RefreshCw} from "lucide-react";
 import api, { auth, ApiError, alFallarPeticion, alCerrarSesion, isTokenExpired, parseJwt, limpiarDatosLocales, esSinPermiso, msgServidor } from "./api/client";
 import { mensajeErrorLogin } from "./api/reintentos";
 import { limpiarRegistroSedes, hayRegistroSedes, idxDeUuid } from "./compartido/sedesRegistro";
@@ -41,6 +41,7 @@ import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, e
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
 import { motivoVisible } from "./util/textoCita";
+import { nombrePropio } from "./util/nombres";
 import { codigoAutorizacionValido, estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa, verificable } from "./util/linksPago";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
@@ -90,11 +91,11 @@ import { MOTIVO_ANULAR_MIN, accionesProcedimiento, cuerpoAnulacion, motivoAnulac
 import { puedeSalir } from "./compartido/guardaSalida";
 import { cruceAlergias, listaAlergias } from "./compartido/alergias";
 import { horasSemana, horarioConfigurado } from "./comun";
-import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, partirIndicaciones } from "./compartido/recetaItems";
+import { itemsDeReceta, nombreItemReceta, indicacionItemReceta, itemRecetaDesdeFormulario, partirIndicaciones, posologiaItemReceta, nombreVisibleReceta } from "./compartido/recetaItems";
 import { imprimirReceta as imprimirRecetaDoc } from "./util/recetaDoc";
 import { textoConsentimiento } from "./compartido/consentimientoTexto";
 import { MOTIVO_ANULAR_CONSENT_MIN, contenidoSinMarcas, estadoConsentimiento, motivoAnulacion, tituloLimpio, validarMotivoAnulacion } from "./util/consentimientoEstado";
-import {BotonPDF, conceptoVisible, SedeCtx, useSede, useEmiteCobros, coincideBusqueda, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
+import {BotonPDF, CampoFecha, fechaDoc, conceptoVisible, SedeCtx, useSede, useEmiteCobros, coincideBusqueda, comprimirImagen, mismaSede, sedeDePrecio, AvatarPaciente, DatosDemoCtx, RESENAS_SEED, espsDe, Pestanas, EGRESOS_DEMO, DOCUMENTOS_SEED, LAB_SEED, LIQ_SEED, EstadoPill, EnCabecera, MenuAcciones, ListaFiltrable, EDAD_PEDIATRICA, EmblemaNino, HORAS_SEL, caraOdontoLabel, colorPediatrico, PED, PED_LINEA, PED_SUAVE, pluralEs, Select, TimeSelect, esPediatrico, validarFormPaciente, ACCIONES, ACCION_IDS, AUDITORIA, BG, Badge, Btn, CITAS_INIT, CLINICAS_INIT, Card, DISPLAY_FONT, DS, DashLienzo, DataTable, ESPECIALIDADES, ESTADO_BADGE, FICHA_CLINICA, Field, INK, KpiCard, MEDICOS, MODULOS, ModHead, Modal, NAVY, PACIENTES_INIT, PLAN_MODULOS, PLAN_NOMBRE, PacienteBar, RED, ROLES, ROL_PERMS, SEDES, SEDE_IDS, STAFF_INIT, TEAL, UI, USUARIOS, Vacio, addDays, calcEdad, colorDe, cortaSede, etiquetaSedes, exportarExcel, exportarPDF, fechaLegible, fmt, hoy, iniciales, modDeVista, modulosVisibles, tonoAviso, jornadaClinica, feriadoCerrado, horasEntre, horarioDeSede, nombreSede, normSedes, permisosEfectivos, planMinimo, puede, sedeMasCercana, sedesDe, setSedesCatalogo, toMin, usePersist, tint, PersonaCelda} from "./comun";
 /** Accesos de demostración: en desarrollo, o en una compilación de revisión hecha
     con VITE_DEMO=1 (nunca en la de producción normal). */
 const MODO_DEMO = !import.meta.env.PROD || import.meta.env.VITE_DEMO === "1";
@@ -916,7 +917,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
         <Card className="dc-hoy__tareas">
           <div className="dc-hoy__cab">
             <h3>Por hacer</h3>
-            <span className="dc-hoy__num">{tareas.length}</span>
+            {tareas.length > 0 && <span className={`dc-hoy__num${tareas.some((t) => t.tono === "peligro") ? " is-alerta" : ""}`}>{tareas.length}</span>}
           </div>
           {tareas.length === 0 ? (
             <div className="dc-hoy__vacio"><CheckCircle2 size={28} strokeWidth={1.5} /><b>Todo al día</b><span>No hay nada pendiente por ahora.</span></div>
@@ -1320,7 +1321,7 @@ function CalendarioAgenda({ citas, onCita, onReagendar, horario = {}, feriados =
           </div>}
           {/* M7-01: Escape y el clic fuera cierran «Descargar», sin capa que se coma el primer clic. */}
           <div ref={dlCajaRef} style={{ position: "relative" }}>
-            <button ref={dlBtnRef} type="button" aria-haspopup="menu" aria-expanded={dlOpen} onClick={() => setDlOpen((v) => !v)} onKeyDown={(e) => { if (dlOpen) moverFocoMenu(e, dlMenuRef.current); }} title="Descargar lo visible" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", cursor: "pointer" }}><Download size={15} strokeWidth={1.75} /> Descargar</button>
+            <button ref={dlBtnRef} type="button" aria-haspopup="menu" aria-expanded={dlOpen} onClick={() => setDlOpen((v) => !v)} onKeyDown={(e) => { if (dlOpen) moverFocoMenu(e, dlMenuRef.current); }} title="Descargar lo visible" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: "var(--dc-r-sm)", border: "1px solid var(--dc-line)", background: "#fff", fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", cursor: "pointer" }}><Download size={15} strokeWidth={1.75} /> Exportar</button>
             {dlOpen && (
               <div ref={dlMenuRef} role="menu" onKeyDown={(e) => moverFocoMenu(e, dlMenuRef.current)} style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 41, background: "#fff", border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", boxShadow: "0 18px 40px -18px rgba(16,24,40,.4)", overflow: "hidden", minWidth: 220 }}>
                 <div style={{ padding: "8px 12px", fontSize: 12, fontWeight: 500, color: "var(--dc-ink-400)", textTransform: "uppercase", letterSpacing: ".05em", borderBottom: "1px solid var(--dc-bg)" }}>{modo === "mes" ? "Mes visible" : (modo === "semana" || modo === "tabla") ? "Semana visible" : "Día visible"} – {conteoRango}</div>
@@ -1658,6 +1659,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // sin borrarlo aquí (en modo estricto el inicializador corre dos veces) y se borra después.
   const [filtroIni] = useState(() => { try { const x = JSON.parse(sessionStorage.getItem("dc_agenda_filtro") || "null"); return x && x.estado ? x : null; } catch { return null; } });
   const [estadoDia, setEstadoDia] = useState(() => (filtroIni ? filtroIni.estado : null));
+  // Las canceladas y cerradas por sistema no se mezclan con las citas del día: se ven a pedido.
+  const [verCanceladas, setVerCanceladas] = useState(false);
   useEffect(() => { try { sessionStorage.removeItem("dc_agenda_filtro"); } catch { /* sin almacenamiento */ } }, []);
   // M6-03: la vista Día arranca en la fecha que se miraba en Semana, Mes, Por doctor o Por
   // sillón (si fue hace poco) y les deja la suya: antes Día 09/10 → Semana mostraba la de hoy.
@@ -1917,7 +1920,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
 
   const atend = todasHoy.filter((c) => c.estado === "atendida").length;
   const avance = todasHoy.length ? Math.round((atend / todasHoy.length) * 100) : 0;
-  const EST = { pendiente: { c: "var(--dc-ink-500)", l: "Pendiente" }, confirmada: { c: DS.c.primary, l: "Confirmada" }, en_sala: { c: "var(--dc-purple)", l: "En sala" }, en_atencion: { c: "var(--dc-warn-600)", l: "En atención" }, atendida: { c: "var(--dc-ok-700)", l: "Atendida" }, cancelada: { c: "var(--dc-red)", l: "Cancelada" }, no_show: { c: "var(--dc-warn-600)", l: "No asistió" }, reprogramada: { c: "var(--dc-purple)", l: "Reprogramada" }, cerrada_sistema: { c: "var(--dc-ink-400)", l: "Cerrada por sistema" } };
+  const EST = { pendiente: { c: "var(--dc-ink-500)", l: "Pendiente" }, confirmada: { c: DS.c.primary, l: "Confirmada" }, en_sala: { c: "var(--dc-purple)", l: "En sala" }, en_atencion: { c: "var(--dc-warn-600)", l: "En atención" }, atendida: { c: "var(--dc-ok-700)", l: "Atendida" }, cancelada: { c: "var(--dc-red)", l: "Cancelada" }, no_show: { c: "var(--dc-warn-600)", l: "No asistió" }, reprogramada: { c: "var(--dc-purple)", l: "Reprogramada" }, cerrada_sistema: { c: "var(--dc-ink-400)", l: "Cerrada automáticamente" } };
   const nombreSillon = (c) => { if (!c.sillon) return ""; const x = (reglasAg.sillones || []).find((y) => String(y.sede) === String(c.sede) && String(y.numero) === String(c.sillon)); return x ? x.nombre : `Sillón ${c.sillon}`; };
   /* Acciones de una cita según su estado, su día y quién mira. Las usan la fila de la vista
      Día y el panel que se abre al hacer clic en una cita del calendario: una sola lógica.
@@ -1945,7 +1948,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       else if (est === "en_sala") principal = A("Pasar a sillón", () => pasarAtencion(c), "var(--dc-warn-600)");
       else if (est === "en_atencion") principal = A("Finalizar y cobrar", () => { set(c.id, "atendida", `Atención de ${c.paciente} finalizada. Cóbrala en Caja.`, () => { window.location.hash = "#/caja"; }); }, "var(--dc-ok-700)");
     }
-    if (!principal && rol !== "medico" && emiteCobroAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0) principal = A(`Cobrar S/ ${saldos[c.pacienteId].toFixed(0)}`, () => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede }), DS.c.primary);
+    // Cobrar no se ofrece en una cita cancelada, no asistida o cerrada: invitaba a cobrar algo que no ocurrió.
+    if (!principal && rol !== "medico" && emiteCobroAg && conectado && c.pacienteId && saldos[c.pacienteId] > 0 && !["cancelada", "cerrada_sistema", "reprogramada", "no_show"].includes(c.estado)) principal = A(`Cobrar S/ ${M.sol2(saldos[c.pacienteId])}`, () => setPago({ pid: c.pacienteId, nombre: c.paciente, monto: saldos[c.pacienteId], sedeId: c.sede }), DS.c.primary);
     const opciones = puedeOperarAgenda && abierta ? [
       // Llegó sin haber confirmado: se marca la llegada sin pasar antes por «Confirmar».
       esHoy && !c.llegada && (est === "pendiente" || est === "confirmada") && principal?.label !== "Marcar llegada" && { label: "Marcar llegada", onClick: llegada },
@@ -1976,8 +1980,8 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 11, minWidth: 0 }}>
           <div style={{ width: 36, height: 36, borderRadius: "var(--dc-r-full)", background: pasada ? "var(--dc-bg-alt)" : tint(colorDe(c.paciente), 0.14), color: pasada ? "var(--dc-ink-400)" : colorDe(c.paciente), display: "grid", placeItems: "center", fontWeight: 600, fontSize: 12, flexShrink: 0, boxShadow: pasada ? "none" : `inset 0 0 0 1.5px ${tint(colorDe(c.paciente), 0.25)}` }}>{iniciales(c.paciente)}</div>
           <div style={{ minWidth: 0 }}>
-            <span title={c.paciente} style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, minWidth: 0, lineHeight: 1.3 }}><span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{c.paciente}</span>{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
-            {c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 2, color: "var(--dc-ok-700)", fontWeight: 500 }}><MessageSquare size={10} strokeWidth={1.75} /> Agendada por IA</span>}
+            <span title={c.paciente} style={{ fontWeight: 500, color: NAVY, fontSize: 14, display: "flex", alignItems: "center", gap: 5, minWidth: 0, lineHeight: 1.3 }}><span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{nombrePropio(c.paciente)}</span>{c.confirmadoWa && <span title="Confirmó asistencia por WhatsApp" style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "1px 5px", borderRadius: "var(--dc-r-full)", flexShrink: 0 }}><CheckCheck size={10} strokeWidth={1.75} /> WA</span>}</span>
+            {c.agendadoPorIa && <span title="Agendada por el asistente de WhatsApp" style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 3, color: "var(--dc-ok-700)", fontWeight: 600, whiteSpace: "nowrap" }}><MessageSquare size={10} strokeWidth={1.75} /> IA</span>}
           </div>
         </div>); } },
     { key: "dni", label: "DNI", get: (c) => c.dni || "", w: "80px", a: "left", cell: (c) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{c.dni || "—"}</span> },
@@ -2013,6 +2017,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
       } },
   ];
   const lista = [...todasHoy].sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
+  const FUERA_DIA = ["cancelada", "cerrada_sistema", "reprogramada"];
   // M6-03: los horarios bloqueados del día que se ve. El médico ve los suyos y los de toda la
   // agenda (como en su Semana); recepción y administración, todos los de la sede.
   const bloqDia = vista === "calendario" ? [] : bloqueosDelDia(bloqueosEf, diaVer, { medicoPropio: miIdPropio, soloPropios: rol === "medico", enSede: (s) => sedeCx.enSede(s) });
@@ -2037,7 +2042,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
     { l: "No asistió", c: EST.no_show.c, n: todasHoy.filter((c) => c.estado === "no_show").length },
     { l: "Reprogramadas", c: EST.reprogramada.c, n: todasHoy.filter((c) => c.estado === "reprogramada").length },
     // Aparte de las canceladas, como en el Consolidado: el sistema la cerró, nadie la anuló.
-    { l: "Cerradas por sistema", c: EST.cerrada_sistema.c, n: todasHoy.filter((c) => c.estado === "cerrada_sistema").length },
+    { l: "Cerradas automáticamente", c: EST.cerrada_sistema.c, n: todasHoy.filter((c) => c.estado === "cerrada_sistema").length },
   ].filter((x) => x.n > 0);
   const lbl = { fontSize: 12, fontWeight: 500, letterSpacing: .7, textTransform: "uppercase", color: "var(--dc-ink-500)" };
   const soft = DS.card;
@@ -2113,7 +2118,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
             </div>
             <div>
               <label style={lblSty}>Fecha</label>
-              <input className="dc-premium-inp" type="date" value={asignarPac.fecha} onChange={(e) => setAsignarPac({ ...asignarPac, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} />
+              <CampoFecha className="dc-premium-inp" value={asignarPac.fecha} onChange={(e) => setAsignarPac({ ...asignarPac, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} />
             </div>
             <div>
               <label style={lblSty}>Hora</label>
@@ -2144,7 +2149,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           { l: "En atención", c: "#C4B5FD", n: cnt("en_atencion") },
           { l: "Atendidas", c: "#6EE7A8", n: cnt("atendida") },
           { l: "No asistió / canceladas", c: "#F59A8D", n: cnt("no_show") + cnt("cancelada") },
-          { l: "Cerradas por sistema", c: "rgba(255,255,255,.3)", n: cnt("cerrada_sistema") },
+          { l: "Cerradas automáticamente", c: "rgba(255,255,255,.3)", n: cnt("cerrada_sistema") },
         ].filter((x) => x.n > 0);
         // Una sola franja: tres cifras principales y el desglose por estado. Antes eran
         // ocho tarjetas en dos filas que repetían los mismos números.
@@ -2159,12 +2164,12 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
               {/* Misma regla que la cifra «Citas»: activas y, aparte, canceladas y demás. */}
               <p>{textoConteo(todasHoy, esHoyVer ? " hoy" : "")}</p>
               {/* Otros días: para confirmar, reprogramar o cancelar citas futuras desde la lista. */}
-              {(() => { const nb = { height: 28, minWidth: 28, display: "inline-grid", placeItems: "center", padding: "0 8px", borderRadius: 8, border: "1px solid rgba(255,255,255,.32)", background: "rgba(255,255,255,.12)", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }; return (
+              {(() => { const nb = { height: 34, minWidth: 34, display: "inline-grid", placeItems: "center", padding: "0 8px", borderRadius: 8, border: "1px solid rgba(255,255,255,.32)", background: "rgba(255,255,255,.12)", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }; return (
                 <div className="dc-ag-dianav" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
                   <button type="button" aria-label="Día anterior" title="Día anterior" onClick={() => moverDia(-1)} style={nb}><ChevronRight size={15} strokeWidth={2} style={{ transform: "rotate(180deg)" }} /></button>
                   <button type="button" onClick={() => setDiaVer(hoyISO)} aria-pressed={esHoyVer} style={{ ...nb, background: esHoyVer ? "#fff" : nb.background, color: esHoyVer ? "#0C6B75" : "#fff" }}>Hoy</button>
                   <button type="button" aria-label="Día siguiente" title="Día siguiente" onClick={() => moverDia(1)} style={nb}><ChevronRight size={15} strokeWidth={2} /></button>
-                  <input type="date" aria-label="Ir a la fecha" value={diaVer} onChange={(e) => e.target.value && setDiaVer(e.target.value)} style={{ ...nb, cursor: "text", fontWeight: 500, colorScheme: "dark" }} />
+                  <CampoFecha aria-label="Ir a la fecha" value={diaVer} onChange={(e) => e.target.value && setDiaVer(e.target.value)} style={{ ...nb, cursor: "text", fontWeight: 500, colorScheme: "dark" }} />
                 </div>
               ); })()}
             </div>
@@ -2175,7 +2180,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
               <div><b>{cnt("pendiente")}</b><span>Por confirmar</span></div>
             </div>
             {/* AGE-02: la próxima cita ya se marca en su fila de la tabla. */}
-            {segs.length > 0 && (
+            {segs.length > 0 && todasHoy.some((c) => !["cancelada", "cerrada_sistema", "reprogramada"].includes(estadoCita(c))) && (
               <div className="dc-ag-hero__estados">
                 <div className="dc-ag-hero__barra" role="img" aria-label={segs.map((a) => `${a.l}: ${a.n}`).join(", ")}>
                   {segs.map((a) => <i key={a.l} style={{ width: `${a.pct}%`, background: a.c }} />)}
@@ -2211,14 +2216,15 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           ); })}
         </div>
       )}
-      <DataTable titulo={`${esHoyVer ? "Citas de hoy" : `Citas del ${fechaLegible(diaVer)}`}${estadoDia ? ` · ${(ETQ_FILTRO_DIA[estadoDia] || estadoInfo("cita", estadoDia).label).toLowerCase()}` : ""}`} sub="en la lista" minWidth={980} rows={estadoDia ? lista.filter((c) => c.estado === estadoDia) : lista} defaultSort={{ key: "hora", dir: "asc" }}
+      <DataTable titulo={`${esHoyVer ? "Citas de hoy" : `Citas del ${fechaLegible(diaVer)}`}${estadoDia ? ` · ${(ETQ_FILTRO_DIA[estadoDia] || estadoInfo("cita", estadoDia).label).toLowerCase()}` : ""}`} sub="en la lista" minWidth={980} rows={estadoDia ? lista.filter((c) => c.estado === estadoDia) : verCanceladas ? lista : lista.filter((c) => !FUERA_DIA.includes(c.estado))} defaultSort={{ key: "hora", dir: "asc" }}
+        accion={!estadoDia && lista.some((c) => FUERA_DIA.includes(c.estado)) ? <button type="button" className="dc-dt__limpiar is-ver" onClick={() => setVerCanceladas((v) => !v)}>{verCanceladas ? "Ocultar canceladas" : `Ver canceladas (${lista.filter((c) => FUERA_DIA.includes(c.estado)).length})`}</button> : null}
         rowClassName={(c) => `dc-ag-fila${proxima && c.id === proxima.id && c.estado !== "atendida" ? " is-prox" : ""}${c.estado === "cancelada" || c.estado === "cerrada_sistema" || c.estado === "atendida" ? " is-pasada" : ""}`}
         onRowClick={(c) => abrirFichaCita(c)}
         empty={estadoDia
           // R-24: «Ninguna cita atendida» (decía «Ninguna cita atendidas»).
           ? <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo={`Ninguna cita ${(ETQ_FILTRO_DIA_UNA[estadoDia] || estadoInfo("cita", estadoDia).label).toLowerCase()}`} sub="Pulsa «Ver todas las citas» para ver el resto del día." />
           : <Vacio icon={<Calendar size={24} strokeWidth={1.75} />} titulo="Sin citas programadas" sub={bloqDia.length ? `No hay citas para ese día; ${bloqDia.length === 1 ? "hay un horario bloqueado (arriba)" : `hay ${bloqDia.length} horarios bloqueados (arriba)`}.` : esHoyVer ? "Tu agenda para hoy está libre." : "No hay citas para ese día."} />}
-        cols={COLS_AGENDA} />
+        cols={COLS_AGENDA.filter((c) => !(c.key === "medico" && rol === "medico") && !(c.key === "sede" && (sedeCx.sede !== "all" || (sedeCx.ids && sedeCx.ids.length === 1))))} />
       </>) : <CalendarioAgenda modoFijo={calModo} onRango={cargarRango} notify={notify} onIrDia={onIrDia} citas={(conectado ? (remotoAll || []).filter(enFiltro) : citasProp.map((c) => ({ ...c, medico: c.medico || (MEDICOS.find((m) => m.id === c.medicoId) || {}).nombre }))).filter((c) => miId == null || c.medicoId === miId)} medicoFijo={miId} medicoPropio={miIdPropio} soloConCitas={rol === "medico"} onCita={(c) => setCitaVer(c.id)} onReagendar={puedeOperarAgenda ? reagendarCita : undefined} horario={conectado ? horarioClinica.horario : (demoDb?.horarioClinica?.horario || {})} feriados={conectado ? horarioClinica.feriados : (demoDb?.horarioClinica?.feriados || [])} bloqueos={bloqueosEf.filter((b) => b.sede == null || sedeCx.enSede(b.sede))} reglas={reglasVis} validar={validarMovida} sedeInicial={sedeActiva} sedeFiltro={sedeCx.sede}
         onAsignar={puedeAgendar ? (a) => { if (conectado) { api.sillones.asignar(a).then(() => notify("Turno asignado.")).catch(() => notify("No se pudo asignar el turno.")); return; } demoDb?.setAsignaciones((xs) => [...(xs || []), { ...a, id: `t${Date.now()}` }]); notify("Turno asignado. Las citas de ese rango ya usan esta regla."); } : null}
         onQuitarAsignacion={puedeAgendar ? (id) => { if (conectado) { api.sillones.quitarAsignacion(id).then(() => notify("Turno quitado.")).catch(() => notify("No se pudo quitar.")); return; } demoDb?.setAsignaciones((xs) => (xs || []).filter((x) => x.id !== id)); notify("Turno quitado."); } : null} onNuevo={puedeAgendar ? ({ sede, medicoId, ...patch }) => setAgendar({ ...patch, ...(sede != null ? { sedeId: sede } : {}), ...(medicoId != null && medicoId !== "sin" ? { medicoId } : {}) }) : undefined} />}
@@ -2290,7 +2296,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
             {bloqForm.aplica === "doctor" && <div><label style={lblSty}>Doctor</label><Select value={bloqForm.medicoId || ""} onChange={(v) => setBloqForm({ ...bloqForm, medicoId: v })} placeholder="— Selecciona —" options={(reglasVis.medicos || []).map((m) => ({ value: m.id, label: m.nombre }))} /></div>}
             {bloqForm.aplica === "sillon" && <div><label style={lblSty}>Sillón</label><Select value={bloqForm.sillonKey || ""} onChange={(v) => setBloqForm({ ...bloqForm, sillonKey: v })} placeholder="— Selecciona —" options={(reglasVis.sillones || []).map((x) => ({ value: `${x.sede}|${x.numero}`, label: x.nombre, sub: nombreSede(x.sede) || "" }))} /></div>}
             {bloqForm.tipo === "dia"
-              ? <div><label style={lblSty}>Fecha</label><input className="dc-premium-inp" type="date" value={bloqForm.fecha} onChange={(e) => setBloqForm({ ...bloqForm, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} /></div>
+              ? <div><label style={lblSty}>Fecha</label><CampoFecha className="dc-premium-inp" value={bloqForm.fecha} onChange={(e) => setBloqForm({ ...bloqForm, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} /></div>
               : <div><label style={lblSty}>Día de la semana</label><Select value={bloqForm.diaSemana} onChange={(v) => setBloqForm({ ...bloqForm, diaSemana: v })} options={DIAS_B.map(([v, l]) => ({ value: v, label: l }))} /></div>}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div><label style={lblSty}>Desde</label><input className="dc-premium-inp" type="time" value={bloqForm.horaInicio} onChange={(e) => setBloqForm({ ...bloqForm, horaInicio: e.target.value })} style={{ ...selSty, cursor: "text" }} /></div>
@@ -2360,7 +2366,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
               <label style={lblSty}>Nueva fecha</label>
-              <input className="dc-premium-inp" type="date" min={hoyISO} value={reprog.fecha} onChange={(e) => setReprog({ ...reprog, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} />
+              <CampoFecha className="dc-premium-inp" min={hoyISO} value={reprog.fecha} onChange={(e) => setReprog({ ...reprog, fecha: e.target.value })} style={{ ...selSty, cursor: "text" }} />
             </div>
             <div>
               <label style={lblSty}>Nueva hora</label>
@@ -2809,7 +2815,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     { key: "paciente", label: "Paciente", w: "minmax(170px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => { const col = colorDe(p.nombre); return (
       <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
         <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-full)", background: tint(col, 0.102), color: col, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{iniciales(p.nombre)}</div>
-        <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={p.nombre}>{p.nombre}</div>{(p.tags || []).length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>{(p.tags || []).slice(0, 3).map((tg) => { const tc = TAG_COLOR[tg] || "var(--dc-slate)"; return <span key={tg} style={{ fontSize: 12, fontWeight: 500, color: tc, background: tint(tc, 0.086), padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{tg}</span>; })}</div>}</div>
+        <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }} title={p.nombre}>{nombrePropio(p.nombre)}</div>{(p.tags || []).length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>{(p.tags || []).slice(0, 3).map((tg) => { const tc = TAG_COLOR[tg] || "var(--dc-slate)"; return <span key={tg} style={{ fontSize: 12, fontWeight: 500, color: tc, background: tint(tc, 0.086), padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{tg}</span>; })}</div>}</div>
       </div>
     ); } },
     { key: "dni", label: "DNI", w: "92px", a: "left", get: (p) => p.dni || "", cell: (p) => <span className="dc-tp__num" style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.dni || "—"}</span> },
@@ -2818,8 +2824,8 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // qué sede se atiende cada paciente; con el filtro en una sede la columna sobra.
     ...(sedeIds.length > 1 ? [{ key: "sede", label: "Sede", w: "minmax(104px,0.7fr)", a: "left", get: (p) => (conectado ? nombreSede(p.sedeRegistroId) : etiquetaSedes(sedesDe(p))),
       cell: (p) => { const t = conectado ? cortaSede(p.sedeRegistroId) : sedesDe(p).map(cortaSede).join(" · "); return <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t}>{t || "—"}</span>; } }] : []),
-    { key: "ultima", label: "Última cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => ultimaDe(p) || "", cell: (p) => { const u = ultimaDe(p); if (!u) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Sin visitas</span>; const m = mesesSinVenir(p); const c = m >= 6 ? "var(--dc-warn-600)" : m >= 3 ? "var(--dc-ink-400)" : "var(--dc-ok-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 size={13} strokeWidth={1.75} color={c} style={{ flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: c, fontWeight: 500 }}>{relFecha(u, false)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(u)}</div></div></div>; } },
-    { key: "proxima", label: "Próxima cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => proxima(p)?.fecha || "zzz", cell: (p) => { const px = proxima(p); if (!px) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar size={12} strokeWidth={1.75} /> Sin agendar</span>; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: DS.c.primary, flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: DS.c.primary, fontWeight: 500 }}>{relFecha(px.fecha, true)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(px.fecha)} – {(px.hora || "").slice(0, 5)}</div></div></div>; } },
+    { key: "ultima", label: "Última cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => ultimaDe(p) || "", cell: (p) => { const u = ultimaDe(p); if (!u) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }} title="Sin visitas">—</span>; const m = mesesSinVenir(p); const c = m >= 6 ? "var(--dc-warn-600)" : m >= 3 ? "var(--dc-ink-400)" : "var(--dc-ok-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 size={13} strokeWidth={1.75} color={c} style={{ flexShrink: 0 }} /><div style={{ minWidth: 0 }} title={relFecha(u, false)}><div style={{ fontSize: 13, color: "var(--dc-ink-700)", fontWeight: 500, whiteSpace: "nowrap" }}>{fechaLegible(u)}</div><div style={{ fontSize: 12, color: c, whiteSpace: "nowrap" }}>{relFecha(u, false)}</div></div></div>; } },
+    { key: "proxima", label: "Próxima cita", w: "minmax(120px,0.9fr)", a: "left", get: (p) => proxima(p)?.fecha || "zzz", cell: (p) => { const px = proxima(p); if (!px) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }} title="Sin cita agendada">—</span>; return <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "var(--dc-r-full)", background: DS.c.primary, flexShrink: 0 }} /><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, color: DS.c.primary, fontWeight: 500 }}>{relFecha(px.fecha, true)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(px.fecha)} – {(px.hora || "").slice(0, 5)}</div></div></div>; } },
     // "Tarea" no existe en el backend: con sesión salía "—" en todas las filas.
     ...(conectado || !lista.some((p) => p.tarea) ? [] : [{ key: "tarea", label: "Tarea", w: "minmax(130px,0.9fr)", a: "left", vacio: (p) => !p.tarea, get: (p) => p.tarea || "zzz", cell: (p) => { const t = p.tarea; if (!t) return <span style={{ fontSize: 12, color: "var(--dc-line-alt)" }}>—</span>; return <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-sm)", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><BellRing size={12} strokeWidth={1.75} /> {t}</span>; } }]),
     // Con sesión, el saldo real del paciente (plan menos pagos); en la demostración, el
@@ -2828,7 +2834,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
     // PAC-03: «Saldo» = monto por pagar del plan (en rojo si tiene vencido) o «—». Sin barra.
     { key: "presupuesto", label: "Saldo", w: "minmax(110px,0.8fr)", a: "right", get: (p) => { if (conectado) { const q = saldos ? saldos[p.id] : null; return q ? Math.max(0, q.total - q.pagado) : 0; } return ctaSede(p).saldoPlan; },
       cell: (p) => { let saldo, venc = 0; if (conectado) { const q = saldos ? saldos[p.id] : null; saldo = q ? Math.max(0, (Number(q.total) || 0) - (Number(q.pagado) || 0)) : 0; } else { const c = ctaSede(p); saldo = c.saldoPlan; venc = c.vencido; }
-        return saldo > 0 ? <span title={venc > 0 ? `S/ ${venc.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vencido (más de ${M.UMBRAL_VENCIDO_DIAS} días)` : "Saldo del plan"} style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: venc > 0 ? "var(--dc-danger-700)" : "var(--dc-ink-900, #0B1220)" }}>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>; } },
+        return saldo > 0 ? <span title={venc > 0 ? `S/ ${venc.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vencido (más de ${M.UMBRAL_VENCIDO_DIAS} días)` : "Saldo del plan"} style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: venc > 0 ? "var(--dc-danger-700)" : "var(--dc-ink-900, #0B1220)" }}>S/ {saldo.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-400)", fontVariantNumeric: "tabular-nums" }}>S/ 0.00</span>; } },
     { key: "acc", label: "Acciones", w: "128px", a: "right", sticky: true, noFilter: true, noSort: true, cell: (p) => (
       <div className="dc-row-actions" style={{ display: "inline-flex", gap: 4, justifyContent: "flex-end", alignItems: "center", flexWrap: "nowrap" }} onClick={(e) => e.stopPropagation()}>
         {/* PAC-04: una acción principal con texto + menú ⋯. */}
@@ -2884,11 +2890,11 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
       <section className="dc-esp-hero dc-pac-hero">
         <div className="dc-esp-hero__txt">
           <div className="dc-esp-hero__num"><b>{listaError && !lista.length ? "—" : lista.length}</b><span>pacientes</span></div>
-          <p>{listaError && !lista.length ? "No se pudo cargar el directorio" : "En el directorio – toca una fila para abrir la ficha"}</p>
+          <p>{listaError && !lista.length ? "No se pudo cargar el directorio" : "En el directorio · elige uno para abrir su ficha"}</p>
         </div>
         <div className="dc-esp-hero__cifras">
           {activos < lista.length ? <div><b>{activos}</b><span>Activos</span></div> : <div><b>{cumpleMes}</b><span>Cumpleaños del mes</span></div>}
-          <div><b>{nuevos}</b><span>Nuevos – 30 días</span></div>
+          <div><b>{nuevos}</b><span>Nuevos en 30 días</span></div>
           {reactivar === 0 && <div><b>0</b><span>Para reactivar</span></div>}
         </div>
         {reactivar > 0 ? (
@@ -2900,7 +2906,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
         ) : <span />}
         {puedeGestionar && <button type="button" className="dc-esp-hero__agregar" onClick={nuevo}><Plus size={15} strokeWidth={2} /> Nuevo paciente</button>}
       </section>
-      <DataTable titulo="Directorio de pacientes" buscar="siempre" buscarPlaceholder="Buscar por nombre, DNI o teléfono…" sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
+      <DataTable titulo="Directorio de pacientes" buscar="siempre" buscarPlaceholder="Nombre, DNI o teléfono" sub={listaError && !lista.length ? "error de carga" : "personas"} cols={cols} rows={lista} onRowClick={(p) => verFicha(p)} minWidth={0} defaultSort={{ key: "paciente", dir: "asc" }} empty={<Vacio icon={<Users size={22} strokeWidth={1.75} />} titulo={listaError ? "Sin datos" : "Sin pacientes"} sub={listaError ? "El servidor no respondió; reintenta más tarde. No se muestran ceros inventados." : "Registra el primer paciente o ajusta el filtro."} />} />
       {fmId && fmPermitido && (
         <React.Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", background: "rgba(15,23,42,.35)", color: "#fff", fontSize: 14 }}>Cargando ficha…</div>}>
           <FichaMedica key={`fm-${fmId}`} pacienteId={fmId} onClose={cerrarFm} notify={notify} can={can} rol={rol}
@@ -2969,7 +2975,7 @@ function PacientesView({ pacientes, setPacientes, fichas, updFicha = () => {}, n
           </div>
           <div>
             <label style={lblSty}>Fecha de nacimiento <span style={{ color: RED }}>*</span> {edad != null && <span style={{ color: TEAL, fontWeight: 500 }}>– {edad} años</span>}</label>
-            <input className="dc-premium-inp" type="date" min={`${Number(hoyISO.slice(0, 4)) - 120}${hoyISO.slice(4)}`} max={hoyISO} value={form.nacimiento} onChange={(e) => updateField('nacimiento', e.target.value)} style={{ ...selSty, backgroundImage: "none", cursor: "text", borderColor: formErr.nacimiento ? RED : "var(--dc-line)" }} />
+            <CampoFecha className="dc-premium-inp" min={`${Number(hoyISO.slice(0, 4)) - 120}${hoyISO.slice(4)}`} max={hoyISO} value={form.nacimiento} onChange={(e) => updateField('nacimiento', e.target.value)} style={{ ...selSty, backgroundImage: "none", cursor: "text", borderColor: formErr.nacimiento ? RED : "var(--dc-line)" }} />
             {formErr.nacimiento && <div style={errSty}>{formErr.nacimiento}</div>}
           </div>
           <div>
@@ -4366,7 +4372,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
   const avance = fases.length ? Math.round((atendidas / fases.length) * 100) : 0;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
-      {!pacienteFijo && <PacienteBar pacientes={pacientes} pacienteId={pacienteId} setPacienteId={setPacienteId} modulo="Plan y cuenta" />}
+      {!pacienteFijo && <PacienteBar pacientes={pacientes} pacienteId={pacienteId} setPacienteId={setPacienteId} modulo="Tratamientos" />}
       {/* Una sola franja de cifras del plan (TRA-01) con rótulos claros (TRA-03). */}
       {fases.length > 0 && (
         <div className="dc-trat-met dc-trat-met--franja">
@@ -4406,7 +4412,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
           </div>
         )}
         {conectado && !tratCargado && !tratError && !tratSinPermiso && pacienteId && <div style={{ padding: 20, fontSize: 13, color: "var(--dc-ink-500)" }}>Leyendo el plan del paciente…</div>}
-        {!pacienteId && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Elige un paciente" sub="Arriba eliges al paciente y aquí aparece su plan de tratamiento." />}
+        {!pacienteId && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Aquí aparece su plan de tratamiento" sub="Procedimientos, avance y lo que falta cobrar del paciente que elijas arriba." />}
         {pacienteId && fases.length === 0 && !nueva && !(tratSinPermiso && conectado) && planListo && <Vacio icon={<ClipboardList size={24} strokeWidth={1.75} />} titulo="Presupuesto vacío" sub={puedeAgregarProc ? "Agrega el primer procedimiento o pásalos desde el odontograma." : "Aún no hay procedimientos en el plan de este paciente."} />}
         {fases.length > 0 && (
           <ListaFiltrable rows={fases.map((f, i) => ({ ...f, _n: i + 1 }))} sub="procedimientos" className="dc-lf--dentro dc-tr__lf" vistaClave="tratamientos"
@@ -4424,7 +4430,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
                   {f.estado !== "terminada" && puedeTerminar
                     ? <button type="button" className="dc-tr__btn is-fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={14} strokeWidth={2} /> Terminar</button>
-                    : puedeCobrar && <button type="button" className="dc-tr__btn is-cob" onClick={() => cobrarFase(f)}><DollarSign size={14} strokeWidth={2} /> Cobrar</button>}
+                    : puedeCobrar && <button type="button" className="dc-tr__btn is-cob" onClick={() => cobrarFase(f)}><Banknote size={14} strokeWidth={2} /> Cobrar</button>}
                   {(puedeCobrar || puedeTerminar || opcionesBaja(f).length > 0) && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={[
                     ...(f.estado !== "terminada" && puedeTerminar && puedeCobrar ? [{ label: "Cobrar por adelantado", onClick: () => cobrarFase(f) }] : []),
                     { label: "Ver detalle", onClick: () => setDetF(f) },
@@ -4443,7 +4449,7 @@ function Tratamientos({ pacienteFijo = null, pacientes: pacProp, fichas, updFich
                 <div className="dc-tr__acc" onClick={(e) => e.stopPropagation()}>
                   {f.estado !== "terminada" && puedeTerminar && <button type="button" className="dc-accion dc-accion--fin" onClick={() => terminarFase(f)} title="Marca el procedimiento como realizado y genera su cobro en Caja"><CheckCheck size={13} strokeWidth={2} style={{ marginRight: 4 }} />Terminar</button>}
                   {f.estado === "terminada" && <EstadoPill entidad="procedimiento" estado="terminada" />}
-                  {puedeCobrar ? <button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><DollarSign size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button> : (f.estado !== "terminada" && !puedeTerminar) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : null}
+                  {puedeCobrar ? <button type="button" className="dc-accion" onClick={() => cobrarFase(f)}><Banknote size={13} strokeWidth={2} style={{ marginRight: 4 }} />Cobrar</button> : (f.estado !== "terminada" && !puedeTerminar) ? <EstadoPill entidad="procedimiento" estado={f.estado} /> : null}
                   {/* El médico (sin Caja) también anula desde aquí: antes el menú salía solo con «Cobrar». */}
                   {opcionesBaja(f).length > 0 && <MenuAcciones etiqueta="Más acciones del procedimiento" opciones={opcionesBaja(f)} />}
                 </div>
@@ -4704,9 +4710,9 @@ function Espera({ notify, esp: espProp, setEsp, onAsignar, embedded = false, pac
       ); })()}
       {embedded ? (
       <DataTable titulo="Pacientes esperando cupo" sub="en espera" minWidth={940} rows={ordenada} rowClassName={(p) => (ordenada[0] && p.id === ordenada[0].id ? "dc-esp-fila is-sug" : "dc-esp-fila")} accion={<Btn small onClick={nuevoEspera}><Plus size={15} strokeWidth={1.75} /> Agregar a espera</Btn>} empty={<Vacio icon={<Bell size={24} strokeWidth={1.75} />} titulo="Lista vacía" sub="Agrega un paciente que quedó esperando cupo." />} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(158px,1.4fr)", a: "left", get: (p) => p.n, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(colorDe(p.n), 0.14), color: colorDe(p.n), display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.n)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</div>{p.ofrecido.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", display: "flex", alignItems: "center", gap: 4 }}><Bell size={10} strokeWidth={1.75} /> {pluralEs(p.ofrecido.length, "oferta", "ofertas")}</div>}</div></div> },
+        { key: "paciente", label: "Paciente", w: "minmax(158px,1.4fr)", a: "left", get: (p) => p.n, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(colorDe(p.n), 0.14), color: colorDe(p.n), display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(p.n)}</div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nombrePropio(p.n)}</div>{p.ofrecido.length > 0 && <div style={{ fontSize: 12, color: "var(--dc-warn-600)", display: "flex", alignItems: "center", gap: 4 }}><Bell size={10} strokeWidth={1.75} /> {pluralEs(p.ofrecido.length, "oferta", "ofertas")}</div>}</div></div> },
         { key: "urg", label: "Urgencia", w: "minmax(88px,0.7fr)", a: "center", get: (p) => URGENCIA[p.urg].l, cell: (p) => { const u = URGENCIA[p.urg]; return <span style={{ fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: "var(--dc-r-full)", background: u.bg, color: u.fg }}>{u.l}</span>; } },
-        { key: "tel", label: "Contacto", w: "minmax(112px,1fr)", a: "left", get: (p) => p.tel, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Phone size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {p.tel}</span> },
+        { key: "tel", label: "Contacto", w: "minmax(112px,1fr)", a: "left", get: (p) => p.tel, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", display: "inline-flex", alignItems: "center", gap: 5 }}><Phone size={12} strokeWidth={1.75} color="var(--dc-ink-400)" /> {telVisible(p.tel)}</span> },
         { key: "esp", label: "Especialidad", w: "minmax(120px,1fr)", a: "left", get: (p) => p.e, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><Stethoscope size={13} strokeWidth={1.75} color="var(--dc-ink-400)" style={{ flexShrink: 0 }} /> <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.e}</span></span> },
         { key: "medico", label: "Médico", w: "minmax(112px,1fr)", a: "left", get: (p) => p.medico, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{p.medico}</span> },
         { key: "pref", label: "Preferencia", w: "minmax(92px,0.9fr)", a: "center", get: (p) => p.pref, cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{p.pref}</span> },
@@ -5770,7 +5776,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
   const cabeceraCaja = (
     <section className={`dc-cj4${cajaAbierta ? " is-abierta" : cerradaHoyReg ? " is-cerrada" : " is-pendiente"}`} aria-label="Caja del día">
       <div className="dc-cj4__franja">
-        <span className="dc-cj4__estado"><i />{sedeCaja == null ? "Elige la caja" : cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>
+        {sedeCaja == null ? <span className="dc-cj4__estado is-etiqueta">Caja de</span> : <span className="dc-cj4__estado"><i />{cajaAbierta ? "Caja abierta" : cerradaHoyReg ? "Caja cerrada" : "Caja sin abrir"}</span>}
         {/* Con «Todas» la caja se elige aquí, siempre a la vista: las cifras y el arqueo son de
             esa sede; «Todas» solo suma los saldos y no permite abrir, cobrar ni cerrar (CAJA-09). */}
         {sedeRequierePick && sedesCaja.length > 1 ? (
@@ -5921,22 +5927,22 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <AlertTriangle size={18} strokeWidth={1.75} color="var(--dc-red)" />
             <div style={{ flex: 1, fontSize: 13, color: "var(--dc-danger-700)" }}>No se pudieron cargar los saldos de caja. No uses los datos de abajo como reales.</div>
-            <Btn small kind="ghost" onClick={recargarCaja}><Repeat size={14} strokeWidth={1.75} /> Reintentar</Btn>
+            <Btn small kind="ghost" onClick={recargarCaja}><RefreshCw size={14} strokeWidth={1.75} /> Reintentar</Btn>
           </div>
         </Card>
       )}
       {conectado && porCobrarHoy.length > 0 && (
         <Card style={{ overflow: "hidden", border: "1px solid var(--dc-amber-soft)" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--dc-warn-soft)", background: "var(--dc-white)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "var(--dc-r-sm)", background: "var(--dc-warn-600)", display: "grid", placeItems: "center" }}><Clock size={17} strokeWidth={1.75} color="#fff" /></div><div><div style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Por cobrar de hoy</div><div style={{ fontSize: 13, color: "var(--dc-warn-700)" }}>{pluralEs(porCobrarHoy.length, "paciente", "pacientes")} del día con saldo – cobra aquí al salir de atención</div></div></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "var(--dc-r-sm)", background: "var(--dc-warn-600)", display: "grid", placeItems: "center" }}><Clock size={17} strokeWidth={1.75} color="#fff" /></div><div><div style={{ fontWeight: 600, color: NAVY, fontSize: 14, fontFamily: DISPLAY_FONT }}>Por cobrar de hoy</div><div style={{ fontSize: 13, color: "var(--dc-warn-700)" }}>{pluralEs(porCobrarHoy.length, "paciente", "pacientes")} del día con saldo · se cobra al salir de la atención</div></div></div>
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dc-warn-600)", fontFamily: DISPLAY_FONT }}>S/ {porCobrarHoy.reduce((s, x) => s + x.saldo, 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           {porCobrarHoy.map((x, i) => (
             <div key={x.p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: i ? "1px solid var(--dc-bg)" : "none" }}>
               <div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-full)", background: tint(NAVY, 0.071), color: NAVY, display: "grid", placeItems: "center", fontWeight: 500, fontSize: 12, flexShrink: 0 }}>{iniciales(x.p.nombre)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.p.nombre}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{x.pend} {x.pend === 1 ? "fase pendiente" : "fases pendientes"} – plan S/ {x.total.toFixed(0)}</div></div>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nombrePropio(x.p.nombre)}</div><div style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{x.pend} {x.pend === 1 ? "fase pendiente" : "fases pendientes"} · plan de S/ {M.sol2(x.total)}</div></div>
               <span style={{ fontWeight: 600, color: RED, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(x.saldo)}</span>
-              <Btn small disabled={!cajaAbierta} title={cajaAbierta ? undefined : tituloCajaCerrada(jornadaAbiertaPrevia)} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><CreditCard size={14} strokeWidth={1.75} /> Cobrar</Btn>
+              <button type="button" className="dc-cob__btn" disabled={!cajaAbierta} title={cajaAbierta ? undefined : tituloCajaCerrada(jornadaAbiertaPrevia)} onClick={() => intentarCobrar({ pid: x.p.id, nombre: x.p.nombre, monto: x.saldo })}><Banknote size={15} strokeWidth={2} /> Cobrar</button>
             </div>
           ))}
         </Card>
@@ -5958,7 +5964,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               { key: "listo", label: "Listo para cobrar", w: "minmax(160px,1.2fr)", cell: (x) => x.porCobrar > 0 ? <span style={{ display: "grid", minWidth: 0 }}><span className="dc-tp__num is-mal" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}>S/ {M.sol2(x.porCobrar)}{x.vencido > 0 ? <small className="dc-cob__venc"> · vencido</small> : null}</span>{(x.terminadosItems || []).length > 0 && <small className="dc-tp__sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(x.terminadosItems || []).map((f) => f.nombre).filter(Boolean).join(" · ")}</small>}</span> : <span className="dc-tp__sub">—</span> },
               { key: "cob", label: "Pagado del plan", w: "minmax(150px,1fr)", cell: (x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; return <span className="dc-tp__prog"><i><em style={{ width: `${pct}%` }} /></i><small>{pct}% · S/ {Number(x.pagado).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de {Number(x.total).toLocaleString("es-PE")}</small></span>; } },
               { key: "saldo", label: "Saldo del plan", w: "120px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {M.sol2(x.saldo)}</span> },
-              { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button> },
+              { key: "acc", label: "", w: "110px", a: "right", cell: (x) => <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><Banknote size={15} strokeWidth={2} /> Cobrar</button> },
             ] }} cols={[
               { key: "paciente", label: "Paciente", get: (x) => x.p.nombre || "" },
               { key: "sede", label: "Sede", get: (x) => x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "") },
@@ -5970,12 +5976,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 {lista.map((x) => { const pct = x.total ? Math.round((x.pagado / x.total) * 100) : 0; const col = colorDe(x.p.nombre); const pc = pct >= 75 ? "#16A36A" : pct >= 40 ? "#0E9199" : "#D97706"; return (
                   <div key={x.p.id} className="dc-cob__fila dc-cob__fila--v2">
                     <span className="dc-rec__av" style={{ width: 40, height: 40, fontSize: 13, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(x.p.nombre)}</span>
-                    <div className="dc-cob__quien"><b>{x.p.nombre}</b><span>{x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} · {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span>
+                    <div className="dc-cob__quien"><b>{nombrePropio(x.p.nombre)}</b><span>{x.p.sedeNombre || etiquetaSedes(x.p.sedes ?? x.p.sede ?? "")} · {x.pend} {x.pend === 1 ? "procedimiento pendiente" : "procedimientos pendientes"}</span>
                       {/* R-24: qué se cobra, a la vista (el nombre solo salía en el tooltip). */}
                       {x.porCobrar > 0 && (x.terminadosItems || []).length > 0 && <em className="dc-cob__proc" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}><CheckCircle2 size={12} strokeWidth={2} /><span>{(x.terminadosItems || []).map((f) => f.nombre).filter(Boolean).join(" · ")}</span></em>}</div>
                     <div className="dc-cob__ahora" title={(x.terminadosItems || []).map((f) => f.nombre).join(" · ")}><small>Por cobrar ahora</small><b className={x.porCobrar > 0 ? "is-si" : ""}>{x.porCobrar > 0 ? `S/ ${M.sol2(x.porCobrar)}` : "—"}</b></div>
                     <div className="dc-cob__plan"><small>Saldo del plan</small><b>S/ {M.sol2(x.saldo)}</b><i title={`Cobrado S/ ${x.pagado} de S/ ${x.total}`}><u style={{ width: `${pct}%`, background: pc }} /></i><em>{pct}% cobrado</em></div>
-                    <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><DollarSign size={15} strokeWidth={2} /> Cobrar</button>
+                    <button type="button" className="dc-cob__btn" disabled={!puedeAbrirCaja} title={tituloCobrar(x)} onClick={() => cobrarCuenta(x)}><Banknote size={15} strokeWidth={2} /> Cobrar</button>
                   </div>
                 ); })}
               </div>
@@ -6017,13 +6023,13 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
       {conectado && (
         <Card style={{ overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: verHist ? "1px solid var(--dc-line)" : "none", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Todos los pagos</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{histFiltrado.length} pagos este mes · {sol(histFiltrado.reduce((s, p) => s + (Number(p.monto) || 0), 0))} · {sedeNombre()}</div></div>
+            <div><h3 style={{ margin: 0, color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Todos los pagos</h3><div style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 2 }}>{histFiltrado.length} pagos este mes · {sol(histFiltrado.reduce((s, p) => s + (Number(p.monto) || 0), 0))}{sedeCaja != null ? ` · ${sedeNombre()}` : ""}</div></div>
             <Btn small kind="ghost" onClick={() => setVerHist((v) => !v)}>{verHist ? "Ocultar" : "Ver historial"}</Btn>
           </div>
           {histError && (
             <div style={{ padding: "12px 20px", background: "var(--dc-danger-soft)", borderBottom: "1px solid var(--dc-danger-mid)", fontSize: 13, color: "var(--dc-danger-700)", display: "flex", gap: 10, alignItems: "center" }}>
               <AlertTriangle size={16} strokeWidth={1.75} /> No se pudo cargar el historial de pagos.
-              <Btn small kind="ghost" onClick={recargarHist}><Repeat size={13} strokeWidth={1.75} /> Reintentar</Btn>
+              <Btn small kind="ghost" onClick={recargarHist}><RefreshCw size={13} strokeWidth={1.75} /> Reintentar</Btn>
             </div>
           )}
           {verHist && (
@@ -6143,7 +6149,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <div className="dc-esp-hero__cifras" hidden></div>
               <span />
               <div className="dc-hero-acc">
-                <button type="button" className="dc-esp-hero__agregar" onClick={recargarCierre}><Repeat size={14} strokeWidth={1.9} /> Actualizar</button>
+                <button type="button" className="dc-esp-hero__agregar" onClick={recargarCierre}><RefreshCw size={14} strokeWidth={1.9} /> Actualizar</button>
                 <button type="button" className="dc-esp-hero__agregar" onClick={() => {
                   // Arqueo imprimible con el membrete de la sede (no la pantalla completa).
                   const e = (t) => String(t ?? "").replace(/[&<>"]/g, (x) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[x]));
@@ -6361,12 +6367,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
             ].join(" · ");
             const rango = (
             <div className="dc-hero-acc dc-rango">
-              {js.length > 0 && <span className={`dc-flujo__neto${rs.faltantes ? " is-neg" : ""}`} title={`${rs.nFaltantes} ${rs.nFaltantes === 1 ? "cierre con faltante" : "cierres con faltante"} en el rango`}>Faltantes <b>{rs.faltantes ? "− " : ""}S/ {M.sol2(rs.faltantes)}</b></span>}
-              {js.length > 0 && <span className={`dc-flujo__neto${rs.sobrantes ? " is-aviso" : ""}`} title={`${rs.nSobrantes} ${rs.nSobrantes === 1 ? "cierre con sobrante" : "cierres con sobrante"} en el rango`}>Sobrantes <b>{rs.sobrantes ? "+ " : ""}S/ {M.sol2(rs.sobrantes)}</b></span>}
+              {js.length > 0 && <span className={`dc-flujo__neto${rs.faltantes ? " is-neg" : " is-mute"}`} title={`${rs.nFaltantes} ${rs.nFaltantes === 1 ? "cierre con faltante" : "cierres con faltante"} en el rango`}>Faltantes <b>{rs.faltantes ? "− " : ""}S/ {M.sol2(rs.faltantes)}</b></span>}
+              {js.length > 0 && <span className={`dc-flujo__neto${rs.sobrantes ? " is-aviso" : " is-mute"}`} title={`${rs.nSobrantes} ${rs.nSobrantes === 1 ? "cierre con sobrante" : "cierres con sobrante"} en el rango`}>Sobrantes <b>{rs.sobrantes ? "+ " : ""}S/ {M.sol2(rs.sobrantes)}</b></span>}
               {(ru.faltantes > 0 || ru.sobrantes > 0) && <span className={`dc-flujo__neto${ru.faltantes ? " is-neg" : ""}`} title="Descuadres de la gaveta en dólares">Dólares <b>{ru.faltantes ? `− ${usd2(ru.faltantes)}` : ""}{ru.faltantes && ru.sobrantes ? " · " : ""}{ru.sobrantes ? `+ ${usd2(ru.sobrantes)}` : ""}</b></span>}
-              <label><span>Desde</span><input type="date" aria-label="Desde" aria-invalid={histRangoInvertido || undefined} max={histCajaRango.hasta || undefined} value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
-              <label><span>Hasta</span><input type="date" aria-label="Hasta" aria-invalid={histRangoInvertido || undefined} min={histCajaRango.desde || undefined} value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
-              <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja} disabled={histRangoInvertido}><Repeat size={14} strokeWidth={1.9} /></button>
+              <label><span>Desde</span><CampoFecha aria-label="Desde" aria-invalid={histRangoInvertido || undefined} max={histCajaRango.hasta || undefined} value={histCajaRango.desde} onChange={(e) => setHistCajaRango({ ...histCajaRango, desde: e.target.value })} /></label>
+              <label><span>Hasta</span><CampoFecha aria-label="Hasta" aria-invalid={histRangoInvertido || undefined} min={histCajaRango.desde || undefined} value={histCajaRango.hasta} onChange={(e) => setHistCajaRango({ ...histCajaRango, hasta: e.target.value })} /></label>
+              <button type="button" className="dc-rango__btn" aria-label="Actualizar" title="Actualizar" onClick={recargarHistCaja} disabled={histRangoInvertido}><RefreshCw size={14} strokeWidth={1.9} /></button>
             </div>
           );
           // R7-10: con el rango invertido, un solo mensaje (antes salían dos del mismo error, más
@@ -6405,7 +6411,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               // El color de la tarjeta avisa también un descuadre en dólares (C3).
               const dU = difUsdDe(r), estU = estDe(r, dU);
               const estCard = est === "abierta" ? est : [est, estU].includes("falta") ? "falta" : [est, estU].includes("sobra") ? "sobra" : est;
-              const conUsd = r.efectivoContadoUsd != null || Number(r.fondoUsd) > 0 || r.efectivoEsperadoUsd != null;
+              // La gaveta en dólares solo se muestra si tuvo algo: una fila de «US$ 0.00» era ruido.
+              const conUsd = Number(r.fondoUsd) > 0 || Number(r.efectivoContadoUsd) > 0 || Number(r.efectivoEsperadoUsd) > 0;
               const txtSol = est === "abierta" ? "Abierta" : est === "cuadra" ? "Cuadra exacto" : est === "cerrada" ? "Cerrada" : `${est === "falta" ? "Faltan" : "Sobran"} S/ ${M.sol2(Math.abs(d))}`;
               const hoyLima = ymdLima(new Date()) || fmt(hoy);
               const esp = Number(r.efectivoEsperado) || 0, con = Number(r.efectivoContado) || 0;
@@ -6414,7 +6421,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                 <div className="dc-jor__fecha"><b>{isNaN(f) ? "—" : f.getDate()}</b><span>{isNaN(f) ? r.fecha : f.toLocaleDateString("es-PE", { month: "short" }).replace(".", "")}</span><small>{isNaN(f) ? "" : f.toLocaleDateString("es-PE", { weekday: "short" }).replace(".", "")}</small></div>
                 <div className="dc-jor__info">
                   <b><MapPin size={13} strokeWidth={2} /> {sedes.find((x) => x.id === r.sedeId)?.nombre || r.sedeNombre || "—"}</b>
-                  <span><Clock size={12} strokeWidth={2} /> {hora(r.abiertaEn)}{diaHist(r.abiertaEn, r.fecha)} a {r.abierta ? "en curso" : `${hora(r.cerradaEn)}${diaHist(r.cerradaEn, (r.abiertaEn && ymdLima(r.abiertaEn)) || r.fecha)}`}</span>
+                  <span><Clock size={12} strokeWidth={2} /> {r.abierta ? `Abierta desde las ${hora(r.abiertaEn)}${diaHist(r.abiertaEn, r.fecha)}` : diaHist(r.cerradaEn, (r.abiertaEn && ymdLima(r.abiertaEn)) || r.fecha) ? `De ${hora(r.abiertaEn)}${diaHist(r.abiertaEn, r.fecha)} a ${hora(r.cerradaEn)} del ${fechaLegible(ymdLima(r.cerradaEn))}` : `De ${hora(r.abiertaEn)}${diaHist(r.abiertaEn, r.fecha)} a ${hora(r.cerradaEn)}`}</span>
                   <span className="dc-jor__quien">Abrió {r.abiertaPorNombre || "—"}{!r.abierta && r.cerradaPorNombre ? `, cerró ${r.cerradaPorNombre}` : ""}</span>
                 </div>
                 <div className="dc-jor__arq">
@@ -6472,7 +6479,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                   <div style={{ fontWeight: 500, color: "var(--dc-danger-700)", fontSize: 14 }}>No se pudieron cargar los movimientos</div>
                   <div style={{ fontSize: 13, color: "var(--dc-danger-700)", marginTop: 4, lineHeight: 1.45 }}>No interpretés ceros aquí: la carga de caja falló. Reintenta para ver ingresos y egresos reales del día.</div>
                 </div>
-                <Btn small kind="ghost" onClick={recargarCaja}><Repeat size={14} strokeWidth={1.75} /> Reintentar</Btn>
+                <Btn small kind="ghost" onClick={recargarCaja}><RefreshCw size={14} strokeWidth={1.75} /> Reintentar</Btn>
               </div>
             </Card>
           );
@@ -6504,8 +6511,8 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <section key={t} className={`dc-flujo__col is-${t}`}>
                 <header>
                   <span className="dc-flujo__ico"><Ico size={18} strokeWidth={2} /></span>
-                  <div><h3>{tit}</h3><span>{sub} – {lista.length} {lista.length === 1 ? "movimiento" : "movimientos"}{totUsd[t] ? ` · incluye ${usd2(totUsd[t])} al TC de cada uno` : ""}</span></div>
-                  <b>{tot ? (t === "ingreso" ? "+ " : "− ") : ""}S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+                  <div><h3>{tit}</h3><span>{sub} · {lista.length} {lista.length === 1 ? "movimiento" : "movimientos"}{totUsd[t] ? ` · incluye ${usd2(totUsd[t])} al TC de cada uno` : ""}</span></div>
+                  <b className={tot ? undefined : "is-cero"}>{tot ? (t === "ingreso" ? "+ " : "− ") : ""}S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
                 </header>
                 {t === "egreso" && egresosSinPermiso ? (
                   <div className="dc-flujo__vacio">Sin permiso para ver los egresos de esta caja.</div>
@@ -6595,7 +6602,7 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
         const r = resumenLinks(linksVis);
         const filas = linksVis.slice(0, MAX_LINKS).map(filaLink);
         const cargando = linksCarga === "cargando";
-        const actualizar = <Btn small kind="ghost" disabled={cargando} onClick={recargarLinks}><Repeat size={14} strokeWidth={1.9} /> {cargando ? "Actualizando…" : "Actualizar"}</Btn>;
+        const actualizar = <Btn small kind="ghost" disabled={cargando} onClick={recargarLinks}><RefreshCw size={14} strokeWidth={1.9} /> {cargando ? "Actualizando…" : "Actualizar"}</Btn>;
         const nuevoLink = <button type="button" className="dc-flujo__nuevo is-teal" title={AVISO_CREAR_LINK} onClick={() => notify(AVISO_CREAR_LINK)}><Plus size={14} strokeWidth={2} /> Nuevo link</button>;
         const citaTxt = (l) => [/^\d{4}-\d{2}-\d{2}$/.test(String(l.fecha || "")) ? fechaLegible(l.fecha) : "", String(l.hora || "").slice(0, 5)].filter(Boolean).join(" · ");
         const sedeTxt = (l) => l.sedeNombre || nombreSedeEn(sedes, l.sedeId) || "";
@@ -6708,10 +6715,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
               <article key={l.id} className={`dc-ticket${pagado ? " is-pagado" : ""}${e.tono === "mute" || vencido ? " is-inactivo" : ""}`}>
                 <div className="dc-ticket__top">
                   <span className="dc-rec__av" style={{ width: 38, height: 38, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(l.paciente)}</span>
-                  <div className="dc-ticket__quien"><b>{l.paciente}</b><span>{l.concepto || "Reserva de cita"}</span></div>
-                  {pill(l, true)}
+                  <div className="dc-ticket__quien"><b title={l.paciente}>{nombrePropio(l.paciente)}</b><span>{l.concepto || "Reserva de cita"}</span></div>
                 </div>
-                <div className="dc-ticket__monto"><small>Importe</small><b>S/ {M.sol2(l.monto)}</b></div>
+                <div className="dc-ticket__monto"><div><small>Importe</small><b>S/ {M.sol2(l.monto)}</b></div>{pill(l, true)}</div>
                 <div className="dc-ticket__info">
                   {citaTxt(l) && <span><Calendar size={13} strokeWidth={2} /> Cita: {citaTxt(l)}</span>}
                   {sedeTxt(l) && <span><MapPin size={13} strokeWidth={2} /> {sedeTxt(l)}</span>}
@@ -6721,10 +6727,12 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     {conCita && onIrDiaAgenda && /^\d{4}-\d{2}-\d{2}$/.test(String(l.fecha || "")) && <> · <button type="button" onClick={() => onIrDiaAgenda(l.fecha)}>Ver en la agenda</button></>}
                   </span>}
                 </div>
+                {/* El número de pedido es para buscar en Izipay: va en la tabla y en el Excel, no a la
+                    vista en la tarjeta («Pedido b5725904» parecía un enlace). Sin acciones, sin pie. */}
+                {(copiable(l) || conciliable(l) || verificableAqui(l) || anulable(l)) && <>
                 <div className="dc-ticket__corte" aria-hidden="true" />
-                <div className="dc-ticket__pie">
-                  <span className="dc-ticket__url" title={`Pedido ${l.pagoId || ""}`}><Receipt size={13} strokeWidth={2} /> Pedido {idCorto(l.pagoId) || "—"}</span>
-                  {(copiable(l) || conciliable(l) || verificableAqui(l) || anulable(l)) && <div className="dc-ticket__acc">
+                <div className="dc-ticket__pie" title={l.pagoId ? `Pedido de Izipay ${l.pagoId}` : undefined}>
+                  <div className="dc-ticket__acc">
                     {copiable(l) && <button type="button" onClick={() => copiar(l)} title="Copiar el link para el paciente"><Copy size={14} strokeWidth={2} /> Copiar link</button>}
                     {/* Publicado por el programador (revisión 19): pago confirmado sin cita → reintentar. */}
                     {conciliable(l) && <button type="button" title="Reintentar crear la cita tras un pago confirmado" onClick={() => {
@@ -6732,8 +6740,9 @@ function Facturacion({ pacientes = [], fichas = {}, updFicha, notify, consumirIn
                     }}><RotateCcw size={14} strokeWidth={2} /> Conciliar</button>}
                     {verificableAqui(l) && <button type="button" title="Registrar el pago que viste aprobado en Izipay (código de autorización)" onClick={() => registrarVerificado(l)}><CheckCircle2 size={14} strokeWidth={2} /> Registrar verificado</button>}
                     {anulable(l) && <button type="button" title="Anular el link y liberar el cupo" onClick={() => anularLink(l)}><X size={14} strokeWidth={2} /> Anular link</button>}
-                  </div>}
+                  </div>
                 </div>
+                </>}
               </article>
               );
             })}
@@ -7150,7 +7159,7 @@ function MiProduccion({ usuario, citas, sedes = null }) {
     { l: pctComision != null ? `Mi comisión (${pctComision}%)` : "Mi comisión", v: `S/ ${comision.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Percent, color: RED, sub: conectado ? undefined : "Se paga el 5 del mes", desc: pctComision != null ? `El ${pctComision}% de tu producción (S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).${conectado ? "" : " Se liquida el día 5 del mes siguiente."}` : `Sobre una producción de S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.${conectado ? "" : " Se liquida el día 5 del mes siguiente."} Tu porcentaje lo fija administración.` },
     // M4-12: «1 cita hoy», «1 atención del mes» (decía «1 citas», «1 atenciones»).
     { l: "Producción de hoy", v: `S/ ${prodHoy.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: TrendingUp, color: "var(--dc-ok-700)", sub: restaHoy > 0 ? `S/ ${restaHoy.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} esperan su evolución` : `${pluralEs(citasHoyN, "cita", "citas")} hoy`, desc: `Lo producido en tus atenciones de hoy (${pluralEs(citasHoyN, "cita programada", "citas programadas")}).${restaHoy > 0 ? ` No suma S/ ${restaHoy.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de atenciones con la evolución pendiente: cuentan al completarla.` : ""}` },
-    { l: "Promedio por atención", v: `S/ ${ticket}`, icon: CreditCard, color: DS.c.primary, sub: `${pluralEs(atenciones, "atención", "atenciones")} del mes`, desc: `Producción del mes dividida entre ${atenciones === 1 ? "tu única atención" : `tus ${atenciones} atenciones`}. Subirlo con tratamientos de mayor valor mejora tu comisión.` },
+    { l: "Promedio por atención", v: `S/ ${M.sol2(ticket)}`, icon: CreditCard, color: DS.c.primary, sub: `${pluralEs(atenciones, "atención", "atenciones")} del mes`, desc: `Producción del mes dividida entre ${atenciones === 1 ? "tu única atención" : `tus ${atenciones} atenciones`}. Subirlo con tratamientos de mayor valor mejora tu comisión.` },
     { l: "Tasa de ausentismo", v: noShow != null ? `${noShow}%` : "—", icon: TrendingDown, color: DS.c.primary, sub: "de tus citas", desc: `Porcentaje de citas canceladas o no asistidas sobre tu agenda. Los recordatorios automáticos ayudan a bajarlo.` },
     // La calificación real de este médico (backend: calificacion / resenas). Era un
     // "4.9 ★ – 120 reseñas" escrito a mano: un doctor sin una sola reseña lo veía igual.
@@ -7203,8 +7212,9 @@ function MiProduccion({ usuario, citas, sedes = null }) {
             {(() => { const max = Math.max(...tend); const y = (max - promedio) / max * 130 + 18; return <div style={{ position: "absolute", left: 0, right: 0, top: y, borderTop: "2px dashed var(--dc-ink-200)", zIndex: 1 }} />; })()}
             {tend.map((v, i) => { const max = Math.max(...tend); return (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 2 }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: NAVY }}>{(v / 1000).toFixed(1)}k</span>
-                <div style={{ width: "100%", height: `${(v / max) * 130}px`, background: i === tend.length - 1 ? RED : NAVY, borderRadius: "5px 5px 0 0", opacity: i === tend.length - 1 ? 1 : 0.4 + (i / 6) * 0.6 }} />
+                {/* «0.4k» no se entendía: el monto en soles («S/ 400», «S/ 1.2 mil»); un mes en cero no se rotula. */}
+                <span style={{ fontSize: 12, fontWeight: 500, color: NAVY, whiteSpace: "nowrap" }}>{v > 0 ? (v >= 1000 ? `S/ ${(v / 1000).toLocaleString("es-PE", { maximumFractionDigits: 1 })} mil` : `S/ ${Math.round(v)}`) : "\u00a0"}</span>
+                <div style={{ width: "100%", height: `${max ? (v / max) * 130 : 0}px`, background: i === tend.length - 1 ? DS.c.primary : NAVY, borderRadius: "5px 5px 0 0", opacity: i === tend.length - 1 ? 1 : 0.35 + (i / 6) * 0.45 }} />
                 <span style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{tendMeses[i]}</span>
               </div>
             ); })}
@@ -7214,12 +7224,13 @@ function MiProduccion({ usuario, citas, sedes = null }) {
         <Card style={{ padding: 22 }}>
           <h3 style={{ margin: "0 0 16px", color: NAVY, fontSize: 14, fontWeight: 600, fontFamily: DISPLAY_FONT }}>Meta del mes</h3>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 27, fontWeight: 600, color: meta == null ? "var(--dc-ink-400)" : pct >= 100 ? "var(--dc-ok-700)" : NAVY, fontFamily: DISPLAY_FONT }}>{meta == null ? "—" : pct + "%"}</div>
+            {/* Sin meta, la cifra grande es lo producido (antes un «—» suelto). */}
+            <div style={{ fontSize: 27, fontWeight: 600, color: meta == null ? NAVY : pct >= 100 ? "var(--dc-ok-700)" : NAVY, fontFamily: DISPLAY_FONT }}>{meta == null ? `S/ ${M.sol2(mesProd)}` : pct + "%"}</div>
             <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>
-              {meta == null ? `S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} producidos este mes` : `S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de S/ ${meta.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              {meta == null ? "producidos este mes · sin meta asignada" : `S/ ${mesProd.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de S/ ${meta.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </div>
           </div>
-          <div style={{ height: 12, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${pct || 0}%`, height: "100%", background: pct >= 100 ? "var(--dc-ok)" : `linear-gradient(90deg,${RED},var(--dc-red))` }} /></div>
+          {meta != null && <div style={{ height: 12, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: `${Math.min(100, pct || 0)}%`, height: "100%", background: pct >= 100 ? "var(--dc-ok)" : DS.c.primary }} /></div>}
           {/* Tres estados distintos: sin meta, meta pendiente y meta superada. Antes
               siempre decia "te faltan", y al pasarse mostraba un importe negativo y
               un numero de atenciones negativo. */}
@@ -7361,12 +7372,12 @@ function Integraciones({ notify }) {
               <article key={it.n} className={`dc-int2__card is-${it.estado}`} onClick={() => setDetInt(it)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setDetInt(it); }}>
                 <span className="dc-int__logo" style={{ background: `linear-gradient(135deg, ${col}, ${tint(col, 0.75)})` }}>{it.n.replace(/[^A-Za-z ]/g, "").split(" ").filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
                 <div className="dc-int2__txt">
-                  <b>{it.n}{it.rec && <Star size={11} strokeWidth={2.4} className="dc-int2__rec" aria-label="Recomendado" />}</b>
+                  <b>{it.n}</b>{it.rec && it.estado !== "conectado" && <em className="dc-int2__recom">Recomendado</em>}
                   <small style={{ "--c": it.cc }}><CI size={11} strokeWidth={2.2} /> {it.cat}</small>
                 </div>
                 {it.estado === "conectado" || it.estado === "incidencia"
                   ? <span className={`dc-int__est ${ec}`}><i />{it.etiqueta || el}</span>
-                  : <button type="button" className={it.estado === "pendiente" ? "is-warn" : ""} onClick={(e) => { e.stopPropagation(); setDetInt(it); }}>{it.estado === "pendiente" ? "Terminar" : "Conectar"}</button>}
+                  : <button type="button" className={it.estado === "pendiente" ? "is-warn" : ""} onClick={(e) => { e.stopPropagation(); setDetInt(it); }}>{it.estado === "pendiente" ? "Completar" : "Conectar"}</button>}
               </article>
             ); })}
           </div>
@@ -7420,7 +7431,8 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     if (ua) {
       try {
         const d = new Date(ua);
-        ultimo = Number.isNaN(d.getTime()) ? String(ua) : d.toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+        // «mar 20 oct, 20:19» (hora de Lima), como el resto de fechas; antes «20/10/2026 20:19».
+        ultimo = Number.isNaN(d.getTime()) ? String(ua) : `${fechaLegible(ymdLima(d))}, ${d.toLocaleTimeString("es-PE", { timeZone: "America/Lima", hour: "2-digit", minute: "2-digit", hour12: false })}`;
       } catch { ultimo = String(ua); }
     }
     // Todas sus sedes (UUID), no solo la primera. Sin ninguna, solo los roles de toda la
@@ -7429,7 +7441,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
     // Los permisos propios del usuario (si el servidor los tiene) se conservan: editar o
     // reactivar manda el usuario completo y antes los enviaba en null.
     const permisos = u.permisos && typeof u.permisos === "object" && Object.keys(u.permisos).length ? u.permisos : null;
-    return { id: u.id, nombre: u.nombre, user: (u.email || "").split("@")[0], email: u.email, rol: u.rol, sedes: lista.length ? lista : (puedeSerGlobal(u.rol) ? "all" : []), activo: u.activo, ultimo, permisos };
+    return { id: u.id, nombre: u.nombre, user: (u.email || "").split("@")[0], email: u.email, rol: u.rol, sedes: lista.length ? lista : (puedeSerGlobal(u.rol) ? "all" : []), activo: u.activo, ultimo, ultimoISO: ua || "", permisos };
   };
   const [remoto, setRemoto] = useState(null);
   const [usuariosError, setUsuariosError] = useState(null);
@@ -7638,7 +7650,7 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
                   <Shield size={16} strokeWidth={1.75} color="var(--dc-warn-600)" />
                   <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-ink)", flex: 1, minWidth: 140 }}>Permisos personalizados ({modulosVisibles(form.permisos).length} módulos visibles)</span>
                   <Btn small kind="ghost" onClick={() => setPermOpen(true)}><Pencil size={14} strokeWidth={1.75} /> Editar matriz</Btn>
-                  <Btn small kind="ghost" onClick={() => setForm({ ...form, permisos: undefined })}><Repeat size={14} strokeWidth={1.75} /> Volver al rol</Btn>
+                  <Btn small kind="ghost" onClick={() => setForm({ ...form, permisos: undefined })}><RotateCcw size={14} strokeWidth={1.75} /> Volver al rol</Btn>
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "11px 14px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", background: "var(--dc-bg)" }}>
@@ -7676,19 +7688,19 @@ function GestionUsuarios({ staff: staffProp, setStaff, notify, rolePerms = {}, u
         {/* Matriz de permisos por usuario (override) */}
         {form && permOpen && (
           <Modal icon={<Shield size={20} strokeWidth={1.75} />} titulo={`Permisos de ${form.nombre || "usuario"}`} sub="Ajusta qué puede hacer esta persona en cada módulo. Sobrescribe los permisos de su rol." onClose={() => setPermOpen(false)} maxW={860}
-            footer={<><Btn small kind="ghost" onClick={() => { setForm({ ...form, permisos: undefined }); setPermOpen(false); }}><Repeat size={14} strokeWidth={1.75} /> Restaurar rol</Btn><Btn small onClick={() => setPermOpen(false)}><Check size={15} strokeWidth={1.75} /> Listo</Btn></>}>
+            footer={<><Btn small kind="ghost" onClick={() => { setForm({ ...form, permisos: undefined }); setPermOpen(false); }}><RotateCcw size={14} strokeWidth={1.75} /> Usar los del rol</Btn><Btn small onClick={() => setPermOpen(false)}><Check size={15} strokeWidth={1.75} /> Listo</Btn></>}>
             <PermisosGrupos perms={form.permisos || {}} onSet={(mod, acts) => setForm((f) => ({ ...f, permisos: { ...(f.permisos || (rolePerms[f.rol] || ROL_PERMS[f.rol] || {})), [mod]: ACCION_IDS.filter((a) => acts.includes(a)) } }))} onToggle={(mod, acc) => setForm((f) => ({ ...f, permisos: togglePermAccion(f.permisos || (rolePerms[f.rol] || ROL_PERMS[f.rol] || {}), mod, acc) }))} />
           </Modal>
         )}
 
         <DataTable buscar={false} titulo="Directorio de usuarios" sub="usuarios" minWidth={1060} rows={lista} defaultSort={{ key: "usuario", dir: "asc" }} empty={<Vacio icon={<UserCog size={22} strokeWidth={1.75} />} titulo="Sin usuarios" sub="No hay usuarios que coincidan." />} cols={[
-          { key: "usuario", label: "Nombre", w: "minmax(150px,1.2fr)", a: "left", get: (u) => u.nombre, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(R.color, 0.22)}, ${tint(R.color, 0.08)})`, color: R.color, flexShrink: 0 }}>{iniciales(u.nombre.replace(/^Dra?\.\s*/, ""))}</span><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14 }}>{u.nombre}</div></div></div>; } },
+          { key: "usuario", label: "Nombre", w: "minmax(190px,1.3fr)", a: "left", get: (u) => u.nombre, cell: (u) => { const R = ROLES[u.rol]; return <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, opacity: u.activo ? 1 : 0.55 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(R.color, 0.22)}, ${tint(R.color, 0.08)})`, color: R.color, flexShrink: 0 }}>{iniciales(u.nombre.replace(/^Dra?\.\s*/, ""))}</span><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3 }}>{nombrePropio(u.nombre)}</div></div></div>; } },
           // Con sesión no hay «usuario»: se entra con el correo (la columna repetía su inicio).
           ...(conectado ? [] : [{ key: "user", label: "Usuario", w: "106px", a: "left", get: (u) => u.user || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>@{u.user}</span> }]),
-          { key: "email", label: "Correo", w: "minmax(160px,1.4fr)", a: "left", get: (u) => u.email || "", cell: (u) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || "—"}</span> },
-          { key: "rol", label: "Rol", w: "132px", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)" }}><RIc size={13} strokeWidth={1.75} /> {R.label}</span>; } },
+          { key: "email", label: "Correo", w: "minmax(160px,1.4fr)", a: "left", get: (u) => u.email || "", cell: (u) => <span title={u.email || undefined} style={{ display: "block", minWidth: 0, fontSize: 13, color: "var(--dc-ink-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || "—"}</span> },
+          { key: "rol", label: "Rol", w: "150px", a: "center", get: (u) => ROLES[u.rol].label, cell: (u) => { const R = ROLES[u.rol]; const RIc = R.icon; return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: R.color, background: tint(R.color, 0.078), padding: "4px 10px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}><RIc size={13} strokeWidth={1.75} /> {/^dra\.?\s/i.test(u.nombre || "") ? R.label.replace(/ólogo$/, "óloga") : R.label}</span>; } },
           { key: "sede", label: "Sede", w: "120px", a: "center", get: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? "Sin sede" : etiquetaSedes(u.sedes)), cell: (u) => (u.sedes !== "all" && !normSedes(u.sedes).length ? <span style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-warn-600)" }}>Sin sede</span> : <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{etiquetaSedes(u.sedes)}</span>) },
-          { key: "ultimo", label: "Último acceso", w: "116px", a: "center", get: (u) => u.ultimo, cell: (u) => { const [f, h] = String(u.ultimo || "").split(", "); return <span style={{ display: "grid", fontSize: 13, lineHeight: 1.3, color: "var(--dc-ink-500)", whiteSpace: "nowrap" }}><span>{f}</span>{h && <small style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{h}</small>}</span>; } },
+          { key: "ultimo", label: "Último acceso", w: "116px", a: "center", get: (u) => u.ultimo, sortVal: (u) => u.ultimoISO || "",  cell: (u) => { const [f, h] = String(u.ultimo || "").split(", "); return <span style={{ display: "grid", fontSize: 13, lineHeight: 1.3, color: "var(--dc-ink-500)", whiteSpace: "nowrap" }}><span>{f}</span>{h && <small style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{h}</small>}</span>; } },
           { key: "estado", label: "Estado", w: "96px", a: "center", get: (u) => u.activo ? "Activo" : "Inactivo", cell: (u) => <span className={`dc-us__est${u.activo ? " is-on" : ""}`}><i />{u.activo ? "Activo" : "Inactivo"}</span> },
           { key: "acc", label: "Acciones", w: conectado && puedeResetUs ? "136px" : "116px", a: "center", noFilter: true, noSort: true, sticky: true, cell: (u) => !(puedeEditarUs || puedeBajaUs) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Tu rol puede ver los usuarios, pero no cambiarlos.">Solo lectura</span> : !editable(u) ? <span style={{ fontSize: 12, color: "var(--dc-ink-400)" }} title="Trabaja también fuera de tus sedes: lo gestiona la administración general.">Solo lectura</span> : <div className="dc-us__acc">{puedeEditarUs && <button type="button" className="dc-row-action" aria-label="Editar" title="Editar" onClick={() => editar(u)}><Pencil size={14} strokeWidth={2} /></button>}{conectado && puedeResetUs && u.activo && <button type="button" className="dc-row-action" aria-label={`Restablecer clave de ${u.nombre}`} title="Restablecer clave" onClick={() => resetPass(u)}><KeyRound size={14} strokeWidth={2} /></button>}{/* Desactivar es DELETE (baja); reactivar es PUT (editar). */}{(u.activo ? puedeBajaUs : puedeEditarUs) && <button type="button" className={`dc-row-action ${u.activo ? "is-warn" : "is-ok"}`} aria-label={u.activo ? "Desactivar" : "Activar"} title={u.activo ? "Desactivar" : puedeBajaUs ? "Activar" : "Activar (darlo de baja otra vez lo hace la administración general)"} onClick={() => toggle(u)}><Power size={14} strokeWidth={2} /></button>}{/* H-T6: con sesión «Eliminar» hacía el mismo DELETE que Desactivar (no borra): queda solo Desactivar. */}{!conectado && puedeBajaUs && <button type="button" className="dc-row-action is-mal" aria-label="Eliminar" title="Eliminar" onClick={() => eliminar(u)}><Trash2 size={14} strokeWidth={2} /></button>}</div> },
         ]} />
@@ -7846,7 +7858,7 @@ function GestionPermisos({ rolePerms, setRolePerms, notify, onRefreshMe }) {
         </div>
         <span />
         <div className="dc-hero-acc">
-          <button type="button" className="dc-esp-hero__agregar" onClick={restaurar}><Repeat size={14} strokeWidth={1.9} /> Restaurar rol</button>
+          <button type="button" className="dc-esp-hero__agregar" onClick={restaurar} title="Vuelve a los permisos predeterminados de este rol (no se guarda hasta pulsar Guardar cambios)"><RotateCcw size={14} strokeWidth={1.9} /> Restablecer predeterminados</button>
           <button type="button" className="dc-esp-hero__btn" onClick={guardar} disabled={guardando}><Check size={14} strokeWidth={2} /> {guardando ? "Guardando…" : "Guardar cambios"}</button>
         </div>
       </section>
@@ -8051,10 +8063,12 @@ function AuditoriaVista({ rows, hoyN, usuarios, alertas, sub, onDet, niv }) {
               <button key={a.id} type="button" className={`dc-aud__ev${a.nivel === "warn" ? " is-warn" : ""}`} style={{ "--c": c }} onClick={() => onDet(a)}>
                 <span className="dc-aud__hora">{a._hora}</span>
                 <span className="dc-aud__ico"><TI size={15} strokeWidth={2} /></span>
-                <div className="dc-aud__txt"><b>{a.accion}</b><span>{a.detalle}</span></div>
+                {/* «Inicio de sesión (Roberto Díaz)» repetía el usuario de la columna de al lado. */}
+                {(() => { const det = String(a.detalle || "").replace(/\s*\(([^()]*)\)\s*$/, (m, n) => (n.trim() === String(a.usuario || "").trim() ? "" : m)).trim(); return <div className="dc-aud__txt"><b>{a.accion}</b>{det && det !== a.accion && <span>{det}</span>}</div>; })()}
                 <div className="dc-aud__quien"><b>{a.usuario}</b><span style={{ color: R?.color }}>{R?.label || a.rol}</span></div>
                 <code>{a.ip}</code>
-                {a.nivel === "warn" ? <span className="dc-int__est is-warn"><i />Alerta</span> : <span className="dc-int__est is-ok"><i />{niv.ok.l}</span>}
+                {/* Solo se marca lo que no salió bien: un «OK» en cada fila no decía nada. */}
+                {a.nivel === "warn" ? <span className="dc-int__est is-warn"><i />Alerta</span> : <span aria-hidden="true" />}
               </button>
             ); })}
           </div>
@@ -8099,7 +8113,7 @@ function Auditoria() {
           ...base,
           fecha,
           dia: creado && !isNaN(creado) ? ymdLima(creado) : "",
-          diaTxt: creado && !isNaN(creado) ? creado.toLocaleDateString("es-PE", { timeZone: "America/Lima", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }) : "",
+          diaTxt: creado && !isNaN(creado) ? fechaLegible(ymdLima(creado)) : "",
           hora: creado && !isNaN(creado) ? creado.toLocaleTimeString("es-PE", { timeZone: "America/Lima", hour: "2-digit", hour12: false, minute: "2-digit" }) : null,
           usuario: a.usuario || "—",
           rol: a.rol || "—",
@@ -8191,8 +8205,8 @@ function Auditoria() {
     <div style={{ display: "grid", gap: 14 }}>
       {err && <div className="fm-aviso-edad is-mal"><AlertTriangle size={15} strokeWidth={2} /><span>{err}</span></div>}
       <div className="dc-us__barra" style={{ alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
-        <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Desde<input type="date" className="dc-premium-inp" value={audDesde} max={audHasta || hoyLima} onChange={(e) => setAudDesde(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
-        <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Hasta<input type="date" className="dc-premium-inp" value={audHasta} min={audDesde || undefined} max={hoyLima} onChange={(e) => setAudHasta(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
+        <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Desde<CampoFecha className="dc-premium-inp" value={audDesde} max={audHasta || hoyLima} onChange={(e) => setAudDesde(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
+        <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--dc-ink-500)", fontWeight: 500 }}>Hasta<CampoFecha className="dc-premium-inp" value={audHasta} min={audDesde || undefined} max={hoyLima} onChange={(e) => setAudHasta(e.target.value)} style={{ padding: "7px 10px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)", fontSize: 13 }} /></label>
         {(audDesde || audHasta) && <Btn small kind="ghost" onClick={() => { setAudDesde(""); setAudHasta(""); }}>Quitar fechas</Btn>}
         {/* R7-06: con el rango invertido no queda a la vista la cifra del rango anterior. */}
         {!audRangoInvertido && <span style={{ fontSize: 12, color: "var(--dc-ink-500)", alignSelf: "center" }}>{enRango.length} de {rowsN.length} eventos{masAntiguo ? ` · hay datos desde el ${fechaCorta(masAntiguo)}` : ""}</span>}
@@ -8220,7 +8234,7 @@ function Auditoria() {
 const indicRx = (raw) => { const { texto, alertas } = partirIndicaciones(raw); return { indic: texto, alertasRx: alertas, indicRaw: raw ?? "" }; };
 const EstadoRx = ({ r }) => (r.firmada
   ? <span className="dc-pill is-ok"><ShieldCheck size={12} strokeWidth={2} /> Firmada</span>
-  : <span className="dc-pill"><FileText size={12} strokeWidth={2} /> Emitida</span>);
+  : <span className="dc-pill" title="El médico que la emitió no tiene COP registrado">Sin firma</span>);
 function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
   const conectado = !!auth.token;
   const sedeCx = useSede();
@@ -8248,7 +8262,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
       const p = (pacProp || []).find((x) => String(x.id) === String(pid));
       if (!p) return;
       // H-08: los dos formatos de ítem (ficha y módulo) se leen con la misma función.
-      const items = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) }));
+      const items = itemsDeReceta(r).map((x) => ({ med: nombreVisibleReceta(x), detalle: posologiaItemReceta(x) }));
       out.push({ id: pid + "-" + i, pacienteId: p.id, paciente: p.nombre, dni: p.dni || "", fecha: r.fecha, items, itemsRaw: itemsDeReceta(r), ...indicRx(r.indicaciones), firmada: true, medico: r.medico || "", sede: r.sede, demoIdx: i });
     }));
     return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
@@ -8267,7 +8281,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
     setRecetasLeyendo(true);
     api.recetas.listar().then((rows) => {
       setRecetasError(null); setRecetasLeyendo(false);
-      setRecetasRem((rows || []).map((r) => { const its = itemsDeReceta(r).map((x) => ({ med: nombreItemReceta(x), detalle: indicacionItemReceta(x) })); const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); const cop = r.cop || med?.cop || ""; return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, ...indicRx(r.indicaciones), firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl || (r.medicoId && conCop(cop))), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop, items: its, itemsRaw: itemsDeReceta(r) }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")));
+      setRecetasRem((rows || []).map((r) => { const its = itemsDeReceta(r).map((x) => ({ med: nombreVisibleReceta(x), detalle: posologiaItemReceta(x) })); const pac = (pacRemoto || []).find((p) => p.id === r.pacienteId); const med = medRemoto.find((m) => String(m.id) === String(r.medicoId)); const cop = r.cop || med?.cop || ""; return { id: r.id, pacienteId: r.pacienteId, paciente: r.paciente || nombrePac(r.pacienteId), dni: pac?.dni || "", fecha: r.fecha, ...indicRx(r.indicaciones), firmada: !!(r.firmada || r.firmadaEn || r.firmaUrl || (r.medicoId && conCop(cop))), medicoId: r.medicoId || null, medico: r.medico || med?.nombre || "", cop, items: its, itemsRaw: itemsDeReceta(r) }; }).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")));
     }).catch((e) => { setRecetasLeyendo(false); setRecetasError(esSinPermiso(e) ? "sin permiso" : msgServidor(e, "error del servidor")); });
   };
   useEffect(() => { recargarRecetas(); }, [conectado, pacRemoto, medRemoto]); // eslint-disable-line
@@ -8411,11 +8425,11 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
         )}
         {recetas.length === 0 && !form && !(conectado && recetasError) && <Card style={{ padding: 0 }}><Vacio icon={<FileText size={22} strokeWidth={1.75} />} titulo="Sin recetas" sub="Emite la primera receta; queda firmada en la historia del paciente." /></Card>}
         {recetas.length > 0 && (
-          <ListaFiltrable rows={recetas} sub="recetas" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="recetas"
+          <ListaFiltrable rows={recetas} sub="recetas" defaultSort={{ key: "fecha", dir: "desc" }} alfabetico={false} vistaClave="recetas"
             vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]}
             tabla={{ minWidth: 760, cols: [
-              { key: "paciente", label: "Paciente", w: "minmax(160px,1fr)", cell: (r) => { const col = colorDe(r.paciente); return <span className="dc-tp__quien"><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente)}</span><b>{r.paciente}</b></span>; } },
-              { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__sub">{fechaLegible(r.fecha)}</span> },
+              { key: "paciente", label: "Paciente", w: "minmax(160px,1fr)", cell: (r) => { const col = colorDe(r.paciente); return <span className="dc-tp__quien"><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.paciente)}</span><b>{nombrePropio(r.paciente)}</b></span>; } },
+              { key: "fecha", label: "Fecha", w: "130px", cell: (r) => <span className="dc-tp__sub">{fechaDoc(r.fecha)}</span> },
               { key: "med", label: "Medicamentos", w: "minmax(260px,2.2fr)", cell: (r) => <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div> },
               ...(recetas.some((r) => r.indic) ? [{ key: "indic", label: "Indicaciones", w: "minmax(140px,1fr)", get: (r) => r.indic || "—" }] : []),
               { key: "estado", label: "Estado", w: "110px", a: "right", cell: (r) => <EstadoRx r={r} /> },
@@ -8431,7 +8445,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
               <article key={r.id} className="dc-rx2">
                 <header>
                   {av(r.paciente)}
-                  <div><b>{r.paciente}</b><span className="dc-rx2__meta"><Calendar size={12} strokeWidth={1.9} /><span>{fechaLegible(r.fecha)}{r.medico ? <> · <span className="dc-rx2__doc">{r.medico}</span></> : null}</span></span></div>
+                  <div><b>{nombrePropio(r.paciente)}</b><span className="dc-rx2__meta"><Calendar size={12} strokeWidth={1.9} /><span>{fechaDoc(r.fecha)}</span></span>{r.medico ? <span className="dc-rx2__meta"><Stethoscope size={12} strokeWidth={1.9} /><span className="dc-rx2__doc">{r.medico}</span></span> : null}</div>
                   <EstadoRx r={r} />
                 </header>
                 {(r.items || []).length > 0 ? (
@@ -8449,7 +8463,7 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                 {listaRx.map((r) => (
                   <div key={r.id} className="dc-rx2__fila">
                     {av(r.paciente, 36)}
-                    <div className="dc-rx2__quien"><b>{r.paciente}</b><span>{fechaLegible(r.fecha)}</span></div>
+                    <div className="dc-rx2__quien"><b>{nombrePropio(r.paciente)}</b><span>{fechaDoc(r.fecha)}</span></div>
                     <div className="dc-rx2__meds">{(r.items || []).map((it, k) => <span key={k}><i>℞</i>{it.med}</span>)}</div>
                     <span className="dc-rx2__n">{(r.items || []).length} {(r.items || []).length === 1 ? "medicamento" : "medicamentos"}</span>
                     <EstadoRx r={r} />
@@ -8465,11 +8479,11 @@ function Recetas({ pacientes: pacProp, notify, updFicha, fichas = null }) {
                 <div className="dc-rx2__grupos">
                   {grupos.map((g) => (
                     <section key={g.p} className="dc-rx2__grupo">
-                      <header>{av(g.p, 38)}<div><b>{g.p}</b><span>{g.items.length} {g.items.length === 1 ? "receta" : "recetas"} · última {fechaLegible(g.items[0].fecha)}</span></div></header>
+                      <header>{av(g.p, 38)}<div><b>{g.p}</b><span>{g.items.length} {g.items.length === 1 ? "receta" : "recetas"} · última {fechaDoc(g.items[0].fecha)}</span></div></header>
                       <ol>
                         {g.items.map((r) => (
                           <li key={r.id}>
-                            <span className="dc-rx2__gf">{fechaLegible(r.fecha)}</span>
+                            <span className="dc-rx2__gf">{fechaDoc(r.fecha)}</span>
                             <div>{(r.items || []).map((it, k) => <div key={k} className="dc-rx2__gm"><b>{it.med}</b>{it.detalle && <small>{it.detalle}</small>}</div>)}{(r.alertasRx || []).length > 0 && <small className="dc-rx2__gi dc-rx2__gi--alerta">Emitida pese a alerta de alergia: {r.alertasRx.join(" · ")}</small>}{r.indic && <small className="dc-rx2__gi">{r.indic}</small>}</div>
                           </li>
                         ))}
@@ -8556,6 +8570,8 @@ function FirmaModal({ doc, onClose, onConfirm, esMenor = false, firmante, setFir
 }
 function Consentimientos({ pacientes: pacProp, notify }) {
   const conectado = !!auth.token;
+  // Los anulados no se borran, pero ocultos por defecto: con 24 anulados y 4 vigentes la lista era casi toda gris.
+  const [verAnulados, setVerAnulados] = useState(false);
   // R-38: registrar es POST /consentimientos (consentimientos:crear). Recepción solo tiene
   // «ver»: llenaba todo el formulario y el servidor respondía 403.
   const puedeCrear = tienePermiso("consentimientos", "crear");
@@ -8665,11 +8681,10 @@ function Consentimientos({ pacientes: pacProp, notify }) {
         <section className="dc-esp-hero dc-form-hero">
           <div className="dc-esp-hero__txt">
             {/* «100% firmados» con 22 anulados confundía: el % es de los documentos vigentes. */}
-            <div className="dc-esp-hero__num"><b>{pct}%</b><span>{nF + nP ? `de los ${nF + nP} vigentes, firmados` : "sin documentos vigentes"}</span></div>
+            <div className="dc-esp-hero__num"><b>{nF + nP ? nF : 0}</b><span>{nF + nP ? `de ${nF + nP} vigentes ${nF === 1 ? "firmado" : "firmados"}` : "sin documentos vigentes"}</span></div>
             <p>{conectado ? "Se firma en consultorio y queda archivado con fecha y hora" : "El paciente firma en línea y queda archivado con fecha y hora"}</p>
           </div>
           <div className="dc-esp-hero__cifras">
-            <div><b>{nF}</b><span>Firmados</span></div>
             <div><b>{nP}</b><span>Por firmar</span></div>
             <div><b>{docs.length}</b><span>Documentos</span></div>
             {nA > 0 && <div><b>{nA}</b><span>{nA === 1 ? "Anulado" : "Anulados"}</span></div>}
@@ -8750,7 +8765,7 @@ function Consentimientos({ pacientes: pacProp, notify }) {
         const av = (nom, sz = 34) => { const col = colorDe(nom); return <span className="dc-rec__av" style={{ width: sz, height: sz, fontSize: sz > 36 ? 13 : 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(nom)}</span>; };
         const tarjeta = (d) => (
           <article key={d.id} className={`dc-cns__card${firmado(d) ? " is-ok" : anulado(d) ? " is-anul" : " is-pend"}`}>
-            <header>{av(d.paciente, 38)}<div><b>{d.paciente}</b><span><Calendar size={12} strokeWidth={2} /> {fechaLegible(d.fecha)}</span></div>{pill(d)}</header>
+            <header>{av(d.paciente, 38)}<div><b>{nombrePropio(d.paciente)}</b><span><Calendar size={12} strokeWidth={2} /> {fechaDoc(d.fecha)}</span></div>{pill(d)}</header>
             <div className="dc-cns__doc"><span><Shield size={15} strokeWidth={1.9} /></span><b>{d.tipo}</b></div>
             <footer><small>{firmado(d) ? "Archivado con fecha y hora" : anulado(d) ? textoAnulado(d) : "Esperando la firma del paciente"}</small>{accion(d)}</footer>
           </article>
@@ -8765,16 +8780,19 @@ function Consentimientos({ pacientes: pacProp, notify }) {
         const tarjetas = (lst) => { const vig = lst.filter((d) => !anulado(d)), anul = lst.filter(anulado); return !anul.length
           ? <div className="dc-cns__grid">{lst.map(tarjeta)}</div>
           : <div style={{ display: "grid", gap: 14 }}>{vig.length > 0 && <div className="dc-cns__grid">{vig.map(tarjeta)}</div>}{colAnulados(anul)}</div>; };
+        const nAnul = docs.filter(anulado).length;
+        const conAnulados = verAnulados || nAnul === docs.length;
         if (!docs.length) return <Card><Vacio icon={<Shield size={22} strokeWidth={1.75} />} titulo="Sin consentimientos" sub={!puedeCrear ? "Aún no hay consentimientos registrados." : conectado ? "Registra el primero con «Nuevo consentimiento»: queda por firmar en consultorio." : "Envía el primer consentimiento para que el paciente lo firme en línea."} /></Card>;
         return (
           <Card className="dc-env">
             <div className="dc-env__cab"><h3>Consentimientos</h3></div>
-            <ListaFiltrable rows={docs} sub="documentos" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="consentimientos"
+            <ListaFiltrable rows={conAnulados ? docs : docs.filter((d) => !anulado(d))} sub="documentos" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} alfabetico={false} vistaClave="consentimientos"
+              extra={nAnul > 0 && nAnul < docs.length ? <button type="button" className="dc-dt__limpiar is-ver" onClick={() => setVerAnulados((v) => !v)}>{verAnulados ? "Ocultar anulados" : `Ver anulados (${nAnul})`}</button> : null}
               vistas={[{ id: "estado", label: "Por estado", icon: Columns3 }]}
               tabla={{ primero: true, minWidth: 720, cols: [
-                { key: "paciente", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (d) => <span className="dc-tp__quien" title={d.paciente}>{av(d.paciente)}<b>{d.paciente}</b></span> },
+                { key: "paciente", label: "Paciente", w: "minmax(180px,1.2fr)", cell: (d) => <span className="dc-tp__quien" title={d.paciente}>{av(d.paciente)}<b>{nombrePropio(d.paciente)}</b></span> },
                 { key: "tipo", label: "Documento", w: "minmax(200px,1.5fr)", cell: (d) => <><span className="dc-doc-tipo"><span><Shield size={14} strokeWidth={1.9} /></span>{d.tipo}</span>{anulado(d) && <small className="dc-cns__motivo">{textoAnulado(d)}</small>}</> },
-                { key: "fecha", label: "Fecha", w: "120px", a: "center", cell: (d) => <span className="dc-tp__sub" style={{ whiteSpace: "nowrap" }}>{fechaLegible(d.fecha)}</span> },
+                { key: "fecha", label: "Fecha", w: "120px", a: "center", cell: (d) => <span className="dc-tp__sub" style={{ whiteSpace: "nowrap" }}>{fechaDoc(d.fecha)}</span> },
                 { key: "estado", label: "Estado", w: "130px", a: "center", cell: pill },
                 { key: "acc", label: "", w: "140px", a: "right", cell: accion },
               ] }} cols={[
@@ -8823,6 +8841,10 @@ function Consentimientos({ pacientes: pacProp, notify }) {
 // Cada sede tiene su almacén: el mismo insumo existe en las dos con su propio stock y
 // consumo (Surco atiende menos y repone por su lado). consumirInsumos descuenta solo
 // del almacén de la sede donde se atendió.
+// Celular peruano en grupos de 3 («948 277 030»); con +51 o sin él. Otro formato, tal cual.
+const telVisible = (t) => { const d = String(t || "").replace(/\D/g, ""); const n = d.length === 11 && d.startsWith("51") ? d.slice(2) : d; return n.length === 9 ? `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}` : (t || "—"); };
+// «unid» se lee «unidad» / «unidades»; las demás unidades («cajas», «cartuchos») van tal cual.
+const unidadTxt = (u, n) => (!u || /^unid\.?$/i.test(u) ? (Number(n) === 1 ? "unidad" : "unidades") : u);
 const INVENTARIO_INIT = [
   { id: 1, sede: 1, nombre: "Guantes de nitrilo (caja)", cat: "Bioseguridad", stock: 24, min: 10, unidad: "cajas", dia: 1.5, precio: 35 },
   { id: 2, sede: 1, nombre: "Anestesia lidocaína 2%", cat: "Anestesia", stock: 8, min: 15, unidad: "cartuchos", dia: 4, precio: 3 },
@@ -8947,6 +8969,9 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
   // Precio que se muestra: el de la sede a la vista o, con varias, el base.
   const precioEn = (s, sedeId) => precioServicio({ ...s, precio: s.monto }, sedeId);
   const propioEn = (s, sedeId) => s.preciosSede?.[sedeId] != null && s.preciosSede[sedeId] !== "";
+  // Una sede «tiene precio propio» solo si alguno difiere del base (hay sedes con el mismo precio cargado).
+  const difiereEn = (x, sedeId) => Math.abs(precioEn(x, sedeId) - (Number(x.monto) || 0)) >= 0.005;
+  const hayPrecioSede = sedesLista.some((sd) => items.some((x) => difiereEn(x, sd.id)));
   const precioVista = (s) => (sedeUnica ? precioEn(s, sedeUnica.id) : Number(s.monto) || 0);
   const activosTodos = itemsTodos.filter((s) => s.activo !== false);
   const itemsVista = activosTodos.map((s) => ({ ...s, monto: precioVista(s) }));
@@ -9080,8 +9105,9 @@ function Servicios({ notify = () => {}, crearIntent = false, onIntentDone = () =
         { key: "igv", label: "IGV 18%", w: "88px", a: "right", get: (s) => desgloseIgv(precioVista(s)).igv, cell: (s) => <span style={{ fontSize: 13, color: "var(--dc-ink-500)", fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(desgloseIgv(precioVista(s)).igv)}</span> },
         // Con una sede a la vista, su total: el propio en negrita; el base que hereda, atenuado
         // (igual que las columnas por sede).
-        { key: "monto", label: sedesLista.length > 1 ? "Total base" : sedeUnica && multiSede ? `Total ${cortaSede(sedeUnica.id)}` : "Total", w: "110px", a: "right", get: (s) => precioVista(s), cell: (s) => { const heredado = sedeUnica && multiSede && !propioEn(s, sedeUnica.id); return <span className="dc-money" title={sedeUnica && multiSede ? (heredado ? `${sedeUnica.nombre} cobra el precio base` : `Precio propio de ${sedeUnica.nombre} · base S/ ${M.sol2(Number(s.monto))}`) : undefined} style={{ fontWeight: heredado ? 500 : 600, color: heredado ? "var(--dc-ink-500)" : NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioVista(s))}</span>; } },
-        ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), w: "112px", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={`${propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} · sin IGV S/ ${M.sol2(desgloseIgv(precioServicio({ ...s, precio: s.monto }, sd.id)).base)}`} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
+        { key: "monto", label: sedesLista.length > 1 && hayPrecioSede ? "Total base" : sedeUnica && multiSede ? `Total ${cortaSede(sedeUnica.id)}` : "Total", w: "110px", a: "right", get: (s) => precioVista(s), cell: (s) => { const heredado = sedeUnica && multiSede && !propioEn(s, sedeUnica.id); return <span className="dc-money" title={sedeUnica && multiSede ? (heredado ? `${sedeUnica.nombre} cobra el precio base` : `Precio propio de ${sedeUnica.nombre} · base S/ ${M.sol2(Number(s.monto))}`) : undefined} style={{ fontWeight: heredado ? 500 : 600, color: heredado ? "var(--dc-ink-500)" : NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioVista(s))}</span>; } },
+        // Una sede sin precios propios repetía el total base en toda su columna: solo va al Excel.
+        ...(sedesLista.length > 1 ? sedesLista.map((sd) => ({ key: `sede${sd.id}`, label: sd.nombre.replace(/^Sede\s+/i, ""), soloExport: !items.some((x) => difiereEn(x, sd.id)), w: "112px", a: "right", get: (s) => precioServicio({ ...s, precio: s.monto }, sd.id), cell: (s) => { const propio = s.preciosSede?.[sd.id] != null && s.preciosSede[sd.id] !== ""; return <span className="dc-money" title={`${propio ? `Precio propio de ${sd.nombre}` : "Usa el precio base"} · sin IGV S/ ${M.sol2(desgloseIgv(precioServicio({ ...s, precio: s.monto }, sd.id)).base)}`} style={{ fontWeight: propio ? 600 : 400, color: propio ? NAVY : "var(--dc-ink-400)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {M.sol2(precioServicio({ ...s, precio: s.monto }, sd.id))}</span>; } })) : []),
         // SRV-02: la columna Margen solo aparece cuando hay algún costo cargado.
         // El costo y el margen son internos: quien solo consulta el catálogo (el doctor) no los ve.
         // R6-09: margen = precio sin IGV − costo directo (antes se restaba al total con IGV).
@@ -9549,7 +9575,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             <div className="dc-esp-hero__cifras">
               <div><b>{hoyN}</b><span>Hoy</span></div>
               <div><b>{new Set(movs.map((m) => m.paciente)).size}</b><span>Pacientes</span></div>
-              <div title={top ? top[0] : undefined}><b>{top ? top[1] : "—"}</b><span>{top ? `Más usado: ${top[0]}` : "Más usado: sin consumos"}</span></div>
+              {top && <div title={top[0]}><b>{top[1]}</b><span>Más usado: {top[0]}</span></div>}
             </div>
           </section>
         ); })()}
@@ -9583,8 +9609,8 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           { key: "nombre", label: "Proveedor", w: "minmax(180px,1.4fr)", a: "left", get: (p) => p.nombre, cell: (p) => <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg, ${tint(colorDe(p.nombre), 0.22)}, ${tint(colorDe(p.nombre), 0.08)})`, color: colorDe(p.nombre), fontWeight: 800, display: "grid", placeItems: "center", flexShrink: 0 }}><Building2 size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div style={{ fontWeight: 500, color: NAVY, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nombre}</div></div></div> },
           { key: "contacto", label: "Contacto", w: "minmax(150px,1fr)", a: "left", get: (p) => p.contacto || "", cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{p.contacto || "—"}</span> },
           ...((conectado ? proveedoresReales : proveedoresDemo).some((p) => p.categoria && p.categoria !== "—") ? [{ key: "categoria", label: "Categoría", w: "minmax(150px,1fr)", a: "left", get: (p) => p.categoria, cell: (p) => p.categoria && p.categoria !== "—" ? <span className="dc-pill dc-pill--wrap" style={{ "--c": colorDe(p.categoria) }}><i /> {p.categoria}</span> : <span style={{ color: "var(--dc-ink-400)" }}>—</span> }] : []),
-          ...((conectado ? proveedoresReales : proveedoresDemo).some((p) => p.ultima) ? [{ key: "ultima", label: "Última compra", w: "140px", a: "left", get: (p) => p.ultima || "", cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{p.ultima ? fechaLegible(p.ultima) : "—"}</span> }] : []),
-          { key: "compras", label: "Compras", w: "110px", a: "center", get: (p) => p.compras, cell: (p) => <span className="dc-pill">{p.compras} {p.compras === 1 ? "compra" : "compras"}</span> },
+          ...((conectado ? proveedoresReales : proveedoresDemo).some((p) => p.ultima) ? [{ key: "ultima", label: "Última compra", w: "140px", a: "left", get: (p) => p.ultima || "", cell: (p) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)", whiteSpace: "nowrap" }}>{p.ultima ? fechaDoc(p.ultima) : "—"}</span> }] : []),
+          { key: "compras", label: "Compras", w: "110px", a: "center", get: (p) => p.compras, cell: (p) => <span className="dc-tp__num">{p.compras}</span> },
           { key: "total", label: "Total comprado", w: "150px", a: "right", get: (p) => p.total, cell: (p) => <span style={{ fontWeight: 600, color: NAVY, fontFamily: DISPLAY_FONT, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>S/ {p.total.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
         ]} />
         </>
@@ -9600,7 +9626,7 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
           <div className="dc-esp-hero__cifras">
             {/* Redondeado como el «Inventario valorizado» del Panel gerencial: la misma cifra en los dos. */}
             {puedeGestionar && <div><b>S/ {Math.round(valorTotal).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b><span>Valor en stock</span></div>}
-            <div title={covMinInsumo ? covMinInsumo.nombre : undefined}><b>{covMinHoy === Infinity ? "—" : covMinHoy <= 0 ? "Hoy" : `${covMinHoy} d`}</b><span>{covMinInsumo ? `Se acaba primero: ${covMinInsumo.nombre}` : "Cobertura mínima"}</span></div>
+            {covMinHoy !== Infinity && <div title={covMinInsumo ? covMinInsumo.nombre : undefined}><b>{covMinHoy <= 0 ? "Hoy" : pluralEs(covMinHoy, "día", "días")}</b><span>{covMinInsumo ? `Se acaba primero: ${covMinInsumo.nombre}` : "Cobertura mínima"}</span></div>}
             <div><b>{vencenPronto.length}</b><span>Vencen pronto</span></div>
           </div>
           <span />
@@ -9616,27 +9642,28 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
             // M5-12: un rol de solo lectura (el médico) no puede agregar insumos: no se le pide.
             ? `No hay insumos registrados${variasSedes ? "" : ` en ${nombreSede(verSedes[0])}`}. Si falta alguno, avisa a administración.`
             : variasSedes ? "Agrega tu primer insumo para controlar stock y cobertura." : `${nombreSede(verSedes[0])} aún no tiene insumos. Agrégalos para controlar su stock y cobertura.`} />} cols={[
-        { key: "insumo", label: "Insumo", w: "minmax(160px,1.4fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div></div></div>; } },
+        { key: "insumo", label: "Insumo", w: "minmax(160px,1.4fr)", a: "left", get: (it) => it.nombre, cell: (it) => { const e = estado(it); const col = e === "ok" ? DS.c.primary : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; return <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}><div style={{ width: 34, height: 34, borderRadius: "var(--dc-r-sm)", background: tint(col, 0.082), color: col, display: "grid", placeItems: "center", flexShrink: 0 }}><Package size={16} strokeWidth={1.75} /></div><div style={{ minWidth: 0 }}><div title={it.nombre} style={{ fontWeight: 500, color: NAVY, fontSize: 14, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.nombre}</div>{(it.cat || it.lote) && <div style={{ fontSize: 12, color: "var(--dc-ink-400)", marginTop: 2 }}>{[it.cat, it.lote ? `Lote ${it.lote}` : ""].filter(Boolean).join(" · ")}</div>}</div></div>; } },
         // Con «Todas las sedes» el mismo insumo sale una vez por almacén: la sede dice cuál es.
         ...colSede,
-        { key: "cat", label: "Categoría", w: "minmax(100px,0.7fr)", a: "left", get: (it) => it.cat || "—" },
-        ...(items.some((it) => it.lote) ? [{ key: "lote", label: "Lote", w: "96px", a: "left", get: (it) => it.lote || "", cell: (it) => <span style={{ fontSize: 13, whiteSpace: "nowrap", color: it.lote ? "var(--dc-ink-700)" : "var(--dc-ink-400)" }}>{it.lote || "—"}</span> }] : []),
-        ...(items.some((it) => it.fechaVencimiento) ? [{ key: "vence", label: "Vence", w: "124px", a: "left", get: (it) => it.fechaVencimiento || "", cell: (it) => {
+        // Categoría y lote van bajo el nombre (la tabla no cabía a 1440 px); siguen en el Excel.
+        { key: "cat", label: "Categoría", soloExport: true, get: (it) => it.cat || "—" },
+        ...(items.some((it) => it.lote) ? [{ key: "lote", label: "Lote", soloExport: true, w: "96px", a: "left", get: (it) => it.lote || "", cell: (it) => <span style={{ fontSize: 13, whiteSpace: "nowrap", color: it.lote ? "var(--dc-ink-700)" : "var(--dc-ink-400)" }}>{it.lote || "—"}</span> }] : []),
+        ...(items.some((it) => it.fechaVencimiento) ? [{ key: "vence", label: "Vence", w: "150px", a: "left", get: (it) => it.fechaVencimiento || "", cell: (it) => {
           const dv = diasVenc(it.fechaVencimiento);
           if (!it.fechaVencimiento) return <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>—</span>;
           const estVenc = dv === null ? null : dv < 0 ? "vencido" : dv <= 60 ? "alerta" : "ok";
           return (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, whiteSpace: "nowrap" }}>
-              <span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{fechaLegible(it.fechaVencimiento)}</span>
+              <span style={{ color: "var(--dc-ink-700)", fontVariantNumeric: "tabular-nums" }}>{fechaDoc(it.fechaVencimiento)}</span>
               {estVenc === "vencido" ? <span style={{ fontSize: 11, fontWeight: 600, color: "var(--dc-danger-700)", background: "var(--dc-fee)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>Vencido</span>
-                : estVenc === "alerta" ? <span style={{ fontSize: 11, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }}>{dv === 0 ? "Hoy" : `${dv} d`}</span> : null}
+                : estVenc === "alerta" ? <span style={{ fontSize: 11, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "1px 6px", borderRadius: "var(--dc-r-sm)" }} title={`Vence en ${pluralEs(dv, "día", "días")}`}>{dv === 0 ? "Hoy" : `${dv} días`}</span> : null}
             </span>
           );
         } }] : []),
-        { key: "stock", label: "Stock", w: "minmax(124px,1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{it.unidad}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto" }}>mín {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? <div style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>—</div> : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
+        { key: "stock", label: "Stock", w: "minmax(124px,1fr)", a: "left", get: (it) => it.stock, cell: (it) => { const e = estado(it); const col = e === "ok" ? "var(--dc-ok-700)" : e === "bajo" ? "var(--dc-warn-600)" : "var(--dc-danger-700)"; const pct = pctCoberturaBarra(it); const lp = layoutProgreso(pct); return <div style={{ minWidth: 0, paddingRight: 8 }}><div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 5 }}><span style={{ fontWeight: 600, fontFamily: DISPLAY_FONT, fontSize: 14, color: col }}>{it.stock}</span><span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ink-500)" }}>{unidadTxt(it.unidad, it.stock)}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)", marginLeft: "auto", whiteSpace: "nowrap" }}>mín. {it.min}</span></div>{!lp.dibujar && !lp.soloTexto ? null : lp.soloTexto ? <div style={{ fontSize: 12, fontWeight: 500, color: col }}>{Math.round(lp.pct)}%</div> : <div style={{ height: 6, background: "var(--dc-line)", borderRadius: "var(--dc-r-full)", overflow: "hidden" }}><div style={{ width: lp.pct + "%", height: "100%", background: col, borderRadius: "var(--dc-r-full)", transition: "width .7s cubic-bezier(.2,.7,.2,1)" }} /></div>}</div>; } },
         // INV-01: una sola columna de urgencia (Estado) con los días de cobertura como subtítulo.
-        { key: "estado", label: "Estado", w: "minmax(118px,0.8fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); return <span style={{ display: "inline-grid", justifyItems: "center", gap: 2 }}>{badge(estado(it))}{d < 999 && <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{d <= 0 ? "se acaba hoy" : `~${Math.round(d)} d de cobertura`}</small>}</span>; } },
-        { key: "pedir", label: "Sugerido", w: "minmax(118px,0.8fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>+{q} {it.unidad}</span>; } },
+        { key: "estado", label: "Estado", w: "minmax(118px,0.8fr)", a: "center", get: (it) => cobertura(it), cell: (it) => { const d = cobertura(it); return <span style={{ display: "inline-grid", justifyItems: "center", gap: 2 }}>{badge(estado(it))}{d < 999 && <small style={{ fontSize: 12, color: "var(--dc-ink-500)" }}>{d <= 0 ? "se acaba hoy" : `para ~${pluralEs(Math.round(d), "día", "días")}`}</small>}</span>; } },
+        { key: "pedir", label: "Sugerido", w: "minmax(118px,0.8fr)", a: "right", get: (it) => pedir(it), cell: (it) => { const q = pedir(it); return q === 0 ? <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-ok-700)", background: "var(--dc-ok-soft)", padding: "4px 10px", borderRadius: "var(--dc-r-full)", display: "inline-flex", alignItems: "center", gap: 4 }}><Check size={12} strokeWidth={1.75} /> Suficiente</span> : <span title="Hasta 2× el mínimo cuando cobertura &lt; 14 d o stock bajo" style={{ fontSize: 13, fontWeight: 500, color: DS.c.primary, background: (tint(DS.c.primary, 0.078)), padding: "4px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>+{q} {unidadTxt(it.unidad, q)}</span>; } },
         // Ajustar o editar el stock es gestion: quien solo consulta no lo ve.
         // Ajuste rápido de stock (usar / ingresar una unidad); editar es tocar la fila.
         ...(puedeGestionar ? [{ key: "acc", label: "Ajustar", w: "96px", a: "center", noFilter: true, noSort: true, sticky: false, fijo: true, cell: (it) => <span className="dc-inv__step" onClick={(e) => e.stopPropagation()}><button type="button" aria-label={`Usar 1 de ${it.nombre}`} title="Usar una unidad" onClick={() => ajustar(it.id, -1)}><Minus size={14} strokeWidth={2} /></button><b>{it.stock}</b><button type="button" aria-label={`Ingresar 1 de ${it.nombre}`} title="Ingresar una unidad" onClick={() => ajustar(it.id, 1)}><Plus size={14} strokeWidth={2} /></button></span> }] : []),
@@ -9731,6 +9758,9 @@ function Inventario({ notify, items: itemsProp = INVENTARIO_INIT, setItems, can,
 
 /* ---- Casos a laboratorio (paridad con Doctocliq) ---- */
 const LAB_FLUJO = ["enviado", "en_proceso", "recibido", "entregado"];
+// «Avanzar» no decía a qué estado pasaba: el botón nombra el paso siguiente.
+const LAB_PLURAL = { enviado: "Enviados", recibido: "Recibidos", entregado: "Entregados" };
+const LAB_ACCION = { enviado: "Marcar en proceso", en_proceso: "Marcar recibido", recibido: "Marcar entregado" };
 const LAB_INFO = { enviado: { l: "Enviado", bg: "var(--dc-info-soft)", fg: "var(--dc-info-ink)" }, en_proceso: { l: "En proceso", bg: "var(--dc-warn-soft)", fg: "var(--dc-warn-600)" }, recibido: { l: "Recibido", bg: "#EFEAFC", fg: "#5B3FC4" }, entregado: { l: "Entregado", bg: "var(--dc-ok-soft)", fg: "var(--dc-ok-700)" } };
 function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
   // Mandar un trabajo al laboratorio es dar de alta un caso. Quien solo consulta el
@@ -9820,7 +9850,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
           </div>
           <ol className="dc-lab-flujo" aria-label="Flujo del laboratorio">
             {LAB_FLUJO.map((st, i) => { const I = LAB_INFO[st]; const n = casos.filter((c) => c.estado === st).length; return (
-              <li key={st} className={`is-${st}`}><b>{n}</b><span>{I.l}</span>{i < LAB_FLUJO.length - 1 && <ChevronRight size={14} strokeWidth={2} className="dc-lab-flujo__fl" />}</li>
+              <li key={st} className={`is-${st}`}><b>{n}</b><span>{n !== 1 && LAB_PLURAL[st] ? LAB_PLURAL[st] : I.l}</span>{i < LAB_FLUJO.length - 1 && <ChevronRight size={14} strokeWidth={2} className="dc-lab-flujo__fl" />}</li>
             ); })}
           </ol>
           {atr.length > 0 ? (
@@ -9846,7 +9876,7 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Paciente<br /><Select value={nuevo.paciente} onChange={(v) => setNuevo({ ...nuevo, paciente: v })} placeholder="— Selecciona —" options={pacientes.map((p) => ({ value: p.nombre, label: p.nombre }))} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Laboratorio<br /><input className="dc-premium-inp" value={nuevo.lab} onChange={(e) => setNuevo({ ...nuevo, lab: e.target.value })} style={{ ...inp, marginTop: 4 }} /></label>
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", gridColumn: "1 / -1" }}>Trabajo<br /><input className="dc-premium-inp" value={nuevo.trabajo} onChange={(e) => setNuevo({ ...nuevo, trabajo: e.target.value })} placeholder="Corona de porcelana – pieza 36" style={{ ...inp, marginTop: 4 }} /></label>
-            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Fecha de entrega<br /><input className="dc-premium-inp" type="date" value={nuevo.entrega} onChange={(e) => setNuevo({ ...nuevo, entrega: e.target.value })} style={{ ...inp, marginTop: 4 }} /></label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Fecha de entrega<br /><CampoFecha className="dc-premium-inp" value={nuevo.entrega} onChange={(e) => setNuevo({ ...nuevo, entrega: e.target.value })} style={{ ...inp, marginTop: 4 }} /></label>
             {/* El caso queda en la sede que lo envía: solo esa sede lo ve y le llega el egreso. */}
             <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Sede que envía<br /><Select value={nuevo.sede ?? ""} onChange={(v) => setNuevo({ ...nuevo, sede: v })} placeholder="— Selecciona —" disabled={sedesEnvio.length < 2} options={sedesEnvio.map((x) => ({ value: x.id, label: x.nombre }))} /></label>
           </div>
@@ -9858,15 +9888,15 @@ function Laboratorio({ pacientes: pacientesProp, notify, updFicha, can }) {
         { key: "lab", label: "Laboratorio", w: "minmax(140px,1.1fr)", a: "left", get: (c) => c.lab, cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{c.lab}</span> },
         // Con más de una sede a la vista, de qué sede es cada caso.
         ...(variasSedes ? [{ key: "sede", label: "Sede", w: "120px", a: "center", get: (c) => cortaSede(sedeDelCaso(c)), cell: (c) => <span style={{ fontSize: 13, color: "var(--dc-ink-700)" }}>{cortaSede(sedeDelCaso(c))}</span> }] : []),
-        { key: "entrega", label: "Entrega", w: "minmax(160px,1.1fr)", a: "center", get: (c) => c.entrega, cell: (c) => { const d = faltanDias(c); const done = c.estado === "entregado" || c.estado === "recibido"; const atr = labAtrasado(c, fmt(hoy)); const lbl = atr ? `Atrasado ${Math.abs(d)} d` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : d < 0 ? "Vencido" : `Faltan ${d} d`; const col = atr ? "var(--dc-red)" : d <= 2 ? "var(--dc-warn-600)" : DS.c.primary;
+        { key: "entrega", label: "Entrega", w: "minmax(160px,1.1fr)", a: "center", get: (c) => c.entrega, cell: (c) => { const d = faltanDias(c); const done = c.estado === "entregado" || c.estado === "recibido"; const atr = labAtrasado(c, fmt(hoy)); const lbl = atr ? `${pluralEs(Math.abs(d), "día", "días")} de atraso` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : d < 0 ? "Vencido" : `Faltan ${pluralEs(d, "día", "días")}`; const col = atr ? "var(--dc-red)" : d <= 2 ? "var(--dc-warn-600)" : DS.c.primary;
           // Recibido o entregado ya lo dice «Estado»: aquí solo la fecha, sin repetir el estado.
-          if (done) return <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{fechaLegible(c.entrega)}</span>;
-          return <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}><span style={{ fontSize: 13, fontWeight: 500, color: col, background: tint(col, 0.078), padding: "3px 11px", borderRadius: "var(--dc-r-full)" }}>{lbl}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{fechaLegible(c.entrega)}</span></div>; } },
+          if (done) return <span style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{fechaDoc(c.entrega)}</span>;
+          return <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}><span style={{ fontSize: 13, fontWeight: 500, color: col, background: tint(col, 0.078), padding: "3px 11px", borderRadius: "var(--dc-r-full)", whiteSpace: "nowrap" }}>{lbl}</span><span style={{ fontSize: 12, color: "var(--dc-ink-400)" }}>{fechaDoc(c.entrega)}</span></div>; } },
         { key: "estado", label: "Estado", w: "130px", a: "center", get: (c) => (LAB_INFO[c.estado] || { l: c.estado || "—" }).l, cell: (c) => { const I = LAB_INFO[c.estado] || { l: c.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; return <span style={{ fontSize: 12, fontWeight: 500, color: I.fg, background: I.bg, padding: "3px 10px", borderRadius: "var(--dc-r-full)" }}>{I.l}</span>; } },
-        { key: "acc", label: "Acción", w: "130px", a: "center", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" ? (puedeAvanzar ? <span onClick={(e) => e.stopPropagation()}><Btn small kind="ghost" onClick={() => avanzar(c.id)}>Avanzar <ChevronRight size={14} strokeWidth={1.75} /></Btn></span> : <span style={{ color: "var(--dc-ink-300, #B6C2C9)" }}>—</span>) : <span style={{ color: "var(--dc-ink-300, #B6C2C9)" }}>—</span> },
+        { key: "acc", label: "Acción", w: "176px", a: "right", noFilter: true, noSort: true, cell: (c) => c.estado !== "entregado" && puedeAvanzar && LAB_ACCION[c.estado] ? <span onClick={(e) => e.stopPropagation()}><Btn small kind="ghost" onClick={() => avanzar(c.id)}>{LAB_ACCION[c.estado]}</Btn></span> : null },
       ]} />
       {detalle && (() => { const I = LAB_INFO[detalle.estado] || { l: detalle.estado || "—", bg: "var(--dc-line)", fg: "var(--dc-ink-400)" }; const atrasado = labAtrasado(detalle, fmt(hoy)); return (
-        <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detalle.trabajo} sub={detalle.paciente} onClose={() => setDetalle(null)} maxW={520} footer={detalle.estado !== "entregado" && puedeAvanzar ? <Btn small onClick={() => { avanzar(detalle.id); setDetalle(null); }}>Avanzar estado <ChevronRight size={14} strokeWidth={1.75} /></Btn> : <Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
+        <Modal icon={<FlaskConical size={20} strokeWidth={1.75} />} tone={DS.c.primary} titulo={detalle.trabajo} sub={detalle.paciente} onClose={() => setDetalle(null)} maxW={520} footer={detalle.estado !== "entregado" && puedeAvanzar ? <Btn small onClick={() => { avanzar(detalle.id); setDetalle(null); }}>{LAB_ACCION[detalle.estado] || "Avanzar estado"}</Btn> : <Btn small kind="ghost" onClick={() => setDetalle(null)}>Cerrar</Btn>}>
           <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 18 }}>
             {LAB_FLUJO.map((st, i) => { const idx = LAB_FLUJO.indexOf(detalle.estado); const done = i <= idx; return (
               <React.Fragment key={st}>
@@ -9974,13 +10004,13 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
     <div style={{ display: "grid", gap: 14 }}>
       <section className="dc-esp-hero is-tablero">
         <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>S/ {actual.precio}</b><span>al mes · plan {actual.nombre}</span></div>
-          <p>{totalMods(actual.id)} módulos activos{conectado ? (renuevaEl ? ` – renueva el ${fechaLegible(String(renuevaEl).slice(0, 10))}` : "") : ` – renueva el ${fechaLegible(addDays(26))}`}</p>
+          <div className="dc-esp-hero__num"><b>S/ {M.sol2(Number(actual.precio) || 0)}</b><span>al mes · plan {actual.nombre}</span></div>
+          <p>{totalMods(actual.id)} módulos activos{conectado ? (renuevaEl ? ` · renueva el ${fechaDoc(String(renuevaEl).slice(0, 10))}` : "") : ` · renueva el ${fechaDoc(addDays(26))}`}</p>
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{sedesUsadas == null ? "—" : `${sedesUsadas} ${sedesUsadas === 1 ? "sede" : "sedes"}`}</b><span>{sedesUsadas == null ? "Sedes" : sedesExtra > 0 ? `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"} + ${sedesExtra} adicional${sedesExtra === 1 ? "" : "es"}` : `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"}`}</span></div>
           <div><b>{odontologos == null ? "—" : actual.odontologos === "ilim" ? odontologos : `${odontologos}/${actual.odontologos}`}</b><span>Odontólogos</span></div>
-          <div title={pacSinPermiso ? SIN_PERM : undefined}><b>{pacSinPermiso ? "No disponible" : totalPacientes == null ? "—" : totalPacientes}</b><span>{pacSinPermiso ? "Pacientes: no disponible para tu rol" : "Pacientes, ilimitados"}</span></div>
+          <div title={pacSinPermiso ? SIN_PERM : undefined}><b>{pacSinPermiso ? "No disponible" : totalPacientes == null ? "—" : totalPacientes}</b><span>{pacSinPermiso ? "Pacientes: no disponible para tu rol" : "Pacientes (sin límite)"}</span></div>
         </div>
         <span />
         <div className="dc-hero-acc"><span className="dc-plan__activo"><CheckCircle2 size={14} strokeWidth={2.2} /> Activo</span></div>
@@ -10203,9 +10233,9 @@ function Resenas({ notify, citas = [], can }) {
         {(() => { const lista = [...reviews].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).filter((r) => filtroRes === "todas" ? true : filtroRes === "pendientes" ? !r.resp : !!r.resp); return lista.length === 0
           ? <Vacio icon={<Star size={22} strokeWidth={1.75} />} titulo={reviews.length ? "Nada con este filtro" : "Sin reseñas"} sub={reviews.length ? "Prueba con otro filtro." : "Solicita reseñas a tus pacientes recientes para construir tu reputación."} />
           : (
-          <ListaFiltrable rows={lista} sub="reseñas" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} vistaClave="resenas" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, onRowClick: (r) => setSel(r), cols: [
+          <ListaFiltrable rows={lista} sub="reseñas" className="dc-lf--dentro" defaultSort={{ key: "fecha", dir: "desc" }} alfabetico={false} vistaClave="resenas" vistas={[{ id: "tarjetas", label: "Tarjetas", icon: LayoutGrid }]} tabla={{ minWidth: 760, onRowClick: (r) => setSel(r), cols: [
             { key: "n", label: "Paciente", w: "minmax(160px,1fr)", cell: (r) => <PersonaCelda nombre={r.nombre} /> },
-            { key: "f", label: "Fecha", w: "110px", cell: (r) => <span className="dc-tp__num">{fechaLegible(r.fecha)}</span> },
+            { key: "f", label: "Fecha", w: "110px", cell: (r) => <span className="dc-tp__num">{fechaDoc(r.fecha)}</span> },
             ...(variasSedes ? [{ key: "sd", label: "Sede", w: "110px", get: (r) => cortaSede(r.sede) }] : []),
             // get: en el Excel y el PDF las estrellas (íconos) salían vacías; va el número.
             { key: "s", label: "Calificación", w: "120px", get: (r) => `${r.estrellas || 0} de 5`, sortVal: (r) => Number(r.estrellas) || 0, cell: (r) => <span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span> },
@@ -10220,12 +10250,12 @@ function Resenas({ notify, citas = [], can }) {
           <div className="dc-sat__grid">
             {listaR.map((r) => { const col = colorDe(r.nombre); const tono = r.estrellas >= 5 ? "prom" : r.estrellas <= 3 ? "det" : "neutro"; return (
               <figure key={r.id} className={`dc-sat__com is-${tono} dc-res-card`} onClick={() => setSel(r)}>
-                <div className="dc-res-card__top"><span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span><span className="dc-res-card__fecha">{fechaLegible(r.fecha)}</span></div>
+                <div className="dc-res-card__top"><span className="dc-sat__estrellas">{estrellas(r.estrellas, 13)}</span><span className="dc-res-card__fecha">{fechaDoc(r.fecha)}</span></div>
                 <blockquote>{r.texto}</blockquote>
                 <figcaption>
                   <span className="dc-rec__av" style={{ width: 32, height: 32, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(r.nombre)}</span>
-                  <div><b>{r.nombre}</b>{r.resp ? <span className="dc-res-card__ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-res-card__pend">Esperando respuesta</span>}</div>
-                  {!r.resp && puedeResponder ? <button type="button" className="dc-accion" onClick={(e) => { e.stopPropagation(); setSel(r); }}>{conectado ? "Marcar respondida" : r.origen === "portal" ? "Responder en portal" : "Responder en Google"}</button> : <button type="button" className="dc-accion is-sutil" onClick={(e) => { e.stopPropagation(); setSel(r); }}>Ver</button>}
+                  <div><b>{nombrePropio(r.nombre)}</b>{r.resp ? <span className="dc-res-card__ok"><CheckCircle2 size={12} strokeWidth={2} /> Respondida</span> : <span className="dc-res-card__pend">Esperando respuesta</span>}</div>
+                  {!r.resp && puedeResponder ? <button type="button" className="dc-accion" onClick={(e) => { e.stopPropagation(); setSel(r); }}>{conectado ? "Marcar respondida" : r.origen === "portal" ? "Responder en portal" : "Responder en Google"}</button> : <button type="button" className="dc-accion is-sutil" onClick={(e) => { e.stopPropagation(); setSel(r); }}>{r.resp ? "Ver respuesta" : "Ver reseña"}</button>}
                 </figcaption>
               </figure>
             ); })}
@@ -10418,7 +10448,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
                   <div><b>{c.n}</b><span className={`dc-pill ${c.estado === "activo" ? "is-ok" : "is-warn"}`}>{c.estado === "activo" ? "Activo" : "En evaluación"}</span></div>
                   <span className="dc-seg__anillo" style={{ "--p": c.cob }}><b>{c.cob}%</b></span>
                 </div>
-                <div className="dc-seg__pie"><span>{nLiq(c.n)} {nLiq(c.n) === 1 ? "caso" : "casos"}</span><b className={pend > 0 ? "is-pend" : "is-ok"}>{pend > 0 ? `S/ ${pend.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por liquidar` : "Al día"}</b></div>
+                <div className="dc-seg__pie"><span>{nLiq(c.n)} {nLiq(c.n) === 1 ? "caso" : "casos"}</span><b className={pend > 0 ? "is-pend" : "is-ok"}>{pend > 0 ? `S/ ${pend.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por liquidar` : "Nada por liquidar"}</b></div>
               </article>
             ); })}
           </div>
@@ -10428,7 +10458,7 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
         { key: "p", label: "Paciente", w: "minmax(170px,1.1fr)", cell: (x) => <PersonaCelda nombre={x.paciente} /> },
         { key: "aseg", label: "Aseguradora", w: "minmax(140px,1fr)", get: (x) => x.aseg || "—" },
         { key: "cob", label: "Seguro", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-ok">S/ {Number(x.cob).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
-        { key: "cop", label: "Copago", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num is-warn">S/ {Number(x.copago).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
+        { key: "cop", label: "Copago", w: "110px", a: "right", cell: (x) => <span className={`dc-tp__num${Number(x.copago) ? " is-warn" : ""}`}>S/ {Number(x.copago).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
         { key: "tot", label: "Total", w: "110px", a: "right", cell: (x) => <span className="dc-tp__num">S/ {Number(x.total).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> },
         { key: "est", label: "Estado", w: "150px", a: "center", cell: (x) => <EstadoPill entidad="liquidacion" estado={x.estado} /> },
       ] }} cols={[
@@ -10440,14 +10470,14 @@ function Seguros({ notify, pacientes: pacientesProp = [], fichas = {}, can }) {
       <div className="dc-seg__tablero">
         {COLS_LIQ.map(([k, tit, sub, col, Ico]) => { const items = listaLq.filter((l) => l.estado === k); const tot = items.reduce((a, l) => a + (Number(l.cob) || 0), 0); return (
           <section key={k} className="dc-seg__col" style={{ "--c": col }}>
-            <header><span className="dc-seg__cico"><Ico size={16} strokeWidth={2} /></span><div><h4>{tit} <i>{items.length}</i></h4><small>{sub}</small></div><b>S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></header>
+            <header><span className="dc-seg__cico"><Ico size={16} strokeWidth={2} /></span><div><h4>{tit} <i>{items.length}</i></h4><small>{sub}</small></div><b className={tot ? undefined : "is-cero"}>S/ {tot.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></header>
             {items.length === 0 ? <p className="dc-seg__nada">Sin liquidaciones aquí.</p> : items.map((x) => { const pc = x.total ? Math.round((x.cob / x.total) * 100) : 0; return (
               <article key={x.id} className="dc-seg__liq" onClick={() => setDetalleLiq(x)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setDetalleLiq(x); }}>
                 <div className="dc-seg__lq1"><b>{x.paciente}</b><span>{x.aseg}</span></div>
                 <div className="dc-seg__split" title={`Seguro ${pc}%, copago ${100 - pc}%`}><i style={{ width: `${pc}%` }} /></div>
                 <div className="dc-seg__lq2">
                   <span>Seguro <b className="is-ok">S/ {Number(x.cob).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
-                  <span>Copago <b className="is-warn">S/ {Number(x.copago).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
+                  <span>Copago <b className={Number(x.copago) ? "is-warn" : "is-cero"}>S/ {Number(x.copago).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
                   <span>Total <b>S/ {Number(x.total).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
                 </div>
                 {x.estado !== "pagado" && puedeEditarLiq && <button type="button" className="dc-seg__av" onClick={(e) => { e.stopPropagation(); avanzar(x.id); }}>{({ borrador: "Enviar", observado: "Reenviar corregida", enviado: "Marcar aprobada" })[x.estado] || "Marcar pagada"} <ChevronRight size={13} strokeWidth={2.2} /></button>}
@@ -10710,11 +10740,10 @@ function Formularios({ pacientes: pacProp, notify }) {
       {(() => { const nC = docs.filter((d) => d.estado === "completado").length; const pct = docs.length ? Math.round((nC / docs.length) * 100) : 0; return (
         <section className="dc-esp-hero dc-form-hero">
           <div className="dc-esp-hero__txt">
-            <div className="dc-esp-hero__num"><b>{pct}%</b><span>completados</span></div>
+            <div className="dc-esp-hero__num"><b>{nC}</b><span>{docs.length ? `de ${docs.length} ${nC === 1 ? "completado" : "completados"}` : "formularios enviados"}</span></div>
             <p>El paciente los llena desde su celular antes de llegar.</p>
           </div>
           <div className="dc-esp-hero__cifras">
-            <div><b>{nC}</b><span>Completados</span></div>
             <div><b>{docs.length - nC}</b><span>Pendientes</span></div>
             <div><b>{docs.length}</b><span>Enviados</span></div>
           </div>
@@ -10740,10 +10769,10 @@ function Formularios({ pacientes: pacProp, notify }) {
           </div>
         </Modal>
       )}
-      <DataTable titulo="Formularios enviados" sub="formularios" minWidth={720} rows={docs} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin formularios" sub="Envía un formulario para que el paciente lo complete desde su celular." />} cols={[
-        { key: "paciente", label: "Paciente", w: "minmax(170px,1.3fr)", a: "left", get: (d) => d.paciente, cell: (d) => { const col = colorDe(d.paciente); return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(d.paciente)}</span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.paciente}</span></span>; } },
+      <DataTable titulo="Formularios enviados" sub="formularios" minWidth={720} rows={docs} defaultSort={{ key: "fecha", dir: "desc" }} empty={<Vacio icon={<ClipboardList size={22} strokeWidth={1.75} />} titulo="Sin formularios" sub="Envía un formulario para que el paciente lo complete desde su celular." />} cols={[
+        { key: "paciente", label: "Paciente", w: "minmax(170px,1.3fr)", a: "left", get: (d) => d.paciente, cell: (d) => { const col = colorDe(d.paciente); return <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}><span className="dc-rec__av" style={{ width: 34, height: 34, fontSize: 12, background: `linear-gradient(135deg, ${tint(col, 0.2)}, ${tint(col, 0.08)})`, color: col }}>{iniciales(d.paciente)}</span><span style={{ fontWeight: 600, color: "var(--dc-ink-900)", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={d.paciente}>{nombrePropio(d.paciente)}</span></span>; } },
         { key: "tipo", label: "Formulario", w: "minmax(190px,1.5fr)", a: "left", get: (d) => d.tipo, cell: (d) => <span style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--dc-ink-700)", fontSize: 13 }}><ClipboardList size={15} strokeWidth={1.75} color={DS.c.primary} style={{ flexShrink: 0 }} /> {d.tipo}</span> },
-        { key: "fecha", label: "Fecha", w: "150px", a: "center", get: (d) => d.fecha, cell: (d) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>{fechaLegible(d.fecha)}</span> },
+        { key: "fecha", label: "Fecha", w: "150px", a: "center", get: (d) => d.fecha, cell: (d) => <span style={{ fontSize: 13, color: "var(--dc-ink-400)", whiteSpace: "nowrap" }}>{fechaDoc(d.fecha)}</span> },
         { key: "estado", label: "Estado", w: "150px", a: "center", get: (d) => d.estado, cell: (d) => d.estado === "completado"
           ? <span className="dc-pill is-ok"><CheckCircle2 size={12} strokeWidth={2} /> Completado</span>
           : <span className="dc-pill is-aviso"><Clock size={12} strokeWidth={2} /> Pendiente</span> },
@@ -11875,6 +11904,8 @@ function MainApp({ usuario, setUsuario, onLogout }) {
       .filter((it) => (it.children ? it.children.length > 0 : mods.includes(it.mod || modDeVista(it.id)))),
   })).filter((g) => g.items.length);
   const NAV = NAV_GRUPOS.flatMap((g) => g.items.flatMap((it) => it.children ? it.children : [it]));
+  // El menú no mostraba la pantalla activa cuando quedaba más abajo (Caja, Radiografías, Formularios…).
+  useEffect(() => { const el = document.querySelector(".dc-side .dc-sb__item.is-on"); if (el) el.scrollIntoView({ block: "nearest" }); }, [vista]);
 
   const sedesDelSelector = useMemo(() => {
     // Con API: UUIDs reales. Sin API: ids demo 1/2.
@@ -12155,10 +12186,9 @@ function MainApp({ usuario, setUsuario, onLogout }) {
         <div className="dc-sb__pie">
           <div className="dc-sb__user">
             <div className="dc-sb__avatar" title={usuario.nombre} style={{ background: R.color }}>{usuario.nombre.split(" ").map((x) => x[0]).join("").slice(0, 2)}</div>
-            {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{R.label}</div>
-              {!esSuper && plan && (mods.includes("plan")
-                ? <button type="button" className="dc-sb__planchip" title="Ver mi plan" onClick={() => { setVista("plan"); setSidebarOpen(false); }}><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</button>
-                : <span className="dc-sb__planchip"><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</span>)}
+            {!colap && <div className="dc-sb__who"><div className="dc-sb__uname">{usuario.nombre}</div><div className="dc-sb__urol">{/^dra\.?\s/i.test(usuario.nombre) ? R.label.replace(/ólogo$/, "óloga") : R.label}</div>
+              {/* El plan es un dato comercial: solo lo ve quien puede administrarlo. */}
+              {!esSuper && plan && mods.includes("plan") && <button type="button" className="dc-sb__planchip" title="Ver mi plan" onClick={() => { setVista("plan"); setSidebarOpen(false); }}><Crown size={11} strokeWidth={2.2} /> Plan {PLAN_NOMBRE[plan]}</button>}
             </div>}
             {rol !== "superadmin" && misPasos.length > 0 && <button type="button" className="dc-mini-btn dc-sb__ayuda" aria-label="Ayuda: guía del sistema" title="Ayuda: guía del sistema" aria-haspopup="dialog" aria-expanded={showPasos} onClick={() => { setShowPasos(true); setSidebarOpen(false); }}>?</button>}
             <button type="button" className="dc-mini-btn dc-sb__out" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={onLogout}><LogOut size={15} strokeWidth={2} /></button>
@@ -13253,7 +13283,7 @@ function AgendarCitaModal({ paciente, onClose, onConfirm, base, citas = CITAS_IN
             <Select value={esp} onChange={(v) => setEsp(Number(v))} options={ESPECIALIDADES.map((e) => { const p = precioDe(e.id); return { value: e.id, label: e.nombre, sub: !medicoDe(e.id) ? `No disponible en ${sede.nombre}` : p != null ? `desde S/ ${p}` : undefined }; })} />
           </label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <label><span style={lbl}>Fecha</span><input className="dc-premium-inp" type="date" min={fmt(hoy)} value={fecha} onChange={(e) => setFecha(e.target.value)} style={inp} /></label>
+            <label><span style={lbl}>Fecha</span><CampoFecha className="dc-premium-inp" min={fmt(hoy)} value={fecha} onChange={(e) => setFecha(e.target.value)} style={inp} /></label>
             <label><span style={lbl}>Hora</span><div><TimeSelect value={hora} onChange={setHora} width={"100%"} /></div></label>
           </div>
           <label><span style={lbl}>Motivo (opcional)</span><input className="dc-premium-inp" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder={espObj.nombre} style={inp} /></label>

@@ -1,6 +1,6 @@
 /* Módulo Configuracion. Extraído de App.jsx para servirse en un chunk aparte (code splitting). */
 import React, { useState, useEffect, useContext, useRef } from "react";
-import {AlertTriangle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, MessageCircle, Navigation, Pencil, Plus, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
+import {AlertTriangle, Info, ArrowRight, Briefcase, Building2, Check, CheckCircle2, ClipboardList, Clock, Megaphone, MessageCircle, Navigation, Pencil, Plus, RefreshCw, Repeat, Search, Settings, Sparkles, Stethoscope, Trash2, MapPin, Phone, Percent, Target, Tag, Smartphone, LayoutGrid, Armchair, Lock, Users, Wrench} from "lucide-react";
 import api, { auth } from "../api/client";
 import { empresaDemo, guardarDemo, logoDesdeArchivo, refrescarDatosDemo, sedeDemo } from "../util/membrete";
 import { medicoEnSedes, metaSede, sedesMed } from "../compartido/medicosSede";
@@ -12,15 +12,36 @@ import { conCop } from "../util/cop";
 import { USOS_SILLON, etiquetaUso, normSillon, sillonesDeSede, SILLONES_DEMO, DISP_DEMO } from "../compartido/sillones";
 import { sillonesPorSede } from "../compartido/useReglasAgenda";
 import { medicosDeSedes } from "../compartido/medicoEnSede";
-import { estadoWhatsApp, notaUltimoEnvioOk } from "../compartido/integraciones";
+import { estadoWhatsApp } from "../compartido/integraciones";
 import { formatearWhatsappPe, mismoNumero, normalizarPhoneNumberId, normalizarWhatsappPe, validarPhoneNumberId, validarWhatsappPe, whatsappDeSede } from "../compartido/whatsappSede";
-import {DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda, useSede, mismaSede, sedeNum, nombreSede} from "../comun";
+import {CampoFecha, DatosDemoCtx, Btn, Card, ListaFiltrable, DIAS_SEM, DISPLAY_FONT, DS, ESPECIALIDADES, MEDICOS, Modal, NAVY, RED, SEDES, Select, fechaLegible, fmt, hoy, puede, tint, colorDe, iniciales, PersonaCelda, useSede, mismaSede, sedeNum, nombreSede} from "../comun";
+import "./modulos2.css";
 
 /* H-08 (admin): un 405/404 de POST /disponibilidad es que el servidor no tiene la ruta, no
    que las horas estén mal; el aviso lo dice para no mandar a revisar lo que está bien. */
 const msgAgregarHorario = (e) => (e?.status === 405 || e?.status === 404
   ? "El servidor todavía no permite agregar horarios desde aquí (POST /disponibilidad no disponible)."
   : e?.status === 400 || e?.status === 409 || e?.status === 422 ? `No se pudo agregar: ${String(e?.message || "revisa las horas").replace(/\.$/, "")}.` : "No se pudo agregar el horario.");
+
+/* Paso de GET /go-live tal como se muestra: plurales «(s)» resueltos (R7-09), sin el modelo
+   de IA («Activo (gpt-4o)»), sin jerga («(HSM)») y sin un detalle que solo repite el título
+   («Asistente con IA activo» · «Activo»). */
+const palabras = (s) => String(s || "").toLowerCase().replace(/[.,:;]/g, "").split(/\s+/).filter(Boolean);
+function pasoVisible(it) {
+  if (!it) return it;
+  const titulo = String(it.titulo || "").replace(/plantillas de mensajes\s*\(HSM\)/i, "Plantillas de WhatsApp");
+  let detalle = typeof it.detalle === "string" ? pluralizarParentesis(it.detalle).replace(/\s*\((?:gpt|claude|o\d|gemini|llama)[^)]*\)/gi, "") : it.detalle;
+  if (detalle && palabras(detalle).every((p) => palabras(titulo).includes(p))) detalle = "";
+  return { ...it, titulo, detalle };
+}
+/* « Último envío correcto: mar 20 oct, 14:44.» en hora de Lima («20/10, 14:44» no se leía como fecha). */
+const notaEnvioOk = (s) => {
+  const t = s && s.ultimoEnvioOk ? new Date(s.ultimoEnvioOk) : null;
+  if (!t || Number.isNaN(t.getTime())) return "";
+  const dia = t.toLocaleDateString("en-CA", { timeZone: "America/Lima" });
+  const hora = t.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Lima" });
+  return ` Último envío correcto: ${fechaLegible(dia)}, ${hora}.`;
+};
 
 const BANCOS_PE = [
   { id: "bcp", nombre: "BCP — Banco de Crédito", cuenta: [14] },
@@ -212,6 +233,9 @@ function WizList({ items, icon, vacio }) {
   );
 }
 
+// Secciones de Configuración: [clave, nombre, ícono, detalle, color]. La clave también vale en «#/config/<clave>».
+const TABS = [["puesta", "Puesta en marcha", Navigation, "Pasos para operar", "#0E9199"], ["empresa", "Datos de la clínica", Briefcase, "RUC, logo y facturación", "#28527A"], ["atencion", "Horario de atención", Clock, "Días y horas de la clínica", "#2F6FDE"], ["doctores", "Doctores", Stethoscope, "Equipo clínico", "#6D4FD1"], ["sedes", "Sedes", Building2, "Locales de atención", "#D97706"], ["sillones", "Sillones", Armchair, "Uso y doctores", "#0B6C78"], ["horarios", "Horarios por doctor", Clock, "Disponibilidad de agenda", "#0E9EB0"], ["promos", "Promociones", Megaphone, "Ofertas del agente IA", "#E0694F"]];
+
 function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "puesta", misSedes = null }) {
   // Sedes: el filtro del menú (ids) decide qué se ve; las del usuario (mias), qué puede tocar.
   // Sin proveedor de sede (pruebas) se usan las props.
@@ -246,7 +270,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
   // WhatsApp por sede: el ID del número en Meta (phone_number_id) es un dato técnico de la
   // integración; solo lo ve y lo edita quien gestiona integraciones o la configuración.
   const veMetaId = can ? (can("integraciones", "editar") || can("integraciones", "configurar") || can("config", "configurar")) : true;
-  const [tab, setTab] = useState(seccionInicial);
+  // «#/config/sedes» (enlace desde Recordatorios) abre directo en esa sección.
+  const [tab, setTab] = useState(() => { const s = window.location.hash.split("/")[2] || ""; return TABS.some(([k]) => k === s) ? s : seccionInicial; });
   // Listas completas; en pantalla se muestran solo las de las sedes que se ven.
   const [sedesTodas, setSedes] = useState([]);
   const [esps, setEsps] = useState([]);
@@ -309,13 +334,11 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     }
   };
   const pasoGoLive = (it0) => {
-    // R7-09: «2 sede(s)», «6 doctor(es)»… del servidor se escriben con el plural que toca.
-    // El backend añade el modelo de IA al estado («Activo (gpt-4o)»): es un dato técnico.
-    const it = it0 && typeof it0.detalle === "string" ? { ...it0, detalle: pluralizarParentesis(it0.detalle).replace(/\s*\((?:gpt|claude|o\d|gemini|llama)[^)]*\)/gi, "") } : it0;
+    const it = pasoVisible(it0);
     if (it?.clave !== "whatsapp" || !conectado || !waSalud) return it;
     const w = estadoWhatsApp(waSalud);
-    if (w.estado === "operativo") return { ...it, detalle: `${w.detalle}${notaUltimoEnvioOk(waSalud)}` };
-    return { ...it, aviso: w.estado === "incidencia", detalle: `${w.etiqueta}: ${w.detalle}${notaUltimoEnvioOk(waSalud)}` };
+    if (w.estado === "operativo") return { ...it, detalle: `${w.detalle}${notaEnvioOk(waSalud)}` };
+    return { ...it, aviso: w.estado === "incidencia", detalle: `${w.etiqueta}: ${w.detalle}${notaEnvioOk(waSalud)}` };
   };
   // El horario y los feriados se guardan también en el navegador con la clave que lee
   // el resto de la app (dashboard y disponibilidad), para que la demostración sea
@@ -642,7 +665,6 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
     api.disponibilidad.borrar(d.id).then(() => { notify("Horario eliminado."); cargarDisp(medHor); }).catch(() => {});
   };
 
-  const TABS = [["puesta", "Puesta en marcha", Navigation, "Pasos para operar", "#0E9199"], ["empresa", "Datos de la clínica", Briefcase, "RUC, logo y facturación", "#28527A"], ["atencion", "Horario de atención", Clock, "Días y horas de la clínica", "#2F6FDE"], ["doctores", "Doctores", Stethoscope, "Equipo clínico", "#6D4FD1"], ["sedes", "Sedes", Building2, "Locales de atención", "#D97706"], ["sillones", "Sillones", Armchair, "Uso y doctores", "#0B6C78"], ["horarios", "Horarios por doctor", Clock, "Disponibilidad de agenda", "#0E9EB0"], ["promos", "Promociones", Megaphone, "Ofertas del agente IA", "#E0694F"]];
   const cab = (titulo, sub, accion) => (
     <div className="dc-cfg__cab"><div><h3>{titulo}</h3><span>{sub}</span></div>{accion}</div>
   );
@@ -663,6 +685,11 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
           </button>
         ); })}
       </nav>
+      {/* Celular: un desplegable en vez de la lista de secciones, que ocupaba la primera pantalla. */}
+      <div className="dc-cfg__navsel">
+        <span>Sección</span>
+        <Select ariaLabel="Sección de configuración" value={tab} onChange={setTab} options={TABS.map(([k, lbl, Ic, , col]) => ({ value: k, label: lbl, icon: <Ic size={15} strokeWidth={2} color={col} /> }))} />
+      </div>
       <div className="dc-cfg__main">
 
       {tab === "puesta" && (() => {
@@ -681,6 +708,17 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
             ? `Lo obligatorio está configurado, pero ${conAviso === 1 ? "un paso tiene" : `${conAviso} pasos tienen`} avisos por revisar${opcPend ? ` y quedan ${opcPend} opcionales` : ""}.`
             : opcPend ? `Lo obligatorio está configurado. ${opcPend === 1 ? "Queda 1 paso opcional" : `Quedan ${opcPend} pasos opcionales`}.` : "Sedes, servicios, doctores y horarios están configurados.";
         const ICO = { sedes: Building2, especialidades: ClipboardList, servicios: ClipboardList, doctores: Stethoscope, horarios: Clock, promos: Megaphone };
+        // Adónde lleva «Configurar». Los pasos del servidor sin sección aquí (plantillas de
+        // WhatsApp, pagos online, boleta electrónica) se reconocen por su clave o su título.
+        const irA = (h) => () => { window.location.hash = h; };
+        const destino = (it) => {
+          const k = `${it.clave} ${it.titulo}`;
+          if (["servicios", "especialidades"].includes(it.clave)) return irA("#/servicios");
+          if (["sedes", "doctores", "horarios", "promos"].includes(it.clave)) return () => setTab(it.clave);
+          if (/plantilla|hsm/i.test(k)) return !can || can("recall", "ver") ? irA("#/recall") : null;
+          if (/niubiz|pago|sunat|boleta|factur/i.test(k)) return !can || can("integraciones", "ver") ? irA("#/integraciones") : null;
+          return null;
+        };
         return (
           <section className="dc-cfg__panel">
             <div className={`dc-go${listo ? " is-listo" : ""}`}>
@@ -692,15 +730,16 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
               </div>
               <div className="dc-go__acc">
                 <button type="button" className="dc-cfg__nuevo" onClick={() => setWizard(true)}><Sparkles size={14} strokeWidth={2.2} /> {limitarSede ? "Configurar mi sede" : "Asistente de configuración"}</button>
-                <button type="button" className="dc-row-action" aria-label="Actualizar" title="Actualizar" onClick={cargarGoLive}><Repeat size={14} strokeWidth={2} /></button>
+                <button type="button" className="dc-row-action" aria-label="Actualizar el estado de la puesta en marcha" title="Actualizar estado" onClick={cargarGoLive}><RefreshCw size={14} strokeWidth={2} /></button>
               </div>
             </div>
             <div className="dc-go__pasos">
-              {pasos.map((it, i) => { const I = ICO[it.clave] || CheckCircle2; const ir = ["servicios", "especialidades"].includes(it.clave) ? () => { window.location.hash = "#/servicios"; } : ["sedes", "doctores", "horarios", "promos"].includes(it.clave) ? () => setTab(it.clave) : null; return (
+              {pasos.map((it) => { const I = ICO[it.clave] || CheckCircle2; const ir = destino(it); return (
                 <div key={it.clave} className={`dc-go__paso ${it.aviso ? "is-aviso" : it.ok ? "is-ok" : it.obligatorio ? "is-falta" : "is-opc"}`}>
-                  <span className="dc-go__n">{it.aviso ? <AlertTriangle size={13} strokeWidth={2.4} /> : it.ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
+                  {/* Sin número de orden (solo lo tenían los pendientes): hecho, aviso o un anillo vacío si falta. */}
+                  <span className="dc-go__n">{it.aviso ? <AlertTriangle size={13} strokeWidth={2.4} /> : it.ok ? <Check size={14} strokeWidth={3} /> : null}</span>
                   <span className="dc-go__ico"><I size={16} strokeWidth={2} /></span>
-                  <div><b>{it.titulo}</b><small>{it.detalle || it.descripcion}</small></div>
+                  <div><b>{it.titulo}</b>{(it.detalle || it.descripcion) && <small>{it.detalle || it.descripcion}</small>}</div>
                   <span className="dc-go__tag">{it.obligatorio ? "Obligatorio" : "Opcional"}</span>
                   {/* Una sola columna de acción, aunque el paso no tenga botón: así las etiquetas quedan alineadas. */}
                   <span className="dc-go__accion">
@@ -904,7 +943,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
               {(clinica.feriados || []).length === 0 && <div style={{ fontSize: 13, color: "var(--dc-ink-400)" }}>Sin feriados configurados. Los días normales siguen el horario de arriba.</div>}
               {(clinica.feriados || []).map((fr, i) => (
                 <fieldset key={i} disabled={limitarSede} style={{ margin: 0, minWidth: 0,  border: "1px solid var(--dc-line)", borderRadius: "var(--dc-r-md)", padding: 12, background: "var(--dc-white)", display: "grid", gridTemplateColumns: "150px auto 1fr auto", gap: 10, alignItems: "center" }}>
-                  <div><label style={lbl}>Fecha</label><input className="dc-premium-inp" type="date" value={fr.fecha || ""} onChange={(e) => setFeriado(i, "fecha", e.target.value)} style={inp} /></div>
+                  <div><label style={lbl}>Fecha</label><CampoFecha className="dc-premium-inp" value={fr.fecha || ""} onChange={(e) => setFeriado(i, "fecha", e.target.value)} style={inp} /></div>
                   <label style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, color: fr.cerrado ? "var(--dc-red-deep)" : "var(--dc-ok-700)", marginTop: 18 }}>
                     <input type="checkbox" checked={!!fr.cerrado} onChange={(e) => setFeriado(i, "cerrado", e.target.checked)} /> {fr.cerrado ? "Cerrado" : "Abierto"}
                   </label>
@@ -1094,7 +1133,7 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                   <div style={{ width: 38, height: 38, borderRadius: "var(--dc-r-md)", background: viv ? "var(--dc-ok-soft)" : "var(--dc-bg)", color: viv ? "var(--dc-ok-700)" : "var(--dc-ink-400)", display: "grid", placeItems: "center", flexShrink: 0 }}><Megaphone size={18} strokeWidth={1.75} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 500, color: NAVY, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{p.titulo}{p.descuento && <span style={{ fontSize: 12, fontWeight: 500, color: "var(--dc-warn-600)", background: "var(--dc-warn-soft)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{p.descuento}</span>}<span style={{ fontSize: 12, fontWeight: 500, color: viv ? "var(--dc-ok-700)" : "var(--dc-ink-400)", background: viv ? "var(--dc-ok-soft)" : "var(--dc-line)", padding: "2px 8px", borderRadius: "var(--dc-r-full)" }}>{viv ? "Vigente" : (p.activa ? "Programada/vencida" : "Inactiva")}</span><span className="dc-pill"><MapPin size={11} strokeWidth={2.2} /> {p.sedeId != null && p.sedeId !== "" ? nomSedeCfg(p.sedeId) : "Toda la clínica"}</span></div>
-                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{p.descripcion || ""}{p.especialidadId ? ` – ${espNombre(p.especialidadId)}` : ""}{p.hasta ? ` – hasta ${p.hasta}` : ""}</div>
+                    <div style={{ fontSize: 13, color: "var(--dc-ink-500)" }}>{p.descripcion || ""}{p.especialidadId ? ` – ${espNombre(p.especialidadId)}` : ""}{p.hasta ? ` – hasta ${fechaLegible(p.hasta)}` : ""}</div>
                   </div>
                   {editable && <button onClick={() => setEdit({ tipo: "promo", item: { ...p, sedeId: p.sedeId ?? "" } })} style={{ border: "1px solid var(--dc-line)", background: "var(--dc-white)", borderRadius: "var(--dc-r-sm)", padding: "6px 11px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: DS.c.primary, display: "inline-flex", alignItems: "center", gap: 5 }}><Pencil size={13} strokeWidth={1.75} /> Editar</button>}
                   {editable && <button aria-label="Eliminar" onClick={() => delPromo(p)} style={{ border: "1px solid var(--dc-danger-mid)", background: "var(--dc-white)", color: RED, borderRadius: "var(--dc-r-sm)", padding: "6px 9px", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}><Trash2 size={13} strokeWidth={1.75} /></button>}
@@ -1125,8 +1164,8 @@ function Configuracion({ notify = () => {}, rol = "", can, seccionInicial = "pue
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Sede<Select value={it.sedeId ?? ""} onChange={(v) => set("sedeId", v)} placeholder="— Selecciona —" disabled={limitarSede && sedesEdit.length < 2} options={[...(limitarSede ? [] : [{ value: "", label: "Toda la clínica" }]), ...sedesEdit.map((x) => ({ value: x.id, label: x.nombre }))]} /></label>
                 <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Aplica a (servicio, opcional)<Select value={it.especialidadId || ""} onChange={(v) => set("especialidadId", v)} placeholder="Todos" options={[{ value: "", label: "Todos" }, ...esps.map((e) => ({ value: e.id, label: e.nombre }))]} /></label>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <label style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Desde<input className="dc-premium-inp" type="date" value={it.desde || ""} onChange={(e) => set("desde", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
-                  <label style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Hasta<input className="dc-premium-inp" type="date" value={it.hasta || ""} onChange={(e) => set("hasta", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
+                  <label style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Desde<CampoFecha className="dc-premium-inp" value={it.desde || ""} onChange={(e) => set("desde", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
+                  <label style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)" }}>Hasta<CampoFecha className="dc-premium-inp" value={it.hasta || ""} onChange={(e) => set("hasta", e.target.value)} style={{ ...inp, marginTop: 5 }} /></label>
                 </div>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--dc-ink-700)", cursor: "pointer" }}><input type="checkbox" checked={it.activa !== false} onChange={(e) => set("activa", e.target.checked)} /> Activa (el agente la ofrece si está vigente)</label>
               </>}

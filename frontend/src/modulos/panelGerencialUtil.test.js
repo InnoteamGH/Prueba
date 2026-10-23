@@ -14,6 +14,7 @@ import {
   medicosEnSedes,
   equipoDeSede,
   metaDeSede,
+  rankingConSinAsignar,
   valorInventario,
 } from "./panelGerencialUtil.js";
 import fs from "node:fs";
@@ -27,6 +28,14 @@ describe("panelGerencialUtil — barras (total-scale, zero no bar)", () => {
     const lay = layoutProgreso(0, 1000);
     assert.equal(lay.dibujar, false);
     assert.equal(lay.pct, 0);
+  });
+
+  it("el % es un entero; sin valor dice «0%», no «sin saldo»", () => {
+    assert.equal(layoutProgreso(0, 1000).etiquetaPct, "0%");
+    assert.equal(layoutProgreso(560, 1500).etiquetaPct, "37%");
+    assert.equal(layoutProgreso(1500, 1500).etiquetaPct, "100%");
+    assert.equal(layoutProgreso(2, 1000).etiquetaPct, "<1%");
+    assert.equal(layoutProgreso(7, 1000).etiquetaPct, "1%");
   });
 
   it("total 0 no dibuja", () => {
@@ -118,7 +127,7 @@ describe("H-G3/H-G4: facturado y especialidad desde /tratamientos/resumen", () =
     const esp = produccionPorEspecialidad(resumen, cat);
     assert.deepEqual(esp, [{ nombre: "Endodoncia", valor: 220 }, { nombre: "Periodoncia", valor: 120 }]);
     assert.equal(esp.reduce((a, e) => a + e.valor, 0), totalResumen(resumen));
-    assert.equal(produccionPorEspecialidad([{ nombre: "Rara", importeTotal: 50 }], cat)[0].nombre, "Sin especialidad en el catálogo");
+    assert.equal(produccionPorEspecialidad([{ nombre: "Rara", importeTotal: 50 }], cat)[0].nombre, "Sin especialidad");
   });
 });
 
@@ -161,6 +170,21 @@ describe("R6-02: equipo y meta de la sede elegida", () => {
     assert.deepEqual([...medicosEnSedes(disp, ["a2"], undefined, meds)].sort(), ["d2", "d5"]);
     // Sin fichas con sede, el mismo resultado que con el horario solo.
     assert.deepEqual([...medicosEnSedes(disp, ["a2"], undefined, [{ id: "d1", sedes: [] }])], ["d2"]);
+  });
+});
+
+describe("Top del equipo: producción sin odontólogo asignado", () => {
+  // Como en producción: el equipo suma S/ 80 y «Producción del mes» dice S/ 220.
+  const ranking = [{ medicoId: "d1", nombre: "Dra. Carla", produccion: 80, meta: 500 }];
+  it("lo que el ranking no reparte va en su propia fila", () => {
+    const conResto = rankingConSinAsignar(ranking, 220);
+    assert.equal(conResto.length, 2);
+    assert.deepEqual(conResto[1], { medicoId: null, nombre: "Sin odontólogo asignado", produccion: 140, meta: 0, atendidas: 0 });
+    assert.equal(rankingConSinAsignar(null, 220)[0].produccion, 220);
+  });
+  it("todo repartido (o el ranking suma más): sin fila extra", () => {
+    assert.equal(rankingConSinAsignar(ranking, 80), ranking);
+    assert.equal(rankingConSinAsignar(ranking, 50), ranking);
   });
 });
 
