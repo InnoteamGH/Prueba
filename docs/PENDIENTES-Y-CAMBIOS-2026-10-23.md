@@ -9,6 +9,7 @@
 | **`REVISION-DISENO-2026-10-23.md`** | Qué cambia el parche, pantalla por pantalla. |
 | **`FLUJO-WHATSAPP-GUIADO-2026-10-20.md`** | Cómo debe funcionar el WhatsApp guiado y las 16 conversaciones de aceptación. |
 | **`QA-REVISION-34-2026-10-23.md`** | Evidencia de las pruebas del 23/10: frases, respuestas y conteo de veces. |
+| **`ESCENARIOS-WHATSAPP-2026-10-23.md`** | Los escenarios de WhatsApp que fallan, paso a paso, con hora e id de conversación para reproducirlos y buscarlos en el log. |
 
 Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 23/10/2026, con datos de prueba «QA» y el sandbox de Izipay.
 
@@ -35,7 +36,7 @@ De las 16 conversaciones de aceptación pasaron **7**, 3 a medias y fallaron 6. 
 | # | Qué falla | Cómo está hoy | Veces |
 |---|---|---|---|
 | W1 | **Pierde lo que el paciente ya dijo.** | Tras «En San Isidro» y «Mañana», con «A las 10» responde «No encontré ese cupo… **¿Para qué sede y fecha…?**». Con «Para mí», «necesito **sede, día y hora**». Lo mismo con «¿Y a las 14:00 no hay?». | 2 |
-| W2 | **Ofrece otro día.** | «El jueves 29» → «🕐 **Viernes 23 de octubre** — 09:00, 09:30, 10:00». Con «En San Isidro», sin día dicho, también ofrece hoy en vez de preguntar el día. | 1 |
+| W2 | **Ofrece otro día, y horas que ya pasaron.** | «El jueves 29» → «🕐 **Viernes 23 de octubre** — 09:00, 09:30, 10:00». Con «En Surco» o «En San Isidro», sin día dicho, también ofrece hoy en vez de preguntar el día, y a las 11:28 ofreció las 09:00 de ese mismo día. Pasó 3 de 3 veces. | 1 |
 | W3 | **No entiende un pedido completo en un mensaje.** | «Consulta general en Surco el jueves 29 a las 9:30 para mí» → «No encontré ese cupo… ¿Para qué sede y fecha…?» (2 de 2 veces), con el cupo libre. | 2 |
 | W4 | **No reinicia un chat viejo.** | «Hola» en un chat de hace 3 días → «¿Desea agendar una cita para una consulta general en la sede de San Isidro?». Retoma la reserva vieja. | 2 |
 | W5 | **Pide varios datos juntos.** | «necesito su nombre completo, DNI (8 dígitos), edad (o fecha de nacimiento)». También junta fecha y sede, o servicio y sede, en un mensaje. No pregunta «¿para usted o para otra persona?». | 2 |
