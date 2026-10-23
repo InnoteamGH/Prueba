@@ -210,6 +210,6 @@
 4. Publicar.
 
 **Alcance:**
-- 33 archivos de `frontend/`, 4 de ellos nuevos (`modulos/modulos2.css`, `modulos/reportes.css`, `util/nombres.js` y su prueba);
+- 33 archivos de `frontend/`, 6 de ellos nuevos: `modulos/modulos2.css`, `modulos/reportes.css`, `util/nombres.js` y su prueba, más `util/textoCita.js` y su prueba, que vienen del ajuste de QA33;
 - no toca la pantalla de cambio de clave;
 - no cambia llamadas al servidor ni datos guardados: solo cómo se muestran.

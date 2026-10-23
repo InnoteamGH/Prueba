@@ -116,7 +116,7 @@ Con la versión probada a las 14:36 pasan **14 de 16** conversaciones de aceptac
 - **Base:** la versión publicada (`index-DjK7jcE6.js`).
 - **Ya incluye el ajuste de `cambio-frontend-QA33.patch`:** no hay que aplicarlo aparte.
 - **Alcance:**
-  - 33 archivos de `frontend/`, 4 de ellos nuevos;
+  - 33 archivos de `frontend/`, 6 de ellos nuevos (2 vienen del ajuste de QA33);
   - no toca la pantalla de cambio de clave;
   - no cambia llamadas al servidor ni datos guardados.
 
