@@ -5750,3 +5750,6 @@ button, input, select, textarea { font-family: inherit; }
 @media (max-width: 1280px) { .dc-cons__rango .dc-moneda-sel button { flex: 1 1 auto; } }
 /* Celular: el menú cerrado (fuera de pantalla) dejaba su sombra como una franja gris al borde izquierdo. */
 @media (max-width: 767px) { .dc-side:not(.open) { box-shadow: none !important; } }
+
+/* Filtros de la bandeja de WhatsApp: 25 px de alto en escritorio eran demasiado chicos. */
+.wa-filtros > button { min-height: 30px; display: inline-flex; align-items: center; gap: 4px; }

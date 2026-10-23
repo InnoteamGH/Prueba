@@ -11,6 +11,7 @@ import api from "../api/client";
 import { sedeApiUuid } from "../routing";
 import { ListaFiltrable, PersonaCelda, ESTADO_BADGE, Card, Vacio, fmt, hoy, addDays, fechaLegible, nombreSede, exportarExcel, colorDe, useSede } from "../comun";
 import { estadoCita } from "../compartido/estados";
+import { motivoVisible } from "../util/textoCita";
 
 const PROGRAMADA = ["pendiente", "confirmada", "en_sala", "en_atencion"];
 const PERDIDA = ["cancelada", "reprogramada"];
@@ -46,7 +47,7 @@ export default function ConsolidadoCitas({ citas = [], medicos = [], rol, usuari
     if (!conectado) return;
     setCargando(true);
     api.citas.listar(null, rango.desde, rango.hasta, sedesVer ? sedesVer.map(sedeApiUuid).filter(Boolean) : null)
-      .then((r) => setRemotas((r || []).map((c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || "Sin asignar", sede: c.sedeId, sedeNombre: c.sede || "", fecha: (c.fecha || "").slice(0, 10), hora: (c.hora || "").slice(0, 5), motivo: c.motivo || "", estado: c.estado }))))
+      .then((r) => setRemotas((r || []).map((c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || "Sin asignar", sede: c.sedeId, sedeNombre: c.sede || "", fecha: (c.fecha || "").slice(0, 10), hora: (c.hora || "").slice(0, 5), motivo: motivoVisible(c.motivo), estado: c.estado }))))
       .catch(() => { setRemotas([]); notify("No se pudieron cargar las citas del rango."); })
       .finally(() => setCargando(false));
   }, [conectado, rango.desde, rango.hasta, sedesKey]); // eslint-disable-line react-hooks/exhaustive-deps

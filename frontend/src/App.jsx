@@ -40,6 +40,7 @@ import { apiRowsAHtmlDatos } from "./util/odontogramaHydrate.js";
 import { EGRESO_CATS, EGRESO_CAT_COL, EGRESO_METODOS, TC_DEFECTO, armarBoleta, egresoEnSoles, leerMonto, r2 as red2, resumenDiferencias, sumarCobros, sumarEgresos } from "./compartido/cajaMoneda";
 import { sedeNum as numSede, aplicarSedesApi } from "./comun";
 import { ymdLima, contarEventosHoy, mapAuditoriaApiRows, resumenDispositivo, fechaHoraLima, fechaCortaLima, fechaRelativa } from "./util/fechaLima";
+import { motivoVisible } from "./util/textoCita";
 import { codigoAutorizacionValido, estadoLink, horaLimaDe, idCorto, mapConLimite, pagoIniciado, pedidoIzipay, porConciliar, resumenLinks, vencioYa, verificable } from "./util/linksPago";
 import { detalleConNombres, directorioUsuarios, nombrePorCorreo, usuarioAfectado } from "./util/auditoriaUsuarios";
 import { guardarUltimoPaciente, leerUltimoPaciente, olvidarUltimoPaciente } from "./util/ultimoPaciente";
@@ -499,7 +500,7 @@ function Dashboard({ citas: citasProp, pacientes: pacProp, rol, usuario = null, 
   const sedesApiDash = () => (sedeCtxDash.sede === "all" && sedeCtxDash.global ? null : (sedeCtxDash.ids || []).map((x) => sedeApiUuid(x)));
   // Todas las sedes del usuario (no solo la del filtro): al cambiar de sede no hay que volver a pedir.
   const sedesMiasApiDash = () => (sedeCtxDash.global ? null : (sedeCtxDash.mias || []).map((x) => sedeApiUuid(x)).filter(Boolean));
-  const mapCD = (c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || null, especialidad: c.especialidad || null, esp: c.especialidadId, sede: c.sedeId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), motivo: c.motivo, estado: c.estado, llegada: !!c.llegada, valor: c.valor });
+  const mapCD = (c) => ({ id: c.id, paciente: c.paciente || "—", pacienteId: c.pacienteId || null, medicoId: c.medicoId, medico: c.medico || null, especialidad: c.especialidad || null, esp: c.especialidadId, sede: c.sedeId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), motivo: motivoVisible(c.motivo), estado: c.estado, llegada: !!c.llegada, valor: c.valor });
   const [remC, setRemC] = useState(null);
   const [cajaDeuda, setCajaDeuda] = useState(null);
   // NEW-29/30: cobros reales (misma base que Caja), filtrados por sede activa.
@@ -1629,7 +1630,7 @@ function Agenda({ citas: citasProp, setCitas, medicos, rol, usuario, notify, onA
   // y gerencia -que solo lee- pasaba el filtro y podía cancelar cualquier cita.
   const puedeOperarAgenda = can ? can("agenda", "editar") : rol !== "medico";
   const conectado = !!auth.token;
-  const mapCita = (c) => ({ id: c.id, pacienteId: c.pacienteId, paciente: c.paciente || "—", dni: c.dni || "", medicoId: c.medicoId, medico: c.medico || "—", sede: c.sedeId, sedeNombre: c.sede || "—", esp: c.especialidadId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), duracionMin: c.duracionMin || null, sillon: c.sillon || null, motivo: c.motivo, estado: c.estado, llegada: !!c.llegada, confirmadoWa: !!c.confirmadoWa, agendadoPorIa: !!c.agendadoPorIa });
+  const mapCita = (c) => ({ id: c.id, pacienteId: c.pacienteId, paciente: c.paciente || "—", dni: c.dni || "", medicoId: c.medicoId, medico: c.medico || "—", sede: c.sedeId, sedeNombre: c.sede || "—", esp: c.especialidadId, fecha: c.fecha, hora: (c.hora || "").slice(0, 5), duracionMin: c.duracionMin || null, sillon: c.sillon || null, motivo: motivoVisible(c.motivo), estado: c.estado, llegada: !!c.llegada, confirmadoWa: !!c.confirmadoWa, agendadoPorIa: !!c.agendadoPorIa });
   const [remoto, setRemoto] = useState(null);
   const [saldos, setSaldos] = useState({});   // pacienteId → saldo por cobrar (para cobrar desde la fila)
   const [pago, setPago] = useState(null);      // { pid, nombre, monto, sedeId }
@@ -9973,8 +9974,8 @@ function Plan({ notify, plan = "mediana", setPlan, esSuper, can, puedeCambiar = 
     <div style={{ display: "grid", gap: 14 }}>
       <section className="dc-esp-hero is-tablero">
         <div className="dc-esp-hero__txt">
-          <div className="dc-esp-hero__num"><b>{actual.nombre}</b><span>tu plan</span></div>
-          <p>S/ {actual.precio}/mes – {totalMods(actual.id)} módulos activos{conectado ? (renuevaEl ? ` – renueva el ${fechaLegible(String(renuevaEl).slice(0, 10))}` : "") : ` – renueva el ${fechaLegible(addDays(26))}`}</p>
+          <div className="dc-esp-hero__num"><b>S/ {actual.precio}</b><span>al mes · plan {actual.nombre}</span></div>
+          <p>{totalMods(actual.id)} módulos activos{conectado ? (renuevaEl ? ` – renueva el ${fechaLegible(String(renuevaEl).slice(0, 10))}` : "") : ` – renueva el ${fechaLegible(addDays(26))}`}</p>
         </div>
         <div className="dc-esp-hero__cifras">
           <div><b>{sedesUsadas == null ? "—" : `${sedesUsadas} ${sedesUsadas === 1 ? "sede" : "sedes"}`}</b><span>{sedesUsadas == null ? "Sedes" : sedesExtra > 0 ? `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"} + ${sedesExtra} adicional${sedesExtra === 1 ? "" : "es"}` : `${actual.sedesIncl} incluida${actual.sedesIncl === 1 ? "" : "s"}`}</span></div>
@@ -13393,7 +13394,7 @@ function PortalPaciente({ usuario, onLogout }) {
         fecha: c.fecha,
         hora: (c.hora || "").toString().slice(0, 5),
         estado: c.estado,
-        motivo: c.motivo || "Consulta",
+        motivo: motivoVisible(c.motivo) || "Consulta",
       })));
     }).catch((e) => {
       setMisCitas([]);

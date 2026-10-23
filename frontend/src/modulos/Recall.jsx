@@ -379,7 +379,7 @@ function Recall({ pacientes, notify, can, tab = "automatizaciones" }) {
           <div className="dc-rec__cifras">
             <div><b>{activas}/{reglas.length}</b><span>Activas</span></div>
             <div><b>{mesEnv.enviados.toLocaleString("es-PE")}</b><span>Enviados este mes</span></div>
-            <div><b>{mesEnv.total ? `${Math.round((mesEnv.enviados / mesEnv.total) * 100)}%` : "Sin envíos"}</b><span>{mesEnv.total ? "Entregados" : "Entrega del mes"}</span></div>
+            <div><b>{mesEnv.total ? `${Math.round((mesEnv.enviados / mesEnv.total) * 100)}%` : "0"}</b><span>{mesEnv.total ? "Entregados" : "Entregados este mes"}</span></div>
             <span className="dc-rec__dnd" title="No se envían automatizaciones fuera de este horario ni más de 3 por paciente al día"><Shield size={13} strokeWidth={1.75} /> No molestar 21:00–08:00 – máx. 3 al día</span>
           </div>
         </div>

@@ -4,7 +4,7 @@ import React, { useContext, useState, useEffect, useRef } from "react";
 import {ArrowLeft, PanelRightClose, PanelRightOpen, AlertTriangle, Bot, Building2, Calendar, Check, CheckCheck, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Info, MapPin, MessageCircle, MessageSquare, Phone, Plus, Repeat, Search, Send, Smile, Sparkles, Star, Trash2, TrendingUp, User, UserCheck, UserPlus, Zap} from "lucide-react";
 import api, { auth } from "../api/client";
 import { sedeApiUuid } from "../routing";
-import {DatosDemoCtx, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, HORARIO_DEF, INK, Modal, NAVY, RED, Select, hoy, mismaSede, nombreSede, tint, useSede} from "../comun";
+import {DatosDemoCtx, fechaLegible, fmt, MenuAcciones, colorDe, Btn, Card, DISPLAY_FONT, DS, ESPECIALIDADES, HORARIO_DEF, INK, Modal, NAVY, RED, Select, hoy, mismaSede, nombreSede, tint, useSede} from "../comun";
 import { CATALOGO_SEED, precioCita } from "../compartido/catalogo";
 import { AgendarRecepcionModal, CamposPacienteRapido, PAC_RAPIDO_VACIO, celular9, registrarPacienteRapido, validarPacienteRapido } from "../compartido/AgendarRecepcionModal";
 import { pasarelaActiva } from "../compartido/integraciones";
@@ -293,7 +293,8 @@ function WhatsAppInbox({ notify = () => {} }) {
     const hoy = fmt(new Date());
     const ayer = fmt(new Date(Date.now() - 86400000));
     if (f === hoy) return "Hoy"; if (f === ayer) return "Ayer";
-    try { return new Date(f + "T12:00:00").toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" }); } catch { return f; }
+    // Corta, como en WhatsApp: «mar, 20 oct.» (con el año solo si no es el actual).
+    return fechaLegible(f);
   };
   const fmtCreado = (iso) => { try { return new Date(iso).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" }); } catch { return "—"; } };
   // La próxima cita llega como «2026-12-19T08:00-05:00» (con hora) o «2026-12-19»: antes se le
