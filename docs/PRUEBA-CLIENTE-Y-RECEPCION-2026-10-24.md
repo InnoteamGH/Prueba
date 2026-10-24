@@ -1,4 +1,4 @@
-# Prueba de punta a punta: el paciente por WhatsApp y la recepción en la app (24/10/2026)
+# Prueba de punta a punta: el paciente por WhatsApp y la recepción en la app (24/10/2026, repetida a las 15:40)
 
 **Para qué sirve:** probar el proceso como lo vive la clínica:
 - el paciente empieza por WhatsApp queriendo agendar;
@@ -63,12 +63,14 @@ Chat 51900000920, conversación `fa7ea56f-b031-4c6a-9ffb-b99d80069fdd`. «QA Izi
 
 ## 3. Lo que falta: el día de la cita (jueves 29/10)
 
-Quedan dos citas QA en Surco con el Dr. Miguel Flores:
+Quedan cuatro citas QA de estos recorridos en Surco con el Dr. Miguel Flores:
 
 | Hora | Paciente | Estado | Pago |
 |---|---|---|---|
+| 9:00 | QA Izipay Cincuenta Siete (DNI 99771279) | pendiente | pagada por link, S/ 50.00 |
 | 10:30 | QA Recepción Cliente Uno (DNI 99771276) | confirmada | por cobrar en la clínica |
 | 11:00 | QA Izipay Cincuenta Uno (DNI 99771272) | pendiente | pagada por link, S/ 50.00 |
+| 12:30 | QA Recepción Cliente Dos (DNI 99771280) | confirmada | por cobrar en la clínica |
 
 **Ese día, en la app:**
 1. **Recordatorio:** el miércoles 28 debe salir para las dos.
@@ -105,3 +107,30 @@ Estos pasos solo se habilitan el mismo día de la cita.
 - **Cita:** que tenga el precio correcto.
 - **IA de vuelta:** que, al recibir el chat, sepa de la cita.
 - **Cobro:** que no haya cobros duplicados.
+
+---
+
+## 5. Repetición del 24/10, 15:40 a 15:55 (R40)
+
+Se repitieron los dos recorridos con pacientes nuevos y los mismos pasos en la app.
+
+**Recorrido A:** chat 51900000849, `3cbf8d2e-76c9-49f3-898c-3160d421edc6`, «QA Recepción Cliente Dos», cita del jueves 29 a las 12:30.
+
+**Recorrido B:** chat 51900000848, `3e048177-7185-4e68-bde4-8f710b210542`, «QA Izipay Cincuenta Siete», reprogramada del viernes 30 a las 10:30 al jueves 29 a las 9:00.
+
+| Paso | R39 | R40 |
+|---|---|---|
+| A2. «Prefiero que me atienda una persona» | ❌ | ❌ Igual. |
+| A4. Recepción ve el chat antes de que la IA busque cupos | ❌ | ❌ Igual: el chat 838 dijo «En Surco» y sigue sin sede. |
+| A5. Pregunta de precio | ❌ | ❌ «¿Cuánto cuesta?» → «No entendí. ¿Puede indicarme sede, día u hora…?» |
+| A6–A12. Tomar control, responder, registrar, agendar, confirmar, devolver | ✅ | ✅ Igual. |
+| A10. Precio S/ 80 frente a S/ 50; fecha por defecto en domingo; nombre del contacto precargado | ❌ / ⚠️ | ❌ / ⚠️ Igual. |
+| A15. «¿A qué hora es mi cita?» | ❌ | ❌ «¿Puede indicarme sede, día u hora de la cita?» |
+| A17. Pedir cambio → reserva nueva | ❌ | ❌ Igual: «Resumen: viernes 30/10 a las 09:00… ¿Confirma?» |
+| B1. Pedir cambio de una cita pagada → deriva | ✅ | ✅ |
+| B2. «Pendientes de hoy» | ❌ | ❌ «Todo al día». |
+| B3. Reprogramar en la agenda | ✅ / ⚠️ pendiente | ✅ / ⚠️ Igual: queda «pendiente». Un solo cobro. |
+| B5. «¿A qué hora es mi cita?» | ❌ | ❌ «¿En qué sede…?» |
+| B6. «Hola» → «2» | ✅ Mostraba la cita. | ❌ Abre un submenú («1) Saber horario 2) Cambiar fecha/hora 3) Cancelar»), y «1» → «¿En qué sede…?». En el chat 920 «2» sí la muestra. |
+
+**Nuevo:** la bandeja de WhatsApp tarda 10 a 12 segundos en cargar la lista de chats (`GET /conversaciones`), aun sin otra carga.

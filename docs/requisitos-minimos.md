@@ -596,3 +596,7 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **El mismo servicio tiene el mismo precio** en WhatsApp, en la agenda y en Caja.
    - **Una cita pagada sigue confirmada al reprogramarla.** La agenda muestra quién la agendó: la IA o una persona de recepción.
    - **Cada versión nueva repite esta prueba** con dos recorridos: un paciente nuevo atendido por recepción y un paciente que pagó por la IA y pide un cambio. El día de la cita se completan llegada, atención y cobro.
+128. Consultar la cita y cargar la bandeja sin esperas (revisión 40; detalle en `QA-REVISION-40-2026-10-24.md`):
+   - **«Ver o cambiar una cita» muestra la cita del paciente en todos los casos:** la agendada por la IA, la agendada por recepción y la reprogramada. Lo mismo vale para una pregunta en texto libre («¿A qué hora es mi cita?»). Nunca se responde con «¿En qué sede le atendemos?».
+   - **La lista de chats de la bandeja carga en menos de 2 segundos:** paginada y solo con los datos que muestra. Hoy tarda 10 a 12 segundos.
+   - **Una versión que no cambia nada se avisa antes de pedir la prueba:** R40 repitió R39 sin diferencias.

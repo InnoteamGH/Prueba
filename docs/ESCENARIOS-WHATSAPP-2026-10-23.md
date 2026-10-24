@@ -1,18 +1,20 @@
-# WhatsApp con IA: escenarios para reproducir (24/10/2026, 13:55)
+# WhatsApp con IA: escenarios para reproducir (24/10/2026, 16:00)
 
-**Estado tras la última versión:**
-- **Probada:** el 24/10 de 13:09 a 13:50, hora de Lima.
-- **E6 y E7 quedaron corregidos:** «Hola» ya no confirma y siempre reinicia.
-- **Siguen bien:** E1 a E5 y el formato de horas.
-- **Primera prueba con recepción:** se hizo la prueba paciente más recepción en la app; el detalle está en `PRUEBA-CLIENTE-Y-RECEPCION-2026-10-24.md`.
+**Estado tras la última prueba:**
+- **Probada:** el 24/10 de 15:35 a 15:55, hora de Lima.
+- **Sin cambios respecto de R39 (13:09).**
+- **Siguen bien:** E1 a E7, el formato de horas, anular un link sin pagar y el pago completo.
+- **Prueba con recepción:** se repitió en la app (`PRUEBA-CLIENTE-Y-RECEPCION-2026-10-24.md`, sección 5).
 
-**Lo que falla ahora:**
-- **E8, regresión:** doble confirmación.
+**Lo que falla (E8 a E13, igual que en R39):**
+- **E8:** doble confirmación con paciente nuevo. Con paciente registrado se confirma una sola vez, pero con el resumen corto.
 - **E9:** el aviso de «día sin atención» contradice la hora pedida.
 - **E10:** «La segunda» sin lista en pantalla cambia la hora.
-- **E11:** pedir una persona o hacer una pregunta (precio, seguro) se ignora.
-- **E12:** con recepción de por medio, la IA no ve la cita al recibir el chat; si el paciente pide cambiarla, arma una reserva nueva.
-- **E13:** un chat sin sede (por ejemplo, el derivado por «no entendí») no lo ve ninguna recepción.
+- **E11:** pedir una persona o preguntar el precio se ignora.
+- **E12:** la IA no ve la cita que agendó o cambió recepción.
+  - Si el paciente pide cambiarla, arma una reserva nueva.
+  - Además, en R40 «Ver o cambiar una cita» abre un submenú cuyo «1) Saber horario» responde «¿En qué sede…?».
+- **E13:** los chats sin sede no los ve ninguna recepción.
 
 **Para reproducir:**
 - **Paso 1:** crear un chat de prueba con un número ficticio (`POST /conversaciones`).
@@ -40,6 +42,8 @@ Chat 51900000818 (`ef5185f6-2b24-4d40-848b-22b0f0f63bf8`), paciente registrado, 
 
 Igual en el chat 819, con un paciente nuevo.
 
+**R40:** igual en el chat 832 (`3ff42210-…`, paciente nuevo, 15:37:44 y 15:37:59) y en el 848 (pago). En el 818 (paciente registrado), una sola confirmación, pero con el resumen corto.
+
 **Debería:** un solo resumen, con el doctor y la sede con mayúscula, y una sola confirmación, como en R36 a R38.
 
 ### E9. «Mañana» cae en un día sin atención
@@ -49,6 +53,8 @@ Chat 51900000827 (`2512fb29-3742-4c44-9b78-0df16e592dd1`), sábado 24/10: «Quie
 > ❌ «Las 10:00 no están libres. ¿Qué otro horario prefiere? El domingo 25 no hay odontología general en Sede San Isidro; el siguiente día es el lunes 26: 🕐 Lunes 26 — 9:00, 9:30, **10:00**, 10:30, 11:00»
 
 **Debería:** «El domingo 25 no atendemos. El lunes 26 a las 10:00 está libre: ¿se la reservo?»
+
+**R40:** igual en el chat 833 (`1234f9e9-…`), a las 15:38:33.
 
 ### E10. «La segunda» sin lista en pantalla
 
@@ -61,6 +67,8 @@ Chat 51900000822 (`42ab2980-9d16-4225-85b3-766357b43075`):
 
 **Debería:** mantener las 11:00 y repetir la pregunta del nombre. Solo vale elegir «la segunda» si la lista está en pantalla.
 
+**R40:** igual en el chat 834 (`0a487c71-…`), a las 15:37:38.
+
 ### E11. Pedir una persona, o una pregunta, se ignora
 
 Chat 51900000831 (`64508a64-cf3e-4255-a52a-478ffb93aba0`):
@@ -69,6 +77,8 @@ Chat 51900000831 (`64508a64-cf3e-4255-a52a-478ffb93aba0`):
 |---|---|---|
 | 13:13:09 | Prefiero que me atienda una persona, por favor | ❌ «¿En qué sede le atendemos?» |
 | 13:18:15 | ¿Cuánto cuesta y aceptan seguro Rímac? | ❌ «¿Cuál le reservo?» |
+
+**R40:** igual en los chats 835 y 836, y en el 849 («¿Cuánto cuesta?» → «No entendí. ¿Puede indicarme sede, día u hora de la cita?»).
 
 **Debería:**
 - **Si pide una persona:** pasar el chat a recepción y decirlo.
@@ -89,6 +99,13 @@ Chat 51900000831 (`64508a64-cf3e-4255-a52a-478ffb93aba0`):
 - **13:47:05:** «¿A qué hora es mi cita?» → ❌ «¿En qué sede le atendemos?».
 - **Con «Hola» → «2»:** ✅ «Su cita está agendada para el jueves 29 de octubre a las 11:00».
 
+**R40:**
+- **Chat 849:** al devolverle el chat, «¿A qué hora es mi cita?» → «¿Puede indicarme sede, día u hora de la cita?». «¿Me la puede pasar al viernes 30 a las 9:00?» → resumen de una cita nueva.
+- **Chat 848**, pagada y reprogramada por recepción:
+  - «Hola» → «2» → submenú «1) Saber horario 2) Cambiar fecha/hora 3) Cancelar»;
+  - «1» → «¿En qué sede le atendemos?».
+- **Chat 920:** «2» sí muestra la cita.
+
 **Debería:**
 - **Al recibir el chat de recepción:** la IA empieza de cero y consulta las citas del paciente.
 - **Si pregunta por su cita, en texto libre:** se la muestra.
@@ -99,6 +116,8 @@ Chat 51900000831 (`64508a64-cf3e-4255-a52a-478ffb93aba0`):
 - **Chats afectados:** los derivados por «dos mensajes sin sentido» (825, 902, 959, 907 y 908) no tienen sede.
 - **Quién no los ve:** la recepción de San Isidro, la de Surco y el administrador de Surco. Solo los ve el administrador general.
 - **Chat 831:** no apareció en la bandeja de Surco hasta que la IA buscó cupos, aunque el paciente ya había dicho «En Surco».
+
+**R40:** igual en el 837 (derivado, sin sede) y en el 838, que dijo «En Surco» y quedó sin sede.
 
 **Debería:**
 - **Sede dicha:** se guarda apenas el paciente la dice.
