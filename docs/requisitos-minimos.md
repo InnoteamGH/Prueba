@@ -580,3 +580,7 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Si no está libre, se dice y se ofrecen las más cercanas:** «A las 11:00 ya no hay cupo el jueves 5; tengo 10:30 y 11:30». No se ofrecen las primeras del día sin avisar.
    - **Al elegir de la lista vale también el número de la opción** («2» = la segunda).
    - **La hora dicha antes del servicio se guarda** y se usa al buscar cupos, como el día y la sede.
+125. Mantener el WhatsApp aceptado y estable (revisión 37; detalle en `QA-REVISION-37-2026-10-23.md`):
+   - **Las 16 conversaciones de aceptación pasan todas** desde esta versión. Cada cambio del asistente repite las 16, los escenarios E1 a E5 de `ESCENARIOS-WHATSAPP-2026-10-23.md` y las 9 formas de elegir de la lista antes de publicarse.
+   - **Las horas se escriben igual en todos los mensajes:** «9:30», sin cero delante, y ordenadas de la más temprana a la más tarde.
+   - **La API no responde 503 con 30 lecturas simultáneas:** la mejora de R36 no se mantuvo (en R37 fallaron hasta 14 de 30). Se mide antes de dar por cerrada cada versión.
