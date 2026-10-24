@@ -1,0 +1,1981 @@
+/**
+ * Panel Gerencial — sustituye el DashLienzo de #/gerencial.
+ * Layout SPEC §3.2 – animaciones HTML §6 – fichas de dato §7.
+ */
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Info, RefreshCw, BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
+import api, { auth } from "../api/client";
+import { sedeApiUuid } from "../routing";
+import {
+  curvaCajaAcumulada,
+  diaDelMesRitmo,
+  distinctPatients,
+  filtraMicro,
+  inicialesDe,
+  layoutProgreso,
+  metaEstado,
+  moneyFmt,
+  totalResumen,
+  produccionPorEspecialidad,
+  carteraComoDirectorio,
+  medicosEnSedes,
+  equipoDeSede,
+  rankingConSinAsignar,
+  valorInventario,
+} from "./panelGerencialUtil";
+import { tienePermiso } from "../compartido/permisos";
+import { contarChatsPorSede, sedeDeConversacion, sedeDePacienteObj } from "../compartido/whatsappSede";
+import NoDisponible from "../ui/NoDisponible";
+
+/* H-G9: el chip de cada asunto de «Requiere acción» lleva a la pantalla donde se resuelve
+   (antes era un <span> sin acción). Solo si el rol puede ver ese módulo. */
+const DESTINOS_ALERTA = [
+  [/stock|insumo|inventario/i, "inventario", "#/inventario", "Ver inventario"],
+  [/laboratorio/i, "laboratorio", "#/laboratorio", "Ver laboratorio"],
+  [/liquidaci|seguro|eps/i, "seguros", "#/seguros", "Ver seguros"],
+  [/saldo|vencid|deuda|cobr/i, "facturacion", "#/caja", "Ver en Caja"],
+  [/caja/i, "facturacion", "#/caja", "Ver caja"],
+  [/evoluci/i, "pacientes", "#/pacientes", "Ver pacientes"],
+  [/cita|agenda|confirm/i, "agenda", "#/agenda", "Ver agenda"],
+];
+export function destinoAlerta(a, puedeVer = (m) => tienePermiso(m, "ver")) {
+  const txt = `${a?.titulo || ""} ${a?.tipo || ""} ${a?.detalle || ""}`;
+  const d = DESTINOS_ALERTA.find(([re]) => re.test(txt));
+  return d && puedeVer(d[1]) ? { hash: d[2], label: d[3] } : null;
+}
+import { pluralEs, fechaLegible, ThOrden, useFiltroTabla, DatosDemoCtx, MEDICOS, ESPECIALIDADES, sedesDe, mismaSede, useSede, jornadaClinica, horarioDeSede, horasEntre } from "../comun";
+import { horarioConfigurado, horaDecimal } from "../compartido/horarioReal";
+import { leerCatalogo, precioCita } from "../compartido/catalogo";
+import { medicoEnSedes } from "../compartido/medicosSede";
+import { SILLONES_DEMO } from "../compartido/sillones";
+import { sillonesPorSede } from "../compartido/useReglasAgenda";
+import * as M from "../compartido/metricas";
+import { labAtrasado } from "../compartido/estados";
+import "./panelGerencial.css";
+import ResumenMes, { avanceDemo } from "./ResumenMes";
+import { ResumenOcupacion } from "./OcupacionSillones";
+
+const COLORES_ESP = [
+  "var(--dc-accent-cyan)",
+  "var(--dc-amber-ink)",
+  "var(--dc-purple)",
+  "var(--dc-ok-700)",
+  "var(--dc-brand-600)",
+];
+
+function hoyYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined"
+    && window.matchMedia
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function cssVar(name, fallback) {
+  if (typeof window === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function hexToRgba(hex, a) {
+  let h = (hex || "").replace("#", "");
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  if (h.length !== 6) return `rgba(14,116,144,${a})`;
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
+}
+
+// Un cero no lleva el color de su estado (verde, turquesa, rojo): se ve en gris.
+function tinta(n, color) {
+  return { color: Number(n) > 0 ? color : "var(--dc-ink-400)" };
+}
+
+function deltaPct(actual, anterior) {
+  const a = Number(actual);
+  const b = Number(anterior);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return null;
+  return ((a - b) / Math.abs(b)) * 100;
+}
+
+/* ── Ficha de dato ── */
+function FichaDato({ dato, onClose }) {
+  const closeRef = useRef(null);
+  const prevFocus = useRef(null);
+
+  useEffect(() => {
+    prevFocus.current = document.activeElement;
+    closeRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      if (e.key !== "Tab") return;
+      const root = e.currentTarget === document ? null : null;
+      const dlg = document.getElementById("dc-pg-ficha");
+      if (!dlg) return;
+      const focusables = dlg.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+      const list = [...focusables];
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (prevFocus.current && typeof prevFocus.current.focus === "function") {
+        prevFocus.current.focus();
+      }
+    };
+  }, [onClose]);
+
+  if (!dato) return null;
+  const cifra = typeof dato.cifra === "function" ? dato.cifra() : dato.cifra;
+  const micro = filtraMicro(
+    typeof dato.micro === "function" ? dato.micro() : dato.micro,
+    cifra,
+    dato.parte,
+  );
+  const filas = typeof dato.filas === "function" ? dato.filas() : (dato.filas || []);
+  const total = typeof dato.total === "function" ? dato.total() : dato.total;
+  const ancho = (dato.cols || []).length >= 5 ? "xl" : undefined;
+
+  return (
+    <div className="dc-pg-ficha-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div
+        id="dc-pg-ficha"
+        className="dc-pg-ficha"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dc-pg-ficha-title"
+        tabIndex={-1}
+        data-tono={dato.tono || "brand"}
+        data-ancho={ancho}
+      >
+        <div className="dc-pg-ficha__head">
+          <span className="ico" aria-hidden="true"><BarChart3 size={20} strokeWidth={1.9} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 id="dc-pg-ficha-title">{dato.t}</h2>
+            <p>{dato.s}</p>
+          </div>
+          {dato.estado && <span className="dc-chip dc-chip--gris">{dato.estado}</span>}
+          <button ref={closeRef} type="button" className="dc-pg-ficha__cerrar" aria-label="Cerrar" onClick={onClose}><X size={17} strokeWidth={2} /></button>
+        </div>
+        <div className="dc-pg-ficha__body">
+          <div className="mdl-hero">
+            <div className="mdl-hero__n">
+              <b>{cifra}</b>
+              {dato.parte && <span className="parte">{dato.parte}</span>}
+            </div>
+            {dato.sub && <p>{dato.sub}</p>}
+            {micro?.length > 0 && (
+              <dl className="mdl-micro">
+                {micro.map(([lab, val], i) => (
+                  <div key={i}><dd>{val}</dd><dt>{lab}</dt></div>
+                ))}
+              </dl>
+            )}
+          </div>
+          {dato.como && (
+            <div className="mdl-bloq">
+              <p className="mdl-seccion"><Calculator size={14} strokeWidth={2} /> Cómo se calcula</p>
+              <p className="mdl-como">{dato.como}</p>
+            </div>
+          )}
+          <div className="mdl-bloq">
+            <p className="mdl-seccion"><ListIcon size={14} strokeWidth={2} /> El detalle</p>
+            {filas.length === 0 ? (
+              <div className="mdl-vacio">{dato.vacio || "Sin filas para mostrar."}</div>
+            ) : (
+              <div style={{ overflow: "auto", maxHeight: 420 }}>
+                <table className="mdl-tabla">
+                  <thead>
+                    <tr>
+                      {(dato.cols || []).map(([h, align], i) => (
+                        <th key={i} className={align === "n" ? "n" : undefined}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filas.map((row, i) => (
+                      <tr key={i}>
+                        {row.map((cell, j) => {
+                          const isNum = (dato.cols || [])[j]?.[1] === "n";
+                          const txt = cell && typeof cell === "object" ? (cell.v ?? cell.n ?? cell.chip ?? "") : cell;
+                          return <td key={j} className={isNum ? "n" : undefined}>{txt}</td>;
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                  {total != null && (
+                    <tfoot>
+                      <tr>
+                        <td>Total</td>
+                        {(dato.cols || []).slice(1).map((_, j) => (
+                          <td key={j} className="n">{j === (dato.cols.length - 2) ? total : ""}</td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
+          </div>
+          {dato.falta ? (
+            <div className="mdl-falta"><b>Qué falta:</b> {dato.falta}</div>
+          ) : dato.fuente ? (
+            <p className="mdl-fuente">{dato.fuente}</p>
+          ) : null}
+        </div>
+        <div className="dc-pg-ficha__footer">
+          <span>{dato.nota || (dato.ejemplo ? "Detalle de ejemplo · los totales son reales" : "Dato de la clínica")}</span>
+          <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Canvas: caja ── */
+// abre/cierra: la jornada de la clínica en horas decimales (antes 08–20 fijo para todas).
+function CanvasCaja({ puntos, onOpen, abre = 8, cierra = 20 }) {
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const badgeRef = useRef(null);
+  const state = useRef({ hVis: abre, max: 40, listo: false });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas || !wrap) return;
+    const quieto = prefersReducedMotion();
+    const ctx = canvas.getContext("2d");
+    let raf = 0;
+    let stopped = false;
+
+    const medir = () => {
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.max(1, Math.floor(r.width * dpr));
+      canvas.height = Math.max(1, Math.floor(r.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { W: r.width, H: r.height };
+    };
+
+    const pinta = () => {
+      if (stopped) return;
+      const { W, H } = medir();
+      const pad = { l: 8, r: 12, t: 18, b: 28 };
+      const pts = puntos?.length ? puntos : [[abre, 0], [abre + 0.01, 0]];
+      const pico = Math.max(...pts.map((p) => p[1]), 0);
+      const objetivo = Math.max(40, Math.ceil((pico * 1.08) / 20) * 20);
+      const st = state.current;
+      if (quieto) {
+        st.max = objetivo;
+        st.hVis = pts[pts.length - 1][0];
+        st.listo = true;
+      } else {
+        st.max += (objetivo - st.max) * 0.1;
+        st.max = Math.max(st.max, pico * 1.08, 40);
+        const ult = pts[pts.length - 1][0];
+        st.hVis += (ult - st.hVis) * 0.045;
+        if (ult - st.hVis < 0.015) st.hVis = ult;
+      }
+      const xOf = (h) => pad.l + ((h - abre) / Math.max(1, cierra - abre)) * (W - pad.l - pad.r);
+      const yOf = (v) => pad.t + (1 - v / st.max) * (H - pad.t - pad.b);
+      const poly = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        if (p[0] <= st.hVis) { poly.push(p); continue; }
+        if (i > 0) {
+          const a = pts[i - 1];
+          const f = (st.hVis - a[0]) / Math.max(1e-6, p[0] - a[0]);
+          if (f > 0) poly.push([st.hVis, a[1] + (p[1] - a[1]) * Math.min(1, f)]);
+        }
+        break;
+      }
+      if (!poly.length) poly.push(pts[0]);
+
+      ctx.clearRect(0, 0, W, H);
+      const g1 = cssVar("--dc-accent-cyan", "#0E7490");
+      const line = cssVar("--dc-line", "#E7EAF0");
+      const ink = cssVar("--dc-ink-400", "#667085");
+      // zona futura
+      const ahora = new Date().getHours() + new Date().getMinutes() / 60;
+      const xAhora = xOf(Math.min(cierra, Math.max(abre, ahora)));
+      ctx.fillStyle = hexToRgba(line.replace(/\s/g, "") || "#E7EAF0", 0.55);
+      // use soft fill
+      ctx.fillStyle = "color-mix(in srgb, var(--dc-line) 55%, transparent)";
+      try {
+        ctx.fillStyle = hexToRgba("#E7EAF0", 0.45);
+        ctx.fillRect(xAhora, pad.t, W - pad.r - xAhora, H - pad.t - pad.b);
+      } catch (_) { /* */ }
+
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 1;
+      for (let h = Math.ceil(abre); h <= cierra; h += 2) {
+        const x = xOf(h);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.t);
+        ctx.lineTo(x, H - pad.b);
+        ctx.stroke();
+        ctx.fillStyle = ink;
+        ctx.font = "10px 'Inter Variable', 'Inter', sans-serif";
+        // Las horas de los extremos se alinean hacia adentro: centradas, «20:00» quedaba cortado.
+        ctx.textAlign = h <= Math.ceil(abre) ? "left" : h + 2 > cierra ? "right" : "center";
+        ctx.fillText(`${String(h).padStart(2, "0")}:00`, x, H - 8);
+      }
+
+      if (poly.length > 1) {
+        const grd = ctx.createLinearGradient(0, pad.t, 0, H - pad.b);
+        grd.addColorStop(0, hexToRgba(g1, 0.28));
+        grd.addColorStop(1, hexToRgba(g1, 0.02));
+        ctx.beginPath();
+        ctx.moveTo(xOf(poly[0][0]), yOf(poly[0][1]));
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(xOf(poly[i][0]), yOf(poly[i][1]));
+        ctx.lineTo(xOf(poly[poly.length - 1][0]), H - pad.b);
+        ctx.lineTo(xOf(poly[0][0]), H - pad.b);
+        ctx.closePath();
+        ctx.fillStyle = grd;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(xOf(poly[0][0]), yOf(poly[0][1]));
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(xOf(poly[i][0]), yOf(poly[i][1]));
+        ctx.strokeStyle = g1;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+        const last = poly[poly.length - 1];
+        const bx = xOf(last[0]);
+        const by = yOf(last[1]);
+        ctx.beginPath();
+        ctx.arc(bx, by, 4, 0, Math.PI * 2);
+        ctx.fillStyle = g1;
+        ctx.fill();
+        if (badgeRef.current) {
+          badgeRef.current.textContent = moneyFmt(last[1]);
+          // La etiqueta va centrada sobre el punto, pero sin salirse por los bordes del gráfico.
+          const mitad = badgeRef.current.offsetWidth / 2;
+          badgeRef.current.style.left = `${Math.min(W - mitad, Math.max(mitad, bx))}px`;
+          badgeRef.current.style.top = `${by}px`;
+          badgeRef.current.classList.add("ver");
+        }
+      }
+      if (!quieto && !st.listo) raf = requestAnimationFrame(pinta);
+      else if (!quieto) raf = requestAnimationFrame(pinta);
+    };
+
+    pinta();
+    const onResize = () => pinta();
+    window.addEventListener("resize", onResize);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [puntos, abre, cierra]);
+
+  return (
+    <div className="serie serie--alto" ref={wrapRef}>
+      <canvas ref={canvasRef} className="clic" onClick={onOpen} aria-label="Curva de cobros del día" />
+      <div className="badge" ref={badgeRef} />
+    </div>
+  );
+}
+
+/* ── Canvas: flujo ── */
+function CanvasFlujo() {
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas || !wrap) return;
+    const quieto = prefersReducedMotion();
+    const ctx = canvas.getContext("2d");
+    let raf = 0;
+    let stopped = false;
+    const parts = Array.from({ length: 26 }, (_, i) => ({
+      t: i / 26,
+      vel: 0.00055 + (i % 5) * 0.00008,
+    }));
+
+    const pinta = (t0) => {
+      if (stopped) return;
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.max(1, Math.floor(r.width * dpr));
+      canvas.height = Math.max(1, Math.floor(r.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const W = r.width;
+      const H = r.height;
+      ctx.clearRect(0, 0, W, H);
+      const g1 = cssVar("--dc-accent-cyan", "#0E7490");
+      const brand = cssVar("--dc-brand-600", "#0B5366");
+      const ok = cssVar("--dc-ok-700", "#15803D");
+      const nodos = [0.08, 0.5, 0.92].map((x, k) => ({
+        x: x * W,
+        y: H * 0.48,
+        c: [g1, brand, ok][k],
+      }));
+      ctx.strokeStyle = hexToRgba("#C4CBD6", 0.7);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(nodos[0].x, nodos[0].y);
+      for (let x = nodos[0].x; x <= nodos[2].x; x += 4) {
+        const u = (x - nodos[0].x) / (nodos[2].x - nodos[0].x);
+        const y = H * 0.48 + Math.sin(u * Math.PI * 2) * 18;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      const pulse = quieto ? 1 : 0.7 + 0.3 * Math.sin((t0 || 0) / 400);
+      nodos.forEach((n) => {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 10 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRgba(n.c, 0.18);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = n.c;
+        ctx.fill();
+      });
+      parts.forEach((p) => {
+        if (!quieto) p.t = (p.t + p.vel) % 1;
+        const u = p.t;
+        const x = nodos[0].x + u * (nodos[2].x - nodos[0].x);
+        const y = H * 0.48 + Math.sin(u * Math.PI * 2) * 18;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRgba(g1, 0.75);
+        ctx.fill();
+      });
+      if (!quieto) raf = requestAnimationFrame(pinta);
+    };
+    if (quieto) pinta(0);
+    else raf = requestAnimationFrame(pinta);
+    return () => { stopped = true; cancelAnimationFrame(raf); };
+  }, []);
+
+  return (
+    <div className="flujo" ref={wrapRef}>
+      <canvas ref={canvasRef} aria-hidden="true" />
+      <span className="etq" style={{ left: 14 }}>Agenda</span>
+      <span className="etq" style={{ left: "50%", transform: "translateX(-50%)" }}>Sillón</span>
+      <span className="etq" style={{ right: 14 }}>Cobro</span>
+    </div>
+  );
+}
+
+/* ── Canvas: esfera ── */
+function CanvasEsfera({ pacientes, onPick }) {
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const fichaRef = useRef(null);
+  const rotRef = useRef(null);
+  const hover = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas || !wrap) return;
+    const quieto = prefersReducedMotion();
+    const ctx = canvas.getContext("2d");
+    const list = (pacientes || []).slice(0, 80);
+    const N = Math.max(list.length, 1);
+    const GOLD = Math.PI * (3 - Math.sqrt(5));
+    const bolas = list.map((p, i) => {
+      const y = 1 - (i / Math.max(N - 1, 1)) * 2;
+      const rad = Math.sqrt(Math.max(0, 1 - y * y));
+      const th = GOLD * i;
+      const saldo = Math.max(0, Number(p.saldo) || 0);
+      let estado = "al_dia";
+      if (saldo > 0) estado = "saldo";
+      else if (!p.ultimaCita) estado = "nuevo";
+      return {
+        p,
+        x: Math.cos(th) * rad,
+        y,
+        z: Math.sin(th) * rad,
+        r: 2.5 + Math.min(6, Math.sqrt(saldo) / 8),
+        estado,
+      };
+    });
+    let gy = 0;
+    let raf = 0;
+    let stopped = false;
+
+    const colorEstado = (e) => {
+      if (e === "saldo") return cssVar("--dc-danger-700", "#B42318");
+      if (e === "nuevo") return cssVar("--dc-accent-cyan", "#0E7490");
+      return cssVar("--dc-ok-700", "#15803D");
+    };
+
+    const pinta = () => {
+      if (stopped) return;
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.max(1, Math.floor(r.width * dpr));
+      canvas.height = Math.max(1, Math.floor(r.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const W = r.width;
+      const H = r.height;
+      const cx = W / 2;
+      const cy = H / 2;
+      const S = Math.min(W, H) * 0.38;
+      if (!quieto && !hover.current) gy += 0.0042;
+      ctx.clearRect(0, 0, W, H);
+      const proyectados = bolas.map((b) => {
+        const cos = Math.cos(gy);
+        const sin = Math.sin(gy);
+        const x = b.x * cos - b.z * sin;
+        const z = b.x * sin + b.z * cos;
+        return { ...b, px: cx + x * S, py: cy + b.y * S, pz: z };
+      }).sort((a, b) => a.pz - b.pz);
+      proyectados.forEach((b) => {
+        const depth = (b.pz + 1) / 2;
+        const alpha = 0.35 + depth * 0.65;
+        const rr = b.r * (0.7 + depth * 0.5);
+        ctx.beginPath();
+        ctx.arc(b.px, b.py, rr, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRgba(colorEstado(b.estado).replace(/\s/g, "") || "#15803D", alpha);
+        // fallback if color is css var unresolved
+        ctx.fillStyle = colorEstado(b.estado);
+        ctx.globalAlpha = alpha;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+      if (rotRef.current) rotRef.current.textContent = `${list.length} NODOS`;
+      if (!quieto) raf = requestAnimationFrame(pinta);
+    };
+
+    const onMove = (ev) => {
+      hover.current = true;
+      const rect = canvas.getBoundingClientRect();
+      const mx = ev.clientX - rect.left;
+      const my = ev.clientY - rect.top;
+      // nearest
+      let best = null;
+      let bestD = 18;
+      const r = wrap.getBoundingClientRect();
+      const cx = r.width / 2;
+      const cy = r.height / 2;
+      const S = Math.min(r.width, r.height) * 0.38;
+      const cos = Math.cos(gy);
+      const sin = Math.sin(gy);
+      bolas.forEach((b) => {
+        const x = b.x * cos - b.z * sin;
+        const z = b.x * sin + b.z * cos;
+        const px = cx + x * S;
+        const py = cy + b.y * S;
+        const d = Math.hypot(px - mx, py - my);
+        if (d < bestD) { bestD = d; best = b; }
+      });
+      if (fichaRef.current) {
+        if (best) {
+          fichaRef.current.innerHTML = `<b>${best.p.nombre || "Paciente"}</b><br/><em>Saldo ${moneyFmt(best.p.saldo)}</em>`;
+          fichaRef.current.classList.add("ver");
+          canvas.style.cursor = "pointer";
+        } else {
+          fichaRef.current.classList.remove("ver");
+          canvas.style.cursor = "crosshair";
+        }
+      }
+      canvas._pick = best;
+    };
+    const onLeave = () => {
+      hover.current = false;
+      fichaRef.current?.classList.remove("ver");
+    };
+    const onClick = () => {
+      if (canvas._pick) onPick?.(canvas._pick.p);
+    };
+
+    canvas.addEventListener("mousemove", onMove);
+    canvas.addEventListener("mouseleave", onLeave);
+    canvas.addEventListener("click", onClick);
+    if (quieto) pinta();
+    else raf = requestAnimationFrame(pinta);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener("mousemove", onMove);
+      canvas.removeEventListener("mouseleave", onLeave);
+      canvas.removeEventListener("click", onClick);
+    };
+  }, [pacientes, onPick]);
+
+  return (
+    <div className="lienzo" ref={wrapRef}>
+      <canvas ref={canvasRef} className="clic" />
+      <span className="rot" ref={rotRef} aria-hidden="true" hidden />
+      <div className="ficha" ref={fichaRef} />
+    </div>
+  );
+}
+
+const ESCALA_CUBO_DEF = { dias: 180, importe: 1650, visitas: 6 };
+/** Máximos de los ejes del cubo a partir de los pacientes (con un mínimo para que no colapse). */
+export function escalaCubo(pacientes, hoy = new Date()) {
+  const lista = (pacientes || []).slice(0, 60);
+  if (!lista.length) return ESCALA_CUBO_DEF;
+  const dias = Math.max(30, ...lista.map((p) => (p.ultimaCita ? Math.max(0, (hoy - new Date(p.ultimaCita)) / 86400000) : 0)));
+  const importe = Math.max(100, ...lista.map((p) => Math.max(0, Number(p.importeAcumulado) || 0)));
+  const visitas = Math.max(2, ...lista.map((p) => Number(p.numeroDeCitas) || 0));
+  return { dias: Math.ceil(dias), importe: Math.ceil(importe), visitas: Math.ceil(visitas) };
+}
+
+/* ── Canvas: cubo ── */
+// esc: { dias, importe, visitas } máximos de los ejes, calculados de los propios pacientes
+// (antes 180 días, S/ 1 650 y 6 visitas fijos: con importes mayores los puntos salían del cubo).
+function CanvasCubo({ pacientes, onPick, esc = ESCALA_CUBO_DEF }) {
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const rotRef = useRef(null);
+  const fichaRef = useRef(null);
+  const hover = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas || !wrap) return;
+    const quieto = prefersReducedMotion();
+    const ctx = canvas.getContext("2d");
+    const hoy = new Date();
+    const pts = (pacientes || []).slice(0, 60).map((p) => {
+      let dias = esc.dias / 2;
+      if (p.ultimaCita) {
+        const u = new Date(p.ultimaCita);
+        dias = Math.max(0, Math.min(esc.dias, (hoy - u) / 86400000));
+      }
+      const importe = Math.min(esc.importe, Math.max(0, Number(p.importeAcumulado) || 0));
+      const visitas = Math.max(1, Math.min(esc.visitas, Number(p.numeroDeCitas) || 1));
+      return {
+        p,
+        x: (dias / esc.dias) * 2 - 1,
+        y: -(importe / esc.importe) * 2 + 1,
+        z: (visitas / esc.visitas) * 2 - 1,
+        saldo: Number(p.saldo) || 0,
+      };
+    });
+    let ang = 0.4;
+    const tilt = 0.35;
+    let raf = 0;
+    let stopped = false;
+
+    const pK = (x, y, z, cx, cy, S) => {
+      const X = x * Math.cos(ang) - z * Math.sin(ang);
+      let Z = x * Math.sin(ang) + z * Math.cos(ang);
+      const Y = y * Math.cos(tilt) - Z * Math.sin(tilt);
+      const Z2 = y * Math.sin(tilt) + Z * Math.cos(tilt);
+      const k = 560 / (560 + Z2 * S);
+      return { x: cx + X * S * k, y: cy + Y * S * k, z: Z2 };
+    };
+
+    const pinta = () => {
+      if (stopped) return;
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.max(1, Math.floor(r.width * dpr));
+      canvas.height = Math.max(1, Math.floor(r.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const W = r.width;
+      const H = r.height;
+      const cx = W / 2;
+      const cy = H / 2;
+      const S = Math.min(W, H) * 0.32;
+      if (!quieto && !hover.current) ang += 0.0037;
+      ctx.clearRect(0, 0, W, H);
+      const cyan = cssVar("--dc-accent-cyan", "#0E7490");
+      const amber = cssVar("--dc-amber-ink", "#D97706");
+      const purple = cssVar("--dc-purple", "#7C3AED");
+      const verts = [];
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+        verts.push(pK(sx, sy, sz, cx, cy, S));
+      }
+      const edges = [
+        [0, 1, amber], [2, 3, amber], [4, 5, amber], [6, 7, amber],
+        [0, 2, cyan], [1, 3, cyan], [4, 6, cyan], [5, 7, cyan],
+        [0, 4, purple], [1, 5, purple], [2, 6, purple], [3, 7, purple],
+      ];
+      // map indices properly for cube corners
+      const corners = [[-1, -1, -1], [1, -1, -1], [-1, 1, -1], [1, 1, -1], [-1, -1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, 1]]
+        .map(([x, y, z]) => pK(x, y, z, cx, cy, S));
+      const edgeDefs = [
+        [0, 1, amber], [2, 3, amber], [4, 5, amber], [6, 7, amber],
+        [0, 2, cyan], [1, 3, cyan], [4, 6, cyan], [5, 7, cyan],
+        [0, 4, purple], [1, 5, purple], [2, 6, purple], [3, 7, purple],
+      ];
+      edgeDefs
+        .map(([a, b, c]) => ({ a: corners[a], b: corners[b], c, z: (corners[a].z + corners[b].z) / 2 }))
+        .sort((u, v) => u.z - v.z)
+        .forEach((e) => {
+          ctx.beginPath();
+          ctx.moveTo(e.a.x, e.a.y);
+          ctx.lineTo(e.b.x, e.b.y);
+          ctx.strokeStyle = e.c;
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+        });
+      pts.map((p) => ({ ...p, ...pK(p.x, p.y, p.z, cx, cy, S) }))
+        .sort((a, b) => a.z - b.z)
+        .forEach((p) => {
+          const hot = p.saldo > 0 && p.x > 0.2;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, hot ? 4.5 : 3, 0, Math.PI * 2);
+          ctx.fillStyle = hot ? cssVar("--dc-danger-700", "#B42318") : cssVar("--dc-ink-500", "#5A6474");
+          ctx.fill();
+          if (hot) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+            ctx.strokeStyle = hexToRgba("#B42318", 0.35);
+            ctx.stroke();
+          }
+        });
+      if (rotRef.current) rotRef.current.textContent = `ROT ${Math.round((ang % (Math.PI * 2)) * 180 / Math.PI)}°`;
+      if (!quieto) raf = requestAnimationFrame(pinta);
+    };
+
+    const onEnter = () => { hover.current = true; };
+    const onLeave = () => { hover.current = false; fichaRef.current?.classList.remove("ver"); };
+    const onClick = () => {
+      const hot = pts.filter((p) => p.saldo > 0).sort((a, b) => b.saldo - a.saldo)[0];
+      if (hot) onPick?.(hot.p);
+    };
+    canvas.addEventListener("mouseenter", onEnter);
+    canvas.addEventListener("mouseleave", onLeave);
+    canvas.addEventListener("click", onClick);
+    if (quieto) pinta();
+    else raf = requestAnimationFrame(pinta);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener("mouseenter", onEnter);
+      canvas.removeEventListener("mouseleave", onLeave);
+      canvas.removeEventListener("click", onClick);
+    };
+  }, [pacientes, onPick, esc.dias, esc.importe, esc.visitas]);
+
+  return (
+    <div className="lienzo" ref={wrapRef}>
+      <canvas ref={canvasRef} className="clic" />
+      <span className="rot" ref={rotRef} aria-hidden="true" hidden />
+      <div className="ficha" ref={fichaRef} />
+    </div>
+  );
+}
+
+function BarraFila({ nombre, valor, total, color, onOpen }) {
+  const lay = layoutProgreso(valor, total);
+  if (!lay.dibujar) {
+    return (
+      <div className="hb hb--nula clic" role="button" tabIndex={0}
+        onClick={onOpen} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen?.(e)}>
+        <span className="n">{nombre}</span>
+        <span className="v">{moneyFmt(valor)}</span>
+        <span className="pc">{lay.etiquetaPct}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="hb clic" role="button" tabIndex={0}
+      onClick={onOpen} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen?.(e)}>
+      <span className="n">{nombre}</span>
+      <span className="v">{moneyFmt(valor)}</span>
+      <span className="pc">{lay.etiquetaPct}</span>
+      <div className="pista">
+        <div className="seg" data-w={lay.pct} style={{ width: `${lay.pct}%`, ["--w"]: `${lay.pct}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+function StackSegs({ items, total }) {
+  return (
+    <div className="stack" role="img">
+      {items.map((it, i) => {
+        const lay = layoutProgreso(it.valor, total);
+        if (!lay.dibujar) return null;
+        return (
+          <i key={i} data-w={lay.pct}
+            style={{ width: `${lay.pct}%`, ["--w"]: `${lay.pct}%`, background: it.color }} />
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Panel principal ── */
+export default function PanelGerencial({ citas: citasProp = [], sede, sedes = null, horarioClinica = null }) {
+  // Sedes que se ven (filtro global o sedes del usuario): todo el panel se limita a ellas.
+  const verSedes = sedes && sedes.length ? sedes.map(String) : null;
+  const claveSedes = verSedes ? verSedes.join(",") : "todas";
+  const conectado = !!auth.token;
+  // Para la API las sedes van como UUID: con «Todas» y un usuario de toda la clínica, null
+  // (las decide el servidor); si no, el UUID real de cada una (antes iban los números 1/2/3).
+  const sedeCx = useSede();
+  const sedesApi = (!verSedes || (sedeCx.sede === "all" && sedeCx.global)) ? null
+    : verSedes.map((x) => sedeApiUuid(x)).filter(Boolean);
+  // R6-02: /gerencial/kpis, /tratamientos/resumen y /comisiones ya filtran por sedeIds, y de
+  // /gerencial/indicadores también la aceptación y las especialidades: esas cifras son de la
+  // sede elegida, sin aviso ni rótulo. /gerencial/indicadores sigue sin filtrar la deuda y las
+  // alertas (R6-03): la antigüedad de la deuda y el aviso de cobros vencidos se calculan con
+  // GET /caja (sí filtra); lo que queda del servidor sin filtrar lleva el rótulo «toda la clínica».
+  const sedeElegida = conectado && !!(sedesApi && sedesApi.length);
+  // R8-06: el inventario se separa por sede cuando se ve una parte de la clínica (también en la
+  // demostración y para el usuario de una sede); con «Todas» se suma todo.
+  const invPorSede = !!verSedes && !(sedeCx.sede === "all" && sedeCx.global);
+  const [kd, setKd] = useState(null);
+  const [ind, setInd] = useState(null);
+  const [rep, setRep] = useState(null);
+  const [pagos, setPagos] = useState([]);
+  const [pagosErr, setPagosErr] = useState(null);
+  const [citasHoy, setCitasHoy] = useState(citasProp || []);
+  const [actividad, setActividad] = useState(null);
+  const [tratResumen, setTratResumen] = useState(null);
+  const [pacResumen, setPacResumen] = useState([]);
+  const [servicios, setServicios] = useState(null);       // catálogo (especialidad de cada servicio)
+  const [dirPac, setDirPac] = useState(null);             // { total, nuevos30 } con la regla del directorio
+  const [ficha, setFicha] = useState(null);
+  const [metaEdit, setMetaEdit] = useState(null);
+  const [metaVal, setMetaVal] = useState("");
+  // { total, sinSede, nSinSede } (panelGerencialUtil.valorInventario) o null si no se pudo leer.
+  const [inventarioValorizado, setInventarioValorizado] = useState(null);
+  // R8-07: GET /medicos, para usar las sedes de la ficha de cada doctor si el servidor las manda.
+  const [medsPanel, setMedsPanel] = useState(null);
+  const [nSillones, setNSillones] = useState(null);
+  const [nSedes, setNSedes] = useState(null);
+  const [sedesRows, setSedesRows] = useState([]);         // GET /sedes (número de WhatsApp de cada una)
+  // R6-03: GET /caja de las sedes que se ven (deuda por antigüedad y cobros vencidos por sede).
+  const [cajaRes, setCajaRes] = useState(null);
+  // R7-07: GET /caja falló. La antigüedad no vuelve en silencio al criterio del servidor.
+  const [cajaErr, setCajaErr] = useState(false);
+  // R6-02: horario de los doctores (GET /disponibilidad): quién atiende en la sede elegida.
+  // undefined = cargando; null = sin horario a la vista o no se pudo leer.
+  const [dispMed, setDispMed] = useState(undefined);
+  // R6-08: chats de WhatsApp (GET /conversaciones, solo con permiso de WhatsApp) y la sede de
+  // cada paciente, para contar cada chat en una sola sede.
+  const [convs, setConvs] = useState(null);
+  const [pacSede, setPacSede] = useState(null);
+  // R5-02: qué lecturas fallaron. Un bloque cuya carga falló dice «No disponible · Reintentar»,
+  // no S/ 0, «sin saldo» ni «Nada pendiente por ahora» (que se leen como datos reales).
+  const [fallo, setFallo] = useState({});
+  const marcar = useCallback((k, mal) => setFallo((f) => (!!f[k] === mal ? f : { ...f, [k]: mal })), []);
+  // Cada «Reintentar» vuelve a pedir todo el panel, también el Resumen del mes.
+  const [nRecarga, setNRecarga] = useState(0);
+  const fecha = hoyYmd();
+
+  const abrir = useCallback((d) => setFicha(d), []);
+  const cerrar = useCallback(() => setFicha(null), []);
+
+  // Demostración: el panel se arma con los mismos datos que usa el resto del sistema
+  // (citas, pacientes, fichas, sillones), para que cada bloque cuadre con los demás
+  // en vez de mostrar ceros junto al resumen del mes.
+  const demoDb = useContext(DatosDemoCtx);
+  const cargarDemo = useCallback(() => {
+    // citasProp ya llega filtrada por sede desde MainApp; pacientes, pagos y casos se limitan igual.
+    const enSede = (ids) => !verSedes || ids.some((x) => verSedes.some((v) => mismaSede(v, x)));
+    const citas = citasProp || [];
+    const deHoy = citas.filter((c) => c.fecha === fecha);
+    const pacientes = (demoDb?.pacientes || []).filter((p) => enSede(sedesDe(p)));
+    const fichas = demoDb?.fichas || {};
+    // Precio del catálogo en la sede de la cita (el mismo que cobra Caja).
+    const precio = (c) => precioCita(demoDb?.catalogo || leerCatalogo(), c.esp, c.sede) ?? ((ESPECIALIDADES.find((e) => e.id === c.esp) || {}).precio || 0);
+    const atendidasHoy = deHoy.filter((c) => c.estado === "atendida");
+    const pagosTodos = pacientes.flatMap((p) => ((fichas[p.id] || {}).pagos || []).filter((pg) => enSede([pg.sede ?? sedesDe(p)[0]])).map((pg) => ({ ...pg, paciente: p.nombre, pacienteId: p.id })));
+    const fa = avanceDemo();
+    // Producción y meta de cada doctor en las sedes que se ven (compartido/medicosSede.js).
+    const ranking = MEDICOS.map((m) => ({ m, e: medicoEnSedes(m, verSedes) })).filter((x) => x.e.sedes.length)
+      .map(({ m, e }) => ({ id: m.id, nombre: m.nombre, especialidad: (ESPECIALIDADES.find((x) => x.id === m.esp) || {}).nombre || "", produccion: Math.round(e.prod * fa), meta: e.meta || 0, citas: Math.max(1, Math.round(e.citas * fa)) }));
+    // Parte de la clínica que se ve (sede elegida): escala las cifras de ejemplo que no salen de datos.
+    const prodTodas = MEDICOS.reduce((a, m) => a + (Number(m.prodDemo) || 0), 0);
+    const parte = prodTodas ? Math.min(1, ranking.reduce((a, r) => a + r.produccion, 0) / (prodTodas * (fa || 1))) : 1;
+    setCitasHoy(deHoy);
+    setKd({
+      ingresosMes: ranking.reduce((a, r) => a + r.produccion, 0), ingresosMesAnterior: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) / 0.91), hayMeta: true, metaMensualClinica: ranking.reduce((a, r) => a + r.meta, 0),
+      produccionDia: atendidasHoy.reduce((a, c) => a + precio(c), 0),
+      pacientesAtendidosHoy: new Set(atendidasHoy.map((c) => c.paciente)).size,
+      ranking,
+    });
+    // Saldos, vencido, nuevos e inventario: las mismas consultas que Caja, Pacientes e
+    // Inventario (compartido/metricas.js), para que la cifra coincida en todas partes.
+    const pacs = pacientes.map((p) => {
+      const cta = M.cuentaPaciente(fichas[p.id]);
+      const suyas = citas.filter((c) => M.citaDePaciente(c, p));
+      return { id: p.id, nombre: p.nombre, saldo: cta.saldoPlan, porCobrar: cta.porCobrar, vencido: cta.vencido, ultimaCita: M.ultimaVisita(p, citas), numeroDeCitas: suyas.length, creadoEn: p.creadoEn || null };
+    });
+    setPacResumen(pacs);
+    const cart = M.cartera(fichas, pacientes);
+    const aging = M.antiguedadDeuda(cart).map((t) => t.v);
+    const nomP = (id) => (pacientes.find((p) => String(p.id) === String(id)) || {}).nombre || "Paciente";
+    const dePac = (pid) => pacientes.some((p) => String(p.id) === String(pid));
+    // Por la sede del registro (si no tiene, la principal del paciente), igual que Seguros y Laboratorio.
+    const sedeReg = (x, pid) => x.sede ?? sedesDe(pacientes.find((p) => String(p.id) === String(pid)) || {})[0];
+    const liqObs = (demoDb?.liquidaciones || []).filter((l) => l.estado === "observado" && dePac(l.pid) && enSede([sedeReg(l, l.pid)]));
+    const labAtr = (demoDb?.labCasos || []).filter((c) => labAtrasado(c, fecha) && dePac(c.pacienteId ?? c.pid) && enSede([sedeReg(c, c.pacienteId ?? c.pid)]));
+    const alertasDemo = [
+      cart.conVencido.length && { titulo: cart.conVencido.length === 1 ? "1 paciente con saldo vencido" : `${cart.conVencido.length} pacientes con saldo vencido`, detalle: cart.conVencido.map((f) => f.p.nombre).slice(0, 3).join(", "), monto: cart.vencido },
+      liqObs.length && { titulo: liqObs.length === 1 ? "1 liquidación de seguro observada" : `${liqObs.length} liquidaciones de seguro observadas`, detalle: liqObs.map((l) => `${l.aseg} (${nomP(l.pid)})`).join(", "), cantidad: liqObs.length },
+      labAtr.length && { titulo: labAtr.length === 1 ? "1 trabajo de laboratorio atrasado" : `${labAtr.length} trabajos de laboratorio atrasados`, detalle: labAtr.map((c) => c.trabajo).join(", "), cantidad: labAtr.length },
+    ].filter(Boolean);
+    setInd({
+      deudaPorAntiguedad: { hasta30: aging[0], de31a60: aging[1], de61a90: aging[2], masDe90: aging[3] },
+      conversionPlanes: { aceptado: Math.round(18400 * fa * parte), pendiente: Math.round(6200 * fa * parte), rechazado: Math.round(2100 * fa * parte) },
+      // Reparte la producción del mes (la misma del resumen) entre especialidades.
+      porEspecialidad: [["Ortodoncia", 0.271], ["Endodoncia", 0.239], ["Odontología general", 0.218], ["Rehabilitación", 0.174], ["Periodoncia", 0.057], ["Odontopediatría", 0.041]].map(([nombre, k]) => ({ nombre, produccion: Math.round(ranking.reduce((a, r) => a + r.produccion, 0) * k) })),
+      cartera: { nuevos: M.nuevos30(pacientes, citas).length, vencido: cart.vencido },
+      alertas: alertasDemo,
+    });
+    setRep({ funnel: { conversaciones: Math.round(46 * parte), agendadas: Math.round(19 * parte) } });
+    setPagos(pagosTodos);
+    setTratResumen([
+      // GER-03: servicios del catálogo único (Odontología general), mismos importes que el Top del mes.
+      ["Curación con resina", 44, 5280], ["Limpieza y profilaxis", 42, 3360], ["Reconstrucción estética", 14, 2520], ["Consulta / evaluación", 30, 1500],
+    ].map(([nombre, n, imp]) => ({ nombre, numeroDeVentas: Math.max(1, Math.round(n * fa * parte)), importeTotal: Math.round(imp * fa * parte) })));
+    setActividad([
+      ...deHoy.filter((c) => c.llegada).map((c) => ({ hora: c.hora, tipo: "Llegada", detalle: `${c.paciente} llegó a su cita` })),
+      ...pagosTodos.filter((pg) => pg.fecha === fecha).map((pg) => ({ hora: "—", tipo: "Cobro", detalle: `${pg.paciente} · S/ ${(Number(pg.monto)).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })),
+    ].sort((a, b) => String(a.hora).localeCompare(String(b.hora))));
+    setInventarioValorizado(valorInventario(demoDb?.inventario || [], { enSede: invPorSede ? (s) => enSede([s]) : null, costoDe: (it) => it.precio ?? it.costo ?? it.precioUnitario }));
+    setNSillones((demoDb?.sillones || SILLONES_DEMO).filter((x) => x.activo !== false && enSede([x.sede])).length);
+    setNSedes(verSedes ? verSedes.length : 2);
+  }, [demoDb, citasProp, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const recargar = useCallback(() => {
+    if (!conectado) { cargarDemo(); return; }
+    api.gerencial(sedesApi).then(setKd).catch(() => setKd({ error: true }));
+    api.gerencialIndicadores(sedesApi).then(setInd).catch(() => setInd({ errorDeCarga: true }));
+    api.gerencialReportes(sedesApi).then(setRep).catch(() => setRep({ errorDeCarga: true }));
+    const deSede = (x) => !verSedes || x?.sedeId == null || verSedes.some((v) => mismaSede(v, x.sedeId));
+    // Un 403 no es «S/ 0 cobrado»: se marca y la tarjeta dice «sin permiso».
+    api.pagos.listar().then((r) => { setPagosErr(null); setPagos((r || []).filter(deSede)); }).catch((e) => { setPagosErr(e?.status === 403 ? "sin permiso" : "no disponible"); setPagos([]); });
+    api.citas.listar(fecha, null, null, sedesApi).then((r) => { marcar("citas", false); setCitasHoy((r || []).filter(deSede)); }).catch(() => { marcar("citas", true); setCitasHoy([]); });
+    api.actividad(fecha).then((r) => setActividad(r || [])).catch(() => setActividad([]));
+    const d = new Date();
+    const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    // Todas las áreas y solo las sedes que se ven (antes: área «Odontología general» fija y sin sede).
+    api.tratamientos.resumen(desde, fecha, { sedeIds: sedesApi })
+      .then((r) => { marcar("trat", false); setTratResumen(r || []); })
+      .catch(() => { marcar("trat", true); setTratResumen([]); });
+    api.pacientes.resumen().then((r) => { marcar("pacRes", false); setPacResumen(r || []); }).catch(() => { marcar("pacRes", true); setPacResumen([]); });
+    api.catalogo.servicios().then((r) => { marcar("serv", false); setServicios(Array.isArray(r) ? r : []); }).catch(() => { marcar("serv", true); setServicios([]); });
+    Promise.all([api.pacientes.listar(), api.pacientes.resumenCitas().catch(() => [])]).then(([ps, rc]) => {
+      const ult = {}; (Array.isArray(rc) ? rc : []).forEach((x) => { if (x && x.pacienteId) ult[x.pacienteId] = x.ultimaVisita || null; });
+      const todos = Array.isArray(ps) ? ps : [];
+      const visibles = todos.filter((p) => deSede({ sedeId: p.sedeRegistroId ?? null }));
+      marcar("dir", false);
+      // R6-07: los pacientes sin sede se ven en cada sede (como en el directorio); se cuentan aparte.
+      setDirPac({ ...carteraComoDirectorio(visibles, ult, fecha), ids: new Set(visibles.map((p) => String(p.id))), sinSede: visibles.filter((p) => p.sedeRegistroId == null).length });
+      setPacSede(new Map(todos.map((p) => [String(p.id), sedeDePacienteObj(p)])));
+    }).catch(() => { marcar("dir", true); setDirPac(null); setPacSede(null); });
+    // R6-03: deuda por sede con GET /caja (porCobrar y terminados traen la sede de cada fila).
+    api.caja({ sedeIds: sedesApi }).then((r) => { const ok = r && typeof r === "object" && !Array.isArray(r); setCajaRes(ok ? r : null); setCajaErr(!ok); }).catch(() => { setCajaRes(null); setCajaErr(true); });
+    // R6-02: horario de los doctores, para saber la meta y el equipo de la sede elegida.
+    api.disponibilidad.listar().then((r) => setDispMed(Array.isArray(r) && r.length ? r : null)).catch(() => setDispMed(null));
+    // R6-08: los chats de WhatsApp solo si el rol puede verlos (gerencia no: usa la cifra del servidor).
+    if (tienePermiso("whatsapp", "ver")) api.conversaciones.listar().then((r) => setConvs(Array.isArray(r) ? r : null)).catch(() => setConvs(null));
+    else setConvs(null);
+    // R8-06: solo el almacén de las sedes que se ven; los insumos sin sede van aparte.
+    api.inventario.listar(sedesApi).then((rows) => {
+      const v = valorInventario(rows, { enSede: invPorSede ? (s) => verSedes.some((x) => mismaSede(x, s)) : null });
+      setInventarioValorizado(v.total == null ? null : v);
+    }).catch(() => setInventarioValorizado(null));
+    // R8-07: la ficha de los doctores (sus sedes, si el servidor las manda) para el equipo y la meta de la sede.
+    api.catalogo.medicos().then((r) => setMedsPanel(Array.isArray(r) ? r : null)).catch(() => setMedsPanel(null));
+    sillonesPorSede(null).then((rows) => {
+      setNSillones(Array.isArray(rows) ? rows.filter((x) => deSede({ sedeId: x.sedeId ?? x.sede })).length : null);
+    }).catch(() => setNSillones(null));
+    api.sedes.listar().then((rows) => {
+      setSedesRows(Array.isArray(rows) ? rows : []);
+      setNSedes(verSedes ? verSedes.length : Array.isArray(rows) ? rows.length : null);
+    }).catch(() => setNSedes(null));
+  }, [conectado, fecha, citasProp, cargarDemo, claveSedes, sedeCx.sede]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { recargar(); }, [recargar]);
+  const reintentar = useCallback(() => { setNRecarga((n) => n + 1); recargar(); }, [recargar]);
+  // Bloques sin dato del servidor (solo con sesión: la demostración no falla).
+  const indErr = conectado && !!ind?.errorDeCarga;
+  const citasErr = conectado && !!fallo.citas;
+  const tratErr = conectado && !!fallo.trat;
+  const espErr = conectado && (!!fallo.trat || !!fallo.serv);
+  const carteraErr = conectado && (!!fallo.pacRes || !!fallo.dir);
+  const kpisErr = conectado && !!kd?.error;
+  const nd = (props) => <NoDisponible onReintentar={reintentar} {...props} />;
+
+  // Jornada de hoy: del horario de la clínica (o de la sede elegida). Con sesión y sin
+  // horario cargado no se supone uno; en la demostración vale el horario por defecto.
+  // La demostración conserva su jornada de ejemplo (08:00–20:00, 12 franjas).
+  const horarioReal = horarioClinica?.horario || {};
+  const sinHorario = conectado && !horarioConfigurado(horarioReal);
+  const jornada = !conectado ? { abierta: true, abre: "08:00", cierra: "20:00" } : sinHorario ? null
+    : jornadaClinica(horarioDeSede(horarioReal, sede && sede !== "all" ? sede : null), horarioClinica?.feriados || [], fecha);
+  const jAbre = jornada?.abierta ? horaDecimal(jornada.abre) : null;
+  const jCierra = jornada?.abierta ? horaDecimal(jornada.cierra) : null;
+  const rangoCaja = jAbre != null && jCierra != null && jCierra > jAbre ? { abre: jAbre, cierra: jCierra } : null;
+  const horasJornada = jornada?.abierta ? horasEntre(jornada.abre, jornada.cierra) : [];
+  const rotuloJornada = sinHorario ? "horario sin configurar"
+    : !jornada?.abierta ? "hoy no abre"
+    : `${jornada.abre}–${jornada.cierra} · en vivo`;
+
+
+  const meta = metaEstado(kd?.hayMeta, kd?.metaMensualClinica);
+  // H-G3: con sesión, lo mismo que «Producción del mes» y el Top de tratamientos.
+  const prodMes = conectado ? totalResumen(tratResumen) : (Number(kd?.ingresosMes) || 0);
+  // «Top del equipo» (Resumen del mes) recibe también la producción sin odontólogo asignado.
+  const kdResumen = useMemo(() => (kd && !kd.error ? { ...kd, ranking: rankingConSinAsignar(kd.ranking, prodMes) } : kd), [kd, prodMes]);
+  // R6-02: /gerencial/kpis ya trae la producción y los atendidos de hoy de la sede elegida.
+  const prodDia = Number(kd?.produccionDia) || 0;
+  const atendidosApi = kd?.pacientesAtendidosHoy;
+  const atendidos = atendidosApi != null
+    ? Number(atendidosApi) || 0
+    : distinctPatients(citasHoy, "atendida");
+  // R6-12: una cita cancelada no está «en agenda» (la única de hoy, cancelada, salía como
+  // «1 cita en agenda · 0 de 1 atendidas» con Pendientes diciendo que no hay citas).
+  const citasAgenda = citasHoy.filter((c) => c.estado !== "cancelada");
+  // R6-02 / R8-07: doctores que atienden en la sede elegida (meta y equipo de la sede), con la
+  // regla de Metas: las sedes de su ficha si el servidor las manda; si no, su horario.
+  const medicosSede = !sedeElegida ? null : dispMed === undefined ? undefined : medicosEnSedes(dispMed, verSedes, mismaSede, medsPanel);
+  // R6-03: deuda de las sedes que se ven, con GET /caja (null si no se pudo o el servidor no
+  // manda «terminados»: entonces vale la de /gerencial/indicadores, con su rótulo).
+  const deudaCaja = useMemo(() => (conectado && cajaRes
+    ? M.deudaDeCaja(cajaRes, { hoy: fecha, incluir: (sid) => sid == null || !verSedes || verSedes.some((v) => mismaSede(v, sid)) })
+    : null), [conectado, cajaRes, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dMes = deltaPct(kd?.ingresosMes, kd?.ingresosMesAnterior);
+  const ritmo = diaDelMesRitmo();
+  const avanceMeta = !meta.vacia && meta.meta > 0 ? (prodMes / meta.meta) * 100 : 0;
+
+  const pagosHoy = useMemo(
+    () => (pagos || []).filter((p) => String(p.creadoEn || p.fecha || "").slice(0, 10) === fecha),
+    [pagos, fecha],
+  );
+  const cobradoHoy = pagosHoy.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+  // Sin cobros no hay ticket medio (null → «—»), no S/ 0.00.
+  const ticketMedio = pagosHoy.length ? cobradoHoy / pagosHoy.length : null;
+  const curva = useMemo(() => curvaCajaAcumulada(pagosHoy, fecha, rangoCaja || undefined), [pagosHoy, fecha, rangoCaja?.abre, rangoCaja?.cierra]); // eslint-disable-line react-hooks/exhaustive-deps
+  const funnel = rep?.funnel || {};
+  const waAgendadas = Number(funnel.agendadas) || 0;
+  // R6-08: el servidor reparte los chats por paciente y cuenta algunos en dos sedes (San Isidro
+  // 5 + Surco 6 con 8 en total). Con permiso de WhatsApp se cuentan aquí, cada chat en una sola
+  // sede (la regla de la bandeja de WhatsApp) y los que no tienen sede aparte; la ventana es la
+  // del servidor: actividad en los últimos 30 días.
+  const waChats = useMemo(() => {
+    if (!conectado || !convs) return null;
+    const sedeDePac = (c) => {
+      const conSede = (c.pacientes || []).find((p) => sedeDePacienteObj(p) != null);
+      if (conSede) return sedeDePacienteObj(conSede);
+      const pid = c.pacienteId || ((c.pacientes || []).length === 1 ? c.pacientes[0].id : null);
+      return pid && pacSede ? pacSede.get(String(pid)) ?? null : null;
+    };
+    const sedeDe = (c) => sedeDeConversacion(c, { sedes: sedesRows, sedeDePaciente: sedeDePac, igual: mismaSede }).sedeId;
+    return contarChatsPorSede(convs, { desde: M.sumarDias(fecha, -30), sedeDe, enSede: verSedes ? (s) => verSedes.some((v) => mismaSede(v, s)) : null });
+  }, [conectado, convs, pacSede, sedesRows, fecha, claveSedes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const waConversaciones = waChats ? waChats.deSedes + (sedeElegida ? 0 : waChats.sinSede) : Number(funnel.conversaciones) || 0;
+
+  // R6-03: con /caja, la antigüedad es la del trabajo terminado sin cobrar de las sedes que se
+  // ven (lo mismo que «Hecho sin pagar» de Más reportes y «Listo para cobrar» de Caja), tramo
+  // por tramo. R7-07: con sesión no se usa la de /gerencial/indicadores (otro criterio y sin
+  // sede): si /caja falla, «No disponible · Reintentar»; antes salía en silencio S/ 1 990 de
+  // toda la clínica, con su alerta «saldo vencido +60 días». La demostración sigue con la suya.
+  const deuda = conectado ? {} : (ind?.deudaPorAntiguedad || {});
+  // Cargando = aún no responde GET /caja. Si respondió sin «terminados» (deudaDeCaja da null)
+  // es un fallo más: antes se quedaba para siempre en «Leyendo Caja…».
+  const cajaCargando = conectado && !cajaRes && !cajaErr;
+  const tramosCaja = deudaCaja ? deudaCaja.tramos.map((t) => t.v) : null;
+  const agingItems = [
+    { nom: "Corriente · 0–30 días", valor: tramosCaja ? tramosCaja[0] : Number(deuda.hasta30) || 0, color: "var(--dc-ok-700)" },
+    { nom: "31–60 días", valor: tramosCaja ? tramosCaja[1] : Number(deuda.de31a60) || 0, color: "var(--dc-amber-ink)" },
+    { nom: "61–90 días", valor: tramosCaja ? tramosCaja[2] : Number(deuda.de61a90) || 0, color: "var(--dc-warn-700)" },
+    { nom: "+90 días · riesgo", valor: tramosCaja ? tramosCaja[3] : Number(deuda.masDe90) || 0, color: "var(--dc-danger-700)" },
+  ].map((it, i) => ({ ...it, filas: deudaCaja ? deudaCaja.tramos[i].items : null }));
+  const agingTotal = agingItems.reduce((s, x) => s + x.valor, 0);
+  const agingErr = conectado ? (!deudaCaja && !cajaCargando) : indErr;
+
+  // Requiere acción: con /caja, el aviso de saldos vencidos es el de la sede (trabajo terminado
+  // hace más de 30 días sin cobrar); el del servidor («N pacientes con saldo vencido +60 días»,
+  // de toda la clínica y con otra regla) se reemplaza. Lo demás (stock, evoluciones…) sigue
+  // siendo de toda la clínica: con una sede elegida cada uno lleva su rótulo.
+  const esAlertaSaldo = (a) => /saldo|vencid|deuda/i.test(`${a?.titulo || ""} ${a?.tipo || ""}`);
+  // R7-07: con sesión el aviso de saldos es siempre el de Caja; el del servidor usa otra regla
+  // y, si Caja no carga, contradecía al bloque de antigüedad.
+  const alertasSrv = indErr ? [] : (ind?.alertas || []).filter((a) => !((deudaCaja || conectado) && esAlertaSaldo(a))).map((a) => ({ ...a, _toda: sedeElegida }));
+  const alertaCaja = deudaCaja && deudaCaja.conVencido.length ? [{
+    tipo: "accion", severidad: "alta",
+    titulo: `${pluralEs(deudaCaja.conVencido.length, "paciente", "pacientes")} con trabajo terminado sin cobrar hace más de 30 días`,
+    detalle: deudaCaja.conVencido.map((f) => f.paciente).slice(0, 3).join(", "),
+    monto: deudaCaja.vencido,
+  }] : [];
+  const alertas = [...alertaCaja, ...alertasSrv];
+  const conv = ind?.conversionPlanes || {};
+  const aceptado = Number(conv.aceptado) || 0;
+  const rechazado = Number(conv.rechazado) || 0;
+  const pendiente = Number(conv.pendiente) || 0;
+  // R5-14: el 100 % es lo presupuestado vigente, como lo cuenta el servidor (presupuestado =
+  // aceptado + sin respuesta; tasa = aceptado ÷ presupuestado). Lo rechazado va aparte: antes
+  // se sumaba y, con planes rechazados, la tarjeta daba S/ 4 861 y 38 % con el servidor en
+  // S/ 4 380 y 42,2 %.
+  const propuesto = Number(conv.presupuestado) > 0 ? Number(conv.presupuestado) : aceptado + pendiente;
+  const tasaAceptacion = conv.tasa != null && Number.isFinite(Number(conv.tasa)) ? Number(conv.tasa) : (propuesto ? (aceptado / propuesto) * 100 : 0);
+  // H-G4: con sesión, el resumen de tratamientos del mes repartido por la especialidad de
+  // cada servicio del catálogo: suma lo mismo que «Producción del mes» y que «Producción por
+  // tratamiento». indicadores.porEspecialidad contaba citas (canceladas y futuras incluidas).
+  const espRaw = conectado
+    ? produccionPorEspecialidad(tratResumen, servicios || [])
+    : (ind?.porEspecialidad || []).map((e) => ({
+      nombre: e.nombre || e.especialidad || "—",
+      valor: Number(e.produccion ?? e.ingresos ?? e.monto ?? 0) || 0,
+    }));
+  const espTotal = espRaw.reduce((s, e) => s + e.valor, 0);
+
+  const tratList = Array.isArray(tratResumen) ? tratResumen : [];
+  const tratTotal = tratList.reduce((s, t) => s + (Number(t.importeTotal) || 0), 0);
+  const tratSorted = [...tratList].sort((a, b) => (Number(b.importeTotal) || 0) - (Number(a.importeTotal) || 0));
+
+  const cartera = ind?.cartera || {};
+  // /pacientes/resumen no trae la sede: con una sede elegida se queda con los pacientes del
+  // directorio de esa sede (la misma regla que la Cartera).
+  const pacs = useMemo(() => (Array.isArray(pacResumen) ? pacResumen : []).filter((p) => !sedeElegida || !dirPac || dirPac.ids.has(String(p.pacienteId ?? p.id))), [pacResumen, sedeElegida, dirPac]);
+  const conSaldo = pacs.filter((p) => Number(p.saldo) > 0);
+  // Ejes del cubo a la medida de los pacientes que se dibujan.
+  const escCubo = useMemo(() => (conectado ? escalaCubo(pacs) : ESCALA_CUBO_DEF), [pacs, conectado]);
+  // Sin pacientes no hay rango que contar (no se muestran los topes por defecto como si fueran datos).
+  const ejeCubo = (txt) => (pacs.length || !conectado ? txt : "sin pacientes aún");
+  const saldoMayor = conSaldo.reduce((m, p) => Math.max(m, Number(p.saldo) || 0), 0);
+
+  // Con una sede elegida, los doctores de esa sede y quien atendió en ella (el servidor manda a todos).
+  const rankingBase = sedeElegida ? equipoDeSede(kd?.ranking, medicosSede || null) : (kd?.ranking || []);
+  // Equipo: orden en el encabezado, igual que el resto de tablas del sistema.
+  const colsEquipo = useMemo(() => [
+    { key: "nombre", label: "Odontólogo", get: (r) => r.nombre || r.medico || "" },
+    { key: "estado", label: "Estado", get: (r) => (Number(r.produccion) > 0 ? "Facturó" : "Sin actividad") },
+    { key: "citas", label: "Citas", get: (r) => String(r.citas ?? r.atendidas ?? 0), sortVal: (r) => Number(r.citas ?? r.atendidas ?? 0) || 0 },
+    { key: "prod", label: "Producción", get: (r) => String(r.produccion || 0), sortVal: (r) => Number(r.produccion) || 0 },
+    { key: "meta", label: "Meta del mes", get: (r) => String(r.meta || 0), sortVal: (r) => Number(r.meta) || 0 },
+  ], []);
+  const { lista: ranking, st: stEq } = useFiltroTabla(rankingBase, colsEquipo, null);
+
+  const enSillon = citasHoy.filter((c) => c.estado === "en_atencion").length;
+  const cobradas = citasHoy.filter((c) => c.estado === "atendida").length;
+  // Franjas = horas de la jornada de hoy (antes 12 fijas); ocupadas = horas con alguna cita.
+  const franjas = horasJornada.length;
+  const horasConCita = new Set(citasHoy.filter((c) => c.estado !== "cancelada").map((c) => parseInt(String(c.hora || ""), 10)).filter((h) => horasJornada.includes(h)));
+  // Demostración: como antes, una franja por cita (hasta 12).
+  const ocupadas = conectado ? horasConCita.size : Math.min(franjas, citasAgenda.length);
+  const sillonesLibres = nSillones != null
+    ? Math.max(0, nSillones - enSillon)
+    : null;
+  // H-G14: con sesión el total y los nuevos salen como en el directorio de Pacientes.
+  const totalCartera = conectado && dirPac ? dirPac.total : pacs.length;
+  const conSaldoCartera = conectado && dirPac ? conSaldo.filter((p) => dirPac.ids.has(String(p.pacienteId ?? p.id))) : conSaldo;
+  const alDia = Math.max(0, (totalCartera || 0) - conSaldoCartera.length);
+  const nuevos30 = conectado && dirPac ? dirPac.nuevos30 : Number(cartera.nuevos ?? cartera.sinAtender) || pacs.filter((p) => {
+    const u = p.ultimaCita || p.creadoEn || p.fechaAlta;
+    if (!u) return false;
+    const t = new Date(String(u).slice(0, 10)).getTime();
+    if (!Number.isFinite(t)) return false;
+    return (Date.now() - t) <= 30 * 86400000;
+  }).length;
+  // Rótulo de lo que, con una sede elegida, sigue siendo de toda la clínica (sale de
+  // /gerencial/indicadores, que no lo filtra por sede: alertas y, sin /caja, la deuda).
+  const todaClinica = sedeElegida ? <span className="dc-pg__toda" title="Cifra de toda la clínica: el servidor aún no la filtra por sede.">toda la clínica</span> : null;
+  const subHead = [
+    nSedes != null ? `${nSedes} sede${nSedes === 1 ? "" : "s"}` : null,
+    "datos al día de hoy",
+  ].filter(Boolean).join(" · ");
+  // Sin horario o sin sillones, el botón a Configuración (solo si el rol puede verla).
+  const verConfig = tienePermiso("config", "ver");
+  // Cubo de pacientes: en celular va esta lista (a quién llamar primero) en lugar del cubo 3D.
+  const paraLlamar = [...conSaldo].sort((a, b) => (Number(b.saldo) || 0) - (Number(a.saldo) || 0)).slice(0, 5);
+  const fichaLlamada = (p) => abrir({
+    t: p.nombre || "Paciente",
+    s: "Prioridad de llamada",
+    cifra: moneyFmt(p.saldo),
+    sub: "Dejó dinero y hace tiempo que no viene.",
+    cols: [["Campo"], ["Valor"]],
+    filas: [
+      ["Última cita", fechaLegible(p.ultimaCita)],
+      ["Acumulado", moneyFmt(p.importeAcumulado)],
+      ["Visitas", String(p.numeroDeCitas ?? 0)],
+    ],
+    tono: "riesgo",
+  });
+
+  const guardarMeta = async () => {
+    if (!metaEdit?.id) return;
+    const n = Number(metaVal);
+    try {
+      await api.catalogo.fijarMeta(metaEdit.id, Number.isFinite(n) && n > 0 ? n : null);
+      setMetaEdit(null);
+      setMetaVal("");
+      recargar();
+    } catch (_) {
+      /* notify via silent fail — panel stays */
+    }
+  };
+
+  const fichaMeta = () => abrir({
+    t: "Meta del mes",
+    s: "Suma de las metas de los odontólogos activos",
+    cifra: meta.vacia ? meta.label : meta.label,
+    parte: meta.vacia ? undefined : `${avanceMeta.toFixed(1)}%`,
+    sub: meta.vacia
+      ? "Todavía no hay metas configuradas en el equipo."
+      : `Faltan ${moneyFmt(Math.max(0, meta.meta - prodMes))} para llegar.`,
+    como: "La meta de la clínica es la suma de las metas mensuales de cada odontólogo activo. El avance es la producción del mes dividido entre esa meta.",
+    cols: [["Odontólogo"], ["Meta", "n"]],
+    filas: ranking.map((r) => [r.nombre || r.medico || "—", r.meta != null ? moneyFmt(r.meta) : "Sin meta"]),
+    vacio: "Ningún odontólogo tiene meta.",
+    falta: meta.vacia ? "Define la meta mensual en la ficha de cada odontólogo (Configuración › Doctores)." : undefined,
+    fuente: meta.vacia ? undefined : "Producción del mes cruzada con las metas del equipo.",
+    tono: meta.vacia ? "aviso" : "brand",
+  });
+
+  return (
+    <div className="dc-pg">
+      {/* R6-02: ya no va el aviso general de cifras sin filtrar por sede: el servidor filtra
+          kpis, tratamientos y comisiones. Lo poco que sigue sin filtrar lleva su propio
+          rótulo «toda la clínica». */}
+      {/* Estado y ayuda del panel en la misma línea del título del mes: sin fila extra. */}
+      <ResumenMes kd={kdResumen} sedes={verSedes} sedesApi={sedesApi} recarga={nRecarga} onReintentar={reintentar} medicosSede={medicosSede} acciones={<div className="dc-head-acc" title={subHead}>
+          <button type="button" className="dc-rm__ib" aria-label="Actualizar" title="Actualizar datos" onClick={reintentar}><RefreshCw size={15} strokeWidth={2} /></button>
+          <button type="button" className="dc-rm__ib" aria-label="Qué mide cada gráfico" title="Qué mide cada gráfico" onClick={() => abrir({
+            t: "Qué mide cada gráfico",
+            s: "Índice del panel",
+            cifra: "11",
+            parte: "módulos",
+            sub: "De la meta del mes al equipo, en el orden en que mira un gerente.",
+            como: "El orden responde a cómo se mira la clínica: primero el día, luego lo que cuesta dinero, luego el mes, luego los pacientes, luego el equipo.",
+            cols: [["Módulo"], ["Pregunta"]],
+            filas: [
+              ["Meta del mes", "¿A dónde tengo que llegar?"],
+              ["Producción", "¿Dónde voy / qué hice hoy?"],
+              ["Caja del día", "¿Cuánto entró a caja?"],
+              ["Requiere acción", "¿Qué no puedo dejar para mañana?"],
+              ["Equipo", "¿Quién aporta y a qué ritmo?"],
+            ],
+            tono: "cian",
+          })}>
+            <Info size={15} strokeWidth={2} />
+          </button>
+        </div>} />
+
+
+      {/* Caja | Hoy en la clínica. Sin cobros, la Caja no se estira hasta la altura de su vecina. */}
+      <div className={`dc-grid g-2a${pagosHoy.length ? "" : " g-alto-libre"}`}>
+        <section className="dc-card">
+          <div className="dc-card__head">
+            <span className="vin" style={{ background: "var(--g1)" }} />
+            <h2>Caja del día</h2>
+            <span className="dc-card__meta">{rotuloJornada}</span>
+            <button type="button" className="dc-info" aria-label="Detalle de caja"
+              onClick={() => abrir({
+                t: "Caja del día",
+                s: "Cobros acumulados de la jornada",
+                cifra: moneyFmt(cobradoHoy),
+                parte: pluralEs(pagosHoy.length, "cobro", "cobros"),
+                sub: "La curva nunca decrece: cada cobro suma.",
+                como: "Suma acumulada de los pagos del día ordenados por hora. Cada cobro añade un punto y estira la línea.",
+                micro: [["Ticket medio", ticketMedio == null ? "—" : moneyFmt(ticketMedio)], ["Cobros del día", String(pagosHoy.length)]],
+                cols: [["Hora"], ["Concepto"], ["Monto", "n"]],
+                filas: pagosHoy.map((p) => [
+                  String(p.creadoEn || "").slice(11, 16) || "—",
+                  p.concepto || p.metodo || "Cobro",
+                  moneyFmt(p.monto),
+                ]),
+                total: moneyFmt(cobradoHoy),
+                fuente: "Pagos registrados hoy. Cobrado del periodo y tasa de cobro viven en Producción y comisiones.",
+                tono: "cian",
+              })}>i</button>
+          </div>
+          <div className="dc-card__body dc-card__body--alto">
+            <dl className="dc-datos">
+              <div><dt>Cobrado hoy</dt><dd style={tinta(cobradoHoy, "var(--g1)")} title={pagosErr && conectado ? `Cobros ${pagosErr}` : undefined}>{pagosErr && conectado ? "—" : moneyFmt(cobradoHoy)}</dd></div>
+              <div><dt>Cobros</dt><dd>{pagosErr && conectado ? (pagosErr === "sin permiso" ? "sin permiso" : nd()) : pagosHoy.length}</dd></div>
+              <div><dt>Ticket medio</dt><dd title={ticketMedio == null && !(pagosErr && conectado) ? "Sin cobros hoy no hay ticket medio: es lo cobrado entre el número de cobros." : undefined}>{ticketMedio == null ? "—" : moneyFmt(ticketMedio)}</dd></div>
+            </dl>
+            {/* Sin cobros no hay curva que dibujar: una línea lo dice (antes, una raya en cero y «S/ 0.00» fuera del borde). */}
+            {pagosHoy.length ? (
+              <CanvasCaja puntos={curva} abre={rangoCaja?.abre ?? 8} cierra={rangoCaja?.cierra ?? 20} onOpen={() => abrir({
+                t: "Caja del día", s: "Curva acumulada", cifra: moneyFmt(cobradoHoy),
+                como: "Cada cobro añade un punto a la línea.", cols: [["Monto", "n"]], filas: [[moneyFmt(cobradoHoy)]], tono: "cian",
+              })} />
+            ) : !(pagosErr && conectado) && <div className="dc-vacio-mod">Aún no hay cobros hoy.</div>}
+          </div>
+        </section>
+
+        {/* Hoy en la clínica: lo del día que mira un gerente (producción, pacientes,
+            sillones y cómo va la agenda). Reemplaza al registro de eventos, que es
+            operativo y vive en Auditoría. */}
+        <section className="dc-card dc-hoy">
+          <div className="dc-card__head">
+            <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
+            <h2>Hoy en la clínica</h2>
+            {/* Sin la nota «N citas en agenda»: repetía «X de N citas atendidas» de abajo y
+                empujaba «Ver agenda» a otra línea. */}
+            <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={() => { window.location.hash = "#/agenda"; }}>Ver agenda</button>
+          </div>
+          <div className="dc-card__body">
+            <div className="dc-hoy__kpis">
+
+        <div className="dc-hoy__t" role="button" tabIndex={0}
+          onClick={() => abrir({
+            t: "Producción del día",
+            s: "Valor de lo producido hoy",
+            cifra: moneyFmt(prodDia),
+            sub: "Producción no es cobro: lo cobrado son los pagos registrados en Caja.",
+            como: "Producción = valor de los procedimientos terminados (criterio acordado con la clínica). El servidor todavía calcula la del día con las citas atendidas de hoy.",
+            cols: [["Paciente"], ["Estado"]],
+            filas: citasHoy.filter((c) => c.estado === "atendida").map((c) => [c.paciente || c.pacienteNombre || "—", "Atendida"]),
+            vacio: "Aún no hay citas atendidas hoy.",
+            fuente: "Citas de hoy en estado atendida.",
+            tono: "ok",
+          })}>
+          <span className="dc-hoy__ico" style={{ background: "var(--dc-ok-100)", color: "var(--dc-ok-700)" }} aria-hidden="true">$</span>
+          <div className="dc-hoy__tb">
+            <div className="dc-hoy__tl">Producción del día</div>
+            <div className="dc-hoy__tv">{kpisErr ? "—" : moneyFmt(prodDia)}</div>
+            <div className="dc-hoy__ts">{citasErr ? "Agenda no disponible" : !citasAgenda.length ? "Sin citas hoy" : <>{citasHoy.filter((c) => c.estado === "atendida").length} de {pluralEs(citasAgenda.length, "cita", "citas")} atendidas</>}</div>
+          </div>
+        </div>
+
+        <div className="dc-hoy__t" role="button" tabIndex={0}
+          onClick={() => abrir({
+            t: "Pacientes atendidos hoy",
+            s: "Personas distintas, no citas",
+            cifra: String(atendidos),
+            sub: "Un paciente con dos citas el mismo día cuenta una sola vez.",
+            como: "Citas de hoy en estado atendida, contando pacientes distintos.",
+            cols: [["Paciente"], ["Citas"]],
+            filas: (() => {
+              const map = new Map();
+              citasHoy.filter((c) => c.estado === "atendida").forEach((c) => {
+                const k = String(c.pacienteId ?? c.paciente ?? "");
+                map.set(k, (map.get(k) || 0) + 1);
+              });
+              return [...map.entries()].map(([k, n]) => {
+                const c = citasHoy.find((x) => String(x.pacienteId ?? x.paciente) === k);
+                return [c?.paciente || c?.pacienteNombre || k, String(n)];
+              });
+            })(),
+            vacio: "Nadie atendido aún hoy.",
+            tono: "cian",
+          })}>
+          <span className="dc-hoy__ico" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">✓</span>
+          <div className="dc-hoy__tb">
+            <div className="dc-hoy__tl">Pacientes atendidos hoy</div>
+            <div className="dc-hoy__tv">{atendidosApi == null && citasErr ? "—" : atendidos}</div>
+            <div className="dc-hoy__ts">{citasErr ? "Agenda no disponible" : `${enSillon} en sillón ahora`}</div>
+          </div>
+        </div>
+        <ResumenOcupacion variante="hoy" sedes={verSedes} onVer={() => { window.location.hash = "#/reportes_ocs"; }} />
+            </div>
+            {citasErr ? <div className="dc-hoy__est"><p className="dc-rotulo">Cómo va la agenda de hoy</p>{nd({ bloque: true, detalle: "No se pudieron leer las citas de hoy." })}</div>
+              : !citasHoy.length ? <div className="dc-hoy__est"><p className="dc-rotulo">Cómo va la agenda de hoy</p><div className="dc-vacio-mod">Sin citas hoy.</div></div> : (() => {
+              const est = [
+                ["Atendidas", citasHoy.filter((c) => c.estado === "atendida").length, "var(--dc-ok-700)"],
+                ["En sillón", enSillon, "var(--dc-accent-cyan)"],
+                ["Por atender", citasHoy.filter((c) => ["pendiente", "confirmada", "reprogramada"].includes(c.estado)).length, "#6D4FD1"],
+                ["No asistieron", citasHoy.filter((c) => c.estado === "no_show").length, "var(--dc-danger-700)"],
+                ["Canceladas", citasHoy.filter((c) => c.estado === "cancelada").length, "var(--dc-warn-600)"],
+              ];
+              const tot = citasHoy.length;
+              return (
+                <div className="dc-hoy__est">
+                  <p className="dc-rotulo">Cómo va la agenda de hoy</p>
+                  {est.map(([l, n, col]) => (
+                    <div key={l} className={`dc-hoy__fila${n ? "" : " is-cero"}`}>
+                      <span>{l}</span>
+                      <i><u style={{ width: `${(n / tot) * 100}%`, background: col }} /></i>
+                      <b>{n}</b>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </section>
+      </div>
+
+      {/* Requiere acción */}
+      <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
+        <div className="dc-card__head">
+          {/* Rojo solo con asuntos abiertos: con 0, el punto va en gris. */}
+          <span className="vin" style={{ background: !indErr && alertas.length ? "var(--dc-danger-700)" : "var(--dc-ink-400)" }} />
+          <h2>Requiere acción</h2>
+          <span className="dc-card__meta">{indErr ? nd() : `${pluralEs(alertas.length, "asunto abierto", "asuntos abiertos")}`}</span>
+          <button type="button" className="dc-info" aria-label="Asuntos"
+            onClick={() => abrir({
+              t: "Requiere acción",
+              s: "Lo que no puede esperar",
+              cifra: indErr ? "—" : String(alertas.length),
+              parte: indErr ? undefined : alertas.length === 1 ? "asunto" : "asuntos",
+              // La explicación de la antigüedad de la deuda vive aquí, no en la tarjeta.
+              como: deudaCaja
+                ? `Trabajo terminado hace más de 30 días sin cobrar (de Caja, por la sede que se ve), stock bajo y evoluciones pendientes. Los asuntos marcados «toda la clínica» el servidor aún no los separa por sede. La antigüedad de la deuda es el trabajo terminado sin cobrar, por días desde que se terminó; ${deudaCaja.saldoPlanes > 0 ? `el saldo de los planes en Caja (${moneyFmt(deudaCaja.saldoPlanes)}, ${pluralEs(deudaCaja.pacientesConSaldo, "paciente", "pacientes")}) incluye lo que falta hacer y va aparte.` : "Caja no tiene saldos de planes por cobrar."}`
+                : "Saldos vencidos, cajas abiertas, stock bajo y evoluciones pendientes.",
+              cols: [["Asunto"], ["Detalle"]],
+              filas: alertas.map((a) => [`${a.titulo || a.tipo || "—"}${a._toda ? " (toda la clínica)" : ""}`, a.detalle || a.mensaje || "—"]),
+              vacio: indErr ? "No se pudieron leer los asuntos abiertos del servidor." : "Sin asuntos abiertos.",
+              tono: "riesgo",
+            })}>i</button>
+        </div>
+        <div className="dc-card__body">
+          <div className="dc-split" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <div>
+              {indErr ? nd({ bloque: true, detalle: "No se pudieron leer los asuntos abiertos." })
+                : !alertas.length && <div className="dc-vacio-mod">Nada pendiente por ahora.</div>}
+              {alertas.map((a, i) => {
+                const riesgo = a.severidad === "alta" || /vencid|caja|cerrar|saldo/i.test(String(a.titulo || a.tipo || ""));
+                return (
+                  <div className="dc-pgacc" key={i} role="button" tabIndex={0}
+                    onClick={() => abrir({
+                      t: a.titulo || a.tipo || "Asunto",
+                      s: a.detalle || a.mensaje || "",
+                      cifra: a.monto != null ? moneyFmt(a.monto) : (a.cantidad != null ? String(a.cantidad) : "—"),
+                      como: "Alerta generada a partir del estado actual de la clínica.",
+                      cols: [["Campo"], ["Valor"]],
+                      filas: Object.entries(a).filter(([k]) => !["titulo", "tipo", "_toda"].includes(k)).slice(0, 6)
+                        .map(([k, v]) => [k, String(v)]),
+                      nota: a._toda ? "Asunto de toda la clínica: el servidor aún no lo separa por sede" : undefined,
+                      tono: riesgo ? "riesgo" : "aviso",
+                    })}>
+                    <span className="rail" style={{ background: riesgo ? "var(--dc-danger-700)" : "var(--dc-warn-600)" }} />
+                    <div className="dc-pgacc__txt">
+                      <h3>{a.titulo || a.tipo || "Asunto"}{a._toda && todaClinica}</h3>
+                      <p>{a.detalle || a.mensaje || ""}</p>
+                    </div>
+                    {/* La cifra del asunto va como dato y la acción como botón secundario, el mismo
+                        estilo de «Ver agenda» (antes, una pastilla de color con la cifra y la flecha).
+                        La cantidad no se repite si el título ya empieza por ella («1 liquidación…»). */}
+                    {(() => { const dest = destinoAlerta(a); const cif = a.monto != null ? moneyFmt(a.monto) : a.cantidad != null && !String(a.titulo || a.tipo || "").startsWith(`${a.cantidad} `) ? a.cantidad : a.chip; return <>
+                      {cif != null && <b className="dc-pgacc__cif">{cif}</b>}
+                      {dest && <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" aria-label={`${dest.label}: ${a.titulo || a.tipo || "asunto"}`} onClick={(e) => { e.stopPropagation(); window.location.hash = dest.hash; }}>{dest.label}</button>}
+                    </>; })()}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="dc-split__rule">
+              <p className="dc-rotulo">Antigüedad de la deuda{agingErr || cajaCargando || agingTotal <= 0 ? "" : ` · Total ${moneyFmt(agingTotal)}`}{!deudaCaja && !conectado && todaClinica}</p>
+              {agingErr ? nd({ bloque: true, texto: "No se pudo cargar", detalle: conectado ? "Sin el trabajo terminado de Caja no se sabe cuánto falta cobrar en cada tramo." : "Sin este dato no se sabe cuánto saldo hay en cada tramo." })
+                : cajaCargando ? <p className="dc-card__foot" style={{ margin: 0, padding: 0, border: 0 }}>Leyendo Caja…</p>
+                : agingTotal <= 0 ? <div className="dc-vacio-mod">Nada por cobrar.</div> : <>
+              <StackSegs items={agingItems} total={agingTotal} />
+              <div className="dc-leyenda">
+                {agingItems.map((it, i) => {
+                  const lay = layoutProgreso(it.valor, agingTotal);
+                  return (
+                    <div key={i} className={`fila${lay.dibujar ? "" : " cero"} clic`} role="button" tabIndex={0}
+                      onClick={() => abrir(deudaCaja ? {
+                        t: it.nom,
+                        s: "Trabajo terminado sin cobrar, por antigüedad",
+                        cifra: moneyFmt(it.valor),
+                        parte: lay.etiquetaPct,
+                        como: "Procedimientos terminados que aún no se cobran (en Caja, «Listo para cobrar»), por los días que pasaron desde que se terminaron. Lo pagado se descuenta de lo más antiguo.",
+                        cols: [["Paciente"], ["Procedimiento"], ["Días", "n"], ["Por cobrar", "n"]],
+                        filas: (it.filas || []).map((x) => [x.paciente || "—", x.nombre || "—", x.dias != null ? String(x.dias) : "—", moneyFmt(x.pendiente, { dec: 2 })]),
+                        vacio: "Nada por cobrar en este tramo.",
+                        total: moneyFmt(it.valor, { dec: 2 }),
+                        fuente: `Caja de ${sedeElegida ? "la sede elegida" : "las sedes que ves"}. Saldo de los planes: ${moneyFmt(deudaCaja.saldoPlanes, { dec: 2 })}, que incluye lo que falta hacer.`,
+                        tono: i >= 3 ? "riesgo" : i >= 1 ? "aviso" : "ok",
+                      } : {
+                        t: it.nom,
+                        s: "Tramo de antigüedad del saldo",
+                        cifra: moneyFmt(it.valor),
+                        parte: lay.etiquetaPct,
+                        como: "Saldo por cobrar agrupado según la fecha del cargo.",
+                        cols: [["Tramo"], ["Saldo", "n"]],
+                        filas: [[it.nom, moneyFmt(it.valor)]],
+                        total: moneyFmt(it.valor),
+                        nota: sedeElegida ? "Cifra de toda la clínica: el servidor aún no la filtra por sede" : undefined,
+                        tono: i >= 3 ? "riesgo" : i >= 1 ? "aviso" : "ok",
+                      })}>
+                      <i className="sw" style={{ background: lay.dibujar ? it.color : "var(--dc-line-alt, var(--dc-line))" }} />
+                      <span className="nm">{it.nom}</span>
+                      <span className="im">{moneyFmt(it.valor)}</span>
+                      <span className="pc">{lay.etiquetaPct}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              </>}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Especialidad | Planes: cada tarjeta con su altura (antes, ~280 px vacíos bajo las barras). */}
+      <div className="dc-grid g-2b g-alto-libre">
+        <section className="dc-card">
+          <div className="dc-card__head">
+            <span className="vin" style={{ background: "var(--g2)" }} />
+            <h2>Producción por especialidad</h2>
+            <span className="dc-card__meta">{espErr ? "—" : espTotal > 0 ? `Total ${moneyFmt(espTotal)}` : null}</span>
+            <button type="button" className="dc-info" aria-label="Especialidades"
+              onClick={() => abrir({
+                t: "Producción por especialidad",
+                s: "Cada barra es su parte del total",
+                cifra: moneyFmt(espTotal),
+                como: conectado
+                  ? "Los procedimientos del mes (la misma lista del Top de tratamientos) agrupados por la especialidad de su servicio en el catálogo. Suma lo mismo que «Producción del mes»."
+                  : "Se cruza la cita (con su especialidad) con lo producido.",
+                cols: [["Especialidad"], ["Importe", "n"], ["%", "n"]],
+                filas: espRaw.map((e) => [e.nombre, moneyFmt(e.valor), layoutProgreso(e.valor, espTotal).etiquetaPct]),
+                total: moneyFmt(espTotal),
+                tono: "aviso",
+              })}>i</button>
+          </div>
+          <div className="dc-card__body">
+            <div className="dc-barras">
+              {espErr ? nd({ bloque: true, detalle: "No se pudieron leer las ventas del mes o el catálogo de servicios." })
+                : !espRaw.length && <div className="dc-vacio-mod">Sin producción este mes.</div>}
+              {!espErr && espRaw.map((e, i) => (
+                <BarraFila key={e.nombre + i} nombre={e.nombre} valor={e.valor} total={espTotal}
+                  color={COLORES_ESP[i % COLORES_ESP.length]}
+                  onOpen={() => abrir({
+                    t: e.nombre, s: "Parte del total", cifra: moneyFmt(e.valor),
+                    parte: layoutProgreso(e.valor, espTotal).etiquetaPct,
+                    cols: [["Concepto"], ["Importe", "n"]], filas: [[e.nombre, moneyFmt(e.valor)]],
+                    tono: "cian",
+                  })} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="dc-card">
+          <div className="dc-card__head">
+            <span className="vin" style={{ background: "var(--g3)" }} />
+            <h2>Aceptación de planes</h2>
+            <span className="dc-card__meta">{indErr ? "—" : propuesto > 0 ? `${moneyFmt(propuesto)} presupuestado` : null}</span>
+            <button type="button" className="dc-info" aria-label="Planes"
+              onClick={() => abrir({
+                t: "Aceptación de planes",
+                s: "Reparto de lo presupuestado",
+                cifra: indErr ? "—" : moneyFmt(propuesto),
+                parte: indErr ? undefined : `${Math.round(tasaAceptacion)}% aceptado`,
+                como: "El 100 % es lo presupuestado vigente: lo aceptado más lo que espera respuesta, como lo cuenta el servidor. El porcentaje es lo aceptado entre ese total. Los planes rechazados no entran en el total; su porcentaje es sobre lo presupuestado. Lo sin contestar no está perdido: nadie lo ha rechazado todavía.",
+                cols: [["Estado"], ["Importe", "n"]],
+                filas: indErr ? [] : [
+                  ["Aceptado", moneyFmt(aceptado)],
+                  ["Sin respuesta", moneyFmt(pendiente)],
+                ],
+                vacio: "No se pudo leer la aceptación de planes del servidor.",
+                total: indErr ? null : moneyFmt(propuesto),
+                fuente: indErr ? undefined : `Rechazado, aparte: ${moneyFmt(rechazado)}.`,
+                tono: "morado",
+              })}>i</button>
+          </div>
+          <div className="dc-card__body">
+            {indErr ? nd({ bloque: true, detalle: "No se pudo leer cuánto se presupuestó y cuánto se aceptó." })
+              // Sin nada presupuestado no hay reparto: ni «0%» en verde ni una barra vacía.
+              : propuesto <= 0 ? <div className="dc-vacio-mod">{rechazado > 0 ? `Sin presupuestos vigentes · ${moneyFmt(rechazado)} rechazado.` : "Sin presupuestos vigentes."}</div> : <>
+            <div className="dc-acep">
+              <div><b style={tinta(tasaAceptacion, "var(--dc-ok-700)")}>{Math.round(tasaAceptacion)}%</b><span>de lo presupuestado ya fue aceptado</span></div>
+              <div><b>{moneyFmt(pendiente)}</b><span>esperan respuesta: llamar para cerrar</span></div>
+            </div>
+            <p className="dc-rotulo">Reparto de lo presupuestado</p>
+            <StackSegs
+              items={[
+                { valor: aceptado, color: "var(--g4)" },
+                { valor: pendiente, color: "var(--dc-line-alt, var(--dc-ink-200))" },
+              ]}
+              total={propuesto}
+            />
+            <div className="dc-leyenda">
+              {[
+                { nom: "Aceptado", valor: aceptado, color: "var(--g4)" },
+                { nom: "Sin respuesta", valor: pendiente, color: "var(--dc-line-alt, var(--dc-ink-200))" },
+              ].map((it) => {
+                const lay = layoutProgreso(it.valor, propuesto);
+                return (
+                  <div key={it.nom} className={`fila${lay.dibujar ? "" : " cero"}`}>
+                    <i className="sw" style={{ background: it.color }} />
+                    <span className="nm">{it.nom}</span>
+                    <span className="im">{moneyFmt(it.valor)}</span>
+                    <span className="pc">{lay.etiquetaPct}</span>
+                  </div>
+                );
+              })}
+              {/* Lo rechazado no es parte del 100 %: va aparte, con su % sobre lo presupuestado. */}
+              <div className={`fila${rechazado > 0 ? "" : " cero"}`} title="Aparte: no entra en el total. Su % es sobre lo presupuestado.">
+                <i className="sw" style={{ background: "transparent", border: "1px dashed var(--dc-line)" }} />
+                <span className="nm">Rechazado</span>
+                <span className="im">{moneyFmt(rechazado)}</span>
+                <span className="pc">{layoutProgreso(rechazado, propuesto).etiquetaPct}</span>
+              </div>
+            </div>
+            </>}
+          </div>
+        </section>
+      </div>
+
+      {/* Odontología general por tratamiento */}
+      <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
+        <div className="dc-card__head">
+          <span className="vin" style={{ background: "var(--g1)" }} />
+          <h2>{conectado ? "Producción por tratamiento" : "Odontología general · por tratamiento"}</h2>
+          <span className="dc-card__meta">{tratErr ? "—" : tratTotal > 0 ? `Total ${moneyFmt(tratTotal)}` : null}</span>
+          <button type="button" className="dc-info" aria-label="Tratamientos"
+            onClick={() => abrir({
+              t: "Por tratamiento",
+              s: conectado ? "Desglose del mes por tratamiento" : "Desglose de odontología general",
+              cifra: tratTotal > 0 ? moneyFmt(tratTotal) : "—",
+              como: "Agrupa las ventas por el servicio del catálogo vinculado a cada fase.",
+              cols: [["Tratamiento"], ["Ventas", "n"], ["Importe", "n"]],
+              filas: tratSorted.map((t) => [t.nombre || "—", String(t.numeroDeVentas ?? 0), moneyFmt(t.importeTotal)]),
+              vacio: "Aún no hay ventas enlazadas a un servicio del catálogo.",
+              falta: tratTotal <= 0
+                ? "Al crear una fase desde el catálogo hay que guardar también el servicio elegido. Las ventas nuevas empezarán a acumularse solas."
+                : undefined,
+              tono: "cian",
+            })}>i</button>
+        </div>
+        <div className="dc-card__body">
+          {/* Qué falta para tener el desglose lo explica el botón «i». */}
+          {tratErr ? nd({ bloque: true, detalle: "No se pudieron leer las ventas del mes por tratamiento." }) : tratTotal <= 0 ? (
+            <div className="dc-vacio-mod">Aún no hay ventas enlazadas al catálogo.</div>
+          ) : (
+            // Con un solo tratamiento no va «Para la campaña»: «El que más vendes» repetía la única
+            // barra (y el Top de tratamientos de arriba).
+            <div className={tratSorted.length > 1 ? "dc-split dc-split--trat" : undefined} style={tratSorted.length > 1 ? { gridTemplateColumns: "minmax(0, 1.15fr) minmax(0, 1fr)" } : undefined}>
+              <div className="dc-barras">
+                {tratSorted.map((t, i) => (
+                  <BarraFila key={t.servicioId || t.nombre || i}
+                    nombre={t.nombre || "—"}
+                    valor={Number(t.importeTotal) || 0}
+                    total={tratTotal}
+                    color={COLORES_ESP[i % COLORES_ESP.length]}
+                    onOpen={() => abrir({
+                      t: t.nombre || "Tratamiento",
+                      s: `${t.numeroDeVentas ?? 0} ${(t.numeroDeVentas ?? 0) === 1 ? "venta" : "ventas"}`,
+                      cifra: moneyFmt(t.importeTotal),
+                      cols: [["Campo"], ["Valor"]],
+                      filas: [["Ventas", String(t.numeroDeVentas ?? 0)], ["Importe", moneyFmt(t.importeTotal)]],
+                      tono: "ok",
+                    })} />
+                ))}
+              </div>
+              {tratSorted.length > 1 && (() => {
+                const top = tratSorted[0];
+                const bot = tratSorted[tratSorted.length - 1];
+                const topV = Math.max(1, Number(top.numeroDeVentas) || 1);
+                const botV = Math.max(0, Number(bot.numeroDeVentas) || 0);
+                const botImp = Number(bot.importeTotal) || 0;
+                const unit = botV > 0 ? botImp / botV : 0;
+                const metaVentas = 5;
+                const gapX = botV > 0 ? (topV / botV) : null;
+                const uplift = unit > 0 && botV < metaVentas
+                  ? (metaVentas - botV) * unit
+                  : null;
+                return (
+                  <div className="dc-split__rule">
+                    <p className="dc-rotulo">Para la campaña</p>
+                    <div className="camp__f camp__f--top">
+                      <span className="camp__pos">1.º</span>
+                      <div className="camp__txt">
+                        <div className="camp__lab">El que más vendes</div>
+                        <div className="camp__nom">{top.nombre}</div>
+                      </div>
+                      <div className="camp__cif">{moneyFmt(top.importeTotal)}<span>{top.numeroDeVentas} {top.numeroDeVentas === 1 ? "venta" : "ventas"}</span></div>
+                    </div>
+                    <div className="camp__vs">
+                      <i aria-hidden="true" />
+                      <span>
+                        {gapX != null && Number.isFinite(gapX)
+                          ? `${gapX >= 10 ? Math.round(gapX) : gapX.toFixed(1).replace(/\.0$/, "")}× de diferencia entre los dos`
+                          : "Entre el primero y el último"}
+                      </span>
+                    </div>
+                    <div className="camp__f camp__f--bot">
+                      <span className="camp__pos">{tratSorted.length}.º</span>
+                      <div className="camp__txt">
+                        <div className="camp__lab">El que menos vendes</div>
+                        <div className="camp__nom">{bot.nombre}</div>
+                      </div>
+                      <div className="camp__cif">
+                        {moneyFmt(bot.importeTotal)}
+                        <span>{bot.numeroDeVentas} {bot.numeroDeVentas === 1 ? "venta" : "ventas"}</span>
+                      </div>
+                    </div>
+                    {uplift != null && uplift > 0 && (
+                      <p className="camp__acc">
+                        <b>Qué hacer:</b> si {bot.nombre} pasara de{" "}
+                        <b>{botV} a {metaVentas} ventas</b> serían{" "}
+                        <b>+{moneyFmt(uplift)}</b>
+                        {top?.nombre ? (
+                          <> — y más pacientes entrando por la puerta barata, de donde sale {top.nombre}.</>
+                        ) : null}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Flujo del día */}
+      <section className="dc-card" style={{ marginBottom: "var(--dc-sp-5)" }}>
+        <div className="dc-card__head">
+          <span className="vin" style={{ background: "var(--dc-brand-600)" }} />
+          <h2>Flujo del día</h2>
+          <span className="dc-card__meta">Agenda → sillón → cobro</span>
+          <button type="button" className="dc-info" aria-label="Flujo"
+            onClick={() => abrir({
+              t: "Flujo del día",
+              s: "Pulso de la jornada, no un gráfico con ejes",
+              cifra: String(citasAgenda.length),
+              parte: citasAgenda.length === 1 ? "cita" : "citas",
+              sub: "Las partículas son ambiente: no codifican ninguna cifra.",
+              como: "A la izquierda van las cifras exactas; el lienzo solo muestra el pulso agenda → sillón → cobro.",
+              cols: [["Métrica"], ["Valor", "n"]],
+              filas: [
+                ["Citas hoy", String(citasAgenda.length)],
+                ["En sillón", String(enSillon)],
+                ["Atendidas", String(cobradas)],
+                ["Sillones libres", nSillones == null ? "—" : nSillones ? `${sillonesLibres} de ${nSillones}` : "Sin sillones"],
+              ],
+              tono: "brand",
+            })}>i</button>
+        </div>
+        <div className="dc-card__body">
+          {/* Sin citas, una línea en vez de cifras en cero y el lienzo de ambiente. */}
+          {citasErr ? nd({ bloque: true, texto: "Agenda de hoy no disponible" })
+            : !citasAgenda.length ? <div className="dc-vacio-mod">Sin citas hoy.</div> : (
+          <div className="dc-split" style={{ gridTemplateColumns: "250px 1fr" }}>
+            <div>
+              {franjas > 0 ? (<>
+                <p className="dc-rotulo">Franjas horarias con citas · {ocupadas} de {franjas}</p>
+                <div className="gate" aria-label={`Ocupación: ${ocupadas} de ${franjas}`}>
+                  {horasJornada.map((h, g) => (
+                    <i key={h} title={`${String(h).padStart(2, "0")}:00`} className={conectado
+                      ? (horasConCita.has(h) ? (h === new Date().getHours() ? "hoy" : "on") : undefined)
+                      : (g < ocupadas ? (g === ocupadas - 1 ? "hoy" : "on") : undefined)} />
+                  ))}
+                </div>
+              </>) : sinHorario ? (
+                <div className="dc-flujo__falta">
+                  <p className="dc-rotulo">Sin horario de atención</p>
+                  {verConfig && <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={() => { window.location.hash = "#/config"; }}>Configurar horario</button>}
+                </div>
+              ) : (
+                <p className="dc-rotulo">Hoy la clínica no abre.</p>
+              )}
+              <dl className="dc-cifras">
+                <div className="dc-cifra"><dt>Citas hoy</dt><dd>{citasAgenda.length}</dd></div>
+                <div className="dc-cifra"><dt>En sillón</dt><dd>{enSillon}</dd></div>
+                <div className="dc-cifra"><dt>Cobradas</dt><dd>{cobradas}</dd></div>
+                {/* Sin sillones creados no hay «libres»: se dice y se lleva a crearlos. */}
+                <div className="dc-cifra">
+                  <dt>Sillones libres</dt>
+                  <dd>
+                    {nSillones == null ? "—"
+                      : nSillones ? `${sillonesLibres} de ${nSillones}`
+                      : verConfig ? <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={() => { window.location.hash = "#/config"; }}>Crear sillones</button>
+                      : "Sin sillones"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <CanvasFlujo />
+          </div>
+          )}
+        </div>
+      </section>
+
+      {/* Cartera | Cubo */}
+      <div className="dc-grid g-2b">
+        <section className="dc-card">
+          <div className="dc-card__head">
+            <span className="vin" style={{ background: "var(--g3)" }} />
+            <h2>Cartera de pacientes</h2>
+            {/* R6-07: con una sede elegida, los pacientes sin sede se cuentan en cada sede (como en
+                el directorio): se dice cuántos son, para que la suma de las sedes se entienda. */}
+            <span className="dc-card__meta" title={sedeElegida && dirPac?.sinSede ? "Los pacientes sin sede se ven en todas las sedes, como en el directorio de Pacientes. Asígnales su sede en su ficha." : undefined}>{carteraErr ? "—" : !totalCartera ? null : `${pluralEs(totalCartera, "paciente", "pacientes")}${sedeElegida && dirPac?.sinSede ? ` · ${dirPac.sinSede} sin sede` : ""}`}</span>
+            <button type="button" className="dc-info" aria-label="Cartera"
+              onClick={() => abrir({
+                t: "Cartera de pacientes",
+                s: "Color = estado · tamaño = saldo",
+                cifra: String(totalCartera || 0),
+                micro: [
+                  ["Al día", String(alDia)],
+                  ["Nuevos 30 días", String(nuevos30)],
+                  ["Con saldo", String(conSaldo.length)],
+                ],
+                como: `Cada punto es un paciente. Rojo = con saldo; cian = nuevo; verde = al día; el tamaño es el saldo. La esfera se detiene al señalarla o tocarla.${sedeElegida && dirPac?.sinSede ? ` Incluye ${pluralEs(dirPac.sinSede, "paciente", "pacientes")} sin sede, que se ven en todas las sedes como en el directorio.` : ""}`,
+                cols: [["Paciente"], ["Saldo", "n"]],
+                filas: conSaldo.slice(0, 20).map((p) => [p.nombre, moneyFmt(p.saldo)]),
+                vacio: "Sin pacientes en cartera.",
+                tono: "morado",
+              })}>i</button>
+          </div>
+          <div className="dc-card__body">
+            {carteraErr ? nd({ bloque: true, detalle: "No se pudieron leer los pacientes ni sus saldos." })
+              : !totalCartera ? <div className="dc-vacio-mod">Aún no hay pacientes en la cartera.</div> :
+            <div className="dc-split" style={{ gridTemplateColumns: "236px 1fr" }}>
+              <dl className="dc-cifras">
+                <div className="dc-cifra"><dt>Total</dt><dd>{totalCartera}</dd></div>
+                <div className="dc-cifra"><dt>Al día</dt><dd style={tinta(alDia, "var(--dc-ok-700)")}>{alDia}</dd></div>
+                <div className="dc-cifra"><dt>Nuevos 30 días</dt><dd style={tinta(nuevos30, "var(--g1)")}>{nuevos30}</dd></div>
+                <div className="dc-cifra"><dt>Con saldo</dt><dd style={tinta(conSaldo.length, "var(--dc-danger-700)")}>{conSaldo.length}</dd></div>
+                <div className="dc-cifra"><dt>Saldo mayor</dt><dd>{moneyFmt(saldoMayor)}</dd></div>
+              </dl>
+              <CanvasEsfera
+                pacientes={pacs}
+                onPick={(p) => abrir({
+                  t: p.nombre || "Paciente",
+                  s: "Ficha rápida de cartera",
+                  cifra: moneyFmt(p.saldo),
+                  parte: p.ultimaCita ? `Última cita ${fechaLegible(p.ultimaCita)}` : "Sin cita",
+                  micro: [["Visitas", String(p.numeroDeCitas ?? 0)], ["Acumulado", moneyFmt(p.importeAcumulado)]],
+                  cols: [["Campo"], ["Valor"]],
+                  filas: [["Saldo", moneyFmt(p.saldo)], ["Visitas", String(p.numeroDeCitas ?? 0)]],
+                  tono: Number(p.saldo) > 0 ? "riesgo" : "ok",
+                })}
+              />
+            </div>}
+          </div>
+        </section>
+
+        <section className="dc-card">
+          <div className="dc-card__head">
+            <span className="vin" style={{ background: "var(--g2)" }} />
+            <h2>Cubo de pacientes</h2>
+            <span className="dc-card__meta">A quién llamar primero</span>
+            <button type="button" className="dc-info" aria-label="Cubo"
+              onClick={() => abrir({
+                t: "Cubo de pacientes",
+                s: "Tres ejes en castellano de clínica",
+                cifra: String(pacs.length),
+                como: "Azul: hace cuánto no viene. Ámbar: cuánto ha dejado. Morado: cuántas veces ha venido. Al girar el cubo, cada arista cambia de lado, no de color. En el celular va la lista de a quién llamar primero.",
+                cols: [["Eje"], ["Rango"]],
+                filas: [
+                  ["Hace cuánto no viene", ejeCubo(`0 a ${escCubo.dias} días`)],
+                  ["Cuánto ha dejado", ejeCubo(`S/ 0 a ${moneyFmt(escCubo.importe)}`)],
+                  ["Cuántas veces ha venido", ejeCubo(`1 a ${escCubo.visitas} visitas`)],
+                ],
+                tono: "aviso",
+              })}>i</button>
+          </div>
+          <div className="dc-card__body">
+            {conectado && fallo.pacRes ? nd({ bloque: true, detalle: "No se pudieron leer los pacientes." })
+              : !pacs.length ? <div className="dc-vacio-mod">Aún no hay pacientes.</div> :
+            <div className="dc-split dc-cubo" style={{ gridTemplateColumns: "236px 1fr" }}>
+              <div>
+                <p className="dc-rotulo">Cómo leerlo</p>
+                <dl className="ejes">
+                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-accent-cyan)" }} /><div><dt>Hace cuánto no viene</dt><dd>de 0 a {escCubo.dias} días</dd></div></div>
+                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-amber-ink)" }} /><div><dt>Cuánto ha dejado</dt><dd>de S/ 0 a {moneyFmt(escCubo.importe)}</dd></div></div>
+                  <div className="eje"><i className="trazo" style={{ background: "var(--dc-purple)" }} /><div><dt>Cuántas veces ha venido</dt><dd>de 1 a {escCubo.visitas} visitas</dd></div></div>
+                </dl>
+                <dl className="dc-cifras dc-cubo__cifras">
+                  <div className="dc-cifra"><dt>Pacientes en el cubo</dt><dd>{pacs.length}</dd></div>
+                  <div className="dc-cifra"><dt>Para llamar</dt><dd style={tinta(conSaldo.length, "var(--dc-danger-700)")}>{conSaldo.length}</dd></div>
+                </dl>
+              </div>
+              <CanvasCubo pacientes={pacs} esc={escCubo} onPick={fichaLlamada} />
+              {/* En celular, en lugar del cubo 3D: los de mayor saldo, que son los primeros a llamar. */}
+              {paraLlamar.length ? (
+                <dl className="dc-cifras dc-cubo__lista">
+                  {paraLlamar.map((p, i) => (
+                    <div key={p.pacienteId ?? p.id ?? i} className="dc-cifra clic" role="button" tabIndex={0}
+                      onClick={() => fichaLlamada(p)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fichaLlamada(p)}>
+                      <dt>{p.nombre || "Paciente"}</dt><dd>{moneyFmt(p.saldo)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : <div className="dc-vacio-mod dc-cubo__lista">Nadie con saldo por cobrar.</div>}
+            </div>}
+          </div>
+        </section>
+      </div>
+
+      {/* GER-04: la producción por odontólogo vive en un solo bloque («Producción del equipo vs. meta», arriba); el detalle está en Reportes. */}
+
+      <div className="dc-pie">
+        {/* R8-06: con una sede, la cifra es la de sus insumos; los que no tienen sede se dicen
+            aparte (antes salía la cifra de toda la clínica como si fuera de la sede). */}
+        <span title={inventarioValorizado?.nSinSede ? (inventarioValorizado.nSinSede === 1
+          ? "1 insumo no tiene sede: no es de ninguna sede, así que no se suma a la cifra de la sede. Asígnale su sede en Inventario."
+          : `${inventarioValorizado.nSinSede} insumos no tienen sede: no son de ninguna sede, así que no se suman a la cifra de la sede. Asígnales su sede en Inventario.`) : undefined}>
+          Inventario valorizado{invPorSede ? (verSedes.length === 1 ? " de la sede" : " de las sedes") : ""}{" "}
+          <b>{inventarioValorizado != null ? moneyFmt(inventarioValorizado.total) : "—"}</b>
+          {inventarioValorizado?.nSinSede > 0 && <>{" + "}<b>{moneyFmt(inventarioValorizado.sinSede)}</b> de insumos sin sede (toda la clínica)</>}
+        </span>
+        {/* R6-08: con los chats a la vista, cada uno cuenta en una sola sede y los que aún no
+            tienen sede se dicen aparte (sede A + sede B + sin sede = total). Sin permiso de
+            WhatsApp vale la cifra del servidor, que con una sede elegida puede contar un chat en
+            más de una sede: se avisa en el título. */}
+        {/* R7-08: el título decía «los chats aún no guardan su sede», y ya la guardan. Lo cierto
+            para quien no ve WhatsApp (gerencia) es que la cifra es la del resumen gerencial, que
+            reparte los chats por la sede del paciente: con una sede elegida se dice «de pacientes
+            de la sede», y que la suma de las sedes puede pasar del total (8 frente a 5 + 6). */}
+        <span title={waChats ? "Chats con actividad en los últimos 30 días. Cada chat es de la sede del número que lo recibió o, si no se sabe, de la sede del paciente." : sedeElegida ? "Cifra del resumen gerencial del servidor: cuenta los chats de los pacientes de esta sede, no la sede de cada chat. Un paciente de las dos sedes cuenta en ambas, así que la suma de las sedes puede pasar del total de la clínica. Con permiso de WhatsApp se cuenta por la sede de cada chat." : "Cifra del resumen gerencial del servidor."}>
+          WhatsApp{" "}
+          {/* «—» solo si no se pudo leer; sin chats, los ceros se dicen como ceros. */}
+          {conectado && rep?.errorDeCarga && !waChats ? <b>—</b> : (
+            <>
+              <b>{waConversaciones}</b> {waConversaciones === 1 ? "conversación" : "conversaciones"}{waChats ? (sedeElegida ? " de la sede" : " en 30 días") : (sedeElegida ? " de pacientes de la sede" : "")}
+              {waChats?.sinSede ? <>{sedeElegida ? " + " : " ("}<b>{waChats.sinSede}</b> sin sede{sedeElegida ? " (de toda la clínica)" : ")"}</> : null}
+              {" · "}<b>{waAgendadas}</b> {waAgendadas === 1 ? "cita agendada" : "citas agendadas"} por ese canal
+            </>
+          )}
+        </span>
+        <span>
+          <b>{nSedes != null ? nSedes : "—"}</b> sede{nSedes === 1 ? "" : "s"}
+          {" · "}
+          <b>{nSillones != null ? nSillones : "—"}</b> {nSillones === 1 ? "sillón" : "sillones"}
+          {" · "}
+          <b>{kpisErr ? "—" : ranking.length}</b> {ranking.length === 1 ? "odontólogo" : "odontólogos"}
+        </span>
+      </div>
+
+      {ficha && <FichaDato dato={ficha} onClose={cerrar} />}
+
+      {metaEdit && (
+        <div className="dc-pg-ficha-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setMetaEdit(null); }}>
+          <div className="dc-pg-ficha" role="dialog" aria-modal="true" aria-labelledby="meta-title" tabIndex={-1}>
+            <div className="dc-pg-ficha__head">
+              <span className="ico" aria-hidden="true">◎</span>
+              <div style={{ flex: 1 }}>
+                <h2 id="meta-title">Meta mensual</h2>
+                <p>{metaEdit.nombre || "Odontólogo"}</p>
+              </div>
+              <button type="button" className="dc-pg-ficha__cerrar" aria-label="Cerrar" onClick={() => setMetaEdit(null)}>×</button>
+            </div>
+            <div className="dc-pg-ficha__body">
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--dc-ink-700)", display: "block" }}>
+                Meta del mes (S/)
+                <input
+                  className="dc-premium-inp"
+                  type="number"
+                  min="0"
+                  value={metaVal}
+                  onChange={(e) => setMetaVal(e.target.value)}
+                  placeholder="Ej. 5000"
+                  style={{ display: "block", width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: "var(--dc-r-md)", border: "1.5px solid var(--dc-line)" }}
+                />
+              </label>
+              <p style={{ fontSize: 13, color: "var(--dc-ink-500)", marginTop: 12 }}>
+                Déjalo vacío o en 0 para quitar la meta.
+              </p>
+            </div>
+            <div className="dc-pg-ficha__footer">
+              <span>Se guarda en la ficha del odontólogo</span>
+              <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={guardarMeta}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

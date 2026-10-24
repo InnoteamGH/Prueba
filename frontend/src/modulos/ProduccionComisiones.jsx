@@ -1,0 +1,1225 @@
+/**
+ * Producción y comisiones — pantalla de personas (SPEC §15 / HTML maqueta).
+ * Rutas: #/reportes – #/comisiones – #/metas
+ */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BarChart3, X, Calculator, List as ListIcon } from "lucide-react";
+import api, { auth } from "../api/client";
+import { ESPECIALIDADES, ListaFiltrable, MEDICOS, ThOrden, fechaLegible, mismaSede, useSede } from "../comun";
+import { sedeApiUuid } from "../routing";
+import { medicoEnSedes } from "../compartido/medicosSede";
+import { medicosDeSedes } from "../compartido/medicoEnSede";
+import NoDisponible from "../ui/NoDisponible";
+import { CRITERIO_PRODUCCION } from "../util/metasComision";
+
+/* Demostración: sin servidor, producción y comisiones de los médicos de ejemplo (las
+   mismas cifras que usan Metas y el Resumen del mes), para que el módulo no salga en cero. */
+function datosDemo(sedes = null) {
+  // Solo los odontólogos que atienden en las sedes que se ven, con lo que producen ahí
+  // y el % y la meta de esas sedes (compartido/medicosSede.js).
+  const meds = MEDICOS.map((m) => ({ m, e: medicoEnSedes(m, sedes) })).filter((x) => x.e.sedes.length);
+  const porMedico = meds.map(({ m, e }) => ({
+    medicoId: m.id, nombre: m.nombre, atendidas: e.citas, produccion: e.prod, porcentaje: e.pct ?? 0,
+    comision: e.comision, meta: e.meta,
+    especialidad: (ESPECIALIDADES.find((x) => x.id === m.esp) || {}).nombre || "Odontólogo",
+    ticketCita: e.citas ? e.prod / e.citas : 0,
+  }));
+  const totalProduccion = porMedico.reduce((a, m) => a + m.produccion, 0);
+  const totalComision = porMedico.reduce((a, m) => a + m.comision, 0);
+  const totalCitas = porMedico.reduce((a, m) => a + m.atendidas, 0);
+  const fr = [0.14, 0.15, 0.16, 0.17, 0.18, 0.2];
+  const ahora = new Date();
+  const cobrosPorMes = fr.map((f, i) => {
+    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (fr.length - 1 - i), 1);
+    return {
+      mes: d.toLocaleDateString("es-PE", { month: "short" }).replace(".", ""),
+      mesLargo: d.toLocaleDateString("es-PE", { month: "long", year: "numeric" }),
+      cobrado: Math.round(totalProduccion * f * 1.02),
+    };
+  });
+  const totalCobrado = cobrosPorMes.reduce((a, m) => a + m.cobrado, 0);
+  const totalPagado = Math.round(totalComision * 0.6);
+  return {
+    porMedico, totalProduccion, totalComision, totalCitas, totalCobrado, totalPagado, cobrosPorMes,
+    odontologos: porMedico.length, odontologosConProduccion: porMedico.filter((m) => m.produccion > 0).length,
+    pendienteLiquidar: totalComision - totalPagado, mesesConCobro: cobrosPorMes.length, sinDato: false,
+  };
+}
+import { equipoDeSede, filtraMicro, inicialesDe, layoutProgreso } from "./panelGerencialUtil";
+import {
+  UMBRAL_AUSENTISMO,
+  PERIODOS_COMISIONES,
+  rangoPeriodo,
+  mesesDelPeriodo,
+  ritmoDelPeriodo,
+  rotuloPeriodo,
+  rotuloMeses,
+  ESCALA_AUSENTISMO_MAX,
+  acumularCobros,
+  ausentismoPorOdontologo,
+  escalaCurva,
+  layoutRinde,
+  marcaMediaPct,
+  moneyFmt,
+  pctEnEscalaAusentismo,
+  pctTxt,
+  techoRinde,
+} from "./produccionComisionesUtil";
+import "./panelGerencial.css";
+import "./produccionComisiones.css";
+
+// Un solo color de marca para las barras: el color no codifica nada (no hay leyenda).
+const COLOR_BARRA = "var(--dc-brand-600)";
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined"
+    && window.matchMedia
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function cssVar(name, fallback) {
+  if (typeof window === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function hexToRgba(hex, a) {
+  let h = (hex || "").replace("#", "");
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  if (h.length !== 6) return `rgba(14,116,144,${a})`;
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
+}
+
+function FichaDato({ dato, onClose }) {
+  const closeRef = useRef(null);
+  const prevFocus = useRef(null);
+
+  useEffect(() => {
+    prevFocus.current = document.activeElement;
+    closeRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      if (e.key !== "Tab") return;
+      const dlg = document.getElementById("dc-pc-ficha");
+      if (!dlg) return;
+      const focusables = dlg.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+      const list = [...focusables];
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (prevFocus.current && typeof prevFocus.current.focus === "function") {
+        prevFocus.current.focus();
+      }
+    };
+  }, [onClose]);
+
+  if (!dato) return null;
+  const cifra = typeof dato.cifra === "function" ? dato.cifra() : dato.cifra;
+  const micro = filtraMicro(
+    typeof dato.micro === "function" ? dato.micro() : dato.micro,
+    cifra,
+    dato.parte,
+  );
+  const filas = typeof dato.filas === "function" ? dato.filas() : (dato.filas || []);
+  const total = typeof dato.total === "function" ? dato.total() : dato.total;
+
+  return (
+    <div className="dc-pg-ficha-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div
+        id="dc-pc-ficha"
+        className="dc-pg-ficha"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dc-pc-ficha-title"
+        tabIndex={-1}
+        data-tono={dato.tono || "brand"}
+      >
+        <div className="dc-pg-ficha__head">
+          <span className="ico" aria-hidden="true"><BarChart3 size={20} strokeWidth={1.9} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 id="dc-pc-ficha-title">{dato.t}</h2>
+            <p>{dato.s}</p>
+          </div>
+          {dato.estado && <span className="dc-chip dc-chip--gris">{dato.estado}</span>}
+          <button ref={closeRef} type="button" className="dc-pg-ficha__cerrar" aria-label="Cerrar" onClick={onClose}><X size={17} strokeWidth={2} /></button>
+        </div>
+        <div className="dc-pg-ficha__body">
+          <div className="mdl-hero">
+            <div className="mdl-hero__n">
+              <b>{cifra}</b>
+              {dato.parte && <span className="parte">{dato.parte}</span>}
+            </div>
+            {dato.sub && <p>{dato.sub}</p>}
+            {micro?.length > 0 && (
+              <dl className="mdl-micro">
+                {micro.map(([lab, val], i) => (
+                  <div key={i}><dd>{val}</dd><dt>{lab}</dt></div>
+                ))}
+              </dl>
+            )}
+          </div>
+          {dato.como && (
+            <div className="mdl-bloq">
+              <p className="mdl-seccion"><Calculator size={14} strokeWidth={2} /> Cómo se calcula</p>
+              <p className="mdl-como">{dato.como}</p>
+            </div>
+          )}
+          <div className="mdl-bloq">
+            <p className="mdl-seccion"><ListIcon size={14} strokeWidth={2} /> El detalle</p>
+            {filas.length === 0 ? (
+              <div className="mdl-vacio">{dato.vacio || "Sin filas para mostrar."}</div>
+            ) : (
+              <div style={{ overflow: "auto", maxHeight: 420 }}>
+                <table className="mdl-tabla">
+                  <thead>
+                    <tr>
+                      {(dato.cols || []).map(([h, align], i) => (
+                        <th key={i} className={align === "n" ? "n" : undefined}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filas.map((row, i) => (
+                      <tr key={i}>
+                        {row.map((cell, j) => {
+                          const isNum = (dato.cols || [])[j]?.[1] === "n";
+                          return <td key={j} className={isNum ? "n" : undefined}>{cell}</td>;
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                  {total != null && (
+                    <tfoot>
+                      <tr>
+                        <td>Total</td>
+                        {(dato.cols || []).slice(1).map((_, j) => (
+                          <td key={j} className="n">{j === (dato.cols.length - 2) ? total : ""}</td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
+          </div>
+          {dato.falta ? (
+            <div className="mdl-falta"><b>Qué falta:</b> {dato.falta}</div>
+          ) : dato.fuente ? (
+            <p className="mdl-fuente">{dato.fuente}</p>
+          ) : null}
+        </div>
+        <div className="dc-pg-ficha__footer">
+          <span>{dato.nota || (dato.ejemplo ? "Detalle de ejemplo – los totales son reales" : "Dato de la clínica")}</span>
+          <button type="button" className="dc-btn dc-btn--secundario dc-btn--sm" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CanvasIngresos({ meses, cobrados, onOpen }) {
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const badgeRef = useRef(null);
+  const state = useRef({ vis: 0, max: 400 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas || !wrap) return;
+    const quieto = prefersReducedMotion();
+    const ctx = canvas.getContext("2d");
+    let raf = 0;
+    let stopped = false;
+    let mouse = null;
+    const { mensuales, acum } = acumularCobros(cobrados.map((c) => ({ cobrado: c })));
+    const labels = meses?.length ? meses : mensuales.map((_, i) => String(i + 1));
+
+    const onMove = (ev) => {
+      const r = canvas.getBoundingClientRect();
+      mouse = { x: ev.clientX - r.left, y: ev.clientY - r.top };
+    };
+    const onLeave = () => { mouse = null; };
+    canvas.addEventListener("mousemove", onMove);
+    canvas.addEventListener("mouseleave", onLeave);
+
+    const medir = () => {
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.max(1, Math.floor(r.width * dpr));
+      canvas.height = Math.max(1, Math.floor(r.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { W: r.width, H: r.height };
+    };
+
+    const pinta = (t) => {
+      if (stopped) return;
+      const { W, H } = medir();
+      const n = Math.max(1, labels.length);
+      const pad = { l: 30, r: 30, t: 34, b: 42 };
+      const c1 = cssVar("--dc-accent-cyan", "#0E7490");
+      const lin = cssVar("--dc-line", "#E7EAF0");
+      const fa = cssVar("--dc-ink-400", "#667085");
+      const ink = cssVar("--dc-ink-900", "#101828");
+      const X = (i) => pad.l + (n === 1 ? 0 : i / (n - 1)) * (W - pad.l - pad.r);
+
+      const st = state.current;
+      if (quieto) st.vis = n - 1;
+      else {
+        st.vis += (n - 1 - st.vis) * 0.045;
+        if (n - 1 - st.vis < 0.02) st.vis = n - 1;
+      }
+
+      const poly = [];
+      for (let i = 0; i < n; i++) {
+        if (i <= st.vis) poly.push([i, acum[i] || 0]);
+        else {
+          const a = acum[i - 1] || 0;
+          const f = st.vis - (i - 1);
+          if (f > 0) poly.push([st.vis, a + ((acum[i] || 0) - a) * f]);
+          break;
+        }
+      }
+      if (poly.length < 2) poly.push([0, acum[0] || 0], [0.001, acum[0] || 0]);
+
+      let pico = 0;
+      poly.forEach((p) => { if (p[1] > pico) pico = p[1]; });
+      st.max = escalaCurva(pico, st.max, quieto);
+      const mx = st.max;
+      const Y = (v) => H - pad.b - (v / mx) * (H - pad.t - pad.b);
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = lin;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.9;
+      labels.forEach((_, i) => {
+        ctx.beginPath();
+        ctx.moveTo(X(i), pad.t - 8);
+        ctx.lineTo(X(i), H - pad.b);
+        ctx.stroke();
+      });
+      ctx.beginPath();
+      ctx.moveTo(pad.l, H - pad.b);
+      ctx.lineTo(W - pad.r, H - pad.b);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      ctx.font = '400 11px "Inter Variable", sans-serif';
+      ctx.fillStyle = fa;
+      ctx.textAlign = "center";
+      labels.forEach((m, i) => ctx.fillText(m, X(i), H - 24));
+      // Lo cobrado de cada mes, con «S/»; los meses sin cobro no se rotulan.
+      ctx.font = '600 11px "Inter Variable", sans-serif';
+      ctx.fillStyle = c1;
+      labels.forEach((_, i) => {
+        const v = mensuales[i] || 0;
+        if (i <= st.vis + 0.001 && v) ctx.fillText(`+${moneyFmt(v, { dec: 0 })}`, X(i), H - 8);
+      });
+      ctx.font = '400 11px "Inter Variable", sans-serif';
+      ctx.fillStyle = fa;
+      ctx.textAlign = "left";
+      ctx.fillText(moneyFmt(Math.round(mx)), pad.l + 2, pad.t - 5);
+
+      ctx.beginPath();
+      ctx.moveTo(X(poly[0][0]), H - pad.b);
+      poly.forEach((p) => ctx.lineTo(X(p[0]), Y(p[1])));
+      ctx.lineTo(X(poly[poly.length - 1][0]), H - pad.b);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, pad.t, 0, H - pad.b);
+      g.addColorStop(0, hexToRgba(c1, 0.26));
+      g.addColorStop(1, hexToRgba(c1, 0.02));
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      ctx.beginPath();
+      poly.forEach((p, j) => {
+        const px = X(p[0]);
+        const py = Y(p[1]);
+        if (j === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.strokeStyle = c1;
+      ctx.lineWidth = 2.2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      const fin = poly[poly.length - 1];
+      const ux = X(fin[0]);
+      const uy = Y(fin[1]);
+      if (!quieto) {
+        const pl = 1 + Math.sin((t || 0) * 0.0034) * 0.35;
+        ctx.beginPath();
+        ctx.arc(ux, uy, 8 * pl, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRgba(c1, 0.2);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(ux, uy, 3.8, 0, Math.PI * 2);
+      ctx.fillStyle = c1;
+      ctx.fill();
+
+      if (badgeRef.current) {
+        badgeRef.current.textContent = moneyFmt(fin[1]);
+        badgeRef.current.style.left = `${Math.min(W - 40, Math.max(34, ux))}px`;
+        badgeRef.current.style.top = `${uy}px`;
+        badgeRef.current.classList.add("ver");
+      }
+
+      if (mouse && mouse.x > pad.l && mouse.x < W - pad.r) {
+        let iR = Math.round(((mouse.x - pad.l) / (W - pad.l - pad.r)) * (n - 1));
+        iR = Math.max(0, Math.min(Math.floor(st.vis), iR));
+        const kx = X(iR);
+        const ky = Y(acum[iR] || 0);
+        ctx.strokeStyle = fa;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(kx, pad.t);
+        ctx.lineTo(kx, H - pad.b);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(kx, ky, 4.6, 0, Math.PI * 2);
+        ctx.fillStyle = c1;
+        ctx.fill();
+        ctx.fillStyle = ink;
+        ctx.font = '600 11px "Inter Variable", sans-serif';
+        ctx.textAlign = kx > W * 0.66 ? "right" : "left";
+        const extra = mensuales[iR] ? `  (+${moneyFmt(mensuales[iR])})` : "";
+        ctx.fillText(`${labels[iR]}  ${moneyFmt(acum[iR] || 0)}${extra}`, kx + (kx > W * 0.66 ? -10 : 10), pad.t + 2);
+      }
+
+      if (!quieto && !stopped) raf = requestAnimationFrame(pinta);
+    };
+
+    if (quieto) pinta(0);
+    else raf = requestAnimationFrame(pinta);
+
+    const onResize = () => { /* next frame remeasures */ };
+    window.addEventListener("resize", onResize);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+      canvas.removeEventListener("mousemove", onMove);
+      canvas.removeEventListener("mouseleave", onLeave);
+    };
+  }, [meses, cobrados]);
+
+  return (
+    <div className="serie serie--alto" ref={wrapRef}>
+      <canvas ref={canvasRef} className="clic" onClick={onOpen} aria-label="Curva de ingresos cobrados" />
+      <div className="badge" ref={badgeRef}>S/ 0</div>
+    </div>
+  );
+}
+
+function AusentismoTab({ citas, medicos, ticketMedio, onOpen }) {
+  const { rows, clinica, ticketMedio: ticket, costeTotal, escala } = useMemo(
+    () => ausentismoPorOdontologo(citas, medicos, ticketMedio),
+    [citas, medicos, ticketMedio],
+  );
+  const umbralLeft = pctEnEscalaAusentismo(UMBRAL_AUSENTISMO, escala);
+  const clinicaLeft = clinica.tasa != null ? pctEnEscalaAusentismo(clinica.tasa, escala) : 0;
+  const sobreUmbral = clinica.tasa != null && clinica.tasa >= UMBRAL_AUSENTISMO;
+  /* La etiqueta de la clínica va sobre la barra y se ancla al borde cerca de los extremos,
+     para no pisar «0%», la alerta ni el tope de la escala. */
+  const anclaClinica = clinicaLeft > 85 ? "fin" : clinicaLeft < 12 ? "ini" : "";
+  // «0%» y «15% alerta» se enciman si la alerta queda cerca del inicio (escala alta).
+  const verCero = umbralLeft >= 30;
+  // Cuántas de cada 100 citas se pierden y qué hacer, según lo que más pesa.
+  const deCien = clinica.sinDato ? "" : clinica.perdidas === 0 ? "No se perdió ninguna cita"
+    : clinica.tasa < 0.5 ? "Menos de 1 de cada 100 citas se pierde" : `${Math.round(clinica.tasa)} de cada 100 citas se pierden`;
+  const accion = !sobreUmbral ? `Por debajo de la alerta del ${UMBRAL_AUSENTISMO}%: la asistencia no es el problema principal.`
+    : clinica.canceladas >= clinica.noShows ? "La mayoría son cancelaciones: ofrece esos huecos a la lista de espera."
+    : "La mayoría son faltas sin aviso: refuerza los recordatorios.";
+
+  const fichaPerdidas = () => onOpen?.({
+    t: "Citas que se pierden",
+    s: "Canceladas y no asistidas sobre la agenda",
+    cifra: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
+    parte: clinica.sinDato ? "sin dato" : `${clinica.perdidas} de ${clinica.total}`,
+    sub: "Se mide sobre la agenda del periodo, no sobre la producción.",
+    micro: [
+      ["Canceladas", String(clinica.canceladas)],
+      ["No asistió", String(clinica.noShows)],
+      ["Reprogramadas", "No suman"],
+    ],
+    como: "Se cuentan las citas canceladas y las no asistidas, y se dividen entre todas las citas de agenda del tramo excepto las reprogramadas.",
+    cols: [["Estado"], ["En la cifra"], ["Qué implica"]],
+    filas: [
+      ["Cancelada", "Suma", "Lista de espera: el hueco avisado se puede revender"],
+      ["No asistió", "Suma", "Recordatorios: el hueco se quema"],
+      ["Reprogramada", "No suma", "Se cuenta en su nueva fecha"],
+      ["Pendiente, confirmada, en atención o atendida", "Total", "Siguen en pie o se atendieron"],
+    ],
+    fuente: "Agenda del periodo.",
+    tono: "aviso",
+  });
+
+  const fichaCoste = () => onOpen?.({
+    t: "Cuesta una cita perdida",
+    s: "Producción media de una cita del periodo",
+    cifra: ticket != null ? moneyFmt(ticket) : "—",
+    parte: ticket != null ? "media" : "sin dato",
+    sub: "Producción del periodo ÷ citas atendidas. No todas cuestan igual; es la media de la clínica.",
+    como: "Si hace falta reforzar recordatorios, conviene priorizar agendas de mayor ticket, no solo las de más volumen.",
+    cols: [["Concepto"], ["Valor", "n"]],
+    filas: [
+      ["Ticket medio", ticket != null ? moneyFmt(ticket) : "—"],
+      ["Citas perdidas", String(clinica.perdidas)],
+      ["Costo estimado", costeTotal != null ? moneyFmt(costeTotal) : "—"],
+    ],
+    fuente: "Producción y citas del mismo periodo que la pestaña principal.",
+    tono: "brand",
+  });
+
+  const fichaEscala = () => onOpen?.({
+    t: "Dónde está la clínica",
+    s: `Escala 0 – ${escala}% – alerta ${UMBRAL_AUSENTISMO}%`,
+    cifra: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
+    parte: sobreUmbral ? "sobre el umbral" : "bajo el umbral",
+    sub: clinica.sinDato ? "Sin citas en agenda para medir." : `${deCien}.`,
+    como: `La raya roja es la alerta del ${UMBRAL_AUSENTISMO}%. La escala llega al ${escala}%${escala > ESCALA_AUSENTISMO_MAX ? ` porque hay tasas por encima del ${ESCALA_AUSENTISMO_MAX}%` : ""}. Canceladas y no asistidas se suman en el %; se enseñan aparte porque piden acciones distintas.`,
+    cols: [["Estado"], ["En la cifra"], ["Nota"]],
+    filas: [
+      ["Cancelada", "Suma", "El paciente avisó"],
+      ["No asistió", "Suma", "El paciente no avisó"],
+      ["Reprogramada", "No suma", "Se cuenta en su nueva fecha"],
+      ["Pendiente, confirmada, en atención o atendida", "Total", "No son pérdida"],
+    ],
+    fuente: "Citas de agenda del periodo.",
+    tono: "ok",
+  });
+
+  const fichaDoc = (r) => onOpen?.({
+    t: r.nombre,
+    s: `${r.especialidad || "Odontólogo"} – ausentismo del periodo`,
+    cifra: pctTxt(r.tasa),
+    parte: `${r.perdidas} perdidas`,
+    sub: r.perdidas
+      ? "Citas de su agenda que quedaron canceladas o sin asistir."
+      : "Ninguna cita perdida en el periodo.",
+    micro: [
+      ["Agenda", String(r.agenda)],
+      ["Canceladas", String(r.cancelada)],
+      ["No asistió", String(r.noShow)],
+      ["Costo", r.coste != null ? moneyFmt(r.coste) : "—"],
+    ],
+    como: "Sus citas del tramo, contando canceladas y no asistidas. El costo es esas citas por el ticket medio de la clínica.",
+    cols: [["Concepto"], ["Valor", "n"]],
+    filas: [
+      ["Citas en agenda", String(r.agenda)],
+      ["Canceladas", String(r.cancelada)],
+      ["No asistió", String(r.noShow)],
+      ["Tasa", pctTxt(r.tasa)],
+      ["Costo", r.coste != null ? moneyFmt(r.coste) : "—"],
+    ],
+    fuente: "Agenda agrupada por odontólogo (dato real).",
+    tono: "cian",
+  });
+
+  return (
+    <>
+      <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores de ausentismo">
+        <button type="button" className="dc-kpi" onClick={fichaPerdidas}>
+          <span className="dc-kpi__icon" style={{ background: "var(--dc-warn-100)", color: "var(--dc-warn-700)" }} aria-hidden="true">⊘</span>
+          <div className="dc-kpi__body">
+            <div className="dc-kpi__label">Citas que se pierden</div>
+            <div className="dc-kpi__value">{clinica.sinDato ? "—" : pctTxt(clinica.tasa)}</div>
+            <div className="dc-kpi__sub">Canceladas y no asistidas</div>
+          </div>
+        </button>
+        {/* REP-03: el umbral (15%) es un parámetro, no un KPI: se ve como la línea roja del gráfico. */}
+        <button type="button" className="dc-kpi" onClick={fichaCoste}>
+          <span className="dc-kpi__icon" style={{ background: "var(--dc-brand-100)", color: "var(--dc-brand-600)" }} aria-hidden="true">S/</span>
+          <div className="dc-kpi__body">
+            <div className="dc-kpi__label">Cuesta una cita perdida</div>
+            <div className="dc-kpi__value">{ticket != null ? moneyFmt(ticket) : "—"}</div>
+            <div className="dc-kpi__sub">La producción media de una cita</div>
+          </div>
+        </button>
+      </section>
+
+      <section className="dc-card">
+        <div className="dc-card__head">
+          <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
+          <h2>Dónde está la clínica</h2>
+          <span className="dc-card__meta">raya roja: alerta del {UMBRAL_AUSENTISMO}%</span>
+          <button type="button" className="dc-info" aria-label="Qué mide esta escala" onClick={fichaEscala}>i</button>
+        </div>
+        <div className="dc-card__body">
+          <div className="dc-split" style={{ gridTemplateColumns: "1.15fr 1fr" }}>
+            <div>
+              <div className="dc-escala">
+                {!clinica.sinDato && (
+                  <div className="tope">
+                    <span className={`op${anclaClinica ? ` op--${anclaClinica}` : ""}`} style={{ left: `${clinicaLeft}%` }}>
+                      <b>{pctTxt(clinica.tasa)}</b> la clínica
+                    </span>
+                  </div>
+                )}
+                <div className="pista pista--escala">
+                  {!clinica.sinDato && (
+                    <i
+                      className="seg"
+                      style={{
+                        width: `${clinicaLeft}%`,
+                        background: sobreUmbral ? "var(--dc-danger-700)" : "var(--dc-ok-700)",
+                      }}
+                      data-w={clinicaLeft}
+                    />
+                  )}
+                  <i className="marca" style={{ left: `${umbralLeft}%` }} title={`Umbral ${UMBRAL_AUSENTISMO}%`} />
+                </div>
+                <div className="ejes">
+                  {verCero && <span className="eje-ini">0%</span>}
+                  <span style={{ left: `${umbralLeft}%` }}><b>{UMBRAL_AUSENTISMO}% alerta</b></span>
+                  <span className="eje-fin">{escala}%</span>
+                </div>
+              </div>
+              {clinica.sinDato ? (
+                <p className="dc-nota" style={{ marginTop: "var(--dc-sp-5)" }}>Sin citas de agenda en el periodo para medir ausentismo.</p>
+              ) : (
+                <>
+                  <p className="dc-nota" style={{ marginTop: "var(--dc-sp-5)", marginBottom: 4 }}><b>{deCien}</b> ({clinica.perdidas} de {clinica.total}).</p>
+                  <p className="dc-nota">{accion}</p>
+                </>
+              )}
+            </div>
+            <div className="dc-split__rule">
+              <p className="dc-rotulo">Qué se suma en esa cifra</p>
+              {/* Misma palabra, mismo color: «Suma» (pérdida), «No suma» y «Total» (solo cuentan en la base). */}
+              <div className="dc-estados">
+                <button type="button" className="fila" onClick={fichaEscala}>
+                  <span className="nm">Cancelada<em>el paciente avisó: el hueco se puede volver a vender</em></span>
+                  <span className="dc-chip dc-chip--riesgo">Suma</span>
+                </button>
+                <button type="button" className="fila" onClick={fichaEscala}>
+                  <span className="nm">No asistió<em>el paciente no avisó: el hueco se quema</em></span>
+                  <span className="dc-chip dc-chip--riesgo">Suma</span>
+                </button>
+                <button type="button" className="fila" onClick={fichaEscala}>
+                  <span className="nm">Reprogramada<em>se movió a otra fecha: se cuenta en la nueva</em></span>
+                  <span className="dc-chip dc-chip--gris">No suma</span>
+                </button>
+                <button type="button" className="fila" onClick={fichaEscala}>
+                  <span className="nm">Pendiente, confirmada, en atención o atendida<em>siguen en pie o se atendieron: solo cuentan en el total</em></span>
+                  <span className="dc-chip dc-chip--info">Total</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="dc-card__foot">
+          Canceladas y no asistidas se muestran <b>por separado</b>: una cancelación se arregla con
+          lista de espera; una falta, con recordatorios.
+        </p>
+      </section>
+
+      <section className="dc-card">
+        <div className="dc-card__head">
+          <span className="vin" style={{ background: "var(--dc-accent-cyan)" }} />
+          <h2>Ausentismo por odontólogo</h2>
+          <span className="dc-card__meta">
+            {clinica.sinDato ? "Sin citas de agenda" : `100% = ${clinica.total} citas de agenda`}
+          </span>
+          <button type="button" className="dc-info" aria-label="Qué mide este módulo" onClick={() => onOpen?.({
+            t: "Ausentismo por odontólogo",
+            s: "Quién pierde citas y cuánto cuesta",
+            cifra: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
+            parte: `${clinica.perdidas} perdidas`,
+            como: "Citas de la agenda del periodo, agrupadas por odontólogo.",
+            cols: [["Odontólogo"], ["Agenda", "n"], ["Perdidas", "n"], ["%", "n"], ["Costo", "n"]],
+            filas: rows.map((r) => [
+              r.nombre,
+              String(r.agenda),
+              String(r.perdidas),
+              pctTxt(r.tasa),
+              r.coste != null ? moneyFmt(r.coste) : "—",
+            ]),
+            total: clinica.sinDato ? "—" : pctTxt(clinica.tasa),
+            fuente: "Dato real de la agenda – sin reparto de ejemplo.",
+            tono: "cian",
+          })}>i</button>
+        </div>
+        <div className="dc-card__body">
+          {/* R4-13: el Excel y el PDF se llamaban «Odontólogos», igual que los de Producción.
+              Orden por % de pérdida, de mayor a menor (el encabezado lo marca). */}
+          <ListaFiltrable rows={rows} sub="odontólogos" exportTitulo="Ausentismo por odontólogo" alfabetico={false} defaultSort={{ key: "tasa", dir: "desc" }} cols={[
+            { key: "nombre", label: "Odontólogo", get: (r) => r.nombre || "" },
+            { key: "agenda", label: "Agenda", get: (r) => String(r.agenda ?? ""), sortVal: (r) => Number(r.agenda) || 0 },
+            { key: "perdidas", label: "Perdidas", get: (r) => String(r.perdidas ?? ""), sortVal: (r) => Number(r.perdidas) || 0 },
+            { key: "tasa", label: "%", get: (r) => (r.tasa == null ? "" : String(r.tasa)), sortVal: (r) => (r.tasa == null ? -1 : Number(r.tasa)) },
+            { key: "coste", label: "Costo", get: (r) => (r.coste != null ? String(r.coste) : ""), sortVal: (r) => Number(r.coste) || 0 },
+          ]} modoTabla>{(lstA, _v, stA) => (
+          <div className="dc-tabla-doc dc-tabla-doc--aus" role="table" aria-label="Ausentismo por odontólogo">
+            <div className="fila cab" role="row">
+              <ThOrden st={stA} k="nombre">Odontólogo</ThOrden>
+              <ThOrden st={stA} k="agenda" a="right" className="der">Agenda</ThOrden>
+              <span title={`Escala 0 – ${escala}% · alerta ${UMBRAL_AUSENTISMO}% (raya roja)`}>Pérdida</span>
+              <ThOrden st={stA} k="perdidas" a="right" className="der">Perdidas</ThOrden>
+              <ThOrden st={stA} k="tasa" a="right" className="der">%</ThOrden>
+              <ThOrden st={stA} k="coste" a="right" className="der">Costo</ThOrden>
+            </div>
+            {lstA.map((r) => (
+              <div
+                key={r.id}
+                className={`fila${r.perdidas === 0 ? " nula" : ""}`}
+                role="row"
+                tabIndex={0}
+                onClick={() => fichaDoc(r)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fichaDoc(r); } }}
+              >
+                <span className="qui">
+                  <i className="ini" style={{ background: "var(--dc-bg-alt)", color: "var(--dc-ink-500)" }}>{inicialesDe(r.nombre)}</i>
+                  <span>
+                    <b>{r.nombre}</b>
+                    {r.especialidad ? <em>{r.especialidad}</em> : null}
+                  </span>
+                </span>
+                <span className="der num">{r.agenda}</span>
+                {r.dibujarBarra ? (
+                  <span className="pista pista--escala">
+                    <i
+                      className="seg"
+                      style={{
+                        width: `${r.pctEscala}%`,
+                        background: (r.tasa || 0) >= UMBRAL_AUSENTISMO ? "var(--dc-amber-ink)" : "var(--dc-ok-700)",
+                      }}
+                      data-w={r.pctEscala}
+                    />
+                    <i className="marca" style={{ left: `${umbralLeft}%` }} />
+                  </span>
+                ) : (
+                  <span className="vacia" style={{ color: "var(--dc-ok-700)" }}>0%</span>
+                )}
+                <span className="der num">{r.perdidas}</span>
+                <span className="der pc">{pctTxt(r.tasa)}</span>
+                <span className="der num">{r.coste != null ? moneyFmt(r.coste) : "—"}</span>
+              </div>
+            ))}
+            {!rows.length && (
+              <div className="dc-nota">Sin odontólogos ni citas para calcular.</div>
+            )}
+            {rows.length > 0 && (
+              <div className="fila pie" role="row">
+                <span><b>Total</b></span>
+                <span className="der num">{clinica.total}</span>
+                <span />
+                <span className="der num">{clinica.perdidas}</span>
+                <span className="der pc">{clinica.sinDato ? "—" : pctTxt(clinica.tasa)}</span>
+                <span className="der num">{costeTotal != null ? moneyFmt(costeTotal) : "—"}</span>
+              </div>
+            )}
+          </div>
+          )}</ListaFiltrable>
+        </div>
+        <p className="dc-card__foot">
+          El costo es citas perdidas × lo que produce una cita en promedio
+          {ticket != null ? <> (<b>{moneyFmt(ticket)}</b>)</> : null}.
+        </p>
+      </section>
+
+      <div className="dc-pie">
+        <span>Se cuenta sobre las <b>citas de la agenda</b>, no sobre la producción</span>
+        <span>Canceladas y no asistidas van <b>separadas</b> en la lectura; el % las suma</span>
+      </div>
+    </>
+  );
+}
+
+export default function ProduccionComisiones({ citas: citasProp = [], tab = "resumen", sedes = null }) {
+  const conectado = !!auth.token;
+  // Sedes para la API como UUID (antes iban los números 1/2/3). Con «Todas» y un usuario
+  // de toda la clínica, null: las decide el servidor.
+  const sedeCx = useSede();
+  const sedesApi = (!sedes || !sedes.length || (sedeCx.sede === "all" && sedeCx.global)) ? null
+    : sedes.map((x) => sedeApiUuid(x)).filter(Boolean);
+  const claveSedes = sedesApi ? sedesApi.join(",") : "todas";
+  // Ausentismo con sesión: citas del mes en curso del servidor (GET /citas?desde&hasta&sedeIds),
+  // no las del estado de la demostración.
+  const hoyD = new Date();
+  const ymdL = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const desdeMes = ymdL(new Date(hoyD.getFullYear(), hoyD.getMonth(), 1)), hastaHoy = ymdL(hoyD);
+  const [citasSrv, setCitasSrv] = useState(null);
+  const [citasErr, setCitasErr] = useState(false);
+  // R5-02: «Reintentar» vuelve a pedir todo lo de la pantalla (comisiones y citas).
+  const [nRecarga, setNRecarga] = useState(0);
+  const reintentar = () => setNRecarga((n) => n + 1);
+  useEffect(() => {
+    if (!conectado || tab !== "ausencias") return;
+    setCitasErr(false);
+    api.citas.listar(null, desdeMes, hastaHoy, sedesApi)
+      .then((r) => setCitasSrv((Array.isArray(r) ? r : []).filter((c) => !sedesApi || sedes.some((v) => mismaSede(v, c.sedeId ?? c.sede)))))
+      .catch(() => { setCitasSrv([]); setCitasErr(true); });
+  }, [conectado, tab, claveSedes, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps
+  const citas = conectado ? (citasSrv || []) : citasProp;
+  // Metas con sesión: las del catálogo de médicos del servidor (no las de ejemplo de MEDICOS).
+  const [medsSrv, setMedsSrv] = useState([]);
+  useEffect(() => { if (conectado) api.catalogo.medicos().then((r) => setMedsSrv(Array.isArray(r) ? r : [])).catch(() => setMedsSrv([])); }, [conectado]);
+  // R8-07: horario de los doctores (GET /disponibilidad). Con una sede elegida se listan los
+  // doctores que atienden en ella con la regla de Metas y del Panel (compartido/medicoEnSede.js)
+  // y solo cuenta su meta: antes, con Surco, salían los 6 y «Al ritmo de su meta 0 de 1» contaba
+  // la meta de un doctor sin horario en Surco. undefined = cargando; null = no se pudo leer.
+  const [dispSrv, setDispSrv] = useState(undefined);
+  useEffect(() => {
+    if (!conectado) return;
+    api.disponibilidad.listar().then((r) => setDispSrv(Array.isArray(r) ? r : null)).catch(() => setDispSrv(null));
+  }, [conectado, nRecarga]);
+  const medsSede = conectado && sedesApi && dispSrv !== undefined ? medicosDeSedes(sedes, dispSrv, medsSrv, mismaSede) : null;
+  const metaSrv = (m) => {
+    const md = medsSrv.find((x) => String(x.id) === String(m.medicoId ?? m.id));
+    if (!md) return 0;
+    const ms = Array.isArray(md.metasSede) ? md.metasSede : Object.entries(md.metasSede || {}).map(([sedeId, x]) => ({ sedeId, ...x }));
+    const propias = sedesApi ? ms.filter((x) => sedes.some((v) => mismaSede(v, x.sedeId))) : ms;
+    if (propias.length) return propias.reduce((a, x) => a + (Number(x.metaMensual) || 0), 0);
+    return Number(md.metaMensual) || 0;
+  };
+  const [dataSrv, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  // H-G5: periodo explícito (antes /comisiones sin fechas = mayo–octubre sin rotular).
+  const [periodo, setPeriodo] = useState("6m");
+  const rango = rangoPeriodo(periodo);
+  const [ficha, setFicha] = useState(null);
+  const [animReady, setAnimReady] = useState(false);
+
+  const abrir = useCallback((d) => setFicha(d), []);
+  const cerrar = useCallback(() => setFicha(null), []);
+
+  const cargar = useCallback(() => {
+    setErr(null);
+    if (!auth.token) { setData(datosDemo(sedes)); return; }
+    api.comisiones(rango.desde, rango.hasta, sedesApi)
+      .then((r) => setData(r && !Array.isArray(r) ? r : {}))
+      .catch((e) => { setData(null); setErr(e?.message || "No se pudo cargar comisiones"); });
+  }, [sedes && sedes.join(","), claveSedes, periodo, nRecarga]); // eslint-disable-line react-hooks/exhaustive-deps -- se recarga al cambiar el filtro de sede
+
+  useEffect(() => { cargar(); }, [cargar]);
+  // R6-02: /comisiones?sedeIds ya devuelve producción, comisión y cobrado de la sede elegida
+  // (médico por médico). Se usa tal cual: sin el recálculo con citas y pagos (H-06) ni el
+  // aviso de que el reporte era de toda la clínica.
+  const data = dataSrv;
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setAnimReady(true));
+    return () => cancelAnimationFrame(t);
+  }, [data]);
+
+  // R8-07: con una sede elegida, los doctores que atienden en ella y quien produjo ahí (como el
+  // equipo del Panel). Sin horario ni sedes a la vista no se sabe y se listan todos.
+  const porMedicoSrv = data?.porMedico || [];
+  const porMedico = medsSede ? equipoDeSede(porMedicoSrv, medsSede) : porMedicoSrv;
+  const deLaSede = (m) => !medsSede || medsSede.has(String(m.medicoId ?? m.id ?? ""));
+  const totalProd = Number(data?.totalProduccion) || 0;
+  const totalCom = Number(data?.totalComision) || 0;
+  const totalCitas = Number(data?.totalCitas) || 0;
+  const odontoCon = Number(data?.odontologosConProduccion) || 0;
+  const odontoTot = Number(data?.odontologos) || porMedico.length;
+  const sinDato = data?.sinDato !== false && (data?.pendienteLiquidar == null);
+  const pendiente = data?.pendienteLiquidar;
+  const totalCobrado = Number(data?.totalCobrado) || 0;
+  const descuadre = Number(data?.descuadre) || (totalCobrado - totalProd);
+  const mesesConCobro = Number(data?.mesesConCobro) || 0;
+  const cobros = data?.cobrosPorMes || [];
+  const mediaClinica = Number(data?.mediaTicketClinica) || (totalCitas > 0 ? totalProd / totalCitas : 0);
+  // Cuánto rinde cada cita, de mayor a menor (sin citas, S/ 0.00 al final).
+  const rinde = porMedico.map((m) => ({ m, ticket: m.atendidas > 0 ? Number(m.produccion) / m.atendidas : 0 }))
+    .sort((a, b) => b.ticket - a.ticket);
+  const techo = techoRinde(rinde.map((x) => x.ticket), 250);
+  const mediaPct = marcaMediaPct(mediaClinica, techo);
+  const filasEjemplo = porMedico.filter((m) => m.ejemplo).length;
+  const quieto = prefersReducedMotion();
+
+  // El periodo que de verdad usó el servidor (desde/hasta de la respuesta) o el pedido.
+  const perDesde = conectado ? (data?.desde || rango.desde) : null;
+  const perHasta = conectado ? (data?.hasta || rango.hasta) : null;
+  const mesesPer = conectado ? mesesDelPeriodo(perDesde, perHasta) : 1;
+  const ritmoPer = conectado ? ritmoDelPeriodo(perDesde, perHasta) : null;
+  // «may – oct 2026»: los meses de la curva (sin sesión, los 6 últimos del ejemplo).
+  const rangoLabel = rotuloMeses(perDesde || rango.desde, perHasta || rango.hasta);
+  const citasTxt = (n) => `${n || 0} ${n === 1 ? "cita" : "citas"}`;
+  // Sin pagos de comisión registrados, lo pendiente es toda la comisión devengada.
+  const pendienteVal = sinDato ? totalCom : Number(pendiente) || 0;
+  // Cobrado − producción con su signo; el rótulo dice hacia dónde va la diferencia.
+  const difTxt = `${descuadre >= 0 ? "+" : "−"}${moneyFmt(Math.abs(descuadre))}`;
+  const difRotulo = descuadre >= 0 ? "Cobrado sobre la producción" : "Producción sin cobrar";
+  const difCifra = descuadre >= 0 ? difTxt : moneyFmt(-descuadre);
+
+  const fichaDoc = (m) => ({
+    t: m.nombre,
+    s: m.especialidad || "Odontólogo",
+    cifra: moneyFmt(m.produccion),
+    parte: citasTxt(m.atendidas),
+    sub: `Comisión ${moneyFmt(m.comision)} (${m.porcentaje}%).`,
+    como: `${CRITERIO_PRODUCCION} Hoy: citas atendidas × precio base de la especialidad de cada cita. Comisión = producción × % del odontólogo (el mismo en todas sus sedes).`,
+    cols: [["Concepto"], ["Valor", "n"]],
+    filas: [
+      ["Citas atendidas", String(m.atendidas || 0)],
+      ["Producción", moneyFmt(m.produccion)],
+      ["% comisión", `${m.porcentaje}%`],
+      ["Comisión", moneyFmt(m.comision)],
+      ["Ticket / cita", m.ticketCita != null ? moneyFmt(m.ticketCita) : "—"],
+    ],
+    fuente: "Citas atendidas del periodo – catálogo de especialidades – ficha del odontólogo.",
+    ejemplo: !!m.ejemplo,
+    estado: m.ejemplo ? "Detalle de ejemplo" : undefined,
+    tono: "brand",
+  });
+
+  return (
+    <div className="dc-pc">
+      {/* Resumen y Ausentismo son submódulos del menú lateral (sin fila de pestañas). */}
+
+      {/* R5-02: si /comisiones falla, la pantalla no cae a S/ 0: dice que no hay dato. */}
+      {err && tab !== "ausencias" && <div style={{ marginBottom: 16 }}><NoDisponible bloque onReintentar={reintentar} texto="Producción y comisiones no disponibles" detalle="No se pudieron leer las comisiones del servidor. No son ceros: faltan los datos." /></div>}
+
+      {tab === "ausencias" && conectado && !citasErr && (
+        <p className="dc-nota" style={{ marginBottom: 12 }}>
+          {citasSrv == null ? "Cargando citas del servidor…" : `Agenda del mes en curso: ${rotuloPeriodo(desdeMes, hastaHoy)}.`}
+        </p>
+      )}
+      {tab === "ausencias" && conectado && citasErr ? (
+        <NoDisponible bloque onReintentar={reintentar} texto="Ausentismo no disponible" detalle="No se pudieron cargar las citas del mes. Sin ellas no se calcula el ausentismo." />
+      ) : tab === "ausencias" ? (
+        <AusentismoTab
+          citas={citas}
+          medicos={porMedico}
+          ticketMedio={mediaClinica > 0 ? mediaClinica : null}
+          onOpen={abrir}
+        />
+      ) : (
+        <>
+          {conectado && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+              <div className="dc-us__roles" role="tablist" aria-label="Periodo">
+                {PERIODOS_COMISIONES.map(([k, l]) => (
+                  <button key={k} type="button" role="tab" aria-selected={periodo === k} className={periodo === k ? "is-on" : ""} style={{ "--c": "#0E9199" }} onClick={() => setPeriodo(k)}>{l}</button>
+                ))}
+              </div>
+              <span className="dc-nota" style={{ margin: 0 }}>Periodo: <b>{rotuloPeriodo(perDesde, perHasta)}</b></span>
+              {/* La regla de la meta en periodos de varios meses va en el «i», no en el rótulo. */}
+              {mesesPer > 1 && <button type="button" className="dc-info" aria-label="Cómo se cuenta la meta en el periodo" onClick={() => abrir({
+                t: "Periodo del reporte",
+                s: rotuloPeriodo(perDesde, perHasta),
+                cifra: `${mesesPer} meses`,
+                como: `La meta de cada odontólogo es mensual: en un periodo de ${mesesPer} meses se cuenta ${mesesPer} veces para medir el avance.`,
+                cols: [["Concepto"], ["Valor", "n"]],
+                filas: [["Desde", fechaLegible(perDesde)], ["Hasta", fechaLegible(perHasta)], ["Meses", String(mesesPer)]],
+                tono: "cian",
+              })}>i</button>}
+            </div>
+          )}
+          {!err && <>
+          <section className="dc-kpis dc-kpis--hero" aria-label="Indicadores del periodo">
+            <button type="button" className="dc-kpi" onClick={() => abrir({
+              t: "Producción del periodo",
+              s: "Valor de los procedimientos terminados",
+              cifra: moneyFmt(totalProd),
+              parte: citasTxt(totalCitas),
+              como: `${CRITERIO_PRODUCCION} Hoy es la suma atribuida a cada odontólogo por sus citas atendidas (precio base de la especialidad de la cita).`,
+              cols: [["Odontólogo"], ["Citas", "n"], ["Producción", "n"]],
+              filas: porMedico.map((m) => [m.nombre, String(m.atendidas || 0), moneyFmt(m.produccion)]),
+              total: moneyFmt(totalProd),
+              fuente: "Misma regla que el gerencial: citas atendidas × precio base (el S/ coincide si el periodo es el mismo).",
+              tono: "brand",
+            })}>
+              <span className="dc-kpi__icon" style={{ background: "var(--dc-brand-100)", color: "var(--dc-brand-600)" }} aria-hidden="true">◎</span>
+              <div className="dc-kpi__body">
+                <div className="dc-kpi__label">Producción del periodo</div>
+                <div className="dc-kpi__value">{moneyFmt(totalProd)}</div>
+                <div className="dc-kpi__sub">{totalCitas} {totalCitas === 1 ? "cita atendida" : "citas atendidas"}</div>
+              </div>
+            </button>
+            <button type="button" className="dc-kpi" onClick={() => abrir({
+              t: "Comisión devengada",
+              s: "Producción × porcentaje",
+              cifra: moneyFmt(totalCom),
+              como: `Cada odontólogo: producción × su % de comisión (el mismo en todas sus sedes). No es lo cobrado ni lo pagado. ${CRITERIO_PRODUCCION}`,
+              cols: [["Odontólogo"], ["%", "n"], ["Comisión", "n"]],
+              filas: porMedico.map((m) => [m.nombre, `${m.porcentaje}%`, moneyFmt(m.comision)]),
+              total: moneyFmt(totalCom),
+              tono: "ok",
+            })}>
+              <span className="dc-kpi__icon" style={{ background: "var(--dc-ok-100)", color: "var(--dc-ok-700)" }} aria-hidden="true">%</span>
+              <div className="dc-kpi__body">
+                <div className="dc-kpi__label">Comisión devengada</div>
+                <div className="dc-kpi__value">{moneyFmt(totalCom)}</div>
+                <div className="dc-kpi__sub">Sobre la producción</div>
+              </div>
+            </button>
+            {/* Avance contra la meta de cada odontólogo (la meta se edita en Metas y comisiones). */}
+            {(() => {
+              const hoyD = new Date();
+              // Con sesión: meta mensual × meses del periodo y ritmo sobre el mismo periodo.
+              const ritmoM = ritmoPer != null ? ritmoPer : (hoyD.getDate() / new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0).getDate()) * 100;
+              // R8-07: solo la meta de los doctores de la sede (la que suman Metas y el Panel).
+              const conMeta = porMedico.filter(deLaSede).map((m) => { const md = conectado ? null : MEDICOS.find((x) => String(x.id) === String(m.medicoId ?? m.id) || x.nombre === m.nombre); const metaMes = Number(m.meta ?? (conectado ? metaSrv(m) : md ? medicoEnSedes(md, sedes).meta : 0)) || 0; const meta = metaMes * mesesPer; return { ...m, metaMes, meta, pct: meta ? (Number(m.produccion) || 0) / meta * 100 : null }; }).filter((m) => m.meta > 0);
+              const alRitmo = conMeta.filter((m) => m.pct >= ritmoM).length;
+              const metaTot = conMeta.reduce((a, m) => a + m.meta, 0);
+              // Producción de quien tiene meta ÷ su meta del mismo periodo (antes: la producción de todo el equipo ÷ una sola meta mensual).
+              const avanceTot = metaTot ? (conMeta.reduce((a, m) => a + (Number(m.produccion) || 0), 0) / metaTot) * 100 : null;
+              return (
+                <button type="button" className="dc-kpi" onClick={() => abrir({
+                  t: "Cumplimiento de metas",
+                  s: `Ritmo esperado a hoy: ${pctTxt(ritmoM)} de la meta`,
+                  cifra: `${alRitmo} de ${conMeta.length}`,
+                  parte: "con meta",
+                  como: mesesPer > 1
+                    ? `Producción del odontólogo en el periodo ÷ (su meta mensual × ${mesesPer} meses). Está al ritmo si su avance es igual o mayor a la parte del periodo que ya pasó.`
+                    : "Producción del odontólogo ÷ su meta mensual. Está al ritmo si su avance es igual o mayor al porcentaje del mes que ya pasó.",
+                  cols: [["Odontólogo"], ["Producción", "n"], [mesesPer > 1 ? `Meta (${mesesPer} meses)` : "Meta", "n"], ["Avance", "n"]],
+                  filas: conMeta.map((m) => [m.nombre, moneyFmt(m.produccion), moneyFmt(m.meta), pctTxt(m.pct)]),
+                  vacio: "Sin metas definidas: se fijan en Metas y comisiones.",
+                  tono: "cian",
+                })}>
+                  <span className="dc-kpi__icon" style={{ background: "var(--dc-info-100)", color: "var(--dc-info-700)" }} aria-hidden="true">◎</span>
+                  <div className="dc-kpi__body">
+                    <div className="dc-kpi__label">Al ritmo de su meta</div>
+                    <div className="dc-kpi__value">{alRitmo} de {conMeta.length} <small>con meta</small></div>
+                    <div className="dc-kpi__sub">{avanceTot != null ? `${pctTxt(avanceTot)} del total de metas` : "Sin metas definidas"}</div>
+                  </div>
+                </button>
+              );
+            })()}
+            <button type="button" className="dc-kpi" onClick={() => abrir({
+              t: "Pendiente de liquidar",
+              s: "Comisión devengada − pagos al odontólogo",
+              cifra: moneyFmt(pendienteVal),
+              parte: sinDato ? "0 pagos registrados" : undefined,
+              como: "Comisión devengada menos los pagos de comisión registrados. Sin pagos registrados, toda la comisión devengada está pendiente.",
+              cols: [["Concepto"], ["Valor", "n"]],
+              filas: [
+                ["Comisión devengada", moneyFmt(totalCom)],
+                ["Pagado", moneyFmt(sinDato ? 0 : data?.totalPagado)],
+                ["Pendiente", moneyFmt(pendienteVal)],
+              ],
+              tono: "aviso",
+            })}>
+              <span className="dc-kpi__icon" style={{ background: "var(--dc-warn-100)", color: "var(--dc-warn-700)" }} aria-hidden="true">☐</span>
+              <div className="dc-kpi__body">
+                <div className="dc-kpi__label">Pendiente de liquidar</div>
+                <div className="dc-kpi__value">{moneyFmt(pendienteVal)}</div>
+                <div className="dc-kpi__sub">{sinDato ? "0 pagos registrados" : "Comisión menos pagos"}</div>
+              </div>
+            </button>
+          </section>
+
+          <section className="dc-card">
+            <div className="dc-card__head">
+              <span className="vin" style={{ background: "var(--dc-brand-600)" }} />
+              <h2>Producción y comisión por odontólogo</h2>
+              <span className="dc-card__meta">
+                100% = {moneyFmt(totalProd)}
+                {filasEjemplo > 0 && (
+                  <span className="marca-demo">{filasEjemplo} filas de ejemplo</span>
+                )}
+              </span>
+              <button type="button" className="dc-info" aria-label="Detalle del módulo" onClick={() => abrir({
+                t: "Producción y comisión por odontólogo",
+                s: "Parte del total del periodo",
+                cifra: moneyFmt(totalProd),
+                parte: "100%",
+                como: "Cada barra es la parte del total de producción del periodo, no un avance contra meta. La atribución es por el odontólogo de cada cita.",
+                cols: [["Odontólogo"], ["Especialidad"], ["Citas", "n"], ["Producción", "n"], ["Comisión", "n"]],
+                filas: porMedico.map((m) => [m.nombre, m.especialidad || "—", String(m.atendidas || 0), moneyFmt(m.produccion), moneyFmt(m.comision)]),
+                total: moneyFmt(totalProd),
+                fuente: "Misma regla de producción que el gerencial (atendidas × precio base); el S/ cuadra si el periodo coincide.",
+                tono: "brand",
+              })}>i</button>
+            </div>
+            <div className="dc-card__body">
+              {/* Orden por producción, de mayor a menor (el encabezado lo marca); por nombre, el
+                  alfabético ponía a todos los «Dr.» antes que las «Dra.». */}
+              <ListaFiltrable rows={porMedico} sub="odontólogos" exportTitulo="Producción por odontólogo" alfabetico={false} defaultSort={{ key: "prod", dir: "desc" }} cols={[
+                { key: "nombre", label: "Odontólogo", get: (m) => m.nombre || "" },
+                { key: "esp", label: "Especialidad", get: (m) => m.especialidad || "" },
+                { key: "citas", label: "Citas", get: (m) => String(m.atendidas || 0), sortVal: (m) => Number(m.atendidas) || 0 },
+                { key: "prod", label: "Producción", get: (m) => String(m.produccion || 0), sortVal: (m) => Number(m.produccion) || 0 },
+                { key: "com", label: "Comisión", get: (m) => String(m.comision || 0), sortVal: (m) => Number(m.comision) || 0 },
+              ]} modoTabla>{(lstP, _v, stP) => (
+              <div className="dc-tabla-doc" role="table" aria-label="Producción y comisión por odontólogo">
+                <div className="fila cab" role="row">
+                  <ThOrden st={stP} k="nombre">Odontólogo</ThOrden><ThOrden st={stP} k="citas" a="right" className="der">Citas</ThOrden><span>Parte del total</span>
+                  <ThOrden st={stP} k="prod" a="right" className="der">Producción</ThOrden><span className="der">%</span><ThOrden st={stP} k="com" a="right" className="der">Comisión</ThOrden>
+                </div>
+                {lstP.map((m) => {
+                  const lay = layoutProgreso(m.produccion, totalProd);
+                  const nula = !(Number(m.produccion) > 0);
+                  return (
+                    <div
+                      key={String(m.medicoId || m.nombre)}
+                      className={`fila${nula ? " nula" : ""}`}
+                      role="row"
+                      tabIndex={0}
+                      title={m.ejemplo ? "Reparto de ejemplo" : undefined}
+                      onClick={() => abrir(fichaDoc(m))}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(fichaDoc(m)); } }}
+                    >
+                      <span className="qui">
+                        <i className="ini" style={{ background: "var(--dc-bg-alt)", color: "var(--dc-ink-500)" }}>{inicialesDe(m.nombre)}</i>
+                        <span>
+                          <b>{m.nombre}</b>
+                          <em>{m.especialidad || "—"}</em>
+                        </span>
+                      </span>
+                      <span className="der num">{m.atendidas || 0}</span>
+                      {nula || !lay.dibujar ? (
+                        <span className="vacia">sin producción</span>
+                      ) : (
+                        <span className="pista">
+                          <i className="seg" style={{ width: animReady || quieto ? `${lay.pct}%` : "0%", background: COLOR_BARRA }} />
+                        </span>
+                      )}
+                      <span className="der num">{moneyFmt(m.produccion)}</span>
+                      <span className="der pc">{pctTxt(lay.pct)}</span>
+                      <span className={`der num${nula ? "" : " c-ok"}`}>{moneyFmt(m.comision)}</span>
+                    </div>
+                  );
+                })}
+                <div className="fila pie" role="row">
+                  <span><b>Total</b></span>
+                  <span className="der num">{totalCitas}</span>
+                  <span />
+                  <span className="der num">{moneyFmt(totalProd)}</span>
+                  <span className="der pc">100%</span>
+                  <span className="der num">{moneyFmt(totalCom)}</span>
+                </div>
+              </div>
+              )}</ListaFiltrable>
+            </div>
+          </section>
+
+          <div className="dc-grid g-2a">
+            <section className="dc-card">
+              <div className="dc-card__head">
+                <span className="vin" style={{ background: "var(--dc-accent-cyan)" }} />
+                <h2>Ingresos cobrados – acumulado</h2>
+                <span className="dc-card__meta">{rangoLabel}</span>
+                <button type="button" className="dc-info" aria-label="Detalle de ingresos" onClick={() => abrir({
+                  t: "Ingresos cobrados",
+                  s: "Acumulado del periodo",
+                  cifra: moneyFmt(totalCobrado),
+                  micro: [
+                    ["Producción", moneyFmt(totalProd)],
+                    ["Diferencia", difTxt],
+                  ],
+                  como: "Cobrado = pagos registrados en Caja, sumados por mes. La diferencia con la producción (procedimientos terminados) puede venir de saldos de meses anteriores o de trabajo aún sin cobrar.",
+                  cols: [["Mes"], ["Cobrado", "n"]],
+                  filas: cobros.map((m) => [m.mesLargo || m.mes, moneyFmt(m.cobrado)]),
+                  total: moneyFmt(totalCobrado),
+                  tono: "cian",
+                })}>i</button>
+              </div>
+              <div className="dc-card__body dc-card__body--alto">
+                <dl className="dc-datos">
+                  <div><dt>Cobrado</dt><dd>{moneyFmt(totalCobrado)}</dd></div>
+                  {/* No es una alerta: cobrar más que lo producido sale de saldos de antes (verde);
+                      lo contrario es trabajo aún sin cobrar (neutro). */}
+                  <div onClick={() => abrir({
+                    t: difRotulo,
+                    s: "Cobrado − producción, misma ventana de fechas",
+                    cifra: difCifra,
+                    como: `Cobrado del periodo (pagos en Caja) − producción del mismo tramo. Puede ser positivo si se cobran tratamientos de antes. ${CRITERIO_PRODUCCION}`,
+                    cols: [["Concepto"], ["Monto", "n"]],
+                    filas: [["Cobrado", moneyFmt(totalCobrado)], ["Producción", moneyFmt(totalProd)], ["Diferencia", difTxt]],
+                    tono: descuadre >= 0 ? "ok" : "brand",
+                  })}>
+                    <dt>{difRotulo}</dt>
+                    <dd style={descuadre >= 0 ? { color: "var(--dc-ok-700)" } : undefined}>{difCifra}</dd>
+                  </div>
+                  <div><dt>Meses con cobro</dt><dd>{mesesConCobro} de {cobros.length || 6}</dd></div>
+                </dl>
+                <CanvasIngresos
+                  meses={cobros.map((m) => m.mes)}
+                  cobrados={cobros.map((m) => Number(m.cobrado) || 0)}
+                  onOpen={() => abrir({
+                    t: "Curva acumulada",
+                    s: rangoLabel,
+                    cifra: moneyFmt(totalCobrado),
+                    como: "Escalón acumulado mes a mes; cada mes escribe lo cobrado bajo el eje para que montos chicos se lean.",
+                    tono: "cian",
+                  })}
+                />
+              </div>
+            </section>
+
+            <section className="dc-card">
+              <div className="dc-card__head">
+                <span className="vin" style={{ background: "var(--dc-ok-700)" }} />
+                <h2>Cuánto rinde cada cita</h2>
+                <button type="button" className="dc-info" aria-label="Detalle de rendimiento" onClick={() => abrir({
+                  t: "Cuánto rinde cada cita",
+                  s: "Producción ÷ citas",
+                  cifra: moneyFmt(mediaClinica),
+                  parte: "media clínica",
+                  como: `Escala fija a ${moneyFmt(techo)} (no al máximo de la serie). La marca gris es la media de la clínica.`,
+                  cols: [["Odontólogo"], ["Citas", "n"], ["Ticket", "n"]],
+                  filas: rinde.map(({ m, ticket }) => [m.nombre, String(m.atendidas || 0), moneyFmt(ticket)]),
+                  tono: "ok",
+                })}>i</button>
+              </div>
+              <div className="dc-card__body">
+                <div className="dc-barras">
+                  {rinde.map(({ m, ticket }) => {
+                    const lay = layoutRinde(ticket, techo);
+                    if (!lay.dibujar) {
+                      return (
+                        <div key={String(m.medicoId)} className="hb hb--nula" title={`${m.nombre} – ${citasTxt(m.atendidas)}`}>
+                          <span className="n">{m.nombre}</span>
+                          <span className="v">{moneyFmt(0)}</span>
+                          <span className="pc">{citasTxt(m.atendidas)}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        key={String(m.medicoId)}
+                        className="hb"
+                        tabIndex={0}
+                        onClick={() => abrir(fichaDoc(m))}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(fichaDoc(m)); } }}
+                      >
+                        <span className="n">{m.nombre}</span>
+                        <span className="v">{moneyFmt(ticket)}</span>
+                        <span className="pc">{citasTxt(m.atendidas)}</span>
+                        <div className="pista">
+                          <div className="seg" style={{ width: animReady || quieto ? `${lay.pct}%` : "0%", background: COLOR_BARRA }} />
+                          {mediaPct != null && <i className="marca" style={{ left: `${mediaPct}%` }} />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <p className="dc-card__foot">
+                La marca gris es la <b>media de la clínica: {moneyFmt(mediaClinica)} por cita</b>.
+              </p>
+            </section>
+          </div>
+
+          <div className="dc-pie">
+            <span>Comisión sobre la <b>producción</b> (procedimientos terminados), no sobre lo cobrado</span>
+            <span>El porcentaje es del odontólogo, el mismo en todas sus sedes</span>
+          </div>
+          </>}
+        </>
+      )}
+
+      {ficha && <FichaDato dato={ficha} onClose={cerrar} />}
+    </div>
+  );
+}

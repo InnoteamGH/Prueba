@@ -1,0 +1,23 @@
+/* Reportes (Ocupación de sillones, Metas y comisiones): ajustes sobre ui.css. */
+
+/* Ocupación: los días en minúscula, como fechaLegible («vie 23»), no «VIE». */
+.dc-ocz__fila.is-cab small,
+.dc-ocz__hdia small { text-transform: none; letter-spacing: 0; }
+/* Celda sin citas: atenuada y sin texto; solo resaltan las ocupadas. */
+.dc-ocz__c.is-cero { background: var(--dc-bg-soft, #F7FAFA); }
+.dc-ocz__c.is-cero:not(.is-hoy) { box-shadow: inset 0 0 0 1px #EEF3F4; }
+/* «Asígnalo en la Agenda» se lee entero: baja de línea en vez de cortarse. */
+.dc-ocz__fila.is-suelta .dc-ocz__nom small { white-space: normal; overflow: visible; }
+
+/* Metas: la especialidad y «también en Surco» en gris (en turquesa parecían enlaces). */
+.dc-mtz__dn i { color: inherit; }
+/* Celular: sin encabezados de columna, cada cifra lleva su rótulo y «Gana al cumplir» va a
+   todo el ancho. */
+@media (max-width: 760px) {
+  .dc-mtz__fila:not(.is-cab) > [data-rot]::before {
+    content: attr(data-rot); display: block; margin-bottom: 4px;
+    font-size: 11px; font-weight: 700; color: var(--dc-ink-500);
+  }
+  .dc-mtz__gana { grid-column: 1 / -1; }
+  .dc-mtz__fila:not(.is-cab) > .dc-mtz__parte::before { grid-column: 1 / -1; margin-bottom: -6px; }
+}
