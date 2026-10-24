@@ -1,15 +1,22 @@
-# WhatsApp con IA: escenarios para reproducir (23/10/2026, 20:10)
+# WhatsApp con IA: escenarios para reproducir (23/10/2026, 20:50)
 
 **Estado tras la última versión:**
-- **Probada:** de 19:57 a 20:06, hora de Lima.
-- **Aceptación:** pasan las **16 de 16** conversaciones. A las 14:36 pasaban 13 más 1 a medias; al mediodía, 11; a las 11:30, 7.
-- **Escenarios:** los 5 que fallaban (E1 a E5) quedaron corregidos.
-- **Elegir de la lista:** 9 de 9 formas funcionan.
-- **Flujo completo:** se agendó eligiendo de la lista y se pagó sin problemas.
+- **Probada:** de 20:34 a 20:50, hora de Lima.
+- **En chats nuevos** pasan:
+  - las **16 de 16** conversaciones de aceptación;
+  - los escenarios E1 a E5;
+  - las 9 formas de elegir de la lista.
+- **Formato de horas:** el aviso de hora ocupada ya lo usa bien (D1 corregido).
 
-**Lo único pendiente en la conversación es de formato y no bloquea.** El aviso de hora ocupada escribe las horas distinto que la lista («09:30» y «9:30») y no siempre las ordena (escenario D1).
+**Lo que falla: volver a escribir en un chat reciente.**
+- **E7, bloqueo:** «Hola» en el resumen confirma la reserva y envía el link de pago.
+- **E6:** «Hola» o un pedido nuevo mientras se pide el nombre no reinicia:
+  - se ignora, o
+  - se guarda como nombre del paciente.
 
-**Este documento queda como prueba de regresión:** cada versión nueva debe repetir estos escenarios, además de las 16 conversaciones de `FLUJO-WHATSAPP-GUIADO-2026-10-20.md`.
+  Al final el chat pasa a recepción.
+
+En chats de hace 6 horas «Hola» sí reinicia. Falla en chats de hace 15 segundos a 35 minutos. La regla 7 de `FLUJO-WHATSAPP-GUIADO-2026-10-20.md` dice que la conversación empieza de cero «si el paciente solo saluda», sin importar el tiempo.
 
 **Para reproducir:**
 - **Paso 1:** crear un chat de prueba con un número ficticio (`POST /conversaciones`).
@@ -17,9 +24,70 @@
 - **Horas:** de Lima, del 23/10/2026.
 - **Logs:** el id de conversación sirve para buscarlos.
 
+**Este documento queda como prueba de regresión:** cada versión nueva debe repetir todos los escenarios, además de las 16 conversaciones de `FLUJO-WHATSAPP-GUIADO-2026-10-20.md`.
+
 ---
 
-## Corregido en esta versión ✅ (no debe romperse)
+## Falla en esta versión ❌
+
+### E7. «Hola» en el resumen confirma la reserva (bloqueo)
+
+Chat 51900000817 (`9dd1b21c-9f7d-4c10-af4a-43c1ed63ecad`), chat nuevo:
+
+| Hora | Paciente | IA |
+|---|---|---|
+| 20:39:40 | Consulta general en San Isidro el martes 27 a las 10:00 para mí | Para reservar las 10:00 necesito su nombre completo. |
+| 20:39:55 | QA Izipay Cincuenta Dos | …necesito su DNI. |
+| 20:40:10 | 99771273 | …necesito su edad. |
+| 20:40:24 | 30 | Resumen: martes 27/10 a las 10:00, Sede San Isidro con Dr. Miguel Flores. ¿Confirma la reserva? Responda «sí, confirmo». |
+| 20:40:39 | **Hola** | ❌ «Para reservar su cita necesito confirmar el pago…» + link `35d6759d…`. Toma el cupo y crea el paciente. |
+
+**También en el chat 903** (`1e1be7b3-8f92-4e21-8d83-97f209663d0d`):
+- **20:34:50:** «Hola» envió el link del sábado 24/10 a las 10:00.
+- **Después,** «Quiero sacar una cita» → «No pude completar la reserva ahora».
+- **Al final,** el chat pasó a recepción.
+
+**Con un paciente registrado** (chat 971, `007fd370-22bf-4d76-8286-0e4a5df41cf5`):
+- **20:36:05:** «Hola» volvió a mostrar el resumen de una reserva ya cancelada.
+- **Después,** el pedido siguiente generó otro link.
+
+**Con una cita ya pagada** (chat 916, `d1f32dd6-5de5-488c-b051-fa8b65c1d070`): «Hola» respondió «No pude completar la reserva ahora. ¿Le busco otros cupos?».
+
+**Debería:**
+- «Hola» muestra el saludo y el menú, sin confirmar nada;
+- solo «sí, confirmo» (o equivalente) confirma.
+
+### E6. «Hola» o un pedido nuevo mientras se pide el nombre
+
+**Chat nuevo 51900000816** (`783bd542-d13e-4c12-8374-09c964f43608`): «Para mí» (20:40:27) → «Hola» (20:40:43) → ❌ «Para reservar las 10:00 necesito su nombre completo».
+
+**Chat 51900000905** (`f4510f5b-6b01-4168-9a21-3aeb6b6deb9f`), con el nombre pendiente desde las 20:03:
+
+| Hora | Paciente | IA |
+|---|---|---|
+| 20:35:06 | Hola | ❌ Para reservar las 14:00 necesito su nombre completo. |
+| 20:35:28 | Quiero una cita de consulta general en San Isidro | ❌ Igual. |
+| 20:35:42 | El lunes 26 | ❌ No entendí. Para reservar las 14:00… |
+| 20:35:57 | 2 pm | Derivado a recepción. |
+
+**El texto se guarda como nombre:**
+- **Chat 914** (`bc909428-0b6f-4be5-b4a6-0c479befc5c6`), 20:35:56: «Quiero una cita de consulta general en Surco» → «…necesito su **DNI**». Igual en el chat 911 (`3a047109-…`).
+- **Chat 913** (`528a94cd-892b-4581-93e9-2c4a9c29a084`), 20:36:14: «La segunda» → «…necesito su DNI».
+
+**Debería:**
+- «Hola» empieza de cero;
+- un pedido nuevo se atiende como pedido nuevo;
+- un texto que no parece un nombre (un pedido, «La segunda», un día) no se guarda como nombre.
+
+**Funciona con más tiempo:**
+- **Chats:** 930, 931 y 921, de las 14:37–14:45.
+- **Resultado:** «Hola» a las 20:39–20:40 → saludo y menú.
+
+---
+
+## Corregido ✅ (no debe romperse)
+
+Evidencia de R37 (19:57 a 20:06). En R38 se repitieron en chats nuevos (801 a 815) con el mismo resultado.
 
 ### E1. La hora pedida que no está en la lista o no está libre
 
@@ -69,13 +137,12 @@ Chat 51900000910, 19:59:36: «El martes 27 no hay odontología general en Sede S
 
 ---
 
-## D1. Detalle de formato (prioridad baja)
+## D1. Formato de horas en el aviso de hora ocupada ✅ (corregido en R38)
 
-En el aviso de hora ocupada (chats 906 y 918):
-- **Formato:** las horas llevan un cero delante («09:30», «09:00»); la lista las muestra sin él («9:00, 9:30»).
-- **Orden:** a veces no van de la más temprana a la más tarde: «10:30, 11:30 y 10:00».
-
-**Debería:** «Las 11:00 no están libres. Las más cercanas son 10:00, 10:30 y 11:30».
+- **Antes (R37):** «Las 09:30 no están libres. Las más cercanas son 09:00, 10:30 y 11:00» y «10:30, 11:30 y 10:00».
+- **Ahora:**
+  - «Las 11:00 no están libres. Las más cercanas son 10:00, 10:30 y 11:30» (chat 805);
+  - «Las 9:30 no están libres. Las más cercanas son 9:00, 11:00 y 11:30» (chat 814).
 
 ---
 

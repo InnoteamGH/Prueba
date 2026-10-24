@@ -584,3 +584,8 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Las 16 conversaciones de aceptación pasan todas** desde esta versión. Cada cambio del asistente repite las 16, los escenarios E1 a E5 de `ESCENARIOS-WHATSAPP-2026-10-23.md` y las 9 formas de elegir de la lista antes de publicarse.
    - **Las horas se escriben igual en todos los mensajes:** «9:30», sin cero delante, y ordenadas de la más temprana a la más tarde.
    - **La API no responde 503 con 30 lecturas simultáneas:** la mejora de R36 no se mantuvo (en R37 fallaron hasta 14 de 30). Se mide antes de dar por cerrada cada versión.
+126. Un saludo nunca confirma ni se guarda como dato (revisión 38; detalle en `ESCENARIOS-WHATSAPP-2026-10-23.md`, E6 y E7):
+   - **«Hola» solo reinicia la conversación en cualquier estado y a cualquier hora**, no solo tras varias horas: en el resumen, mientras se pide un dato o después de pagar. Se mantiene quién es el paciente si ya está registrado.
+   - **Solo una confirmación explícita crea el link de pago.** Un saludo, un pedido nuevo o un dato suelto no confirman: hoy «Hola» en el resumen tomó el cupo y creó el paciente.
+   - **Un texto se guarda como nombre solo si parece un nombre.** Un pedido («Quiero una cita…»), una elección («La segunda») o un día no son un nombre.
+   - **Las pruebas de aceptación incluyen volver a escribir en un chat reciente** (a los pocos segundos y a los 30 minutos), además de los chats nuevos.
