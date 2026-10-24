@@ -1,4 +1,4 @@
-# Pendientes del servidor y cambios del frontend (23/10/2026)
+# Pendientes del servidor y cambios del frontend (actualizado el 24/10/2026)
 
 **Archivos:**
 
@@ -8,11 +8,12 @@
 | **`cambio-frontend-diseno-2026-10-23.patch`** | El cambio del frontend: cifras, fechas, textos y botones en todas las pantallas. Ya incluye el ajuste de `cambio-frontend-QA33.patch`. |
 | **`REVISION-DISENO-2026-10-23.md`** | Qué cambia el parche, pantalla por pantalla. |
 | **`FLUJO-WHATSAPP-GUIADO-2026-10-20.md`** | Cómo debe funcionar el WhatsApp guiado y las 16 conversaciones de aceptación. |
-| **`QA-REVISION-38-2026-10-23.md`** | Evidencia de la última prueba (23/10, 20:34 a 20:50, última versión del WhatsApp): frases, respuestas y conteo de veces. |
-| **`QA-REVISION-37-2026-10-23.md`** | Evidencia de la prueba anterior (23/10, 19:57 a 20:10). |
-| **`ESCENARIOS-WHATSAPP-2026-10-23.md`** | Los escenarios de WhatsApp paso a paso, con hora e id de conversación: E6 y E7, que fallan, y E1 a E5, ya corregidos, como prueba de regresión. |
+| **`QA-REVISION-39-2026-10-24.md`** | Evidencia de la última prueba (24/10, 13:09 a 13:55): E6 y E7 corregidos, regresión y la prueba paciente más recepción. |
+| **`PRUEBA-CLIENTE-Y-RECEPCION-2026-10-24.md`** y **`capturas-r39/`** | La prueba de punta a punta: el paciente empieza por WhatsApp y la recepción sigue en la app (tomar control, registrar, agendar, confirmar, reprogramar, devolver a la IA). Paso a paso, con capturas. |
+| **`QA-REVISION-38-2026-10-23.md`** | Evidencia de la prueba anterior (23/10, 20:34 a 20:50). |
+| **`ESCENARIOS-WHATSAPP-2026-10-23.md`** | Los escenarios de WhatsApp paso a paso, con hora e id de conversación: E8 a E13, que fallan, y E1 a E7, ya corregidos, como prueba de regresión. |
 
-Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 23/10/2026, con datos de prueba «QA» y el sandbox de Izipay.
+Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 23 y el 24/10/2026, con datos de prueba «QA» y el sandbox de Izipay.
 
 ---
 
@@ -32,6 +33,8 @@ Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 23/10/202
 | **Dos mensajes sin sentido** | Al segundo: «Una persona de recepción le escribirá por aquí en breve». El chat pasa a recepción. |
 | **Minúsculas** | «El martes 27 no hay odontología general en Sede Surco; el siguiente día es el jueves 29». |
 | **Formato de horas** | «Las 11:00 no están libres. Las más cercanas son 10:00, 10:30 y 11:30»: sin cero delante y en orden (W18). |
+| **«Hola» reinicia siempre** | En el resumen, mientras pide un dato o con la lista en pantalla: saludo y menú, sin confirmar nada (W19 y W20). Un pedido nuevo se atiende como pedido nuevo. |
+| **Recepción en la app** | Tomar control, responder, registrar al paciente desde el chat, agendar con sillón, confirmar en la agenda, reprogramar y devolver a la IA. La IA no contesta mientras recepción tiene el control, y al reprogramar se mantiene un solo cobro. |
 | **Agendar y pagar** | Elegir de la lista → datos → **una sola** confirmación → link → pago en el sandbox → cita confirmada → aviso por WhatsApp → **un solo cobro** en Caja. |
 | **Anular un link sin pagar** | «Mejor no, ya no quiero la cita» → «Listo: anulé el link de pago pendiente… El cupo quedó libre». |
 | **Paciente registrado** | «¿La cita es para usted, QA Izipay Cuarenta Uno?» y pasa al resumen, sin pedir datos. |
@@ -43,27 +46,40 @@ Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 23/10/202
 
 ---
 
-## 2. WhatsApp guiado: lo que falta (prioridad alta)
+## 2. WhatsApp y recepción: lo que falta (prioridad alta)
 
-**Qué pasa en chats nuevos** con la versión probada a las 20:34:
-- pasan las **16 de 16** conversaciones de aceptación;
-- también pasan los escenarios E1 a E5 y las 9 formas de elegir de la lista;
-- W18 quedó corregido.
-
-**Qué falla:** volver a escribir en un chat reciente.
-- **Evidencia:** en `QA-REVISION-38-2026-10-23.md`.
-- **Paso a paso:** en `ESCENARIOS-WHATSAPP-2026-10-23.md`, escenarios E6 y E7.
+**Versión probada el 24/10 a las 13:09:**
+- **Corregido:** W19 y W20 («Hola» en un chat reciente).
+- **Regresión:** volvió la doble confirmación.
+- **Prueba nueva:** por primera vez se hizo la prueba paciente más recepción en la app.
+- **Detalle:**
+  - `QA-REVISION-39-2026-10-24.md`;
+  - `PRUEBA-CLIENTE-Y-RECEPCION-2026-10-24.md`;
+  - los escenarios E8 a E13 de `ESCENARIOS-WHATSAPP-2026-10-23.md`.
 
 | # | Qué falla | Cómo está hoy | Veces |
 |---|---|---|---|
-| W19 | **Bloqueo: «Hola» en el resumen confirma la reserva** (escenario E7). | Con el resumen en pantalla («¿Confirma la reserva? Responda «sí, confirmo»»), «Hola» envía el link de pago, toma el cupo y crea el paciente. Pasó en un chat nuevo (817) y en el 903. En el 971 mostró el resumen de una reserva ya cancelada; en el 916, con la cita pagada, intentó reservar otra vez. | 1 |
-| W20 | **«Hola» o un pedido nuevo mientras se pide el nombre no reinicia** (E6). | Repite «necesito su nombre completo», o guarda el texto como nombre: «Quiero una cita de consulta general en Surco» y «La segunda» pasaron a pedir el DNI. Tras dos «No entendí» el chat pasa a recepción. En chats de hace 6 horas «Hola» sí reinicia; falla en los de hace 15 segundos a 35 minutos. | 1 |
+| W21 | **Recepción no ve los chats sin sede** (E13). | Los chats derivados por «no entendí» (825, 902, 959, 907 y 908) no tienen sede, y no los ve ninguna recepción ni el administrador de sede: solo el administrador general. Al paciente se le dijo «recepción le escribirá en breve». Un chat nuevo no aparece en la bandeja de su sede hasta que la IA busca cupos, aunque el paciente ya dijo la sede. `POST /conversaciones` ignora `sedeId`, y «Hola» borra la sede. | 1 |
+| W22 | **La IA no ve la cita al recibir el chat de recepción** (E12). | Retoma la oferta de antes de que entrara recepción. «¿A qué hora era mi cita?» → «¿Cuál le reservo?»; «Ver el estado de mi cita» → «¿En qué sede…?». Si el paciente pide cambiarla, arma **una reserva nueva** sin mencionar la que tiene: quedarían dos citas. | 1 |
+| W14 | **Doble confirmación** (E8, regresión). | «Sí, para mí» → «Resumen: jueves 5/11 a las 10:00 en surco. ¿Confirma?» → «Sí, confirmo» → otro resumen con el doctor que vuelve a pedir la confirmación. En R36 a R38 era una sola. | 2 |
+| W23 | **Pedir una persona, o preguntar precio o seguro, se ignora** (E11). | «Prefiero que me atienda una persona» → «¿En qué sede…?». «¿Cuánto cuesta y aceptan seguro Rímac?» → «¿Cuál le reservo?». | 1 |
+| W24 | **«Mañana» en un día sin atención: mensaje contradictorio** (E9). | «Las 10:00 no están libres… El domingo 25 no hay odontología general…; el siguiente día es el lunes 26: 9:00, 9:30, **10:00**…». | 1 |
+| W25 | **«La segunda» sin lista en pantalla cambia la hora** (E10). | Pidió las 11:00; al pedirle el nombre escribió «La segunda» → «Para reservar las 09:30…». | 1 |
 
-**Lo más urgente es W19:** un saludo no puede confirmar una reserva ni generar un cobro.
+**Lo más urgente:**
+- **W21:** hay pacientes a los que se les promete que recepción les escribirá y nadie ve su chat.
+- **W22:** puede crear citas duplicadas.
 
-**La regla 7 del flujo** dice: «si pasaron más de 12 horas desde el último mensaje, **o el paciente solo saluda**, la conversación empieza de cero». El saludo debe reiniciar siempre. Si el paciente ya está registrado, se mantiene quién es.
+**Sigue pendiente probar el día de la cita (jueves 29/10)** con las dos citas QA del recorrido:
+- llegada;
+- sillón;
+- atención;
+- cobro sin duplicar lo pagado por link;
+- recordatorio del miércoles 28.
 
-**Lo que todavía se nota en WhatsApp y viene del servidor:**
+Los pasos están en `PRUEBA-CLIENTE-Y-RECEPCION-2026-10-24.md`, sección 3.
+
+**Lo que todavía se nota en WhatsApp viene del servidor:**
 - la notificación a recepción con identificadores (punto 16);
 - el concepto del cobro con códigos (punto 21).
 
@@ -71,32 +87,49 @@ Todo se verificó en producción (`app.odontosonrisa.biz` y su API) el 23/10/202
 
 ## 3. Falta en el servidor
 
-«Veces» es en cuántas revisiones se reportó, de R1 a R38.
+«Veces» es en cuántas revisiones se reportó, de R1 a R39.
 
 ### Prioridad alta: pacientes, seguridad y operación
 
 | # | Qué falta | Cómo está hoy | Veces |
 |---|---|---|---|
-| 1 | **La sesión con clave temporal solo debe servir para cambiar la clave.** | Con `debeCambiarClave: true`, `GET /pacientes` y `GET /citas` → 200. | 26 |
-| 2 | **`/servicios` no debe mostrar costos ni precios de otra sede** a recepción y al administrador de sede. | Llegan `costeDirecto` y los precios de las dos sedes. | 33 |
-| 3 | **Caídas con 503 bajo carga.** | Sigue en R38: en 4 tandas de 30 lecturas simultáneas respondieron bien 14, 24, 27 y 25. En R37 fueron 19, 27, 16, 23, 30 y 22, y en R36, 30 de 30. El error es `{"message":"Service Unavailable"}`, en menos de un segundo. | 32 |
-| 4 | **Cargar los datos reales de la clínica** (entregados en R22). | RUC 20123456789, teléfono 900000000, sedes sin WhatsApp y los 22 servicios de la demo. | 17 |
+| 1 | **La sesión con clave temporal solo debe servir para cambiar la clave.** | Con `debeCambiarClave: true`, `GET /pacientes` y `GET /citas` → 200. | 27 |
+| 2 | **`/servicios` no debe mostrar costos ni precios de otra sede** a recepción y al administrador de sede. | Llegan `costeDirecto` y los precios de las dos sedes. | 34 |
+| 3 | **Caídas con 503 bajo carga.** | Sigue en R39: en 4 tandas de 30 lecturas simultáneas respondieron bien 15, 27, 29 y 27. En R38 fueron 14, 24, 27 y 25; en R36, 30 de 30. El error es `{"message":"Service Unavailable"}`, en menos de un segundo. | 33 |
+| 4 | **Cargar los datos reales de la clínica** (entregados en R22). | RUC 20123456789, teléfono 900000000, sedes sin WhatsApp y los 22 servicios de la demo. Sin el WhatsApp de cada sede, los chats llegan sin sede (W21). | 18 |
+
+### Recepción: lo que encontró la prueba de punta a punta (R39)
+
+| # | Qué falta | Cómo está hoy | Veces |
+|---|---|---|---|
+| 27 | **«Pendientes de hoy» debe contar los chats derivados** a recepción. | Con chats esperando respuesta de recepción («Recepción 14» en la bandeja), el inicio dice «Por hacer 0 · Todo al día». Captura `07`. | 1 |
+| 28 | **Un solo precio para la consulta.** | La IA cobra S/ 50.00 («Consulta / evaluación»). En «Agendar cita», recepción solo puede elegir «Odontología general», que muestra S/ 80.00 en Surco. Capturas `04a` y `02`. | 1 |
+| 29 | **Reprogramar una cita pagada no debe dejarla «pendiente».** | Al reprogramar una cita confirmada y pagada desde la agenda (29/10 11:00), pasó a «pendiente». | 1 |
+| 30 | **El origen de la cita debe ser real.** | Una cita que agendó recepción desde el chat aparece como «Agendada por IA». Captura `05`. | 1 |
+| 31 | **Las citas que agenda la IA no tienen sillón.** | En la agenda figuran con sillón «—». Así no se controla el choque de sillones. | 1 |
+| 32 | **Cobro por adelantado de una cita agendada por recepción.** | No hay forma de mandar un link de pago: «Nuevo link» solo avisa «Los links se crean desde el chat de WhatsApp al reservar un cupo». Es una decisión de negocio: hoy esas citas se cobran en la clínica. | — |
+
+**Detalles de uso al registrar y agendar desde el chat:**
+- **«Registrar como paciente»:** trae como nombre el del contacto («QA R39 Cliente Uno»), y hay que corregirlo.
+- **«Agendar cita»:**
+  - la fecha por defecto es el domingo 25, un día sin atención;
+  - no trae el día y la hora que se acordaron en el chat.
 
 ### Prioridad media: datos que no se guardan o no cuadran
 
 | # | Qué falta | Cómo está hoy | Veces |
 |---|---|---|---|
-| 5 | **La meta es por sede.** | `"persistencia":"medico"`. | 31 |
-| 6 | **Radiografías y fotos:** guardar `piezas`, `vista` y `momento`. | Vuelven vacíos. | 37 |
-| 7 | **Guardar la sede** en consentimientos, recetas e historias; **devolver `sedeId`** en seguros. | Sin sede. | 31–32 |
-| 8 | **`ficha360`:** citas con `id`. | Sin `id`. | 33 |
-| 9 | **«Nuevos y recurrentes»:** `primeraVisita`. | No viene. | 35 |
-| 10 | **Mi producción:** `produccionMesAnteriorAlDia`. | Solo viene `produccionMesAnterior`. | 31 |
-| 11 | **Servicios inactivos.** | `incluirInactivos=true` devuelve lo mismo. | 32 |
-| 12 | **Citas pasadas** que siguen «confirmada». | 14/09 (Sofía Pérez) y 10/10 (QA Prueba Doctor), y una «pendiente» del 15/10 (QA Agenda Recepción). | 35 |
-| 13 | **Los chats deben cuadrar.** | El resumen gerencial dice 23; `/conversaciones` tiene 152. | 30 |
-| 14 | **Stock:** registrar movimientos, no solo el valor final. | No hay endpoint. | 34 |
-| 15 | **Auditoría:** registrar inventario, órdenes, laboratorio, seguros, metas, clínica y odontograma, y paginar. | No los registra; tope de 2000 eventos y `page=2` devuelve lo mismo. | 34–35 |
+| 5 | **La meta es por sede.** | `"persistencia":"medico"`. | 32 |
+| 6 | **Radiografías y fotos:** guardar `piezas`, `vista` y `momento`. | Vuelven vacíos. | 38 |
+| 7 | **Guardar la sede** en consentimientos, recetas e historias; **devolver `sedeId`** en seguros. | Sin sede. | 32–33 |
+| 8 | **`ficha360`:** citas con `id`. | Sin `id`. | 34 |
+| 9 | **«Nuevos y recurrentes»:** `primeraVisita`. | No viene. | 36 |
+| 10 | **Mi producción:** `produccionMesAnteriorAlDia`. | Solo viene `produccionMesAnterior`. | 32 |
+| 11 | **Servicios inactivos.** | `incluirInactivos=true` devuelve lo mismo. | 33 |
+| 12 | **Citas pasadas** que siguen «confirmada». | 14/09 (Sofía Pérez) y 10/10 (QA Prueba Doctor), y una «pendiente» del 15/10 (QA Agenda Recepción). | 36 |
+| 13 | **Los chats deben cuadrar.** | El resumen gerencial dice 24; `/conversaciones` tiene 165. | 31 |
+| 14 | **Stock:** registrar movimientos, no solo el valor final. | No hay endpoint. | 35 |
+| 15 | **Auditoría:** registrar inventario, órdenes, laboratorio, seguros, metas, clínica y odontograma, y paginar. | No los registra; tope de 2000 eventos y `page=2` devuelve lo mismo. | 35–36 |
 
 ### Prioridad baja: textos y limpieza (el frontend ya los oculta)
 
@@ -104,15 +137,15 @@ El punto 17 (minúsculas a mitad de frase) quedó corregido en R37.
 
 | # | Qué falta | Cómo está hoy | Veces |
 |---|---|---|---|
-| 16 | **Notificación de derivación legible.** | «WhatsApp → recepción: QA R37 Pago (paciente afc5d848-…) · cita 94dcf2e8-… — Quiero cancelar mi cita». Usa el nombre del contacto («QA R37 Pago») y no el del paciente («QA Izipay Cuarenta Nueve»). Debe nombrar al paciente y la fecha de la cita. Sin paciente ya se lee bien: «WhatsApp → recepción: QA R37 No entiende — zxcvb ñlkjh». | 6 |
-| 18 | **Procedimiento anulado:** no pegar el motivo al nombre. | «QA fase anular R38 [Motivo: QA R38 prueba]». El motivo ya viene en `motivo`. | 22 |
+| 16 | **Notificación de derivación legible.** | «WhatsApp → recepción: QA R38 Pago (paciente 949c8ea3-…) · cita 3085f5f8-… — ¿Puedo pasar mi cita al jueves 29 a las 11:00?». Usa el nombre del contacto («QA R38 Pago») y no el del paciente («QA Izipay Cincuenta Uno»). Debe nombrar al paciente y la fecha de la cita. Sin paciente ya se lee bien: «WhatsApp → recepción: QA R37 No entiende — zxcvb ñlkjh». | 7 |
+| 18 | **Procedimiento anulado:** no pegar el motivo al nombre. | «QA fase anular R39 [Motivo: QA R39 prueba]». El motivo ya viene en `motivo`. | 23 |
 | 19 | **Consentimiento anulado:** sin marcas en el título ni en el texto, y con `anuladoEn` y `anuladoPor`. | «[ANULADO] …» y «[Anulado: …]»; `anuladoEn` y `anuladoPor` vacíos (verificado en R34). | 19 |
-| 20 | **Estado del asistente** sin el modelo. | «Activo (gpt-4o)». | 7 |
-| 21 | **Concepto de los cobros de Izipay** sin códigos. | «Izipay · Consulta general · Odontología general · 17928058864360 · e2c783b0-…». Los códigos van en campos aparte. | 7 |
-| 22 | **Estado de las integraciones** (Izipay conectado o no). | `/integraciones` → 404. | 7 |
-| 23 | **Textos con «(s)»** en `/go-live`. | «2 sede(s)», «6 doctor(es)». | 31 |
-| 24 | **Odontograma:** responder 400, no 500, con datos inválidos. | 500 con una dentición inválida. | 33 |
-| 25 | **Imágenes fuera de la base de datos.** | Se guardan en base64. | 35 |
+| 20 | **Estado del asistente** sin el modelo. | «Activo (gpt-4o)». | 8 |
+| 21 | **Concepto de los cobros de Izipay** sin códigos. | «Izipay · Consulta general · Odontología general · 17928058864360 · e2c783b0-…». Los códigos van en campos aparte. | 8 |
+| 22 | **Estado de las integraciones** (Izipay conectado o no). | `/integraciones` → 404. | 8 |
+| 23 | **Textos con «(s)»** en `/go-live`. | «2 sede(s)», «6 doctor(es)». | 32 |
+| 24 | **Odontograma:** responder 400, no 500, con datos inválidos. | 500 con una dentición inválida. | 34 |
+| 25 | **Imágenes fuera de la base de datos.** | Se guardan en base64. | 36 |
 | 26 | **IPN de Izipay:** confirmar en el log si llegan los POST a `/public/izipay/ipn`. | Sin confirmar. No se cuenta como defecto. | — |
 
 ---

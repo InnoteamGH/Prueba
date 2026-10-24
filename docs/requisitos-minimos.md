@@ -589,3 +589,10 @@ Con sesión el frontend ya no muestra datos de ejemplo ni finge acciones: lo que
    - **Solo una confirmación explícita crea el link de pago.** Un saludo, un pedido nuevo o un dato suelto no confirman: hoy «Hola» en el resumen tomó el cupo y creó el paciente.
    - **Un texto se guarda como nombre solo si parece un nombre.** Un pedido («Quiero una cita…»), una elección («La segunda») o un día no son un nombre.
    - **Las pruebas de aceptación incluyen volver a escribir en un chat reciente** (a los pocos segundos y a los 30 minutos), además de los chats nuevos.
+127. El proceso con recepción funciona de punta a punta (revisión 39; detalle en `PRUEBA-CLIENTE-Y-RECEPCION-2026-10-24.md`):
+   - **Todo chat derivado lo ve alguna recepción:** si no se sabe la sede, lo ven todas. La sede se guarda apenas el paciente la dice. «Pendientes de hoy» cuenta los chats que esperan respuesta de recepción.
+   - **Al devolver el chat a la IA**, la conversación empieza de cero y la IA consulta las citas del paciente. Una pregunta por la cita la responde, y un pedido de cambio modifica esa cita o la pasa a recepción. Nunca crea una segunda.
+   - **El paciente puede pedir hablar con una persona** en cualquier momento, y la IA pasa el chat a recepción.
+   - **El mismo servicio tiene el mismo precio** en WhatsApp, en la agenda y en Caja.
+   - **Una cita pagada sigue confirmada al reprogramarla.** La agenda muestra quién la agendó: la IA o una persona de recepción.
+   - **Cada versión nueva repite esta prueba** con dos recorridos: un paciente nuevo atendido por recepción y un paciente que pagó por la IA y pide un cambio. El día de la cita se completan llegada, atención y cobro.
